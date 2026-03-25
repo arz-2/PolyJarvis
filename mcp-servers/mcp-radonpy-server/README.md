@@ -52,17 +52,7 @@ save_lammps_data(mol_file="cell.json", output_path="cell.data")
 mcp-radonpy-server/
 └── src/
     ├── server.py                   # MCP server (18 tools)
-    ├── analysis_scripts/           # Python scripts executed on remote server
-    │   ├── check_equilibration.py
-    │   ├── extract_bulk_modulus.py
-    │   ├── extract_equilibrated_density.py
-    │   ├── extract_tg.py
-    │   └── unwrap_dump.py
-    ├── bashrc                      # Shell config for remote sessions
-    └── timer.dat                   # Internal timing state
 ```
-
-> **Note:** `analysis_scripts/` contains the scripts that the LAMMPS Engine server uploads to and runs on the remote simulation server. They live here as the canonical source but are deployed remotely at `/home/arz2/simulations/analysis_scripts/`.
 
 ## MCP Tools Reference
 
@@ -103,4 +93,3 @@ mcp-radonpy-server/
 |---|---|
 | `save_molecule(mol_file, output_path, format)` | Save mol in json/pickle/pdb/xyz/mol format |
 | `save_lammps_data(mol_file, output_path)` | Write LAMMPS `.data` file (topology + force field) |
-| `analyze_equilibration(...)` | Local equilibration analysis (density, energy) |
