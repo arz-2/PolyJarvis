@@ -1,0 +1,95 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - NVT Simulation Template
+# ============================================================
+# Stage: NVT (constant volume, constant temperature)
+# Use cases:
+#   - Initial heating to melt temperature
+#   - Constant-T annealing step
+#   - Production run at fixed density (after NPT equilibration)
+#   - Temperature ramp up or down
+#
+# Tunable parameters (injected by script_generator.py):
+#   DATA_FILE        - .data or .restart file to read
+#   READ_COMMAND     - "read_data" or "read_restart"
+#   LOG_FILE         - log filename
+#   LOG_APPEND       - "append" or "" (overwrite)
+#   DUMP_FILE        - trajectory filename
+#   LAST_DUMP_FILE   - final snapshot filename
+#   WRITE_DATA_FILE  - output .data filename
+#   RESTART_FILE_1   - restart checkpoint file 1
+#   RESTART_FILE_2   - restart checkpoint file 2
+#   RESTART_FREQ     - steps between restart writes
+#   RESTART_BLOCK    - full restart command or empty
+#   PAIR_STYLE_BLOCK - pair + kspace style lines
+#   BOND_STYLE, ANGLE_STYLE, DIHEDRAL_STYLE, IMPROPER_STYLE
+#   GPU_PACKAGE      - "package gpu 1 neigh no" or empty
+#   T_START          - initial temperature (K)
+#   T_FINAL          - final temperature (K) -- ramp or constant
+#   T_DAMP           - thermostat damping (fs), recommended 100*timestep
+#   TIMESTEP         - integration timestep (fs), typically 1.0
+#   N_STEPS          - number of MD steps
+#   THERMO_FREQ      - thermo output frequency (steps)
+#   DUMP_FREQ        - dump output frequency (steps)
+#   SHAKE_BLOCK      - "fix shake..." or empty
+#   UNSHAKE_BLOCK    - "unfix shake..." or empty
+#   INIT_VELOCITY_BLOCK - "velocity all create..." or empty
+# ============================================================
+
+log {LOG_FILE} {LOG_APPEND}
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+{PAIR_STYLE_BLOCK}
+dielectric 1.000000
+bond_style {BOND_STYLE}
+angle_style {ANGLE_STYLE}
+dihedral_style {DIHEDRAL_STYLE}
+improper_style {IMPROPER_STYLE}
+special_bonds amber
+pair_modify mix arithmetic
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+{GPU_PACKAGE}
+
+{READ_COMMAND} {DATA_FILE}
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+# --- Trajectory ---
+dump dump_nvt all custom {DUMP_FREQ} {DUMP_FILE} id type mol x y z ix iy iz vx vy vz
+
+# --- Restart Checkpointing ---
+{RESTART_BLOCK}
+
+# --- Initial Velocities (optional) ---
+{INIT_VELOCITY_BLOCK}
+
+# --- SHAKE Constraints ---
+# Constrains H-X bonds to allow 2fs timestep
+{SHAKE_BLOCK}
+
+# --- NVT Thermostat (Nose-Hoover) ---
+# T_damp = {T_DAMP} fs  (coupling timescale for heat exchange)
+# Ramp: {T_START} K -> {T_FINAL} K over {N_STEPS} steps
+timestep {TIMESTEP}
+fix nvt_fix all nvt temp {T_START} {T_FINAL} {T_DAMP}
+
+run {N_STEPS}
+
+# --- Cleanup ---
+unfix nvt_fix
+{UNSHAKE_BLOCK}
+undump dump_nvt
+
+# --- Write Output ---
+write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
+write_data {WRITE_DATA_FILE}
+
+print "STAGE COMPLETE: NVT T={T_START}->{T_FINAL}K steps={N_STEPS}"
+quit

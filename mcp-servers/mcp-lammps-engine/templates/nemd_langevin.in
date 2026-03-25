@@ -1,0 +1,152 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - NEMD Langevin (Direct Thermostat) Template
+# ============================================================
+# Method: Direct NEMD with split Langevin thermostats
+#   Ref:  Ikeshoji & Hafskjold, Mol. Phys. 81, 251 (1994)
+#         Wirnsberger et al., J. Chem. Phys. 143, 124104 (2015)
+#
+# Physics:
+#   - Box split into two halves along NEMD_AXIS
+#   - Left half (slab 0 to N/2): cold Langevin thermostat at T_COLD
+#   - Right half (slab N/2 to N): hot Langevin thermostat at T_HOT
+#   - Imposed temperature gradient -> measure resulting heat flux
+#   - Complementary to Müller-Plathe; useful when MP swap rate is hard to tune
+#
+# Key differences from Müller-Plathe (nemd_thermal):
+#   - SHAKE can remain ON (thermostats don't corrupt H-bond constraints)
+#   - Timestep can be 1.0 fs with SHAKE, or 0.2 fs without
+#   - Easier to tune temperature difference; harder to converge at low dT
+#   - Measures kappa = J / |dT/dx| the same way
+#
+# CRITICAL NOTES:
+#   1. T_HOT - T_COLD should be 10-30 K for linear response (not too large)
+#   2. Run NVT pre-equil first, then switch to split Langevin
+#   3. Verify energy added to hot = energy removed from cold at steady state
+#   4. Box must be long along NEMD_AXIS (>= 60 Ang recommended for Langevin)
+#   5. Monitor f_lang_hot and f_lang_cold for heat flux balance
+#
+# Placeholders:
+#   {LOG_FILE}, {LOG_APPEND}
+#   {PAIR_STYLE_BLOCK}
+#   {BOND_STYLE}, {ANGLE_STYLE}, {DIHEDRAL_STYLE}, {IMPROPER_STYLE}
+#   {SPECIAL_BONDS}, {PAIR_MODIFY}
+#   {NEIGHBOR_SKIN}, {NEIGH_MODIFY}, {NEIGH_ONE}
+#   {GPU_PACKAGE}
+#   {READ_COMMAND}, {DATA_FILE}
+#   {THERMO_FREQ}, {DUMP_FREQ}, {DUMP_FILE}
+#   {TIMESTEP}         - 1.0 fs with SHAKE, 0.2 fs without
+#   {N_STEPS}          - use >= 5000000
+#   {T_TARGET}         - mean temperature (K) = (T_HOT + T_COLD) / 2
+#   {T_HOT}            - hot slab temperature (K), e.g. T_TARGET + 15
+#   {T_COLD}           - cold slab temperature (K), e.g. T_TARGET - 15
+#   {T_DAMP_LANGEVIN}  - Langevin damping (fs), typically 100-500 fs
+#   {T_DAMP_NVT}       - global NVT damp for pre-equil (fs)
+#   {NEMD_N_SLABS}     - number of slabs for T profile measurement
+#   {NEMD_INVSLAB}     - 1/N_SLABS (reduced coords)
+#   {NEMD_AXIS}        - heat flux axis: x, y, or z
+#   {NEMD_AREA}        - cross-section perpendicular to axis [Ang^2]
+#   {NEMD_AXIS_LO}     - box low bound along axis [Ang]
+#   {NEMD_AXIS_MID}    - box midpoint along axis [Ang]
+#   {NEMD_AXIS_HI}     - box high bound along axis [Ang]
+#   {SHAKE_BLOCK}, {UNSHAKE_BLOCK}
+#   {INIT_VELOCITY_BLOCK}
+#   {LAST_DUMP_FILE}, {WRITE_DATA_FILE}
+#   {TPROF_FILE}       - temperature profile output file
+#   {SEED_HOT}         - RNG seed for hot Langevin thermostat
+#   {SEED_COLD}        - RNG seed for cold Langevin thermostat
+# ============================================================
+
+log {LOG_FILE} {LOG_APPEND}
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field ---
+{PAIR_STYLE_BLOCK}
+dielectric 1.0
+bond_style {BOND_STYLE}
+angle_style {ANGLE_STYLE}
+dihedral_style {DIHEDRAL_STYLE}
+improper_style {IMPROPER_STYLE}
+special_bonds {SPECIAL_BONDS}
+pair_modify {PAIR_MODIFY}
+neighbor {NEIGHBOR_SKIN} bin
+neigh_modify {NEIGH_MODIFY}
+neigh_modify one {NEIGH_ONE}
+{GPU_PACKAGE}
+
+{READ_COMMAND} {DATA_FILE}
+
+# --- Thermo Output ---
+thermo_style custom step time temp press etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+# --- Trajectory ---
+dump dump_langv all custom {DUMP_FREQ} {DUMP_FILE} id type mol xs ys zs ix iy iz
+
+# --- Initial Velocities ---
+{INIT_VELOCITY_BLOCK}
+
+# --- SHAKE Constraints (optional, OK to use with Langevin) ---
+{SHAKE_BLOCK}
+
+# --- NVE + Split Langevin ---
+# Define hot and cold regions along NEMD_AXIS
+# Cold region: low end (slab 0 to N/2)
+# Hot region: upper half (slab N/2 to N)
+if "{NEMD_AXIS} == x" then &
+  "region cold_region block {NEMD_AXIS_LO} {NEMD_AXIS_MID} INF INF INF INF units box" &
+  "region hot_region  block {NEMD_AXIS_MID} {NEMD_AXIS_HI} INF INF INF INF units box" &
+elif "{NEMD_AXIS} == y" &
+  "region cold_region block INF INF {NEMD_AXIS_LO} {NEMD_AXIS_MID} INF INF units box" &
+  "region hot_region  block INF INF {NEMD_AXIS_MID} {NEMD_AXIS_HI} INF INF units box" &
+elif "{NEMD_AXIS} == z" &
+  "region cold_region block INF INF INF INF {NEMD_AXIS_LO} {NEMD_AXIS_MID} units box" &
+  "region hot_region  block INF INF INF INF {NEMD_AXIS_MID} {NEMD_AXIS_HI} units box"
+
+group cold_atoms dynamic all region cold_region every 100
+group hot_atoms  dynamic all region hot_region  every 100
+
+# --- Pre-equilibrate with global NVT ---
+timestep {TIMESTEP}
+fix nvt_pre all nvt temp {T_TARGET} {T_TARGET} {T_DAMP_NVT}
+run 10000
+unfix nvt_pre
+reset_timestep 0
+
+# --- Production: NVE + split Langevin thermostats ---
+fix NVE_prod all nve
+fix lang_cold cold_atoms langevin {T_COLD} {T_COLD} {T_DAMP_LANGEVIN} {SEED_COLD} tally yes
+fix lang_hot  hot_atoms  langevin {T_HOT}  {T_HOT}  {T_DAMP_LANGEVIN} {SEED_HOT}  tally yes
+
+# --- Temperature profile measurement ---
+compute layers all chunk/atom bin/1d {NEMD_AXIS} lower {NEMD_INVSLAB} units reduced
+fix tprof all ave/chunk 1 {NEMD_SWAP_FREQ} {NEMD_SWAP_FREQ} layers temp density/mass file {TPROF_FILE} norm sample
+
+# --- Heat flux tracking (energy added to hot / removed from cold) ---
+# At steady state: f_lang_hot should equal -f_lang_cold
+# J [kcal/mol/fs] -> [W/m^2]: multiply by (4184/NA) / (area_m^2)
+variable E_hot  equal f_lang_hot
+variable E_cold equal f_lang_cold
+
+thermo_style custom step time temp press etotal ke pe vol lx ly lz density v_E_hot v_E_cold
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+run {N_STEPS}
+
+# --- Cleanup ---
+unfix NVE_prod
+unfix lang_cold
+unfix lang_hot
+unfix tprof
+uncompute layers
+{UNSHAKE_BLOCK}
+undump dump_langv
+
+write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
+write_data {WRITE_DATA_FILE}
+
+print "STAGE COMPLETE: NEMD Langevin T_hot={T_HOT}K T_cold={T_COLD}K axis={NEMD_AXIS} steps={N_STEPS}"
+quit

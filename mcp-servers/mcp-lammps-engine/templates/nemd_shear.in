@@ -1,0 +1,171 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - NEMD Shear Viscosity Template
+# ============================================================
+# Method: SLLOD equations of motion + fix deform (Planar Couette Flow)
+#   Ref:  Evans & Morriss, Phys Rev A 30, 1528 (1984)
+#         Daivis & Todd, J Chem Phys 124, 194103 (2006)
+#         Todd & Daivis, Nonequilibrium Molecular Dynamics (Cambridge, 2017)
+#
+# Physics:
+#   - Box is sheared continuously via fix deform: tilt xy at rate SHEAR_RATE
+#   - fix nvt/sllod integrates SLLOD equations; subtracts streaming velocity
+#     from each atom's velocity before thermostatting (avoids viscous heating
+#     from being counted as thermal energy)
+#   - compute temp/deform computes temperature in the co-moving frame
+#   - Shear viscosity:  eta = -<Pxy> / shear_rate   [Pa.s]
+#   - First normal stress:   N1 = <Pxx - Pyy>
+#   - Second normal stress:  N2 = <Pyy - Pzz>
+#
+# Flow geometry (default):
+#   Shear plane:  xy  (shear direction = x, gradient direction = y)
+#   Shear rate:   fix deform xy erate <SHEAR_RATE>
+#   Velocity profile: vx varies linearly from -v/2 (y=0) to +v/2 (y=Ly)
+#
+# CRITICAL NOTES FOR POLYMERS:
+#   1. SHAKE must be OFF — fix nvt/sllod is incompatible with SHAKE when
+#      box tilt is changing. Use dt = 0.5-1.0 fs.
+#   2. fix deform must use "remap v" (NOT "remap x") — SLLOD adjusts
+#      positions internally; only velocity remapping at PBC crossings.
+#      LAMMPS will error if remap is inconsistent.
+#   3. Shear rates for polymers: 1e8 to 1e11 s^-1 (1e-4 to 1e-1 ps^-1).
+#      At 1 fs timestep, SHEAR_RATE in LAMMPS real units (1/fs):
+#        1e8 s^-1  = 1e-7 /fs   (very slow, Newtonian regime likely)
+#        1e10 s^-1 = 1e-5 /fs   (typical for polymer NEMD)
+#        1e11 s^-1 = 1e-4 /fs   (fast, non-Newtonian)
+#   4. Run multiple shear rates to get eta(gamma_dot) -- polymers shear-thin.
+#   5. Pre-equilibrate at zero shear (NVT) before applying deformation.
+#   6. Production: ~5-10 ns needed for stress to reach steady state.
+#   7. Average Pxy over last 50% of production only.
+#   8. Use "fix momentum" to prevent center-of-mass drift under shear.
+#   9. SLLOD works best with tchain=1 (single chain Nose-Hoover).
+#      Larger tchain can cause poor equilibration (LAMMPS docs warning).
+#
+# Shear rate in LAMMPS "real" units:
+#   [SHEAR_RATE] = 1/fs = 1e15 s^-1 * SHEAR_RATE
+#   Example: SHEAR_RATE = 1e-5 /fs = 1e10 s^-1 in SI
+#
+# Viscosity unit conversion:
+#   <Pxy> in atm (from thermo), shear_rate in 1/fs
+#   eta [Pa.s] = -<Pxy> [atm] * 101325 [Pa/atm] / (SHEAR_RATE [1/fs] * 1e15 [fs/s])
+#   Simplified: eta [mPa.s] = -<Pxy> [atm] * 1.01325e-4 / SHEAR_RATE [1/fs]
+#
+# Placeholders (injected by script_generator.py):
+#   {LOG_FILE}, {LOG_APPEND}
+#   {PAIR_STYLE_BLOCK}
+#   {BOND_STYLE}, {ANGLE_STYLE}, {DIHEDRAL_STYLE}, {IMPROPER_STYLE}
+#   {SPECIAL_BONDS}, {PAIR_MODIFY}
+#   {NEIGHBOR_SKIN}, {NEIGH_MODIFY}, {NEIGH_ONE}
+#   {GPU_PACKAGE}
+#   {READ_COMMAND}, {DATA_FILE}
+#   {THERMO_FREQ}, {DUMP_FREQ}, {DUMP_FILE}
+#   {RESTART_BLOCK}
+#   {TIMESTEP}        - 0.5 or 1.0 fs (SHAKE must be off)
+#   {N_PRE_STEPS}     - NVT pre-equilibration steps (default 500000 = 0.5 ns at 1 fs)
+#   {N_STEPS}         - SLLOD production steps (default 5000000 = 5 ns at 1 fs)
+#   {T_START}         - temperature (K) for pre-equil NVT
+#   {T_FINAL}         - temperature (K) for SLLOD production
+#   {T_DAMP}          - thermostat damping (fs), default 100 fs
+#   {SHEAR_RATE}      - engineering shear strain rate (1/fs, see notes above)
+#   {SHEAR_PLANE}     - tilt component to ramp: xy, xz, or yz (default xy)
+#   {VPROF_FILE}      - velocity profile output file (vx vs y bins)
+#   {VPROF_N_BINS}    - number of y-bins for velocity profile (default 20)
+#   {VPROF_INVSLAB}   - 1/VPROF_N_BINS for chunk/atom bin width
+#   {VPROF_AXIS}      - gradient direction for ave/chunk: y (for xy shear)
+#   {LAST_DUMP_FILE}, {WRITE_DATA_FILE}
+# ============================================================
+
+log {LOG_FILE} {LOG_APPEND}
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field ---
+{PAIR_STYLE_BLOCK}
+dielectric 1.0
+bond_style {BOND_STYLE}
+angle_style {ANGLE_STYLE}
+dihedral_style {DIHEDRAL_STYLE}
+improper_style {IMPROPER_STYLE}
+special_bonds {SPECIAL_BONDS}
+pair_modify {PAIR_MODIFY}
+neighbor {NEIGHBOR_SKIN} bin
+neigh_modify {NEIGH_MODIFY}
+neigh_modify one {NEIGH_ONE}
+{GPU_PACKAGE}
+
+{READ_COMMAND} {DATA_FILE}
+
+# --- Thermo output ---
+thermo_style custom step time temp press etotal ke pe vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+# --- Trajectory ---
+dump dump_shear all custom {DUMP_FREQ} {DUMP_FILE} id type mol x y z ix iy iz vx vy vz
+
+# --- Restart checkpointing ---
+{RESTART_BLOCK}
+
+# ============================================================
+# STAGE 1: NVT pre-equilibration (zero shear, constant T)
+# Bring system to thermal equilibrium before applying shear.
+# SHAKE is intentionally off throughout (incompatible with SLLOD).
+# ============================================================
+timestep {TIMESTEP}
+
+# Remove any center-of-mass drift
+fix mom_fix all momentum 1000 linear 1 1 1 angular
+
+fix nvt_pre all nvt temp {T_START} {T_START} {T_DAMP}
+
+run {N_PRE_STEPS}
+
+unfix nvt_pre
+reset_timestep 0
+print "PRE-EQUIL COMPLETE: NVT {T_START}K {N_PRE_STEPS} steps done"
+
+# ============================================================
+# STAGE 2: SLLOD + fix deform production (steady shear)
+# fix deform: ramp xy tilt at constant engineering shear strain rate
+# fix nvt/sllod: Nose-Hoover thermostat in co-moving SLLOD frame
+#   - tchain=1 is strongly recommended for SLLOD (LAMMPS docs)
+#   - compute temp/deform is auto-created by fix nvt/sllod
+# ============================================================
+
+# Apply continuous shear deformation — MUST use remap v for SLLOD
+fix deform_fix all deform 1 {SHEAR_PLANE} erate {SHEAR_RATE} remap v flip yes
+
+# SLLOD thermostat (subtracts streaming velocity before computing T)
+# tchain=1 per LAMMPS recommendation for SLLOD
+fix sllod_fix all nvt/sllod temp {T_FINAL} {T_FINAL} {T_DAMP} tchain 1
+
+# --- Velocity profile: vx binned along gradient direction (y for xy shear) ---
+# This verifies the velocity profile is linear (confirms laminar shear)
+compute vbins all chunk/atom bin/1d {VPROF_AXIS} lower {VPROF_INVSLAB} units reduced
+fix vprof all ave/chunk 10 1000 10000 vbins vx vy vz temp density/mass file {VPROF_FILE} norm sample
+
+# Thermo tracks stress tensor — Pxy is the key viscosity observable
+# viscosity = -<Pxy> / shear_rate
+thermo_style custom step time temp press etotal ke pe vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+run {N_STEPS}
+
+# ============================================================
+# Cleanup
+# ============================================================
+unfix sllod_fix
+unfix deform_fix
+unfix vprof
+unfix mom_fix
+uncompute vbins
+undump dump_shear
+
+write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
+write_data {WRITE_DATA_FILE}
+
+print "STAGE COMPLETE: NEMD-SLLOD shear T={T_FINAL}K rate={SHEAR_RATE}/fs steps={N_STEPS}"
+print "Viscosity post-processing: eta [mPa.s] = -mean(Pxy) [atm] * 1.01325e-4 / {SHEAR_RATE}"
+print "N1 = mean(Pxx - Pyy), N2 = mean(Pyy - Pzz)"
+quit

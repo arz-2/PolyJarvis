@@ -1,0 +1,83 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - NPT Compression Template
+# ============================================================
+# Stage: High-pressure NPT compression (density packing step)
+# Purpose: Compress low-density amorphous cell to target density
+#          before switching to full PPPM electrostatics.
+#
+# Design choice: Uses lj/charmm/coul/charmm (short-range Coulomb, no PPPM)
+# to avoid PPPM instability at low density while preserving short-range
+# electrostatics for polar/charged systems (PEG, PMMA, etc.).
+# Switch to lj/charmm/coul/long + pppm AFTER reaching ~0.8 g/cm3.
+#
+# Tunable parameters:
+#   DATA_FILE        - input .data file
+#   READ_COMMAND     - "read_data" or "read_restart"
+#   LOG_FILE, LOG_APPEND
+#   DUMP_FILE, LAST_DUMP_FILE, WRITE_DATA_FILE
+#   RESTART_BLOCK, RESTART_FILE_1/2, RESTART_FREQ
+#   PAIR_STYLE_BLOCK - pair style lines (injected by generator based on use_pppm)
+#                      Default (use_pppm=False): lj/charmm/coul/charmm 8.0 12.0
+#                      Override (use_pppm=True):  lj/charmm/coul/long 8.0 12.0 + pppm
+#   BOND_STYLE, ANGLE_STYLE, DIHEDRAL_STYLE, IMPROPER_STYLE
+#   GPU_PACKAGE
+#   T_START, T_FINAL - temperature ramp during compression
+#   T_DAMP
+#   P_START, P_FINAL - pressure ramp (e.g. 1 -> 50000 atm)
+#   P_DAMP
+#   TIMESTEP, N_STEPS
+#   THERMO_FREQ, DUMP_FREQ
+#   SHAKE_BLOCK, UNSHAKE_BLOCK
+#   INIT_VELOCITY_BLOCK
+# ============================================================
+
+log {LOG_FILE} {LOG_APPEND}
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field (injected via PAIR_STYLE_BLOCK) ---
+{PAIR_STYLE_BLOCK}
+dielectric 1.000000
+bond_style {BOND_STYLE}
+angle_style {ANGLE_STYLE}
+dihedral_style {DIHEDRAL_STYLE}
+improper_style {IMPROPER_STYLE}
+special_bonds amber
+pair_modify mix arithmetic
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+{GPU_PACKAGE}
+
+{READ_COMMAND} {DATA_FILE}
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+# --- Trajectory ---
+dump dump_comp all custom {DUMP_FREQ} {DUMP_FILE} id type mol x y z ix iy iz vx vy vz
+
+{RESTART_BLOCK}
+{INIT_VELOCITY_BLOCK}
+{SHAKE_BLOCK}
+
+# --- NPT Compression ---
+# High pressure compresses the cell from low to target density
+# P ramp: {P_START} -> {P_FINAL} atm
+timestep {TIMESTEP}
+fix npt_comp all npt temp {T_START} {T_FINAL} {T_DAMP} iso {P_START} {P_FINAL} {P_DAMP}
+
+run {N_STEPS}
+
+unfix npt_comp
+{UNSHAKE_BLOCK}
+undump dump_comp
+
+write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
+write_data {WRITE_DATA_FILE}
+
+print "STAGE COMPLETE: NPT compression P={P_START}->{P_FINAL}atm density target reached"
+quit

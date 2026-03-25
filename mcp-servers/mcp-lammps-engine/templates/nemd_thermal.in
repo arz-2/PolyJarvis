@@ -1,0 +1,129 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - NEMD Müller-Plathe Template
+# ============================================================
+# Method: Reverse NEMD (RNEMD) - Müller-Plathe kinetic energy exchange
+#   Ref:  Müller-Plathe, J. Chem. Phys. 106, 6082 (1997)
+#         Zhang et al., J. Phys. Chem. B 109, 15060 (2005)
+#
+# Physics:
+#   - Box divided into NEMD_N_SLABS slabs along NEMD_AXIS
+#   - Every NEMD_SWAP_FREQ steps: swap KE of hottest atom in slab 0
+#     with coldest atom in slab N/2 (velocity exchange = no net momentum)
+#   - Imposed heat flux J = (cumulative KE transferred) / (2 * A * t)
+#     Factor 2: flux travels in both directions (periodic boundary)
+#   - Measure T gradient from ave/chunk -> lambda = J / |dT/dx|
+#
+# CRITICAL NOTES FOR POLYMERS:
+#   1. SHAKE must be OFF for NEMD — LAMMPS docs explicitly warn that
+#      SHAKE constraints corrupt the momentum exchange (use_shake=False)
+#   2. Timestep should be 0.2 fs (not 1.0 fs) — constraints removed
+#   3. Run at NVT (fixed volume) — box must NOT change during flux measurement
+#   4. Need >= 5M steps for reliable T gradient statistics (~1 ns at 0.2 fs)
+#   5. Verify T gradient linearity — non-linear = swap frequency too high
+#   6. Box must be long along NEMD_AXIS (>= 40 Ang recommended)
+#
+# Unit conversion for kappa:
+#   heat flux J [W/m^2] = f_mp [kcal/mol] * (4184/6.022e23) / (2 * A [Ang^2] * 1e-20)
+#   kappa [W/m/K] = J / |dT/dx [K/m]|
+#
+# Placeholders:
+#   {LOG_FILE}, {LOG_APPEND}
+#   {PAIR_STYLE_BLOCK}
+#   {BOND_STYLE}, {ANGLE_STYLE}, {DIHEDRAL_STYLE}, {IMPROPER_STYLE}
+#   {SPECIAL_BONDS}, {PAIR_MODIFY}
+#   {NEIGHBOR_SKIN}, {NEIGH_MODIFY}, {NEIGH_ONE}
+#   {GPU_PACKAGE}
+#   {READ_COMMAND}, {DATA_FILE}
+#   {THERMO_FREQ}, {DUMP_FREQ}, {DUMP_FILE}
+#   {TIMESTEP}       - use 0.2 fs (SHAKE off, no H constraints)
+#   {N_STEPS}        - use >= 5000000 (1 ns at 0.2 fs)
+#   {T_TARGET}       - target temperature (K)
+#   {T_DAMP}         - thermostat damping (fs)
+#   {NEMD_N_SLABS}   - number of slabs (even number, e.g. 20)
+#   {NEMD_SWAP_FREQ} - steps between KE swaps (e.g. 1000)
+#   {NEMD_AXIS}      - heat flux axis: x, y, or z
+#   {NEMD_INVSLAB}   - 1/N_SLABS (reduced coord bin width, e.g. 0.05 for 20 slabs)
+#   {NEMD_AREA}      - cross-sectional area [Ang^2] perpendicular to NEMD_AXIS
+#   {LAST_DUMP_FILE}, {WRITE_DATA_FILE}
+#   {TPROF_FILE}     - temperature profile output file
+# ============================================================
+
+log {LOG_FILE} {LOG_APPEND}
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field ---
+{PAIR_STYLE_BLOCK}
+dielectric 1.0
+bond_style {BOND_STYLE}
+angle_style {ANGLE_STYLE}
+dihedral_style {DIHEDRAL_STYLE}
+improper_style {IMPROPER_STYLE}
+special_bonds {SPECIAL_BONDS}
+pair_modify {PAIR_MODIFY}
+neighbor {NEIGHBOR_SKIN} bin
+neigh_modify {NEIGH_MODIFY}
+neigh_modify one {NEIGH_ONE}
+{GPU_PACKAGE}
+
+{READ_COMMAND} {DATA_FILE}
+
+# --- Unit conversion constants (for heat flux calculation) ---
+variable        kcal2j  equal  4184.0               # kcal -> J
+variable        NA      equal  6.02214076e23         # Avogadro
+variable        ang2m   equal  1.0e-10               # Angstrom -> m
+variable        fs2s    equal  1.0e-15               # fs -> s
+
+# --- Geometry variables ---
+variable        Nslabs  equal  {NEMD_N_SLABS}
+variable        invslab equal  {NEMD_INVSLAB}        # = 1/Nslabs (reduced coords)
+variable        Jarea   equal  {NEMD_AREA}           # cross-section [Ang^2]
+
+# --- Thermo output during pre-equil ---
+thermo_style custom step time temp press etotal ke pe vol lx ly lz density
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+# --- Trajectory ---
+dump dump_nemd all custom {DUMP_FREQ} {DUMP_FILE} id type mol xs ys zs ix iy iz
+
+# --- NVE integrator (standard for Müller-Plathe RNEMD) ---
+# NVT is applied via velocity exchange, not thermostat
+# Use a brief NVT pre-equilibration then switch to NVE for production
+timestep {TIMESTEP}
+fix NVT_pre all nvt temp {T_TARGET} {T_TARGET} {T_DAMP}
+run 10000
+unfix NVT_pre
+reset_timestep 0
+
+# --- Müller-Plathe RNEMD Production ---
+fix NVE all nve
+fix mp all thermal/conductivity {NEMD_SWAP_FREQ} {NEMD_AXIS} {NEMD_N_SLABS}
+
+# --- Temperature profile (reduced bin coords: lower to upper in steps of invslab) ---
+compute layers all chunk/atom bin/1d {NEMD_AXIS} lower {NEMD_INVSLAB} units reduced
+fix tprof all ave/chunk 1 {NEMD_SWAP_FREQ} {NEMD_SWAP_FREQ} layers temp density/mass file {TPROF_FILE} norm sample
+
+# --- Thermo: track f_mp (cumulative KE transferred [kcal/mol]) ---
+# Post-processing kappa formula (perform after run):
+#   J [W/m^2] = (f_mp_final * 4184 / 6.022e23) / (2 * {NEMD_AREA}e-20 * N_STEPS * {TIMESTEP}e-15)
+#   kappa [W/m/K] = J / |dT/d{NEMD_AXIS} [K/m]|  (slope from {TPROF_FILE})
+thermo_style custom step time temp press etotal ke pe vol lx ly lz density f_mp
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+run {N_STEPS}
+
+# --- Cleanup ---
+unfix NVE
+unfix mp
+unfix tprof
+uncompute layers
+undump dump_nemd
+
+write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
+write_data {WRITE_DATA_FILE}
+
+print "STAGE COMPLETE: NEMD Muller-Plathe T={T_TARGET}K axis={NEMD_AXIS} slabs={NEMD_N_SLABS} steps={N_STEPS}"
+quit

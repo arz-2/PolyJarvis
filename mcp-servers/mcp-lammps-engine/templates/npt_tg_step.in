@@ -1,0 +1,80 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - Tg Sweep Single Step Template
+# ============================================================
+# Stage: One NPT temperature step in a glass transition sweep
+# Purpose: Run short NPT at a single T, extract equilibrium density
+#          Caller chains many of these for the full T sweep.
+#
+# Design: No restart files (each step is short and independent).
+#         GPU-safe when restart is disabled.
+#         Reads from previous step's WRITE_DATA_FILE.
+#
+# Tunable parameters:
+#   DATA_FILE        - equilibrated cell from previous step
+#   READ_COMMAND     - "read_data" or "read_restart"
+#   LOG_FILE, LOG_APPEND
+#   DUMP_FILE, LAST_DUMP_FILE, WRITE_DATA_FILE
+#   PAIR_STYLE_BLOCK
+#   BOND_STYLE, ANGLE_STYLE, DIHEDRAL_STYLE, IMPROPER_STYLE
+#   GPU_PACKAGE
+#   T_TARGET         - target temperature for this step (K)
+#   T_DAMP           - thermostat damping (fs)
+#   P_TARGET         - target pressure (atm), typically 1
+#   P_DAMP           - barostat damping (fs)
+#   TIMESTEP, N_STEPS
+#   THERMO_FREQ, DUMP_FREQ
+#   SHAKE_BLOCK, UNSHAKE_BLOCK
+#   INIT_VELOCITY_BLOCK - rescale velocities to T_TARGET
+# ============================================================
+
+log {LOG_FILE} {LOG_APPEND}
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+{PAIR_STYLE_BLOCK}
+dielectric 1.000000
+bond_style {BOND_STYLE}
+angle_style {ANGLE_STYLE}
+dihedral_style {DIHEDRAL_STYLE}
+improper_style {IMPROPER_STYLE}
+special_bonds amber
+pair_modify mix arithmetic
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+{GPU_PACKAGE}
+
+{READ_COMMAND} {DATA_FILE}
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+# --- Trajectory ---
+# {DUMP_BLOCK} is empty when DUMP_FREQ=0 or DUMP_FILE="" (thermo-only run)
+{DUMP_BLOCK}
+
+# --- Velocity rescaling to target T before run ---
+{INIT_VELOCITY_BLOCK}
+
+{SHAKE_BLOCK}
+
+# --- NPT at T_TARGET ---
+# Fixed T and P: collect density for Tg analysis
+timestep {TIMESTEP}
+fix npt_tg all npt temp {T_TARGET} {T_TARGET} {T_DAMP} iso {P_TARGET} {P_TARGET} {P_DAMP}
+
+run {N_STEPS}
+
+unfix npt_tg
+{UNSHAKE_BLOCK}
+{UNDUMP_BLOCK}
+
+{LAST_DUMP_BLOCK}
+write_data {WRITE_DATA_FILE}
+
+print "STAGE COMPLETE: Tg step T={T_TARGET}K P={P_TARGET}atm steps={N_STEPS}"
+quit

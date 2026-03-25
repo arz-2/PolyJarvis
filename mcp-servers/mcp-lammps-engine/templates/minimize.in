@@ -1,0 +1,69 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - Minimization Template
+# ============================================================
+# Stage: Energy minimization (step 0 of equilibration)
+# Purpose: Relax bad contacts in newly generated amorphous cells
+#
+# Tunable parameters (injected by script_generator.py):
+#   DATA_FILE       - path to .data file
+#   LOG_FILE        - log output filename
+#   DUMP_FILE       - trajectory dump filename
+#   WRITE_DATA_FILE - output .data file after minimization
+#   LAST_DUMP_FILE  - final snapshot dump filename
+#   PAIR_STYLE_BLOCK- pair + kspace style lines (soft-core for dense systems)
+#   BOND_STYLE      - e.g. harmonic
+#   ANGLE_STYLE     - e.g. harmonic
+#   DIHEDRAL_STYLE  - e.g. fourier
+#   IMPROPER_STYLE  - e.g. cvff
+#   GPU_PACKAGE     - "package gpu 1 neigh no" or empty string
+#   MIN_STYLE       - cg (conjugate gradient) or hftn
+#   ETOL            - energy convergence tolerance (e.g. 1e-6)
+#   FTOL            - force convergence tolerance (e.g. 1e-6)
+#   MAXITER         - max iterations (e.g. 50000)
+#   MAXEVAL         - max force evaluations (e.g. 100000)
+#   THERMO_FREQ     - thermo output frequency
+#   DUMP_FREQ       - dump output frequency
+# ============================================================
+
+log {LOG_FILE}
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+{PAIR_STYLE_BLOCK}
+dielectric 1.000000
+bond_style {BOND_STYLE}
+angle_style {ANGLE_STYLE}
+dihedral_style {DIHEDRAL_STYLE}
+improper_style {IMPROPER_STYLE}
+special_bonds amber
+pair_modify mix arithmetic
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+{GPU_PACKAGE}
+
+read_data {DATA_FILE}
+
+# --- Thermo Output ---
+thermo_style custom step time temp press etotal pe ebond eangle edihed eimp evdwl ecoul elong vol lx ly lz density
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+# --- Trajectory ---
+dump dump_min all custom {DUMP_FREQ} {DUMP_FILE} id type mol x y z ix iy iz
+
+# --- Minimization ---
+min_style {MIN_STYLE}
+minimize {ETOL} {FTOL} {MAXITER} {MAXEVAL}
+
+undump dump_min
+reset_timestep 0
+
+# --- Write Output ---
+write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
+write_data {WRITE_DATA_FILE}
+
+print "STAGE COMPLETE: minimization"
+quit

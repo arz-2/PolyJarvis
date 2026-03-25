@@ -1,0 +1,113 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - NEMD Müller-Plathe with Supercell Template
+# ============================================================
+# Method: RNEMD Müller-Plathe on a replicated supercell
+#   Ref:  Müller-Plathe, J. Chem. Phys. 106, 6082 (1997)
+#         Zhang et al., J. Phys. Chem. B 109, 15060 (2005)
+#
+# Purpose:
+#   Polymer simulation boxes are often nearly cubic. For NEMD, the box
+#   must be long along the heat flux axis (>= 40 Ang). This template
+#   handles systems that need replication along NEMD_AXIS before running
+#   (e.g., replicate 3x along z while keeping x,y at 1x).
+#
+#   IMPORTANT: Replication must be done OUTSIDE LAMMPS via RadonPy's
+#   poly.super_cell() BEFORE generating this script. The data file passed
+#   in should already be the replicated cell. This template documents
+#   that expectation and uses geometry that matches the replicated box.
+#
+# When to use vs. nemd_thermal:
+#   - nemd_thermal: Box is already long enough (>= 40 Ang) along NEMD_AXIS
+#   - nemd_supercell: Equilibrated box is too short; needs replication first
+#
+# Physics identical to nemd_thermal (Müller-Plathe RNEMD):
+#   - SHAKE must be OFF
+#   - Timestep 0.2 fs
+#   - NVE + fix thermal/conductivity
+#   - Same unit conversion and kappa formula
+#
+# Additional placeholders vs. nemd_thermal:
+#   {SUPERCELL_NOTE}   - informational comment about replication factor used
+#   {NEMD_REP}         - replication factor along NEMD_AXIS (for documentation)
+#   {NEMD_REP_OTHER}   - replication factor along other axes (for documentation)
+#
+# All other placeholders same as nemd_thermal.
+# ============================================================
+
+log {LOG_FILE} {LOG_APPEND}
+units real
+atom_style full
+boundary p p p
+
+# --- Supercell note ---
+# {SUPERCELL_NOTE}
+# Box replicated {NEMD_REP}x along {NEMD_AXIS}, {NEMD_REP_OTHER}x along other axes
+# Replication performed by RadonPy poly.super_cell() before this script
+
+# --- Force Field ---
+{PAIR_STYLE_BLOCK}
+dielectric 1.0
+bond_style {BOND_STYLE}
+angle_style {ANGLE_STYLE}
+dihedral_style {DIHEDRAL_STYLE}
+improper_style {IMPROPER_STYLE}
+special_bonds {SPECIAL_BONDS}
+pair_modify {PAIR_MODIFY}
+neighbor {NEIGHBOR_SKIN} bin
+neigh_modify {NEIGH_MODIFY}
+neigh_modify one {NEIGH_ONE}
+{GPU_PACKAGE}
+
+{READ_COMMAND} {DATA_FILE}
+
+# --- Unit conversion ---
+variable        kcal2j  equal  4184.0
+variable        NA      equal  6.02214076e23
+variable        ang2m   equal  1.0e-10
+variable        fs2s    equal  1.0e-15
+
+# --- Geometry ---
+variable        Nslabs  equal  {NEMD_N_SLABS}
+variable        invslab equal  {NEMD_INVSLAB}
+variable        Jarea   equal  {NEMD_AREA}
+
+# --- Thermo Output ---
+thermo_style custom step time temp press etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+# --- Trajectory ---
+dump dump_sc all custom {DUMP_FREQ} {DUMP_FILE} id type mol xs ys zs ix iy iz
+
+# --- NVT pre-equilibration of supercell ---
+timestep {TIMESTEP}
+fix NVT_pre all nvt temp {T_TARGET} {T_TARGET} {T_DAMP}
+run 10000
+unfix NVT_pre
+reset_timestep 0
+
+# --- Müller-Plathe RNEMD Production on supercell ---
+fix NVE all nve
+fix mp all thermal/conductivity {NEMD_SWAP_FREQ} {NEMD_AXIS} {NEMD_N_SLABS}
+
+compute layers all chunk/atom bin/1d {NEMD_AXIS} lower {NEMD_INVSLAB} units reduced
+fix tprof all ave/chunk 1 {NEMD_SWAP_FREQ} {NEMD_SWAP_FREQ} layers temp density/mass file {TPROF_FILE} norm sample
+
+thermo_style custom step time temp press etotal ke pe vol lx ly lz density f_mp
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+run {N_STEPS}
+
+# --- Cleanup ---
+unfix NVE
+unfix mp
+unfix tprof
+uncompute layers
+undump dump_sc
+
+write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
+write_data {WRITE_DATA_FILE}
+
+print "STAGE COMPLETE: NEMD supercell Muller-Plathe T={T_TARGET}K rep={NEMD_REP}x axis={NEMD_AXIS} steps={N_STEPS}"
+quit

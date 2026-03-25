@@ -1,0 +1,25 @@
+# ── Secrets ───────────────────────────────────────────────────────────────────
+.env
+*.env
+*.pem
+*.key
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyc
+.python-version
+
+# ── Runtime state (not source) ────────────────────────────────────────────────
+mcp-lammps-engine/run_state.json
+mcp-radonpy-server/src/timer.dat
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── Simulation outputs (large, not source) ────────────────────────────────────
+*.dump
+*.data
+*.restart
+*.xtc
+*.dcd

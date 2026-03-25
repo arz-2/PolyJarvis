@@ -1,0 +1,101 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - NPT Simulation Template
+# ============================================================
+# Stage: NPT (constant pressure, constant temperature)
+# Use cases:
+#   - Density equilibration after heating
+#   - Compression/decompression sweeps
+#   - Production run for density, Cp, modulus
+#   - Single temperature point in Tg sweep
+#
+# NOTE: For CPU runs with restarts (safe default for equilibration).
+#       GPU+NPT+restart causes volume-change memory reallocation crashes.
+#       Use GPU flag only when restart is disabled (short production runs).
+#
+# Tunable parameters (injected by script_generator.py):
+#   DATA_FILE        - .data or .restart file to read
+#   READ_COMMAND     - "read_data" or "read_restart"
+#   LOG_FILE         - log filename
+#   LOG_APPEND       - "append" or ""
+#   DUMP_FILE        - trajectory filename
+#   LAST_DUMP_FILE   - final snapshot filename
+#   WRITE_DATA_FILE  - output .data filename
+#   RESTART_FILE_1/2 - restart checkpoint filenames
+#   RESTART_FREQ     - steps between restart writes
+#   RESTART_BLOCK    - full restart command or empty
+#   PAIR_STYLE_BLOCK - pair + kspace style lines
+#   BOND_STYLE, ANGLE_STYLE, DIHEDRAL_STYLE, IMPROPER_STYLE
+#   GPU_PACKAGE      - "package gpu 1 neigh no" or empty
+#   T_START          - initial temperature (K)
+#   T_FINAL          - final temperature (K)
+#   T_DAMP           - thermostat damping (fs), recommended 100*timestep
+#   P_START          - initial pressure (atm)
+#   P_FINAL          - final pressure (atm)
+#   P_DAMP           - barostat damping (fs), recommended 1000*timestep
+#   TIMESTEP         - integration timestep (fs)
+#   N_STEPS          - number of MD steps
+#   THERMO_FREQ      - thermo output frequency
+#   DUMP_FREQ        - dump output frequency
+#   SHAKE_BLOCK      - "fix shake..." or empty
+#   UNSHAKE_BLOCK    - "unfix shake..." or empty
+#   INIT_VELOCITY_BLOCK - "velocity all create..." or empty
+# ============================================================
+
+log {LOG_FILE} {LOG_APPEND}
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+{PAIR_STYLE_BLOCK}
+dielectric 1.000000
+bond_style {BOND_STYLE}
+angle_style {ANGLE_STYLE}
+dihedral_style {DIHEDRAL_STYLE}
+improper_style {IMPROPER_STYLE}
+special_bonds amber
+pair_modify mix arithmetic
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+{GPU_PACKAGE}
+
+{READ_COMMAND} {DATA_FILE}
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+# --- Trajectory ---
+dump dump_npt all custom {DUMP_FREQ} {DUMP_FILE} id type mol x y z ix iy iz vx vy vz
+
+# --- Restart Checkpointing ---
+{RESTART_BLOCK}
+
+# --- Initial Velocities (optional) ---
+{INIT_VELOCITY_BLOCK}
+
+# --- SHAKE Constraints ---
+{SHAKE_BLOCK}
+
+# --- NPT Thermostat + Barostat (Nose-Hoover) ---
+# T_damp = {T_DAMP} fs  (heat bath coupling)
+# P_damp = {P_DAMP} fs  (pressure bath coupling, ~10x T_damp typical)
+# Ramp: T={T_START}->{T_FINAL}K  P={P_START}->{P_FINAL}atm
+timestep {TIMESTEP}
+fix npt_fix all npt temp {T_START} {T_FINAL} {T_DAMP} iso {P_START} {P_FINAL} {P_DAMP}
+
+run {N_STEPS}
+
+# --- Cleanup ---
+unfix npt_fix
+{UNSHAKE_BLOCK}
+undump dump_npt
+
+# --- Write Output ---
+write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
+write_data {WRITE_DATA_FILE}
+
+print "STAGE COMPLETE: NPT T={T_START}->{T_FINAL}K P={P_START}->{P_FINAL}atm steps={N_STEPS}"
+quit
