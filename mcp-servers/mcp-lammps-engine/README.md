@@ -62,19 +62,17 @@ MDA_SCRIPTS_DIR=/home/YOUR_USERNAME/simulations/analysis_scripts
 
 All templates expose a `{GPU_PACKAGE}` placeholder. Pass `use_gpu=True` in `generate_script()` to inject `package gpu N neigh no`; omit it (default) for CPU-only runs.
 
-| Template | Use Case | GPU Safe? | Restarts? |
-|---|---|---|---|
-| `minimize` | Relax bad contacts in fresh amorphous cell | ✅ Yes | No |
-| `nvt` | Heating ramps, constant-T annealing, production | ✅ Yes | Optional |
-| `npt` | Density equilibration | ⚠️ Only without restarts | Optional |
-| `npt_compress` | Low→target density compression (lj/cut only) | ⚠️ Only without restarts | Optional |
-| `npt_tg_step` | Single T point in Tg sweep | ✅ Yes | No |
-| `nemd_thermal` | Thermal conductivity — Muller-Plathe | ✅ Yes | No |
-| `nemd_supercell` | Muller-Plathe on pre-replicated supercell | ✅ Yes | No |
-| `nemd_langevin` | Direct Langevin thermostat thermal conductivity | ✅ Yes | No |
-| `nemd_shear` | SLLOD shear viscosity | ✅ Yes | Optional |
-
-**The one crash condition:** GPU + NPT + restarts enabled. When an NPT run writes restart files, LAMMPS reallocates memory for the changing box — this conflicts with the GPU package's neighbour-list management and crashes. Disable restarts (`write_restart=False`) to use GPU safely with `npt` and `npt_compress`. All other templates are unconditionally GPU-safe.
+| Template | Use Case |
+|---|---|
+| `minimize` | Relax bad contacts in fresh amorphous cell |
+| `nvt` | Heating ramps, constant-T annealing, production |
+| `npt` | Density equilibration | 
+| `npt_compress` | Low→target density compression (lj/cut only) | 
+| `npt_tg_step` | Single T point in Tg sweep |
+| `nemd_thermal` | Thermal conductivity — Muller-Plathe |
+| `nemd_supercell` | Muller-Plathe on pre-replicated supercell | 
+| `nemd_langevin` | Direct Langevin thermostat thermal conductivity |
+| `nemd_shear` | SLLOD shear viscosity | 
 
 ## Typical Equilibration Workflow
 
