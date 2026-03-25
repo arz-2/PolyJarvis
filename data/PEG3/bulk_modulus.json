@@ -1,0 +1,41 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/simulations/PEG_run3/bulk_modulus/peg3_npt_bulk.log",
+  "output_dir": "/home/arz2/simulations/PEG_run3/analysis/bulk_modulus",
+  "method": "volume_fluctuation",
+  "bulk_modulus_GPa": 2.9853,
+  "bulk_modulus_atm": 29463.09,
+  "bulk_modulus_sem_GPa": 0.4716,
+  "isothermal_compressibility_per_Pa": 3.3496940671730333e-10,
+  "V_mean_A3": 67024.1998,
+  "V_std_A3": 304.9775,
+  "block_averaging": {
+    "block_count": 5,
+    "block_size": 100,
+    "block_K_GPa_values": [
+      2.8347,
+      3.2961,
+      3.7913,
+      4.2647,
+      5.5789
+    ],
+    "K_block_mean_GPa": 3.9531,
+    "K_block_std_GPa": 1.0546,
+    "K_sem_GPa": 0.4716
+  },
+  "diagnostics": {
+    "n_total_rows": 1001,
+    "n_production_rows": 501,
+    "eq_fraction": 0.5,
+    "T_mean_K": 300.07,
+    "T_std_K": 3.26,
+    "P_mean_atm": 11.67,
+    "P_std_atm": 589.13,
+    "density_mean": 1.093935,
+    "density_std": 0.00497,
+    "volume_drift_pct": 0.6787,
+    "volume_drift_regression_p": 4.45990046800377e-24,
+    "volume_equilibrated": true
+  },
+  "volume_timeseries_csv": "/home/arz2/simulations/PEG_run3/analysis/bulk_modulus/volume_timeseries.csv"
+}

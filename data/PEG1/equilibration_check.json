@@ -1,0 +1,72 @@
+{
+  "status": "success",
+  "equilibrated": true,
+  "density_equilibrated": true,
+  "energy_equilibrated": true,
+  "meta": {
+    "log_file": "/home/arz2/simulations/PEG_run1/bulk_modulus/peg1_npt_bulk.log",
+    "n_total_rows": 1001,
+    "n_production_rows": 501,
+    "eq_fraction": 0.5,
+    "T_mean": 299.72,
+    "T_std": 3.2,
+    "P_mean": 9.45,
+    "P_std": 588.55
+  },
+  "density": {
+    "property": "density",
+    "mean": 1.099466,
+    "std": 0.005104,
+    "n_points": 501,
+    "drift": {
+      "slope_per_step": -5.471117952143548e-06,
+      "total_drift": 0.002741,
+      "drift_pct": 0.2493,
+      "regression_p": 0.0004900028256345788,
+      "pass": true
+    },
+    "block_avg": {
+      "block_count": 5,
+      "block_size": 100,
+      "block_means": [
+        1.100554,
+        1.100745,
+        1.097646,
+        1.09923,
+        1.099219
+      ],
+      "sem": 0.000559,
+      "sem_pct": 0.0508,
+      "pass": true
+    },
+    "equilibrated": true
+  },
+  "energy": {
+    "property": "energy",
+    "mean": 23280.5269,
+    "std": 86.859076,
+    "n_points": 501,
+    "drift": {
+      "slope_per_step": 0.1161292475129421,
+      "total_drift": 58.180753,
+      "drift_pct": 0.2499,
+      "regression_p": 1.2836622377335958e-05,
+      "pass": true
+    },
+    "block_avg": {
+      "block_count": 5,
+      "block_size": 100,
+      "block_means": [
+        23262.15507,
+        23265.1257,
+        23274.43435,
+        23297.35463,
+        23303.21751
+      ],
+      "sem": 8.395988,
+      "sem_pct": 0.0361,
+      "pass": true
+    },
+    "equilibrated": true
+  }
+}

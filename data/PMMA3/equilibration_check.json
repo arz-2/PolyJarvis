@@ -1,0 +1,72 @@
+{
+  "status": "success",
+  "equilibrated": true,
+  "density_equilibrated": true,
+  "energy_equilibrated": true,
+  "meta": {
+    "log_file": "/home/arz2/simulations/PMMA_run3/bulk_modulus/pmma3_npt_bulk.log",
+    "n_total_rows": 5001,
+    "n_production_rows": 502,
+    "eq_fraction": 0.1002,
+    "T_mean": 300.17,
+    "T_std": 2.13,
+    "P_mean": 2.05,
+    "P_std": 437.28
+  },
+  "density": {
+    "property": "density",
+    "mean": 1.114824,
+    "std": 0.003214,
+    "n_points": 502,
+    "drift": {
+      "slope_per_step": -3.122568892772149e-06,
+      "total_drift": 0.001568,
+      "drift_pct": 0.1406,
+      "regression_p": 0.0015498659347309679,
+      "pass": true
+    },
+    "block_avg": {
+      "block_count": 5,
+      "block_size": 100,
+      "block_means": [
+        1.116078,
+        1.115222,
+        1.113734,
+        1.113914,
+        1.115183
+      ],
+      "sem": 0.00044,
+      "sem_pct": 0.0395,
+      "pass": true
+    },
+    "equilibrated": true
+  },
+  "energy": {
+    "property": "energy",
+    "mean": 77131.00358,
+    "std": 119.407131,
+    "n_points": 502,
+    "drift": {
+      "slope_per_step": -0.07749325394579884,
+      "total_drift": 38.901613,
+      "drift_pct": 0.0504,
+      "regression_p": 0.03497136964174749,
+      "pass": true
+    },
+    "block_avg": {
+      "block_count": 5,
+      "block_size": 100,
+      "block_means": [
+        77148.78822,
+        77119.31294,
+        77144.85763,
+        77143.57433,
+        77101.72928
+      ],
+      "sem": 9.104401,
+      "sem_pct": 0.0118,
+      "pass": true
+    },
+    "equilibrated": true
+  }
+}

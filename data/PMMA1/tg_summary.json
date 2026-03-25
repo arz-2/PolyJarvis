@@ -1,0 +1,34 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/simulations/PMMA_run1/tg_sweep/tg_sweep.log",
+  "output_dir": "/home/arz2/simulations/PMMA_run1/analysis/tg",
+  "Tg_K": 394.6,
+  "Tg_alternative_K": 394.6,
+  "Tg_curvefit_K": 394.6,
+  "r_squared": 0.9983,
+  "fit_quality": "GOOD",
+  "fit_quality_r2": "EXCELLENT",
+  "fit_quality_fstat": "GOOD",
+  "f_statistic": 58.09167328413608,
+  "f_statistic_pvalue": 6.731282869987254e-07,
+  "fit_method": "F-stat exhaustive split",
+  "binning_method": "plateau_detection",
+  "fit_params": {
+    "a_glassy": -0.00020141867306458768,
+    "b_glassy": 1.1867402049552687,
+    "a_rubbery": -0.0003446421170385911,
+    "b_rubbery": 1.2432510255064166
+  },
+  "n_temperature_bins": 16,
+  "n_plateau_bins": 16,
+  "n_plateaus_skipped_drift": 1,
+  "temp_range_K": [
+    250.0,
+    550.0
+  ],
+  "bins_csv": "/home/arz2/simulations/PMMA_run1/analysis/tg/tg_density_bins.csv",
+  "bins_csv_plateau": "/home/arz2/simulations/PMMA_run1/analysis/tg/tg_density_bins_plateau.csv",
+  "equilibration_fraction": 0.5,
+  "temp_col": "Temp",
+  "density_col": "Density"
+}

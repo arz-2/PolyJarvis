@@ -1,0 +1,41 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/simulations/PMMA_run1/bulk_modulus/pmma1_npt_bulk.log",
+  "output_dir": "/home/arz2/simulations/PMMA_run1/analysis/bulk_modulus",
+  "method": "volume_fluctuation",
+  "bulk_modulus_GPa": 3.4449,
+  "bulk_modulus_atm": 33998.83,
+  "bulk_modulus_sem_GPa": 0.1723,
+  "isothermal_compressibility_per_Pa": 2.9028151982985066e-10,
+  "V_mean_A3": 163382.1958,
+  "V_std_A3": 443.2234,
+  "block_averaging": {
+    "block_count": 5,
+    "block_size": 100,
+    "block_K_GPa_values": [
+      3.0676,
+      3.2426,
+      3.3765,
+      3.6932,
+      4.0377
+    ],
+    "K_block_mean_GPa": 3.4835,
+    "K_block_std_GPa": 0.3852,
+    "K_sem_GPa": 0.1723
+  },
+  "diagnostics": {
+    "n_total_rows": 1001,
+    "n_production_rows": 501,
+    "eq_fraction": 0.5,
+    "T_mean_K": 300.01,
+    "T_std_K": 1.97,
+    "P_mean_atm": 11.72,
+    "P_std_atm": 446.11,
+    "density_mean": 1.120207,
+    "density_std": 0.003038,
+    "volume_drift_pct": 0.0403,
+    "volume_drift_regression_p": 0.33750325603651093,
+    "volume_equilibrated": true
+  },
+  "volume_timeseries_csv": "/home/arz2/simulations/PMMA_run1/analysis/bulk_modulus/volume_timeseries.csv"
+}

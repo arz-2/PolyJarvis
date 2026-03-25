@@ -1,0 +1,40 @@
+# ══════════════════════════════════════════════════════════
+# PEG_run1 — Property Log
+# Polymer: PEG   Chains: 10   Atoms: 7020
+# Backbone types: [2,3,5]
+# Force field: GAFF2 (lj/charmm/coul/long + pppm + SHAKE)
+# Updated: 2026-03-22 (PolyJarvis audit — structural data added)
+# ══════════════════════════════════════════════════════════
+
+## Equilibration (bulk_modulus NPT, 300 K, 1 atm, 500k steps)
+  Status:           PASS
+  Density converged: YES
+  Energy converged:  YES
+  T_mean:           299.72 K
+  Note:             peg1_npt_bulk.log — constant T=300K NPT
+
+## Density (300 K, plateau method, bulk_modulus NPT)
+  ρ = 1.0995 ± 0.0002 g/cm³  (SEM=0.000228)
+  Plateau fraction: 100% (501 points)
+
+## Glass Transition Temperature (bilinear F-stat fit, v3 March 2026)
+  Tg        = 273.0 K
+  Tg (alt)  = 273.0 K
+  Quality   = GOOD
+  R²        = 0.9981
+  Bins used = 16 (skipped 12 drifting)
+
+## Bulk Modulus (NPT volume-fluctuation method, T=300 K)
+  K = 2.88 GPa  (SEM = 0.46 GPa)
+  Method: K = kT⟨V⟩/⟨δV²⟩, last 50% of peg1_npt_bulk.log (501 samples)
+  ⟨V⟩ = 66687.05 Å³, σ(V) = 309.60 Å³
+  Block avg: [3.66, 2.60, 4.79, 2.19, 2.92] GPa
+
+## Structural Properties (MDAnalysis 2.10.0, 101 frames, NVT 300 K)
+  ⟨R⟩ (end-to-end)  = 38.34 Å
+  ⟨R²⟩              = 1776.67 Å²
+  Chains analysed   = 10
+  Source: structure/analysis_mda/end_to_end_summary.json
+
+  RDF pairs computed: 2-2, 2-3, 3-3, 1-2, 1-3, 3-5, 5-6, 3-6
+  Source: structure/analysis_mda/rdf_summary.json

@@ -1,0 +1,21 @@
+{
+  "status": "success",
+  "data_file": "/home/arz2/simulations/PE_run3/mol/PE3.data",
+  "dump_file": "/home/arz2/simulations/PE_run3/structure/nvt_struct.dump",
+  "output_dir": "/home/arz2/simulations/PE_run3/structure/analysis_mda",
+  "rmax": 15.0,
+  "nbins": 150,
+  "frames_analysed": 101,
+  "pairs_computed": [
+    "1-1",
+    "1-2",
+    "2-2"
+  ],
+  "rdf_files": {
+    "1-1": "/home/arz2/simulations/PE_run3/structure/analysis_mda/rdf_t1-t1.csv",
+    "1-2": "/home/arz2/simulations/PE_run3/structure/analysis_mda/rdf_t1-t2.csv",
+    "2-2": "/home/arz2/simulations/PE_run3/structure/analysis_mda/rdf_t2-t2.csv"
+  },
+  "method": "MDAnalysis.analysis.rdf.InterRDF",
+  "mdanalysis_version": "2.10.0"
+}

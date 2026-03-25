@@ -1,0 +1,31 @@
+{
+  "status": "success",
+  "data_file": "/home/arz2/simulations/PEG_run2/mol/PEG2.data",
+  "dump_file": "/home/arz2/simulations/PEG_run2/structure/peg2_nvt_300K.dump",
+  "output_dir": "/home/arz2/simulations/PEG_run2/structure/analysis_mda",
+  "rmax": 15.0,
+  "nbins": 150,
+  "frames_analysed": 101,
+  "pairs_computed": [
+    "2-2",
+    "2-3",
+    "3-3",
+    "1-2",
+    "1-3",
+    "3-5",
+    "5-6",
+    "3-6"
+  ],
+  "rdf_files": {
+    "2-2": "/home/arz2/simulations/PEG_run2/structure/analysis_mda/rdf_t2-t2.csv",
+    "2-3": "/home/arz2/simulations/PEG_run2/structure/analysis_mda/rdf_t2-t3.csv",
+    "3-3": "/home/arz2/simulations/PEG_run2/structure/analysis_mda/rdf_t3-t3.csv",
+    "1-2": "/home/arz2/simulations/PEG_run2/structure/analysis_mda/rdf_t1-t2.csv",
+    "1-3": "/home/arz2/simulations/PEG_run2/structure/analysis_mda/rdf_t1-t3.csv",
+    "3-5": "/home/arz2/simulations/PEG_run2/structure/analysis_mda/rdf_t3-t5.csv",
+    "5-6": "/home/arz2/simulations/PEG_run2/structure/analysis_mda/rdf_t5-t6.csv",
+    "3-6": "/home/arz2/simulations/PEG_run2/structure/analysis_mda/rdf_t3-t6.csv"
+  },
+  "method": "MDAnalysis.analysis.rdf.InterRDF",
+  "mdanalysis_version": "2.10.0"
+}

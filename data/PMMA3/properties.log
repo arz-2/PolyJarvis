@@ -1,0 +1,42 @@
+# ══════════════════════════════════════════════════════════
+# PMMA_run3 — Property Log
+# Polymer: PMMA   Chains: 10   Atoms: 15020
+# Backbone types: [2,3]
+# Force field: GAFF2 (lj/charmm/coul/long + pppm + SHAKE)
+# Updated: 2026-03-24 (re-extracted with 502 production frames for consistency)
+# ══════════════════════════════════════════════════════════
+
+## Equilibration (bulk_modulus NPT, 300 K, 1 atm, 500k steps)
+  Status:           PASS
+  Density converged: YES  (drift=0.14%, block SEM=0.040%)
+  Energy converged:  YES  (drift=0.050%, block SEM=0.012%)
+  T_mean:           300.17 K
+  P_mean:           2.05 atm
+  Note:             pmma3_npt_bulk.log — last 502 frames (eq_fraction=0.1002)
+
+## Density (300 K, plateau method, bulk_modulus NPT)
+  ρ = 1.1148 ± 0.0001 g/cm³  (SEM=0.000143)
+  Plateau fraction: 100% (502 points)
+  Plateau and naive means agree → clean equilibration
+
+## Glass Transition Temperature (bilinear F-stat fit, v3 March 2026)
+  Tg        = 473.2 K
+  Tg (alt)  = 434.4 K
+  Quality   = POOR
+  R²        = 0.9877
+  Bins used = 10 (skipped 0 drifting)
+
+## Bulk Modulus (NPT volume-fluctuation method, T=300 K)
+  K = 3.04 GPa  (SEM = 0.47 GPa)
+  Method: K = kT⟨V⟩/⟨δV²⟩, last 502 frames of pmma3_npt_bulk.log (eq_fraction=0.1002)
+  ⟨V⟩ = 164171.31 Å³, σ(V) = 473.11 Å³
+  Block avg: [3.13, 4.28, 2.93, 4.87, 2.27] GPa
+
+## Structural Properties (MDAnalysis 2.10.0, 101 frames, NVT 300 K)
+  ⟨R⟩ (end-to-end)  = 42.82 Å
+  ⟨R²⟩              = 1909.04 Å²
+  Chains analysed   = 10
+  Source: structure/analysis_mda/end_to_end_summary.json
+
+  RDF pairs computed: 2-2, 2-3, 3-4, 3-5, 2-5, 4-5, 1-2
+  Source: structure/analysis_mda/rdf_summary.json

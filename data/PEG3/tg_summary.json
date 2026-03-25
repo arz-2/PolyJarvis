@@ -1,0 +1,34 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/simulations/PEG_run3/tg_sweep/tg_sweep.log",
+  "output_dir": "/home/arz2/simulations/PEG_run3/analysis/tg",
+  "Tg_K": 260.3,
+  "Tg_alternative_K": 260.3,
+  "Tg_curvefit_K": 287.3,
+  "r_squared": 0.9995,
+  "fit_quality": "GOOD",
+  "fit_quality_r2": "EXCELLENT",
+  "fit_quality_fstat": "GOOD",
+  "f_statistic": 43.846264063864176,
+  "f_statistic_pvalue": 1.663986112898641e-06,
+  "fit_method": "F-stat exhaustive split",
+  "binning_method": "plateau_detection",
+  "fit_params": {
+    "a_glassy": -0.0005903219543456486,
+    "b_glassy": 1.2849649460819164,
+    "a_rubbery": -0.0008607462817664994,
+    "b_rubbery": 1.3553658040896912
+  },
+  "n_temperature_bins": 17,
+  "n_plateau_bins": 17,
+  "n_plateaus_skipped_drift": 10,
+  "temp_range_K": [
+    200.0,
+    445.0
+  ],
+  "bins_csv": "/home/arz2/simulations/PEG_run3/analysis/tg/tg_density_bins.csv",
+  "bins_csv_plateau": "/home/arz2/simulations/PEG_run3/analysis/tg/tg_density_bins_plateau.csv",
+  "equilibration_fraction": 0.5,
+  "temp_col": "Temp",
+  "density_col": "Density"
+}

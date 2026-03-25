@@ -1,0 +1,72 @@
+{
+  "status": "success",
+  "equilibrated": true,
+  "density_equilibrated": true,
+  "energy_equilibrated": true,
+  "meta": {
+    "log_file": "/home/arz2/simulations/PS_run1/bulk_modulus/ps1_npt_bulk.log",
+    "n_total_rows": 1001,
+    "n_production_rows": 501,
+    "eq_fraction": 0.5,
+    "T_mean": 300.11,
+    "T_std": 2.6,
+    "P_mean": 1.02,
+    "P_std": 566.32
+  },
+  "density": {
+    "property": "density",
+    "mean": 1.055739,
+    "std": 0.004442,
+    "n_points": 501,
+    "drift": {
+      "slope_per_step": 1.0749574377937346e-05,
+      "total_drift": 0.005386,
+      "drift_pct": 0.5101,
+      "regression_p": 6.455439982699881e-16,
+      "pass": true
+    },
+    "block_avg": {
+      "block_count": 5,
+      "block_size": 100,
+      "block_means": [
+        1.055369,
+        1.053707,
+        1.054232,
+        1.055908,
+        1.059521
+      ],
+      "sem": 0.001021,
+      "sem_pct": 0.0968,
+      "pass": true
+    },
+    "equilibrated": true
+  },
+  "energy": {
+    "property": "energy",
+    "mean": 29143.953267,
+    "std": 102.67293,
+    "n_points": 501,
+    "drift": {
+      "slope_per_step": -0.0025804911611044196,
+      "total_drift": 1.292826,
+      "drift_pct": 0.0044,
+      "regression_p": 0.9352524679022565,
+      "pass": true
+    },
+    "block_avg": {
+      "block_count": 5,
+      "block_size": 100,
+      "block_means": [
+        29140.51816,
+        29136.5707,
+        29157.42535,
+        29157.53077,
+        29128.32564
+      ],
+      "sem": 5.815056,
+      "sem_pct": 0.02,
+      "pass": true
+    },
+    "equilibrated": true
+  }
+}

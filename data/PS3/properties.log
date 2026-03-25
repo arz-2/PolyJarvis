@@ -1,0 +1,42 @@
+# ══════════════════════════════════════════════════════════
+# PS_run3 — Property Log
+# Polymer: PS   Chains: 10   Atoms: 9940
+# Backbone types: [2,3]
+# Force field: GAFF2 (lj/charmm/coul/long + pppm + SHAKE)
+# Updated: 2026-03-22 (PolyJarvis audit — source corrected to bulk_modulus NPT)
+# ══════════════════════════════════════════════════════════
+
+## Equilibration (bulk_modulus NPT, 300 K, 1 atm, 500k steps)
+  Status:           PASS
+  Density converged: YES  (drift=0.06%, block SEM=0.036%)
+  Energy converged:  YES  (drift=0.01%, block SEM=0.034%)
+  T_mean:           299.90 K
+  P_mean:           -7.45 atm
+  Note:             ps3_npt_bulk.log — constant T=300K NPT
+
+## Density (300 K, plateau method, bulk_modulus NPT)
+  ρ = 1.0535 ± 0.0002 g/cm³  (SEM=0.000165)
+  Plateau fraction: 100% (501 points)
+  Plateau and naive means agree → clean equilibration
+
+## Glass Transition Temperature (bilinear F-stat fit, v3 March 2026)
+  Tg        = 466.0 K
+  Tg (alt)  = 476.4 K
+  Quality   = GOOD
+  R²        = 0.9897
+  Bins used = 25 (skipped 12 drifting)
+
+## Bulk Modulus (NPT volume-fluctuation method, T=300 K)
+  K = 3.12 GPa  (SEM = 0.09 GPa)
+  Method: K = kT⟨V⟩/⟨δV²⟩, last 50% of ps3_npt_bulk.log (501 samples)
+  ⟨V⟩ = 107769.36 Å³, σ(V) = 377.92 Å³
+  Block avg: [3.30, 3.11, 3.56, 3.03, 3.21] GPa
+
+## Structural Properties (MDAnalysis 2.10.0, 101 frames, NVT 300 K)
+  ⟨R⟩ (end-to-end)  = 42.04 Å
+  ⟨R²⟩              = 2072.88 Å²
+  Chains analysed   = 10
+  Source: structure/analysis_mda/end_to_end_summary.json
+
+  RDF pairs computed: 1-1, 1-2, 1-3, 2-2, 2-3, 3-3
+  Source: structure/analysis_mda/rdf_summary.json
