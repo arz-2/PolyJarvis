@@ -1,0 +1,137 @@
+# PolyJarvis Task Template
+# ============================================================
+# HOW TO USE:
+#   1. Fill in every [PLACEHOLDER] below before submitting.
+#   2. Remove this header block and all inline comments (#).
+#   3. Delete the "Example Fills" section at the bottom.
+#
+# REQUIRED PLACEHOLDERS:
+#   [POLYMER_NAME]        — Full polymer name and common abbreviation
+#                           e.g. "Polyethylene (PE)", "Atactic Polystyrene (PS)"
+#   [POLYMER_SMILES]      — Repeat-unit SMILES with * attachment points
+#                           e.g. "*CC*", "*CC(c1ccccc1)*", "*CC(C(=O)OC)*"
+#   [TACTICITY]           — atactic / isotactic / syndiotactic
+#   [TARGET_PROPERTIES]   — Comma-separated list of properties to compute
+#                           e.g. "Tg, density", "Tg, density, bulk modulus"
+#   [CPU_CORES]           — Integer, e.g. 4 or 24
+#   [NUM_GPUS]            — Integer or "None", e.g. 4
+#   [MEMORY_GB]           — Integer GB, e.g. 64
+#   [MAX_RUNTIME]         — e.g. "48 hours", "1 week"
+# ============================================================
+
+## Task: Autonomous Polymer Property Prediction via Molecular Dynamics Simulation
+
+**System:** [POLYMER_NAME], SMILES: `[POLYMER_SMILES]`, tacticity: [TACTICITY]
+
+**Target Properties:** [TARGET_PROPERTIES]
+
+**Available Computational Resources:**
+- CPU Cores: [CPU_CORES]
+- Remote GPUs: [NUM_GPUS]
+- Memory: [MEMORY_GB] GB
+- Expected Max Runtime: [MAX_RUNTIME]
+- Parallel Capabilities: MPI [Y], OpenMP [Y]
+
+---
+
+**Your Authority:**
+- **Total control** over all simulation parameters (force field selection, ensemble choices, timesteps, equilibration protocols, temperature/pressure ranges, system size, chain length, number of chains, etc.)
+- **Complete freedom** to determine the workflow sequence and methodology
+- **Full discretion** on convergence criteria and analysis approaches
+- **Independent decision-making** on computational resource allocation (MPI/OMP settings, GPU usage, balancing accuracy vs. computational cost)
+- **Autonomous error handling** and workflow adaptation
+
+---
+
+**Requirements:**
+
+1. **Research Phase (Mandatory):**
+   - Search literature for established MD simulation protocols for [POLYMER_NAME], specifically targeting [TARGET_PROPERTIES]
+   - Use the arXiv MCP server to query recent papers on [POLYMER_NAME] MD simulations
+   - Identify force fields validated for [POLYMER_NAME] in published studies
+   - Determine standard system sizes, chain lengths, equilibration methods, and property extraction protocols for this polymer class
+   - Review experimental benchmark values for [TARGET_PROPERTIES] of [POLYMER_NAME]
+   - Document all findings with full citations
+   - Justify your chosen approach based on this research before proceeding
+
+2. **Design Phase:**
+   - Run `classify_polymer(smiles="[POLYMER_SMILES]")` first and record the class, FF recommendation, and any warnings in SUMMARY_LOG
+   - Determine optimal system specifications (degree of polymerization, number of chains, box size) appropriate for [TARGET_PROPERTIES]
+   - Select and justify force field based on literature validation for [POLYMER_NAME]
+   - Design equilibration protocol appropriate for the system and target properties
+   - Plan property extraction methodology with statistical rigor
+   - Estimate computational requirements and confirm they fit within [MAX_RUNTIME]
+
+3. **Execution Phase:**
+   - Implement the complete workflow from SMILES to final property extraction following the PolyJarvis stage guides
+   - Make all technical decisions independently (I will not intervene unless you explicitly request it)
+   - Handle any errors, convergence failures, or technical challenges autonomously
+   - Monitor job progress and adapt strategy if needed
+   - Document every decision and its rationale in real-time in SUMMARY_LOG
+
+4. **Validation Phase:**
+   - Compare results to experimental data from literature or databases
+   - Calculate percent error for each property in [TARGET_PROPERTIES]
+   - Identify potential sources of discrepancy (force field limitations, system size effects, insufficient sampling time, etc.)
+   - If accuracy is outside acceptable bounds, propose and implement improvements autonomously
+
+5. **Reporting Phase:**
+   - Report final values for [TARGET_PROPERTIES] with uncertainty estimates
+   - Complete simulation log documenting all design choices and their rationale
+   - Validation report comparing to experimental benchmarks with citations
+   - Publication-quality discussion of methodology, results, and limitations
+
+---
+
+**Deliverables:**
+- Final [TARGET_PROPERTIES] values with statistical uncertainty
+- Complete methodology documentation suitable for peer review
+- Organized simulation directory under `production/MMDDYYYY_[POLYMER_NAME]/`
+- `SUMMARY_LOG.md` covering every stage, design choice, error encountered, and resolution
+- Validation analysis with literature comparison and percent error for each property
+
+**Constraints:**
+- Use the PolyJarvis MCP tools (RadonPy server for molecular construction, Lammps-Engine server for simulation and analysis)
+- Work within the [MAX_RUNTIME] computational budget
+- Follow best practices for MD simulation rigor
+- Maintain full reproducibility: document random seeds, software versions, and exact parameter values
+
+**Success Metrics:**
+- [TARGET_PROPERTIES] predictions within accepted simulation error bounds (Tg ±20K, density ±5%, bulk modulus ±30% if applicable — tighten if literature warrants it)
+- Complete methodology documentation suitable for publication
+- Demonstrated autonomous problem-solving and decision-making throughout
+- Efficient use of computational resources within [MAX_RUNTIME]
+
+---
+
+**Begin when ready. You have complete autonomy over this simulation. I will not provide guidance unless you explicitly request it. Demonstrate what an AI agent can achieve when given full control over complex scientific workflows.**
+
+---
+
+## Example Fills
+
+The following shows how to instantiate this template for two different systems.
+
+### Example A — Polyethylene, Tg + Density
+```
+System:            Polyethylene (PE)
+SMILES:            *CC*
+Tacticity:         atactic
+Target Properties: Tg, density
+CPU Cores:         4
+Remote GPUs:       4
+Memory:            64 GB
+Max Runtime:       1 week
+```
+
+### Example B — Atactic Polystyrene, Tg only
+```
+System:            Atactic Polystyrene (PS)
+SMILES:            *CC(c1ccccc1)*
+Tacticity:         atactic
+Target Properties: Tg
+CPU Cores:         24
+Remote GPUs:       4
+Memory:            64 GB
+Max Runtime:       48 hours
+```
