@@ -64,6 +64,8 @@ SMILES string
 │  Compare to experimental benchmarks         │
 └─────────────────────────────────────────────┘
 ```
+Below is a sample conversation between a user and the agent:
+![Conversation](figures/figure2_conversation.png)
 
 ---
 
