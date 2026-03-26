@@ -80,7 +80,7 @@ Initial cell built with RadonPy at 0.05 g/cm³ density. LAMMPS data file: `PS3_n
 | Points | 15 |
 | Steps per T | 500,000 (0.5 ns) |
 | Ensemble | NPT, P=1 atm |
-| Pair style | lj/charmm/coul/charmm (no kspace for speed) |
+| Pair style | lj/charmm/coul/long + PPPM 1e-6 (reverted from Run 2 cutoff approach; confirmed in tg_T*.in scripts and properties.log) |
 | Total simulation time | ~7.5 ns |
 
 **Lambda kills encountered:** 2 (T525, T450). Both recovered by resuming from last completed `_out.data`. Final chain: `f9efed80`, completed Feb 27 05:40.

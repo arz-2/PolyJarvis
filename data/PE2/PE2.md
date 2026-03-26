@@ -32,7 +32,7 @@
 | Total atoms | 9,020 | 150 units × 2 atoms/unit × 10 chains + H |
 | Force field | GAFF2 | General small-molecule FF; limitations documented for PE |
 | Charge method | Gasteiger | Nonpolar charge distribution; near-zero for long alkyl chains |
-| Pair style / Electrostatics | `lj/cut 12.0 Å` (no PPPM) | Nonpolar PE; electrostatics negligible; justified by OPLS-UA, TraPPE conventions |
+| Pair style / Electrostatics | `lj/cut 12.0 Å` + tail correction (no PPPM) | Nonpolar PE; electrostatics negligible; `pair_modify mix arithmetic tail yes` applied in Tg sweep |
 | Timestep | 2 fs | SHAKE on H; sufficient constraint for extended timestep |
 
 ---
