@@ -103,7 +103,7 @@ PolyJarvis/
 
 ### `mcp-radonpy-server` (local)
 
-Wraps the [RadonPy](https://github.com/RadonPy/RadonPy) library for molecule construction. All heavy computation runs locally via RDKit, Psi4, and RadonPy's amorphous cell builder.
+Wraps the [RadonPy](https://github.com/RadonPy/RadonPy) library for molecule construction. All heavy computation runs locally via RDKit, Psi4, and RadonPy.
 
 Key tools: `classify_polymer`, `build_molecule_from_smiles`, `submit_polymerize_job`, `submit_assign_charges_job`, `assign_forcefield`, `submit_generate_cell_job`, `save_lammps_data`, `get_job_status`, `get_job_output`
 
