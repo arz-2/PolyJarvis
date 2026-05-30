@@ -2,6 +2,7 @@
 **Read when:** You have a converged equilibrated cell and need to run a Tg sweep
 **Previous stage:** `STAGE_2_EQUILIBRATION.md`
 **Next stage:** `STAGE_4_ANALYSIS.md` — once the sweep log is complete
+**Revision parameters:** `REVISION_PARAMS.md` — T_START, T_END, T_STEP, steps/T for all 8 revision polymers
 
 ---
 
@@ -67,14 +68,9 @@ params = {
 
 ---
 
-### Rule E: Tg Sweep via lammps-engine — No Hand-Written Scripts
+### Rule E: Tg Sweep via MCP Tool — No Hand-Written Scripts, No Direct Python Imports
 
-```python
-script = lammps_engine.generate_script(
-    template_name="npt_tg_step",
-    ...
-)
-```
+Always use `generate_script` via the lammps-engine MCP tool with the `npt_tg_step` template. Do not import `ScriptGenerator` directly — the MCP tool is the only supported path for agent runs. Pass `use_pcff` and `params_file` from the EMC job output for PCFF systems.
 
 ---
 
@@ -82,12 +78,17 @@ script = lammps_engine.generate_script(
 
 The sweep must bracket the transition. Too narrow = bilinear fit fails to capture both glassy and rubbery slopes.
 
-| Polymer | Exp Tg | Suggested Range | Notes |
-|---|---|---|---|
-| PE | ~195 K | 600K → 150K | Wide range needed |
-| PS | ~373 K | 550K → 250K | Standard |
-| PMMA | ~378 K | 550K → 250K | Standard |
-| PEO/PEG | ~206 K | 450K → 150K | Similar to PE |
+| Polymer | Class | Exp Tg | Suggested Range | Notes |
+|---|---|---|---|---|
+| PE | PHYC | ~195 K | 450K → 100K | Wide range needed |
+| PS | PSTR | ~373 K | 550K → 250K | Standard |
+| PMMA | PACR | ~378 K | 550K → 250K | Standard |
+| PEO/PEG | POXI | ~206 K | 450K → 100K | Similar to PE |
+| BPA-PC | PCBN | ~422 K | 700K → 200K | PCFF; MD Tg ~500–540K |
+| Nylon-6 | PAMD | ~323 K | 650K → 150K | PCFF; MD Tg ~400–440K |
+| PEEK | PKTN | ~418 K | 800K → 300K | PCFF; MD Tg ~500–540K; start >Tm=616K |
+| PSU (Udel) | PSFO | ~463 K | 800K → 300K | PCFF; MD Tg ~540–580K |
+| Kapton | PIMD | ~633 K | 900K → 350K | PCFF; MD Tg ~730–810K; must sweep very high |
 
 **Rule of thumb:**
 - Start: ~1.5× expected Tg (or 600K, whichever is lower)
@@ -105,68 +106,76 @@ Search literature (arXiv, ACS, etc.) for MD Tg studies on your specific polymer 
 
 ### Step 2: Check GPU availability
 
-```python
-execute_remote_shell_command("nvidia-smi")
+```bash
+nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader
 ```
 
 ### Step 3: Generate Tg sweep script
 
-```python
-tg_dir = "/home/arz2/simulations/<run_dir>/tg_sweep"
+`generate_script` is a **synchronous** lammps-engine MCP tool — it returns immediately with the script path.
 
-script = lammps_engine.generate_script(
-    template_name="npt_tg_step",
-    data_file="/home/arz2/simulations/<run_dir>/eq/restart_final_eq.data",
-    output_script="./tg_sweep.in",
+```python
+# lammps_flags = {"use_pcff": True, "use_opls": False}  ← from get_emc_job_output for EMC builds
+#                {"use_pcff": False, "use_opls": True}   ← GAFF2/OPLS-AA (RadonPy path)
+
+equil_data = "/home/arz2/simulations/<run_dir>/06_nvt_production/06_nvt_production_out.data"
+params_file = "/home/arz2/polyjarvis_emc_jobs/<job_id>/emc_build.params"  # EMC builds only; omit for RadonPy
+
+result = generate_script(
+    template="npt_tg_step",
+    output_path="/home/arz2/simulations/<run_dir>/tg_sweep/tg_sweep.in",
+    data_file=equil_data,
     params={
-        "T_START": 600,                  # K — high temperature
-        "T_END": 250,                    # K — low temperature
-        "T_STEP": 10,                    # K per step
-        "N_STEPS_PER_T": 2000000,        # ← verify this from literature first
-        "P_START": 1,
-        "P_FINAL": 1,
-        "LOG_FILE": "tg_sweep.log",
-        "DUMP_FILE": "",                 # No dump — thermo only
-        "use_gpu": 1
+        "LOG_FILE":       "tg_sweep.log",
+        "DUMP_FILE":      "",              # No dump — thermo only (Rule D)
+        "T_START":        600,             # K — see temperature range table above
+        "T_END":          200,             # K
+        "T_STEP":         20,              # K (10 for production; 20 for screening)
+        "N_STEPS_PER_T":  500000,          # 500 ps screening; 2000000 for production
+        "P_START":        1.0,
+        "P_FINAL":        1.0,
+        "T_DAMP":         100.0,
+        "TIMESTEP":       1.0,
+        "use_pppm":       True,            # from lammps_flags; False for TraPPE-UA (lj/cut)
+        "use_gpu":        True,
+        "use_pcff":       True,            # from lammps_flags; False for OPLS-AA/TraPPE
+        "use_shake":      False,           # False for PCFF/TraPPE-UA; True for GAFF2
+        "params_file":    params_file,     # EMC only; omit key for RadonPy builds
+        "write_restart":  False,
     },
-    upload_to_lambda=True,
-    remote_output_dir=tg_dir
 )
+script_path = result["script_path"]
 ```
 
 ### Step 4: Submit sweep
 
-```python
-# Confirm free GPUs via nvidia-smi first, then assign explicitly
-# Tg sweeps benefit from the most GPUs available
-GPU_IDS = "0,1,2,3"  # ← replace with free GPU IDs confirmed from nvidia-smi
-MPI     = 4           # ← confirm with user; match number of GPU IDs
+`run_lammps_script` is an **async** lammps-engine MCP tool — returns a `run_id` immediately.
 
-run = lammps_engine.run_lammps_script(
-    remote_script=script["remote_path"],
-    remote_work_dir=tg_dir,
-    log_file="tg_sweep_stdout.log",
-    mpi=MPI, gpu_ids=GPU_IDS
+```python
+run = run_lammps_script(
+    script_path=script_path,
+    gpu_ids=[0, 1, 2, 3],   # all GPUs; adjust if other jobs are running (Rule A)
+    mpi=4,
+    run_name="tg_sweep_<run_dir>",
 )
-print(f"Submitted: {run['run_id']}")
+run_id = run["run_id"]
 ```
 
-### Step 5: Monitor periodically
+### Step 5: Monitor until completion
+
+Follow the same auto-continuation pattern as Stage 2 (per CLAUDE.md):
 
 ```python
-# Check every 30 min during a long sweep — don't poll constantly
-status = lammps_engine.get_run_status(run["run_id"])
-log = lammps_engine.read_remote_log(run_id=run["run_id"], n_lines=30)
+w = watch_run(run_id=run_id)
+Monitor(command=w["monitor_command"])
+# Claude is re-invoked automatically when the run completes or errors
 ```
 
 ### Step 6: Verify log integrity before proceeding to Stage 4
 
-```python
-# Quick sanity check: count temperature blocks in log
-execute_remote_shell_command(
-    f"grep -c 'Loop time' {tg_dir}/tg_sweep.log"
-)
-# Should equal number of temperature steps in your sweep
+```bash
+# Count should equal (T_START - T_END) / T_STEP + 1
+grep -c "Loop time" /home/arz2/simulations/<run_dir>/tg_sweep/tg_sweep.log
 ```
 
 ---
@@ -180,11 +189,11 @@ Total steps = (T_START - T_END) / T_STEP × N_STEPS_PER_T
 Runtime (hrs) = Total steps / measured_steps_per_sec / 3600
 ```
 
-**Example:** 35 temperatures × 2,000,000 steps/T = 70M steps
-- lj/cut system (~183 steps/sec): 70M / 183 / 3600 ≈ **106 hrs** — but 4 GPUs parallelize, so ~26 hrs
-- PPPM system (~148 steps/sec): 70M / 148 / 3600 ≈ **131 hrs** — so ~33 hrs with 4 GPUs
+**Example:** 20 temperatures × 500,000 steps/T = 10M steps
+- PCFF GPU (~600 steps/s): 10M / 600 / 3600 ≈ **4.6 hrs** (screening)
+- PCFF GPU × 2M steps/T: ~18 hrs (production)
 
-Adjust your Lambda session reservation accordingly before submitting.
+Measure actual throughput from stage 02 log before estimating — don't guess.
 
 ---
 

@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "mcp-lammps-engine": {
+      "command": "/path/to/PolyJarvis/mcp-servers/.venv/bin/python",
+      "args": [
+        "/path/to/PolyJarvis/mcp-servers/mcp-lammps-engine/server.py"
+      ],
+      "cwd": "/path/to/PolyJarvis/mcp-servers/mcp-lammps-engine",
+      "env": {
+        "LAMBDA_USER": "your_username",
+        "LAMBDA_WORKDIR": "/path/to/simulations",
+        "LAMBDA_LAMMPS": "/path/to/lammps-install/bin/lmp",
+        "CONDA_ENV": "mol-builder",
+        "MDA_SCRIPTS_DIR": "/path/to/simulations/analysis_scripts"
+      }
+    },
+    "mcp-radonpy-server": {
+      "command": "/path/to/miniforge3/envs/mol-builder/bin/python",
+      "args": [
+        "/path/to/PolyJarvis/mcp-servers/mcp-radonpy-server/src/server.py"
+      ],
+      "cwd": "/path/to/PolyJarvis/mcp-servers/mcp-radonpy-server",
+      "env": {
+        "RADONPY_PATH": "/path/to/RadonPy"
+      }
+    },
+    "mcp-emc-server": {
+      "command": "/path/to/PolyJarvis/mcp-servers/.venv/bin/python",
+      "args": [
+        "/path/to/PolyJarvis/mcp-servers/mcp-emc-server/server.py"
+      ],
+      "cwd": "/path/to/PolyJarvis/mcp-servers/mcp-emc-server",
+      "env": {
+        "EMC_ROOT": "/path/to/emc",
+        "EMC_JOBS_DIR": "/path/to/polyjarvis_emc_jobs"
+      }
+    }
+  }
+}

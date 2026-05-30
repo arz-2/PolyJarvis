@@ -1,3 +1,7 @@
+# ── Claude Code (machine-specific, use .mcp.json.example as template) ─────────
+.mcp.json
+.claude/settings.local.json
+
 # ── Secrets ───────────────────────────────────────────────────────────────────
 .env
 *.env
@@ -23,3 +27,12 @@ mcp-radonpy-server/src/timer.dat
 *.restart
 *.xtc
 *.dcd
+*.log
+
+# ── Manuscript & private notes (not for public repo) ──────────────────────────
+revision.md
+literature/
+guides/TODO_OWNER.md
+guides/ROADMAP.md
+guides/REVISION_PARAMS.md
+data/Polymer_Handbook/

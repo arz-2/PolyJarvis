@@ -13,52 +13,56 @@ Tools exposed:
   1.  list_templates                  - Show all available simulation templates
   2.  get_template_defaults           - Tunable parameters and defaults for a template
   3.  parse_data_file                 - Extract system info from a .data file
-  4.  generate_script                 - Fill a template and write a .in file
-  5.  run_lammps_script               - Execute a .in script on the remote server
-  6.  run_lammps_chain                - Submit ordered chain of scripts (nohup, crash-safe)
-  7.  generate_equilibration_workflow - Auto-generate full 6-stage equilibration protocol
+  4.  validate_data_file              - Pre-flight checks before submitting a simulation
+  5.  generate_script                 - Fill a template and write a .in file
+  6.  run_lammps_script               - Execute a .in script on the server
+  7.  run_lammps_chain                - Submit ordered chain of scripts (nohup, crash-safe)
+  8.  generate_equilibration_workflow - Auto-generate full 6-stage equilibration protocol
   ── Monitoring ────────────────────────────────────────────────────────────────
-  8.  get_run_status                  - Check status of any run or analysis job
-  9.  get_run_output                  - Results + log tail from a completed job
-  10. list_runs                       - List all submitted runs and analysis jobs
-  11. read_remote_log                 - Live-tail a LAMMPS log during a running job
+  9.  get_run_status                  - Check status of any run or analysis job
+  10. get_run_output                  - Results + log tail from a completed job
+  11. list_runs                       - List all submitted runs and analysis jobs
+  12. watch_run                       - Return Monitor command to block until a run completes
+  13. read_log                 - Live-tail a LAMMPS log during a running job
   ── Analysis ──────────────────────────────────────────────────────────────────
-  12. unwrap_coordinates              - Write new dump with image-flag-unwrapped coords
-  13. extract_end_to_end_vectors      - End-to-end R vectors via MDAnalysis sort_backbone
-  14. calculate_rdf                   - g(r) via MDAnalysis InterRDF
-  15. check_equilibration             - Drift + block-average convergence check
-  16. extract_equilibrated_density    - Plateau density via reverse-cumulative-mean
-  17. extract_tg                      - Tg via exhaustive F-stat bilinear fit
-  18. extract_bulk_modulus            - Isothermal K via NPT volume fluctuations
-  ── Remote Utilities (utilities.py) ──────────────────────────────────────────
-  19. list_remote_files               - List files in a remote directory
-  20. list_remote_files_detailed      - List files with size + mtime
-  21. upload_file_to_remote           - Upload a local file to the remote server
-  22. download_file_from_remote       - Download a remote file locally
-  23. check_remote_status             - Server status and GPU availability
-  24. read_remote_file                - Read full content of a remote file
-  25. read_remote_file_tail           - Read last N lines of a remote file
-  26. write_remote_file               - Write content to a remote file
-  27. execute_remote_shell_command    - Run an arbitrary shell command remotely
-  28. check_remote_file_exists        - Check whether a remote path exists
+  14. unwrap_coordinates              - Write new dump with image-flag-unwrapped coords
+  15. extract_end_to_end_vectors      - End-to-end R vectors via MDAnalysis sort_backbone
+  16. calculate_rdf                   - g(r) via MDAnalysis InterRDF
+  17. check_equilibration             - Drift + block-average convergence check
+  18. extract_equilibrated_density    - Plateau density via reverse-cumulative-mean
+  19. extract_tg                      - Tg via exhaustive F-stat bilinear fit
+  20. extract_bulk_modulus            - Isothermal K via NPT volume fluctuations
+  21. extract_radius_of_gyration      - Mass-weighted Rg per chain, CV, C∞
+  22. calculate_msd                   - Chain CoM MSD, α exponent, kinetic-trap flag
+  23. check_orientation_order         - P2 nematic order from backbone bond vectors
+  24. check_density_homogeneity       - Voxel mass density CV, heterogeneous_flag
+  25. check_equilibration_extended    - Run all four structural checks in parallel
 """
 
 import os
 import sys
 import json
 import uuid
+import shutil
 import logging
 import threading
+import subprocess
 import time
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+# Load root .env (PolyJarvis/.env) — single source of truth for all MCP servers
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).parent.parent.parent / ".env")
+except ImportError:
+    pass  # python-dotenv not installed; rely on shell env vars
+
 # Add server directory to path so we can import script_generator
 sys.path.insert(0, str(Path(__file__).parent))
 from script_generator import ScriptGenerator, TEMPLATE_DOCS, TEMPLATE_DEFAULTS
-import utilities
 
 from mcp.server.fastmcp import FastMCP
 
@@ -69,37 +73,52 @@ logging.basicConfig(
 )
 logger = logging.getLogger("lammps_engine")
 
-# ─── Remote executor ─────────────────────────────────────────────────────────
-from remote_executor import RemoteExecutor
+# ─── Config ───────────────────────────────────────────────────────────────────
+LAMBDA_USER     = os.environ.get("LAMBDA_USER",    "arz2")
+LAMBDA_WORKDIR  = os.environ.get("LAMBDA_WORKDIR", f"/home/{LAMBDA_USER}/simulations")
+LAMBDA_LAMMPS   = os.environ.get("LAMBDA_LAMMPS",  f"/home/{LAMBDA_USER}/lammps-install/bin/lmp")
+CONDA_ENV       = os.environ.get("CONDA_ENV",      "mol-builder")
+# Analysis scripts are bundled with the server; MDA_SCRIPTS_DIR env var overrides for dev use.
+MDA_SCRIPTS_DIR = os.environ.get("MDA_SCRIPTS_DIR",
+                                  str(Path(__file__).parent / "analysis_scripts"))
 
-# Connection config — loaded from environment variables.
-# Copy .env.example → .env and fill in real values. Never commit .env.
-LAMBDA_HOST     = os.environ.get("LAMBDA_HOST",     "YOUR_SERVER_IP")
-LAMBDA_USER     = os.environ.get("LAMBDA_USER",     "YOUR_USERNAME")
-LAMBDA_KEY      = os.environ.get("LAMBDA_KEY",      "~/.ssh/your_key")
-LAMBDA_WORKDIR  = os.environ.get("LAMBDA_WORKDIR",  "/home/YOUR_USERNAME/simulations")
-LAMBDA_LAMMPS   = os.environ.get("LAMBDA_LAMMPS",   "/home/YOUR_USERNAME/lammps-install/bin/lmp")
-CONDA_ENV       = os.environ.get("CONDA_ENV",       "radonpy")
-MDA_SCRIPTS_DIR = os.environ.get("MDA_SCRIPTS_DIR", "/home/YOUR_USERNAME/simulations/analysis_scripts")
 
-executor = RemoteExecutor(
-    host=LAMBDA_HOST,
-    username=LAMBDA_USER,
-    key_path=LAMBDA_KEY,
-    remote_workdir=LAMBDA_WORKDIR,
-    conda_env=CONDA_ENV,
-)
-executor.connect()
+def _conda_run(cmd: str, workdir: str = None, timeout: int = 3600):
+    """Run cmd inside the project conda env. Returns (stdout, stderr, returncode)."""
+    script = (
+        f"source ~/miniforge3/etc/profile.d/conda.sh\n"
+        f"conda activate {CONDA_ENV}\n"
+        f"cd {workdir or LAMBDA_WORKDIR}\n"
+        f"{cmd}\n"
+    )
+    logger.info(f"Running: {cmd}")
+    try:
+        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL, timeout=timeout)
+        if r.returncode != 0:
+            logger.warning(f"Exit {r.returncode}: {r.stderr[:200]}")
+        return r.stdout, r.stderr, r.returncode
+    except subprocess.TimeoutExpired:
+        return "", f"Timed out after {timeout}s", 1
 
-# ─── Local working directory ──────────────────────────────────────────────────
-LOCAL_WORKDIR = Path.home() / "Desktop" / "Research" / "sims"
-LOCAL_WORKDIR.mkdir(parents=True, exist_ok=True)
+# ─── Completion sentinels ─────────────────────────────────────────────────────
+# Each completed (or failed) run writes a small JSON file here.
+# Claude watches this directory via the Monitor tool so it is re-invoked
+# automatically when a simulation finishes, without polling.
+SENTINEL_DIR = Path("/tmp/polyjarvis/sentinels")
+SENTINEL_DIR.mkdir(parents=True, exist_ok=True)
+
+def _write_sentinel(run_id: str, status: str, extra: dict = None):
+    """Write a completion sentinel file for run_id."""
+    payload = {"run_id": run_id, "status": status, "timestamp": datetime.now().isoformat()}
+    if extra:
+        payload.update(extra)
+    path = SENTINEL_DIR / f"done_{run_id}.json"
+    path.write_text(json.dumps(payload))
+    logger.info(f"Sentinel written: {path}")
 
 # ─── MCP Server ───────────────────────────────────────────────────────────────
 mcp = FastMCP("PolyJarvis LAMMPS Engine")
-
-# Register remote utility tools (file I/O, shell, status)
-utilities.register(mcp, executor)
 
 # ─── Job Manager ─────────────────────────────────────────────────────────────
 class JobStatus(Enum):
@@ -123,6 +142,17 @@ class RunManager:
             try:
                 with open(STATE_FILE, "r") as f:
                     self.runs = json.load(f)
+                # Migrate entries written by older server versions that used a
+                # different schema (created_at/started_at, flat fields, no meta).
+                for run_id, r in self.runs.items():
+                    if "submitted_at" not in r:
+                        r["submitted_at"] = r.get("created_at", "unknown")
+                    if "completed_at" not in r:
+                        r["completed_at"] = r.get("finished_at", None)
+                    if "run_type" not in r:
+                        r["run_type"] = r.get("chain_type", "unknown")
+                    if "meta" not in r:
+                        r["meta"] = {}
                 logger.info(f"Loaded {len(self.runs)} runs from {STATE_FILE}")
             except Exception as e:
                 logger.warning(f"Could not load run state: {e}")
@@ -285,11 +315,7 @@ def _lammps_run_background(
         )
 
         logger.info(f"[{run_id}] Launching LAMMPS: {cmd}")
-        stdout, stderr, exit_code = executor.execute_command(
-            cmd,
-            workdir=remote_work_dir,
-            timeout=86400,  # 24h max
-        )
+        stdout, stderr, exit_code = _conda_run(cmd, workdir=remote_work_dir, timeout=86400)
 
         if exit_code == 0:
             run_manager.complete(run_id, {
@@ -299,14 +325,17 @@ def _lammps_run_background(
                 "stdout_tail": stdout[-2000:] if stdout else "",
             })
             logger.info(f"[{run_id}] LAMMPS completed successfully")
+            _write_sentinel(run_id, "completed", {"work_dir": remote_work_dir})
         else:
             err = stderr[-2000:] if stderr else "no stderr"
             run_manager.fail(run_id, f"LAMMPS exited {exit_code}: {err}")
             logger.error(f"[{run_id}] LAMMPS failed: {err}")
+            _write_sentinel(run_id, "failed", {"error": err[:500]})
 
     except Exception as e:
         run_manager.fail(run_id, str(e))
         logger.error(f"[{run_id}] Exception: {e}")
+        _write_sentinel(run_id, "failed", {"error": str(e)[:500]})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -392,25 +421,84 @@ def get_template_defaults(template_name: str) -> dict:
 
 
 @mcp.tool()
-def parse_data_file(data_file: str, remote: bool = True) -> dict:
+def validate_data_file(
+    data_file: str,
+    h_type_ids: Optional[list] = None,
+    backbone_types: Optional[list] = None,
+    atom_type_pairs: Optional[list] = None,
+    lj_cutoff: float = 12.0,
+    charge_tol: float = 0.01,
+) -> dict:
     """
-    Parse a RadonPy LAMMPS .data file and extract system information.
+    Systematic pre-simulation validation of a LAMMPS data file.
+
+    Performs seven checks and returns errors (blocking) and warnings (advisory):
+
+    BLOCKING errors — submission refused:
+      1. Charge neutrality — |net charge| > charge_tol: PPPM will diverge
+      2. Force field completeness — any Pair/Bond/Angle/Dihedral/Improper Coeffs
+         section has fewer entries than the type count in the header
+      3. Box vs. cutoff — min(box side) < 2 × lj_cutoff: LAMMPS hard requirement
+      4. User type IDs out of range — h_type_ids / backbone_types / atom_type_pairs
+         reference type IDs outside [1, n_atom_types]
+
+    ADVISORY warnings — logged but do not block submission:
+      5. Density plausibility — computed density outside [0.1, 2.5] g/cm³
+      6. h_type_ids mass check — any supplied H type has mass > 2.5 amu
+      7. backbone_types hydrogen check — any backbone type name starts with 'h'
+      8. Bond/atom ratio outside [0.5, 3.0]
+
+    Run this before run_lammps_chain and generate_equilibration_workflow.
+    Both functions call this automatically when data_file is provided.
+
+    Args:
+        data_file:       Path to the .data file.
+        h_type_ids:      SHAKE H type IDs to validate.
+        backbone_types:  Backbone atom type IDs to validate (end-to-end, P2).
+        atom_type_pairs: RDF atom type pairs to validate.
+        lj_cutoff:       LJ cutoff in Å (default 12.0 for GAFF2).
+        charge_tol:      Maximum allowed |net charge| in e (default 0.01).
+
+    Returns:
+        dict with:
+            valid    — bool: True only when errors is empty
+            errors   — list of blocking issues
+            warnings — list of advisory concerns
+            stats    — computed values: net_charge_e, density_g_cm3, box_min_A, etc.
+    """
+    try:
+        content = Path(data_file).read_text(encoding="utf-8")
+        gen = ScriptGenerator(data_file=data_file)
+        gen.parse_data_file(content=content)
+        result = gen.validate_data_file(
+            content=content,
+            h_type_ids=h_type_ids,
+            backbone_types=backbone_types,
+            atom_type_pairs=atom_type_pairs,
+            lj_cutoff=lj_cutoff,
+            charge_tol=charge_tol,
+        )
+        result["data_file"] = data_file
+        return result
+    except Exception as e:
+        return {"valid": False, "errors": [str(e)], "warnings": [], "stats": {}, "data_file": data_file}
+
+
+@mcp.tool()
+def parse_data_file(data_file: str) -> dict:
+    """
+    Parse a LAMMPS .data file and extract system information.
     Use this to understand your system before generating scripts.
 
     Args:
-        data_file: Path to the .data file. If remote=True, path on Lambda.
-        remote:    If True, reads file from Lambda Labs via SSH.
+        data_file: Path to the .data file.
 
     Returns:
         dict with n_atoms, n_atom_types, box dimensions, atom type names,
         h_type_ids (for SHAKE), and force field info.
     """
     try:
-        if remote:
-            content = executor.read_file(data_file)
-        else:
-            with open(data_file, "r") as f:
-                content = f.read()
+        content = Path(data_file).read_text(encoding="utf-8")
 
         gen = ScriptGenerator(data_file=data_file)
         info = gen.parse_data_file(content=content)
@@ -439,64 +527,44 @@ def generate_script(
     data_file: str,
     output_script: str,
     params: dict,
-    upload_to_lambda: bool = True,
-    remote_output_dir: Optional[str] = None,
 ) -> dict:
     """
-    Generate a filled LAMMPS .in script from a template and optionally
-    upload it to Lambda Labs ready to run.
+    Generate a filled LAMMPS .in script from a template and write it to disk.
 
     Args:
-        template_name:     Template to use (minimize/nvt/npt/npt_compress/
-                           npt_tg_step/nemd_thermal)
-        data_file:         Path to RadonPy .data file ON LAMBDA (used as DATA_FILE
-                           in the script). This is the remote path.
-        output_script:     Local path to write the generated .in file.
-        params:            Parameter overrides (see get_template_defaults for options).
-                           Common params: T_START, T_FINAL, N_STEPS, T_DAMP,
-                           P_START, P_FINAL, P_DAMP, use_gpu, LOG_FILE, DUMP_FILE.
-        upload_to_lambda:  If True, upload the generated script to Lambda.
-        remote_output_dir: Directory on Lambda to upload the script to.
-                           Defaults to dirname of data_file.
+        template_name: Template to use (minimize/nvt/npt/npt_compress/
+                       npt_tg_step/nemd_thermal)
+        data_file:     Path to the LAMMPS .data file.
+        output_script: Path to write the generated .in file.
+        params:        Parameter overrides (see get_template_defaults for options).
+                       Common params: T_START, T_FINAL, N_STEPS, T_DAMP,
+                       P_START, P_FINAL, P_DAMP, use_gpu, LOG_FILE, DUMP_FILE.
 
     Returns:
-        dict with script content, local path, and remote path (if uploaded).
+        dict with script content, output path, and params used.
     """
     try:
         gen = ScriptGenerator(data_file=data_file)
-
-        # Try to parse the data file to enrich system info
         try:
-            content = executor.read_file(data_file)
-            gen.parse_data_file(content=content)
+            gen.parse_data_file(content=Path(data_file).read_text(encoding="utf-8"))
         except Exception:
-            logger.warning("Could not parse data file from Lambda; using defaults")
+            logger.warning("Could not parse data file; using defaults")
 
         script = gen.generate(
             template_name=template_name,
             output_path=output_script,
             params=params,
-            data_file_override=data_file,  # always use remote path in script
+            data_file_override=data_file,
         )
 
-        result = {
-            "status":        "success",
-            "template":      template_name,
-            "local_script":  output_script,
-            "remote_script": None,
-            "params_used":   {**TEMPLATE_DEFAULTS[template_name], **params},
-            "system_info":   gen.get_system_info(),
+        return {
+            "status":         "success",
+            "template":       template_name,
+            "output_script":  output_script,
+            "params_used":    {**TEMPLATE_DEFAULTS[template_name], **params},
+            "system_info":    gen.get_system_info(),
             "script_preview": script[:1500] + "\n..." if len(script) > 1500 else script,
         }
-
-        if upload_to_lambda:
-            remote_dir = remote_output_dir or os.path.dirname(data_file)
-            remote_path = os.path.join(remote_dir, os.path.basename(output_script))
-            executor.upload_file(output_script, remote_path)
-            result["remote_script"] = remote_path
-            result["upload_status"] = "uploaded"
-
-        return result
 
     except Exception as e:
         logger.error(f"generate_script failed: {e}")
@@ -528,7 +596,7 @@ def run_lammps_script(
     """
     try:
         # Ensure remote work directory exists
-        executor.execute_command(f"mkdir -p {remote_work_dir}")
+        Path(remote_work_dir).mkdir(parents=True, exist_ok=True)
 
         meta = {
             "remote_script":   remote_script,
@@ -555,7 +623,7 @@ def run_lammps_script(
             "mpi":             mpi,
             "gpu_ids":         gpu_ids,
             "poll_tip":        "Use get_run_status(run_id) to check progress. "
-                               "Use read_remote_log(run_id) to monitor LAMMPS output.",
+                               "Use read_log(run_id) to monitor LAMMPS output.",
         }
 
     except Exception as e:
@@ -567,6 +635,9 @@ def run_lammps_chain(
     stages: list,
     mpi: int = 2,
     gpu_ids: str = "0,1",
+    data_file: Optional[str] = None,
+    h_type_ids: Optional[list] = None,
+    backbone_types: Optional[list] = None,
 ) -> dict:
     """
     Execute a sequence of LAMMPS scripts on Lambda Labs as a fully chained
@@ -579,17 +650,28 @@ def run_lammps_chain(
     Progress is written to chain_progress.jsonl (one JSON line per event)
     in the same directory as the chain script. Poll with get_run_status().
 
+    Pre-flight validation: when data_file is provided, validate_data_file()
+    is called before submission. Blocking errors (charge non-neutrality,
+    missing Coeffs, box too small, invalid type IDs) stop the chain
+    immediately with a clear error message. Warnings are returned alongside
+    the chain_id so they appear in the result.
+
     Args:
-        stages:   Ordered list of stage dicts, each with:
-                    - name            (str)  human-readable label
-                    - remote_script   (str)  full path to .in file on Lambda
-                    - remote_work_dir (str)  working directory on Lambda
-                    - log_file        (str)  run log filename (optional)
-        mpi:      MPI processes (same for all stages).
-        gpu_ids:  Comma-separated GPU IDs (same for all stages).
+        stages:         Ordered list of stage dicts, each with:
+                          - name            (str)  human-readable label
+                          - remote_script   (str)  full path to .in file on Lambda
+                          - remote_work_dir (str)  working directory on Lambda
+                          - log_file        (str)  run log filename (optional)
+        mpi:            MPI processes (same for all stages).
+        gpu_ids:        Comma-separated GPU IDs (same for all stages).
+        data_file:      Optional remote path to the .data file. When provided,
+                        runs pre-flight validation before launching the chain.
+        h_type_ids:     SHAKE H type IDs — validated against the data file.
+        backbone_types: Backbone type IDs — validated against the data file.
 
     Returns:
         dict with chain_id, remote paths, and poll instructions.
+        Includes preflight_warnings if validation found advisory issues.
     """
     try:
         if not stages:
@@ -603,6 +685,32 @@ def run_lammps_chain(
         for s in stages:
             if "log_file" not in s:
                 s["log_file"] = f"{s.get('name', 'stage')}_run.log"
+
+        # ── Pre-flight validation ─────────────────────────────────────────────
+        preflight_warnings = []
+        if data_file:
+            try:
+                content = Path(data_file).read_text(encoding="utf-8")
+                gen = ScriptGenerator(data_file=data_file)
+                gen.parse_data_file(content=content)
+                vr = gen.validate_data_file(
+                    content=content,
+                    h_type_ids=h_type_ids,
+                    backbone_types=backbone_types,
+                )
+                if vr["errors"]:
+                    return {
+                        "status": "error",
+                        "error": "Pre-flight validation failed — chain not submitted",
+                        "validation_errors": vr["errors"],
+                        "validation_warnings": vr["warnings"],
+                        "validation_stats": vr["stats"],
+                    }
+                preflight_warnings = vr["warnings"]
+                if preflight_warnings:
+                    logger.warning(f"Pre-flight warnings for {data_file}: {preflight_warnings}")
+            except Exception as ve:
+                logger.warning(f"Pre-flight validation skipped (error reading data file): {ve}")
 
         chain_id = str(uuid.uuid4())[:8]
 
@@ -627,9 +735,9 @@ def run_lammps_chain(
             f"mkdir -p {chain_dir} && "
             f"cat > {chain_script} << 'POLYJARVIS_EOF'\n{script_body}\nPOLYJARVIS_EOF\n"
             f"chmod +x {chain_script} && "
-            f"nohup bash {chain_script} > {chain_dir}/chain_{chain_id}.log 2>&1 & echo $!"
+            f"setsid nohup bash {chain_script} > {chain_dir}/chain_{chain_id}.log 2>&1 </dev/null & disown; echo $!"
         )
-        stdout, _, _ = executor.execute_command(one_shot)
+        stdout, _, _ = _conda_run(one_shot)
         pid = stdout.strip().splitlines()[-1] if stdout.strip() else "unknown"
 
         meta = {
@@ -647,7 +755,16 @@ def run_lammps_chain(
         run_manager.create_with_id(chain_id, "lammps_nohup_chain", meta)
         run_manager.start(chain_id)
 
-        return {
+        # Start a background thread that polls the remote progress file and writes
+        # a local sentinel when the nohup chain finishes — enabling Monitor-based
+        # auto-continuation without Claude polling.
+        threading.Thread(
+            target=_chain_completion_monitor,
+            args=(chain_id, progress_file),
+            daemon=True,
+        ).start()
+
+        result = {
             "status":        "submitted",
             "chain_id":      chain_id,
             "n_stages":      len(stages),
@@ -656,12 +773,47 @@ def run_lammps_chain(
             "chain_script":  chain_script,
             "progress_file": progress_file,
             "poll_tip":      "Use get_run_status(chain_id) to check progress. "
-                             "Status is read live from Lambda's progress file — "
-                             "survives MCP server restarts.",
+                             "Call watch_run(chain_id) immediately after this to "
+                             "be notified automatically when the chain finishes.",
         }
+        if preflight_warnings:
+            result["preflight_warnings"] = preflight_warnings
+        return result
 
     except Exception as e:
         return {"status": "error", "error": str(e)}
+
+
+def _chain_completion_monitor(chain_id: str, progress_file: str, poll_interval: int = 60):
+    """
+    Background thread: polls Lambda's chain_progress.jsonl every poll_interval seconds.
+    Writes a local sentinel file when the chain completes or fails so Claude can
+    be notified via the Monitor tool without polling get_run_status().
+    """
+    logger.info(f"[{chain_id}] Chain monitor started (polling every {poll_interval}s)")
+    while True:
+        time.sleep(poll_interval)
+        try:
+            stdout, _, exit_code = _conda_run(f"tail -5 {progress_file} 2>/dev/null || echo ''")
+            if not stdout:
+                continue
+            for line in reversed(stdout.strip().splitlines()):
+                try:
+                    event = json.loads(line)
+                    if event.get("stage") == "__chain__":
+                        if event.get("status") == "completed":
+                            _write_sentinel(chain_id, "completed")
+                            logger.info(f"[{chain_id}] Chain monitor: completed")
+                            return
+                        elif event.get("status") == "failed":
+                            _write_sentinel(chain_id, "failed",
+                                            {"stage": event.get("failed_stage", "unknown")})
+                            logger.info(f"[{chain_id}] Chain monitor: failed")
+                            return
+                except json.JSONDecodeError:
+                    continue
+        except Exception as e:
+            logger.warning(f"[{chain_id}] Chain monitor poll error: {e}")
 
 
 @mcp.tool()
@@ -686,7 +838,7 @@ def get_run_status(run_id: str) -> dict:
     if run.get("run_type") == "lammps_nohup_chain":
         progress_file = run["meta"].get("progress_file", "")
         try:
-            stdout, _, rc = executor.execute_command(
+            stdout, _, rc = _conda_run(
                 f"cat {progress_file} 2>/dev/null || echo ''"
             )
             events = [json.loads(line) for line in stdout.strip().splitlines() if line.strip()]
@@ -760,14 +912,14 @@ def get_run_output(run_id: str) -> dict:
     # Tail the LAMMPS log
     try:
         lammps_log = os.path.join(work_dir, "log.lammps")
-        stdout, _, _ = executor.execute_command(f"tail -100 {lammps_log}")
+        stdout, _, _ = _conda_run(f"tail -100 {lammps_log}")
         result["lammps_log_tail"] = stdout
     except Exception:
         result["lammps_log_tail"] = "(could not read log.lammps)"
 
     # List output files
     try:
-        files = executor.list_directory(work_dir)
+        files = os.listdir(work_dir)
         result["output_files"] = sorted(files)
     except Exception:
         result["output_files"] = []
@@ -794,19 +946,58 @@ def list_runs(status_filter: Optional[str] = None) -> dict:
     summaries = []
     for r in runs:
         summaries.append({
-            "run_id":       r["run_id"],
-            "status":       r["status"],
-            "run_type":     r["run_type"],
-            "submitted_at": r["submitted_at"],
-            "completed_at": r["completed_at"],
-            "script":       r["meta"].get("remote_script", ""),
+            "run_id":       r.get("run_id", "unknown"),
+            "status":       r.get("status", "unknown"),
+            "run_type":     r.get("run_type", "unknown"),
+            "submitted_at": r.get("submitted_at", "unknown"),
+            "completed_at": r.get("completed_at"),
+            "script":       r.get("meta", {}).get("remote_script", ""),
         })
 
     return {"runs": summaries, "total": len(summaries)}
 
 
 @mcp.tool()
-def read_remote_log(
+def watch_run(run_id: str) -> dict:
+    """
+    Return a shell command Claude can pass to the Monitor tool to be notified
+    automatically when a run completes — no polling required.
+
+    Call this immediately after run_lammps_chain(), run_lammps_script(), or
+    any analysis tool. Then invoke the Monitor tool with the returned command.
+    The Monitor will block until the sentinel file appears and print its
+    contents; the harness re-invokes Claude at that point to continue the
+    workflow.
+
+    Args:
+        run_id: The run_id or chain_id to watch.
+
+    Returns:
+        monitor_command to pass directly to the Monitor tool.
+        Also returns sentinel_path for reference.
+    """
+    sentinel_path = SENTINEL_DIR / f"done_{run_id}.json"
+    # The command blocks until the sentinel file exists, then prints its contents.
+    # The Monitor tool streams stdout line-by-line; the final line is the JSON payload.
+    monitor_command = (
+        f"until [ -f {sentinel_path} ]; do sleep 30; done"
+        f" && echo 'RUN_COMPLETE'"
+        f" && cat {sentinel_path}"
+    )
+    return {
+        "run_id":          run_id,
+        "sentinel_path":   str(sentinel_path),
+        "monitor_command": monitor_command,
+        "usage":           (
+            "Pass monitor_command to the Monitor tool. "
+            "When it prints RUN_COMPLETE, read sentinel_path to get the status, "
+            "then continue the workflow."
+        ),
+    }
+
+
+@mcp.tool()
+def read_log(
     run_id: Optional[str] = None,
     remote_log_path: Optional[str] = None,
     n_lines: int = 50,
@@ -835,7 +1026,7 @@ def read_remote_log(
         else:
             return {"error": "Provide either run_id or remote_log_path"}
 
-        stdout, _, exit_code = executor.execute_command(f"tail -{n_lines} {log_path}")
+        stdout, _, exit_code = _conda_run(f"tail -{n_lines} {log_path}")
 
         if exit_code != 0:
             return {"error": f"Could not read log at {log_path}"}
@@ -883,6 +1074,8 @@ def generate_equilibration_workflow(
     max_press: float = 50000.0,
     n_chains: int = 6,
     n_atoms: Optional[int] = None,
+    use_pcff: bool = False,
+    params_file: str = "",
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
@@ -906,6 +1099,15 @@ def generate_equilibration_workflow(
         max_press:      Compression pressure (atm), typically 50000.
         n_chains:       Number of polymer chains (informational).
         n_atoms:        Total atom count. Auto-detected if not provided.
+        use_pcff:       Set True for EMC/PCFF class2 systems (PCBN, PAMD, PKTN,
+                        PSFO, PIMD). Switches all templates to class2 styles,
+                        sixthpower mixing, and full 1-4 interactions. SHAKE is
+                        disabled (PCFF runs cleanly at 1 fs without it).
+        params_file:    Optional path to an EMC-generated .params file containing
+                        force field coefficients (pair_coeff, bond_coeff, etc.).
+                        When provided, Coeffs validation is skipped on the .data
+                        file (EMC stores coefficients separately) and each script
+                        includes the file via `include {params_file}`.
 
     Returns:
         dict with:
@@ -915,13 +1117,29 @@ def generate_equilibration_workflow(
     """
     try:
         # Parse data file to get system info
-        content = executor.read_file(data_file)
+        content = Path(data_file).read_text(encoding="utf-8")
         gen = ScriptGenerator(data_file=data_file)
         info = gen.parse_data_file(content=content)
+
+        # Pre-flight validation — block on errors, surface warnings.
+        # When params_file is set (EMC output), Coeffs live in the params file
+        # rather than the .data file — filter those specific errors out.
+        vr = gen.validate_data_file(content=content, h_type_ids=info.get("h_type_ids"))
+        errors = vr["errors"]
+        if params_file:
+            errors = [e for e in errors if "Coeffs' section missing" not in e]
+        if errors:
+            return {
+                "status": "error",
+                "error": "Pre-flight validation failed — workflow not generated",
+                "validation_errors": errors,
+                "validation_warnings": vr["warnings"],
+                "validation_stats": vr["stats"],
+            }
+
         n_atoms = n_atoms or info.get("n_atoms", 0)
 
         # Select step counts based on system size
-        # Larger systems need fewer steps per stage (GPU is faster)
         if n_atoms < 5000:
             steps_min   = 50000
             steps_comp  = 300000
@@ -941,65 +1159,68 @@ def generate_equilibration_workflow(
             steps_npt   = 3000000
             steps_nvt   = 3000000
 
+        # PCFF class2 cells from EMC start at ~0.5× experimental density — no
+        # separate soft-heat or cutoff-only compression phase needed.
+        # SHAKE is off: PCFF runs stably at 1 fs all-atom without constraints.
+        ff_base = {"use_pcff": True, "use_shake": False} if use_pcff else {}
+        if params_file:
+            ff_base["params_file"] = params_file
+
         stages = []
-        local_base = LOCAL_WORKDIR / "generated_scripts" / polymer_name
-        local_base.mkdir(parents=True, exist_ok=True)
 
         def _stage(name, template, p, prev_data):
-            local_script = str(local_base / f"{name}.in")
-            remote_dir   = f"{work_dir_base}/{name}"
+            remote_dir    = f"{work_dir_base}/{name}"
             remote_script = f"{remote_dir}/{name}.in"
-            out_data     = f"{remote_dir}/{name}_out.data"
+            out_data      = f"{remote_dir}/{name}_out.data"
             p = {
                 "LOG_FILE":        f"{name}.log",
                 "DUMP_FILE":       f"{name}.dump",
                 "LAST_DUMP_FILE":  f"{name}_last.dump",
                 "WRITE_DATA_FILE": out_data,
-                **p,
+                **p,        # stage params first (lower priority for FF keys)
+                **ff_base,  # ff_base last — ensures use_shake/use_pcff/params_file always win
             }
-            script = gen.generate(
+            Path(remote_dir).mkdir(parents=True, exist_ok=True)
+            gen.generate(
                 template_name=template,
-                output_path=local_script,
+                output_path=remote_script,
                 params=p,
                 data_file_override=prev_data,
             )
-            executor.execute_command(f"mkdir -p {remote_dir}")
-            executor.upload_file(local_script, remote_script)
             return {
-                "name":          name,
-                "template":      template,
-                "local_script":  local_script,
-                "remote_script": remote_script,
+                "name":            name,
+                "template":        template,
+                "remote_script":   remote_script,
                 "remote_work_dir": remote_dir,
-                "input_data":    prev_data,
-                "output_data":   out_data,
-                "params":        p,
+                "input_data":      prev_data,
+                "output_data":     out_data,
+                "params":          p,
             }
 
         # Stage 1: Minimize
         s1 = _stage("01_minimize", "minimize", {
             "use_pppm":  True,
-            "use_gpu":   False,
+            "use_gpu":   True,
             "MIN_STYLE": "cg",
             "MAXITER":   50000,
         }, data_file)
         stages.append(s1)
 
-        # Stage 2: NVT soft heat (no PPPM, low timestep to avoid blowup)
+        # Stage 2: NVT soft heat — GPU + PPPM throughout
         s2 = _stage("02_nvt_softheat", "nvt", {
             "T_START":    300.0,
             "T_FINAL":    max_temp,
             "T_DAMP":     50.0,
             "TIMESTEP":   0.5,
             "N_STEPS":    steps_comp,
-            "use_pppm":   False,   # lj/cut during initial heating
-            "use_gpu":    False,
-            "use_shake":  False,   # off for first heat to avoid constraint failures
+            "use_pppm":   True,
+            "use_gpu":    True,
+            "use_shake":  False,
             "init_velocity": 300.0,
         }, s1["output_data"])
         stages.append(s2)
 
-        # Stage 3: NPT compression to target density
+        # Stage 3: NPT compression to target density — GPU + PPPM
         s3 = _stage("03_npt_compress", "npt_compress", {
             "T_START":   max_temp,
             "T_FINAL":   max_temp,
@@ -1009,13 +1230,12 @@ def generate_equilibration_workflow(
             "P_DAMP":    1000.0,
             "TIMESTEP":  1.0,
             "N_STEPS":   steps_comp,
-            "use_pppm":  False,   # still lj/cut during compression
-            "use_gpu":   False,
-            "use_shake": True,
+            "use_pppm":  True,
+            "use_gpu":   True,
         }, s2["output_data"])
         stages.append(s3)
 
-        # Stage 4: NPT decompress + switch to PPPM
+        # Stage 4: NPT decompress — GPU + PPPM
         s4 = _stage("04_npt_pppm", "npt", {
             "T_START":   max_temp,
             "T_FINAL":   max_temp,
@@ -1026,13 +1246,12 @@ def generate_equilibration_workflow(
             "TIMESTEP":  1.0,
             "N_STEPS":   steps_comp,
             "use_pppm":  True,
-            "use_gpu":   False,  # CPU for NPT + restart
-            "use_shake": True,
+            "use_gpu":   True,
             "write_restart": True,
         }, s3["output_data"])
         stages.append(s4)
 
-        # Stage 5: NPT cool to target temp
+        # Stage 5: NPT cool to target temp — GPU + PPPM
         s5 = _stage("05_npt_cool", "npt", {
             "T_START":   max_temp,
             "T_FINAL":   temp,
@@ -1043,13 +1262,12 @@ def generate_equilibration_workflow(
             "TIMESTEP":  1.0,
             "N_STEPS":   steps_npt,
             "use_pppm":  True,
-            "use_gpu":   False,
-            "use_shake": True,
+            "use_gpu":   True,
             "write_restart": True,
         }, s4["output_data"])
         stages.append(s5)
 
-        # Stage 6: NVT production at target temp (GPU safe)
+        # Stage 6: NVT production — GPU + PPPM
         s6 = _stage("06_nvt_production", "nvt", {
             "T_START":   temp,
             "T_FINAL":   temp,
@@ -1057,8 +1275,7 @@ def generate_equilibration_workflow(
             "TIMESTEP":  1.0,
             "N_STEPS":   steps_nvt,
             "use_pppm":  True,
-            "use_gpu":   True,   # GPU safe: NVT + no restarts
-            "use_shake": True,
+            "use_gpu":   True,
             "write_restart": False,
         }, s5["output_data"])
         stages.append(s6)
@@ -1072,12 +1289,14 @@ def generate_equilibration_workflow(
             "n_stages":   len(stages),
             "stages":     stages,
             "run_order":  [s["name"] for s in stages],
+            "preflight_warnings": vr["warnings"],
+            "preflight_stats":    vr["stats"],
             "instructions": (
                 f"Generated {len(stages)} staged scripts for {polymer_name}.\n"
                 "Execute in order using run_lammps_script().\n"
                 "GPU is OFF for NPT stages (restart safety).\n"
                 "GPU is ON for NVT production stage.\n"
-                "Monitor each stage with read_remote_log() before proceeding."
+                "Monitor each stage with read_log() before proceeding."
             ),
         }
 
@@ -1110,9 +1329,11 @@ def _analysis_run_background(run_id: str, func, kwargs: dict):
         run_manager.start(run_id)
         result = func(**kwargs)
         run_manager.complete(run_id, result)
+        _write_sentinel(run_id, "completed")
     except Exception as e:
         logger.error(f"Analysis run {run_id} failed: {e}")
         run_manager.fail(run_id, str(e))
+        _write_sentinel(run_id, "failed", {"error": str(e)[:500]})
 
 
 # ── Tool: unwrap_coordinates ─────────────────────────────────────────────────
@@ -1127,11 +1348,7 @@ def _run_unwrap_coordinates(dump_file: str, output_file: str) -> dict:
     command = " ".join(parts)
     logger.info(f"Running unwrap via CLI: {command}")
 
-    stdout, stderr, exit_code = executor.execute_command(
-        command,
-        workdir=executor.remote_workdir,
-        timeout=36000,
-    )
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
 
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
@@ -1225,11 +1442,7 @@ def _run_extract_end_to_end(
     command = " ".join(parts)
     logger.info(f"Running E2E via MDAnalysis: {command}")
 
-    stdout, stderr, exit_code = executor.execute_command(
-        command,
-        workdir=executor.remote_workdir,
-        timeout=36000,
-    )
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
 
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
@@ -1352,11 +1565,7 @@ def _run_calculate_rdf(
     command = " ".join(parts)
     logger.info(f"Running RDF via MDAnalysis: {command}")
 
-    stdout, stderr, exit_code = executor.execute_command(
-        command,
-        workdir=executor.remote_workdir,
-        timeout=36000,
-    )
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
 
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
@@ -1460,11 +1669,7 @@ def _run_extract_tg(
     command = " ".join(parts)
     logger.info(f"Running Tg extraction via CLI: {command}")
 
-    stdout, stderr, exit_code = executor.execute_command(
-        command,
-        workdir=executor.remote_workdir,
-        timeout=36000,
-    )
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
 
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
@@ -1577,11 +1782,7 @@ def _run_check_equilibration(
     command = " ".join(parts)
     logger.info(f"Running equilibration check via CLI: {command}")
 
-    stdout, stderr, exit_code = executor.execute_command(
-        command,
-        workdir=executor.remote_workdir,
-        timeout=36000,
-    )
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
 
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
@@ -1702,11 +1903,7 @@ def _run_extract_equilibrated_density(
     command = " ".join(parts)
     logger.info(f"Running equilibrated density extraction via CLI: {command}")
 
-    stdout, stderr, exit_code = executor.execute_command(
-        command,
-        workdir=executor.remote_workdir,
-        timeout=36000,
-    )
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
 
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
@@ -1824,11 +2021,7 @@ def _run_extract_bulk_modulus(
     command = " ".join(parts)
     logger.info(f"Running bulk modulus extraction via CLI: {command}")
 
-    stdout, stderr, exit_code = executor.execute_command(
-        command,
-        workdir=executor.remote_workdir,
-        timeout=36000,
-    )
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
 
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
@@ -1927,6 +2120,524 @@ def extract_bulk_modulus(
     }
 
 
+# ── Tool: extract_radius_of_gyration ─────────────────────────────────────────
+
+def _run_extract_radius_of_gyration(
+    data_file: str,
+    dump_file: str,
+    output_dir: str,
+    skip_frames: int,
+    max_frames: Optional[int],
+    atom_style: str,
+    n_backbone_bonds: Optional[int],
+    bond_length_A: float,
+) -> dict:
+    parts = [f"python {MDA_SCRIPTS_DIR}/mda_radius_of_gyration.py"]
+    parts.append(f"--data_file {data_file}")
+    parts.append(f"--dump_file {dump_file}")
+    parts.append(f"--output_dir {output_dir}")
+    parts.append(f"--skip_frames {skip_frames}")
+    if max_frames is not None:
+        parts.append(f"--max_frames {max_frames}")
+    parts.append(f'--atom_style "{atom_style}"')
+    if n_backbone_bonds is not None:
+        parts.append(f"--n_backbone_bonds {n_backbone_bonds}")
+    parts.append(f"--bond_length_A {bond_length_A}")
+
+    command = " ".join(parts)
+    logger.info(f"Running radius of gyration via CLI: {command}")
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def extract_radius_of_gyration(
+    data_file: str,
+    dump_file: str,
+    output_dir: Optional[str] = None,
+    skip_frames: int = 0,
+    max_frames: Optional[int] = None,
+    atom_style: str = "id resid type charge x y z",
+    n_backbone_bonds: Optional[int] = None,
+    bond_length_A: float = 1.54,
+) -> dict:
+    """
+    Compute mass-weighted radius of gyration (Rg) per chain per frame.
+
+    Reports the mean, std, and CV of Rg across chains. Flags if CV > 30%
+    (unequal chain conformations — poor equilibration). Optionally computes
+    the characteristic ratio C∞ = 6·⟨Rg²⟩/(N·l²) when n_backbone_bonds
+    is supplied.
+
+    Key result fields (when completed):
+        overall_mean_Rg_A       — ⟨Rg⟩ across all chains and frames (Å)
+        overall_mean_Rg2_A2     — ⟨Rg²⟩ (Å²), use as rg_sq_A2 input to calculate_msd
+        rg_cv_across_chains     — CV of per-chain mean Rg (flag fires if > 0.30)
+        rg_spread_flag          — bool: CV > 30% → heterogeneous conformations
+        characteristic_ratio_from_Rg — C∞ (if n_backbone_bonds supplied)
+
+    The job runs in the background — poll with get_run_status(run_id).
+
+    Args:
+        data_file:         Full path to LAMMPS .data file on Lambda.
+        dump_file:         Full path to LAMMPS dump file on Lambda.
+        output_dir:        Output directory on Lambda (default: <dump_dir>/analysis).
+        skip_frames:       Number of initial frames to skip.
+        max_frames:        Maximum frames to analyse.
+        atom_style:        LAMMPS atom_style columns.
+        n_backbone_bonds:  Backbone bonds per chain for C∞ calculation.
+        bond_length_A:     Backbone bond length in Å (default 1.54 for C-C).
+
+    Returns:
+        dict with run_id. Output files: rg_per_chain.csv, rg_summary.json.
+    """
+    if output_dir is None:
+        output_dir = str(Path(dump_file).parent / "analysis")
+
+    run_id = run_manager.create("extract_radius_of_gyration", {"data_file": data_file, "dump_file": dump_file})
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_extract_radius_of_gyration, dict(
+            data_file        = data_file,
+            dump_file        = dump_file,
+            output_dir       = output_dir,
+            skip_frames      = skip_frames,
+            max_frames       = max_frames,
+            atom_style       = atom_style,
+            n_backbone_bonds = n_backbone_bonds,
+            bond_length_A    = bond_length_A,
+        )),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":     "submitted",
+        "run_id":     run_id,
+        "run_type":   "extract_radius_of_gyration",
+        "dump_file":  dump_file,
+        "output_dir": output_dir,
+        "message":    "Poll with get_run_status(run_id)",
+    }
+
+
+# ── Tool: calculate_msd ───────────────────────────────────────────────────────
+
+def _run_calculate_msd(
+    data_file: str,
+    dump_file: str,
+    output_dir: str,
+    skip_frames: int,
+    max_frames: Optional[int],
+    atom_style: str,
+    timestep_fs: float,
+    dump_every: Optional[int],
+    rg_sq_A2: Optional[float],
+    n_lag_points: int,
+) -> dict:
+    parts = [f"python {MDA_SCRIPTS_DIR}/mda_msd.py"]
+    parts.append(f"--data_file {data_file}")
+    parts.append(f"--dump_file {dump_file}")
+    parts.append(f"--output_dir {output_dir}")
+    parts.append(f"--skip_frames {skip_frames}")
+    if max_frames is not None:
+        parts.append(f"--max_frames {max_frames}")
+    parts.append(f'--atom_style "{atom_style}"')
+    parts.append(f"--timestep_fs {timestep_fs}")
+    if dump_every is not None:
+        parts.append(f"--dump_every {dump_every}")
+    if rg_sq_A2 is not None:
+        parts.append(f"--rg_sq_A2 {rg_sq_A2}")
+    parts.append(f"--n_lag_points {n_lag_points}")
+
+    command = " ".join(parts)
+    logger.info(f"Running MSD via CLI: {command}")
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def calculate_msd(
+    data_file: str,
+    dump_file: str,
+    output_dir: Optional[str] = None,
+    skip_frames: int = 0,
+    max_frames: Optional[int] = None,
+    atom_style: str = "id resid type charge x y z",
+    timestep_fs: float = 1.0,
+    dump_every: Optional[int] = None,
+    rg_sq_A2: Optional[float] = None,
+    n_lag_points: int = 40,
+) -> dict:
+    """
+    Compute mean-squared displacement (MSD) of chain centres of mass.
+
+    Tracks CoM per chain via overlapping windows and fits MSD(τ) = A·τ^α
+    in log-log space. The exponent α characterises the diffusion regime:
+      α ≈ 1.0 → Fickian diffusion (well above Tg)
+      α 0.3–0.7 → subdiffusive (Rouse/reptation, near Tg)
+      α < 0.2  → strongly caged / kinetically trapped
+
+    Kinetic-trap flag fires when MSD(max_lag) < ⟨Rg²⟩ — chains have not
+    moved by their own size over the full trajectory window. Pass
+    overall_mean_Rg2_A2 from extract_radius_of_gyration as rg_sq_A2.
+
+    Key result fields (when completed):
+        fit_alpha               — diffusion exponent α
+        kinetic_trap_flag       — bool: MSD_max < Rg²
+        kinetic_trap_ratio_msd_over_rg2 — MSD_max/Rg² (< 1.0 → trapped)
+        diffusivity_cm2_s       — D if α ≈ 1; None otherwise
+
+    The job runs in the background — poll with get_run_status(run_id).
+
+    Args:
+        data_file:     Full path to LAMMPS .data file on Lambda.
+        dump_file:     Full path to LAMMPS dump file on Lambda.
+        output_dir:    Output directory on Lambda.
+        skip_frames:   Initial frames to skip.
+        max_frames:    Maximum frames to analyse.
+        atom_style:    LAMMPS atom_style columns.
+        timestep_fs:   LAMMPS timestep in fs (default 1.0).
+        dump_every:    Dump frequency in steps (auto-detected if None).
+        rg_sq_A2:      ⟨Rg²⟩ in Å² from extract_radius_of_gyration — enables kinetic-trap flag.
+        n_lag_points:  Number of log-spaced lag times (default 40).
+
+    Returns:
+        dict with run_id. Output files: msd_vs_lag.csv, msd_summary.json.
+    """
+    if output_dir is None:
+        output_dir = str(Path(dump_file).parent / "analysis")
+
+    run_id = run_manager.create("calculate_msd", {"data_file": data_file, "dump_file": dump_file})
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_calculate_msd, dict(
+            data_file    = data_file,
+            dump_file    = dump_file,
+            output_dir   = output_dir,
+            skip_frames  = skip_frames,
+            max_frames   = max_frames,
+            atom_style   = atom_style,
+            timestep_fs  = timestep_fs,
+            dump_every   = dump_every,
+            rg_sq_A2     = rg_sq_A2,
+            n_lag_points = n_lag_points,
+        )),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":     "submitted",
+        "run_id":     run_id,
+        "run_type":   "calculate_msd",
+        "dump_file":  dump_file,
+        "output_dir": output_dir,
+        "message":    "Poll with get_run_status(run_id)",
+    }
+
+
+# ── Tool: check_orientation_order ────────────────────────────────────────────
+
+def _run_check_orientation_order(
+    data_file: str,
+    dump_file: str,
+    backbone_types: list,
+    output_dir: str,
+    skip_frames: int,
+    max_frames: Optional[int],
+    atom_style: str,
+) -> dict:
+    parts = [f"python {MDA_SCRIPTS_DIR}/mda_orientation_order.py"]
+    parts.append(f"--data_file {data_file}")
+    parts.append(f"--dump_file {dump_file}")
+    parts.append(f"--backbone_types {' '.join(str(t) for t in backbone_types)}")
+    parts.append(f"--output_dir {output_dir}")
+    parts.append(f"--skip_frames {skip_frames}")
+    if max_frames is not None:
+        parts.append(f"--max_frames {max_frames}")
+    parts.append(f'--atom_style "{atom_style}"')
+
+    command = " ".join(parts)
+    logger.info(f"Running orientation order via CLI: {command}")
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def check_orientation_order(
+    data_file: str,
+    dump_file: str,
+    backbone_types: list,
+    output_dir: Optional[str] = None,
+    skip_frames: int = 0,
+    max_frames: Optional[int] = None,
+    atom_style: str = "id resid type charge x y z",
+) -> dict:
+    """
+    Compute the nematic backbone orientation order parameter P2.
+
+    Builds the Saupe order tensor Q from consecutive backbone bond vectors
+    and extracts P2 (largest eigenvalue) per frame.
+
+    Interpretation:
+      P2 ≈ 0 (< 0.10) → isotropic amorphous — well equilibrated
+      P2 > 0.10       → residual orientation: artificial packing artefact,
+                         nascent crystallite, or inadequate equilibration
+
+    Key result fields (when completed):
+        P2_mean          — mean P2 over all analysed frames
+        P2_trend_per_frame — slope of P2 vs frame (positive → growing order)
+        ordered_flag     — bool: P2_mean > 0.10
+
+    The job runs in the background — poll with get_run_status(run_id).
+
+    Args:
+        data_file:       Full path to LAMMPS .data file on Lambda.
+        dump_file:       Full path to LAMMPS dump file on Lambda.
+        backbone_types:  List of LAMMPS atom type IDs forming the backbone
+                         (e.g. [2, 3] for C-C backbone in GAFF2).
+        output_dir:      Output directory on Lambda.
+        skip_frames:     Initial frames to skip.
+        max_frames:      Maximum frames to analyse.
+        atom_style:      LAMMPS atom_style columns.
+
+    Returns:
+        dict with run_id. Output files: orientation_order.csv, orientation_summary.json.
+    """
+    if output_dir is None:
+        output_dir = str(Path(dump_file).parent / "analysis")
+
+    run_id = run_manager.create("check_orientation_order", {"data_file": data_file, "dump_file": dump_file})
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_check_orientation_order, dict(
+            data_file       = data_file,
+            dump_file       = dump_file,
+            backbone_types  = backbone_types,
+            output_dir      = output_dir,
+            skip_frames     = skip_frames,
+            max_frames      = max_frames,
+            atom_style      = atom_style,
+        )),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":     "submitted",
+        "run_id":     run_id,
+        "run_type":   "check_orientation_order",
+        "dump_file":  dump_file,
+        "output_dir": output_dir,
+        "message":    "Poll with get_run_status(run_id)",
+    }
+
+
+# ── Tool: check_density_homogeneity ──────────────────────────────────────────
+
+def _run_check_density_homogeneity(
+    data_file: str,
+    dump_file: str,
+    output_dir: str,
+    skip_frames: int,
+    max_frames: Optional[int],
+    atom_style: str,
+    grid_n: int,
+    cv_threshold: float,
+) -> dict:
+    parts = [f"python {MDA_SCRIPTS_DIR}/mda_density_homogeneity.py"]
+    parts.append(f"--data_file {data_file}")
+    parts.append(f"--dump_file {dump_file}")
+    parts.append(f"--output_dir {output_dir}")
+    parts.append(f"--skip_frames {skip_frames}")
+    if max_frames is not None:
+        parts.append(f"--max_frames {max_frames}")
+    parts.append(f'--atom_style "{atom_style}"')
+    parts.append(f"--grid_n {grid_n}")
+    parts.append(f"--cv_threshold {cv_threshold}")
+
+    command = " ".join(parts)
+    logger.info(f"Running density homogeneity via CLI: {command}")
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def check_density_homogeneity(
+    data_file: str,
+    dump_file: str,
+    output_dir: Optional[str] = None,
+    skip_frames: int = 0,
+    max_frames: Optional[int] = None,
+    atom_style: str = "id resid type charge x y z",
+    grid_n: int = 10,
+    cv_threshold: float = 0.25,
+) -> dict:
+    """
+    Check spatial density homogeneity by binning atoms into a voxel grid.
+
+    Divides the simulation box into grid_n³ voxels and computes the
+    coefficient of variation (CV = σ/μ) of voxel mass densities per frame.
+    A high CV indicates voids, chain droplets, or crystalline domains.
+
+    Interpretation:
+      CV < 0.15        → homogeneous amorphous (expected)
+      CV 0.15–0.25     → mild fluctuations (acceptable near Tg)
+      CV > 0.25        → heterogeneity flag fires
+
+    Key result fields (when completed):
+        cv_mean              — mean CV over analysed frames
+        cv_max               — worst-case CV (single frame)
+        cv_trend_per_frame   — positive → heterogeneity growing
+        heterogeneous_flag   — bool: cv_mean > cv_threshold
+
+    The job runs in the background — poll with get_run_status(run_id).
+
+    Args:
+        data_file:    Full path to LAMMPS .data file on Lambda.
+        dump_file:    Full path to LAMMPS dump file on Lambda.
+        output_dir:   Output directory on Lambda.
+        skip_frames:  Initial frames to skip.
+        max_frames:   Maximum frames to analyse.
+        atom_style:   LAMMPS atom_style columns.
+        grid_n:       Voxels per axis (default 10 → 1000 voxels).
+        cv_threshold: CV above which heterogeneous_flag fires (default 0.25).
+
+    Returns:
+        dict with run_id. Output files: density_homogeneity.csv, density_summary.json.
+    """
+    if output_dir is None:
+        output_dir = str(Path(dump_file).parent / "analysis")
+
+    run_id = run_manager.create("check_density_homogeneity", {"data_file": data_file, "dump_file": dump_file})
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_check_density_homogeneity, dict(
+            data_file    = data_file,
+            dump_file    = dump_file,
+            output_dir   = output_dir,
+            skip_frames  = skip_frames,
+            max_frames   = max_frames,
+            atom_style   = atom_style,
+            grid_n       = grid_n,
+            cv_threshold = cv_threshold,
+        )),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":     "submitted",
+        "run_id":     run_id,
+        "run_type":   "check_density_homogeneity",
+        "dump_file":  dump_file,
+        "output_dir": output_dir,
+        "message":    "Poll with get_run_status(run_id)",
+    }
+
+
+# ── Tool: check_equilibration_extended ───────────────────────────────────────
+
+@mcp.tool()
+def check_equilibration_extended(
+    log_file: str,
+    data_file: str,
+    dump_file: str,
+    backbone_types: list,
+    output_dir: Optional[str] = None,
+    skip_frames: int = 0,
+    max_frames: Optional[int] = None,
+    atom_style: str = "id resid type charge x y z",
+    timestep_fs: float = 1.0,
+    dump_every: Optional[int] = None,
+    n_backbone_bonds: Optional[int] = None,
+    bond_length_A: float = 1.54,
+    grid_n: int = 10,
+) -> dict:
+    """
+    Run all four extended structural equilibration checks in parallel.
+
+    Launches four background jobs simultaneously:
+      1. extract_radius_of_gyration — Rg distribution, CV across chains, C∞
+      2. calculate_msd              — chain CoM MSD, α exponent, kinetic-trap flag
+      3. check_orientation_order    — P2 nematic order, ordered_flag
+      4. check_density_homogeneity  — voxel CV, heterogeneous_flag
+
+    Call this after check_equilibration passes (thermo convergence) to
+    validate structural relaxation — the level of evidence reviewers expect
+    for polymer systems, especially below Tg or for long chains.
+
+    Workflow:
+      1. Call check_equilibration_extended(...) → get four run_ids
+      2. watch_run / Monitor each run_id to wait for completion
+      3. Interpret flags:
+           rg_spread_flag      → unequal chain conformations
+           kinetic_trap_flag   → chains immobile relative to their size
+           ordered_flag        → residual backbone alignment
+           heterogeneous_flag  → spatial density voids or domains
+
+    Args:
+        log_file:          LAMMPS log file for thermo check (passed to check_equilibration).
+        data_file:         LAMMPS .data topology file on Lambda.
+        dump_file:         LAMMPS dump trajectory file on Lambda.
+        backbone_types:    Atom type IDs of backbone atoms (for P2 and Rg).
+        output_dir:        Base output directory on Lambda.
+        skip_frames:       Initial frames to skip (production window start).
+        max_frames:        Maximum frames to analyse per tool.
+        atom_style:        LAMMPS atom_style columns.
+        timestep_fs:       LAMMPS timestep in fs (for MSD lag times).
+        dump_every:        Dump frequency in steps (auto-detected if None).
+        n_backbone_bonds:  Backbone bonds per chain (for C∞ calculation).
+        bond_length_A:     Backbone bond length in Å (default 1.54 C-C).
+        grid_n:            Voxels per axis for density grid (default 10).
+
+    Returns:
+        dict with four run_ids — poll each with get_run_status(run_id).
+    """
+    if output_dir is None:
+        output_dir = str(Path(dump_file).parent / "analysis")
+
+    rg_result  = extract_radius_of_gyration(
+        data_file=data_file, dump_file=dump_file, output_dir=output_dir,
+        skip_frames=skip_frames, max_frames=max_frames, atom_style=atom_style,
+        n_backbone_bonds=n_backbone_bonds, bond_length_A=bond_length_A,
+    )
+    msd_result = calculate_msd(
+        data_file=data_file, dump_file=dump_file, output_dir=output_dir,
+        skip_frames=skip_frames, max_frames=max_frames, atom_style=atom_style,
+        timestep_fs=timestep_fs, dump_every=dump_every,
+    )
+    p2_result  = check_orientation_order(
+        data_file=data_file, dump_file=dump_file, backbone_types=backbone_types,
+        output_dir=output_dir, skip_frames=skip_frames, max_frames=max_frames,
+        atom_style=atom_style,
+    )
+    dh_result  = check_density_homogeneity(
+        data_file=data_file, dump_file=dump_file, output_dir=output_dir,
+        skip_frames=skip_frames, max_frames=max_frames, atom_style=atom_style,
+        grid_n=grid_n,
+    )
+
+    return {
+        "status": "submitted",
+        "run_type": "check_equilibration_extended",
+        "rg_run_id":      rg_result["run_id"],
+        "msd_run_id":     msd_result["run_id"],
+        "p2_run_id":      p2_result["run_id"],
+        "density_run_id": dh_result["run_id"],
+        "output_dir":     output_dir,
+        "message": (
+            "Four jobs submitted. Poll each run_id with get_run_status(run_id). "
+            "Flags to check: rg_spread_flag, kinetic_trap_flag, ordered_flag, heterogeneous_flag."
+        ),
+    }
+
+
 # ─── Entry point ──────────────────────────────────────────────────────────────
 def _recover_interrupted_chains():
     """
@@ -1957,13 +2668,9 @@ def _recover_interrupted_chains():
         for s in stages:
             out_data = (s.get("output_data") or
                         f"{s['remote_work_dir']}/{s.get('name', 'stage')}_out.data")
-            try:
-                _, _, rc = executor.execute_command(f"test -f {out_data}")
-                if rc == 0:
-                    logger.info(f"[{chain_id}] Recovery skip (done): {s.get('name')}")
-                    continue
-            except Exception:
-                pass
+            if Path(out_data).exists():
+                logger.info(f"[{chain_id}] Recovery skip (done): {s.get('name')}")
+                continue
             remaining.append(s)
 
         if not remaining:

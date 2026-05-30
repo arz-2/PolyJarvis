@@ -30,28 +30,35 @@ SMILES string
      ▼
 ┌─────────────────────────────────────────────┐
 │  STAGE 1 · Molecular Construction          │
-│  RadonPy MCP Server (local)                │
 │                                             │
+│  RadonPy path (GAFF2/OPLS-AA):             │
 │  classify_polymer → build_molecule →        │
 │  assign_charges → polymerize →              │
 │  assign_forcefield → generate_cell →        │
 │  save_lammps_data                           │
+│                                             │
+│  EMC path (PCFF — for PCBN/PAMD/PKTN/      │
+│  PSFO/PIMD only):                           │
+│  classify_polymer → submit_emc_cell_job     │
 └────────────────────┬────────────────────────┘
                      │  .data file
                      ▼
 ┌─────────────────────────────────────────────┐
 │  STAGE 2 · Equilibration                   │
-│  LAMMPS Engine MCP Server (Lambda GPU)     │
+│  LAMMPS Engine MCP Server (local GPU)      │
 │                                             │
-│  generate_equilibration_workflow →          │
+│  generate_equilibration_workflow(           │
+│    use_pcff=True|False) →                  │
 │  run_lammps_chain (6-stage auto protocol)  │
-│  minimize → compress → heat → NPT → cool   │
+│  minimize → softheat → compress →           │
+│  npt_pppm → cool → nvt_production          │
 └────────────────────┬────────────────────────┘
                      │  equilibrated cell
                      ▼
 ┌─────────────────────────────────────────────┐
 │  STAGE 3 · T_g Measurement                 │
-│  Temperature sweep 600K → 160K (20K steps) │
+│  Temperature sweep T_start → 300K          │
+│  (25–20K steps, 0.5–1 ns/T)               │
 │  extract_tg → bilinear F-stat fit          │
 └────────────────────┬────────────────────────┘
                      │
@@ -61,6 +68,7 @@ SMILES string
 │  extract_equilibrated_density               │
 │  extract_bulk_modulus (volume fluctuation)  │
 │  calculate_rdf · extract_end_to_end_vectors │
+│  check_equilibration_extended (Rg/MSD/P2)  │
 │  Compare to experimental benchmarks         │
 └─────────────────────────────────────────────┘
 ```
@@ -79,15 +87,21 @@ PolyJarvis/
 │   ├── STAGE_2_EQUILIBRATION.md
 │   ├── STAGE_3_TG_MEASUREMENT.md
 │   ├── STAGE_4_ANALYSIS.md
-│   └── TOOLS_REFERENCE.md          # Complete MCP tool signatures
+│   ├── TOOLS_REFERENCE.md          # Complete MCP tool signatures
+│   ├── ROADMAP.md                  # Force field expansion (Tracks A–E)
+│   └── polymer_rules.json          # Per-class FF, builder, confidence metadata
 ├── mcp-servers/
-│   ├── mcp-radonpy-server/         # Molecular construction (RadonPy wrapper)
-│   │   └── src/server.py           # 18+ MCP tools
-│   └── mcp-lammps-engine/          # Simulation & analysis (LAMMPS + SSH)
-│       ├── server.py               # 18+ MCP tools
-│       ├── script_generator.py     # Template → filled .in scripts
-│       ├── remote_executor.py      # Paramiko SSH/SFTP wrapper
-│       ├── utilities.py            # Remote file utilities
+│   ├── mcp-mol-builder-server/         # Mol-Builder server (GAFF2/OPLS-AA path)
+│   │   ├── server.py               # 20+ MCP tools
+│   │   └── patch_fluorine_params.py  # PHAL LJ patch (Watkins & Jorgensen 2001)
+│   ├── mcp-emc-server/             # PCFF amorphous cell builder (EMC wrapper)
+│   │   ├── server.py               # 4 MCP tools (PCBN/PAMD/PKTN/PSFO/PIMD)
+│   │   ├── smiles_to_emc.py        # SMILES → EMC .esh → LAMMPS .data pipeline
+│   │   └── tests/                  # Unit tests (35 passing, all 5 PCFF classes)
+│   └── mcp-lammps-engine/          # Simulation & analysis (LAMMPS)
+│       ├── server.py               # 25 MCP tools
+│       ├── script_generator.py     # Template filler — GAFF2, OPLS-AA, PCFF
+│       ├── analysis_scripts/       # Bundled MDAnalysis scripts (extract_tg, RDF, MSD…)
 │       └── templates/              # 9 validated LAMMPS script templates
 ├── data/                           # Completed example runs
 │   ├── PE{1,2,3}/                  # Polyethylene
@@ -103,17 +117,17 @@ PolyJarvis/
 
 ## MCP Servers
 
-### `mcp-radonpy-server` (local)
+### `mcp-mol-builder-server` (local)
 
-Wraps the [RadonPy](https://github.com/RadonPy/RadonPy) library for molecule construction. All heavy computation runs locally via RDKit, Psi4, and RadonPy.
+Wraps [RadonPy](https://github.com/RadonPy/RadonPy) for molecule construction. Handles the full GAFF2/OPLS-AA path: monomer build → charge assignment → polymerization → amorphous cell → LAMMPS `.data` file. Runs in the `mol-builder` conda environment.
 
-Key tools: `classify_polymer`, `build_molecule_from_smiles`, `submit_polymerize_job`, `submit_assign_charges_job`, `assign_forcefield`, `submit_generate_cell_job`, `save_lammps_data`, `get_job_status`, `get_job_output`
+### `mcp-emc-server` (local)
 
-### `mcp-lammps-engine` (remote)
+Wraps [EMC](http://montecarlo.sourceforge.net/emc/) for PCFF amorphous cell construction. Used only for PCBN, PAMD, PKTN, PSFO, and PIMD classes. Outputs a LAMMPS `.data` file with PCFF parameters assigned — no separate charge step needed.
 
-Manages simulation submission and analysis on a remote GPU server (tested on Lambda Labs A10/A100 instances) via SSH/SFTP (Paramiko). Simulation chains run as `nohup` background processes and survive MCP server disconnections.
+### `mcp-lammps-engine` (local)
 
-Key tools: `generate_script`, `run_lammps_script`, `run_lammps_chain`, `generate_equilibration_workflow`, `get_run_status`, `get_run_output`, `read_remote_log`, `extract_tg`, `extract_equilibrated_density`, `extract_bulk_modulus`, `calculate_rdf`, `extract_end_to_end_vectors`, `check_equilibration`, `unwrap_coordinates`
+Script generation, simulation execution, and analysis on the local GPU server. Simulation chains run as `nohup` processes and survive MCP server disconnections. Bundles all MDAnalysis analysis scripts in `analysis_scripts/`.
 
 
 ---
@@ -122,70 +136,98 @@ Key tools: `generate_script`, `run_lammps_script`, `run_lammps_chain`, `generate
 
 ### Prerequisites
 
-- Python ≥ 3.9 with [RadonPy](https://github.com/RadonPy/RadonPy), RDKit, Psi4, and MDAnalysis installed locally
-- LAMMPS (GPU build) on a remote server, accessible via SSH key
-- `fastmcp` Python package for both MCP servers
-- Paramiko for SSH communication
+Install the following before starting:
+
+**1. Miniforge (conda)**
+```bash
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+bash Miniforge3-Linux-x86_64.sh
+```
+
+**2. LAMMPS with GPU support**
+```bash
+# Build with MOLECULE, KSPACE, CLASS2, GPU packages
+# See https://docs.lammps.org/Build_cmake.html
+# Confirm: lmp -h | grep GPU
+```
+
+**3. mol-builder environment**
+```bash
+conda create -n mol-builder python=3.9
+conda activate mol-builder
+pip install radonpy rdkit psi4 mdanalysis fastmcp xtb-python
+pip install -e /path/to/RadonPy
+```
+
+**4. EMC (Enhanced Monte Carlo)**
+```bash
+# Download EMC from http://montecarlo.sourceforge.net/emc/
+# Extract to ~/emc; add ~/emc/bin to PATH in ~/.bashrc
+# Verify: emc_setup.pl --help
+```
+
+**5. Claude Code CLI**
+```bash
+npm install -g @anthropic-ai/claude-code
+```
 
 ### Configuration
 
-Copy and populate the `.env.example` files in each server directory:
+Create `PolyJarvis/.env` (single file shared by all servers):
 
-**`mcp-lammps-engine/.env`**
 ```env
-LAMBDA_HOST       = <remote_server_ip>
-LAMBDA_USER       = <ssh_username>
-LAMBDA_KEY        = ~/.ssh/your_key
-LAMBDA_WORKDIR    = /home/<user>/simulations
-LAMBDA_LAMMPS     = /home/<user>/lammps/build/lmp
-CONDA_ENV         = radonpy
-MDA_SCRIPTS_DIR   = /home/<user>/analysis_scripts
+LAMBDA_USER     = <your_username>
+LAMBDA_WORKDIR  = /home/<user>/simulations
+LAMBDA_LAMMPS   = /home/<user>/lammps-install/bin/lmp
+CONDA_ENV       = mol-builder
+RADONPY_PATH    = /path/to/RadonPy
 ```
 
-**`mcp-radonpy-server/.env`**
-```env
-RADONPY_PATH = /path/to/RadonPy
-```
+MDAnalysis analysis scripts are bundled inside `mcp-lammps-engine/analysis_scripts/` — no separate `MDA_SCRIPTS_DIR` needed.
 
-### Running the MCP Servers
+### Starting the MCP Servers
+
+The servers are launched automatically by Claude Code via `.mcp.json`. To start them manually for debugging:
 
 ```bash
-# Start the RadonPy server
-cd mcp-servers/mcp-radonpy-server
-python src/server.py
+# mol-builder server
+/home/<user>/miniforge3/envs/mol-builder/bin/python \
+  PolyJarvis/mcp-servers/mcp-mol-builder-server/server.py
 
-# Start the LAMMPS engine server
-cd mcp-servers/mcp-lammps-engine
-python server.py
+# EMC server
+PolyJarvis/mcp-servers/.venv/bin/python \
+  PolyJarvis/mcp-servers/mcp-emc-server/server.py
+
+# LAMMPS engine server
+PolyJarvis/mcp-servers/.venv/bin/python \
+  PolyJarvis/mcp-servers/mcp-lammps-engine/server.py
 ```
 
-Connect both servers to your Claude Desktop configuration, then describe your polymer system to the agent.
+See `PolyJarvis/.mcp.json` for the registered server configuration.
 
 ---
 
 ## Usage
 
-The agent is guided by the stage files in `guides/`. For a new simulation, the agent reads `STAGE_INDEX.md` first, then follows the appropriate stage file. The critical workflow invariants are:
+Open Claude Code in the `PolyJarvis/` directory and describe your polymer:
 
-1. **`classify_polymer(smiles)` must be called first** — determines force field and charge method for the entire run.
-2. **Force field assignment happens after polymerization**, never before.
-3. **All LAMMPS scripts are generated via `generate_script()`** — no hand-written `.in` files.
-4. **`nvidia-smi` is checked before every GPU submission.**
-5. **T<sub>g</sub> is never reported without verifying R² ≥ 0.90** (ACCEPTABLE minimum).
+> *"Run a full MD simulation of PVDF. SMILES: \*CC(F)(F)\*. I want Tg and equilibrated density."*
 
-A `Task_TEMPLATE.txt` is provided in the repo root to help structure new simulation requests.
+The agent reads `guides/STAGE_INDEX.md` automatically on every task, classifies the polymer, selects the correct force field and builder, builds the amorphous cell, equilibrates, runs the Tg sweep, and reports results — all without manual intervention.
+
+To start a new simulation, copy `Task_TEMPLATE.txt` and fill in the polymer name and SMILES.
 
 ---
 
 ## Tech Stack
 
-| Component | Library |
+| Component | Library / Tool |
 |-----------|---------|
-| Molecular construction | RadonPy, RDKit |
-| Quantum chemistry (charges) | Psi4 |
-| Force fields | GAFF2 / GAFF2_mod (via RadonPy) |
-| MD simulation | LAMMPS (GPU build) |
-| Remote execution | Paramiko (SSH/SFTP) |
+| Molecular construction (GAFF2) | RadonPy, RDKit |
+| Quantum chemistry (charges) | Psi4 / xTB (GFN2 AM1-BCC fallback) |
+| Amorphous cell builder (PCFF) | EMC v9.4.4 (Pieter in 't Veld) |
+| Force fields | GAFF2, GAFF2_mod (RadonPy) · OPLS-AA, TraPPE-UA, PCFF (EMC) |
+| MD simulation | LAMMPS (GPU build, class2 styles) |
 | Trajectory analysis | MDAnalysis |
 | T<sub>g</sub> fitting | SciPy (F-stat exhaustive split) |
 | MCP framework | FastMCP |

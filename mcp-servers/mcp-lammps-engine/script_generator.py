@@ -56,11 +56,50 @@ PAIR_STYLE_PPPM = (
 PAIR_STYLE_CUTOFF = "pair_style lj/charmm/coul/charmm 8.0 12.0"
 
 # GAFF2 amber special_bonds + arithmetic mixing (required for GAFF2/GAFF2_mod)
-GAFF2_SPECIAL_BONDS = "amber"
+GAFF2_SPECIAL_BONDS = "special_bonds amber"
 GAFF2_PAIR_MODIFY   = "mix arithmetic"
 DEFAULT_NEIGHBOR    = "2.0"
 DEFAULT_NEIGH_MODIFY = "delay 0 every 1 check yes"
 DEFAULT_NEIGH_ONE    = "4000"
+
+# ─── OPLS-AA force field style constants (EMC-generated cells) ──────────────
+OPLS_STYLES = {
+    "BOND_STYLE":      "harmonic",
+    "ANGLE_STYLE":     "harmonic",
+    "DIHEDRAL_STYLE":  "multi/harmonic",
+    "IMPROPER_STYLE":  "none",
+}
+
+# OPLS-AA uses lj/cut/coul/long with geometric mixing and 1-4 scale 0.5
+PAIR_STYLE_OPLS_PPPM = (
+    "pair_style lj/cut/coul/long 9.5 9.5\n"
+    "kspace_style pppm 1e-6"
+)
+
+OPLS_SPECIAL_BONDS = "special_bonds lj/coul 0 0 0.5"
+OPLS_PAIR_MODIFY   = "mix geometric tail yes"
+
+# ─── PCFF class2 force field style constants (EMC-generated cells) ──────────
+# EMC outputs cells at ~0.5× experimental density, so PPPM is safe throughout —
+# no cutoff-only compression phase needed (unlike GAFF2 cells at 0.05 g/cm³).
+PCFF_STYLES = {
+    "BOND_STYLE":      "class2",
+    "ANGLE_STYLE":     "class2",
+    "DIHEDRAL_STYLE":  "class2",
+    "IMPROPER_STYLE":  "class2",
+}
+
+PAIR_STYLE_PCFF_PPPM = (
+    "pair_style lj/class2/coul/long 9.5 9.5\n"
+    "kspace_style pppm 1e-6"
+)
+
+# Fallback for use_pppm=False (e.g. manual override); rarely needed for PCFF.
+PAIR_STYLE_PCFF_CUTOFF = "pair_style lj/class2/coul/cut 9.5 9.5"
+
+# PCFF uses full 1-4 nonbonded interactions and sixth-power combining rules.
+PCFF_SPECIAL_BONDS = "special_bonds lj/coul 0 0 1"
+PCFF_PAIR_MODIFY   = "mix sixthpower tail yes"
 
 
 # ─── Template parameter catalogs ─────────────────────────────────────────────
@@ -408,6 +447,271 @@ class ScriptGenerator:
         self.system_info = info
         return info
 
+    def validate_data_file(
+        self,
+        content: Optional[str] = None,
+        h_type_ids: Optional[list] = None,
+        backbone_types: Optional[list] = None,
+        atom_type_pairs: Optional[list] = None,
+        lj_cutoff: float = 12.0,
+        charge_tol: float = 0.01,
+    ) -> dict:
+        """
+        Systematic pre-simulation validation of a LAMMPS data file.
+
+        Runs parse_data_file first (or uses cached system_info), then performs
+        a second pass over the full file content to check sections that the
+        header parser skips: Atoms (charges), and all Coeffs sections.
+
+        Args:
+            content:         File content as string. If None, reads self.data_file.
+            h_type_ids:      User-supplied SHAKE H type IDs to validate.
+            backbone_types:  User-supplied backbone atom type IDs to validate.
+            atom_type_pairs: User-supplied RDF atom type pairs to validate.
+            lj_cutoff:       LJ cutoff in Å (default 12.0 for GAFF2 lj/charmm).
+            charge_tol:      Maximum allowed |net charge| in e (default 0.01).
+
+        Returns:
+            dict with:
+                errors   — list of blocking issues (submission should be refused)
+                warnings — list of non-blocking concerns
+                stats    — computed values used in checks (net_charge, density, etc.)
+                valid    — bool: True only when errors is empty
+        """
+        if content is None:
+            if self.data_file:
+                with open(self.data_file, "r") as f:
+                    content = f.read()
+            else:
+                return {"errors": ["No content or data_file provided"], "warnings": [], "valid": False}
+
+        # Ensure header is parsed
+        if not self.system_info:
+            self.parse_data_file(content=content)
+        info = self.system_info
+
+        errors   = []
+        warnings = []
+        stats    = {}
+
+        lines = content.splitlines()
+        n_atom_types = info.get("n_atom_types", 0)
+        atom_type_names = info.get("atom_type_names", [])
+
+        # ── 1. Header sanity ──────────────────────────────────────────────────
+        if info.get("n_atoms", 0) == 0:
+            errors.append("n_atoms = 0 — data file is empty or unparseable")
+        if n_atom_types == 0:
+            errors.append("n_atom_types = 0 — Masses section missing or unreadable")
+
+        box_min = min(info.get("box_x", 0), info.get("box_y", 0), info.get("box_z", 0))
+        if box_min <= 0:
+            errors.append(f"Box dimension <= 0 — file may be truncated")
+        elif box_min < 2 * lj_cutoff:
+            errors.append(
+                f"Minimum box side {box_min:.1f} Å < 2×cutoff ({2*lj_cutoff:.1f} Å). "
+                f"LAMMPS requires box > 2×cutoff in all periodic directions."
+            )
+        stats["box_min_A"] = round(box_min, 2)
+        stats["lj_cutoff_A"] = lj_cutoff
+
+        n_bonds = info.get("n_bonds", 0)
+        n_atoms = info.get("n_atoms", 0)
+        if n_atoms > 0 and n_bonds > 0:
+            ratio = n_bonds / n_atoms
+            stats["bond_atom_ratio"] = round(ratio, 3)
+            if ratio < 0.5:
+                warnings.append(
+                    f"bond/atom ratio = {ratio:.2f} (expected ≥ 0.8 for polymers) — "
+                    f"possible disconnected atoms or missing bonds section"
+                )
+            elif ratio > 3.0:
+                warnings.append(
+                    f"bond/atom ratio = {ratio:.2f} (expected ≤ 2.5 for organic polymers) — "
+                    f"possible duplicate bonds"
+                )
+
+        # ── 2. Coeff section completeness ─────────────────────────────────────
+        coeff_checks = [
+            ("Pair Coeffs",     "n_atom_types",     info.get("n_atom_types", 0)),
+            ("Bond Coeffs",     "n_bond_types",     info.get("n_bond_types", 0)),
+            ("Angle Coeffs",    "n_angle_types",    info.get("n_angle_types", 0)),
+            ("Dihedral Coeffs", "n_dihedral_types", info.get("n_dihedral_types", 0)),
+            ("Improper Coeffs", "n_improper_types", info.get("n_improper_types", 0)),
+        ]
+        data_line_re = re.compile(r"^\s*\d+\s+[\d.eE+\-]")
+        current_section = None
+        section_counts = {}
+
+        for line in lines:
+            stripped = line.strip()
+            # Detect section headers (e.g. "Pair Coeffs", "Bond Coeffs # harmonic")
+            matched_section = None
+            for sec_name, _, _ in coeff_checks:
+                if stripped.startswith(sec_name):
+                    matched_section = sec_name
+                    break
+            if matched_section:
+                current_section = matched_section
+                section_counts[current_section] = 0
+                continue
+            # Blank line ends current coeff section
+            if stripped == "" and current_section:
+                if section_counts[current_section] > 0:
+                    current_section = None
+                continue
+            if current_section and data_line_re.match(line):
+                section_counts[current_section] = section_counts.get(current_section, 0) + 1
+
+        for sec_name, count_key, expected in coeff_checks:
+            if expected == 0:
+                continue  # no such connectivity in this system
+            found = section_counts.get(sec_name, 0)
+            stats[f"{sec_name.replace(' ', '_')}_found"] = found
+            if found == 0:
+                errors.append(
+                    f"'{sec_name}' section missing or empty — "
+                    f"expected {expected} entries"
+                )
+            elif found != expected:
+                errors.append(
+                    f"'{sec_name}' has {found} entries but header says {expected} types — "
+                    f"force field is incomplete"
+                )
+
+        # ── 3. Charge neutrality (parse Atoms section) ────────────────────────
+        in_atoms = False
+        atoms_seen_data = False
+        net_charge = 0.0
+        charge_parse_ok = False
+        type_counts: dict = {}
+        masses_by_type: dict = {}
+
+        # Build mass lookup from Masses section
+        in_masses_sec = False
+        masses_seen_data = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped == "Masses":
+                in_masses_sec = True
+                masses_seen_data = False
+                continue
+            if in_masses_sec:
+                if stripped == "" and masses_seen_data:
+                    in_masses_sec = False
+                    continue
+                m = re.match(r"^\s*(\d+)\s+([\d.]+)", line)
+                if m:
+                    masses_seen_data = True
+                    masses_by_type[int(m.group(1))] = float(m.group(2))
+
+        for line in lines:
+            stripped = line.strip()
+            if stripped == "Atoms" or stripped.startswith("Atoms #"):
+                in_atoms = True
+                atoms_seen_data = False
+                continue
+            if in_atoms:
+                if stripped == "" and atoms_seen_data:
+                    in_atoms = False
+                    continue
+                if stripped == "" or stripped.startswith("#"):
+                    continue
+                parts = stripped.split()
+                if len(parts) >= 4:
+                    try:
+                        atype = int(parts[2])
+                        charge = float(parts[3])
+                        net_charge += charge
+                        type_counts[atype] = type_counts.get(atype, 0) + 1
+                        atoms_seen_data = True
+                        charge_parse_ok = True
+                    except (ValueError, IndexError):
+                        pass
+
+        stats["net_charge_e"] = round(net_charge, 4)
+        stats["charge_parse_ok"] = charge_parse_ok
+
+        if not charge_parse_ok:
+            warnings.append("Could not parse Atoms section — charge neutrality not verified")
+        elif abs(net_charge) > charge_tol:
+            errors.append(
+                f"Net charge = {net_charge:+.4f} e (tolerance ±{charge_tol} e). "
+                f"PPPM requires a charge-neutral cell. "
+                f"Check RESP convergence or add a neutralising counterion."
+            )
+
+        # ── 4. Density plausibility ───────────────────────────────────────────
+        if type_counts and masses_by_type:
+            total_mass_amu = sum(
+                type_counts.get(t, 0) * masses_by_type.get(t, 0.0)
+                for t in masses_by_type
+            )
+            box_vol_A3 = (
+                info.get("box_x", 0) * info.get("box_y", 0) * info.get("box_z", 0)
+            )
+            if box_vol_A3 > 0 and total_mass_amu > 0:
+                # 1 amu/Å³ = 1.66054 g/cm³
+                density = total_mass_amu / box_vol_A3 * 1.66054
+                stats["density_g_cm3"] = round(density, 4)
+                if density < 0.1:
+                    warnings.append(
+                        f"Density = {density:.3f} g/cm³ — unusually low. "
+                        f"Cell may be over-expanded or have vacuum voids."
+                    )
+                elif density > 2.5:
+                    warnings.append(
+                        f"Density = {density:.3f} g/cm³ — unusually high. "
+                        f"Cell may be over-compressed or overlapping atoms."
+                    )
+
+        # ── 5. User-supplied type ID validation ───────────────────────────────
+        def _check_type_ids(ids, label):
+            if not ids:
+                return
+            bad = [t for t in ids if not (1 <= t <= n_atom_types)]
+            if bad:
+                errors.append(
+                    f"{label} contains type IDs out of range: {bad}. "
+                    f"Valid range is [1, {n_atom_types}]."
+                )
+
+        _check_type_ids(h_type_ids, "h_type_ids (SHAKE)")
+        _check_type_ids(backbone_types, "backbone_types")
+        if atom_type_pairs:
+            flat = [t for pair in atom_type_pairs for t in pair]
+            _check_type_ids(flat, "atom_type_pairs")
+
+        # ── 6. h_type_ids mass check (should be H ≈ 1.008 amu) ───────────────
+        if h_type_ids and masses_by_type:
+            for tid in h_type_ids:
+                m = masses_by_type.get(tid)
+                if m is not None and m > 2.5:
+                    name = atom_type_names[tid - 1] if tid - 1 < len(atom_type_names) else "?"
+                    warnings.append(
+                        f"h_type_ids includes type {tid} ({name}, mass={m:.3f} amu) "
+                        f"which is heavier than H (< 2.5 amu). SHAKE constraint may be wrong."
+                    )
+
+        # ── 7. backbone_types — warn if pointing at H atoms ───────────────────
+        if backbone_types and atom_type_names:
+            for tid in backbone_types:
+                if 1 <= tid <= len(atom_type_names):
+                    name = atom_type_names[tid - 1]
+                    if name.startswith("h"):
+                        warnings.append(
+                            f"backbone_types includes type {tid} ({name}) which looks like "
+                            f"a hydrogen (name starts with 'h'). "
+                            f"End-to-end vectors and P2 order will be wrong."
+                        )
+
+        return {
+            "valid":    len(errors) == 0,
+            "errors":   errors,
+            "warnings": warnings,
+            "stats":    stats,
+        }
+
     # ─────────────────────────────────────────────────────────────────────────
     # Script Generator
     # ─────────────────────────────────────────────────────────────────────────
@@ -476,15 +780,35 @@ class ScriptGenerator:
         subs["LAST_DUMP_FILE"]   = cfg.get("LAST_DUMP_FILE", f"{template_name}_last.dump")
         subs["WRITE_DATA_FILE"]  = cfg.get("WRITE_DATA_FILE", f"{template_name}_out.data")
 
-        # ── Force field styles (always GAFF2 for RadonPy) ─────────────────
-        subs["BOND_STYLE"]      = GAFF2_STYLES["BOND_STYLE"]
-        subs["ANGLE_STYLE"]     = GAFF2_STYLES["ANGLE_STYLE"]
-        subs["DIHEDRAL_STYLE"]  = GAFF2_STYLES["DIHEDRAL_STYLE"]
-        subs["IMPROPER_STYLE"]  = GAFF2_STYLES["IMPROPER_STYLE"]
+        # ── Force field styles ────────────────────────────────────────────
+        use_pcff = cfg.get("use_pcff", False)
+        use_opls = cfg.get("use_opls", False)
+        if use_pcff:
+            ff_styles = PCFF_STYLES
+        elif use_opls:
+            ff_styles = OPLS_STYLES
+        else:
+            ff_styles = GAFF2_STYLES
+        subs["BOND_STYLE"]      = cfg.get("BOND_STYLE",     ff_styles["BOND_STYLE"])
+        subs["ANGLE_STYLE"]     = cfg.get("ANGLE_STYLE",    ff_styles["ANGLE_STYLE"])
+        subs["DIHEDRAL_STYLE"]  = cfg.get("DIHEDRAL_STYLE", ff_styles["DIHEDRAL_STYLE"])
+        subs["IMPROPER_STYLE"]  = cfg.get("IMPROPER_STYLE", ff_styles["IMPROPER_STYLE"])
 
         # ── Pair style block (PPPM or cutoff) ────────────────────────────
         use_pppm = cfg.get("use_pppm", True)
-        subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_PPPM if use_pppm else PAIR_STYLE_CUTOFF
+        if use_pcff:
+            subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_PCFF_PPPM if use_pppm else PAIR_STYLE_PCFF_CUTOFF
+        elif use_opls:
+            subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_OPLS_PPPM
+        else:
+            subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_PPPM if use_pppm else PAIR_STYLE_CUTOFF
+
+        # ── EMC params file include block ─────────────────────────────────
+        params_file = cfg.get("params_file", "")
+        if params_file:
+            subs["INCLUDE_PARAMS_BLOCK"] = f"include {params_file}"
+        else:
+            subs["INCLUDE_PARAMS_BLOCK"] = ""
 
         # ── GPU package ───────────────────────────────────────────────────
         if cfg.get("use_gpu", False):
@@ -656,8 +980,14 @@ class ScriptGenerator:
             subs["LAST_DUMP_BLOCK"] = ""
 
         # ── Common placeholders present in all templates ───────────────────
-        subs["SPECIAL_BONDS"]  = cfg.get("SPECIAL_BONDS", GAFF2_SPECIAL_BONDS)
-        subs["PAIR_MODIFY"]    = cfg.get("PAIR_MODIFY",   GAFF2_PAIR_MODIFY)
+        if use_pcff:
+            default_sb, default_pm = PCFF_SPECIAL_BONDS, PCFF_PAIR_MODIFY
+        elif use_opls:
+            default_sb, default_pm = OPLS_SPECIAL_BONDS, OPLS_PAIR_MODIFY
+        else:
+            default_sb, default_pm = GAFF2_SPECIAL_BONDS, GAFF2_PAIR_MODIFY
+        subs["SPECIAL_BONDS"]  = cfg.get("SPECIAL_BONDS", default_sb)
+        subs["PAIR_MODIFY"]    = cfg.get("PAIR_MODIFY",   default_pm)
         subs["NEIGHBOR_SKIN"]  = cfg.get("NEIGHBOR_SKIN", DEFAULT_NEIGHBOR)
         subs["NEIGH_MODIFY"]   = cfg.get("NEIGH_MODIFY",  DEFAULT_NEIGH_MODIFY)
         subs["NEIGH_ONE"]      = cfg.get("NEIGH_ONE",     DEFAULT_NEIGH_ONE)

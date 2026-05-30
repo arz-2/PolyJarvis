@@ -43,9 +43,9 @@ Before running any analysis tool, verify the equilibration log shows a converged
 
 ---
 
-### Rule C: All Analysis Runs on Lambda — No Large Downloads
+### Rule C: Analysis Tools Run Locally — No Large File Transfers
 
-`extract_tg`, `extract_end_to_end_vectors`, `calculate_rdf`, `extract_equilibrated_density`, `extract_bulk_modulus`, and `unwrap_coordinates` all run as background jobs on Lambda. Download only the small CSV/JSON result files. Never download full dump files unless absolutely necessary.
+`extract_tg`, `extract_end_to_end_vectors`, `calculate_rdf`, `extract_equilibrated_density`, `extract_bulk_modulus`, and `unwrap_coordinates` all run as background jobs on the local GPU node. Pass local paths directly. Never copy full dump files off the node unless absolutely necessary — they can be tens of GB.
 
 ---
 
@@ -105,8 +105,8 @@ run = extract_tg(
 - `n_plateaus_skipped_drift` — plateaus excluded for excessive density drift (> 1%)
 - `n_temperature_bins` — number of clean plateaus used for fitting
 - `temp_range_K` — `[T_min, T_max]` of data used
-- `bins_csv` — path to `tg_density_bins.csv` on Lambda (download for publication plots)
-- `summary_json` — path to full analysis JSON on Lambda
+- `bins_csv` — path to `tg_density_bins.csv` (use for publication plots)
+- `summary_json` — path to full analysis JSON
 
 **Tuning `equilibration_fraction`:**
 - 0.5 (default): standard for 2 ns/T runs
@@ -138,7 +138,7 @@ run = extract_end_to_end_vectors(
 - `overall_mean_R` — mean end-to-end distance (Å) across all chains and frames
 - `overall_mean_R2` — mean ⟨R²⟩ (Å²) — connects to characteristic ratio C∞
 - `per_chain` — list of per-chain stats: `mean_R`, `std_R`, `mean_R2`, `n_frames`
-- `csv_file` — path to `end_to_end_vectors.csv` on Lambda
+- `csv_file` — path to `end_to_end_vectors.csv`
 
 **`backbone_types` is required.** Always determine these from `parse_data_file()` output — do not assume. The tool traces the backbone bond graph to find true chain termini; incorrect backbone_types will return wrong terminal atoms.
 
@@ -206,7 +206,7 @@ run = extract_equilibrated_density(
 - `plateau_fraction` — fraction of the production window identified as plateau
 - `naive_mean` / `naive_std` — simple average of full production window (compare to plateau for sanity)
 - `plateau_step_range` — `[start_step, end_step]` of the identified plateau
-- `summary_json` — path to JSON on Lambda
+- `summary_json` — path to JSON
 
 **Use for:** Getting a clean density value from equilibration logs before comparing to experiment. Better than manual inspection of the log.
 
@@ -237,7 +237,7 @@ run = extract_bulk_modulus(
 - `V_mean_A3`, `V_std_A3` — volume statistics
 - `block_averaging` — per-block K values
 - `diagnostics` — T, P, density means + volume drift check
-- `summary_json` — path to JSON on Lambda
+- `summary_json` — path to JSON
 
 **Requirements:** Must be an NPT run that is well-equilibrated. Check `check_equilibration` first. If the diagnostics show volume drift > 1% (p < 0.01), a warning is issued — extend equilibration before trusting K.
 
@@ -270,9 +270,58 @@ run = check_equilibration(
   - `drift` — `{pass: bool, slope, p_value, drift_pct}`
   - `block_avg` — `{pass: bool, sem, sem_pct}`
 - `meta` — `{T_mean, P_mean, n_rows_total, n_rows_production}`
-- `summary_json` — path to JSON on Lambda
+- `summary_json` — path to JSON
 
 **Before any property extraction:** Always run `check_equilibration` first. Do not proceed if `equilibrated=False`.
+
+---
+
+## Tool: `check_equilibration_extended`
+
+Structural equilibration checks that go beyond thermo convergence — required for reviewer-grade validation of polymer systems, especially below Tg or for long chains. Launches four background jobs simultaneously from the production dump file.
+
+```python
+ext = check_equilibration_extended(
+    log_file="/home/arz2/simulations/<run>/eq/06_nvt_production/06_nvt_production.log",
+    data_file="/home/arz2/simulations/<run>/cell.data",
+    dump_file="/home/arz2/simulations/<run>/eq/06_nvt_production/06_nvt_production.dump",
+    backbone_types=[2, 3],      # LAMMPS type IDs of backbone atoms
+    skip_frames=50,             # Skip burn-in frames
+    timestep_fs=1.0,
+    n_backbone_bonds=118,       # DP-1 bonds per chain (for C∞ = 6·⟨Rg²⟩/(N·l²))
+)
+# Returns four run_ids — monitor each:
+# ext["rg_run_id"], ext["msd_run_id"], ext["p2_run_id"], ext["density_run_id"]
+```
+
+**Four parallel sub-jobs and their flags:**
+
+| Sub-job | Tool | Flag that fires | Meaning |
+|---------|------|-----------------|---------|
+| Radius of gyration | `extract_radius_of_gyration` | `rg_spread_flag` (CV > 30%) | Unequal chain conformations — poor equilibration |
+| MSD | `calculate_msd` | `kinetic_trap_flag` (MSD_max < Rg²) | Chains immobile relative to their own size |
+| Orientation order | `check_orientation_order` | `ordered_flag` (P2 > 0.10) | Residual backbone alignment from packing |
+| Density homogeneity | `check_density_homogeneity` | `heterogeneous_flag` (CV > 0.25) | Voids, droplets, or crystalline domains |
+
+**Interpreting MSD α exponent:**
+- α ≈ 1.0 → Fickian diffusion (well above Tg — chains fully mobile)
+- α 0.3–0.7 → subdiffusive (Rouse/reptation near Tg — normal for production window)
+- α < 0.2 → strongly caged — potential kinetic trap; check `kinetic_trap_flag`
+
+**Note on kinetic_trap_flag for glassy systems:** Below Tg, `kinetic_trap_flag=True` is *expected* — chains should not diffuse. The flag is diagnostic context, not a failure criterion in that regime. Flag becomes a problem if the system is intended to be in the melt state.
+
+**Workflow after extended checks:**
+
+```python
+# Pass overall_mean_Rg2_A2 from Rg result into MSD for trap flag:
+rg_summary = get_run_status(ext["rg_run_id"])   # when completed
+msd_run = calculate_msd(
+    ...,
+    rg_sq_A2=rg_summary["result"]["overall_mean_Rg2_A2"],
+)
+```
+
+Alternatively, use `check_equilibration_extended` which launches all four without the Rg→MSD handoff (MSD runs without the trap flag in that case; run MSD manually if you need it).
 
 ---
 
@@ -289,7 +338,7 @@ run = unwrap_coordinates(
 
 **Result fields:** `output_file`, `frames_written`, `natoms`, `size_bytes`
 
-**Use only when:** Feeding dump files to external tools (OVITO, VMD) that don't handle image flags. Check Lambda disk space first — output file is same size as input.
+**Use only when:** Feeding dump files to external tools (OVITO, VMD) that don't handle image flags. Check local disk space first — output file is same size as input.
 
 ---
 
@@ -341,7 +390,7 @@ assert eq_result["equilibrated"], f"Not equilibrated: {eq_result}"
 
 ```python
 # Get backbone atom types from data file first
-info = parse_data_file(data_file=data_file, remote=True)
+info = parse_data_file(data_file=data_file, remote=False)
 # Identify backbone type IDs from info["atom_types"] — e.g. [2] for PE
 
 tg_run  = extract_tg(log_file=tg_log_path, initial_tg_guess=200)

@@ -1,7 +1,8 @@
 # Stage 2: Equilibration
-**Read when:** You have a `.data` file and need to equilibrate it on Lambda
+**Read when:** You have a `.data` file and need to equilibrate it
 **Previous stage:** `STAGE_1_MOLECULAR_CONSTRUCTION.md`
 **Next stage:** `STAGE_3_TG_MEASUREMENT.md` — once you have a converged equilibrated cell
+**Revision parameters:** `REVISION_PARAMS.md` — per-polymer dp, nchain, density_initial, T_equil for all 8 revision polymers
 
 ---
 
@@ -13,28 +14,26 @@
 with open("npt.in", "w") as f:
     f.write("fix 1 all npt ...")
 
-# ✅ CORRECT — always use generate_script()
-script = lammps_engine.generate_script(
-    template_name="npt",
-    data_file=remote_data_path,
-    output_script="./npt_eq.in",
-    params={...},
-    upload_to_lambda=True
+# ✅ CORRECT — always use generate_equilibration_workflow
+workflow = lammps_engine.generate_equilibration_workflow(
+    data_file="/home/arz2/simulations/<run_dir>/cell.data",
+    work_dir_base="/home/arz2/simulations/<run_dir>",
+    use_pcff=True,   # or use_opls=True / neither for TraPPE-UA
+    params_file="/home/arz2/polyjarvis_emc_jobs/<job_id>/emc_build.params",  # EMC only
 )
 ```
 
-**Why:** Templates are validated, version-controlled, and contain correct SHAKE constraints, GPU package settings, and restart logic. Hand-written scripts introduce silent errors.
+**Why:** Templates are validated, version-controlled, and contain correct GPU package settings, pair styles, and restart logic. Hand-written scripts introduce silent errors. SHAKE is automatically disabled for PCFF (`bond_style class2` is incompatible with `fix shake`).
 
 ---
 
 ### Rule B: Check nvidia-smi Before Every Submission
 
-**Always do this before running any simulation.** Lambda machines are shared — another user's job can silently saturate a GPU.
+**Always do this before running any simulation.** The GPU node is shared — another user's job can silently saturate a GPU.
 
 ```bash
-# Run via execute_remote_shell_command before every submission:
-nvidia-smi
-ps aux | grep python | grep -v grep | awk '{print $1, $2, substr($0, index($0,$11), 80)}'
+nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader
+ps aux | grep lmp | grep -v grep
 ```
 
 **What to check:**
@@ -50,19 +49,15 @@ ps aux | grep python | grep -v grep | awk '{print $1, $2, substr($0, index($0,$1
 
 GPU is used for every simulation stage including NPT. Before every submission, check `nvidia-smi` to identify free GPUs, then pass those IDs explicitly. Never leave `gpu_ids` unset — the default behavior pins to GPU 0 regardless of what is free.
 
-```python
-# ❌ WRONG — defaults to GPU 0, contends with other jobs
-run_lammps_script(script, mpi=4, gpu_ids="")
+```bash
+# ❌ WRONG — omitting -pk gpu means CPU fallback
+mpirun -np 4 lmp -in stage.in
 
-# ✅ CORRECT — user confirms free GPUs first, then assigns explicitly
-run_lammps_script(script, mpi=4, gpu_ids="1,2,3")  # example: GPU 0 is occupied
+# ✅ CORRECT — always explicit GPU flags
+mpirun -np 4 lmp -pk gpu 4 -sf gpu -in stage.in
 ```
 
-**Always ask the user (or check nvidia-smi) for:**
-- Which GPU IDs are free
-- How many MPI processes to use
-
-Do not assume. Do not default.
+Check `nvidia-smi` first and confirm which GPU IDs are free. Pass only free IDs. Do not assume all 4 are available.
 
 ---
 
@@ -99,114 +94,60 @@ Total: ~7-9 ns
 ## Workflow
 
 ### Step 1: Check GPU availability
-```python
-execute_remote_shell_command("nvidia-smi")
+```bash
+nvidia-smi --query-gpu=index,memory.used,memory.free,utilization.gpu --format=csv,noheader
 ```
 
-### Step 2: Upload `.data` file to Lambda
+### Step 2: Confirm .data file path
 ```python
-# Use upload_file_to_remote or execute_remote_shell_command with scp
-# Target: /home/arz2/simulations/<run_dir>/cell.data
+# The .data file is already local — no upload needed.
+# EMC jobs write to:  /home/arz2/polyjarvis_emc_jobs/<job_id>/emc_build.data
+# RadonPy jobs write to wherever save_lammps_data() was called.
+# Copy or symlink to a clean sim directory:
+import shutil
+shutil.copy("/home/arz2/polyjarvis_emc_jobs/<job_id>/emc_build.data",
+            "/home/arz2/simulations/<run_dir>/cell.data")
 ```
 
 ### Step 3: Parse data file
 ```python
 info = lammps_engine.parse_data_file(
+    data_file="/home/arz2/simulations/<run_dir>/cell.data"
+)
+# Check: n_atoms, atom_types, h_type_ids (for SHAKE), density_g_cm3
+```
+
+### Step 4: Generate and run the full equilibration workflow
+
+Use `generate_equilibration_workflow` — it generates all stages and chains them. All paths are local.
+
+```python
+workflow = lammps_engine.generate_equilibration_workflow(
     data_file="/home/arz2/simulations/<run_dir>/cell.data",
-    remote=True
+    work_dir_base="/home/arz2/simulations/<run_dir>",
+    polymer_name="<name>",
+    temp=300.0,
+    max_temp=600.0,
+    press=1.0,
+    max_press=50000.0,
+    n_atoms=<n_atoms>,
+    use_pcff=<True/False>,          # True for PCBN/PAMD/PKTN/PSFO/PIMD
+    params_file="<path/to/emc_build.params>",  # EMC only — omit for RadonPy
 )
-# Check: n_atoms, atom_types, h_type_ids (for SHAKE), estimated_memory
+# → workflow["stages"] lists all generated scripts with local paths
 ```
 
-### Step 4: Generate and chain scripts
+### Step 5: Run the chain
 
 ```python
-work_dir = "/home/arz2/simulations/<run_dir>/eq"
-data_file = "/home/arz2/simulations/<run_dir>/cell.data"
-
-# Stage 1: Minimize
-s_min = lammps_engine.generate_script(
-    template_name="minimize",
-    data_file=data_file,
-    output_script="./01_minimize.in",
-    params={"N_STEPS": 10000, "LOG_FILE": "01_minimize.log"},
-    upload_to_lambda=True, remote_output_dir=work_dir
+result = lammps_engine.run_lammps_chain(
+    stages=workflow["stages"],
+    gpu_ids="0,1,2,3",   # ← set from nvidia-smi check
+    mpi=4,
 )
-
-# Stage 2: NPT Compress (CPU — no gpu_ids)
-s_compress = lammps_engine.generate_script(
-    template_name="npt_compress",
-    data_file=f"{work_dir}/restart_minimize.data",
-    output_script="./02_compress.in",
-    params={
-        "T_START": 300, "T_FINAL": 600,
-        "P_START": 1, "P_FINAL": 50000,
-        "N_STEPS": 1000000,
-        "LOG_FILE": "02_compress.log"
-    },
-    upload_to_lambda=True, remote_output_dir=work_dir
-)
-
-# Stages 3-N: Annealing cycles (generate in loop, each takes restart from previous)
-anneal_scripts = []
-for i in range(3):
-    prev_restart = f"{work_dir}/restart_compress.data" if i == 0 else f"{work_dir}/restart_cool{i}.data"
-    s_heat = lammps_engine.generate_script(
-        template_name="npt",
-        data_file=prev_restart,
-        output_script=f"./0{3+i*2}_heat{i+1}.in",
-        params={"T_START": 300, "T_FINAL": 600, "P_START": 1, "P_FINAL": 1,
-                "N_STEPS": 500000, "LOG_FILE": f"heat{i+1}.log"},
-        upload_to_lambda=True, remote_output_dir=work_dir
-    )
-    s_cool = lammps_engine.generate_script(
-        template_name="npt",
-        data_file=f"{work_dir}/restart_heat{i+1}.data",
-        output_script=f"./0{4+i*2}_cool{i+1}.in",
-        params={"T_START": 600, "T_FINAL": 300, "P_START": 1, "P_FINAL": 1,
-                "N_STEPS": 500000, "LOG_FILE": f"cool{i+1}.log"},
-        upload_to_lambda=True, remote_output_dir=work_dir
-    )
-    anneal_scripts.extend([s_heat, s_cool])
-
-# Final equilibration
-s_final = lammps_engine.generate_script(
-    template_name="npt",
-    data_file=f"{work_dir}/restart_cool3.data",
-    output_script="./final_eq.in",
-    params={"T_START": 300, "T_FINAL": 300, "P_START": 1, "P_FINAL": 1,
-            "N_STEPS": 2000000, "LOG_FILE": "final_eq.log"},
-    upload_to_lambda=True, remote_output_dir=work_dir
-)
-```
-
-### Step 5: Execute sequence (each waits for previous to complete)
-
-```python
-def run_and_wait(script_remote_path, work_dir, log_file, mpi, gpu_ids, poll_sec=60):
-    run = lammps_engine.run_lammps_script(
-        remote_script=script_remote_path,
-        remote_work_dir=work_dir,
-        log_file=log_file,
-        mpi=mpi, gpu_ids=gpu_ids
-    )
-    while lammps_engine.get_run_status(run["run_id"])["status"] not in ("completed", "failed"):
-        time.sleep(poll_sec)
-    result = lammps_engine.get_run_output(run["run_id"])
-    if result["status"] != "completed":
-        raise RuntimeError(f"Stage failed: {log_file}")
-    return result
-
-# Replace gpu_ids and mpi with values confirmed free via nvidia-smi
-# Example assumes GPUs 1,2,3 are free and user has confirmed mpi=4
-GPU_IDS = "1,2,3"   # ← set from nvidia-smi check
-MPI     = 4         # ← confirm with user
-
-run_and_wait(s_min["remote_path"],      work_dir, "01_minimize.log",  mpi=MPI, gpu_ids=GPU_IDS)
-run_and_wait(s_compress["remote_path"], work_dir, "02_compress.log",  mpi=MPI, gpu_ids=GPU_IDS)
-for s in anneal_scripts:
-    run_and_wait(s["remote_path"],      work_dir, s["log_file"],       mpi=MPI, gpu_ids=GPU_IDS)
-run_and_wait(s_final["remote_path"],   work_dir, "final_eq.log",      mpi=MPI, gpu_ids=GPU_IDS)
+# Returns immediately with chain_id. Use watch_run() to block until done:
+w = lammps_engine.watch_run(result["chain_id"])
+Monitor(command=w["monitor_command"])   # harness re-invokes Claude when done
 ```
 
 ---
@@ -241,8 +182,8 @@ mpi=2, gpu_ids="1,3"
 Check the final equilibration log before moving to Stage 3. Do not skip.
 
 ```python
-log = lammps_engine.read_remote_log(
-    remote_log_path=f"{work_dir}/final_eq.log",
+log = lammps_engine.read_log(
+    log_path="/home/arz2/simulations/<run_dir>/06_nvt_production/06_nvt_production.log",
     n_lines=500
 )
 # Look for: density_stable=True, temperature_stable=True in convergence_hints
@@ -272,7 +213,7 @@ Use this measured rate for all subsequent timeline estimates.
 
 ## Common Failures at This Stage
 
-**GPU crash during NPT:** Restart file writing conflict. Switch to CPU for all NPT stages.
+**GPU crash during NPT:** Check the log for the actual error. Do NOT switch to CPU — GPU NPT works correctly. Common causes: out-of-memory (reduce system size or use fewer GPUs), bad initial geometry (run more minimize steps), or pair style mismatch (check params file was stripped of style lines).
 
 **Density not converging:** Add more annealing cycles. Minimum 3, up to 5.
 
@@ -284,4 +225,33 @@ Use this measured rate for all subsequent timeline estimates.
 
 ---
 
-**→ When final_eq.data is saved and density has converged, proceed to `STAGE_3_TG_MEASUREMENT.md`**
+## Extended Structural Equilibration Checks (Required Before Stage 3)
+
+Thermo convergence (density + energy drift) is necessary but not sufficient for polymer systems — particularly near or below Tg. After `check_equilibration` passes, run the structural diagnostics using the production dump file:
+
+```python
+ext = check_equilibration_extended(
+    log_file="<work_dir>/06_nvt_production/06_nvt_production.log",
+    data_file="<remote_data_file>",
+    dump_file="<work_dir>/06_nvt_production/06_nvt_production.dump",
+    backbone_types=[2, 3],      # adjust to your system's backbone atom type IDs
+    skip_frames=50,             # skip early frames (burn-in within production)
+    timestep_fs=1.0,
+    n_backbone_bonds=None,      # set to DP-1 if you want C∞
+)
+# Returns ext["rg_run_id"], ext["msd_run_id"], ext["p2_run_id"], ext["density_run_id"]
+# Monitor each, then read get_run_status(run_id)["result"]
+```
+
+**Flag interpretation and response:**
+
+| Flag | Tool | Meaning | Response |
+|------|------|---------|----------|
+| `rg_spread_flag=True` | extract_radius_of_gyration | CV(Rg per chain) > 30% — heterogeneous conformations | Extend equilibration; check initial cell quality |
+| `kinetic_trap_flag=True` | calculate_msd | Chains haven't moved by their own size | Expected below Tg; problematic in melt state — extend annealing |
+| `ordered_flag=True` | check_orientation_order | P2 > 0.10 — residual backbone alignment | Extend equilibration; increase annealing temperature |
+| `heterogeneous_flag=True` | check_density_homogeneity | Voxel density CV > 25% — voids or domains | Extend compression stage; rebuild cell at lower initial density |
+
+Record the flag values as D-05 in run_log.md.
+
+**→ When final_eq.data is saved, density has converged, and all four extended flags are clear (or justified for the regime), proceed to `STAGE_3_TG_MEASUREMENT.md`**

@@ -37,14 +37,15 @@ bond_style {BOND_STYLE}
 angle_style {ANGLE_STYLE}
 dihedral_style {DIHEDRAL_STYLE}
 improper_style {IMPROPER_STYLE}
-special_bonds amber
-pair_modify mix arithmetic
+{SPECIAL_BONDS}
+pair_modify {PAIR_MODIFY}
 neighbor 2.0 bin
 neigh_modify delay 0 every 1 check yes
 neigh_modify one 4000
 {GPU_PACKAGE}
 
 read_data {DATA_FILE}
+{INCLUDE_PARAMS_BLOCK}
 
 # --- Thermo Output ---
 thermo_style custom step time temp press etotal pe ebond eangle edihed eimp evdwl ecoul elong vol lx ly lz density

@@ -1,0 +1,89 @@
+{
+  "agentPushNotifEnabled": true,
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'ROADMAP: If any items in guides/ROADMAP.md were completed this turn, update their checkboxes from [ ] to [x] before stopping.'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__mcp-mol-builder-server__classify_polymer",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: classify_polymer done — the result includes preferred_ff, preferred_builder, ff_confidence, ff_justification, and ff_justification_doi fields. Write these directly to D-01 in run_log.md without asking the user — no manual FF choice needed for known classes. For ff_confidence=low or unknown class, escalate to E2 literature search. Also fill D-02 (charges) and D-03 (electrostatics) from the classify_polymer result.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-mol-builder-server__submit_generate_cell_job",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: cell generation submitted — confirm D-04 (DP, chains, atom count) is filled in run_log.md.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-mol-builder-server__save_lammps_data",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'PHAL CHECK: If this run is class PHAL (PVDF/PTFE/PCTFE/PVF), run mcp-servers/mcp-mol-builder-server/patch_fluorine_params.py on the output .data file before submitting to LAMMPS.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__run_lammps_chain",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: LAMMPS chain launched — if this run fails, write a RECOVERY block in run_log.md before retrying.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__check_equilibration",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: check_equilibration done — fill D-05 (convergence verdict, drift %, extensions) in run_log.md now.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__extract_tg",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: extract_tg done — fill D-06 (fit quality, R², Tg K) and the Tg row in RESULTS in run_log.md. Also compute and record cooling_rate_K_per_ns = (T_start - T_end) / (n_stages × n_steps × timestep_fs × 1e-6) from the Tg sweep stages.json and fill the cooling rate row in RESULTS.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__extract_equilibrated_density",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: extract_equilibrated_density done — fill the ρ row in RESULTS in run_log.md now.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__extract_bulk_modulus",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: extract_bulk_modulus done — fill the K row in RESULTS in run_log.md now.'"
+          }
+        ]
+      }
+    ]
+  }
+}
