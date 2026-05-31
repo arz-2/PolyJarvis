@@ -1,9 +1,24 @@
 # PolyJarvis Stage Index
-**Version:** 1.4 | **Last updated:** March 25, 2026
+**Version:** 1.5 | **Last updated:** May 30, 2026
+
+## Multi-Agent Mode
+
+PolyJarvis runs in multi-agent mode by default. The **orchestrator** (main session) reads only `CLAUDE.md` and this file — it never reads stage guides directly. Stage guides are owned exclusively by their worker:
+
+| Worker | Reads | Owns |
+|---|---|---|
+| `molecule-builder` | `STAGE_1_MOLECULAR_CONSTRUCTION.md` | Build → `.data` file |
+| `equilibration-worker` | `STAGE_2_EQUILIBRATION.md` | Validate → submit chain → return chain_id |
+| `tg-sweep-worker` | `STAGE_3_TG_MEASUREMENT.md` | Generate script → submit run → return run_id |
+| `analysis-worker` | `STAGE_4_ANALYSIS.md` | Extract properties → return RESULTS block |
+
+The orchestrator owns: `classify_polymer`, `Monitor`, checkpoint writes to `run_log.md`, and all recovery decisions. Workers are stateless — see `CLAUDE.md` for the full orchestrator workflow.
+
+---
 
 ## Instructions for AI Agent
 
-Read THIS file first. Identify which stage applies to your current task. Then read ONLY that stage file. Do not read ahead.
+Read THIS file first. If you are a **worker agent**, identify your stage and read ONLY that stage file. If you are the **orchestrator**, do not read stage files — spawn the appropriate worker instead.
 
 ---
 
@@ -43,6 +58,63 @@ SMILES
 
 ---
 
+## Scope
+
+All 21 polymer classes returned by `classify_polymer()` are routed. Key edge cases:
+
+- **Semicrystalline polymers (PHAL/PVDF, PHYC/PE):** Amorphous cells are built; if `check_orientation_order` returns high order parameter, flag Tg as ⚠ in RESULTS.
+- **UNKNOWN class (class_id=0):** Fix SMILES (`*` attachment points missing or malformed) and retry — not a pipeline failure.
+- **Low-confidence classes (PPHS, PSIL, PPNL, PIMN):** `classify_polymer` emits a warning; record it in D-01 rationale.
+
+---
+
+## Error Recovery
+
+### Equilibration thresholds (Stage 2)
+
+Density drift is measured from the NPT log. For deeply glassy systems (Kapton, PSU at 300 K), gate on *no systematic trend* + density within ±5% of experiment.
+
+| Verdict | Condition | Action |
+|---|---|---|
+| **PASS** | Density drift < 1% over last 500 ps NPT; energy stable | Proceed to Stage 3 |
+| **EXTEND** | Drift 1–3% | `check_equilibration_extended`; extend 1 ns; max 2 extensions |
+| **ESCALATE** | Drift > 3% after 2 extensions | Restart compress with `density_initial` − 0.05 g/cm³ |
+
+### Tg sweep thresholds (Stage 3)
+
+| Verdict | Condition | Action |
+|---|---|---|
+| **EXCELLENT** | R² ≥ 0.95, F-stat tier EXCELLENT | Report as-is |
+| **ACCEPTABLE** | R² 0.90–0.95 | Report with note |
+| **BORDERLINE** | R² 0.80–0.90 | Re-run with T_STEP halved before reporting |
+| **ABORT** | R² < 0.80 or < 4 temperature bins populated | Widen T range by ±50 K and re-run |
+
+### Common recovery actions
+
+1. **`extract_tg` "fewer than 4 bins"** → Widen T_START +50 K and T_END −50 K; re-run sweep.
+2. **EXTEND loop exhausted** → `check_equilibration_extended`; if density ≥ 110% of experimental RT value, restart compress with lower `density_initial`.
+3. **EMC "missing FF parameters"** → Verify SMILES has exactly two `*` atoms; try `dp=15` if `dp=20` fails.
+4. **`run_lammps_chain` crash** → `get_run_output(run_id)` to read last error; diagnose with table below.
+
+### LAMMPS error taxonomy
+
+| Error string in log | Root cause | Action |
+|---|---|---|
+| "lost atoms" | Timestep too large or bad starting geometry | Reduce timestep to 0.5 fs; verify data file with `validate_data_file` |
+| "out of memory" / GPU OOM | Cell too large for available VRAM | Reduce `mpi` ranks; split across more GPU IDs |
+| Segfault on startup / "unknown atom type" | FF assigned before polymerization | Re-run Stage 1 from `assign_forcefield` step |
+| Energy NaN / diverges in first 100 steps | Bad initial config or `density_initial` too high | Restart compress with `density_initial` − 0.10 g/cm³ |
+
+### RadonPy QM job failure
+
+If `get_job_status` returns `failed` for a conformer search or charge assignment job: retry once with `n_conformers` halved. If still fails, fall back to AM1-BCC charges and note in DECISIONS D-02 ("RESP failed — AM1-BCC fallback"). Do not retry a third time.
+
+### Max attempts rule
+
+After 2 recovery attempts at any stage, write `UNRESOLVED` as the outcome and record the last error verbatim. Stop the run — no third retry without human review.
+
+---
+
 ## Cross-Stage Rules (Always Active — Memorize These)
 
 These apply regardless of stage. They are repeated in each stage file but listed here for emphasis.
@@ -55,6 +127,7 @@ These apply regardless of stage. They are repeated in each stage file but listed
 5. **Check convergence before extracting properties**
 6. **Never report Tg without verifying bilinear fit R²**
 7. **Fill `run_log.md` in real time** — log each DECISION row when made, each RECOVERY block immediately after resolving an error; do not reconstruct at the end
+8. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, and SEED_COLD in the run_log header. For replication studies, use fixed seeds from `guides/REVISION_PARAMS.md`. For exploratory runs, read seeds back from job output and log them immediately after submission.
 
 ---
 

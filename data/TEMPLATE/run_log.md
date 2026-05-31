@@ -1,5 +1,6 @@
 # [POLYMER_NAME] Run [N] · [START_DATE] → [END_DATE]
-SMILES: `[SMILES]`  |  FF: [FF]  |  Charges: [CHARGE_METHOD]  |  DP: [DP]  |  Chains: [N_CHAINS]
+SMILES: `[SMILES]`  |  FF: [FF]  |  Charges: [CHARGE_METHOD]  |  DP: [DP]  |  Chains: [N_CHAINS]  |  GPU: [IDs used]
+Seeds: EMC=[N or "random"]  |  SEED_HOT=[N]  |  SEED_COLD=[N]
 
 ---
 
@@ -38,6 +39,8 @@ SMILES: `[SMILES]`  |  FF: [FF]  |  Charges: [CHARGE_METHOD]  |  DP: [DP]  |  Ch
 None
 
 <!--
+Outcome options: converged / failed again / escalated / UNRESOLVED (stop after 2 attempts, human review needed)
+
 Example recovery block:
 
 [Stage 2]  check_equilibration EXTEND×2 — density still drifting at 2.1% after two 1 ns extensions
@@ -50,6 +53,22 @@ Example recovery block:
            Fix: re-ran sweep with T_START=700K; T_END=200K; T_STEP=10K
            Outcome: converged — R²=0.94, F-stat GOOD, N=25 bins
 -->
+
+---
+
+## TIMING
+
+| Stage | Submitted | Completed | Wall time | Throughput |
+|-------|-----------|-----------|-----------|------------|
+| 1 — Cell build | [HH:MM] | [HH:MM] | [Xh Ym] | — |
+| 2 — Equilibration | [HH:MM] | [HH:MM] | [Xh Ym] | [X ns/day] |
+| 3 — Tg sweep | [HH:MM] | [HH:MM] | [Xh Ym] | [X ns/day] |
+| **Total** | | | **[Xh Ym]** | |
+
+<!-- Times are local wall clock. Throughput from LAMMPS log "Performance" line. Stage 1 times from job poll (submitted → completed status). -->
+
+GPU inventory (`nvidia-smi` at run start):
+- GPU [ID]: [model], [VRAM] GB, [free] GB free
 
 ---
 

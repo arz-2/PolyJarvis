@@ -6,106 +6,100 @@ Read `guides/STAGE_INDEX.md` first on every task.
 
 ---
 
+## Key Directories
+
+| Path | Contents |
+|------|----------|
+| `guides/` | Stage-by-stage workflow guides; `STAGE_INDEX.md` is always read first |
+| `guides/polymer_rules.json` | Per-class Tg ranges, density targets, DP defaults, annealing cycles |
+| `data/TEMPLATE/run_log.md` | Run log template — copy to `data/[RUN]/run_log.md` at task start |
+| `data/[RUN]/` | One directory per simulation run |
+| `emc_pipeline.py` | EMC cell builder (PCBN, PAMD, PKTN, PSFO, PIMD, PHAL, PHYC, PDIE, PSTR) |
+
+---
+
 ## Run Log
 
-Copy `data/TEMPLATE/run_log.md` to `data/[RUN]/run_log.md` at task start. Fill it in real time — not reconstructed at the end.
-
-The **RECOVERIES section is the primary evidence of agent value** over base RadonPy (which retries blindly without diagnosis). Write a RECOVERY block immediately after resolving any LAMMPS or pipeline failure:
-
-```
-[Stage N]  <one-line error description>
-           Diagnosis: <root cause>
-           Fix: <specific change made>
-           Outcome: <converged / failed again / escalated>
-```
-
-If the run completes without errors, write `None` in RECOVERIES.
+Copy `data/TEMPLATE/run_log.md` to `data/[RUN]/run_log.md` at task start. Fill it in real time — not reconstructed at the end. The RECOVERIES section is the primary evidence of agent value — write a block immediately after resolving any failure.
 
 ---
 
-## Auto-continuation after simulation
+## Orchestrator Pattern (Multi-Agent Mode)
 
-After every `run_lammps_chain`, `run_lammps_script`, or analysis tool call:
+The default mode is multi-agent. The orchestrator (this session) spawns specialist workers via `Agent(subagent_type=...)` calls. Workers are stateless — the orchestrator holds all state and recovery logic.
+
+### Dispatch table
+
+| After completing... | Spawn... |
+|---|---|
+| `classify_polymer` + `polymer_rules.json` lookup | `molecule-builder` |
+| `molecule-builder` returns `data_path` | `equilibration-worker` → then Monitor |
+| Monitor returns (equilibration done) | `check_equilibration` → if PASS, spawn `tg-sweep-worker` |
+| Monitor returns (Tg sweep done) | `analysis-worker(tasks=[...])` |
+
+### Orchestrator workflow
 
 ```
-1. result = run_lammps_chain(...)          # submit
-2. w = watch_run(result["chain_id"])       # get monitor command
-3. Monitor(command=w["monitor_command"])   # block until done — harness re-invokes Claude
-4. continue workflow                       # Claude picks up here automatically
+1. Read CLAUDE.md + STAGE_INDEX.md only (never read stage guides directly)
+2. Copy data/TEMPLATE/run_log.md → data/[RUN]/run_log.md
+3. classify_polymer(smiles) → look up polymer_rules.json → build run_params
+4. Agent(subagent_type="molecule-builder", prompt=<smiles + run_params>)
+     → parse RESULT block → extract data_path, lammps_flags
+5. Agent(subagent_type="equilibration-worker", prompt=<data_path + params>)
+     → parse RESULT block → extract chain_id, monitor_command
+6. Write SIMULATION STATE to run_log.md (status=monitoring)
+7. Monitor(command=monitor_command)          # orchestrator owns this
+8. get_run_status(chain_id) → check success/failure
+9. check_equilibration(equil_log) → PASS / EXTEND / ESCALATE
+10. Agent(subagent_type="tg-sweep-worker", prompt=<equil_data_path + tg_params>)
+      → parse RESULT block → extract run_id, monitor_command
+11. Write SIMULATION STATE to run_log.md (status=monitoring)
+12. Monitor(command=monitor_command)          # orchestrator owns this
+13. Agent(subagent_type="analysis-worker", prompt=<logs + tasks=[...]>)
+      → parse RESULT block → write RESULTS to run_log.md
 ```
 
-Never poll `get_run_status` in a loop. The Monitor tool + sentinel file is how PolyJarvis
-avoids requiring the user to manually re-trigger Claude after each simulation stage.
+### Analysis tasks construction
+
+Build the `tasks` list from `polymer_rules.json` defaults plus any user-requested extras:
+- Always include: `check_equilibration`, `extract_tg`, `extract_density`, `extract_bulk_modulus`, `check_equilibration_extended`
+- Add per user request: `calculate_rdf`, `calculate_msd`, `extract_radius_of_gyration`, `extract_end_to_end_vectors`
+- For one-off non-standard requests (NEMD, literature search), handle inline — do not spawn a custom worker.
+
+### Checkpoint protocol
+
+Before every `Monitor` call, write to `run_log.md`:
+
+```markdown
+## SIMULATION STATE
+| Stage         | chain_id / run_id | status     | output_path              |
+|---------------|-------------------|------------|--------------------------|
+| Equilibration | chain-abc123      | monitoring | /path/to/stages/         |
+| Tg sweep      | —                 | pending    | —                        |
+```
+
+Update status to `done` after Monitor returns successfully, or `failed` on error. On session restart, read this table first — if a row shows `monitoring`, call `get_run_status(id)` to determine actual state before proceeding.
+
+### Recovery ownership
+
+The orchestrator decides all recovery actions. Workers are re-spawned with adjusted prompts:
+- **Chain failed (Mode A):** Monitor fires → `get_run_status` returns FAILED → read error log → adjust params → re-spawn worker
+- **Session ended mid-Monitor (Mode B):** On restart, read SIMULATION STATE → `get_run_status` → if still running, re-issue Monitor; if done, continue; if failed, enter recovery
+- Max 2 recovery attempts per stage; after that, write `UNRESOLVED` and stop
 
 ---
 
-## Force Field Routing
+## Auto-Continuation After Simulation
 
-`classify_polymer` returns `class_name`. Route as follows:
+The orchestrator owns all `Monitor` calls. Workers (`equilibration-worker`, `tg-sweep-worker`) submit jobs and return `chain_id`/`run_id` + `monitor_command` without calling Monitor themselves.
 
-| class_name | Builder | FF | `lammps_flags` |
-|---|---|---|---|
-| PCBN, PAMD, PKTN, PSFO, PIMD | EMC | PCFF class2 | `use_pcff=True, use_opls=False` |
-| PHAL | EMC | OPLS-AA 2024 | `use_pcff=False, use_opls=True` |
-| PHYC, PDIE, PSTR | EMC | TraPPE-UA | `use_pcff=False, use_opls=False` |
-| PVNL, PACR, POXI, PSUL, PEST, PURT, PURA, PANH, PIMN, PSIL, PPHS, PPNL | RadonPy | GAFF2_mod + QM charges | `use_pcff=False, use_opls=True` |
+```
+1. result = Agent(subagent_type="equilibration-worker", ...)   # submits chain
+2. chain_id = parse(result, "chain_id")
+3. monitor_command = parse(result, "monitor_command")
+4. write_checkpoint(run_log, chain_id, status="monitoring")
+5. Monitor(command=monitor_command)   # block until done — harness re-invokes Claude
+6. continue workflow                  # Claude picks up here automatically
+```
 
-**EMC path:** `get_emc_job_output()` returns `lammps_flags` — pass directly to `generate_script()` and `generate_equilibration_workflow()`. No manual flag lookup needed.
-
-**PCFF note:** `use_pcff=True` sets class2 bond/angle/dihedral/improper styles, `lj/class2/coul/long` pair style, `special_bonds lj/coul 0 0 1`, `mix sixthpower tail yes`, and disables SHAKE.
-
----
-
-## Decision IDs
-
-Fill the DECISIONS table in run_log.md at each point below. Hooks will prompt you at the right moment.
-
-**EMC path** (PCBN, PAMD, PKTN, PSFO, PIMD, PHAL, PHYC, PDIE, PSTR):
-
-| ID | Decision | Trigger |
-|----|----------|---------|
-| D-01 | Force field (auto from polymer_class — record `field` from submit response) | `classify_polymer` returns |
-| D-02 | Charge method | `"embedded in FF"` — no action |
-| D-03 | Electrostatics | from `lammps_flags` in `get_emc_job_output` |
-| D-04 | System size (dp, ntotal) | Before calling `submit_emc_cell_job` |
-| D-05 | Convergence verdict | `check_equilibration` returns |
-| D-06 | Tg fit quality + Tg value | `extract_tg` returns |
-
-**RadonPy path** (all other classes):
-
-| ID | Decision | Trigger |
-|----|----------|---------|
-| D-01 | Force field (GAFF2 vs GAFF2_mod) | `classify_polymer` returns |
-| D-02 | Charge method (RESP vs AM1-BCC vs Gasteiger) | `classify_polymer` returns |
-| D-03 | Electrostatics (PPPM vs lj/cut) | `classify_polymer` returns |
-| D-04 | System size (DP, chains) | Before calling `submit_generate_cell_job` |
-| D-05 | Convergence verdict | `check_equilibration` returns |
-| D-06 | Tg fit quality + Tg value | `extract_tg` returns |
-
----
-
-## Convergence and Error Recovery
-
-### Equilibration thresholds (Stage 2)
-
-| Verdict | Condition | Action |
-|---|---|---|
-| **PASS** | Density drift < 1% over last 500 ps of NVT production; energy stable | Proceed to Stage 3 |
-| **EXTEND** | Drift 1–3% | Run `check_equilibration_extended`; extend NVT production by 1 ns; max 2 extensions |
-| **ESCALATE** | Drift > 3% after 2 extensions | Log in RECOVERIES; check density vs. target ±10% (over-densification?); restart compress stage with `density_initial` reduced by 0.05 g/cm³ |
-
-### Tg sweep thresholds (Stage 3)
-
-| Verdict | Condition | Action |
-|---|---|---|
-| **EXCELLENT** | R² ≥ 0.95, F-stat tier EXCELLENT | Report as-is |
-| **ACCEPTABLE** | R² 0.90–0.95 | Report with note |
-| **BORDERLINE** | R² 0.80–0.90 | Re-run with T_STEP halved before reporting |
-| **ABORT** | R² < 0.80 or < 4 temperature bins populated | Widen T range by ±50 K and re-run |
-
-### Common recovery actions
-
-1. **`extract_tg` "fewer than 4 bins"** → Widen T_START +50 K and T_END −50 K; re-run sweep.
-2. **`check_equilibration` EXTEND loop exhausted** → Run `check_equilibration_extended`; if density ≥ 110% of experimental RT value, over-densification is likely — restart from compress stage with lower `density_initial`.
-3. **EMC build "missing FF parameters"** → Verify SMILES has exactly two `*` atoms and correct functional group placement (see TOOLS_REFERENCE SMILES conventions); try `dp=15` if `dp=20` fails.
-4. **`run_lammps_chain` crash mid-chain** → Call `get_run_output(run_id)` to read last error; "out of memory" → reduce MPI ranks; "lost atoms" → reduce timestep to 0.5 fs.
+Never poll `get_run_status` in a loop. The Monitor tool + sentinel file is how PolyJarvis avoids requiring the user to manually re-trigger Claude after each simulation stage.
