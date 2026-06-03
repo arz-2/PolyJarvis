@@ -177,25 +177,6 @@ mpi=2, gpu_ids="1,3"
 
 ---
 
-## Convergence Check (Before Marking Stage Complete)
-
-Check the final equilibration log before moving to Stage 3. Do not skip.
-
-```python
-log = lammps_engine.read_log(
-    log_path="/home/arz2/simulations/<run_dir>/06_nvt_production/06_nvt_production.log",
-    n_lines=500
-)
-# Look for: density_stable=True, temperature_stable=True in convergence_hints
-```
-
-**Convergence criteria:**
-- Density fluctuation < 2% over last 50% of trajectory
-- Temperature stable within ±5 K
-- No monotonic drift in energy
-
-**If not converged:** Extend final equilibration by 1-2 ns before proceeding.
-
 ---
 
 ## Benchmark Throughput After First Stage
@@ -225,33 +206,43 @@ Use this measured rate for all subsequent timeline estimates.
 
 ---
 
-## Extended Structural Equilibration Checks (Required Before Stage 3)
+## Comprehensive Equilibration Check (Required Before Stage 3)
 
-Thermo convergence (density + energy drift) is necessary but not sufficient for polymer systems — particularly near or below Tg. After `check_equilibration` passes, run the structural diagnostics using the production dump file:
+Thermo convergence alone is necessary but not sufficient. Call `check_equilibration_comprehensive` — it runs all thermo and structural checks in one job and returns a single `overall_pass` verdict plus a ready-to-paste D-05 markdown block.
 
 ```python
-ext = check_equilibration_extended(
+result = check_equilibration_comprehensive(
     log_file="<work_dir>/06_nvt_production/06_nvt_production.log",
-    data_file="<remote_data_file>",
     dump_file="<work_dir>/06_nvt_production/06_nvt_production.dump",
-    backbone_types=[2, 3],      # adjust to your system's backbone atom type IDs
-    skip_frames=50,             # skip early frames (burn-in within production)
+    data_file="<path/to/cell.data>",
+    backbone_types=[2, 3],      # REQUIRED — get from parse_data_file(); do not guess
+    skip_frames=50,
     timestep_fs=1.0,
-    n_backbone_bonds=None,      # set to DP-1 if you want C∞
+    dump_every=1000,            # auto-detected from dump header if possible
+    n_backbone_bonds=119,       # DP-1; enables C∞ and MSID
 )
-# Returns ext["rg_run_id"], ext["msd_run_id"], ext["p2_run_id"], ext["density_run_id"]
-# Monitor each, then read get_run_status(run_id)["result"]
+# result["run_id"] — poll with get_run_status(run_id)
+# When completed: result["overall_pass"], result["d05_markdown"]
 ```
 
-**Flag interpretation and response:**
+**Hard gates** — block `overall_pass=True` if any fail:
 
-| Flag | Tool | Meaning | Response |
-|------|------|---------|----------|
-| `rg_spread_flag=True` | extract_radius_of_gyration | CV(Rg per chain) > 30% — heterogeneous conformations | Extend equilibration; check initial cell quality |
-| `kinetic_trap_flag=True` | calculate_msd | Chains haven't moved by their own size | Expected below Tg; problematic in melt state — extend annealing |
-| `ordered_flag=True` | check_orientation_order | P2 > 0.10 — residual backbone alignment | Extend equilibration; increase annealing temperature |
-| `heterogeneous_flag=True` | check_density_homogeneity | Voxel density CV > 25% — voids or domains | Extend compression stage; rebuild cell at lower initial density |
+| Check | Threshold | Action if failed |
+|-------|-----------|-----------------|
+| Density drift | < 1% (p < 0.01) | Extend final NPT by 1–2 ns |
+| Energy drift | < 1% (p < 0.01) | Same |
+| Density block-SEM | < 1% of mean | Same |
+| Energy block-SEM | < 1% of mean | Same |
+| Rg CV across chains | < 30% | Add annealing cycles; check initial cell quality |
+| P2 nematic order | < 0.10 | Extend equilibration; raise annealing temperature |
+| Density homogeneity CV | < 25% (adaptive grid) | Extend compression; rebuild at lower `density_initial` |
 
-Record the flag values as D-05 in run_log.md.
+**Soft warnings** — reported in `result["warnings"]`, never block pass:
+- `τ_eff > 10% of trajectory` — short sample; extend production if possible
+- `C(t) not decayed` — expected below Tg; problematic in melt state
+- `MSID slope ≠ 1.0` — possible chain collapse or extension
+- `MSD kinetic trap` — chains immobile; expected below Tg
 
-**→ When final_eq.data is saved, density has converged, and all four extended flags are clear (or justified for the regime), proceed to `STAGE_3_TG_MEASUREMENT.md`**
+After the job completes, copy `result["d05_markdown"]` directly into run_log.md as the D-05 CONVERGENCE DETAIL section.
+
+**→ When `overall_pass=True` (or all failures are justified for glassy regime), proceed to `STAGE_3_TG_MEASUREMENT.md`**

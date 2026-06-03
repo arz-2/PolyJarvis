@@ -29,6 +29,12 @@ import numpy as np
 import pandas as pd
 import MDAnalysis as mda
 
+sys.path.insert(0, str(Path(__file__).parent))
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from plot_style import apply_style, save_fig
+
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 
 
@@ -106,6 +112,25 @@ def get_backbone_bond_vectors(u, chain_ids, backbone_set, box):
     return np.array(vectors) if vectors else np.zeros((0, 3))
 
 
+def _plot_orientation_p2(df, p2_mean, p2_std, p2_threshold, ordered_flag, output_dir):
+    apply_style()
+    frames = df['frame'].values
+    p2_vals = df['p2'].values
+    fig, ax = plt.subplots()
+    ax.plot(frames, p2_vals, color='steelblue', lw=0.8, alpha=0.8, label='P₂(t)')
+    ax.axhline(p2_mean, color='k', ls='-', lw=1.5, label=f'⟨P₂⟩ = {p2_mean:.3f}')
+    ax.fill_between(frames, p2_mean - p2_std, p2_mean + p2_std, alpha=0.2, color='k')
+    ax.axhline(p2_threshold, color='firebrick', ls='--', lw=1.2, alpha=0.7,
+               label=f'Threshold = {p2_threshold}')
+    flag_str = 'ORDERED — residual alignment' if ordered_flag else 'isotropic (OK)'
+    ax.set_xlabel('Frame')
+    ax.set_ylabel('P₂ nematic order parameter')
+    ax.set_title(f'Backbone orientation order — {flag_str}')
+    ax.set_ylim(bottom=max(-0.55, min(p2_vals.min() - 0.05, -0.05)))
+    ax.legend()
+    save_fig(fig, str(Path(output_dir) / 'figures' / 'orientation_p2.png'))
+
+
 def main():
     args = parse_args()
     backbone_set = set(args.backbone_types)
@@ -176,6 +201,14 @@ def main():
         "method": "Saupe tensor P2 from backbone bond vectors via MDAnalysis",
         "mdanalysis_version": mda.__version__,
     })
+
+    p2_fig_png = str(output_dir / "figures" / "orientation_p2.png")
+    try:
+        _plot_orientation_p2(df, p2_mean, p2_std, args.p2_threshold, ordered_flag, output_dir)
+    except Exception as _pe:
+        print(f"  WARNING: orientation_p2 plot failed: {_pe}", flush=True)
+        p2_fig_png = None
+    summary["orientation_p2_png"] = p2_fig_png
 
     json_path = str(output_dir / "orientation_summary.json")
     with open(json_path, "w") as jf:

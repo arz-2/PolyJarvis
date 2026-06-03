@@ -445,64 +445,6 @@ job = submit_copolymerize_job(
 
 ---
 
-### Tool: `submit_random_copolymerize_job` — Statistical Copolymer
-
-Inserts monomers in a random sequence obeying target mole fractions. `ratio` is auto-normalised — does not need to sum to 1.0.
-
-```python
-# Example: poly(styrene-stat-MMA), 70/30 mol%
-job = submit_random_copolymerize_job(
-    mol_files=[
-        "./checkpoints/styrene_monomer.json",
-        "./checkpoints/mma_monomer.json"
-    ],
-    ratio=[0.70, 0.30],
-    degree_of_polymerization=100,  # total monomer units
-    output_file="./checkpoints/stat_smma_copolymer.json",
-    ratio_type="exact",            # 'exact' = enforce composition; 'choice' = probabilistic
-    tacticity="atactic"
-)
-```
-
-**`ratio_type` choice:**
-- `'exact'` — guaranteed composition (rounds to nearest integer count per monomer). Use for production.
-- `'choice'` — each monomer drawn independently from probability distribution. Can deviate from target for short chains.
-
----
-
-### Tool: `submit_block_copolymerize_job` — Block Copolymer
-
-Connects blocks in the order specified. `mol_files` and `block_lengths` are parallel arrays.
-
-```python
-# Example: PEO₄₀-PS₃₀ diblock
-job = submit_block_copolymerize_job(
-    mol_files=[
-        "./checkpoints/peo_monomer.json",
-        "./checkpoints/ps_monomer.json"
-    ],
-    block_lengths=[40, 30],        # A₄₀-B₃₀, total 70 units
-    output_file="./checkpoints/block_peo_ps.json",
-    tacticity="atactic"
-)
-
-# Example: ABA triblock (pass same monomer twice)
-job = submit_block_copolymerize_job(
-    mol_files=[
-        "./checkpoints/a_monomer.json",
-        "./checkpoints/b_monomer.json",
-        "./checkpoints/a_monomer.json"   # same file, second block
-    ],
-    block_lengths=[20, 30, 20],    # A₂₀-B₃₀-A₂₀
-    output_file="./checkpoints/triblock_aba.json",
-    tacticity="atactic"
-)
-```
-
-**Note:** For large blocks (>50 per block), runtime can be significant. Estimate as ~1–5 min per 100 total monomers with `opt='rdkit'`.
-
----
-
 ### Copolymer Workflow (Complete)
 
 ```
@@ -514,50 +456,19 @@ submit_assign_charges_job(monomer_A)  →  monomer_A_charged.json
 submit_assign_charges_job(monomer_B)  →  monomer_B_charged.json
 
 # Then polymerize (do NOT assign FF yet)
-submit_block_copolymerize_job(
+submit_copolymerize_job(
     mol_files=[monomer_A_charged.json, monomer_B_charged.json],
-    block_lengths=[40, 30],
+    degree_of_polymerization=50,
     output_file=copolymer.json
 )
 
 assign_forcefield(copolymer.json, "GAFF2_mod")   # ← FF here, not before
 
-submit_generate_cell_job(copolymer_ff.json, num_chains=10)
+submit_generate_copolymer_cell_job(chain_files=[copolymer_ff.json], num_chains=10)
 save_lammps_data(cell.json, "copolymer.data")
 ```
 
----
-
-## Polymer Blend / Mixture Cell
-
-**Tool: `submit_generate_mixture_cell_job`**
-
-Packs a periodic box from multiple distinct pre-built polymer chains. Each component is a fully prepared (polymerised + FF-assigned) polymer JSON.
-
-```python
-# Example: PS/PMMA 50:50 blend, 5 chains each
-job = submit_generate_mixture_cell_job(
-    mol_files=[
-        "./checkpoints/ps_chain_ff.json",
-        "./checkpoints/pmma_chain_ff.json"
-    ],
-    chains_per_component=[5, 5],   # 5 PS + 5 PMMA = 10 chains total
-    output_file="./checkpoints/ps_pmma_blend_cell.json",
-    density=0.05,                  # ALWAYS start low — same rule as homopolymer cell
-    temperature=300.0
-)
-```
-
-**Differences from `submit_generate_cell_job`:**
-- Takes a list of *already-polymerised, FF-assigned* polymer JSONs (not a single chain)
-- Each component can have different MW, architecture, or chemistry
-- `chains_per_component[i]` controls the stoichiometry
-- Output cell JSON contains the full mixture and can be exported directly to LAMMPS data
-
-**Use cases:**
-- Polymer blends (miscibility, phase behaviour)
-- Block copolymer cells with multiple distinct chain lengths
-- Polymer/solvent mixtures (add small molecule JSON as one component)
+> **Statistical and block copolymers, and polymer blends, are not yet implemented.** See ROADMAP Track H.
 
 ---
 

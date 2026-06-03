@@ -25,18 +25,13 @@ Tools exposed:
   12. watch_run                       - Return Monitor command to block until a run completes
   13. read_log                 - Live-tail a LAMMPS log during a running job
   ── Analysis ──────────────────────────────────────────────────────────────────
-  14. unwrap_coordinates              - Write new dump with image-flag-unwrapped coords
-  15. extract_end_to_end_vectors      - End-to-end R vectors via MDAnalysis sort_backbone
-  16. calculate_rdf                   - g(r) via MDAnalysis InterRDF
-  17. check_equilibration             - Drift + block-average convergence check
-  18. extract_equilibrated_density    - Plateau density via reverse-cumulative-mean
-  19. extract_tg                      - Tg via exhaustive F-stat bilinear fit
-  20. extract_bulk_modulus            - Isothermal K via NPT volume fluctuations
-  21. extract_radius_of_gyration      - Mass-weighted Rg per chain, CV, C∞
-  22. calculate_msd                   - Chain CoM MSD, α exponent, kinetic-trap flag
-  23. check_orientation_order         - P2 nematic order from backbone bond vectors
-  24. check_density_homogeneity       - Voxel mass density CV, heterogeneous_flag
-  25. check_equilibration_extended    - Run all four structural checks in parallel
+  14. unwrap_coordinates                - Write new dump with image-flag-unwrapped coords
+  15. extract_end_to_end_vectors        - End-to-end R vectors via MDAnalysis sort_backbone
+  16. calculate_rdf                     - g(r) via MDAnalysis InterRDF
+  17. check_equilibration_comprehensive - All convergence + structural checks, one call, one verdict
+  18. extract_equilibrated_density      - Plateau density via reverse-cumulative-mean
+  19. extract_tg                        - Tg via bilinear curve_fit (standard polymer MD method)
+  20. extract_bulk_modulus              - Isothermal K via NPT volume fluctuations
 """
 
 import os
@@ -1075,6 +1070,7 @@ def generate_equilibration_workflow(
     n_chains: int = 6,
     n_atoms: Optional[int] = None,
     use_pcff: bool = False,
+    use_trappe: bool = False,
     params_file: str = "",
 ) -> dict:
     """
@@ -1082,12 +1078,14 @@ def generate_equilibration_workflow(
     LAMMPS scripts. Mirrors the Larsen 21-step logic but with full
     parameter control.
 
-    Protocol:
-      Stage 1: minimize       - relax contacts in amorphous cell
-      Stage 2: npt_compress   - NVT heat to max_temp + NPT compress to target density
-      Stage 3: nvt            - NVT equilibration at max_temp (full PPPM)
-      Stage 4: npt            - NPT cool to target temp, density equilibration
-      Stage 5: nvt            - NVT production run at target temp
+    Protocol (7 stages):
+      Stage 01: minimize         - energy minimization in amorphous cell
+      Stage 02: nvt_softheat     - NVT heat from 300 K to max_temp
+      Stage 03: npt_compress     - NPT compress to max_press at max_temp
+      Stage 04: npt_pppm         - NPT decompress from max_press to 1 atm
+      Stage 05: npt_cool         - NPT cool from max_temp to target temp
+      Stage 06: nvt_production   - NVT production at target temp (GPU on; MSD/C(t) analysis)
+      Stage 07: npt_production   - NPT constant-T/P at target conditions (GPU off; bulk modulus)
 
     Args:
         data_file:      Remote path to RadonPy .data file on Lambda.
@@ -1100,9 +1098,14 @@ def generate_equilibration_workflow(
         n_chains:       Number of polymer chains (informational).
         n_atoms:        Total atom count. Auto-detected if not provided.
         use_pcff:       Set True for EMC/PCFF class2 systems (PCBN, PAMD, PKTN,
-                        PSFO, PIMD). Switches all templates to class2 styles,
-                        sixthpower mixing, and full 1-4 interactions. SHAKE is
-                        disabled (PCFF runs cleanly at 1 fs without it).
+                        PSFO, PIMD, POXI, PEST, PSUL, PURT, PANH, PPHS, PACR,
+                        PIMN, PVNL, PPNL). Switches all templates to class2
+                        styles, sixthpower mixing, and full 1-4 interactions.
+                        SHAKE is disabled (PCFF runs cleanly at 1 fs without it).
+        use_trappe:     Set True for EMC/TraPPE-UA systems (PHYC, PDIE, PSTR).
+                        Switches all templates to pair_style lj/cut 14.0 (no
+                        kspace), multi/harmonic dihedrals, and SHAKE disabled
+                        (united-atom force field has no explicit H atoms).
         params_file:    Optional path to an EMC-generated .params file containing
                         force field coefficients (pair_coeff, bond_coeff, etc.).
                         When provided, Coeffs validation is skipped on the .data
@@ -1162,7 +1165,13 @@ def generate_equilibration_workflow(
         # PCFF class2 cells from EMC start at ~0.5× experimental density — no
         # separate soft-heat or cutoff-only compression phase needed.
         # SHAKE is off: PCFF runs stably at 1 fs all-atom without constraints.
-        ff_base = {"use_pcff": True, "use_shake": False} if use_pcff else {}
+        # TraPPE-UA: united-atom (no H), pure lj/cut, no kspace, no SHAKE.
+        if use_pcff:
+            ff_base = {"use_pcff": True, "use_shake": False}
+        elif use_trappe:
+            ff_base = {"use_trappe": True, "use_shake": False, "use_pppm": False, "LJ_CUTOFF": 14.0}
+        else:
+            ff_base = {}
         if params_file:
             ff_base["params_file"] = params_file
 
@@ -1280,6 +1289,25 @@ def generate_equilibration_workflow(
         }, s5["output_data"])
         stages.append(s6)
 
+        # Stage 7: NPT production at target conditions — dedicated for K_T measurement.
+        # Must be constant-T/P; the Stage 5 cooling ramp is invalid for the volume
+        # fluctuation method. Reads from Stage 6 NVT output (best-equilibrated config).
+        steps_npt_prod = steps_npt // 2
+        s7 = _stage("07_npt_production", "npt", {
+            "T_START":       temp,
+            "T_FINAL":       temp,
+            "T_DAMP":        100.0,
+            "P_START":       press,
+            "P_FINAL":       press,
+            "P_DAMP":        1000.0,
+            "TIMESTEP":      1.0,
+            "N_STEPS":       steps_npt_prod,
+            "use_pppm":      True,
+            "use_gpu":       False,
+            "write_restart": False,
+        }, s6["output_data"])
+        stages.append(s7)
+
         return {
             "status":     "success",
             "polymer":    polymer_name,
@@ -1289,13 +1317,16 @@ def generate_equilibration_workflow(
             "n_stages":   len(stages),
             "stages":     stages,
             "run_order":  [s["name"] for s in stages],
+            "npt_production_log": f"{s7['remote_work_dir']}/{s7['params']['LOG_FILE']}",
+            "npt_production_dir": s7["remote_work_dir"],
             "preflight_warnings": vr["warnings"],
             "preflight_stats":    vr["stats"],
             "instructions": (
                 f"Generated {len(stages)} staged scripts for {polymer_name}.\n"
                 "Execute in order using run_lammps_script().\n"
                 "GPU is OFF for NPT stages (restart safety).\n"
-                "GPU is ON for NVT production stage.\n"
+                "GPU is ON for NVT production stage (Stage 6).\n"
+                "Stage 7 (07_npt_production) is a constant-T/P NPT run for bulk modulus.\n"
                 "Monitor each stage with read_log() before proceeding."
             ),
         }
@@ -1688,30 +1719,30 @@ def extract_tg(
     """
     Extract glass transition temperature (Tg) from a LAMMPS MD temperature-sweep log.
 
-    Methodology (v3 — March 2026):
+    Methodology (v4 — May 2026):
       Data: Plateau detection (|ΔT|>15 K jump = new set-point) with
       equilibration burn-in, producing one clean (T, ρ) point per plateau.
-      Plateaus with density drift > 1% (p < 0.01) are excluded from fitting
-      to ensure only equilibrated data contributes to the Tg estimate.
-      Fitting: Exhaustive F-stat split — tries every split point, fits two
-      independent OLS lines, selects the split maximising the F-statistic
-      of the two-line model vs a single line.  Physics constraints enforced
-      (both slopes negative, rubbery steeper).  Tg = line intersection.
-      Cross-validated by scipy curve_fit bilinear.
-      Quality: Rated by both R² and F-stat p-value; overall quality is the
-      stricter of the two.
+      Plateaus with density drift > 1% are excluded from fitting: ≥20-row
+      plateaus require drift > 1% AND p < 0.01; 3–19-row plateaus use
+      magnitude-only (p-value unreliable for short autocorrelated series).
+      Fitting: Bilinear curve_fit — two OLS lines simultaneously fit to the
+      glassy and rubbery regions; Tg = line intersection.  Physics constraints
+      enforced (both slopes negative, rubbery steeper than glassy).  This is
+      the standard method used in polymer MD literature (Afzal 2021, Hayashi/
+      RadonPy 2022, Klajmon 2023, NkepsuMbitou 2025).
+      Quality: Rated by bilinear R².
 
     References:
+      Afzal et al., ACS Appl. Polym. Mater. 3 (2021) 6213–6228
+      Hayashi et al., npj Comput. Mater. 8 (2022) 222
       Patrone et al., Polymer 87 (2016) 246–259
-      Suter et al., JCTC 21 (2025) 1405–1421
 
     The job runs in the background — poll with get_run_status(run_id).
 
     Args:
         log_file:               Full path to the LAMMPS log file on Lambda.
         output_dir:             Output directory on Lambda.
-        initial_tg_guess:       Hint for secondary curve_fit method (primary
-                                F-stat method is guess-free).
+        initial_tg_guess:       Initial Tg hint for curve_fit optimizer (K).
         equilibration_fraction: Fraction of steps at each T used for density
                                 averaging (0.5 = last 50 %).
         temp_col:               Temperature column name (default: 'Temp').
@@ -1719,8 +1750,7 @@ def extract_tg(
 
     Returns:
         dict with run_id.  Result includes Tg_K, Tg_alternative_K,
-        r_squared, f_statistic, f_statistic_pvalue, fit_quality,
-        fit_quality_r2, fit_quality_fstat, fit_method, binning_method,
+        r_squared, fit_quality, fit_method, binning_method,
         n_plateaus_skipped_drift, fit_params, n_temperature_bins,
         temp_range_K, bins_csv, summary_json.
     """
@@ -1751,116 +1781,164 @@ def extract_tg(
     }
 
 
-# ── Tool: check_equilibration ─────────────────────────────────────────────────
+# ── Tool: check_equilibration_comprehensive ───────────────────────────────────
 
-def _run_check_equilibration(
+def _run_check_equilibration_comprehensive(
     log_file: str,
+    dump_file: str,
+    data_file: str,
+    backbone_types: list,
     output_dir: str,
+    skip_frames: int,
+    timestep_fs: float,
+    dump_every: int,
+    n_backbone_bonds: Optional[int],
+    bond_length_A: float,
     eq_fraction: float,
     drift_threshold_pct: float,
     drift_pvalue: float,
     block_count: int,
     temp_col: str,
-    press_col: str,
     density_col: str,
     energy_col: str,
+    atom_style: str,
 ) -> dict:
-    """Background worker — runs check_equilibration.py on Lambda via CLI."""
-
-    parts = [f"python {MDA_SCRIPTS_DIR}/check_equilibration.py"]
-    parts.append(f"--log_file {log_file}")
-    parts.append(f"--output_dir {output_dir}")
-    parts.append(f"--eq_fraction {eq_fraction}")
-    parts.append(f"--drift_threshold_pct {drift_threshold_pct}")
-    parts.append(f"--drift_pvalue {drift_pvalue}")
-    parts.append(f"--block_count {block_count}")
-    parts.append(f"--temp_col {temp_col}")
-    parts.append(f"--press_col {press_col}")
-    parts.append(f"--density_col {density_col}")
-    parts.append(f"--energy_col {energy_col}")
+    """Background worker — runs check_equilibration_comprehensive.py via CLI."""
+    bt_str = " ".join(str(t) for t in backbone_types)
+    parts = [
+        f"python {MDA_SCRIPTS_DIR}/check_equilibration_comprehensive.py",
+        f"--log_file {log_file}",
+        f"--dump_file {dump_file}",
+        f"--data_file {data_file}",
+        f"--backbone_types {bt_str}",
+        f"--output_dir {output_dir}",
+        f"--skip_frames {skip_frames}",
+        f"--timestep_fs {timestep_fs}",
+        f"--dump_every {dump_every}",
+        f"--bond_length_A {bond_length_A}",
+        f"--eq_fraction {eq_fraction}",
+        f"--drift_threshold_pct {drift_threshold_pct}",
+        f"--drift_pvalue {drift_pvalue}",
+        f"--block_count {block_count}",
+        f"--temp_col {temp_col}",
+        f"--density_col {density_col}",
+        f"--energy_col {energy_col}",
+        f'--atom_style "{atom_style}"',
+    ]
+    if n_backbone_bonds is not None:
+        parts.append(f"--n_backbone_bonds {n_backbone_bonds}")
 
     command = " ".join(parts)
-    logger.info(f"Running equilibration check via CLI: {command}")
-
-    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
-
+    logger.info(f"Running comprehensive equilibration check: {command}")
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=72000)
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
     return _parse_json_from_stdout(stdout, stderr)
 
 
 @mcp.tool()
-def check_equilibration(
+def check_equilibration_comprehensive(
     log_file: str,
+    dump_file: str,
+    data_file: str,
+    backbone_types: list,
     output_dir: Optional[str] = None,
+    skip_frames: int = 50,
+    timestep_fs: float = 1.0,
+    dump_every: int = 1000,
+    n_backbone_bonds: Optional[int] = None,
+    bond_length_A: float = 1.54,
     eq_fraction: float = 0.5,
     drift_threshold_pct: float = 1.0,
     drift_pvalue: float = 0.01,
-    block_count: int = 5,
+    block_count: int = 10,
     temp_col: str = "Temp",
-    press_col: str = "Press",
     density_col: str = "Density",
     energy_col: str = "TotEng",
+    atom_style: str = "id resid type charge x y z",
 ) -> dict:
     """
-    Check whether a LAMMPS simulation is equilibrated based on density
-    and energy convergence.
+    Comprehensive polymer equilibration validator — thermo + structural checks in
+    a single call, single overall_pass verdict, auto-generated D-05 markdown block.
 
-    Analyses the production window (last ``eq_fraction`` of the thermo
-    rows) from a single LAMMPS log file and applies two convergence
-    tests on both density and total energy:
+    Hard gates (block overall_pass=True):
+      A. Density drift (regression p-value + magnitude)
+      B. Energy drift
+      C. Density block-SEM < 1% of mean (Flyvbjerg-Petersen)
+      D. Energy block-SEM < 1% of mean
+      E. Rg CV across chains < 30%  (unequal conformation flag)
+      F. P2 nematic order < 0.10    (residual backbone alignment)
+      G. Density homogeneity voxel CV < 25%  (adaptive grid; corrects 10³ false positives)
 
-    1. **Drift test** — linear regression on property vs row index.
-       FAIL if drift > ``drift_threshold_pct`` % AND p < ``drift_pvalue``.
-    2. **Block-average test** — split into ``block_count`` blocks
-       (Flyvbjerg & Petersen, JCP 1989); FAIL if the SEM of block
-       means exceeds 1 % of the overall mean.
-
-    System is "equilibrated" only if BOTH density and energy pass both
-    tests.
+    Soft warnings (reported but never block):
+      - τ_eff / T_traj > 10%  (trajectory too short for good statistics)
+      - C∞ outside broad expected range
+      - MSID(n) power-law slope deviation > 20% from Gaussian (slope=1)
+      - C(t) end-to-end autocorrelation not fully decayed (τ_relax reported)
+      - MSD kinetic-trap  (MSD_max < Rg² — expected below Tg)
 
     The job runs in the background — poll with get_run_status(run_id).
 
     Args:
-        log_file:            Full path to LAMMPS log file on Lambda.
-        output_dir:          Output directory on Lambda (default: <log_dir>/eq_analysis).
-        eq_fraction:         Fraction of rows to use as production window (0.5 = last 50 %).
-        drift_threshold_pct: Max allowed drift as % of mean.
-        drift_pvalue:        p-value threshold for drift regression significance.
-        block_count:         Number of blocks for block averaging.
+        log_file:            LAMMPS log file (thermo output, e.g. 06_nvt_production.log).
+        dump_file:           LAMMPS dump trajectory (e.g. 06_nvt_production.dump).
+        data_file:           LAMMPS .data topology file.
+        backbone_types:      List of LAMMPS atom type IDs that form the backbone.
+                             Determine from parse_data_file() — do not guess.
+        output_dir:          Output directory (default: <dump_dir>/eq_comprehensive).
+        skip_frames:         Frames to skip at start of dump (production window start).
+        timestep_fs:         MD timestep in femtoseconds.
+        dump_every:          Dump frequency in steps (auto-detected from dump header if possible).
+        n_backbone_bonds:    Backbone bonds per chain (DP − 1); enables C∞ calculation.
+        bond_length_A:       Backbone bond length in Å for C∞ (default: 1.54 C-C).
+        eq_fraction:         Fraction of thermo rows used as production window.
+        drift_threshold_pct: Max allowed thermo drift as % of mean.
+        drift_pvalue:        p-value threshold for drift significance.
+        block_count:         Blocks for Flyvbjerg-Petersen block averaging.
         temp_col:            Temperature column name in thermo output.
-        press_col:           Pressure column name.
         density_col:         Density column name.
-        energy_col:          Energy column name.
+        energy_col:          Total energy column name.
+        atom_style:          LAMMPS dump atom_style columns.
 
     Returns:
-        dict with run_id.  When completed, result includes:
-            equilibrated        — overall bool
-            density_equilibrated — bool
-            energy_equilibrated  — bool
-            density / energy     — per-test details (drift, block_avg
-                                   sub-dicts each with a 'pass' field
-                                   and diagnostics)
-            meta                 — T_mean, P_mean, row counts
-            summary_json         — path on Lambda
+        dict with run_id. When completed, result includes:
+            overall_pass      — bool: True iff all hard gates pass
+            thermo            — density/energy drift and block-SEM results
+            chain             — rg (Rg CV, C∞), msid (Gaussian slope), ct (C(t) autocorr), msd
+            spatial           — p2 (nematic order), density_homogeneity (voxel CV)
+            warnings          — list of soft-flag descriptions
+            d05_markdown      — formatted D-05 block for direct paste into run_log.md
+            d05_markdown_path — path to saved d05_block.md
+            summary_json      — path to full JSON
     """
     if output_dir is None:
-        output_dir = str(Path(log_file).parent / "eq_analysis")
+        output_dir = str(Path(dump_file).parent / "eq_comprehensive")
 
-    run_id = run_manager.create("check_equilibration", {"log_file": log_file, "output_dir": output_dir})
+    run_id = run_manager.create(
+        "check_equilibration_comprehensive",
+        {"log_file": log_file, "dump_file": dump_file, "output_dir": output_dir},
+    )
     t = threading.Thread(
         target=_analysis_run_background,
-        args=(run_id, _run_check_equilibration, dict(
+        args=(run_id, _run_check_equilibration_comprehensive, dict(
             log_file            = log_file,
+            dump_file           = dump_file,
+            data_file           = data_file,
+            backbone_types      = backbone_types,
             output_dir          = output_dir,
+            skip_frames         = skip_frames,
+            timestep_fs         = timestep_fs,
+            dump_every          = dump_every,
+            n_backbone_bonds    = n_backbone_bonds,
+            bond_length_A       = bond_length_A,
             eq_fraction         = eq_fraction,
             drift_threshold_pct = drift_threshold_pct,
             drift_pvalue        = drift_pvalue,
             block_count         = block_count,
             temp_col            = temp_col,
-            press_col           = press_col,
             density_col         = density_col,
             energy_col          = energy_col,
+            atom_style          = atom_style,
         )),
         daemon=True,
     )
@@ -1868,10 +1946,11 @@ def check_equilibration(
     return {
         "status":     "submitted",
         "run_id":     run_id,
-        "run_type":   "check_equilibration",
+        "run_type":   "check_equilibration_comprehensive",
         "log_file":   log_file,
+        "dump_file":  dump_file,
         "output_dir": output_dir,
-        "message":    "Poll with get_run_status(run_id)",
+        "message":    "Poll with get_run_status(run_id). Result includes overall_pass and d05_markdown.",
     }
 
 
@@ -1956,14 +2035,25 @@ def extract_equilibrated_density(
 
     Returns:
         dict with run_id.  When completed, result includes:
-            plateau_density_mean  — equilibrated density (g/cm3)
-            plateau_density_std   — standard deviation within plateau
-            plateau_density_sem   — standard error of the mean
-            plateau_n_points      — number of thermo rows in plateau
-            plateau_fraction      — fraction of production window identified as plateau
-            naive_mean / naive_std — simple average of full production window
-            plateau_step_range    — [start_step, end_step] of the plateau
-            summary_json          — path to JSON on Lambda
+            plateau_density_mean     — equilibrated density (g/cm3)
+            plateau_density_std      — standard deviation within plateau
+            plateau_density_sem      — naive SEM (std/sqrt(n)); underestimates when autocorrelated
+            block_sem_density        — tau_eff-aware block-SEM; preferred uncertainty estimate
+            plateau_n_points         — number of thermo rows in plateau
+            plateau_fraction         — fraction of production window identified as plateau
+            production_n_points      — rows in production window
+            total_n_points           — total rows in log
+            tau_eff_frames           — autocorrelation time (batch-means plateau, F&P 1989)
+            tau_eff_fraction         — tau_eff / n_plateau
+            n_effective_samples      — n_plateau / (2 * tau_eff)
+            drift_slope              — linear regression slope over plateau (g/cm3 per frame)
+            drift_pct                — |slope * n| / |mean| * 100
+            drift_p_value            — p-value of drift slope
+            plateau_equilibrated     — False if drift_pct > 1% AND p < 0.01
+            rolling_mean_abs_deriv   — mean |d/dt(rolling mean)|; secondary stationarity check
+            naive_mean / naive_std   — simple average of full production window
+            plateau_step_range       — [start_step, end_step] of the plateau
+            summary_json             — path to JSON on Lambda
     """
     if output_dir is None:
         output_dir = str(Path(log_file).parent / "eq_analysis")
@@ -2119,523 +2209,6 @@ def extract_bulk_modulus(
         "message":    "Poll with get_run_status(run_id)",
     }
 
-
-# ── Tool: extract_radius_of_gyration ─────────────────────────────────────────
-
-def _run_extract_radius_of_gyration(
-    data_file: str,
-    dump_file: str,
-    output_dir: str,
-    skip_frames: int,
-    max_frames: Optional[int],
-    atom_style: str,
-    n_backbone_bonds: Optional[int],
-    bond_length_A: float,
-) -> dict:
-    parts = [f"python {MDA_SCRIPTS_DIR}/mda_radius_of_gyration.py"]
-    parts.append(f"--data_file {data_file}")
-    parts.append(f"--dump_file {dump_file}")
-    parts.append(f"--output_dir {output_dir}")
-    parts.append(f"--skip_frames {skip_frames}")
-    if max_frames is not None:
-        parts.append(f"--max_frames {max_frames}")
-    parts.append(f'--atom_style "{atom_style}"')
-    if n_backbone_bonds is not None:
-        parts.append(f"--n_backbone_bonds {n_backbone_bonds}")
-    parts.append(f"--bond_length_A {bond_length_A}")
-
-    command = " ".join(parts)
-    logger.info(f"Running radius of gyration via CLI: {command}")
-    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
-    if exit_code != 0:
-        return {"status": "failed", "error": stderr, "stdout": stdout}
-    return _parse_json_from_stdout(stdout, stderr)
-
-
-@mcp.tool()
-def extract_radius_of_gyration(
-    data_file: str,
-    dump_file: str,
-    output_dir: Optional[str] = None,
-    skip_frames: int = 0,
-    max_frames: Optional[int] = None,
-    atom_style: str = "id resid type charge x y z",
-    n_backbone_bonds: Optional[int] = None,
-    bond_length_A: float = 1.54,
-) -> dict:
-    """
-    Compute mass-weighted radius of gyration (Rg) per chain per frame.
-
-    Reports the mean, std, and CV of Rg across chains. Flags if CV > 30%
-    (unequal chain conformations — poor equilibration). Optionally computes
-    the characteristic ratio C∞ = 6·⟨Rg²⟩/(N·l²) when n_backbone_bonds
-    is supplied.
-
-    Key result fields (when completed):
-        overall_mean_Rg_A       — ⟨Rg⟩ across all chains and frames (Å)
-        overall_mean_Rg2_A2     — ⟨Rg²⟩ (Å²), use as rg_sq_A2 input to calculate_msd
-        rg_cv_across_chains     — CV of per-chain mean Rg (flag fires if > 0.30)
-        rg_spread_flag          — bool: CV > 30% → heterogeneous conformations
-        characteristic_ratio_from_Rg — C∞ (if n_backbone_bonds supplied)
-
-    The job runs in the background — poll with get_run_status(run_id).
-
-    Args:
-        data_file:         Full path to LAMMPS .data file on Lambda.
-        dump_file:         Full path to LAMMPS dump file on Lambda.
-        output_dir:        Output directory on Lambda (default: <dump_dir>/analysis).
-        skip_frames:       Number of initial frames to skip.
-        max_frames:        Maximum frames to analyse.
-        atom_style:        LAMMPS atom_style columns.
-        n_backbone_bonds:  Backbone bonds per chain for C∞ calculation.
-        bond_length_A:     Backbone bond length in Å (default 1.54 for C-C).
-
-    Returns:
-        dict with run_id. Output files: rg_per_chain.csv, rg_summary.json.
-    """
-    if output_dir is None:
-        output_dir = str(Path(dump_file).parent / "analysis")
-
-    run_id = run_manager.create("extract_radius_of_gyration", {"data_file": data_file, "dump_file": dump_file})
-    t = threading.Thread(
-        target=_analysis_run_background,
-        args=(run_id, _run_extract_radius_of_gyration, dict(
-            data_file        = data_file,
-            dump_file        = dump_file,
-            output_dir       = output_dir,
-            skip_frames      = skip_frames,
-            max_frames       = max_frames,
-            atom_style       = atom_style,
-            n_backbone_bonds = n_backbone_bonds,
-            bond_length_A    = bond_length_A,
-        )),
-        daemon=True,
-    )
-    t.start()
-    return {
-        "status":     "submitted",
-        "run_id":     run_id,
-        "run_type":   "extract_radius_of_gyration",
-        "dump_file":  dump_file,
-        "output_dir": output_dir,
-        "message":    "Poll with get_run_status(run_id)",
-    }
-
-
-# ── Tool: calculate_msd ───────────────────────────────────────────────────────
-
-def _run_calculate_msd(
-    data_file: str,
-    dump_file: str,
-    output_dir: str,
-    skip_frames: int,
-    max_frames: Optional[int],
-    atom_style: str,
-    timestep_fs: float,
-    dump_every: Optional[int],
-    rg_sq_A2: Optional[float],
-    n_lag_points: int,
-) -> dict:
-    parts = [f"python {MDA_SCRIPTS_DIR}/mda_msd.py"]
-    parts.append(f"--data_file {data_file}")
-    parts.append(f"--dump_file {dump_file}")
-    parts.append(f"--output_dir {output_dir}")
-    parts.append(f"--skip_frames {skip_frames}")
-    if max_frames is not None:
-        parts.append(f"--max_frames {max_frames}")
-    parts.append(f'--atom_style "{atom_style}"')
-    parts.append(f"--timestep_fs {timestep_fs}")
-    if dump_every is not None:
-        parts.append(f"--dump_every {dump_every}")
-    if rg_sq_A2 is not None:
-        parts.append(f"--rg_sq_A2 {rg_sq_A2}")
-    parts.append(f"--n_lag_points {n_lag_points}")
-
-    command = " ".join(parts)
-    logger.info(f"Running MSD via CLI: {command}")
-    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
-    if exit_code != 0:
-        return {"status": "failed", "error": stderr, "stdout": stdout}
-    return _parse_json_from_stdout(stdout, stderr)
-
-
-@mcp.tool()
-def calculate_msd(
-    data_file: str,
-    dump_file: str,
-    output_dir: Optional[str] = None,
-    skip_frames: int = 0,
-    max_frames: Optional[int] = None,
-    atom_style: str = "id resid type charge x y z",
-    timestep_fs: float = 1.0,
-    dump_every: Optional[int] = None,
-    rg_sq_A2: Optional[float] = None,
-    n_lag_points: int = 40,
-) -> dict:
-    """
-    Compute mean-squared displacement (MSD) of chain centres of mass.
-
-    Tracks CoM per chain via overlapping windows and fits MSD(τ) = A·τ^α
-    in log-log space. The exponent α characterises the diffusion regime:
-      α ≈ 1.0 → Fickian diffusion (well above Tg)
-      α 0.3–0.7 → subdiffusive (Rouse/reptation, near Tg)
-      α < 0.2  → strongly caged / kinetically trapped
-
-    Kinetic-trap flag fires when MSD(max_lag) < ⟨Rg²⟩ — chains have not
-    moved by their own size over the full trajectory window. Pass
-    overall_mean_Rg2_A2 from extract_radius_of_gyration as rg_sq_A2.
-
-    Key result fields (when completed):
-        fit_alpha               — diffusion exponent α
-        kinetic_trap_flag       — bool: MSD_max < Rg²
-        kinetic_trap_ratio_msd_over_rg2 — MSD_max/Rg² (< 1.0 → trapped)
-        diffusivity_cm2_s       — D if α ≈ 1; None otherwise
-
-    The job runs in the background — poll with get_run_status(run_id).
-
-    Args:
-        data_file:     Full path to LAMMPS .data file on Lambda.
-        dump_file:     Full path to LAMMPS dump file on Lambda.
-        output_dir:    Output directory on Lambda.
-        skip_frames:   Initial frames to skip.
-        max_frames:    Maximum frames to analyse.
-        atom_style:    LAMMPS atom_style columns.
-        timestep_fs:   LAMMPS timestep in fs (default 1.0).
-        dump_every:    Dump frequency in steps (auto-detected if None).
-        rg_sq_A2:      ⟨Rg²⟩ in Å² from extract_radius_of_gyration — enables kinetic-trap flag.
-        n_lag_points:  Number of log-spaced lag times (default 40).
-
-    Returns:
-        dict with run_id. Output files: msd_vs_lag.csv, msd_summary.json.
-    """
-    if output_dir is None:
-        output_dir = str(Path(dump_file).parent / "analysis")
-
-    run_id = run_manager.create("calculate_msd", {"data_file": data_file, "dump_file": dump_file})
-    t = threading.Thread(
-        target=_analysis_run_background,
-        args=(run_id, _run_calculate_msd, dict(
-            data_file    = data_file,
-            dump_file    = dump_file,
-            output_dir   = output_dir,
-            skip_frames  = skip_frames,
-            max_frames   = max_frames,
-            atom_style   = atom_style,
-            timestep_fs  = timestep_fs,
-            dump_every   = dump_every,
-            rg_sq_A2     = rg_sq_A2,
-            n_lag_points = n_lag_points,
-        )),
-        daemon=True,
-    )
-    t.start()
-    return {
-        "status":     "submitted",
-        "run_id":     run_id,
-        "run_type":   "calculate_msd",
-        "dump_file":  dump_file,
-        "output_dir": output_dir,
-        "message":    "Poll with get_run_status(run_id)",
-    }
-
-
-# ── Tool: check_orientation_order ────────────────────────────────────────────
-
-def _run_check_orientation_order(
-    data_file: str,
-    dump_file: str,
-    backbone_types: list,
-    output_dir: str,
-    skip_frames: int,
-    max_frames: Optional[int],
-    atom_style: str,
-) -> dict:
-    parts = [f"python {MDA_SCRIPTS_DIR}/mda_orientation_order.py"]
-    parts.append(f"--data_file {data_file}")
-    parts.append(f"--dump_file {dump_file}")
-    parts.append(f"--backbone_types {' '.join(str(t) for t in backbone_types)}")
-    parts.append(f"--output_dir {output_dir}")
-    parts.append(f"--skip_frames {skip_frames}")
-    if max_frames is not None:
-        parts.append(f"--max_frames {max_frames}")
-    parts.append(f'--atom_style "{atom_style}"')
-
-    command = " ".join(parts)
-    logger.info(f"Running orientation order via CLI: {command}")
-    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
-    if exit_code != 0:
-        return {"status": "failed", "error": stderr, "stdout": stdout}
-    return _parse_json_from_stdout(stdout, stderr)
-
-
-@mcp.tool()
-def check_orientation_order(
-    data_file: str,
-    dump_file: str,
-    backbone_types: list,
-    output_dir: Optional[str] = None,
-    skip_frames: int = 0,
-    max_frames: Optional[int] = None,
-    atom_style: str = "id resid type charge x y z",
-) -> dict:
-    """
-    Compute the nematic backbone orientation order parameter P2.
-
-    Builds the Saupe order tensor Q from consecutive backbone bond vectors
-    and extracts P2 (largest eigenvalue) per frame.
-
-    Interpretation:
-      P2 ≈ 0 (< 0.10) → isotropic amorphous — well equilibrated
-      P2 > 0.10       → residual orientation: artificial packing artefact,
-                         nascent crystallite, or inadequate equilibration
-
-    Key result fields (when completed):
-        P2_mean          — mean P2 over all analysed frames
-        P2_trend_per_frame — slope of P2 vs frame (positive → growing order)
-        ordered_flag     — bool: P2_mean > 0.10
-
-    The job runs in the background — poll with get_run_status(run_id).
-
-    Args:
-        data_file:       Full path to LAMMPS .data file on Lambda.
-        dump_file:       Full path to LAMMPS dump file on Lambda.
-        backbone_types:  List of LAMMPS atom type IDs forming the backbone
-                         (e.g. [2, 3] for C-C backbone in GAFF2).
-        output_dir:      Output directory on Lambda.
-        skip_frames:     Initial frames to skip.
-        max_frames:      Maximum frames to analyse.
-        atom_style:      LAMMPS atom_style columns.
-
-    Returns:
-        dict with run_id. Output files: orientation_order.csv, orientation_summary.json.
-    """
-    if output_dir is None:
-        output_dir = str(Path(dump_file).parent / "analysis")
-
-    run_id = run_manager.create("check_orientation_order", {"data_file": data_file, "dump_file": dump_file})
-    t = threading.Thread(
-        target=_analysis_run_background,
-        args=(run_id, _run_check_orientation_order, dict(
-            data_file       = data_file,
-            dump_file       = dump_file,
-            backbone_types  = backbone_types,
-            output_dir      = output_dir,
-            skip_frames     = skip_frames,
-            max_frames      = max_frames,
-            atom_style      = atom_style,
-        )),
-        daemon=True,
-    )
-    t.start()
-    return {
-        "status":     "submitted",
-        "run_id":     run_id,
-        "run_type":   "check_orientation_order",
-        "dump_file":  dump_file,
-        "output_dir": output_dir,
-        "message":    "Poll with get_run_status(run_id)",
-    }
-
-
-# ── Tool: check_density_homogeneity ──────────────────────────────────────────
-
-def _run_check_density_homogeneity(
-    data_file: str,
-    dump_file: str,
-    output_dir: str,
-    skip_frames: int,
-    max_frames: Optional[int],
-    atom_style: str,
-    grid_n: int,
-    cv_threshold: float,
-) -> dict:
-    parts = [f"python {MDA_SCRIPTS_DIR}/mda_density_homogeneity.py"]
-    parts.append(f"--data_file {data_file}")
-    parts.append(f"--dump_file {dump_file}")
-    parts.append(f"--output_dir {output_dir}")
-    parts.append(f"--skip_frames {skip_frames}")
-    if max_frames is not None:
-        parts.append(f"--max_frames {max_frames}")
-    parts.append(f'--atom_style "{atom_style}"')
-    parts.append(f"--grid_n {grid_n}")
-    parts.append(f"--cv_threshold {cv_threshold}")
-
-    command = " ".join(parts)
-    logger.info(f"Running density homogeneity via CLI: {command}")
-    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
-    if exit_code != 0:
-        return {"status": "failed", "error": stderr, "stdout": stdout}
-    return _parse_json_from_stdout(stdout, stderr)
-
-
-@mcp.tool()
-def check_density_homogeneity(
-    data_file: str,
-    dump_file: str,
-    output_dir: Optional[str] = None,
-    skip_frames: int = 0,
-    max_frames: Optional[int] = None,
-    atom_style: str = "id resid type charge x y z",
-    grid_n: int = 10,
-    cv_threshold: float = 0.25,
-) -> dict:
-    """
-    Check spatial density homogeneity by binning atoms into a voxel grid.
-
-    Divides the simulation box into grid_n³ voxels and computes the
-    coefficient of variation (CV = σ/μ) of voxel mass densities per frame.
-    A high CV indicates voids, chain droplets, or crystalline domains.
-
-    Interpretation:
-      CV < 0.15        → homogeneous amorphous (expected)
-      CV 0.15–0.25     → mild fluctuations (acceptable near Tg)
-      CV > 0.25        → heterogeneity flag fires
-
-    Key result fields (when completed):
-        cv_mean              — mean CV over analysed frames
-        cv_max               — worst-case CV (single frame)
-        cv_trend_per_frame   — positive → heterogeneity growing
-        heterogeneous_flag   — bool: cv_mean > cv_threshold
-
-    The job runs in the background — poll with get_run_status(run_id).
-
-    Args:
-        data_file:    Full path to LAMMPS .data file on Lambda.
-        dump_file:    Full path to LAMMPS dump file on Lambda.
-        output_dir:   Output directory on Lambda.
-        skip_frames:  Initial frames to skip.
-        max_frames:   Maximum frames to analyse.
-        atom_style:   LAMMPS atom_style columns.
-        grid_n:       Voxels per axis (default 10 → 1000 voxels).
-        cv_threshold: CV above which heterogeneous_flag fires (default 0.25).
-
-    Returns:
-        dict with run_id. Output files: density_homogeneity.csv, density_summary.json.
-    """
-    if output_dir is None:
-        output_dir = str(Path(dump_file).parent / "analysis")
-
-    run_id = run_manager.create("check_density_homogeneity", {"data_file": data_file, "dump_file": dump_file})
-    t = threading.Thread(
-        target=_analysis_run_background,
-        args=(run_id, _run_check_density_homogeneity, dict(
-            data_file    = data_file,
-            dump_file    = dump_file,
-            output_dir   = output_dir,
-            skip_frames  = skip_frames,
-            max_frames   = max_frames,
-            atom_style   = atom_style,
-            grid_n       = grid_n,
-            cv_threshold = cv_threshold,
-        )),
-        daemon=True,
-    )
-    t.start()
-    return {
-        "status":     "submitted",
-        "run_id":     run_id,
-        "run_type":   "check_density_homogeneity",
-        "dump_file":  dump_file,
-        "output_dir": output_dir,
-        "message":    "Poll with get_run_status(run_id)",
-    }
-
-
-# ── Tool: check_equilibration_extended ───────────────────────────────────────
-
-@mcp.tool()
-def check_equilibration_extended(
-    log_file: str,
-    data_file: str,
-    dump_file: str,
-    backbone_types: list,
-    output_dir: Optional[str] = None,
-    skip_frames: int = 0,
-    max_frames: Optional[int] = None,
-    atom_style: str = "id resid type charge x y z",
-    timestep_fs: float = 1.0,
-    dump_every: Optional[int] = None,
-    n_backbone_bonds: Optional[int] = None,
-    bond_length_A: float = 1.54,
-    grid_n: int = 10,
-) -> dict:
-    """
-    Run all four extended structural equilibration checks in parallel.
-
-    Launches four background jobs simultaneously:
-      1. extract_radius_of_gyration — Rg distribution, CV across chains, C∞
-      2. calculate_msd              — chain CoM MSD, α exponent, kinetic-trap flag
-      3. check_orientation_order    — P2 nematic order, ordered_flag
-      4. check_density_homogeneity  — voxel CV, heterogeneous_flag
-
-    Call this after check_equilibration passes (thermo convergence) to
-    validate structural relaxation — the level of evidence reviewers expect
-    for polymer systems, especially below Tg or for long chains.
-
-    Workflow:
-      1. Call check_equilibration_extended(...) → get four run_ids
-      2. watch_run / Monitor each run_id to wait for completion
-      3. Interpret flags:
-           rg_spread_flag      → unequal chain conformations
-           kinetic_trap_flag   → chains immobile relative to their size
-           ordered_flag        → residual backbone alignment
-           heterogeneous_flag  → spatial density voids or domains
-
-    Args:
-        log_file:          LAMMPS log file for thermo check (passed to check_equilibration).
-        data_file:         LAMMPS .data topology file on Lambda.
-        dump_file:         LAMMPS dump trajectory file on Lambda.
-        backbone_types:    Atom type IDs of backbone atoms (for P2 and Rg).
-        output_dir:        Base output directory on Lambda.
-        skip_frames:       Initial frames to skip (production window start).
-        max_frames:        Maximum frames to analyse per tool.
-        atom_style:        LAMMPS atom_style columns.
-        timestep_fs:       LAMMPS timestep in fs (for MSD lag times).
-        dump_every:        Dump frequency in steps (auto-detected if None).
-        n_backbone_bonds:  Backbone bonds per chain (for C∞ calculation).
-        bond_length_A:     Backbone bond length in Å (default 1.54 C-C).
-        grid_n:            Voxels per axis for density grid (default 10).
-
-    Returns:
-        dict with four run_ids — poll each with get_run_status(run_id).
-    """
-    if output_dir is None:
-        output_dir = str(Path(dump_file).parent / "analysis")
-
-    rg_result  = extract_radius_of_gyration(
-        data_file=data_file, dump_file=dump_file, output_dir=output_dir,
-        skip_frames=skip_frames, max_frames=max_frames, atom_style=atom_style,
-        n_backbone_bonds=n_backbone_bonds, bond_length_A=bond_length_A,
-    )
-    msd_result = calculate_msd(
-        data_file=data_file, dump_file=dump_file, output_dir=output_dir,
-        skip_frames=skip_frames, max_frames=max_frames, atom_style=atom_style,
-        timestep_fs=timestep_fs, dump_every=dump_every,
-    )
-    p2_result  = check_orientation_order(
-        data_file=data_file, dump_file=dump_file, backbone_types=backbone_types,
-        output_dir=output_dir, skip_frames=skip_frames, max_frames=max_frames,
-        atom_style=atom_style,
-    )
-    dh_result  = check_density_homogeneity(
-        data_file=data_file, dump_file=dump_file, output_dir=output_dir,
-        skip_frames=skip_frames, max_frames=max_frames, atom_style=atom_style,
-        grid_n=grid_n,
-    )
-
-    return {
-        "status": "submitted",
-        "run_type": "check_equilibration_extended",
-        "rg_run_id":      rg_result["run_id"],
-        "msd_run_id":     msd_result["run_id"],
-        "p2_run_id":      p2_result["run_id"],
-        "density_run_id": dh_result["run_id"],
-        "output_dir":     output_dir,
-        "message": (
-            "Four jobs submitted. Poll each run_id with get_run_status(run_id). "
-            "Flags to check: rg_spread_flag, kinetic_trap_flag, ordered_flag, heterogeneous_flag."
-        ),
-    }
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────

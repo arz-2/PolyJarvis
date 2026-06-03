@@ -36,6 +36,13 @@ C5 validation run — PCBN class, target MD Tg 500–540 K vs experimental 422 K
 | Tg       | [PENDING] | 422 K        | —     | — |
 | density  | 1.1677 g/cm3 | 1.20 g/cm3 | −2.7% | ✓ within 5% |
 | K        | —         | —            | —     | — |
-| cooling rate | [PENDING] | ~1e-7 K/ns | — | annotation only |
+| cooling rate | 40 K/ns | ~1e-7 K/ns (exp) | — | annotation only |
+| expected Tg offset | 80–120 K (screening) | — | — | from polymer_rules.json + cooling rate |
+
+## SIMULATION STATE
+| Stage | run_id / chain | status | last update | output_path |
+|-------|---------------|--------|-------------|-------------|
+| Equilibration | chain in `/home/arz2/simulations/BPAPC1/eq/` | done | — | `/home/arz2/simulations/BPAPC1/eq/` |
+| Tg sweep | tg_sweep3 (GPU 1,2, MPI=2) | monitoring — T=540K (9/26 steps, ~19 h remaining) | 2026-05-31 | `/home/arz2/simulations/BPAPC1/tg_sweep3/` |
 
 Simulation dir: `/home/arz2/simulations/BPAPC1`

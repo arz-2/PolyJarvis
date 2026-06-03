@@ -25,6 +25,12 @@ import numpy as np
 import pandas as pd
 import MDAnalysis as mda
 
+sys.path.insert(0, str(Path(__file__).parent))
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from plot_style import apply_style, save_fig
+
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 
 
@@ -113,6 +119,23 @@ def fit_power_law(lags, msd, min_points=5):
     ss_tot = float(((y - y.mean()) ** 2).sum())
     r2 = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
     return A, alpha, r2
+
+
+def _plot_msd_log(lag_times_ps, msd_vals, alpha, A, r2_fit, output_dir):
+    apply_style()
+    mask = (lag_times_ps > 0) & (msd_vals > 0)
+    fig, ax = plt.subplots()
+    ax.loglog(lag_times_ps[mask], msd_vals[mask], 'o', color='steelblue',
+              ms=4, alpha=0.8, label='MSD')
+    if alpha is not None and A is not None:
+        t_fit = lag_times_ps[mask]
+        label = f'α = {alpha:.2f}' + (f'  (R² = {r2_fit:.3f})' if r2_fit is not None else '')
+        ax.loglog(t_fit, A * t_fit ** alpha, '--', color='firebrick', lw=2, label=label)
+    ax.set_xlabel('Lag time (ps)')
+    ax.set_ylabel('MSD (Å²)')
+    ax.set_title('Chain center-of-mass MSD')
+    ax.legend()
+    save_fig(fig, str(Path(output_dir) / 'figures' / 'msd_log.png'))
 
 
 def main():
@@ -228,6 +251,14 @@ def main():
         "method": "Overlapping-window chain CoM MSD via MDAnalysis",
         "mdanalysis_version": mda.__version__,
     })
+
+    msd_fig_png = str(output_dir / "figures" / "msd_log.png")
+    try:
+        _plot_msd_log(lag_times_ps, msd_vals, alpha, A, r2, output_dir)
+    except Exception as _pe:
+        print(f"  WARNING: msd_log plot failed: {_pe}", flush=True)
+        msd_fig_png = None
+    summary["msd_log_png"] = msd_fig_png
 
     json_path = str(output_dir / "msd_summary.json")
     with open(json_path, "w") as jf:

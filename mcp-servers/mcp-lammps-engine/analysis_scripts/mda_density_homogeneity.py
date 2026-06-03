@@ -31,6 +31,12 @@ import numpy as np
 import pandas as pd
 import MDAnalysis as mda
 
+sys.path.insert(0, str(Path(__file__).parent))
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from plot_style import apply_style, save_fig
+
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 
 
@@ -82,6 +88,30 @@ def compute_density_cv(positions, masses, box_lengths, grid_n):
     std_d  = float(occ_dens.std())
     cv = std_d / mean_d if mean_d > 0 else 0.0
     return cv, mean_d, std_d, n_occupied
+
+
+def _plot_density_homogeneity(df, cv_mean, cv_std, cv_threshold, heterogeneous_flag,
+                              poisson_limited, output_dir):
+    apply_style()
+    frames = df['frame'].values
+    cv_vals = df['cv'].values
+    fig, ax = plt.subplots()
+    ax.plot(frames, cv_vals, color='steelblue', lw=0.8, alpha=0.8, label='CV(t)')
+    ax.axhline(cv_mean, color='k', ls='-', lw=1.5, label=f'⟨CV⟩ = {cv_mean:.3f}')
+    ax.fill_between(frames, cv_mean - cv_std, cv_mean + cv_std, alpha=0.2, color='k')
+    ax.axhline(cv_threshold, color='firebrick', ls='--', lw=1.2, alpha=0.7,
+               label=f'Threshold = {cv_threshold}')
+    if poisson_limited:
+        suffix = ' (Poisson-limited — grid too fine)'
+    elif heterogeneous_flag:
+        suffix = ' — HETEROGENEOUS'
+    else:
+        suffix = ' — homogeneous (OK)'
+    ax.set_xlabel('Frame')
+    ax.set_ylabel('Density CV (σ/μ)')
+    ax.set_title(f'Spatial density homogeneity{suffix}')
+    ax.legend()
+    save_fig(fig, str(Path(output_dir) / 'figures' / 'density_homogeneity.png'))
 
 
 def main():
@@ -176,6 +206,15 @@ def main():
         "method": f"Voxel mass density CV on {args.grid_n}³ grid",
         "mdanalysis_version": mda.__version__,
     })
+
+    dh_fig_png = str(output_dir / "figures" / "density_homogeneity.png")
+    try:
+        _plot_density_homogeneity(df, cv_mean, cv_std, args.cv_threshold,
+                                  heterogeneous_flag, poisson_limited, output_dir)
+    except Exception as _pe:
+        print(f"  WARNING: density_homogeneity plot failed: {_pe}", flush=True)
+        dh_fig_png = None
+    summary["density_homogeneity_png"] = dh_fig_png
 
     json_path = str(output_dir / "density_summary.json")
     with open(json_path, "w") as jf:

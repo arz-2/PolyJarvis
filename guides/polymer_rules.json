@@ -1,15 +1,15 @@
 {
   "_metadata": {
-    "description": "PolyJarvis polymer class parameter rules for LAMMPS + GAFF2/GAFF2_mod MD simulations. Drives force field selection, cell construction, equilibration, Tg sweep, and bulk modulus protocols. Parameters are set per PoLyInfo 21-class taxonomy.",
-    "version": "2.0.0",
+    "description": "PolyJarvis polymer class parameter rules for LAMMPS MD simulations. Nine classes route to EMC (emc_pipeline.py): PHYC/PDIE/PSTR → TraPPE-UA, PHAL → OPLS-AA, PCBN/PAMD/PKTN/PSFO/PIMD → PCFF. Twelve classes route to RadonPy (GAFF2_mod + QM charges). preferred_builder in each class block is authoritative for routing. Drives force field selection, cell construction, equilibration, Tg sweep, and bulk modulus protocols per PoLyInfo 21-class taxonomy.",
+    "version": "2.1.0",
     "created": "2026-05-23",
     "units": {
-      "forcefield": "GAFF2 or GAFF2_mod (recalibrated torsions for aromatic/polar backbones)",
+      "forcefield": "Active force field for the class. EMC-routed classes: TraPPE-UA (PHYC/PDIE/PSTR), PCFF (PCBN/PAMD/PKTN/PSFO/PIMD), OPLS-AA (PHAL). RadonPy-routed classes: GAFF2_mod (most) or GAFF2 (PVNL, PSIL). preferred_builder and preferred_ff fields are authoritative for routing; forcefield is the active RadonPy FF when preferred_builder=radonpy.",
       "charge_method": "Method for partial charge assignment: Gasteiger (apolar), AM1-BCC (moderately polar), RESP/HF/6-31G* (aromatic/strongly polar)",
       "dp_typical": "Degree of polymerization (repeat units per chain) for production runs",
       "dp_min": "Minimum DP for chain-length-independent Tg (Fox-Flory plateau)",
       "nchain": "Number of chains in simulation cell",
-      "density_initial_gcm3": "Starting density for RadonPy amorphous cell construction (g/cm\u00b3); ~0.5x experimental RT density avoids atomic overlaps",
+      "density_initial_gcm3": "Starting density for RadonPy amorphous cell construction (g/cm³); ~0.5x experimental RT density avoids atomic overlaps",
       "electrostatics": "Runtime long-range Coulomb treatment: pppm (required for any heteroatom) or lj_cut (purely apolar C/H only)",
       "cutoff_A": "van der Waals and real-space Coulomb cutoff (Angstroms)",
       "dt_fs": "MD timestep in femtoseconds; 1.0 fs universal default with GAFF2",
@@ -17,12 +17,12 @@
       "P_equil_atm": "Target pressure for NPT equilibration and Tg sweep (atm)",
       "t_equil_ns": "Equilibration time at T_equil before Tg sweep begins (ns)",
       "annealing_T_high_K": "Upper temperature of pre-equilibration heat-cool annealing cycles (K)",
-      "eq_annealing_cycles": "Number of heat-cool annealing cycles (300 K \u2192 annealing_T_high_K \u2192 300 K) before Tg sweep",
+      "eq_annealing_cycles": "Number of heat-cool annealing cycles (300 K → annealing_T_high_K → 300 K) before Tg sweep",
       "tg_t_high_K": "Upper bound of Tg temperature sweep (K); must exceed expected MD Tg (MD overestimates experiment by 80-120 K)",
       "tg_t_low_K": "Lower bound of Tg sweep (K); must be well below Tg to sample glassy state",
       "tg_t_step_K": "Temperature step size in stepwise-cooling Tg sweep (K)",
       "tg_steps_per_t": "LAMMPS timesteps per temperature point in Tg sweep (each step = dt_fs femtoseconds)",
-      "K_deform_rate_inv_s": "Engineering strain rate for bulk modulus calculation via NPT uniaxial deformation (s\u207b\u00b9)",
+      "K_deform_rate_inv_s": "Engineering strain rate for bulk modulus calculation via NPT uniaxial deformation (s⁻¹)",
       "K_strain_max": "Maximum engineering strain for bulk modulus extraction; must stay within linear elastic regime",
       "tacticity": "Backbone stereochemistry for RadonPy chain construction. 'atactic': random R/S at each stereocenter (default for amorphous simulations). 'isotactic': all same configuration. 'syndiotactic': alternating R/S. 'not_applicable': backbone has no stereocenters (symmetric CH2 repeat, aromatic, or siloxane). Maps directly to RadonPy stereo parameter."
     },
@@ -30,17 +30,24 @@
       "MD Tg overestimates experimental Tg by 80-120 K due to fast cooling rate (Patrone et al. 2016, Webb et al. JPCB 2024, Srivastava et al. arXiv:2601.17137 2026).",
       "Stepwise cooling with 2 ns equilibration + 2 ns production per temperature point at ~5 K/ns effective cooling rate is recommended (Webb et al. JPCB 2024 DOI:10.1021/acs.jpcb.4c06018).",
       "Tg extracted by bilinear fit of density vs. T; breakpoint is MD Tg (Patrone et al. Macromolecules 2016).",
-      "RadonPy protocol: 1 ns NVT heating 300\u2192700 K, then cooling in 10 K steps, GAFF2, ~10,000 atoms, 10 chains (Hayashi et al. npj Comput. Mater. 2022 DOI:10.1038/s41524-022-00906-4).",
+      "RadonPy protocol: 1 ns NVT heating 300→700 K, then cooling in 10 K steps, GAFF2, ~10,000 atoms, 10 chains (Hayashi et al. npj Comput. Mater. 2022 DOI:10.1038/s41524-022-00906-4).",
       "Degree of polymerization >= 20 needed for chain-length-independent Tg (Fox-Flory plateau); >= 50 preferred for stiff backbones (PIMD, PKTN, PSFO) (Patrone et al. 2016).",
       "PPPM required whenever repeat unit carries significant partial charges (amide, ester, carbonate, urethane, urea, imide, sulfone, ketone, oxide with ether O) (PolyPal PMC12249339; GAFF2 AMBER literature).",
       "lj/cut is acceptable only for purely apolar backbones (PE, PIB, PBD, PI) where charge magnitudes on backbone atoms are < 0.1 e (Afzal et al. ACS Appl. Polym. Mater. 2021 DOI:10.1021/acsapm.0c00524).",
-      "Annealing: 10 heat-cool cycles (300\u2192600 K, 3 ns each) are used in PolyPal (Roos et al. PMC12249339 2025); RadonPy uses a single rapid 1 ns anneal at 700 K then stepwise cooling.",
-      "For halogenated polymers (PHAL), improved GAFF2 fluorine parameters are needed for CF2/CF3 backbones. Key sources: Damm et al. J. Comput. Chem. 1997, 18, 1955 (OPLS-AA F params); Byutner & Smith Macromolecules 2000, 33, 4264 (PVDF-specific QM FF); Kamath & Potoff Fluid Phase Equilib. 2006, 246, 218 (PTFE/perfluorocarbon)."
+      "Annealing: 10 heat-cool cycles (300→600 K, 3 ns each) are used in PolyPal (Roos et al. PMC12249339 2025); RadonPy uses a single rapid 1 ns anneal at 700 K then stepwise cooling.",
+      "For halogenated polymers (PHAL), improved GAFF2 fluorine parameters are needed for CF2/CF3 backbones. Key sources: Damm et al. J. Comput. Chem. 1997, 18, 1955 (OPLS-AA F params); Byutner & Smith Macromolecules 2000, 33, 4264 (PVDF-specific QM FF); Kamath & Potoff Fluid Phase Equilib. 2006, 246, 218 (PTFE/perfluorocarbon).",
+      "Builder routing (expanded 2026-05-31): 19 of 21 classes use EMC. PCFF (Class II, 15 classes): PCBN PAMD PKTN PSFO PIMD POXI PEST PSUL PURT PANH PPHS PACR PIMN PVNL PPNL. OPLS-AA (1 class): PHAL. TraPPE-UA (3 classes): PHYC PDIE PSTR. RadonPy only (2 classes): PSIL (si/osi increment missing), PURA (n_2/hn increment missing). PURT warning: aliphatic urethanes only — aromatic MDI fails. preferred_builder field in each class block is authoritative.",
+      "Primary Tg observable: density (or specific volume) is the most reliable and consistent observable for Tg extraction across all polymer classes and FFs (Wu2011; Klajmon2023; NkepsuMbitou2025). Tg from Coulombic energy is systematically 20–40 K lower than density-based Tg (Wu2011 PEO); do not use electrostatic energy slope-change as primary Tg signal. Tg from E_vdW tracks density Tg closely and is an acceptable secondary check.",
+      "Asymptote convergence is required before reporting Tg (Patrone2016): temperature sweep must extend far enough beyond the transition region to achieve ≥90% convergence to both glassy and rubbery asymptotes. Inadequate sweep range is a leading source of Tg bias in high-throughput MD (Klajmon2023).",
+      "GAFF/GAFF2 Tg accuracy warning: for Class I FFs, Tg errors >40% have been reported for PMMA and PIB (NkepsuMbitou2025). Class II FFs (PCFF, IFF) give <10% error. PolyJarvis routes 9 classes to EMC/PCFF precisely for this reason. For the 12 RadonPy/GAFF2_mod classes, Tg results are screening-quality (±20–30 K) unless validated against experiment.",
+      "No quantitative density-drift pass/fail threshold exists in published literature (Turney & Matta Macromolecules 2025 DOI:10.1021/acs.macromol.5c01166). PolyJarvis 1%/500 ps criterion is more rigorous than any published protocol.",
+      "PCFF system size: Bejagam et al. Phys. Chem. Chem. Phys. 2020 (DOI:10.1039/D0CP03163A) recommends 20 chains × 100-mer as the minimum converged production system for PCFF PHA simulations. Klajmon 2023 reports Tg converges at ~4,000 g/mol and density converges at ~9,000 g/mol per chain. Current nchain=10 is validated by Hayashi2022 (low variance at 10 chains across 1,138 polymers) and is a throughput compromise; nchain=20 is the literature-recommended production minimum for PCFF classes.",
+      "Objective Tg extraction: Carmona Esteva et al. J. Chem. Phys. 2024 (DOI:10.1063/5.0207835) shows bilinear fitting-range selection introduces ±20–40 K analyst variability. Proposes Shapiro-Wilk normality test on residuals to objectively identify valid linear regimes. Open-source code available. Recommended upgrade to the Patrone bilinear method used in extract_tg."
     ],
     "primary_sources": [
       {
         "id": "Webb2024",
-        "citation": "Webb, M. A. et al. How to Determine Glass Transition Temperature of Polymer Electrolytes from Molecular Dynamics Simulations. J. Phys. Chem. B 2024, 128, 49, 11978\u201311991.",
+        "citation": "Webb, M. A. et al. How to Determine Glass Transition Temperature of Polymer Electrolytes from Molecular Dynamics Simulations. J. Phys. Chem. B 2024, 128, 49, 11978–11991.",
         "doi": "10.1021/acs.jpcb.4c06018",
         "pmc": "PMC11533182",
         "relevance": "Definitive protocol comparison: stepwise vs continuous cooling, temperature ranges, cooling rates for polymer electrolytes. Protocol: 40-540 K sweep, 20 K steps, 2 ns eq + 2 ns prod per step."
@@ -49,11 +56,11 @@
         "id": "Hayashi2022",
         "citation": "Hayashi, Y. et al. RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics. npj Comput. Mater. 2022, 8, 222.",
         "doi": "10.1038/s41524-022-00906-4",
-        "relevance": "High-throughput GAFF2 polymer MD; 1 ns NVT anneal 300\u2192700 K; 10 chains ~10,000 atoms; LAMMPS; systematic Tg and density for 1070+ polymers. Primary reference for nchain, dp, and forcefield defaults."
+        "relevance": "High-throughput GAFF2 polymer MD; 1 ns NVT anneal 300→700 K; 10 chains ~10,000 atoms; LAMMPS; systematic Tg and density for 1070+ polymers. Primary reference for nchain, dp, and forcefield defaults."
       },
       {
         "id": "Afzal2021",
-        "citation": "Afzal, M. A. F. et al. High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications. ACS Appl. Polym. Mater. 2021, 3, 2, 620\u2013630.",
+        "citation": "Afzal, M. A. F. et al. High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications. ACS Appl. Polym. Mater. 2021, 3, 2, 620–630.",
         "doi": "10.1021/acsapm.0c00524",
         "relevance": "OPLS3e GPU-based Tg for 315 polymers; validates electrostatics impact on polar vs apolar polymers. lj/cut acceptable only when backbone charge < 0.1 e."
       },
@@ -61,26 +68,26 @@
         "id": "Srivastava2026",
         "citation": "Srivastava, A. et al. On-the-Fly Machine-Learned Force Fields for High-Fidelity Polymer Glass Transition Simulations. arXiv:2601.17137.",
         "url": "https://arxiv.org/html/2601.17137v1",
-        "relevance": "Tg values for 12 polymers; PE Tg=281\u00b152 K; PDMS Tg ~228 K. Validation data for PHYC and PSIL classes."
+        "relevance": "Tg values for 12 polymers; PE Tg=281±52 K; PDMS Tg ~228 K. Validation data for PHYC and PSIL classes."
       },
       {
         "id": "Wen2020",
-        "citation": "Wen, C. et al. Determination of glass transition temperature of polyimides from atomistic molecular dynamics simulations and machine-learning algorithms. J. Polym. Sci. 2020, 58, 1521\u20131534.",
+        "citation": "Wen, C. et al. Determination of glass transition temperature of polyimides from atomistic molecular dynamics simulations and machine-learning algorithms. J. Polym. Sci. 2020, 58, 1521–1534.",
         "doi": "10.1002/pol.20200050",
         "url": "https://arxiv.org/pdf/2001.08889",
-        "relevance": "Polyimide-specific MD Tg; COMPASS force field; 15 repeat units, 10 chains; 1 fs timestep; 20 K/ns cooling; Tg range 178-418\u00b0C (451-691 K). Sets PIMD class protocol."
+        "relevance": "Polyimide-specific MD Tg; COMPASS force field; 15 repeat units, 10 chains; 1 fs timestep; 20 K/ns cooling; Tg range 178-418°C (451-691 K). Sets PIMD class protocol."
       },
       {
         "id": "Klajmon2023",
-        "citation": "Klajmon, M. et al. Glass Transition and Structure of Organic Polymers from All-Atom Molecular Simulations. Ind. Eng. Chem. Res. 2023, 62, 49, 21437\u201321448.",
+        "citation": "Klajmon, M. et al. Glass Transition and Structure of Organic Polymers from All-Atom Molecular Simulations. Ind. Eng. Chem. Res. 2023, 62, 21437–21448.",
         "doi": "10.1021/acs.iecr.3c03038",
-        "relevance": "All-atom FF benchmark for polymer Tg; PPPM with Nose-Hoover; quantifies equilibration errors for PC, PA, PEEK. Informs PCBN, PAMD, PKTN equilibration depth."
+        "relevance": "All-atom MD benchmark for Tg and density of PLA, PEG, and PVP; quantifies equilibration protocol errors and polydispersity effects. Density identified as the most reliable Tg observable regardless of protocol. Informs PEST (PLA) and POXI (PEG) simulation setup. NOTE: paper covers PLA/PEG/PVP — not PC/PA/PEEK as previously annotated."
       },
       {
         "id": "Roos2025",
         "citation": "Roos, M. et al. PolyPal: A Python Package for Molecular Dynamics Simulation of Amorphous Polymers. PMC12249339. 2025.",
         "pmc": "PMC12249339",
-        "relevance": "Protocol: 10 annealing cycles 300-600 K (3 ns each); GROMACS/LAMMPS; energy minimization \u2192 NVT 100 ps \u2192 NPT 100 bar \u2192 NPT 1 bar \u2192 annealing. Maximum annealing cycle reference."
+        "relevance": "Protocol: 10 annealing cycles 300-600 K (3 ns each); GROMACS/LAMMPS; energy minimization → NVT 100 ps → NPT 100 bar → NPT 1 bar → annealing. Maximum annealing cycle reference."
       },
       {
         "id": "Polyisoprene2021",
@@ -92,9 +99,121 @@
         "id": "PE_RSC2016",
         "citation": "The glass transition temperature measurements of polyethylene: determined by using molecular dynamic method. RSC Advances, 2016.",
         "doi": "10.1039/C5RA21115H",
-        "relevance": "PE: 2 chains \u00d7 300 repeat units; COMPASS; NVT 300 K + NPT 300 K; cooling 300\u2192100 K in 10 K/200 ps steps; Tg ~200 K vs literature 195 K."
+        "relevance": "PE: 2 chains × 300 repeat units; COMPASS; NVT 300 K + NPT 300 K; cooling 300→100 K in 10 K/200 ps steps; Tg ~200 K vs literature 195 K."
+      },
+      {
+        "id": "Patrone2016",
+        "citation": "Patrone, P. N. et al. Uncertainty Quantification in Molecular Dynamics Studies of the Glass Transition Temperature. Polymer 2016, 87, 246–259.",
+        "doi": "10.1016/j.polymer.2016.01.074",
+        "relevance": "UQ framework for MD Tg via bilinear fit of density vs T; quantifies finite-size, dynamical-noise, and asymptotic-regime errors. Establishes 80–120 K MD overestimation of experimental Tg (cooling-rate artifact). Primary reference for Tg extraction protocol and bilinear breakpoint method."
+      },
+      {
+        "id": "Ramos2015",
+        "citation": "Ramos, J.; Vega, J. F.; Martínez-Salazar, J. Molecular Dynamics Simulations for the Description of Experimental Molecular Conformation, Melt Dynamics, and Phase Transitions in Polyethylene. Macromolecules 2015, 48, 5016–5027.",
+        "doi": "10.1021/acs.macromol.5b00823",
+        "relevance": "PE TraPPE-UA MD: Tg=187 K, excellent agreement with extrapolated experimental Tg(U)~195 K (Boyer 1973). Characteristic ratio C_n=8.2 at 500 K. Justifies preferred_ff=trappe-ua for PHYC/PDIE and sets ff_justification_doi for those classes."
+      },
+      {
+        "id": "Martin1998",
+        "citation": "Martin, M. G.; Siepmann, J. I. Transferable Potentials for Phase Equilibria. 1. United-Atom Description of n-Alkanes. J. Phys. Chem. B 1998, 102, 2569–2577.",
+        "doi": null,
+        "relevance": "Original TraPPE-UA force field for n-alkanes (CH3/CH2 united atoms): LJ parameters fitted to vapor–liquid coexistence of C1–C12 alkanes. Foundation for all TraPPE-UA-routed classes (PHYC, PDIE, PSTR) via EMC."
+      },
+      {
+        "id": "Keasler2012",
+        "citation": "Keasler, S. J.; Charan, S. M.; Wick, C. D.; Economou, I. G.; Siepmann, J. I. Transferable Potentials for Phase Equilibria–United Atom Description of Five- and Six-Membered Cyclic Alkanes and Ethers. J. Phys. Chem. B 2012, 116, 11234–11246.",
+        "doi": "10.1021/jp302975c",
+        "note": "Literature file archived as Wick_2000_TraPPE_UA_Cyclic_Alkanes_Ethers_J_Phys_Chem_B.pdf (filename mislabeled; paper is 2012).",
+        "relevance": "TraPPE-UA extension to five- and six-membered cyclic alkanes and ethers (THF, cyclohexane, 1,4-dioxane). Provides ring UA parameters and partial charges for oxygen used in EMC for PSTR and PDIE cyclic structures. Sets ff_justification_doi for PSTR class."
+      },
+      {
+        "id": "Byutner2000",
+        "citation": "Byutner, O. G.; Smith, G. D. Quantum Chemistry Based Force Field for Simulations of Poly(vinylidene fluoride). Macromolecules 2000, 33, 4264–4270.",
+        "doi": "10.1021/ma9918295",
+        "relevance": "QM-derived all-atom FF for PVDF: oligomer geometries, conformational energies, and PVDF melt density 10–310°C validated against experiment. Dihedral parameters for CF2–CH2–CF2 backbone. Primary PHAL-class PVDF FF reference; used to validate OPLS-AA path via EMC."
+      },
+      {
+        "id": "Watkins2001",
+        "citation": "Watkins, E. K.; Jorgensen, W. L. Perfluoroalkanes: Conformational Analysis and Liquid-State Properties from ab Initio and Monte Carlo Calculations. J. Phys. Chem. A 2001, 105, 4118–4125.",
+        "doi": "10.1021/jp004071w",
+        "relevance": "OPLS-AA LJ parameters for perfluoroalkanes: F sigma=2.95 Å, epsilon=0.053 kcal/mol (opls_965). Torsional parameters from LMP2/HF/6-31G* and MC validation on PTFE/C4F10/C5F12. Provides the fluorine LJ patch applied in GAFF2_mod for PHAL class to correct default GAFF2 F parameters."
+      },
+      {
+        "id": "Boyer1973",
+        "citation": "Boyer, R. F. Glass Temperatures of Polyethylene. Macromolecules 1973, 6, 288.",
+        "doi": null,
+        "relevance": "Experimental review establishing two PE glass transitions: Tg(L)~145 K (dangling cilia/tight folds in crystalline PE) and Tg(U)~195 K (loose loops/tie molecules, amorphous regions). Amorphous-cell simulations target Tg(U)~195 K. Primary experimental reference for PHYC class PE Tg."
+      },
+      {
+        "id": "Wu2011",
+        "citation": "Wu, C. Simulated Glass Transition of Poly(ethylene oxide) Bulk and Film: A Comparative Study. J. Phys. Chem. B 2011, 115, 11044–11052.",
+        "doi": "10.1021/jp205205x",
+        "relevance": "All-atom stepwise-cooling MD for PEO bulk and thin film; density, energy, and MSD Tg methods compared. Bulk PEO density-Tg consistent with experimental ~206 K. Validates stepwise cooling protocol and density-based Tg extraction for POXI class PEO/PEG simulations."
+      },
+      {
+        "id": "Tang2022",
+        "citation": "Tang, Z.; Okazaki, S. All-Atomistic Molecular Dynamics Study of the Glass Transition of Amorphous Polymers. Polymer 2022, 254, 125044.",
+        "doi": "10.1016/j.polymer.2022.125044",
+        "relevance": "AA-MD Tg study of polycarbonate (PC) and PMMA via cooling simulations; radius of gyration, dihedral transitions, end effects, and INM analysis near Tg. Various DoFs show glass transition slightly above experimental Tg. Validates PCBN (PC) and PACR (PMMA) simulation protocols."
+      },
+      {
+        "id": "NkepsuMbitou2025",
+        "citation": "Nkepsu Mbitou, R. L.; Bedoui, F. A Review on All-Atom Force Fields Capabilities to Predict Polymer Properties: Case of Poly(methyl methacrylate) and Polyisobutylene Polymer Systems. Comput. Mater. Sci. 2025, 253, 113861.",
+        "doi": "10.1016/j.commatsci.2025.113861",
+        "relevance": "Systematic review of Class I (GAFF2, OPLS-AA) and Class II (PCFF, CVFF) all-atom FFs for PMMA (PACR) and PIB/polyisobutylene (PHYC); benchmarks thermomechanical properties against experiment. Class II FFs outperform Class I for thermomechanical predictions; informs PACR and PHYC FF confidence notes."
+      },
+      {
+        "id": "Jakalian2002",
+        "citation": "Jakalian, A.; Jack, D. B.; Bayly, C. I. Fast, Efficient Generation of High-Quality Atomic Charges. AM1-BCC Model: II. Parameterization and Validation. J. Comput. Chem. 2002, 23, 1623–1641.",
+        "doi": "10.1002/jcc.10128",
+        "relevance": "Parameterization and validation of AM1-BCC: AM1 population charges + bond charge corrections fitted to HF/6-31G* ESP for >2700 molecules. Validated via hydrogen-bond energies and solvation free energies for diverse organic functional groups. Primary method reference when charge_method=AM1-BCC (PVNL, POXI, PSIL, PHYC, PDIE)."
+      },
+      {
+        "id": "Bejagam2020",
+        "citation": "Bejagam, K. K.; Iverson, C. N.; Marrone, B. L.; Pilania, G. Molecular dynamics simulations for glass transition temperature predictions of polyhydroxyalkanoate biopolymers. Phys. Chem. Chem. Phys. 2020, 22, 17880–17889.",
+        "doi": "10.1039/D0CP03163A",
+        "relevance": "PCFF (mPCFF) system-size convergence study for polymer Tg. Production minimum: 20 chains × 100-mer. Explicitly tests smaller systems and shows convergence from below. Most relevant PCFF chain-count reference; directly informs nchain recommendations for PCBN/PAMD/PKTN/PSFO/PIMD."
+      },
+      {
+        "id": "Kashmari2024",
+        "citation": "Kashmari, K. et al. Optimal Molecular Dynamics System Size for Increased Precision and Efficiency for Epoxy Materials. J. Phys. Chem. B 2024.",
+        "doi": "10.1021/acs.jpcb.4c00845",
+        "pmc": "PMC11075082",
+        "relevance": "Tests 6 system sizes from 5,265 to 36,855 atoms (5 replicates each) for crosslinked epoxy. Tg, Young's modulus, and bulk modulus converge at ~15,000 atoms. Density is size-insensitive throughout. Note: thermoset — atom-count threshold may not map directly to linear thermoplastics."
+      },
+      {
+        "id": "CarmonaEsteva2024",
+        "citation": "Carmona Esteva, F. J.; Zhang, Y.; Maginn, E. J.; Colón, Y. J. Consistent and reproducible computation of the glass transition temperature from molecular dynamics simulations. J. Chem. Phys. 2024, 161, 014108.",
+        "doi": "10.1063/5.0207835",
+        "relevance": "Bilinear fitting-range selection introduces ±20–40 K analyst variability in Tg. Proposes Shapiro-Wilk normality test on residuals to objectively identify valid linear regimes in both glassy and melt phases. Open-source code available. Recommended upgrade to the Patrone bilinear method used in extract_tg."
+      },
+      {
+        "id": "Suter2025",
+        "citation": "Suter, J. L. et al. Rapid, Accurate and Reproducible Prediction of the Glass Transition Temperature Using Ensemble-Based Molecular Dynamics Simulation. J. Chem. Theory Comput. 2025.",
+        "doi": "10.1021/acs.jctc.4c01364",
+        "pmc": "PMC11823416",
+        "relevance": "95% CI on Tg scales as N^{-0.5} replicas. At least 10 ensemble members needed for 95% CI < 20 K; optimal per-replica protocol is 4 ns burn-in + 2 ns production per temperature point. Single-trajectory Tg cannot have a quantified confidence interval without replicas."
+      },
+      {
+        "id": "Sun1994",
+        "citation": "Sun, H.; Mumby, S. J.; Maple, J. R.; Hagler, A. T. An ab Initio CFF93 All-Atom Force Field for Polycarbonates. J. Am. Chem. Soc. 1994, 116, 2978–2987.",
+        "doi": "10.1021/ja00086a030",
+        "relevance": "Original PCFF (CFF93) force field derivation and validation for polycarbonates. Class II FF with explicit cross-terms and anharmonic bond/angle potentials; parameterized against ab initio QM data. Primary reference for ff_justification_doi of all PCFF-routed classes (PCBN, PAMD, PKTN, PSFO, PIMD) where no class-specific PCFF MD paper is available."
+      },
+      {
+        "id": "Abbott2013",
+        "citation": "Abbott, L. J.; Hart, K. E.; Colina, C. M. Polymatic: a generalized simulated polymerization algorithm for amorphous polymers. Theor. Chem. Acc. 2013, 132, 1334.",
+        "doi": "10.1007/s00214-013-1334-z",
+        "relevance": "De facto standard 21-step compression-relaxation equilibration protocol: 7 NPT→NVT→NVT thermal cycles then NPT at 1 atm. Adopted by RadonPy and PolyPal. Foundation reference for multi-step equilibration design in PolyJarvis Stage 2."
+      },
+      {
+        "id": "Wu2017",
+        "citation": "Wu, C. Re-examining the procedure for simulating polymer Tg using molecular dynamics. J. Mol. Model. 2017, 23, 270.",
+        "doi": "10.1007/s00894-017-3439-0",
+        "relevance": "Single high-T equilibration + monotonic cooling gives Tg statistically equivalent to repeated thermal cycling (PEO). Multiple annealing cycles add robustness but are not strictly required once the melt is adequately equilibrated at T_max. Validates PolyJarvis 5-cycle annealing as conservative but defensible."
       }
-    ]
+    ],
+    "last_updated": "2026-05-31"
   },
   "classes": {
     "PHYC": {
@@ -110,7 +229,7 @@
       "preferred_ff": "trappe-ua",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acs.macromol.5b00823",
-      "ff_note": "Ramos 2015: TraPPE-UA PE Tg=187K vs exp 185-195K, density \u00b17%. Branched types (PP, PIB): UA types exist but no polymer-Tg validation \u2014 use with medium confidence.",
+      "ff_note": "Ramos 2015: TraPPE-UA PE Tg=187K vs exp 185-195K, density ±7%. Branched types (PP, PIB): UA types exist but no polymer-Tg validation — use with medium confidence.",
       "forcefield": "TraPPE-UA",
       "charge_method": "Gasteiger",
       "dp_typical": 120,
@@ -124,11 +243,11 @@
           "syndiotactic"
         ],
         "sensitive": true,
-        "note": "Applies to PP (CH2-CHCH3 stereocenter); PE and PIB have symmetric backbones (no stereocenters). Atactic PP is amorphous (Tg ~258 K); isotactic/syndiotactic PP crystallize above Tg \u2014 use atactic for all amorphous cell builds."
+        "note": "Applies to PP (CH2-CHCH3 stereocenter); PE and PIB have symmetric backbones (no stereocenters). Atactic PP is amorphous (Tg ~258 K); isotactic/syndiotactic PP crystallize above Tg — use atactic for all amorphous cell builds."
       },
       "density_initial_gcm3": 0.48,
       "electrostatics": "lj_cut",
-      "cutoff_A": 12.0,
+      "cutoff_A": 14.0,
       "dt_fs": 1.0,
       "T_equil_K": 550.0,
       "P_equil_atm": 1.0,
@@ -142,26 +261,30 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "experimental_tg_K": {
-        "PE": 148,
+        "PE": 195,
         "PP": 258,
         "PIB": 205,
-        "notes": "PE: ~-125\u00b0C (148 K); PP atactic: ~-15\u00b0C (258 K); PIB: ~-68\u00b0C (205 K). Values from OpenLearn polymer tables and literature DSC data."
+        "notes": "PE: amorphous Tg ~195 K (Boyer 1973 Tg_U; Ramos2015 MD=187 K). Tg_L ~145 K is a sub-Tg relaxation in semicrystalline PE. PP atactic: ~-15°C (258 K); PIB: ~-68°C (205 K)."
       },
       "confidence": "high",
       "citations": [
         "PE_RSC2016",
         "Hayashi2022",
         "Srivastava2026",
-        "Afzal2021"
+        "Afzal2021",
+        "Martin1998",
+        "Ramos2015",
+        "Boyer1973"
       ],
       "notes": [
-        "Purely apolar backbone \u2014 no significant partial charges on C or H; lj_cut is sufficient (Afzal2021). Backbone charges < 0.1 e.",
-        "PE MD Tg ~200 K (PE_RSC2016), ~281\u00b152 K (Srivastava2026 MLFF). Sweep 100-450 K brackets all values including PP (MD Tg ~340-380 K) and PIB (MD Tg ~285-325 K).",
+        "Purely apolar backbone — no significant partial charges on C or H; lj_cut is sufficient (Afzal2021). Backbone charges < 0.1 e.",
+        "TraPPE-UA PE MD Tg=187 K (Ramos2015), consistent with experimental amorphous Tg(U)~195 K (Boyer1973). Sweep 100–450 K brackets all PHYC values including PP (MD Tg ~340–380 K) and PIB (MD Tg ~285–325 K).",
         "PE Tm ~400 K (semicrystalline): T_equil=550 K exceeds Tm, ensuring melt equilibration. PP/PIB are amorphous; 550 K safely above all PHYC Tg+150 K.",
-        "Apolar hydrocarbon: Gasteiger charges acceptable; RESP not required (Afzal2021).",
+        "Apolar hydrocarbon: Gasteiger charges acceptable; RESP not required (Afzal2021). lj_cut sufficient (Afzal2021; backbone charges < 0.1 e).",
         "dp_min=60 to exceed Fox-Flory plateau for flexible backbone (Patrone 2016). dp_typical=120 for PE-like flexibility (large chains needed for reliable Tg).",
-        "1.0 fs timestep standard (universal GAFF2 default). 2.0 fs possible with SHAKE on C-H bonds if templates support SHAKE constraints.",
-        "Exp. RT density: PE=0.95 g/cm\u00b3, PP=0.91 g/cm\u00b3, PIB=0.92 g/cm\u00b3. Initial density 0.48 g/cm\u00b3 = ~0.5x PE density (avoids overlap for all PHYC)."
+        "Timestep: 1.0 fs default (universal safe). With SHAKE on bond lengths only (angles/torsions free), dt=2.0 fs is valid for TraPPE-UA PE and doubles throughput (Ramos2015: SHAKE + 2 fs; Byutner2000: same for PVDF). Enable SHAKE in LAMMPS via 'fix shake ... b' before switching to 2 fs.",
+        "Exp. RT density: PE=0.95 g/cm³, PP=0.91 g/cm³, PIB=0.92 g/cm³. Initial density 0.48 g/cm³ = ~0.5× PE density (avoids overlap for all PHYC). Validation target (TraPPE-UA): volumetric thermal expansion α=8.57×10⁻⁴ K⁻¹ vs experimental HDPE ~7.7–7.9×10⁻⁴ K⁻¹ (+7%; Ramos2015 Table 2). Characteristic ratio C∞=8.2 at 500 K vs experimental 7.4–8.1 (Ramos2015).",
+        "VdW cutoff: 14.0 Å (1.4 nm) used in Ramos2015 TraPPE-UA PE study; gives density within ~7% of experiment. 12 Å is a safe minimum but 14 Å is more accurate for long-chain UA alkanes."
       ]
     },
     "PSTR": {
@@ -175,8 +298,8 @@
       ],
       "preferred_ff": "trappe-ua",
       "preferred_builder": "emc",
-      "ff_justification_doi": null,
-      "ff_note": "TraPPE-UA via EMC: cac (aromatic C with alkyl substituent) and cah (aromatic CH) atom types confirmed in trappe-ua.define. EMC author t_glass example (in 't Veld 2023) uses trappe-ua with *C(c1ccccc1)C* (atactic PS) explicitly for Tg calculations. Supersedes OPLS-AA path (Afzal 2021 R\u00b2=0.40 for styrene subset).",
+      "ff_justification_doi": "10.1021/jp302975c",
+      "ff_note": "TraPPE-UA via EMC: cac (aromatic C with alkyl substituent) and cah (aromatic CH) atom types confirmed in trappe-ua.define. EMC author t_glass example (in 't Veld 2023) uses trappe-ua with *C(c1ccccc1)C* (atactic PS) explicitly for Tg calculations. Supersedes OPLS-AA path (Afzal 2021 R²=0.40 for styrene subset).",
       "forcefield": "TraPPE-UA",
       "charge_method": "RESP",
       "dp_typical": 50,
@@ -210,22 +333,23 @@
       "experimental_tg_K": {
         "PS": 373,
         "P2VP": 374,
-        "notes": "PS: ~100\u00b0C (373 K). P2VP similar to PS due to similar backbone rigidity."
+        "notes": "PS: ~100°C (373 K). P2VP similar to PS due to similar backbone rigidity."
       },
       "confidence": "high",
       "citations": [
         "Hayashi2022",
         "Afzal2021",
-        "Srivastava2026"
+        "Srivastava2026",
+        "Keasler2012"
       ],
       "notes": [
         "GAFF2_mod + RESP is established practice for polystyrenic systems with aromatic pi-system polarization (Hayashi2022; Afzal2021).",
-        "P2VP contains a basic pyridine nitrogen \u2014 weak partial charges; PPPM is conservative and correct.",
-        "PS: MD Tg ~430-500 K expected (SimPoly: 399\u00b122 K vs exp 373 K); upper sweep at 600 K covers this.",
+        "P2VP contains a basic pyridine nitrogen — weak partial charges; PPPM is conservative and correct.",
+        "PS: MD Tg ~430-500 K expected (SimPoly: 399±22 K vs exp 373 K); upper sweep at 600 K covers this.",
         "RESP charges (HF/6-31G*) recommended for PS/PSTR due to ring pi-system polarization. AM1-BCC is acceptable fallback.",
-        "Atactic stereochemistry matters: DP\u226530 needed to average tacticity fluctuations in Tg.",
+        "Atactic stereochemistry matters: DP≥30 needed to average tacticity fluctuations in Tg.",
         "1.0 fs timestep chosen to resolve phenyl ring torsions accurately (GAFF2_mod parameterization).",
-        "Exp. RT density: PS=1.05 g/cm\u00b3. Initial density 0.53 g/cm\u00b3 = ~0.5x PS density."
+        "Exp. RT density: PS=1.05 g/cm³. Initial density 0.53 g/cm³ = ~0.5x PS density."
       ]
     },
     "PVNL": {
@@ -270,7 +394,7 @@
         "PVA": 303,
         "PVC": 354,
         "PVAc": 304,
-        "notes": "PVA: ~30\u00b0C (303 K) from OpenLearn; PVC: ~80\u00b0C (354 K); PVAc: ~30\u00b0C (304 K)."
+        "notes": "PVA: ~30°C (303 K) from OpenLearn; PVC: ~80°C (354 K); PVAc: ~30°C (304 K)."
       },
       "confidence": "medium",
       "citations": [
@@ -279,18 +403,18 @@
         "Hayashi2022"
       ],
       "notes": [
-        "PVA has hydroxyl groups capable of strong hydrogen bonding \u2014 PPPM required for proper electrostatics.",
-        "PVAc ester side chain carries carbonyl dipole \u2014 PPPM recommended.",
-        "PVC chloride gives significant partial charges on backbone carbons \u2014 PPPM required.",
+        "PVA has hydroxyl groups capable of strong hydrogen bonding — PPPM required for proper electrostatics.",
+        "PVAc ester side chain carries carbonyl dipole — PPPM recommended.",
+        "PVC chloride gives significant partial charges on backbone carbons — PPPM required.",
         "AM1-BCC adequate for polar vinyl side chains without aromatic conjugation; RESP not required.",
         "MD Tg expected 380-470 K for PVA/PVC after 80-120 K overestimation. Sweep to 550 K is safe.",
         "Strong H-bonding in PVA can trap chain conformations; extra annealing cycles recommended (5 minimum).",
-        "Exp. RT density: PVC=1.38 g/cm\u00b3, PVA=1.26 g/cm\u00b3, PVAc=1.19 g/cm\u00b3. Initial 0.55 g/cm\u00b3 is conservative (avoids overlaps for full class range)."
+        "Exp. RT density: PVC=1.38 g/cm³, PVA=1.26 g/cm³, PVAc=1.19 g/cm³. Initial 0.55 g/cm³ is conservative (avoids overlaps for full class range)."
       ],
-      "preferred_ff": "opls-aa/2024",
+      "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Afzal 2021 vinyl-class R\u00b2=0.90, MAE=20.2K"
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PVC PASS, PVAc PASS, PVA PASS). Note: OPLS-AA failed for PVC and PVAc; PCFF succeeded."
     },
     "PACR": {
       "name": "Polyacrylic",
@@ -334,27 +458,30 @@
         "PMMA": 378,
         "PMA": 281,
         "PAA": 379,
-        "notes": "PMMA: ~105\u00b0C (378 K); PMA: ~8\u00b0C (281 K); PAA: ~106\u00b0C (379 K)."
+        "notes": "PMMA: ~105°C (378 K); PMA: ~8°C (281 K); PAA: ~106°C (379 K)."
       },
       "confidence": "high",
       "citations": [
         "Hayashi2022",
         "Webb2024",
-        "Afzal2021"
+        "Afzal2021",
+        "NkepsuMbitou2025",
+        "Tang2022"
       ],
       "notes": [
         "GAFF2_mod + RESP for polyacrylics is established protocol: ester carbonyl dipole and methacrylate torsions require recalibrated parameters (Hayashi2022; Webb2024).",
         "PAA has ionizable carboxyl groups; in neutral form PPPM accounts for C=O dipole adequately.",
         "MD Tg for PMMA expected ~430-500 K; Webb2024 protocol: 40-540 K sweep, 20 K steps.",
         "Ester carbonyl dipole in PMMA/PMA requires PPPM to avoid significant electrostatic errors.",
-        "PMA has flexible ester side chain \u2192 lower Tg; sweep lower bound at 150 K to sample deep glassy state.",
+        "PMA has flexible ester side chain → lower Tg; sweep lower bound at 150 K to sample deep glassy state.",
         "GAFF2_mod preferred over bare GAFF2 for methacrylate torsions; recalibrated ester/methacrylate torsional parameters (Hayashi2022).",
-        "Exp. RT density: PMMA=1.19 g/cm\u00b3, PMA=1.22 g/cm\u00b3. Initial 0.60 g/cm\u00b3 = ~0.5x PMMA density."
+        "Exp. RT density: PMMA=1.19 g/cm³, PMA=1.22 g/cm³. Initial 0.60 g/cm³ = ~0.5x PMMA density.",
+        "GAFF2 Tg failure (critical): NkepsuMbitou2025 benchmark shows GAFF Tg error >45% for both PMMA and PIB — the largest error of all tested FFs. Class II FFs (PCFF, IFF) reproduce PMMA density within 2% and Tg within ~10% after WLF rate correction. GAFF2_mod is used here for Tg screening only; quantitative thermomechanical properties (Young's modulus, bulk modulus) require Class II FF. Route PACR to EMC/PCFF when accuracy is critical."
       ],
-      "preferred_ff": "opls-aa/2024",
+      "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Afzal 2021 acrylate-class R\u00b2=0.96, MAE=15.9K \u2014 best-performing subset"
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PMMA PASS). PCFF (Class II) strongly preferred: NkepsuMbitou2025 shows GAFF Tg error >45% for PMMA; PCFF within 10%."
     },
     "PHAL": {
       "name": "Polyhalogenated",
@@ -367,7 +494,7 @@
       "preferred_ff": "opls-aa/2024",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Halogen \u2192 OPLS-AA path. Afzal 2021 halogen-class R\u00b2=0.87, MAE=20.8K. Note: Watkins & Jorgensen 2001 covers perfluoroalkanes (PTFE-like all-CF2); PVDF mixed CF2-CH2 dihedrals use general OPLS-AA CT/HC types. PVDF2 run in progress for validation.",
+      "ff_note": "Halogen → OPLS-AA path. Afzal 2021 halogen-class R²=0.87, MAE=20.8K. Note: Watkins & Jorgensen 2001 covers perfluoroalkanes (PTFE-like all-CF2); PVDF mixed CF2-CH2 dihedrals use general OPLS-AA CT/HC types. PVDF2 run in progress for validation.",
       "forcefield": "OPLS-AA",
       "charge_method": "RESP",
       "dp_typical": 60,
@@ -402,23 +529,26 @@
         "PVDF": 233,
         "PTFE": 160,
         "PCTFE": 325,
-        "notes": "PVDF: -40\u00b0C (233 K); PTFE: Tg controversial, -103\u00b0C (170 K) from dynamic mech. tests, some report 130\u00b0C secondary relaxation; PCTFE: ~52\u00b0C (325 K)."
+        "notes": "PVDF: -40°C (233 K); PTFE: Tg controversial, -103°C (170 K) from dynamic mech. tests, some report 130°C secondary relaxation; PCTFE: ~52°C (325 K)."
       },
       "confidence": "medium",
       "citations": [
         "Hayashi2022",
-        "Afzal2021"
+        "Afzal2021",
+        "Byutner2000",
+        "Watkins2001"
       ],
       "notes": [
-        "PVDF: highly polar (large C-F dipole moments, partial charges ~\u00b10.5 e) \u2014 PPPM mandatory.",
+        "PVDF: highly polar (C-F dipole ~1.9 D; partial charges per repeat unit: CH₂ group ≈ −0.16e, CF₂ group ≈ +0.16e; Byutner2000 Table 1). PPPM mandatory. Byutner2000 finding: QM-derived charges should be increased ×1.1 in condensed-phase MD to account for polarization effects not captured in gas-phase ESP fitting. OPLS-AA PVDF charges derived from COMPASS FF partial charges — verify charge scaling.",
         "PTFE: Tg is experimentally ambiguous (170 K primary vs 400 K secondary relaxation). Sweep 100-550 K covers both.",
-        "PCTFE: C-Cl carries even larger partial charge than C-F \u2014 PPPM required.",
-        "GAFF2_mod required: improved fluorine torsional parameters. Standard GAFF2 fluorine sigma (3.118 \u00c5) is too large for CF2/CF3 backbones; improved LJ params from Watkins & Jorgensen J. Phys. Chem. A 2001, 105, 4118 (OPLS-AA opls_965: sigma=2.95 \u00c5, epsilon=0.053 kcal/mol). Torsional reparameterization also needed for full conformational accuracy (same source). Applied via mcp-servers/mcp-mol-builder-server/patch_fluorine_params.py.",
+        "PCTFE: C-Cl carries even larger partial charge than C-F — PPPM required.",
+        "GAFF2_mod required: improved fluorine LJ parameters from Watkins2001 (OPLS-AA opls_965: σ=2.95 Å, ε=0.053 kcal/mol) applied via patch_fluorine_params.py. Byutner2000 uses Buckingham exp-6 (more accurate for F–F), but OPLS-AA LJ is a reasonable approximation validated against PVDF density. Note: Byutner2000 Buckingham FF reproduces amorphous PVDF density 1.75–1.78 g/cm³ at 283 K — use as primary density validation target.",
         "PTFE Tm ~600 K, PVDF Tm ~443 K (semicrystalline): T_equil=700 K exceeds PTFE Tm. Ensures fully melt equilibration.",
         "MD overestimation likely 80-120 K; PVDF MD Tg expected ~310-350 K. Upper bound 550 K is safe.",
-        "Crystalline tendency (PVDF semi-crystalline): ensure fully amorphous cell. Low initial density (0.89 g/cm\u00b3 = ~0.5x PVDF density 1.78) helps avoid ordered packing.",
-        "PCTFE may have crystallization artifacts \u2014 run at low cooling rate (5-10 K/ns equivalent).",
-        "WARNING: PTFE atom type (CF2 backbone) may require explicit GAFF2_mod parameterization; check atom types before run."
+        "Crystalline tendency (PVDF semi-crystalline): ensure fully amorphous cell. Low initial density (0.89 g/cm³ = ~0.5x PVDF density 1.78) helps avoid ordered packing.",
+        "PCTFE may have crystallization artifacts — run at low cooling rate (5-10 K/ns equivalent).",
+        "WARNING: PTFE atom type (CF2 backbone) may require explicit GAFF2_mod parameterization; check atom types before run.",
+        "Amorphous PVDF density validation target: 1.75–1.78 g/cm³ at 283 K (Byutner2000 Fig 5; experimental Kynar amorphous PVDF). Simulation density at 283 K below 1.70 g/cm³ indicates incorrect charge scaling or wrong nonbonded parameters."
       ],
       "forcefield_alternatives": [
         {
@@ -440,7 +570,7 @@
               "after": 0.053
             }
           },
-          "validation_target": "PVDF RT density ~1.78 g/cm\u00b3; MD Tg within 80-120 K of experimental 233 K",
+          "validation_target": "PVDF RT density ~1.78 g/cm³; MD Tg within 80-120 K of experimental 233 K",
           "limitations": "LJ-only patch; torsional reparameterization (CCCC dihedral in CF2 chains) is a separate follow-up needed for full conformational accuracy"
         }
       ]
@@ -458,7 +588,7 @@
       "preferred_ff": "trappe-ua",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acs.macromol.5b00823",
-      "ff_note": "All-aliphatic C/H backbone (C=C present but no heteroatoms) \u2192 TraPPE-UA. Afzal 2021 butadiene-class OPLS3e R\u00b2=0.87, MAE=13.1K also acceptable. TraPPE-UA includes alkene types; cis/trans microstructure must be encoded in SMILES.",
+      "ff_note": "All-aliphatic C/H backbone (C=C present but no heteroatoms) → TraPPE-UA. Afzal 2021 butadiene-class OPLS3e R²=0.87, MAE=13.1K also acceptable. TraPPE-UA includes alkene types; cis/trans microstructure must be encoded in SMILES.",
       "forcefield": "TraPPE-UA",
       "charge_method": "Gasteiger",
       "dp_typical": 100,
@@ -488,22 +618,23 @@
       "experimental_tg_K": {
         "PBD": 181,
         "PI": 200,
-        "notes": "Polybutadiene: ~-92\u00b0C (181 K); cis-polyisoprene (natural rubber): ~-73\u00b0C (200 K). Very low Tg rubbers."
+        "notes": "Polybutadiene: ~-92°C (181 K); cis-polyisoprene (natural rubber): ~-73°C (200 K). Very low Tg rubbers."
       },
       "confidence": "high",
       "citations": [
         "Polyisoprene2021",
-        "Afzal2021"
+        "Afzal2021",
+        "Martin1998"
       ],
       "notes": [
-        "Purely apolar hydrocarbon backbone with C=C double bonds \u2014 lj_cut sufficient.",
+        "Purely apolar hydrocarbon backbone with C=C double bonds — lj_cut sufficient.",
         "Very low experimental Tg (180-200 K): sweep must go down to 80 K to sample deep glassy state.",
         "MD Tg expected 260-320 K (overestimation). Upper sweep bound 400 K safely brackets this.",
         "DP=50-200 studied by polyisoprene MD: mechanical properties converge above DP=50 (PMC9698502).",
         "Microstructure matters: cis vs trans gives different Tg. RadonPy defaults to atactic/random coil.",
-        "1.0 fs timestep standard. 2.0 fs possible with SHAKE on C-H bonds if templates support SHAKE constraints.",
+        "1.0 fs timestep standard. With SHAKE on bond lengths only, dt=2.0 fs is valid for TraPPE-UA dienes (Martin1998 alkene UA types; same SHAKE logic as PHYC).",
         "Fewer annealing cycles needed due to flexible rubbery backbone (fast equilibration above Tg).",
-        "Exp. RT density: PBD=0.90 g/cm\u00b3, PI=0.91 g/cm\u00b3. Initial 0.45 g/cm\u00b3 = ~0.5x PBD density.",
+        "Exp. RT density: PBD=0.90 g/cm³, PI=0.91 g/cm³. Initial 0.45 g/cm³ = ~0.5x PBD density.",
         "WARNING: GAFF2 may not perfectly represent C=C torsional potentials for cis-1,4 repeat units; validate RDF against experiment."
       ]
     },
@@ -518,8 +649,8 @@
       ],
       "forcefield": "GAFF2_mod",
       "charge_method": "AM1-BCC",
-      "dp_typical": 60,
-      "dp_min": 30,
+      "dp_typical": 100,
+      "dp_min": 50,
       "nchain": 10,
       "tacticity": {
         "default": "atactic",
@@ -550,27 +681,29 @@
         "PEO": 206,
         "PPO": 198,
         "PVME": 242,
-        "notes": "PEO: ~-67\u00b0C (206 K); PPO: ~-75\u00b0C (198 K); PVME: ~-31\u00b0C (242 K). All low-Tg flexible polyethers."
+        "notes": "PEO: ~-67°C (206 K); PPO: ~-75°C (198 K); PVME: ~-31°C (242 K). All low-Tg flexible polyethers."
       },
       "confidence": "high",
       "citations": [
         "Webb2024",
-        "Hayashi2022"
+        "Hayashi2022",
+        "Wu2011",
+        "Klajmon2023"
       ],
       "notes": [
         "GAFF2_mod + AM1-BCC for ether systems: ether O torsions are recalibrated in GAFF2_mod; AM1-BCC adequate for ether oxygen polarization without RESP cost. Webb2024 uses GAFF with PME (PPPM-equivalent) for PEO as canonical example.",
-        "Ether oxygen carries significant negative partial charge (~-0.3 to -0.4 e in GAFF2) \u2014 PPPM required.",
-        "MD Tg for PEO expected ~290-330 K after overestimation. Sweep 100-440 K brackets this well.",
+        "Ether oxygen carries significant negative partial charge (~-0.3 to -0.4 e in GAFF2) — PPPM required.",
+        "MD Tg for PEO: ~270 K (Wu2011 OPLS-AA stepwise-cooling AA-MD, 20×50 chains, 5 ns/step, 20 K steps). Overestimation vs experiment ~63–65 K — LESS than the typical 80–120 K for most classes. Apply ~65 K correction for PEO/PEG; sweep 100–440 K brackets this well.",
         "POM Tm=453 K (semicrystalline): T_equil=500 K exceeds Tm; PEO/PPO/PVME amorphous with Tg+150 K < 500 K.",
         "PEO/LiTFSI: salt addition increases Tg by 20-30 K (Webb2024). Apply offset if simulating salt-doped systems.",
-        "PEO-based electrolytes: stepwise cooling (2 ns/step, 20 K increments) outperforms continuous cooling (Webb2024).",
-        "Chain length: PEG Tg independent of MW above ~4000 g/mol (DP~90 for PEO); DP\u226530 minimum. DP=60 provides margin.",
-        "Exp. RT density: PEO=1.21 g/cm\u00b3, PPO=1.00 g/cm\u00b3, POM=1.42 g/cm\u00b3. Initial 0.61 g/cm\u00b3 = ~0.5x PEO density."
+        "PEO-based electrolytes: stepwise cooling (2 ns/step, 20 K increments) outperforms continuous cooling (Webb2024). Wu2011: Coulombic-energy-based Tg is ~40 K lower than density-based Tg — use density as primary Tg observable for POXI, not energy components.",
+        "Chain length: PEG Tg independent of MW above ~4000 g/mol (DP~90 for PEO); DP≥50 minimum. DP=100 (4,400 g/mol) provides margin above Klajmon2023 Tg convergence threshold (Klajmon2023).",
+        "Exp. RT density: PEO=1.21 g/cm³, PPO=1.00 g/cm³, POM=1.42 g/cm³. Initial 0.61 g/cm³ = ~0.5× PEO density. Validation target: bulk PEO density at 300 K ~1.10–1.12 g/cm³ (Wu2011 OPLS-AA; experimental 1.112 g/cm³). Thermal expansion H-T region: α=8.08×10⁻⁴ K⁻¹ (Wu2011 density method) vs experimental 8.53×10⁻⁴ K⁻¹ (−5%)."
       ],
-      "preferred_ff": "opls-aa/2024",
+      "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Afzal 2021 oxy/ether-class R\u00b2=0.94, MAE=18.2K"
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested 2026-05-31: PEO PASS). PCFF Class II outperforms GAFF2 for thermomechanical properties (NkepsuMbitou2025). EMC recommended."
     },
     "PSUL": {
       "name": "Polythioether / Polysulfide",
@@ -608,7 +741,7 @@
       "K_strain_max": 0.03,
       "experimental_tg_K": {
         "PPS": 358,
-        "notes": "PPS (polyphenylene sulfide): ~85\u00b0C (358 K). Polythioethers generally 250-360 K."
+        "notes": "PPS (polyphenylene sulfide): ~85°C (358 K). Polythioethers generally 250-360 K."
       },
       "confidence": "medium",
       "citations": [
@@ -619,15 +752,15 @@
         "Sulfone S carries very large partial charges (S ~+1.3 e, O ~-0.55 e in GAFF2): RESP mandatory for aryl sulfone/sulfide.",
         "GAFF2_mod for aromatic aryl-sulfide/sulfone torsions (PSU aryl-SO2-aryl dihedral recalibrated).",
         "PPS: MD Tg expected ~440-480 K after overestimation; upper sweep 600 K is safe.",
-        "PPS is semi-crystalline above Tg \u2014 ensure amorphous cell construction. Rapid quench from 700 K helps suppress crystallization.",
+        "PPS is semi-crystalline above Tg — ensure amorphous cell construction. Rapid quench from 700 K helps suppress crystallization.",
         "Slow equilibration from rigid aryl-sulfide/sulfone backbone: 8 ns and 8 cycles required.",
         "PTH (simple polythioether): more flexible than PPS; lower Tg (~250 K experimental).",
-        "Exp. RT density: PPS=1.35 g/cm\u00b3, PSU=1.30 g/cm\u00b3. Initial 0.65 g/cm\u00b3 = ~0.5x PPS density."
+        "Exp. RT density: PPS=1.35 g/cm³, PSU=1.30 g/cm³. Initial 0.65 g/cm³ = ~0.5x PPS density."
       ],
-      "preferred_ff": "opls-aa/2024",
+      "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Heteroatom (S) \u2192 OPLS-AA path"
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PPS PASS). PCFF has sulfone/sulfide types."
     },
     "PEST": {
       "name": "Polyester",
@@ -648,7 +781,7 @@
         "default": "not_applicable",
         "options": [],
         "sensitive": false,
-        "note": "PET, PBT, and most polyesters have no backbone stereocenters. PLA stereocontrol (L-PLA vs D,L-PLA) is handled via SMILES, not RadonPy stereo parameter \u2014 use the correct enantiomer SMILES."
+        "note": "PET, PBT, and most polyesters have no backbone stereocenters. PLA stereocontrol (L-PLA vs D,L-PLA) is handled via SMILES, not RadonPy stereo parameter — use the correct enantiomer SMILES."
       },
       "density_initial_gcm3": 0.63,
       "electrostatics": "pppm",
@@ -670,28 +803,29 @@
         "PLA": 331,
         "PCL": 213,
         "PBT": 323,
-        "notes": "PET: ~69\u00b0C (342 K); PLA: ~58\u00b0C (331 K); PCL: ~-60\u00b0C (213 K); PBT: ~50\u00b0C (323 K)."
+        "notes": "PET: ~69°C (342 K); PLA: ~58°C (331 K); PCL: ~-60°C (213 K); PBT: ~50°C (323 K)."
       },
       "confidence": "high",
       "citations": [
         "Afzal2021",
         "Hayashi2022",
-        "Webb2024"
+        "Webb2024",
+        "Klajmon2023"
       ],
       "notes": [
         "Ester linkage carries C=O dipole (~0.7 D); PPPM required for all polyesters.",
         "GAFF2_mod for ester/lactide torsions; RESP required for ester C=O dipole (HF/6-31G*).",
         "PET Tm=533 K, PBT Tm~498 K, PBS Tm~388 K, PLA Tm~430 K, PCL Tm~333 K: T_equil=620 K exceeds all Tm values.",
         "PET MD Tg expected ~420-460 K; PLA ~410-450 K; PCL ~290-330 K. Sweep 100-600 K covers all.",
-        "PCL: very low Tg (-60\u00b0C, 213 K); lower sweep bound must reach 100 K to fully sample glassy state.",
+        "PCL: very low Tg (-60°C, 213 K); lower sweep bound must reach 100 K to fully sample glassy state.",
         "Semi-crystalline polymers (PET, PBT, PCL, PHB): amorphous cell must be verified by density.",
         "PLA: biodegradable; GAFF2 parameters for lactide linkage well-validated in literature.",
-        "Exp. RT density: PET=1.38 g/cm\u00b3, PLA=1.25 g/cm\u00b3, PCL=1.15 g/cm\u00b3. Initial 0.63 g/cm\u00b3 = ~0.5x PET density."
+        "Exp. RT density: PET=1.38 g/cm³, PLA=1.25 g/cm³, PCL=1.15 g/cm³. Initial 0.63 g/cm³ = ~0.5x PET density."
       ],
-      "preferred_ff": "opls-aa/2024",
+      "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Afzal 2021 oxy/ether-class covers ester linkage; R\u00b2=0.94"
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PLA PASS, PET PASS). PCFF has explicit ester types (c_1, o_2, oe). Klajmon2023 benchmarks PLA/PEG with AA-MD."
     },
     "PAMD": {
       "name": "Polyamide",
@@ -732,30 +866,29 @@
         "Nylon6": 323,
         "Nylon66": 323,
         "Nylon12": 310,
-        "notes": "Nylon-6: ~50\u00b0C (323 K); Nylon-66: ~50\u00b0C (323 K); Nylon-12: ~37\u00b0C (310 K)."
+        "notes": "Nylon-6: ~50°C (323 K); Nylon-66: ~50°C (323 K); Nylon-12: ~37°C (310 K)."
       },
       "confidence": "high",
       "citations": [
         "Afzal2021",
-        "Klajmon2023",
         "Webb2024",
         "Hayashi2022"
       ],
       "notes": [
-        "Amide group has strong C=O dipole and N-H hydrogen bond donor \u2014 PPPM mandatory.",
-        "GAFF2_mod for amide bond torsions; RESP mandatory for strong amide C=O and N-H partial charges (Klajmon2023).",
+        "Amide group has strong C=O dipole and N-H hydrogen bond donor — PPPM mandatory.",
+        "GAFF2_mod for amide bond torsions; RESP mandatory for strong amide C=O and N-H partial charges (Hayashi2022).",
         "PA6 Tm=493 K, PA66 Tm=538 K, PAMXD6 Tm~516 K: T_equil=650 K exceeds all PA Tm values.",
         "MD Tg for Nylon-6,6 expected ~400-440 K after overestimation; upper bound 600 K is safe.",
         "Dense H-bonding between amide groups significantly raises Tg and slows equilibration; 8 annealing cycles, 8 ns required.",
         "Water absorption depresses Tg: at ~2.5 wt% water, H-bond network disruption reduces Tg. Simulate dry chains for intrinsic Tg.",
-        "Nylon-12 has longer methylene spacer \u2192 more flexible \u2192 lower Tg (310 K). Sweep lower bound 150 K adequate.",
-        "Exp. RT density: PA6=1.14 g/cm\u00b3, PA66=1.14 g/cm\u00b3. Initial 0.57 g/cm\u00b3 = ~0.5x PA6 density.",
-        "WARNING: Nylon semi-crystallinity: crystalline domains can form above Tg. Quench from 700 K to prevent. Verify amorphous density ~1.08-1.14 g/cm\u00b3."
+        "Nylon-12 has longer methylene spacer → more flexible → lower Tg (310 K). Sweep lower bound 150 K adequate.",
+        "Exp. RT density: PA6=1.14 g/cm³, PA66=1.14 g/cm³. Initial 0.57 g/cm³ = ~0.5x PA6 density.",
+        "WARNING: Nylon semi-crystallinity: crystalline domains can form above Tg. Quench from 700 K to prevent. Verify amorphous density ~1.08-1.14 g/cm³."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": null,
-      "ff_note": "Track C engineering thermoplastic \u2014 PCFF via EMC (C1-C4 implemented)"
+      "ff_justification_doi": "10.1021/ja00086a030",
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md)."
     },
     "PURT": {
       "name": "Polyurethane",
@@ -787,7 +920,7 @@
       "experimental_tg_K": {
         "soft_segment": 220,
         "hard_segment": 380,
-        "notes": "Polyurethanes have two Tg values: soft segment (polyol-based, ~-50\u00b0C=223 K) and hard segment (diisocyanate-based, ~100\u00b0C=373 K). Effective Tg depends on composition."
+        "notes": "Polyurethanes have two Tg values: soft segment (polyol-based, ~-50°C=223 K) and hard segment (diisocyanate-based, ~100°C=373 K). Effective Tg depends on composition."
       },
       "confidence": "medium",
       "citations": [
@@ -795,19 +928,19 @@
         "Afzal2021"
       ],
       "notes": [
-        "Urethane linkage (-O-CO-NH-) carries strong dipole and H-bond donor/acceptor \u2014 PPPM mandatory.",
+        "Urethane linkage (-O-CO-NH-) carries strong dipole and H-bond donor/acceptor — PPPM mandatory.",
         "GAFF2_mod for urethane torsional parameters (analogous to amide/ester). RESP required for urethane C=O and N-H partial charges.",
         "H-bonding and microphase complexity: 8 annealing cycles and 8 ns equilibration required.",
         "Segmented polyurethanes exhibit micro-phase separation; MD of simplified homopolymer model may not capture both Tg values.",
         "For repeat-unit-based simulation (PoLyInfo): treat as single-phase urethane-linked chain. Expect single MD Tg ~350-480 K.",
         "Wide temperature sweep (100-600 K) needed to cover both possible Tg values.",
-        "Exp. RT density: PU-ether ~1.15 g/cm\u00b3, PU-ester ~1.25 g/cm\u00b3. Initial 0.60 g/cm\u00b3 conservative lower bound.",
+        "Exp. RT density: PU-ether ~1.15 g/cm³, PU-ester ~1.25 g/cm³. Initial 0.60 g/cm³ conservative lower bound.",
         "WARNING: Segmented TPU with soft/hard block alternation cannot be reliably modeled as homopolymer. Tg reported reflects hard-segment-like environment."
       ],
-      "preferred_ff": "opls-aa/2024",
+      "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Polar (C=O, N-H) \u2192 OPLS-AA path"
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: aliphatic TPU PASS). WARNING: aromatic MDI-type urethane SMILES fail with {o,c_2} increment error — test build before submitting aromatic TPU."
     },
     "PURA": {
       "name": "Polyurea",
@@ -837,7 +970,7 @@
       "K_strain_max": 0.03,
       "experimental_tg_K": {
         "hard_segment": 400,
-        "notes": "Hard segment Tg ~127\u00b0C (400 K). Polyurea networks can show two Tg values (Soft Matter 2014 DOI:10.1039/C4SM00979G)."
+        "notes": "Hard segment Tg ~127°C (400 K). Polyurea networks can show two Tg values (Soft Matter 2014 DOI:10.1039/C4SM00979G)."
       },
       "confidence": "low",
       "citations": [
@@ -845,19 +978,19 @@
         "Roos2025"
       ],
       "notes": [
-        "Urea linkage (-NH-CO-NH-) has TWO N-H donors and one C=O acceptor \u2014 strongest H-bonding of all 21 classes. PPPM mandatory.",
+        "Urea linkage (-NH-CO-NH-) has TWO N-H donors and one C=O acceptor — strongest H-bonding of all 21 classes. PPPM mandatory.",
         "GAFF2_mod for urea backbone torsions; RESP mandatory (N partial charges ~-0.5 e, O ~-0.6 e in GAFF2).",
         "10 annealing cycles = PolyPal (Roos2025) maximum protocol, applied here due to dense H-bond network.",
         "MD Tg expected 480-570 K after overestimation; wide sweep to 650 K required.",
         "Equilibration extremely slow due to dense H-bond network: 10 ns and 10 cycles required.",
         "Polyurea networks show two Tg values: soft segment (~223 K) and hard segment (~400 K). MD homopolymer captures only hard-segment behavior.",
-        "Exp. RT density estimated ~1.15-1.25 g/cm\u00b3 (no dedicated GAFF2 polyurea paper; estimated from urea monomer and PURT analogy). Initial 0.60 g/cm\u00b3.",
-        "WARNING: Low confidence \u2014 polyurea MD-specific literature is sparse; parameters inferred from PURT analogy and known urea H-bonding chemistry."
+        "Exp. RT density estimated ~1.15-1.25 g/cm³ (no dedicated GAFF2 polyurea paper; estimated from urea monomer and PURT analogy). Initial 0.60 g/cm³.",
+        "WARNING: Low confidence — polyurea MD-specific literature is sparse; parameters inferred from PURT analogy and known urea H-bonding chemistry."
       ],
-      "preferred_ff": "opls-aa/2024",
-      "preferred_builder": "emc",
+      "preferred_ff": "GAFF2_mod",
+      "preferred_builder": "radonpy",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Polar (C=O, N-H) \u2192 OPLS-AA path"
+      "ff_note": "RadonPy/GAFF2_mod path. Polar (C=O, N-H, N-H) urea backbone. EMC does not yet implement PURA."
     },
     "PIMD": {
       "name": "Polyimide",
@@ -870,7 +1003,7 @@
       ],
       "forcefield": "PCFF",
       "charge_method": "RESP",
-      "dp_typical": 20,
+      "dp_typical": 24,
       "dp_min": 15,
       "nchain": 8,
       "density_initial_gcm3": 0.71,
@@ -892,7 +1025,7 @@
         "PMDA_ODA": 633,
         "BPDA_PDA": 633,
         "general_range": "451-691",
-        "notes": "PMDA-ODA (Kapton): ~360\u00b0C (633 K); BPDA-PDA: ~360\u00b0C (633 K); polyimide range 178-418\u00b0C = 451-691 K (Wen2020)."
+        "notes": "PMDA-ODA (Kapton): ~360°C (633 K); BPDA-PDA: ~360°C (633 K); polyimide range 178-418°C = 451-691 K (Wen2020)."
       },
       "confidence": "high",
       "citations": [
@@ -901,21 +1034,21 @@
         "Hayashi2022"
       ],
       "notes": [
-        "Imide ring has large conjugated pi-system with C=O and N partial charges \u2014 PPPM mandatory.",
+        "Imide ring has large conjugated pi-system with C=O and N partial charges — PPPM mandatory.",
         "GAFF2_mod for imide ring and dianhydride torsions; RESP for imide C=O and aromatic conjugated charges.",
         "Wen2020 protocol: 15 repeat units, 10 chains, 1 fs timestep, 20 K/ns cooling from 900 K; Tg validated 451-691 K.",
         "MD Tg expected 730-810 K for high-Tg polyimides after overestimation. Sweep to 900 K required.",
         "High Tg means long equilibration: 15 ns and 8 cycles required (rigid-rod backbone, slow chain relaxation).",
         "RadonPy annealing to 700 K maximum is INSUFFICIENT for polyimides with Tg > 600 K experimental. Extend to 900 K.",
-        "nchain=8: large PMDA-ODA repeat unit (~382 g/mol); 8 chains \u00d7 20 dp keeps total atom count ~7-8k, well under 15k limit.",
+        "nchain=8: large PMDA-ODA repeat unit (~382 g/mol); 8 chains × 24 dp keeps total atom count ~9-10k (Kashmari2024 15k convergence limit).",
         "Chain length: 15 repeat units (Wen2020) validated minimum; DP=15 acceptable, DP=20 preferred.",
-        "Exp. RT density: Kapton=1.42 g/cm\u00b3. Initial 0.71 g/cm\u00b3 = ~0.5x Kapton density.",
-        "WARNING: Do not simulate crystalline polyimide (BPDA-PDA) in amorphous mode without verifying density matches amorphous values (~1.35-1.42 g/cm\u00b3)."
+        "Exp. RT density: Kapton=1.42 g/cm³. Initial 0.71 g/cm³ = ~0.5x Kapton density.",
+        "WARNING: Do not simulate crystalline polyimide (BPDA-PDA) in amorphous mode without verifying density matches amorphous values (~1.35-1.42 g/cm³)."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": null,
-      "ff_note": "Track C engineering thermoplastic \u2014 PCFF via EMC (C1-C4 implemented)"
+      "ff_justification_doi": "10.1021/ja00086a030",
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md)."
     },
     "PANH": {
       "name": "Polyanhydride",
@@ -948,26 +1081,26 @@
       "experimental_tg_K": {
         "poly_sebacic_anhydride": 319,
         "PLGA": 318,
-        "notes": "Polyanhydrides generally Tg=40-80\u00b0C (313-353 K). PLGA: ~45\u00b0C (318 K). Degradable linkage."
+        "notes": "Polyanhydrides generally Tg=40-80°C (313-353 K). PLGA: ~45°C (318 K). Degradable linkage."
       },
       "confidence": "low",
       "citations": [
         "Hayashi2022"
       ],
       "notes": [
-        "Anhydride linkage (-CO-O-CO-) contains two carbonyls and an ether-like oxygen \u2014 significant partial charges; PPPM required.",
+        "Anhydride linkage (-CO-O-CO-) contains two carbonyls and an ether-like oxygen — significant partial charges; PPPM required.",
         "GAFF2_mod for anhydride linkage torsions (analogous to ester). RESP for dual carbonyl partial charges.",
         "MD Tg expected ~400-450 K after overestimation. Upper sweep 550 K safe.",
         "Polyanhydrides are hydrolytically labile: MD in vacuum/implicit solvent without water is standard.",
         "PLGA (poly(lactic-co-glycolic acid)) is technically a polyester-co-glycolide; anhydride-linkage variants follow similar parameters.",
         "Tg sensitive to copolymer ratio in PLGA-like systems; homopolymer model is approximate.",
-        "Exp. RT density: PLGA ~1.20-1.25 g/cm\u00b3. Initial 0.60 g/cm\u00b3 = ~0.5x PLGA density.",
-        "WARNING: Low confidence \u2014 polyanhydride-specific GAFF2 MD literature is sparse. Parameters inferred from PEST class analogy."
+        "Exp. RT density: PLGA ~1.20-1.25 g/cm³. Initial 0.60 g/cm³ = ~0.5x PLGA density.",
+        "WARNING: Low confidence — polyanhydride-specific GAFF2 MD literature is sparse. Parameters inferred from PEST class analogy."
       ],
-      "preferred_ff": "opls-aa/2024",
+      "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Polar (C=O) \u2192 OPLS-AA path"
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(sebacic anhydride) PASS). PCFF ester-like types cover anhydride linkage."
     },
     "PCBN": {
       "name": "Polycarbonate",
@@ -999,26 +1132,26 @@
       "K_strain_max": 0.03,
       "experimental_tg_K": {
         "BPA_PC": 422,
-        "notes": "Bisphenol-A polycarbonate: ~149\u00b0C (422 K). Literature DSC consensus."
+        "notes": "Bisphenol-A polycarbonate: ~149°C (422 K). Literature DSC consensus."
       },
       "confidence": "high",
       "citations": [
         "Afzal2021",
-        "Klajmon2023"
+        "Tang2022"
       ],
       "notes": [
         "Carbonate linkage (-O-CO-O-) plus bisphenol aromatic rings: significant partial charges. PPPM mandatory.",
         "GAFF2_mod for aryl carbonate and bisphenol ether torsions; RESP required for carbonate C=O dipole and aromatic pi partial charges.",
         "MD Tg for BPA-PC expected ~500-540 K after overestimation. Upper sweep 700 K covers this.",
-        "GAFF2 is applicable but PCFF+ outperforms GAFF for PC Tg in comparative studies (Klajmon2023). GAFF2_mod is preferred for PolyJarvis.",
-        "BPA phenyl ring flip motions: important sub-Tg relaxation. Requires adequate sampling: 8 ns equilibration (Klajmon2023).",
-        "Exp. RT density: BPA-PC=1.20 g/cm\u00b3. Initial 0.60 g/cm\u00b3 = ~0.5x PC density.",
+        "GAFF2 is applicable but PCFF+ outperforms GAFF for PC Tg in comparative studies (Tang2022). GAFF2_mod is preferred for PolyJarvis.",
+        "BPA phenyl ring flip motions: important sub-Tg relaxation. Requires adequate sampling: 8 ns equilibration (Tang2022).",
+        "Exp. RT density: BPA-PC=1.20 g/cm³. Initial 0.60 g/cm³ = ~0.5x PC density.",
         "Langevin thermostat at 500 K then NPT equilibration at 500 K before cooling is a documented protocol for PC MD."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": null,
-      "ff_note": "Track C engineering thermoplastic \u2014 PCFF via EMC (C1-C4 implemented)"
+      "ff_justification_doi": "10.1021/ja00086a030",
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; Tang2022 validates AA-MD Tg and Rg for BPA-PC specifically."
     },
     "PIMN": {
       "name": "Polyamine / Polyetherimide / Epoxy",
@@ -1052,7 +1185,7 @@
         "PEI_Ultem": 488,
         "linear_PEI": 333,
         "DGEBA_amine": 400,
-        "notes": "Ultem (PEI polyetherimide): ~215\u00b0C (488 K). Linear poly(ethyleneimine): ~60\u00b0C (333 K). DGEBA-amine epoxy: ~127\u00b0C (400 K)."
+        "notes": "Ultem (PEI polyetherimide): ~215°C (488 K). Linear poly(ethyleneimine): ~60°C (333 K). DGEBA-amine epoxy: ~127°C (400 K)."
       },
       "confidence": "medium",
       "citations": [
@@ -1060,20 +1193,20 @@
         "Wen2020"
       ],
       "notes": [
-        "Amine nitrogen is a strong H-bond donor and acceptor \u2014 PPPM mandatory.",
+        "Amine nitrogen is a strong H-bond donor and acceptor — PPPM mandatory.",
         "GAFF2_mod for glycidyl-ether ring-opened and aryl ether torsions; RESP for N-H, aryl ether, and ring-opened epoxide partial charges.",
-        "Ultem (polyetherimide): contains both ether and imide linkages \u2014 very high Tg 488 K experimental.",
+        "Ultem (polyetherimide): contains both ether and imide linkages — very high Tg 488 K experimental.",
         "MD Tg for Ultem expected 570-610 K after overestimation. Sweep to 750 K required.",
         "dp_typical=20: short segment between crosslinks for epoxy network model; linear polyimine also uses ~20.",
         "Dense amine H-bonding network: 8 annealing cycles and 8 ns required.",
-        "Exp. RT density: DGEBA epoxy ~1.15-1.20 g/cm\u00b3. Initial 0.60 g/cm\u00b3.",
+        "Exp. RT density: DGEBA epoxy ~1.15-1.20 g/cm³. Initial 0.60 g/cm³.",
         "WARNING: PEI is ambiguous between poly(ethylenimine) (aliphatic amine) and polyetherimide (Ultem). Confirm structure before applying parameters.",
         "WARNING: Crosslinked epoxy networks (DGEBA + curing agent) require a crosslinked simulation protocol not in standard RadonPy pipeline."
       ],
-      "preferred_ff": "opls-aa/2024",
+      "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Afzal 2021 amide-class R\u00b2=0.90, MAE=32.0K"
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PEI PASS). PCFF has amine N types."
     },
     "PSIL": {
       "name": "Polysiloxane",
@@ -1106,7 +1239,7 @@
       "experimental_tg_K": {
         "PDMS": 148,
         "PMHS": 158,
-        "notes": "PDMS: ~-125\u00b0C (148 K); PMHS: ~-115\u00b0C (158 K). Exceptionally low Tg due to flexible Si-O backbone."
+        "notes": "PDMS: ~-125°C (148 K); PMHS: ~-115°C (158 K). Exceptionally low Tg due to flexible Si-O backbone."
       },
       "confidence": "high",
       "citations": [
@@ -1116,18 +1249,18 @@
       "notes": [
         "Si-O backbone has partial ionic character; Si carries positive charge (~+0.5 e in GAFF2), O negative (~-0.4 e). PPPM required at runtime.",
         "AM1-BCC charges adequate for Si-O bond polarization when full RESP is not available. Base GAFF2 covers organosilicone (si, os atom types).",
-        "PDMS crystallizes at ~-40\u00b0C (233 K): T_equil=350 K ensures cell compression and equilibration occur above crystallization temperature.",
-        "PDMS: Tg ~148 K experimentally (-125\u00b0C). MD Tg expected ~230-270 K after overestimation. Sweep must go to 50 K.",
-        "Exceptionally low Tg: temperature sweep 50-350 K is unique to this class \u2014 do not use generic 150-600 K range. tg_t_step_K=10 for finer resolution near low Tg.",
+        "PDMS crystallizes at ~-40°C (233 K): T_equil=350 K ensures cell compression and equilibration occur above crystallization temperature.",
+        "PDMS: Tg ~148 K experimentally (-125°C). MD Tg expected ~230-270 K after overestimation. Sweep must go to 50 K.",
+        "Exceptionally low Tg: temperature sweep 50-350 K is unique to this class — do not use generic 150-600 K range. tg_t_step_K=10 for finer resolution near low Tg.",
         "Very flexible backbone: fast equilibration above rubbery Tg. 3 annealing cycles and 3 ns sufficient.",
         "dp_min=40 to exceed flexible-chain Fox-Flory plateau. dp_typical=80 for production-quality Tg.",
-        "Exp. RT density: PDMS=0.97 g/cm\u00b3. Initial 0.49 g/cm\u00b3 = ~0.5x PDMS density.",
-        "WARNING: Standard GAFF2 may not have optimal parameters for Si-O-Si angle; validate against PDMS density (target ~0.97 g/cm\u00b3 at 298 K). May need GAFF2_mod for specific siloxane torsions."
+        "Exp. RT density: PDMS=0.97 g/cm³. Initial 0.49 g/cm³ = ~0.5x PDMS density.",
+        "WARNING: Standard GAFF2 may not have optimal parameters for Si-O-Si angle; validate against PDMS density (target ~0.97 g/cm³ at 298 K). May need GAFF2_mod for specific siloxane torsions."
       ],
-      "preferred_ff": "opls-aa/2024",
-      "preferred_builder": "emc",
+      "preferred_ff": "GAFF2",
+      "preferred_builder": "radonpy",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Heteroatom (Si) \u2192 OPLS-AA path; OPLS-AA has Si parameters"
+      "ff_note": "RadonPy/GAFF2 path. GAFF2 has si/os atom types for organosilicone. Heteroatom (Si) backbone. EMC does not yet implement PSIL."
     },
     "PPHS": {
       "name": "Polyphosphazene",
@@ -1159,25 +1292,25 @@
       "experimental_tg_K": {
         "range": "173-373",
         "poly_ethoxyphosphazene": 213,
-        "notes": "Polyphosphazenes: highly tunable Tg from -100\u00b0C to 100\u00b0C (173-373 K) depending on substituents. Poly(ethoxyphosphazene): ~-60\u00b0C (213 K)."
+        "notes": "Polyphosphazenes: highly tunable Tg from -100°C to 100°C (173-373 K) depending on substituents. Poly(ethoxyphosphazene): ~-60°C (213 K)."
       },
       "confidence": "low",
       "citations": [
         "Hayashi2022"
       ],
       "notes": [
-        "Phosphazene backbone (P=N alternating) carries large partial charges on P (~+1.2 e) and N (~-0.8 e) \u2014 PPPM mandatory.",
+        "Phosphazene backbone (P=N alternating) carries large partial charges on P (~+1.2 e) and N (~-0.8 e) — PPPM mandatory.",
         "GAFF2_mod for P=N-P torsion. GAFF2 p3/p5 atom types designed for bio-phosphates; validate applicability to inorganic-backbone polyphosphazenes.",
         "Highly tunable: Tg depends strongly on substituents (alkoxy, fluoroalkoxy, phenoxy). Wide temperature sweep 80-550 K covers full experimental range plus 80-120 K MD overestimation.",
-        "Exp. RT density estimated ~1.15-1.25 g/cm\u00b3 (no direct GAFF2 polyphosphazene MD reference; estimated from literature). Initial 0.55 g/cm\u00b3.",
+        "Exp. RT density estimated ~1.15-1.25 g/cm³ (no direct GAFF2 polyphosphazene MD reference; estimated from literature). Initial 0.55 g/cm³.",
         "COMPASS force field used in published polyphosphazene MD (ScienceDirect); GAFF2 is preferable for PolyJarvis but validate P atom type parameters.",
         "Fox equation can predict Tg for copolymer variants (Allcock et al. ScienceDirect 2021).",
-        "WARNING: Low confidence \u2014 polyphosphazene-specific GAFF2 parameterization may be incomplete. Consider custom P=N parameters."
+        "WARNING: Low confidence — polyphosphazene-specific GAFF2 parameterization may be incomplete. Consider custom P=N parameters."
       ],
-      "preferred_ff": "opls-aa/2024",
+      "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Heteroatom (P, N) \u2192 OPLS-AA path"
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(ethoxyphosphazene) PASS; pcff.frc explicitly added polyphosphazene types). WARNING: Cl-substituted PDCP not tested."
     },
     "PKTN": {
       "name": "Polyketone / Polyetherketone",
@@ -1189,9 +1322,9 @@
       ],
       "forcefield": "PCFF",
       "charge_method": "RESP",
-      "dp_typical": 25,
+      "dp_typical": 32,
       "dp_min": 15,
-      "nchain": 8,
+      "nchain": 10,
       "density_initial_gcm3": 0.66,
       "electrostatics": "pppm",
       "cutoff_A": 12.0,
@@ -1211,29 +1344,28 @@
         "PEEK": 418,
         "PEK": 440,
         "PEKK": 433,
-        "notes": "PEEK: ~145\u00b0C (418 K); PEK: ~167\u00b0C (440 K); PEKK: ~160\u00b0C (433 K). Consensus from MD simulations and DSC."
+        "notes": "PEEK: ~145°C (418 K); PEK: ~167°C (440 K); PEKK: ~160°C (433 K). Consensus from MD simulations and DSC."
       },
       "confidence": "high",
       "citations": [
         "Afzal2021",
-        "Klajmon2023",
         "Hayashi2022"
       ],
       "notes": [
-        "Ketone carbonyl C=O and ether oxygen: both carry significant partial charges \u2014 PPPM required.",
+        "Ketone carbonyl C=O and ether oxygen: both carry significant partial charges — PPPM required.",
         "GAFF2_mod for aromatic ketone carbonyl and aryl ether torsions; RESP for ketone C=O and aryl ether partial charges.",
         "PEEK Tm=616 K: T_equil=770 K exceeds Tm and Tg+MD_overestimate (418+120=538 K). PEK Tm~638 K: check if 770 K is sufficient.",
         "COMPASS II gives Tg=424-429 K for PEEK variants (PMC7285100), close to experimental 418 K.",
         "MD Tg for PEEK expected ~500-540 K after overestimation. Sweep to 750 K safely brackets this.",
-        "Very rigid aromatic backbone: slow chain relaxation \u2192 8 annealing cycles and 15 ns required.",
-        "nchain=8: PEEK repeat unit ~288 g/mol; 8 chains \u00d7 25 dp keeps atom count manageable (<10k).",
-        "Exp. RT density: PEEK=1.32 g/cm\u00b3. Initial 0.66 g/cm\u00b3 = ~0.5x PEEK density.",
-        "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. Verify density ~1.30 g/cm\u00b3 at 298 K before Tg sweep."
+        "Very rigid aromatic backbone: slow chain relaxation → 8 annealing cycles and 15 ns required.",
+        "nchain=10: PEEK repeat unit ~288 g/mol; 10 chains × 32 dp → MW ~9,216 g/mol, crossing Klajmon2023 density convergence threshold (~9,000 g/mol) (Bejagam2020; Klajmon2023).",
+        "Exp. RT density: PEEK=1.32 g/cm³. Initial 0.66 g/cm³ = ~0.5x PEEK density.",
+        "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. Verify density ~1.30 g/cm³ at 298 K before Tg sweep."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": null,
-      "ff_note": "Track C engineering thermoplastic \u2014 PCFF via EMC (C1-C4 implemented)"
+      "ff_justification_doi": "10.1021/ja00086a030",
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md)."
     },
     "PSFO": {
       "name": "Polysulfone",
@@ -1247,7 +1379,7 @@
       "charge_method": "RESP",
       "dp_typical": 25,
       "dp_min": 15,
-      "nchain": 8,
+      "nchain": 10,
       "density_initial_gcm3": 0.62,
       "electrostatics": "pppm",
       "cutoff_A": 12.0,
@@ -1267,29 +1399,28 @@
         "PSU": 463,
         "PES": 493,
         "PPSU": 493,
-        "notes": "PSU (Udel): ~190\u00b0C (463 K); PES: ~220\u00b0C (493 K); PPSU: ~220\u00b0C (493 K)."
+        "notes": "PSU (Udel): ~190°C (463 K); PES: ~220°C (493 K); PPSU: ~220°C (493 K)."
       },
       "confidence": "medium",
       "citations": [
-        "Klajmon2023",
         "Hayashi2022",
         "Afzal2021"
       ],
       "notes": [
-        "Sulfone group (-SO2-) has very large partial charges on S (~+1.3 e) and O (~-0.55 e) \u2014 PPPM mandatory.",
+        "Sulfone group (-SO2-) has very large partial charges on S (~+1.3 e) and O (~-0.55 e) — PPPM mandatory.",
         "GAFF2_mod for aryl-SO2-aryl torsion and aryl ether torsion. GAFF2 S atom types: sulfone uses s4 (tetravalent S). Verify in RadonPy GAFF2 assignment.",
         "Ether linkages add additional polarity. Combined sulfone+ether: strong electrostatic interactions throughout chain.",
-        "T_equil=700 K: PES Tg=493 K + 150 K = 643 K \u2192 700 K conservative for slow-relaxing rigid backbone.",
+        "T_equil=700 K: PES Tg=493 K + 150 K = 643 K → 700 K conservative for slow-relaxing rigid backbone.",
         "MD Tg for PSU expected ~540-580 K after overestimation. Sweep to 750 K safely brackets this.",
         "Rigid aromatic backbone: 15 ns and 8 cycles essential for equilibration.",
-        "nchain=8: BPA-PSF repeat unit ~442 g/mol; 8 chains \u00d7 25 dp keeps heavy atom count manageable.",
-        "Exp. RT density: PSF=1.24 g/cm\u00b3. Initial 0.62 g/cm\u00b3 = ~0.5x PSF density.",
-        "WARNING: DP\u226515 minimum; stiff backbone means very short chains behave differently. Aim for DP=20 if budget allows."
+        "nchain=10: BPA-PSF repeat unit ~442 g/mol; 10 chains × 25 dp → MW ~11,050 g/mol, above Klajmon2023 density convergence threshold (Bejagam2020; Klajmon2023).",
+        "Exp. RT density: PSF=1.24 g/cm³. Initial 0.62 g/cm³ = ~0.5x PSF density.",
+        "WARNING: DP≥15 minimum; stiff backbone means very short chains behave differently. Aim for DP=20 if budget allows."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": null,
-      "ff_note": "Track C engineering thermoplastic \u2014 PCFF via EMC (C1-C4 implemented)"
+      "ff_justification_doi": "10.1021/ja00086a030",
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md)."
     },
     "PPNL": {
       "name": "Polyphenylenevinylene / Conjugated Polymer",
@@ -1324,7 +1455,7 @@
         "PPV": 416,
         "MEH_PPV": 358,
         "PPO_PPE": 480,
-        "notes": "PPV (unsubstituted): ~143\u00b0C (416 K); MEH-PPV: ~85\u00b0C (358 K); PPO/PPE (poly(2,6-dimethylphenylene oxide)): ~207\u00b0C (480 K)."
+        "notes": "PPV (unsubstituted): ~143°C (416 K); MEH-PPV: ~85°C (358 K); PPO/PPE (poly(2,6-dimethylphenylene oxide)): ~207°C (480 K)."
       },
       "confidence": "medium",
       "citations": [
@@ -1332,22 +1463,22 @@
         "Afzal2021"
       ],
       "notes": [
-        "Conjugated pi-system: significant partial charges on all backbone atoms due to delocalization \u2014 PPPM required.",
+        "Conjugated pi-system: significant partial charges on all backbone atoms due to delocalization — PPPM required.",
         "GAFF2_mod for phenylene/vinylene torsional barriers (aromatic sp2 carbons 'ca', vinyl bonds 'c2'). RESP for aromatic pi partial charges and aryl ether O.",
         "PPO/PPE Tg=480 K + 150 = 630 K; PPV Tg=416 K; T_equil=650 K covers PPO and provides margin for PPP.",
-        "PPV Tg=416\u00b18 K from MD simulation (Venkatanarayanan & Ananth, Macromol. Theory Simul. 2016 DOI:10.1002/mats.201600006).",
+        "PPV Tg=416±8 K from MD simulation (Venkatanarayanan & Ananth, Macromol. Theory Simul. 2016 DOI:10.1002/mats.201600006).",
         "MEH-PPV: bulky 2-ethylhexyloxy side chain lowers Tg. MD Tg expected ~440-480 K after overestimation.",
         "Rigid conjugated/aryl-ether backbone: very slow relaxation. 8 annealing cycles and 12 ns.",
         "dp_typical=25 for large aromatic repeat units (PPV: two phenyl + vinylene per ru).",
-        "Exp. RT density: PPO/PPE ~1.06 g/cm\u00b3, PPV ~1.10 g/cm\u00b3, PPP ~1.20 g/cm\u00b3. Initial 0.55 g/cm\u00b3.",
+        "Exp. RT density: PPO/PPE ~1.06 g/cm³, PPV ~1.10 g/cm³, PPP ~1.20 g/cm³. Initial 0.55 g/cm³.",
         "PPV is planar in crystalline form; amorphous MD gives backbone twists that lower effective Tg. This is physically correct for amorphous Tg.",
         "WARNING: Standard GAFF2 may not correctly represent pi-conjugation effects on vinylene torsional potentials. Consider DFT-derived barriers in GAFF2_mod.",
-        "Charge transfer states in conjugated polymers cannot be modeled by classical GAFF2 \u2014 Tg (structural) is accessible; optical/electronic properties require QM."
+        "Charge transfer states in conjugated polymers cannot be modeled by classical GAFF2 — Tg (structural) is accessible; optical/electronic properties require QM."
       ],
-      "preferred_ff": "opls-aa/2024",
+      "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "Aromatic backbone \u2192 OPLS-AA path; Afzal 2021 phenyl-class R\u00b2=0.93"
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PPV PASS). Note: OPLS-AA failed for PPV (no vinyl rule); PCFF succeeded. Conjugated torsional accuracy not yet validated."
     }
   },
   "global_defaults": {
@@ -1379,7 +1510,7 @@
       "Default Tg sweep 150-600 K covers most common polymer classes except PSIL (too low) and PIMD/PKTN/PSFO (too low).",
       "Use 1.0 fs timestep as universal safe default with GAFF2 (Hayashi2022; Webb2024).",
       "annealing_T_low_K=300 K (slightly above room temperature) is the lower bound for all annealing cycles.",
-      "Increase annealing cycles if density fluctuates > 0.01 g/cm\u00b3 between last 3 NPT runs.",
+      "Increase annealing cycles if density fluctuates > 0.01 g/cm³ between last 3 NPT runs.",
       "If polymer class is unknown, classify_polymer result takes precedence over these defaults."
     ]
   },
@@ -1426,7 +1557,7 @@
       "examples": [
         "all polar polymers"
       ],
-      "rationale": "Dipole-dipole interactions from C=O, C-F, C-N, Si-O, S=O groups affect bulk density and Tg by 5-20% if neglected (Afzal2021; Webb2024). PPPM with 12 \u00c5 real-space cutoff and 1e-6 accuracy is standard."
+      "rationale": "Dipole-dipole interactions from C=O, C-F, C-N, Si-O, S=O groups affect bulk density and Tg by 5-20% if neglected (Afzal2021; Webb2024). PPPM with 12 Å real-space cutoff and 1e-6 accuracy is standard."
     },
     "lammps_settings": {
       "pppm": "pair_style lj/charmm/coul/long 8.0 12.0\nkspace_style pppm 1e-6",
@@ -1450,12 +1581,18 @@
       "3. NPT at T_equil_K, P=50,000 bar for 0.5 ns (compress to target density)",
       "4. NPT at T_equil_K, P=1 bar for 0.5 ns (release to 1 atm)",
       "5. N annealing cycles: NPT heat to annealing_T_high_K then cool to 300 K, t_equil_ns/N per half-cycle",
-      "6. NPT production at 300 K for 2 ns (verify equilibration: density drift < 0.01 g/cm\u00b3)"
+      "6. NPT production at 300 K for 2 ns (verify equilibration: density drift < 0.01 g/cm³)",
+      "7. Verify Patrone2016 screening: density data must achieve ≥90% asymptote convergence on both sides of Tg. If not, extend sweep range and re-run before extracting Tg."
     ],
     "citations": [
       "Webb2024",
       "Hayashi2022",
-      "Roos2025"
+      "Roos2025",
+      "Patrone2016"
+    ],
+    "additional_notes": [
+      "Patrone2016 screening criterion: verify ≥90% convergence to both asymptotes on BOTH sides of Tg before accepting a Tg estimate. Transition half-width ΔT = e^(c/2)(2P̂−1)/√(P̂(1−P̂)) where P̂=0.90. Practical rule: sweep must extend ≥100 K below T_low and ≥150 K above T_high relative to expected Tg. If transition region spans >50% of the sweep window, widen range and re-run. Datasets failing this test should be held for review, not reported.",
+      "Hyperbola fit (Patrone2016 Eq. 1): ρ(T) = ρ₀ − a(T−T₀) − b·H₀(T,T₀,c) is preferred over piecewise bilinear fit. Fits all data simultaneously; Tg = T₀ (hyperbola center). Slope in glassy state = −a; slope in rubbery state = −(a+b). As c→−∞, hyperbola converges to piecewise linear (bilinear is a special case)."
     ]
   }
 }

@@ -357,37 +357,6 @@ def _run_assign_charges(mol_file, charge_method, optimize_geometry, omp_psi4, me
         "message": f"Charges assigned using {charge_method} method"
     }
 
-def _run_calculate_sp_properties(mol_file, method, basis, omp_psi4, mem, work_dir):
-    """Internal function to calculate SP properties"""
-    os.makedirs(work_dir, exist_ok=True)
-    mol = utils.JSONToMol(mol_file)
-    
-    qm_data = qm.sp_prop(mol, opt=False, work_dir=work_dir, omp=omp_psi4, memory=mem, log_name='monomer1')
-    polar_data = qm.polarizability(mol, opt=False, work_dir=work_dir, omp=omp_psi4, memory=mem, log_name='monomer1')
-    
-    tot_energy = qm_data['qm_total_energy']
-    homo = qm_data['qm_homo']
-    lumo = qm_data['qm_lumo']
-    dipole = qm_data['qm_dipole']
-    dipole_polarizability = polar_data['Dipole polarizability']
-    polarizability_tensor = polar_data['Polarizability tensor']
-    
-    utils.MolToJSON(mol, mol_file)
-    
-    return {
-        "status": "success",
-        "total_energy": float(tot_energy),
-        "homo": float(homo),
-        "lumo": float(lumo),
-        "dipole (x,y,z)": [float(d) for d in dipole],
-        "dipole_polarizability": float(dipole_polarizability) if dipole_polarizability else None,
-        "polarizability_tensor (xx,yy,zz,xy,xz,yz)": [float(p) for p in polarizability_tensor] if polarizability_tensor else None,
-        "method": method,
-        "basis": basis,
-        "output_file": mol_file,
-        "message": "Properties calculated successfully"
-    }
-
 def _run_polymerize(mol_file, degree_of_polymerization, tacticity, headhead):
     """Internal function to polymerize"""
     mol = utils.JSONToMol(mol_file)
@@ -537,7 +506,6 @@ mcp = FastMCP(
     ASYNC OPERATIONS (return job_id immediately):
     - submit_conformer_search_job() - QM conformer search
     - submit_assign_charges_job() - QM charge calculations
-    - submit_sp_properties_job() - QM single-point properties
     - submit_polymerize_job() - Homopolymer generation
     - submit_copolymerize_job() - Random/alternating/block copolymer generation
     - submit_generate_cell_job() - Amorphous cell packing (homopolymer)
@@ -653,52 +621,6 @@ def submit_assign_charges_job(
             "job_id": job_id,
             "job_type": "assign_charges",
             "message": f"Charge assignment job {job_id} submitted. Method: {charge_method}"
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-@mcp.tool()
-def submit_sp_properties_job(
-    mol_file: str,
-    method: str = "HF",
-    basis: str = "6-31G(d)",
-    omp_psi4: int = 1,
-    mem: int = 2000,
-    work_dir: str = "sp_properties"
-) -> dict:
-    """
-    Submit single-point properties calculation job (runs in background).
-
-    Args:
-        mol_file: Path to molecule JSON file
-        method: QM method (e.g., 'HF', 'B3LYP')
-        basis: Basis set
-        omp_psi4: OpenMP threads for Psi4 DFT calculations
-        mem: Memory for Psi4 calculations in MB
-        work_dir: Working directory
-    
-    Returns immediately with job_id. Use get_job_status() to check progress.
-    """
-    try:
-        job_id = job_manager.submit_job(
-            func=_run_calculate_sp_properties,
-            args=(),
-            kwargs={
-                "mol_file": mol_file,
-                "method": method,
-                "basis": basis,
-                "omp_psi4": omp_psi4,
-                "mem": mem,
-                "work_dir": work_dir
-            },
-            job_type="sp_properties"
-        )
-        
-        return {
-            "status": "submitted",
-            "job_id": job_id,
-            "job_type": "sp_properties",
-            "message": f"SP properties job {job_id} submitted. Method: {method}/{basis}"
         }
     except Exception as e:
         return {"error": str(e)}

@@ -15,7 +15,7 @@ Seeds: EMC=[N or "random"]  |  SEED_HOT=[N]  |  SEED_COLD=[N]
 | D-02 Charges        | [RESP / AM1-BCC / Gasteiger / embedded in FF]       | [polar backbone / nonpolar, electrostatics negligible / EMC: embedded] |
 | D-03 Electrostatics | [PPPM / lj/cut [CUTOFF] Å]                         | [heteroatoms present → PPPM / pure C/H → lj/cut 12 Å, ~3× speedup] |
 | D-04 System size    | DP=[N], [N] chains, [N] atoms                       | [polymer_rules.json default / literature: N chains adequate for amorphous Tg / stiff chain: longer DP needed] |
-| D-05 Convergence    | [PASS / EXTEND×N / ESCALATE]                        | [density drift [X]% over last 500 ps, energy stable / [N] ns extension(s) needed] |
+| D-05 Convergence    | [PASS / EXTEND×N / ESCALATE]                        | [overall_pass=true — see D-05 CONVERGENCE DETAIL below / [N] extension(s) needed] |
 | D-06 Tg fit quality | [EXCELLENT / ACCEPTABLE / BORDERLINE / ABORT]       | [R²=[X], F-stat tier=[TIER], N=[N] temperature bins] |
 
 <!-- Example — PS1 completed run:
@@ -56,6 +56,13 @@ Example recovery block:
 
 ---
 
+## D-05 CONVERGENCE DETAIL
+
+<!-- Paste result["d05_markdown"] from check_equilibration_comprehensive here. -->
+<!-- The tool auto-generates this block — do not fill manually. -->
+
+---
+
 ## TIMING
 
 | Stage | Submitted | Completed | Wall time | Throughput |
@@ -80,7 +87,10 @@ GPU inventory (`nvidia-smi` at run start):
 | ρ        | [X] g/cm³| [X]–[X] g/cm³| [X]% | [✓ / ⚠] |
 | K        | [X] GPa  | [X]–[X] GPa  | [X]%  | [✓ / ⚠ / — no exp. ref.] |
 | cooling rate | [X] K/ns | ~10⁻⁷ K/ns (exp) | — | annotation only |
+| expected Tg offset | [80–120 K (screening) / 50–80 K (production)] | — | — | from polymer_rules.json + cooling rate |
 
-<!-- cooling_rate_K_per_ns = (T_start - T_end) / (n_stages × n_steps × timestep_fs × 1e-6) -->
+<!-- cooling_rate_K_per_ns = T_STEP / (N_STEPS_PER_T × timestep_fs × 1e-6)
+     e.g. 20 K / (500000 × 1 fs × 1e-6) = 40 K/ns  →  expected offset 80–120 K (screening)
+          20 K / (4000000 × 1 fs × 1e-6) =  5 K/ns  →  expected offset 50–80 K (production) -->
 
 Simulation dir: `[REMOTE_PATH]`

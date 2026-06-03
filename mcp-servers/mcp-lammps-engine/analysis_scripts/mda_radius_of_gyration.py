@@ -19,10 +19,17 @@ import json
 import sys
 import warnings
 from pathlib import Path
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
 import MDAnalysis as mda
+
+sys.path.insert(0, str(Path(__file__).parent))
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from plot_style import apply_style, save_fig
 
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 
@@ -39,6 +46,8 @@ def parse_args():
                    help="Number of backbone bonds per chain (for C∞ = <R²>/(N·l²))")
     p.add_argument("--bond_length_A",    type=float, default=1.54,
                    help="Backbone bond length in Angstrom (default: 1.54 C-C)")
+    p.add_argument("--backbone_types",   type=int, nargs='+', default=None,
+                   help="Atom type IDs forming the backbone (enables C_n vs n plot)")
     return p.parse_args()
 
 
@@ -63,6 +72,94 @@ def compute_rg_sq(positions, masses):
     delta = positions - r_cm
     rg_sq = (masses * (delta ** 2).sum(axis=1)).sum() / total_mass
     return float(rg_sq)
+
+
+def compute_cn_vs_n(u, chain_ids, backbone_types, bond_length_A, start, stop):
+    """
+    Compute characteristic ratio C_n(n) = <r²(n)> / (n * l²) averaged over
+    all chain segments of backbone length n, across all frames and chains.
+    Returns (ns_array, cn_array) or (None, None) on failure.
+    """
+    try:
+        from MDAnalysis.analysis.polymer import sort_backbone
+    except ImportError:
+        return None, None
+
+    type_sel = ' or '.join(f'type {t}' for t in backbone_types)
+    sorted_chains = {}
+    for cid in chain_ids:
+        bb = u.select_atoms(f'resid {cid} and ({type_sel})')
+        if len(bb) < 4:
+            continue
+        try:
+            sorted_chains[cid] = sort_backbone(bb)
+        except Exception:
+            sorted_chains[cid] = bb  # fallback: unsorted
+
+    if not sorted_chains:
+        return None, None
+
+    r2_sum = defaultdict(float)
+    r2_count = defaultdict(int)
+    l_sum = 0.0
+    l_count = 0
+
+    for ts in u.trajectory[start:stop]:
+        for cid, sorted_bb in sorted_chains.items():
+            pos = sorted_bb.positions  # (N_bb, 3)
+            N = len(pos)
+            for i in range(N - 1):
+                l_sum += float(np.linalg.norm(pos[i + 1] - pos[i]))
+                l_count += 1
+            max_n = min(N - 1, 200)
+            for n in range(1, max_n + 1):
+                dr = pos[n:] - pos[:N - n]      # (N-n, 3), vectorized over i
+                r2 = (dr ** 2).sum(axis=1)
+                r2_sum[n] += float(r2.sum())
+                r2_count[n] += len(r2)
+
+    if l_count == 0:
+        return None, None
+
+    l_mean = l_sum / l_count if bond_length_A is None else bond_length_A
+    ns = sorted(r2_sum.keys())
+    cn_values = [r2_sum[n] / r2_count[n] / (n * l_mean ** 2) for n in ns]
+    return np.array(ns, dtype=float), np.array(cn_values)
+
+
+def _plot_rg_distribution(df, overall_mean_Rg, overall_std_Rg, output_dir):
+    apply_style()
+    fig, ax = plt.subplots()
+    chain_ids = sorted(df['chain'].unique())
+    colors = plt.cm.tab10.colors
+    for i, cid in enumerate(chain_ids[:10]):
+        rg_vals = df[df['chain'] == cid]['rg'].values
+        ax.hist(rg_vals, bins=20, alpha=0.4, color=colors[i % len(colors)],
+                density=True, label=f'Chain {cid}')
+    ax.axvline(overall_mean_Rg, color='k', lw=2, ls='--',
+               label=f'⟨Rg⟩ = {overall_mean_Rg:.2f} Å')
+    ax.axvspan(overall_mean_Rg - overall_std_Rg, overall_mean_Rg + overall_std_Rg,
+               alpha=0.15, color='k')
+    ax.set_xlabel('Radius of gyration Rg (Å)')
+    ax.set_ylabel('Probability density')
+    ax.set_title('Rg distribution per chain')
+    if len(chain_ids) <= 10:
+        ax.legend(loc='upper right', fontsize=8)
+    save_fig(fig, str(Path(output_dir) / 'figures' / 'rg_distribution.png'))
+
+
+def _plot_cn_vs_n(ns, cn_values, char_ratio, output_dir):
+    apply_style()
+    fig, ax = plt.subplots()
+    ax.plot(ns, cn_values, 'o-', color='steelblue', ms=4, lw=1.5, label='C_n')
+    if char_ratio is not None:
+        ax.axhline(char_ratio, color='k', ls='--', lw=1.5,
+                   label=f'C∞ (from Rg) = {char_ratio:.2f}')
+    ax.set_xlabel('n  (backbone bonds in segment)')
+    ax.set_ylabel('C_n = ⟨r²(n)⟩ / (n·l²)')
+    ax.set_title('Characteristic ratio vs backbone separation')
+    ax.legend()
+    save_fig(fig, str(Path(output_dir) / 'figures' / 'cn_vs_n.png'))
 
 
 def main():
@@ -169,6 +266,40 @@ def main():
         "method": "MDAnalysis mass-weighted Rg",
         "mdanalysis_version": mda.__version__,
     })
+
+    # C_n vs n — only when backbone_types supplied
+    cn_csv_path = None
+    cn_fig_png = None
+    if args.backbone_types:
+        print(f"  Computing C_n vs n for backbone types {args.backbone_types}...", flush=True)
+        try:
+            ns_arr, cn_arr = compute_cn_vs_n(u, chain_ids, args.backbone_types,
+                                             args.bond_length_A, start, stop)
+            if ns_arr is not None:
+                cn_df = pd.DataFrame({"n": ns_arr.astype(int), "cn": cn_arr})
+                cn_csv_path = str(output_dir / "cn_vs_n.csv")
+                cn_df.to_csv(cn_csv_path, index=False)
+                print(f"  Wrote {cn_csv_path}", flush=True)
+                cn_fig_png = str(output_dir / "figures" / "cn_vs_n.png")
+                try:
+                    _plot_cn_vs_n(ns_arr, cn_arr, char_ratio_from_rg, output_dir)
+                except Exception as _pe:
+                    print(f"  WARNING: cn_vs_n plot failed: {_pe}", flush=True)
+                    cn_fig_png = None
+        except Exception as _e:
+            print(f"  WARNING: C_n vs n computation failed: {_e}", flush=True)
+
+    summary["cn_vs_n_csv"] = cn_csv_path
+    summary["cn_vs_n_png"] = cn_fig_png
+
+    # Rg distribution figure
+    rg_fig_png = str(output_dir / "figures" / "rg_distribution.png")
+    try:
+        _plot_rg_distribution(df, overall_mean_Rg, overall_std_Rg, output_dir)
+    except Exception as _pe:
+        print(f"  WARNING: rg_distribution plot failed: {_pe}", flush=True)
+        rg_fig_png = None
+    summary["rg_distribution_png"] = rg_fig_png
 
     json_path = str(output_dir / "rg_summary.json")
     with open(json_path, "w") as jf:

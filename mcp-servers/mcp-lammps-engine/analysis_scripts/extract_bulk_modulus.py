@@ -1,24 +1,30 @@
 #!/usr/bin/env python3
 """
 extract_bulk_modulus.py — Extract isothermal bulk modulus from an NPT
-simulation log using the volume fluctuation method.
+simulation log using the volume fluctuation method (B_dyn) and the
+definition formula cross-check (B_def).
 
-Method (volume fluctuation):
+Requirement: the input log must be from a constant-T, constant-P NPT
+stage (e.g. Stage 7: 07_npt_production).  A temperature ramp or NVT
+stage will give meaningless results.
+
+Method 1 — volume fluctuation (B_dyn):
     K_T = kB * T * <V> / Var(V)
 
-where kB is Boltzmann's constant, T is temperature, <V> is the mean
-volume, and Var(V) = <V²> - <V>² is the volume variance over the
-production window of an NPT trajectory at constant T and P.
+Method 2 — definition formula cross-check (B_def):
+    B_def = -(dP / d ln V)_T
+    from linear regression of instantaneous P vs ln V over the same
+    production window (Wu, J. Phys. Chem. B 2020, 124, 10811, Eq. 4).
+    Barostat-independent; R² of the fit is a quality diagnostic.
 
-This is the standard statistical-mechanical route for isothermal bulk
-modulus from NPT ensembles (Allen & Tildesley, 2017; Frenkel & Smit,
-Ch. 5).  The method assumes the simulation is well-equilibrated and
-samples the isobaric-isothermal ensemble.
+Both B_dyn and B_def are reported.  Agreement within 20% gives
+confidence in B_dyn; larger disagreement flags possible barostat
+artefacts or residual non-equilibrium drift.
 
-Uncertainty is estimated via block averaging (Flyvbjerg & Petersen,
-JCP 1989): the production window is split into blocks, K is computed
-independently for each block, and the SEM of the block estimates gives
-the uncertainty.
+Autocorrelation time τ_eff is estimated via batch-means plateau
+(Flyvbjerg & Petersen, JCP 1989).  Block sizes for uncertainty are
+set to ≥5×τ_eff to ensure near-independence.  Effective sample size
+N_eff = n_prod / (2 τ_eff) is reported.
 
 Output contract:
   - Prints a JSON summary to stdout as the last line.
@@ -26,7 +32,7 @@ Output contract:
   - Exit 0 on success, non-zero on failure (errors to stderr).
 
 Usage:
-    python extract_bulk_modulus.py --log_file /path/to/npt.log \
+    python extract_bulk_modulus.py --log_file /path/to/07_npt_production.log \
                                    --output_dir /path/to/bulk_analysis \
                                    --eq_fraction 0.5
 
@@ -34,6 +40,7 @@ References:
     Allen & Tildesley, Computer Simulation of Liquids, 2nd ed. (2017)
     Frenkel & Smit, Understanding Molecular Simulation, 2nd ed. (2002)
     Flyvbjerg & Petersen, J. Chem. Phys. 91, 461 (1989)
+    Wu, J. Phys. Chem. B 2020, 124, 10811
 """
 
 import argparse
@@ -44,6 +51,8 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from scipy import stats as sp_stats
+
+from analysis_utils import compute_tau_eff
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +100,36 @@ def parse_lammps_log(path):
     if not all_dfs:
         raise ValueError(f"No thermo data found in {path}")
     return pd.concat(all_dfs, ignore_index=True)
+
+
+# ---------------------------------------------------------------------------
+# Definition formula cross-check (B_def)
+# ---------------------------------------------------------------------------
+
+def compute_B_def(volumes, pressures):
+    """
+    Bulk modulus via definition formula: B_def = -(dP / d ln V)_T.
+    Uses linear regression of instantaneous P vs ln(V).
+    Wu, J. Phys. Chem. B 2020, 124, 10811, Eq. (4).
+
+    Args:
+        volumes:   array of instantaneous volumes (Å³)
+        pressures: array of instantaneous pressures (atm)
+
+    Returns:
+        B_def_GPa (float), r_squared (float), meta (dict)
+    """
+    lnV = np.log(volumes)
+    slope, intercept, r_val, p_val, se = sp_stats.linregress(lnV, pressures)
+    # slope has units atm (P vs dimensionless ln V); convert to GPa
+    B_def_GPa = float(-slope * 101325.0 * PA_TO_GPA)
+    return B_def_GPa, float(r_val ** 2), {
+        "slope_atm":   float(slope),
+        "intercept_atm": float(intercept),
+        "r_squared":   float(r_val ** 2),
+        "p_value":     float(p_val),
+        "n_points":    len(volumes),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +264,13 @@ def main():
     T_mean = float(np.mean(temperatures))
 
     # -------------------------------------------------------------------
-    # 3. Drift check on volume (warn if still equilibrating)
+    # 3. Autocorrelation time and effective sample size
+    # -------------------------------------------------------------------
+    tau_frames, tau_frac = compute_tau_eff(volumes)
+    n_eff = int(n_prod / max(1.0, 2.0 * tau_frames))
+
+    # -------------------------------------------------------------------
+    # 4. Drift check on volume (warn if still equilibrating)
     # -------------------------------------------------------------------
     x_idx = np.arange(n_prod, dtype=float)
     slope, intercept, r_val, p_val, se = sp_stats.linregress(x_idx, volumes)
@@ -235,7 +280,7 @@ def main():
     volume_equilibrated = not (drift_pct > 1.0 and p_val < 0.01)
 
     # -------------------------------------------------------------------
-    # 4. Compute bulk modulus (full production window)
+    # 5. Compute bulk modulus B_dyn (full production window)
     # -------------------------------------------------------------------
     K_GPa, K_atm, meta = compute_bulk_modulus(volumes, T_mean)
 
@@ -244,19 +289,21 @@ def main():
         sys.exit(0)
 
     # -------------------------------------------------------------------
-    # 5. Block-average uncertainty
+    # 6. Block-average uncertainty (τ_eff-aware block size)
     # -------------------------------------------------------------------
     block_count = args.block_count
-    bs = n_prod // block_count
+    # Blocks must be ≥5×τ_eff frames to ensure near-independence
+    min_block_size = max(20, int(5.0 * max(tau_frames, 1.0)))
+    actual_block_count = max(3, min(block_count, n_prod // min_block_size))
+    bs = n_prod // actual_block_count
     block_K_values = []
 
-    if bs >= 20:
-        for i in range(block_count):
-            block_vols = volumes[i * bs:(i + 1) * bs]
-            block_temps = temperatures[i * bs:(i + 1) * bs]
-            bK, _, _ = compute_bulk_modulus(block_vols, float(np.mean(block_temps)))
-            if bK is not None:
-                block_K_values.append(bK)
+    for i in range(actual_block_count):
+        block_vols = volumes[i * bs:(i + 1) * bs]
+        block_temps = temperatures[i * bs:(i + 1) * bs]
+        bK, _, _ = compute_bulk_modulus(block_vols, float(np.mean(block_temps)))
+        if bK is not None:
+            block_K_values.append(bK)
 
     if len(block_K_values) >= 3:
         K_block_mean = float(np.mean(block_K_values))
@@ -278,10 +325,26 @@ def main():
         }
 
     # -------------------------------------------------------------------
-    # 6. Additional diagnostics
+    # 7. Definition formula cross-check B_def (P vs ln V)
     # -------------------------------------------------------------------
     press_col = args.press_col
     density_col = args.density_col
+    B_def_result = None
+    if press_col in prod.columns:
+        pressures = prod[press_col].values
+        B_def_GPa_val, r2, bdef_meta = compute_B_def(volumes, pressures)
+        agreement_pct = (abs(K_GPa - B_def_GPa_val) / abs(K_GPa) * 100
+                         if abs(K_GPa) > 1e-6 else None)
+        B_def_result = {
+            "B_def_GPa": round(B_def_GPa_val, 4),
+            "r_squared": round(r2, 4),
+            "agreement_with_B_dyn_pct": round(agreement_pct, 2) if agreement_pct is not None else None,
+            **bdef_meta,
+        }
+
+    # -------------------------------------------------------------------
+    # 8. Additional diagnostics
+    # -------------------------------------------------------------------
 
     diagnostics = {
         "n_total_rows": n_total,
@@ -289,6 +352,11 @@ def main():
         "eq_fraction": args.eq_fraction,
         "T_mean_K": round(T_mean, 2),
         "T_std_K": round(float(np.std(temperatures)), 2),
+        "tau_eff_frames": round(tau_frames, 2),
+        "tau_eff_fraction": round(tau_frac, 6),
+        "n_effective_samples": n_eff,
+        "block_size_used": bs,
+        "block_count_used": actual_block_count,
     }
 
     if press_col in prod.columns:
@@ -304,7 +372,7 @@ def main():
     diagnostics["volume_equilibrated"] = volume_equilibrated
 
     # -------------------------------------------------------------------
-    # 7. Save outputs
+    # 9. Save outputs
     # -------------------------------------------------------------------
 
     # Volume time series CSV
@@ -329,16 +397,47 @@ def main():
         "isothermal_compressibility_per_Pa": meta["beta_T_per_Pa"],
         "V_mean_A3": round(meta["V_mean_A3"], 4),
         "V_std_A3": round(meta["V_std_A3"], 4),
+        "tau_eff_frames": round(tau_frames, 2),
+        "tau_eff_fraction": round(tau_frac, 6),
+        "n_effective_samples": n_eff,
+        "B_def": B_def_result,
         "block_averaging": block_info,
         "diagnostics": diagnostics,
         "volume_timeseries_csv": ts_csv,
+        "barostat_note": (
+            "B_dyn from NPT volume fluctuations is sensitive to barostat damping "
+            "(P_DAMP). Nosé-Hoover (LAMMPS fix npt) gives a correct NPT ensemble; "
+            "verify results are stable across P_DAMP values if reporting to high "
+            "precision. B_def (P vs ln V slope) is barostat-independent and is "
+            "provided as a cross-check (Wu, J. Phys. Chem. B 2020, 124, 10811). "
+            "Agreement within 20% gives confidence in B_dyn."
+        ),
     }
 
     if not volume_equilibrated:
-        result["warning"] = (
+        result["warning_drift"] = (
             f"Volume drift {drift_pct:.2f}% (p={p_val:.2e}) exceeds threshold. "
             "The simulation may not be fully equilibrated — consider using a "
             "larger eq_fraction or running longer."
+        )
+    if tau_frac > 0.1:
+        result["warning_autocorrelation"] = (
+            f"Volume autocorrelation time τ_eff ≈ {tau_frac * 100:.1f}% of "
+            f"trajectory (N_eff = {n_eff}). Block sizes adjusted. "
+            "Consider a longer NPT production run for improved statistics."
+        )
+    if n_eff < 50:
+        result["warning_low_neff"] = (
+            f"Only {n_eff} effectively independent volume samples. "
+            "B_dyn uncertainty may be underestimated. Extend 07_npt_production."
+        )
+    if (B_def_result is not None
+            and B_def_result.get("agreement_with_B_dyn_pct") is not None
+            and B_def_result["agreement_with_B_dyn_pct"] > 20.0):
+        result["warning_method_disagreement"] = (
+            f"B_dyn ({K_GPa:.3f} GPa) and B_def ({B_def_result['B_def_GPa']:.3f} GPa) "
+            f"disagree by {B_def_result['agreement_with_B_dyn_pct']:.1f}%. "
+            "Possible barostat artefact or insufficient equilibration — see Wu 2020."
         )
 
     summary_path = str(output_dir / "bulk_modulus.json")

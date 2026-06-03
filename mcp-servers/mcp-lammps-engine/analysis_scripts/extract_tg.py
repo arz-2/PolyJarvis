@@ -3,8 +3,8 @@
 extract_tg.py — Extract glass transition temperature (Tg) from a LAMMPS
 temperature-sweep log file.
 
-Methodology (v3 — March 2026):
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Methodology (v4 — May 2026):
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Data preparation:
   1. Parse LAMMPS log file into a DataFrame of thermo rows.
   2. Detect temperature plateaus via jump detection (|ΔT| > 15 K
@@ -16,8 +16,12 @@ Data preparation:
   5. Also produce standard 5 K bins as a secondary output.
 
 Fitting:
-  Primary — exhaustive F-statistic split (deterministic, guess-free).
-  Secondary — scipy curve_fit bilinear (for cross-validation).
+  Bilinear intersection via scipy curve_fit — the standard method used
+  in polymer MD literature (Afzal 2021, Hayashi/RadonPy 2022, Klajmon
+  2023, NkepsuMbitou 2025).  Two OLS lines are simultaneously fit to the
+  glassy and rubbery regions; Tg is their intersection.  Physics
+  constraints (both slopes negative, rubbery steeper) are enforced via
+  bounds.  Quality is assessed by the overall bilinear R².
 
 Output contract:
   - Prints a JSON summary to stdout as the last line.
@@ -25,8 +29,9 @@ Output contract:
   - Exit 0 on success, non-zero on failure (errors to stderr).
 
 References:
+  Afzal et al., ACS Appl. Polym. Mater. 3 (2021) 6213–6228
+  Hayashi et al., npj Comput. Mater. 8 (2022) 222
   Patrone et al., Polymer 87 (2016) 246–259
-  Suter et al., JCTC 21 (2025) 1405–1421
 
 Usage:
     python extract_tg.py --log_file /path/to/log.lammps \
@@ -93,74 +98,6 @@ def parse_lammps_log(path):
 # ---------------------------------------------------------------------------
 # Fitting methods
 # ---------------------------------------------------------------------------
-
-def fstat_split_tg(T, rho, min_pts=3):
-    """Find optimal two-line split by maximising the F-statistic
-    of the two-line model vs a single-line model."""
-    idx = np.argsort(T)
-    T = T[idx]
-    rho = rho[idx]
-    N = len(T)
-
-    if N < 2 * min_pts:
-        return None, f"Need {2*min_pts} points, have {N}"
-
-    # Single-line (null) model
-    p_single = np.polyfit(T, rho, 1)
-    ssr_null = np.sum((rho - (p_single[0]*T + p_single[1]))**2)
-
-    best_fstat = -np.inf
-    best = None
-
-    for i in range(min_pts, N - min_pts + 1):
-        p_lo = np.polyfit(T[:i], rho[:i], 1)
-        p_hi = np.polyfit(T[i:], rho[i:], 1)
-        a1, b1 = p_lo[0], p_lo[1]   # glassy
-        a2, b2 = p_hi[0], p_hi[1]   # rubbery
-
-        # Physics constraints
-        if a1 > 0 or a2 > 0:
-            continue
-        if a2 >= a1:        # rubbery must be steeper (more negative)
-            continue
-        if abs(a1 - a2) < 1e-15:
-            continue
-
-        Tg_int = (b2 - b1) / (a1 - a2)
-        if Tg_int < T[0] or Tg_int > T[-1]:
-            continue
-
-        pred = np.concatenate([a1*T[:i]+b1, a2*T[i:]+b2])
-        ssr_alt = np.sum((rho - pred)**2)
-
-        df_resid = N - 4
-        if df_resid <= 0 or ssr_alt <= 0:
-            continue
-
-        fstat = ((ssr_null - ssr_alt) / 2.0) / (ssr_alt / df_resid)
-        if fstat > best_fstat:
-            best_fstat = fstat
-            ss_tot = np.sum((rho - np.mean(rho))**2)
-            r2 = 1 - ssr_alt / ss_tot if ss_tot > 0 else 0
-
-            best = {
-                "Tg_K":        float(Tg_int),
-                "split_temp":  float(T[i]),
-                "a_glassy":    float(a1),
-                "b_glassy":    float(b1),
-                "a_rubbery":   float(a2),
-                "b_rubbery":   float(b2),
-                "r_squared":   float(r2),
-                "f_statistic": float(fstat),
-                "n_bins":      N,
-                "n_low":       i,
-                "n_high":      N - i,
-            }
-
-    if best is None:
-        return None, "No valid split found (all splits failed physics constraints)"
-    return best, None
-
 
 def bilinear_indep(T, a1, b1, a2, b2, Tg):
     return np.where(T < Tg, a1 * T + b1, a2 * T + b2)
@@ -313,15 +250,26 @@ def main():
         if len(eq_rhos) < 3:
             continue
 
-        # Equilibration drift check
+        # Equilibration drift check.
+        # The 1% total-drift magnitude is the operative criterion.  The p-value is a
+        # secondary guard to avoid dropping noisy-but-flat short series; it is NOT a
+        # reliable significance test here because linregress assumes i.i.d. residuals
+        # while MD thermo is autocorrelated (n_eff << n), making p systematically small.
+        # For >=20 rows: dual gate (magnitude AND p < 0.01) — p provides marginal value.
+        # For 3-19 rows: magnitude-only — at this sample size OLS SE is dominated by
+        # noise and p is effectively unconstrained; magnitude alone is more honest.
         equilibrated = True
-        if len(eq_rhos) >= 20:
+        if len(eq_rhos) >= 3:
             x_idx = np.arange(len(eq_rhos), dtype=float)
-            slope, intercept, r_val, p_val, se = stats.linregress(x_idx, eq_rhos)
+            slope, _, _, p_val, _ = stats.linregress(x_idx, eq_rhos)
             total_drift = abs(slope * len(eq_rhos))
             mean_rho = np.mean(eq_rhos)
             drift_pct = total_drift / abs(mean_rho) * 100 if abs(mean_rho) > 1e-10 else 0
-            if drift_pct > 1.0 and p_val < 0.01:
+            if len(eq_rhos) >= 20:
+                failed = drift_pct > 1.0 and p_val < 0.01
+            else:
+                failed = drift_pct > 1.0
+            if failed:
                 equilibrated = False
                 n_plateaus_skipped += 1
 
@@ -381,55 +329,47 @@ def main():
     densities = df_bins["mean_density"].values
 
     # -------------------------------------------------------------------
-    # 3. PRIMARY: Exhaustive F-statistic split
-    # -------------------------------------------------------------------
-    primary_result, primary_err = fstat_split_tg(temps, densities)
-
-    # -------------------------------------------------------------------
-    # 3b. SECONDARY: scipy curve_fit bilinear
+    # 3. PRIMARY: bilinear curve_fit (standard polymer MD literature method)
     # -------------------------------------------------------------------
     cf_result = curvefit_bilinear(temps, densities, tg_hint=initial_tg_guess)
 
     # -------------------------------------------------------------------
     # 4. Assemble final result
     # -------------------------------------------------------------------
-    if primary_result:
-        Tg_primary = primary_result["Tg_K"]
-        r2_primary = primary_result["r_squared"]
-    elif cf_result:
-        Tg_primary = cf_result["Tg_alt_K"]
+    if cf_result:
+        Tg_primary = cf_result["Tg_K"]
         r2_primary = cf_result["r_squared"]
     else:
         print(json.dumps({"status": "failed",
-                           "error": primary_err or "All fitting methods failed"}))
+                           "error": "Bilinear curve_fit failed — check temperature range and data quality"}))
         sys.exit(0)
 
-    # Quality rating
-    fit_quality_r2 = (
-        "EXCELLENT" if r2_primary >= 0.995 else
-        "GOOD"      if r2_primary >= 0.98 else
-        "ACCEPTABLE" if r2_primary >= 0.95 else
+    # Quality rating based on bilinear R²
+    fit_quality = (
+        "EXCELLENT"  if r2_primary >= 0.995 else
+        "GOOD"       if r2_primary >= 0.98  else
+        "ACCEPTABLE" if r2_primary >= 0.95  else
         "POOR"
     )
 
-    fstat_val = primary_result["f_statistic"] if primary_result else None
-    n_bins_fit = int(len(temps))
-    if fstat_val is not None and n_bins_fit > 4:
-        from scipy.stats import f as f_dist
-        p_fstat = 1 - f_dist.cdf(fstat_val, 2, n_bins_fit - 4)
-        fit_quality_fstat = (
-            "EXCELLENT" if p_fstat < 1e-10 else
-            "GOOD"      if p_fstat < 1e-5 else
-            "ACCEPTABLE" if p_fstat < 0.01 else
-            "POOR"
+    # Post-fit slope sanity checks (physics constraints not enforced by bounds)
+    a_g = cf_result["a_glassy"]
+    a_r = cf_result["a_rubbery"]
+    slope_signs_valid    = (a_g < 0 and a_r < 0)
+    slope_ordering_valid = (a_r < a_g)   # rubbery must be steeper (more negative)
+    fit_warnings = []
+    if not slope_signs_valid:
+        fit_quality = "POOR"
+        fit_warnings.append(
+            f"slope_sign_invalid: a_glassy={a_g:.4e}, a_rubbery={a_r:.4e} "
+            "(both must be negative — density decreases with T)"
         )
-    else:
-        p_fstat = None
-        fit_quality_fstat = fit_quality_r2
-
-    rank = {"EXCELLENT": 3, "GOOD": 2, "ACCEPTABLE": 1, "POOR": 0}
-    fit_quality = min([fit_quality_r2, fit_quality_fstat],
-                      key=lambda q: rank.get(q, 0))
+    if not slope_ordering_valid:
+        fit_quality = "POOR"
+        fit_warnings.append(
+            f"slope_ordering_invalid: a_rubbery={a_r:.4e} not steeper than "
+            f"a_glassy={a_g:.4e} (rubbery expansion coefficient should exceed glassy)"
+        )
 
     # -------------------------------------------------------------------
     # 5. Save outputs
@@ -448,21 +388,16 @@ def main():
         "log_file":            log_file,
         "output_dir":          str(output_dir),
         "Tg_K":                round(Tg_primary, 1),
-        "Tg_alternative_K":    round(cf_result["Tg_alt_K"], 1) if cf_result else None,
-        "Tg_curvefit_K":       round(cf_result["Tg_K"], 1) if cf_result else None,
+        "Tg_alternative_K":    round(cf_result["Tg_alt_K"], 1),
         "r_squared":           round(r2_primary, 4),
         "fit_quality":         fit_quality,
-        "fit_quality_r2":      fit_quality_r2,
-        "fit_quality_fstat":   fit_quality_fstat,
-        "f_statistic":         primary_result["f_statistic"] if primary_result else None,
-        "f_statistic_pvalue":  float(p_fstat) if p_fstat is not None else None,
-        "fit_method":          "F-stat exhaustive split" if primary_result else "curve_fit fallback",
+        "fit_method":          "bilinear_curvefit",
         "binning_method":      binning_method,
         "fit_params": {
-            "a_glassy":  primary_result["a_glassy"] if primary_result else (cf_result["a_glassy"] if cf_result else None),
-            "b_glassy":  primary_result["b_glassy"] if primary_result else (cf_result["b_glassy"] if cf_result else None),
-            "a_rubbery": primary_result["a_rubbery"] if primary_result else (cf_result["a_rubbery"] if cf_result else None),
-            "b_rubbery": primary_result["b_rubbery"] if primary_result else (cf_result["b_rubbery"] if cf_result else None),
+            "a_glassy":  cf_result["a_glassy"],
+            "b_glassy":  cf_result["b_glassy"],
+            "a_rubbery": cf_result["a_rubbery"],
+            "b_rubbery": cf_result["b_rubbery"],
         },
         "n_temperature_bins":       int(len(temps)),
         "n_plateau_bins":           int(len(df_bins_plateau)) if df_bins_plateau is not None else 0,
@@ -473,6 +408,9 @@ def main():
         "equilibration_fraction":   equilibration_fraction,
         "temp_col":                 temp_col,
         "density_col":              density_col,
+        "slope_signs_valid":        slope_signs_valid,
+        "slope_ordering_valid":     slope_ordering_valid,
+        "fit_warnings":             fit_warnings,
     }
 
     summary_json = str(output_dir / "tg_summary.json")

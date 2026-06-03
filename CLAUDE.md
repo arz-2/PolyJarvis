@@ -14,7 +14,7 @@ Read `guides/STAGE_INDEX.md` first on every task.
 | `guides/polymer_rules.json` | Per-class Tg ranges, density targets, DP defaults, annealing cycles |
 | `data/TEMPLATE/run_log.md` | Run log template — copy to `data/[RUN]/run_log.md` at task start |
 | `data/[RUN]/` | One directory per simulation run |
-| `emc_pipeline.py` | EMC cell builder (PCBN, PAMD, PKTN, PSFO, PIMD, PHAL, PHYC, PDIE, PSTR) |
+| `emc_pipeline.py` | EMC cell builder — 19 classes (PCFF: 15 classes; OPLS-AA: PHAL; TraPPE-UA: PHYC/PDIE/PSTR). RadonPy only: PSIL, PURA. |
 
 ---
 
@@ -34,7 +34,7 @@ The default mode is multi-agent. The orchestrator (this session) spawns speciali
 |---|---|
 | `classify_polymer` + `polymer_rules.json` lookup | `molecule-builder` |
 | `molecule-builder` returns `data_path` | `equilibration-worker` → then Monitor |
-| Monitor returns (equilibration done) | `check_equilibration` → if PASS, spawn `tg-sweep-worker` |
+| Monitor returns (equilibration done) | `check_equilibration_comprehensive` → if PASS, spawn `tg-sweep-worker` |
 | Monitor returns (Tg sweep done) | `analysis-worker(tasks=[...])` |
 
 ### Orchestrator workflow
@@ -50,7 +50,7 @@ The default mode is multi-agent. The orchestrator (this session) spawns speciali
 6. Write SIMULATION STATE to run_log.md (status=monitoring)
 7. Monitor(command=monitor_command)          # orchestrator owns this
 8. get_run_status(chain_id) → check success/failure
-9. check_equilibration(equil_log) → PASS / EXTEND / ESCALATE
+9. check_equilibration_comprehensive(equil_log, dump, data, backbone_types) → PASS / EXTEND / ESCALATE
 10. Agent(subagent_type="tg-sweep-worker", prompt=<equil_data_path + tg_params>)
       → parse RESULT block → extract run_id, monitor_command
 11. Write SIMULATION STATE to run_log.md (status=monitoring)
@@ -62,8 +62,8 @@ The default mode is multi-agent. The orchestrator (this session) spawns speciali
 ### Analysis tasks construction
 
 Build the `tasks` list from `polymer_rules.json` defaults plus any user-requested extras:
-- Always include: `check_equilibration`, `extract_tg`, `extract_density`, `extract_bulk_modulus`, `check_equilibration_extended`
-- Add per user request: `calculate_rdf`, `calculate_msd`, `extract_radius_of_gyration`, `extract_end_to_end_vectors`
+- Always include: `check_equilibration_comprehensive`, `extract_tg`, `extract_density`, `extract_bulk_modulus`
+- Add per user request: `calculate_rdf`, `extract_end_to_end_vectors`
 - For one-off non-standard requests (NEMD, literature search), handle inline — do not spawn a custom worker.
 
 ### Checkpoint protocol

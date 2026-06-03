@@ -164,9 +164,24 @@ job_manager = JobManager()
 # Field selection
 # ---------------------------------------------------------------------------
 
-_PCFF_CLASSES   = {"PCBN", "PAMD", "PKTN", "PSFO", "PIMD"}
+_PCFF_CLASSES   = {
+    # Original engineering thermoplastics
+    "PCBN", "PAMD", "PKTN", "PSFO", "PIMD",
+    # Expanded: build-tested 2026-05-31 — pcff.frc has explicit types for all
+    "POXI",  # polyethers/polyoxides (PEO, PPO)
+    "PEST",  # polyesters (PLA, PET, PCL)
+    "PSUL",  # polythioethers/polysulfides (PPS)
+    "PURT",  # polyurethanes — aliphatic only; aromatic MDI-type SMILES fail {o, c_2}
+    "PANH",  # polyanhydrides
+    "PPHS",  # polyphosphazenes — ethoxy/alkoxy substituents tested; Cl-substituted untested
+    "PACR",  # polyacrylics (PMMA, PMA) — pcff preferred over opls-aa (Class II vs I)
+    "PIMN",  # polyamines/polyetherimides (PEI, linear amines)
+    "PVNL",  # polyvinyls (PVC, PVAc, PVA) — tested with PVC+PVAc+PVA
+    "PPNL",  # conjugated/polyphenylene (PPV, MEH-PPV)
+}
 _OPLS_CLASSES   = {"PHAL"}
 _TRAPPE_CLASSES = {"PHYC", "PDIE", "PSTR"}  # PSTR: cac/cah aromatic UA types; see EMC t_glass example
+# PSIL (PDMS) and PURA (polyurea): EMC build fails on both pcff and opls-aa — remain on RadonPy
 
 def _select_field(polymer_class: str) -> str:
     if polymer_class in _PCFF_CLASSES:
@@ -251,18 +266,38 @@ def _build_emc_cell(
 mcp = FastMCP(
     "EMC",
     instructions="""
-    EMC MCP Server — amorphous cell builder for Track C (PCFF) and PHAL (OPLS-AA) polymers.
+    EMC MCP Server — amorphous cell builder for 19 polymer classes.
+    Uses PCFF (Class II), OPLS-AA, or TraPPE-UA depending on class.
+    Two classes remain on RadonPy: PSIL (Si-O backbone, EMC fails) and PURA (urea N-H, EMC fails).
 
-    SUPPORTED CLASSES (route here instead of RadonPy for these):
-      PCBN  Polycarbonates     (e.g. BPA-PC)            → pcff
-      PAMD  Polyamides         (e.g. Nylon-6, Nylon-6,6) → pcff
-      PKTN  Polyketones/PEEK   (e.g. PEEK, PEK)         → pcff
-      PSFO  Polysulfones       (e.g. PSU/Udel, PES)     → pcff
-      PIMD  Polyimides         (e.g. PMDA-ODA/Kapton)   → pcff
-      PHAL  Polyhalogenated    (e.g. PTFE, PVDF, PCTFE) → opls/2024/opls-aa
-      PHYC  Polyhydrocarbons   (e.g. PE, PP, PIB)       → trappe-ua
-      PDIE  Polydienes         (e.g. PB, PI)            → trappe-ua
-      PSTR  Polystrenic        (e.g. PS, P2VP, SAN)     → trappe-ua
+    SUPPORTED CLASSES → pcff (Class II, best thermomechanical accuracy):
+      PCBN  Polycarbonates       (e.g. BPA-PC)
+      PAMD  Polyamides           (e.g. Nylon-6, Nylon-6,6)
+      PKTN  Polyketones/PEEK     (e.g. PEEK, PEK)
+      PSFO  Polysulfones         (e.g. PSU/Udel, PES)
+      PIMD  Polyimides           (e.g. PMDA-ODA/Kapton)
+      POXI  Polyethers/oxides    (e.g. PEO, PPO, POM)
+      PEST  Polyesters           (e.g. PLA, PET, PCL)
+      PSUL  Polythioethers       (e.g. PPS)
+      PURT  Polyurethanes        (e.g. TPU) ⚠ aliphatic segments only; aromatic MDI fails
+      PANH  Polyanhydrides       (e.g. poly(sebacic anhydride))
+      PPHS  Polyphosphazenes     (e.g. poly(ethoxyphosphazene)) ⚠ alkoxy substituents tested
+      PACR  Polyacrylics         (e.g. PMMA, PMA, PAA)
+      PIMN  Polyamines/etherimides (e.g. PEI, linear poly(ethylenimine))
+      PVNL  Polyvinyls           (e.g. PVC, PVAc, PVA)
+      PPNL  Conjugated/PPV       (e.g. PPV, MEH-PPV)
+
+    SUPPORTED CLASSES → opls/2024/opls-aa:
+      PHAL  Polyhalogenated      (e.g. PTFE, PVDF, PCTFE)
+
+    SUPPORTED CLASSES → trappe-ua:
+      PHYC  Polyhydrocarbons     (e.g. PE, PP, PIB)
+      PDIE  Polydienes           (e.g. PBD, PI)
+      PSTR  Polystyrenics        (e.g. PS, P2VP, SAN)
+
+    RadonPy only (EMC build fails):
+      PSIL  Polysiloxanes        (e.g. PDMS) — pcff missing {si,osi} increment
+      PURA  Polyureas            — pcff missing {n_2,hn} increment
 
     The field is selected automatically from polymer_class — do not override it.
 
@@ -299,8 +334,9 @@ def submit_emc_cell_job(
     Build an amorphous polymer cell with EMC and return a LAMMPS .data file.
 
     The force field is selected automatically from polymer_class:
-        PCBN / PAMD / PKTN / PSFO / PIMD  →  pcff
-        PHAL                               →  opls/2024/opls-aa
+        PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL  →  pcff
+        PHAL                                                                            →  opls/2024/opls-aa
+        PHYC/PDIE/PSTR                                                                  →  trappe-ua
 
     Runs emc_setup.pl + EMC binary in a background thread; returns job_id
     immediately. Poll get_emc_job_status() then call get_emc_job_output() for
@@ -310,8 +346,9 @@ def submit_emc_cell_job(
         smiles:          Repeat-unit SMILES with exactly two * connection points.
                          For polycarbonates include the full -O-C(=O)-O- carbonate
                          in the repeat unit and put * on aromatic carbons.
-        polymer_class:   PoLyInfo class name (PCBN / PAMD / PKTN / PSFO / PIMD / PHAL / PHYC / PDIE).
-                         Determines force field; required.
+        polymer_class:   PolyInfo class name — determines force field; required.
+                         PCFF: PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL
+                         OPLS-AA: PHAL.  TraPPE-UA: PHYC/PDIE/PSTR.
         dp:              Degree of polymerization (repeat units per chain). [20]
         nchains:         Number of polymer chains (informational — EMC determines
                          actual chain count from ntotal and dp). [10]

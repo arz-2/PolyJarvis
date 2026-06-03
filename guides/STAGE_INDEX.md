@@ -41,12 +41,21 @@ Read THIS file first. If you are a **worker agent**, identify your stage and rea
 SMILES
   └─ [Stage 1] classify_polymer()
        │
-       ├─ PCBN/PAMD/PKTN/PSFO/PIMD  →  EMC (pcff)
-       ├─ PHAL                       →  EMC (opls/2024/opls-aa)
-       ├─ PHYC/PDIE/PSTR             →  EMC (trappe-ua)
-       │    └─ submit_emc_cell_job() → poll → data_path + lammps_flags
+       ├─ EMC (pcff — 15 classes):
+       │    PCBN PAMD PKTN PSFO PIMD   ← original engineering thermoplastics
+       │    POXI PEST PSUL PURT PANH   ← expanded 2026-05-31 (build-tested)
+       │    PPHS PACR PIMN PVNL PPNL   ← expanded 2026-05-31 (build-tested)
+       │    ⚠ PURT: aliphatic only (aromatic MDI fails)
+       │    ⚠ PPHS: alkoxy substituents tested (Cl-substituted untested)
        │
-       └─ all other classes          →  RadonPy (GAFF2_mod + QM charges)
+       ├─ EMC (opls/2024/opls-aa): PHAL
+       │
+       ├─ EMC (trappe-ua): PHYC PDIE PSTR
+       │
+       │    └─ all EMC paths: submit_emc_cell_job() → poll → data_path + lammps_flags
+       │
+       └─ RadonPy (GAFF2_mod + QM charges): PSIL PURA only
+            (EMC build fails: PSIL missing {si,osi}; PURA missing {n_2,hn})
             └─ build monomer → charges → polymerize → FF → cell → save_lammps_data()
                  (copolymers: alternating / random / block)
                  (blends: mixture_cell from multiple FF-assigned chains)
@@ -62,7 +71,8 @@ SMILES
 
 All 21 polymer classes returned by `classify_polymer()` are routed. Key edge cases:
 
-- **Semicrystalline polymers (PHAL/PVDF, PHYC/PE):** Amorphous cells are built; if `check_orientation_order` returns high order parameter, flag Tg as ⚠ in RESULTS.
+- **Semicrystalline polymers (PHAL/PVDF, PHYC/PE, PEST/PLA):** Amorphous cells are built; if `check_equilibration_comprehensive` reports `spatial.p2.ordered_flag=True`, flag Tg as ⚠ in RESULTS.
+- **EMC routing (19 of 21 classes):** preferred_builder in polymer_rules.json is authoritative. PSIL and PURA are the only RadonPy-only classes (EMC build fails for both). All other classes use EMC.
 - **UNKNOWN class (class_id=0):** Fix SMILES (`*` attachment points missing or malformed) and retry — not a pipeline failure.
 - **Low-confidence classes (PPHS, PSIL, PPNL, PIMN):** `classify_polymer` emits a warning; record it in D-01 rationale.
 
@@ -76,9 +86,9 @@ Density drift is measured from the NPT log. For deeply glassy systems (Kapton, P
 
 | Verdict | Condition | Action |
 |---|---|---|
-| **PASS** | Density drift < 1% over last 500 ps NPT; energy stable | Proceed to Stage 3 |
-| **EXTEND** | Drift 1–3% | `check_equilibration_extended`; extend 1 ns; max 2 extensions |
-| **ESCALATE** | Drift > 3% after 2 extensions | Restart compress with `density_initial` − 0.05 g/cm³ |
+| **PASS** | `check_equilibration_comprehensive` returns `overall_pass=True` | Proceed to Stage 3 |
+| **EXTEND** | Any hard gate fails; drift 1–3% | Extend final NPT by 1 ns; re-run check; max 2 extensions |
+| **ESCALATE** | Hard gates still failing after 2 extensions | Restart compress with `density_initial` − 0.05 g/cm³ |
 
 ### Tg sweep thresholds (Stage 3)
 
@@ -92,7 +102,7 @@ Density drift is measured from the NPT log. For deeply glassy systems (Kapton, P
 ### Common recovery actions
 
 1. **`extract_tg` "fewer than 4 bins"** → Widen T_START +50 K and T_END −50 K; re-run sweep.
-2. **EXTEND loop exhausted** → `check_equilibration_extended`; if density ≥ 110% of experimental RT value, restart compress with lower `density_initial`.
+2. **EXTEND loop exhausted** → re-run `check_equilibration_comprehensive`; if density ≥ 110% of experimental RT value, restart compress with lower `density_initial`.
 3. **EMC "missing FF parameters"** → Verify SMILES has exactly two `*` atoms; try `dp=15` if `dp=20` fails.
 4. **`run_lammps_chain` crash** → `get_run_output(run_id)` to read last error; diagnose with table below.
 

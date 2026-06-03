@@ -23,6 +23,12 @@ import numpy as np
 import MDAnalysis as mda
 from MDAnalysis.analysis.rdf import InterRDF
 
+sys.path.insert(0, str(Path(__file__).parent))
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from plot_style import apply_style, save_fig
+
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 
 
@@ -42,6 +48,24 @@ def parse_args():
     p.add_argument("--atom_style", type=str, default="id resid type charge x y z",
                    help="LAMMPS atom_style column order for the data file")
     return p.parse_args()
+
+
+def _plot_rdf_all_pairs(rdf_data, output_dir):
+    # rdf_data: dict of {pair_label: (bins_array, gr_array)}
+    if not rdf_data:
+        return
+    apply_style()
+    colors = plt.cm.tab10.colors
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for i, (pair, (bins, gr)) in enumerate(rdf_data.items()):
+        ax.plot(bins, gr, color=colors[i % len(colors)], label=pair)
+    ax.axhline(1.0, color='k', ls='--', lw=0.8, alpha=0.5)
+    ax.set_xlabel('r (Å)')
+    ax.set_ylabel('g(r)')
+    ax.set_title('Radial distribution functions')
+    ncol = min(3, max(1, (len(rdf_data) + 4) // 5))
+    ax.legend(loc='upper right', ncol=ncol, fontsize=9)
+    save_fig(fig, str(Path(output_dir) / 'figures' / 'rdf_all_pairs.png'))
 
 
 def main():
@@ -85,6 +109,7 @@ def main():
 
     # Compute RDF for each pair
     rdf_files = {}
+    rdf_memory = {}   # {pair_label: (bins, gr)} — kept in memory for plotting
     pairs_computed = []
 
     for t1, t2 in pairs:
@@ -119,6 +144,7 @@ def main():
         import pandas as pd
         pd.DataFrame({"r": bins, "g_r": gr}).to_csv(fname, index=False)
         rdf_files[f"{s1}-{s2}"] = fname
+        rdf_memory[f"{s1}-{s2}"] = (bins, gr)
         pairs_computed.append(f"{s1}-{s2}")
         print(f"  Wrote {fname}", flush=True)
 
@@ -136,6 +162,14 @@ def main():
         "method": "MDAnalysis.analysis.rdf.InterRDF",
         "mdanalysis_version": mda.__version__,
     }
+
+    rdf_fig_png = str(output_dir / "figures" / "rdf_all_pairs.png")
+    try:
+        _plot_rdf_all_pairs(rdf_memory, output_dir)
+    except Exception as _pe:
+        print(f"  WARNING: rdf_all_pairs plot failed: {_pe}", flush=True)
+        rdf_fig_png = None
+    summary["rdf_all_pairs_png"] = rdf_fig_png
 
     json_path = str(output_dir / "rdf_summary.json")
     with open(json_path, "w") as jf:

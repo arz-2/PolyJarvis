@@ -33,6 +33,12 @@ import pandas as pd
 from pathlib import Path
 from scipy import stats as sp_stats
 
+sys.path.insert(0, str(Path(__file__).parent))
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from plot_style import apply_style, save_fig
+
 
 # ---------------------------------------------------------------------------
 # LAMMPS log parser
@@ -121,6 +127,34 @@ def analyse(values, name, drift_threshold_pct, drift_pvalue, block_count):
 
     res["equilibrated"] = bool(d_pass and b_pass)
     return res
+
+
+# ---------------------------------------------------------------------------
+# Plot
+# ---------------------------------------------------------------------------
+
+def _plot_equilibration_convergence(prod, density_col, energy_col, equilibrated, output_dir):
+    apply_style()
+    steps = prod['Step'].values if 'Step' in prod.columns else np.arange(len(prod))
+    fig, ax1 = plt.subplots()
+    if density_col in prod.columns:
+        rho = prod[density_col].values
+        ax1.plot(steps, rho, color='steelblue', lw=0.8, alpha=0.8, label='Density')
+        ax1.set_ylabel('Density (g/cm³)', color='steelblue')
+        ax1.tick_params(axis='y', colors='steelblue')
+    ax1.set_xlabel('Step')
+    ax2 = ax1.twinx()
+    if energy_col in prod.columns:
+        eng = prod[energy_col].values
+        ax2.plot(steps, eng, color='firebrick', lw=0.8, alpha=0.8, label='Energy')
+        ax2.set_ylabel('Total Energy (kcal/mol)', color='firebrick')
+        ax2.tick_params(axis='y', colors='firebrick')
+    verdict = 'PASS' if equilibrated else 'FAIL'
+    ax1.set_title(f'Equilibration convergence — {verdict}')
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+    save_fig(fig, str(Path(output_dir) / 'figures' / 'equilibration_convergence.png'))
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +250,15 @@ def main():
         "density": results.get("density"),
         "energy": results.get("energy"),
     }
+
+    eq_fig_png = str(output_dir / "figures" / "equilibration_convergence.png")
+    try:
+        _plot_equilibration_convergence(prod, args.density_col, args.energy_col,
+                                        bool(density_ok and energy_ok), output_dir)
+    except Exception as _pe:
+        print(f"  WARNING: equilibration_convergence plot failed: {_pe}", flush=True)
+        eq_fig_png = None
+    output["equilibration_convergence_png"] = eq_fig_png
 
     summary_path = str(output_dir / "equilibration_check.json")
     with open(summary_path, "w") as jf:

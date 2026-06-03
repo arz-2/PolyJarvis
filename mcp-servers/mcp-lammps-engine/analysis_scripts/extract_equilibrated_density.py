@@ -30,6 +30,9 @@ import sys
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from scipy import stats as sp_stats
+
+from analysis_utils import compute_tau_eff
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +182,32 @@ def main():
     plateau_std = float(np.std(plateau_rho, ddof=1))
     plateau_sem = plateau_std / np.sqrt(n_plateau)
 
+    # τ_eff and effective sample size
+    tau_frames, tau_frac = compute_tau_eff(plateau_rho)
+    n_eff = int(n_plateau / max(1.0, 2.0 * tau_frames))
+
+    # τ_eff-aware block-SEM
+    min_block_size = max(5, int(5.0 * max(tau_frames, 1.0)))
+    n_blocks = max(3, min(10, n_plateau // min_block_size))
+    bs_block = n_plateau // n_blocks
+    block_means = [float(np.mean(plateau_rho[i * bs_block:(i + 1) * bs_block]))
+                   for i in range(n_blocks)]
+    block_sem = (float(np.std(block_means, ddof=1) / np.sqrt(n_blocks))
+                 if len(block_means) >= 3 else None)
+
+    # Drift slope + p-value on the plateau window.
+    # The 1% total-drift magnitude is the operative criterion.  The p-value is a
+    # secondary guard but is NOT a reliable significance test: linregress assumes
+    # i.i.d. residuals, while MD thermo is autocorrelated — tau_eff (computed above)
+    # means n_eff = n/(2*tau_eff) << n, so the OLS SE is understated and p is
+    # systematically too small.  In practice p almost always satisfies p < 0.01 for
+    # correlated series, so the gate reduces to the magnitude floor.
+    x_idx = np.arange(n_plateau, dtype=float)
+    drift_slope, _, _, drift_p_value, _ = sp_stats.linregress(x_idx, plateau_rho)
+    total_drift = abs(drift_slope * n_plateau)
+    drift_pct = (total_drift / abs(plateau_mean) * 100) if abs(plateau_mean) > 1e-12 else 0.0
+    plateau_equilibrated = not (drift_pct > 1.0 and drift_p_value < 0.01)
+
     # Rolling-derivative cross-check
     win = max(5, int(n_prod * 0.2))
     if n_prod >= win:
@@ -204,6 +233,14 @@ def main():
         "naive_mean":              round(float(np.mean(rho)), 6),
         "naive_std":               round(float(np.std(rho, ddof=1)), 6),
         "rolling_mean_abs_deriv":  round(mean_abs_deriv, 8) if mean_abs_deriv is not None else None,
+        "tau_eff_frames":          round(tau_frames, 2),
+        "tau_eff_fraction":        round(tau_frac, 6),
+        "n_effective_samples":     n_eff,
+        "block_sem_density":       round(block_sem, 8) if block_sem is not None else None,
+        "drift_slope":             round(float(drift_slope), 10),
+        "drift_pct":               round(drift_pct, 4),
+        "drift_p_value":           float(drift_p_value),
+        "plateau_equilibrated":    plateau_equilibrated,
     }
 
     if args.target_temp is not None:

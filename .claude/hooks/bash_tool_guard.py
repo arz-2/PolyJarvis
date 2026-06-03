@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""
+PreToolUse hook — warn when bash is used for operations covered by mcp-lammps-engine.
+Reads the tool call from stdin (JSON), prints a warning if a covered script or direct
+lammps invocation is detected, then exits 0 (warn-only, never blocks).
+"""
+import sys
+import json
+import re
+
+try:
+    data = json.load(sys.stdin)
+    cmd = data.get("tool_input", {}).get("command", "")
+except Exception:
+    sys.exit(0)
+
+SCRIPT_TO_TOOL = [
+    ("mda_rdf.py",                      "calculate_rdf"),
+    ("mda_end_to_end.py",               "extract_end_to_end_vectors"),
+    ("mda_msd.py",                      "calculate_msd"),
+    ("mda_radius_of_gyration.py",       "extract_radius_of_gyration"),
+    ("mda_orientation_order.py",        "check_orientation_order"),
+    ("mda_density_homogeneity.py",      "check_density_homogeneity"),
+    ("check_equilibration.py",          "check_equilibration_comprehensive"),
+    ("extract_tg.py",                   "extract_tg"),
+    ("extract_bulk_modulus.py",         "extract_bulk_modulus"),
+    ("extract_equilibrated_density.py", "extract_equilibrated_density"),
+    ("unwrap_dump.py",                  "unwrap_coordinates"),
+]
+
+for script, tool in SCRIPT_TO_TOOL:
+    if script in cmd:
+        print(
+            f"TOOL GUARD: '{script}' has an MCP equivalent. "
+            f"Use mcp-lammps-engine '{tool}' instead — "
+            f"it handles job submission, GPU allocation, monitoring, and output parsing. "
+            f"Only proceed with bash if the MCP tool genuinely cannot cover this use case."
+        )
+        sys.exit(0)
+
+if re.search(r"\blammps\b", cmd) and "lammps-engine" not in cmd and "mcp" not in cmd:
+    print(
+        "TOOL GUARD: Detected direct LAMMPS invocation via bash. "
+        "Use mcp-lammps-engine 'run_lammps_chain' (pipeline) or 'run_lammps_script' (single script) instead — "
+        "they manage GPU IDs, nohup, chain restarts, and crash recovery. "
+        "Only proceed with bash if submitting a workflow the MCP server cannot handle."
+    )

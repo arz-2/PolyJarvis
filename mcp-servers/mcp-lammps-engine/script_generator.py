@@ -101,6 +101,20 @@ PAIR_STYLE_PCFF_CUTOFF = "pair_style lj/class2/coul/cut 9.5 9.5"
 PCFF_SPECIAL_BONDS = "special_bonds lj/coul 0 0 1"
 PCFF_PAIR_MODIFY   = "mix sixthpower tail yes"
 
+# ─── TraPPE-UA force field style constants (EMC-generated cells) ─────────────
+# United-atom: no explicit H, no Coulomb interactions, no kspace.
+# Dihedrals use 5-coefficient multi/harmonic (EMC TraPPE-UA output format).
+TRAPPE_UA_STYLES = {
+    "BOND_STYLE":      "harmonic",
+    "ANGLE_STYLE":     "harmonic",
+    "DIHEDRAL_STYLE":  "multi/harmonic",
+    "IMPROPER_STYLE":  "none",
+}
+
+# TraPPE-UA: exclude all 1-2/1-3/1-4 LJ (bonded terms handle short-range); no Coulomb.
+TRAPPE_SPECIAL_BONDS = "special_bonds lj 0 0 0"
+TRAPPE_PAIR_MODIFY   = "mix arithmetic tail yes"
+
 
 # ─── Template parameter catalogs ─────────────────────────────────────────────
 # Default parameters for each template. All can be overridden by caller.
@@ -782,11 +796,14 @@ class ScriptGenerator:
 
         # ── Force field styles ────────────────────────────────────────────
         use_pcff = cfg.get("use_pcff", False)
-        use_opls = cfg.get("use_opls", False)
+        use_opls   = cfg.get("use_opls",   False)
+        use_trappe = cfg.get("use_trappe", False)
         if use_pcff:
             ff_styles = PCFF_STYLES
         elif use_opls:
             ff_styles = OPLS_STYLES
+        elif use_trappe:
+            ff_styles = TRAPPE_UA_STYLES
         else:
             ff_styles = GAFF2_STYLES
         subs["BOND_STYLE"]      = cfg.get("BOND_STYLE",     ff_styles["BOND_STYLE"])
@@ -796,7 +813,10 @@ class ScriptGenerator:
 
         # ── Pair style block (PPPM or cutoff) ────────────────────────────
         use_pppm = cfg.get("use_pppm", True)
-        if use_pcff:
+        if use_trappe:
+            cutoff = cfg.get("LJ_CUTOFF", 14.0)
+            subs["PAIR_STYLE_BLOCK"] = f"pair_style lj/cut {cutoff}"
+        elif use_pcff:
             subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_PCFF_PPPM if use_pppm else PAIR_STYLE_PCFF_CUTOFF
         elif use_opls:
             subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_OPLS_PPPM
@@ -984,6 +1004,8 @@ class ScriptGenerator:
             default_sb, default_pm = PCFF_SPECIAL_BONDS, PCFF_PAIR_MODIFY
         elif use_opls:
             default_sb, default_pm = OPLS_SPECIAL_BONDS, OPLS_PAIR_MODIFY
+        elif use_trappe:
+            default_sb, default_pm = TRAPPE_SPECIAL_BONDS, TRAPPE_PAIR_MODIFY
         else:
             default_sb, default_pm = GAFF2_SPECIAL_BONDS, GAFF2_PAIR_MODIFY
         subs["SPECIAL_BONDS"]  = cfg.get("SPECIAL_BONDS", default_sb)

@@ -26,6 +26,12 @@ import pandas as pd
 import MDAnalysis as mda
 from MDAnalysis.analysis.polymer import sort_backbone
 
+sys.path.insert(0, str(Path(__file__).parent))
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from plot_style import apply_style, save_fig
+
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 
 
@@ -63,6 +69,21 @@ def to_native(obj):
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
     return obj
+
+
+def _plot_end_to_end_distribution(df_out, per_chain, overall_mean_R, output_dir):
+    apply_style()
+    fig, ax = plt.subplots()
+    distances = df_out['distance'].values
+    ax.hist(distances, bins=40, color='steelblue', alpha=0.7, density=True, label='All frames/chains')
+    for c in per_chain:
+        ax.axvline(c['mean_R'], color='firebrick', alpha=0.35, lw=0.8)
+    ax.axvline(overall_mean_R, color='k', lw=2, ls='--', label=f'⟨R⟩ = {overall_mean_R:.1f} Å')
+    ax.set_xlabel('End-to-end distance |R| (Å)')
+    ax.set_ylabel('Probability density')
+    ax.set_title('End-to-end vector distribution')
+    ax.legend()
+    save_fig(fig, str(Path(output_dir) / 'figures' / 'end_to_end_distribution.png'))
 
 
 def main():
@@ -208,6 +229,15 @@ def main():
         "method": "MDAnalysis.analysis.polymer.sort_backbone",
         "mdanalysis_version": mda.__version__,
     })
+
+    e2e_fig_png = str(output_dir / "figures" / "end_to_end_distribution.png")
+    try:
+        _plot_end_to_end_distribution(df_out, per_chain,
+                                      summary["overall_mean_R"], output_dir)
+    except Exception as _pe:
+        print(f"  WARNING: end_to_end_distribution plot failed: {_pe}", flush=True)
+        e2e_fig_png = None
+    summary["end_to_end_distribution_png"] = e2e_fig_png
 
     json_path = str(output_dir / "end_to_end_summary.json")
     with open(json_path, "w") as jf:

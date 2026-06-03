@@ -1,6 +1,17 @@
 {
   "agentPushNotifEnabled": true,
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/bash_tool_guard.py"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
@@ -45,6 +56,15 @@
           {
             "type": "command",
             "command": "echo 'LOG: LAMMPS chain launched — if this run fails, write a RECOVERY block in run_log.md before retrying.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__watch_run",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'RECOVERY: If the watch_run result shows a failed or error status, invoke /recover before attempting any manual fix. Do not retry ad-hoc — use the skill.'"
           }
         ]
       },

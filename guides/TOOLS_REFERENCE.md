@@ -21,17 +21,13 @@ Quick index of all available MCP tools.
 | `submit_conformer_search_job` | async | QM conformer search (Psi4) |
 | `submit_assign_charges_job` | async | RESP / AM1-BCC / ESP / Gasteiger charge assignment |
 | `submit_polymerize_job` | async | Homopolymer chain construction |
-| `submit_copolymerize_job` | async | Alternating copolymer (ABABAB…) |
-| `submit_random_copolymerize_job` | async | Random/statistical copolymer |
-| `submit_block_copolymerize_job` | async | Block copolymer (AAAn-BBBm) |
+| `submit_copolymerize_job` | async | Copolymer chain construction (alternating/random/block) |
 | `assign_forcefield` | sync | Assign GAFF2 / GAFF2_mod parameters to polymer chain |
 | `submit_generate_cell_job` | async | Single-component amorphous cell |
 | `submit_generate_copolymer_cell_job` | async | Multi-chain copolymer amorphous cell |
-| `submit_generate_mixture_cell_job` | async | Multi-component blend cell |
 | `save_molecule` | sync | Save mol to json/pdb/xyz/mol |
 | `save_lammps_data` | sync | Export cell to LAMMPS .data file |
 | `get_molecule_info` | sync | Inspect molecule properties |
-| `submit_sp_properties_job` | async | QM single-point properties (HOMO, LUMO, dipole) |
 | `get_job_status` | sync | Poll RadonPy async job |
 | `get_job_output` | sync | Retrieve RadonPy async job result |
 | `list_all_jobs` | sync | List all RadonPy jobs |
@@ -92,15 +88,10 @@ Quick index of all available MCP tools.
 
 | Tool | Type | Purpose |
 |---|---|---|
-| `check_equilibration` | async | Drift + block-average on density and energy |
-| `check_equilibration_extended` | async | Parallel: Rg + MSD + P2 + density homogeneity |
+| `check_equilibration_comprehensive` | async | All checks in one call: thermo drift+SEM, Rg CV, MSID, C(t), MSD, P2, density homogeneity — returns `overall_pass` + D-05 markdown |
 | `extract_equilibrated_density` | async | Plateau density from NPT log |
 | `extract_tg` | async | Tg from sweep log via F-stat bilinear fit |
 | `extract_bulk_modulus` | async | Isothermal K from NPT volume fluctuations |
-| `extract_radius_of_gyration` | async | Per-chain Rg, CV, C∞ |
-| `calculate_msd` | async | Chain CoM MSD, α, kinetic-trap flag |
-| `check_orientation_order` | async | Nematic P2 from backbone vectors |
-| `check_density_homogeneity` | async | Voxel density CV, heterogeneity flag |
 | `extract_end_to_end_vectors` | async | Per-chain R vectors |
 | `calculate_rdf` | async | g(r) for atom-type pairs |
 | `unwrap_coordinates` | async | Image-flag-unwrapped dump file |
@@ -115,11 +106,9 @@ Quick index of all available MCP tools.
 | `submit_assign_charges_job` | Monomer JSON |
 | `submit_polymerize_job` | Monomer JSON (with charges) |
 | `submit_copolymerize_job` | List of monomer JSONs (with charges) |
-| `submit_random_copolymerize_job` | List of monomer JSONs (with charges) |
-| `submit_block_copolymerize_job` | List of monomer JSONs (with charges) |
 | `assign_forcefield` | Polymer JSON (after polymerization) |
 | `submit_generate_cell_job` | Polymer JSON (after FF assignment) |
-| `submit_generate_mixture_cell_job` | List of polymer JSONs (after FF assignment) |
+| `submit_generate_copolymer_cell_job` | List of polymer JSONs (after FF assignment) |
 | `save_lammps_data` | Cell JSON (after `submit_generate_*_cell_job`) |
 
 ⚠️ **Force field must be assigned after polymerization, never before.**

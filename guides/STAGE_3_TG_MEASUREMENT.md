@@ -98,6 +98,21 @@ The sweep must bracket the transition. Too narrow = bilinear fit fails to captur
 
 ---
 
+## Cooling Rate & Expected Tg Offset
+
+```
+cooling_rate (K/ns) = T_STEP / (N_STEPS_PER_T × TIMESTEP_fs × 1e-6)
+```
+
+| Protocol | T_STEP | N_STEPS_PER_T | Cooling rate | Expected MD overestimation |
+|----------|--------|---------------|--------------|---------------------------|
+| Screening | 20 K | 500 k (500 ps) | ~40 K/ns | 80–120 K |
+| Production (Webb 2024) | 20 K | 4 M (4 ns) | ~5 K/ns | ~50–80 K |
+
+MD always overestimates experimental Tg due to fast cooling. The per-class offsets in `polymer_rules.json` assume screening-rate runs (~40 K/ns). Slower runs reduce the gap but do not eliminate it — WLF correction (if needed) is deferred to Track G4.
+
+---
+
 ## Workflow
 
 ### Step 1: Look up N_STEPS_PER_T for your polymer

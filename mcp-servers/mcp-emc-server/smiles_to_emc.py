@@ -68,9 +68,23 @@ def make_esh(
             f"SMILES must have exactly 2 * connection points, found {n_stars}: {smiles!r}"
         )
 
-    # Connection spec:
+    # Connection spec for PCFF / OPLS-AA (all-atom fields):
     #   repeat group's left connection (1) bonds to the adjacent repeat's right connection (2)
     #   cap group's single connection (1) can terminate either end of the repeat unit
+    #   cap chemistry: *[H] — explicit H atom type present in PCFF and OPLS-AA
+    #
+    # Connection spec for TraPPE-UA (united-atom field):
+    #   Hydrogen is IMPLICIT in united-atom; *[H] has no UA atom type → EMC exits with
+    #   "Missing rules." Use *C (CH3 methyl UA group) as chain-end cap instead.
+    #   Connection spec goes on the repeat line: repeat knows it can bond to cap.
+    #   Validated against EMC v9.4.4 trappe-ua.top rule 69: c4h3 = C(C) (one neighbour).
+    is_trappe = "trappe" in field.lower()
+    if is_trappe:
+        repeat_connect = f"{smiles},1,repeat:2, 1,cap:1, 2,cap:1"
+        cap_line = "*C"
+    else:
+        repeat_connect = f"{smiles},1,repeat:2"
+        cap_line = "*[H],1,repeat:1,1,repeat:2"
     return f"""\
 ITEM OPTIONS
 
@@ -83,8 +97,8 @@ ITEM END
 
 ITEM GROUPS
 
-repeat   {smiles},1,repeat:2
-cap      *[H],1,repeat:1,1,repeat:2
+repeat   {repeat_connect}
+cap      {cap_line}
 
 ITEM END
 
