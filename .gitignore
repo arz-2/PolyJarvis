@@ -19,7 +19,8 @@ mcp-lammps-engine/run_state.json
 mcp-radonpy-server/src/timer.dat
 
 # ── Simulation data and experiment database (local only) ──────────────────────
-data/
+data/*
+!data/TEMPLATE/
 db/
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
