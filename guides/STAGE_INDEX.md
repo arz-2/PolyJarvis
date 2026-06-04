@@ -32,6 +32,7 @@ Read THIS file first. If you are a **worker agent**, identify your stage and rea
 | **4** | `STAGE_4_ANALYSIS.md` | You have simulation output and need to extract/validate properties |
 | **ref** | `TOOLS_REFERENCE.md` | You need complete tool signatures, parameter tables, or the input compatibility matrix |
 | **log** | `data/TEMPLATE/run_log.md` | Copy to `data/[RUN]/run_log.md` at task start; fill in real time |
+| **exp** | `db/` (`get_tg()`, `get_property()`) | Look up experimental Tg, density, or mechanical properties for a polymer |
 
 ---
 

@@ -1,5 +1,57 @@
 {
   "agentPushNotifEnabled": true,
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "mcp__mcp-lammps-engine__check_equilibration_comprehensive",
+      "mcp__mcp-lammps-engine__extract_tg",
+      "mcp__mcp-lammps-engine__extract_equilibrated_density",
+      "mcp__mcp-lammps-engine__extract_bulk_modulus",
+      "mcp__mcp-lammps-engine__calculate_rdf",
+      "mcp__mcp-lammps-engine__extract_end_to_end_vectors",
+      "mcp__mcp-lammps-engine__unwrap_coordinates",
+      "mcp__mcp-lammps-engine__read_log",
+      "mcp__mcp-lammps-engine__get_run_output",
+      "mcp__mcp-lammps-engine__get_run_status",
+      "mcp__mcp-lammps-engine__generate_equilibration_workflow",
+      "mcp__mcp-lammps-engine__run_lammps_chain",
+      "mcp__mcp-lammps-engine__run_lammps_script",
+      "mcp__mcp-lammps-engine__watch_run",
+      "mcp__mcp-lammps-engine__list_runs",
+      "mcp__mcp-lammps-engine__generate_script",
+      "mcp__mcp-lammps-engine__get_template_defaults",
+      "mcp__mcp-lammps-engine__list_templates",
+      "mcp__mcp-lammps-engine__parse_data_file",
+      "mcp__mcp-lammps-engine__validate_data_file",
+      "mcp__mcp-mol-builder-server__classify_polymer",
+      "mcp__mcp-mol-builder-server__build_molecule_from_smiles",
+      "mcp__mcp-mol-builder-server__assign_forcefield",
+      "mcp__mcp-mol-builder-server__get_molecule_info",
+      "mcp__mcp-mol-builder-server__save_molecule",
+      "mcp__mcp-mol-builder-server__save_lammps_data",
+      "mcp__mcp-mol-builder-server__submit_assign_charges_job",
+      "mcp__mcp-mol-builder-server__submit_conformer_search_job",
+      "mcp__mcp-mol-builder-server__submit_polymerize_job",
+      "mcp__mcp-mol-builder-server__submit_copolymerize_job",
+      "mcp__mcp-mol-builder-server__submit_generate_cell_job",
+      "mcp__mcp-mol-builder-server__submit_generate_copolymer_cell_job",
+      "mcp__mcp-mol-builder-server__get_job_status",
+      "mcp__mcp-mol-builder-server__get_job_output",
+      "mcp__mcp-mol-builder-server__list_all_jobs",
+      "mcp__mcp-mol-builder-server__cancel_job",
+      "mcp__mcp-emc-server__submit_emc_cell_job",
+      "mcp__mcp-emc-server__get_emc_job_status",
+      "mcp__mcp-emc-server__get_emc_job_output",
+      "mcp__mcp-emc-server__list_emc_jobs"
+    ],
+    "additionalDirectories": [
+      "/home/arz2/simulations",
+      "/home/arz2/polyjarvis_emc_jobs"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
