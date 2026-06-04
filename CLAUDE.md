@@ -37,25 +37,29 @@ The default mode is multi-agent. The orchestrator (this session) spawns speciali
 | Monitor returns (equilibration done) | `check_equilibration_comprehensive` → if PASS, spawn `tg-sweep-worker` |
 | Monitor returns (Tg sweep done) | `analysis-worker(tasks=[...])` |
 
+See `guides/WORKER_CONFIGS.md` for prompt templates and RESULT block schemas for each worker.
+
 ### Orchestrator workflow
 
 ```
 1. Read CLAUDE.md + STAGE_INDEX.md only (never read stage guides directly)
 2. Copy data/TEMPLATE/run_log.md → data/[RUN]/run_log.md
-3. classify_polymer(smiles) → look up polymer_rules.json → build run_params
-4. Agent(subagent_type="molecule-builder", prompt=<smiles + run_params>)
+3. classify_polymer(smiles) → extract class entry: `Bash: jq '.classes.CLASS_ID' guides/polymer_rules.json` → build run_params
+4. Agent(subagent_type="molecule-builder", description="🔵 Build {polymer_name} cell", prompt=<smiles + run_params>)
      → parse RESULT block → extract data_path, lammps_flags
-5. Agent(subagent_type="equilibration-worker", prompt=<data_path + params>)
+5. Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polymer_name}", prompt=<data_path + params>)
      → parse RESULT block → extract chain_id, monitor_command
 6. Write SIMULATION STATE to run_log.md (status=monitoring)
 7. Monitor(command=monitor_command)          # orchestrator owns this
+7a. /compact focus on simulation state, run IDs, and run_log.md checkpoint  # run before step 8 if context > 40%
 8. get_run_status(chain_id) → check success/failure
 9. check_equilibration_comprehensive(equil_log, dump, data, backbone_types) → PASS / EXTEND / ESCALATE
-10. Agent(subagent_type="tg-sweep-worker", prompt=<equil_data_path + tg_params>)
+10. Agent(subagent_type="tg-sweep-worker", description="🟣 Tg sweep {polymer_name}", prompt=<equil_data_path + tg_params>)
       → parse RESULT block → extract run_id, monitor_command
 11. Write SIMULATION STATE to run_log.md (status=monitoring)
 12. Monitor(command=monitor_command)          # orchestrator owns this
-13. Agent(subagent_type="analysis-worker", prompt=<logs + tasks=[...]>)
+12a. /compact focus on simulation state, run IDs, and run_log.md checkpoint  # run before step 13 if context > 40%
+13. Agent(subagent_type="analysis-worker", description="🟢 Analyze {polymer_name} results", prompt=<logs + tasks=[...]>)
       → parse RESULT block → write RESULTS to run_log.md
 ```
 
