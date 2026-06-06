@@ -95,7 +95,8 @@ workflow = generate_equilibration_workflow(
     press=1.0,
     max_press=50000.0,
     n_atoms=<from inspect_data_file>,
-    use_pcff=<True/False>,
+    use_pcff=<from lammps_flags>,
+    use_trappe=<from lammps_flags>,  # now populated by EMC server for PHYC/PDIE/PSTR
     params_file="<work_dir>/emc_build.params",  # EMC only — omit for RadonPy
 )
 ```
@@ -107,6 +108,8 @@ result = run_lammps_chain(
     stages=workflow["stages"],
     gpu_ids="<from task.txt or nvidia-smi>",
     mpi=<n>,
+    data_file="<work_dir>/cell.data",         # enables pre-flight check
+    params_file="<work_dir>/emc_build.params", # EMC only — suppresses Coeffs false-positive
 )
 w = watch_run(result["chain_id"])
 # Return chain_id and w["monitor_command"] to the orchestrator — do not call Monitor.
@@ -188,7 +191,3 @@ Copy `result["d05_markdown"]` directly into run_log.md as the D-05 CONVERGENCE D
 **Chain droplets / vacuum voids visible:** Initial density too high. Rebuild cell at `density=0.05`. Add more annealing.
 
 **Another user is on the GPU:** Always check `nvidia-smi` first. Pin to free GPUs via `gpu_ids`.
-
-**TraPPE-UA `validate_data_file` returns `valid: false` (4 "missing Coeffs" errors):** EMC `.data` files for PHYC/PDIE/PSTR contain topology only — no Pair/Bond/Angle/Dihedral Coeffs sections. This is by design; coefficients are in `emc_build.params`. Confirm `emc_build.params` contains the expected Coeffs (type counts must match the data file header), then proceed. This is a false-positive, not a real blocker.
-
-**TraPPE-UA `generate_equilibration_workflow` produces wrong force-field styles:** `lammps_flags` from Stage 1 carries only `use_pcff` and `use_opls` — there is no `use_trappe` key. Infer from `polymer_class`: if class is PHYC, PDIE, or PSTR, set `use_trappe=True`. Without it the generator defaults to GAFF2-style `lj/charmm/coul/long` + PPPM, which runs but applies wrong physics to a united-atom system.

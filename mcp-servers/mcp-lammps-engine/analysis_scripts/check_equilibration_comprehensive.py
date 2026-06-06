@@ -172,11 +172,18 @@ def check_thermo(log_file, eq_fraction, drift_threshold_pct, drift_pvalue, block
     density_ok = bool(results.get("density", {}).get("equilibrated", False))
     energy_ok = bool(results.get("energy", {}).get("equilibrated", False))
 
+    is_npt = (
+        "Volume" in prod.columns
+        and prod["Volume"].mean() > 0
+        and prod["Volume"].std() / prod["Volume"].mean() > 0.001
+    )
+
     return {
         "equilibrated": bool(density_ok and energy_ok),
         "density": results.get("density"),
         "energy": results.get("energy"),
         "tau_eff_density_fraction": tau_eff_frac,
+        "is_npt": is_npt,
         "meta": meta,
     }
 
@@ -537,13 +544,16 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
 
     d = thermo.get("density", {})
     e = thermo.get("energy", {})
+    is_npt = thermo.get("is_npt", False)
 
     dd = d.get("drift", {})
-    lines.append(f"| Density drift | {dd.get('drift_pct','?')}% (p={dd.get('p_value','?')}) | <1%, p<0.01 | N/A (NVT — fixed volume) |")
+    density_drift_result = _gate(dd.get('pass', False)) if is_npt else "N/A (NVT — fixed volume)"
+    lines.append(f"| Density drift | {dd.get('drift_pct','?')}% (p={dd.get('p_value','?')}) | <1%, p<0.01 | {density_drift_result} |")
     ed = e.get("drift", {})
     lines.append(f"| Energy drift | {ed.get('drift_pct','?')}% (p={ed.get('p_value','?')}) | <1%, p<0.01 | {_gate(ed.get('pass',False))} |")
     db = d.get("block_sem", {})
-    lines.append(f"| Density block-SEM | {db.get('sem_pct','?')}% | <1% | N/A (NVT — fixed volume) |")
+    density_sem_result = _gate(db.get('pass', False)) if is_npt else "N/A (NVT — fixed volume)"
+    lines.append(f"| Density block-SEM | {db.get('sem_pct','?')}% | <1% | {density_sem_result} |")
     eb = e.get("block_sem", {})
     lines.append(f"| Energy block-SEM | {eb.get('sem_pct','?')}% | <1% | {_gate(eb.get('pass',False))} |")
     tau_frac = thermo.get("tau_eff_density_fraction")

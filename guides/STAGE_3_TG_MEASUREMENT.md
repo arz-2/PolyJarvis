@@ -97,7 +97,7 @@ result = generate_script(
         "use_pppm":      <True unless TraPPE-UA>,  # from lammps_flags
         "use_gpu":       True,
         "use_pcff":      <from lammps_flags>,
-        "use_trappe":    <True for PHYC/PDIE/PSTR>,  # infer from polymer_class; lammps_flags has no use_trappe key
+        "use_trappe":    <from lammps_flags>,
         "use_shake":     <False for PCFF/TraPPE-UA; True for GAFF2>,
         "params_file":   "<work_dir>/emc_build.params",  # EMC only; omit for RadonPy
         "write_restart": False,

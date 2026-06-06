@@ -2,15 +2,15 @@
 """
 EMC MCP Server
 ==============
-Builds amorphous polymer cells via EMC for Track C (PCFF), PHAL (OPLS-AA),
-and PHYC/PDIE (TraPPE-UA) classes using EMC v9.4.4.
+Builds amorphous polymer cells via EMC for Track C (PCFF), PHAL+PSIL (OPLS-AA),
+and PHYC/PDIE/PSTR (TraPPE-UA) classes using EMC v9.4.4.
 
 Wraps mcp-servers/mcp-emc-server/smiles_to_emc.py's build_cell() pipeline:
     SMILES → .esh → emc_setup.pl → EMC binary → LAMMPS .data
 
 Force field auto-selection by polymer_class:
     PCBN, PAMD, PKTN, PSFO, PIMD  →  pcff               (use_pcff=True downstream)
-    PHAL                           →  opls/2024/opls-aa  (use_opls=True downstream)
+    PHAL, PSIL                     →  opls/2024/opls-aa  (use_opls=True downstream)
     PHYC, PDIE, PSTR               →  trappe-ua          (use_opls=False downstream)
 
 Tools
@@ -179,9 +179,12 @@ _PCFF_CLASSES   = {
     "PVNL",  # polyvinyls (PVC, PVAc, PVA) — tested with PVC+PVAc+PVA
     "PPNL",  # conjugated/polyphenylene (PPV, MEH-PPV)
 }
-_OPLS_CLASSES   = {"PHAL"}
+_OPLS_CLASSES   = {
+    "PHAL",  # polyhalogenated (PTFE, PVDF, PCTFE)
+    "PSIL",  # polysiloxanes (PDMS) — opls/2024/opls-aa has si4/o2 Si-O params; pcff missing {si,osi}
+}
 _TRAPPE_CLASSES = {"PHYC", "PDIE", "PSTR"}  # PSTR: cac/cah aromatic UA types; see EMC t_glass example
-# PSIL (PDMS) and PURA (polyurea): EMC build fails on both pcff and opls-aa — remain on RadonPy
+# PURA (polyurea): EMC build fails on pcff (missing {n_2,hn}) — remains on RadonPy
 
 def _select_field(polymer_class: str) -> str:
     if polymer_class in _PCFF_CLASSES:
@@ -200,7 +203,7 @@ def _lammps_flags(field: str) -> dict:
     if field == "pcff":
         return {"use_pcff": True,  "use_opls": False}
     if field == "trappe-ua":
-        return {"use_pcff": False, "use_opls": False}
+        return {"use_pcff": False, "use_opls": False, "use_trappe": True}
     return {"use_pcff": False, "use_opls": True}
 
 
@@ -266,9 +269,9 @@ def _build_emc_cell(
 mcp = FastMCP(
     "EMC",
     instructions="""
-    EMC MCP Server — amorphous cell builder for 19 polymer classes.
+    EMC MCP Server — amorphous cell builder for 20 polymer classes.
     Uses PCFF (Class II), OPLS-AA, or TraPPE-UA depending on class.
-    Two classes remain on RadonPy: PSIL (Si-O backbone, EMC fails) and PURA (urea N-H, EMC fails).
+    One class remains on RadonPy: PURA (urea N-H, EMC fails).
 
     SUPPORTED CLASSES → pcff (Class II, best thermomechanical accuracy):
       PCBN  Polycarbonates       (e.g. BPA-PC)
@@ -289,6 +292,7 @@ mcp = FastMCP(
 
     SUPPORTED CLASSES → opls/2024/opls-aa:
       PHAL  Polyhalogenated      (e.g. PTFE, PVDF, PCTFE)
+      PSIL  Polysiloxanes        (e.g. PDMS) — opls-aa si4/o2 params; pcff missing {si,osi}
 
     SUPPORTED CLASSES → trappe-ua:
       PHYC  Polyhydrocarbons     (e.g. PE, PP, PIB)
@@ -296,7 +300,6 @@ mcp = FastMCP(
       PSTR  Polystyrenics        (e.g. PS, P2VP, SAN)
 
     RadonPy only (EMC build fails):
-      PSIL  Polysiloxanes        (e.g. PDMS) — pcff missing {si,osi} increment
       PURA  Polyureas            — pcff missing {n_2,hn} increment
 
     The field is selected automatically from polymer_class — do not override it.

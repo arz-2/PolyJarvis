@@ -223,6 +223,5 @@ generate_run_summary(
 
 **`extract_tg` returns "Bilinear curve_fit failed":** Before retrying with different params, parse the Temp column of the sweep log. If Temp spans < ~100 K total or collapses to a single bin, the log is a defective single-isothermal run (no staircase). Return FAIL and recommend regenerating the Tg sweep. Do NOT tune `initial_tg_guess` — that won't help.
 
-**`check_equilibration_comprehensive` labels an NPT run as "N/A (NVT — fixed volume)":** For PHYC/TraPPE-UA systems the tool's ensemble auto-detection can misclassify production NPT logs as fixed-volume. The numeric density-drift and density-SEM values are still computed and correct — trust them. Verify ensemble by checking that Lx/Ly/Lz/Volume vary in the log header. This is a labelling bug, not a run failure.
 
 **C∞ > 15 warning for PE/PHYC:** This is soft INFO, not a gate failure. Semicrystalline-tendency PE at melt temperature legitimately sits at the top of the [3, 15] heuristic. Confirm conformational pass (Rg CV < 30%, MSID slope ≈ 1.0 ±20%, P2 < 0.10) and proceed.
