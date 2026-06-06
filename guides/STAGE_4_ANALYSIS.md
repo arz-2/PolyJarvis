@@ -1,30 +1,13 @@
 # Stage 4: Analysis & Validation
 **Read when:** You have simulation output and need to extract and validate properties
-**Previous stage:** `STAGE_3_TG_MEASUREMENT.md`
 
 ---
 
-## Critical Rules for This Stage
+## Rules
 
 ### Rule A: Never Report Tg Without Checking Fit Quality
 
-```python
-result = get_run_output(tg_run["run_id"])["result"]
-
-# Overall fit_quality is the stricter of R² and F-stat checks
-if result["fit_quality"] in ("EXCELLENT", "GOOD"):
-    agreement = abs(result["Tg_K"] - result["Tg_alternative_K"])
-    if agreement < 15:
-        print(f"Tg = {result['Tg_K']:.1f} K  (R²={result['r_squared']:.4f}, F-stat p={result['f_statistic_pvalue']:.2e})")
-    else:
-        print(f"WARNING: Tg_K={result['Tg_K']:.1f} vs alt={result['Tg_alternative_K']:.1f} — large disagreement")
-elif result["fit_quality"] == "ACCEPTABLE":
-    print(f"Tg ≈ {result['Tg_K']:.1f} K — low confidence, report with caveat")
-else:
-    print("POOR fit — do NOT report. Extend simulation or fix sweep.")
-```
-
-**Fit quality tiers** *(rated independently on R² and F-stat; overall is the stricter of the two)*:
+**Fit quality tiers** — rated independently on R² and F-stat; overall is the stricter of the two:
 
 | R² | F-stat p-value | Quality | Action |
 |---|---|---|---|
@@ -33,328 +16,177 @@ else:
 | ≥ 0.90 | < 0.05 | ACCEPTABLE | Report with caveat |
 | < 0.90 | ≥ 0.05 | POOR | Do not report — investigate |
 
-**`Tg_K` vs `Tg_alternative_K`:** Both are computed independently (F-stat split vs scipy bilinear). Disagreement >20 K means the transition region is noisy or the sweep range is too narrow. Investigate before reporting.
+`Tg_K` vs `Tg_alternative_K`: disagreement >20 K means the transition region is noisy or the sweep range is too narrow. Investigate before reporting.
 
----
-
-### Rule B: Check Convergence Before Extracting Any Property
-
-Before running any analysis tool, verify the equilibration log shows a converged density plateau.
-
----
-
-### Rule C: Analysis Tools Run Locally — No Large File Transfers
-
-`extract_tg`, `extract_end_to_end_vectors`, `calculate_rdf`, `extract_equilibrated_density`, `extract_bulk_modulus`, and `unwrap_coordinates` all run as background jobs on the local GPU node. Pass local paths directly. Never copy full dump files off the node unless absolutely necessary — they can be tens of GB.
-
----
-
-### Rule D: Always Specify `atom_type_pairs` in `calculate_rdf`
+### Rule B: Always Specify `atom_type_pairs` in `calculate_rdf`
 
 `atom_type_pairs=None` computes all pairs and can exceed 2 GB RAM per frame for 10k-atom systems. Always pass explicit pairs.
 
----
+### Rule C: Always Pass `output_dir` to Every Analysis Tool
 
-## Universal Job Pattern (All Analysis Tools)
-
-All analysis tools are async — they return a `run_id` immediately and execute in the background.
+Default `output_dir` for each tool scatters files into different subdirectories next to its input file. Always pass:
 
 ```python
-# 1. Submit (returns immediately with run_id)
-run = extract_tg(log_file="...")    # or extract_end_to_end_vectors, calculate_rdf, etc.
-
-# 2. Poll
-while True:
-    s = get_run_status(run["run_id"])
-    if s["status"] in ("completed", "failed"):
-        break
-    time.sleep(15)
-
-# 3. Retrieve
-result = get_run_output(run["run_id"])["result"]
+output_dir = "/home/arz2/PolyJarvis/data/<run_name>/raw/"
 ```
+
+Omitting `output_dir` means outputs land in `tg_analysis/`, `eq_comprehensive/`, `deform_analysis/`, etc. — `generate_run_summary` won't find them.
 
 ---
 
 ## Tool: `extract_tg`
 
-Extracts Tg from LAMMPS Tg-sweep log. Uses plateau detection + F-stat exhaustive split (v3, March 2026). Works directly from the log file — no dump needed.
-
-```python
-run = extract_tg(
-    log_file="/home/arz2/simulations/<run_dir>/tg_sweep/tg_sweep.log",
-    output_dir=None,               # Defaults to <log_dir>/tg_analysis/
-    initial_tg_guess=200,          # K — hint for secondary curve_fit; primary F-stat method is guess-free
-    equilibration_fraction=0.5,    # Fraction of steps per plateau used for density averaging
-    temp_col="Temp",
-    density_col="Density"
-)
-```
+Key params:
+- `initial_tg_guess` (K) — hint for secondary curve_fit; primary F-stat method is guess-free
+- `equilibration_fraction` — 0.5 (default) for 2 ns/T; 0.7 for large/slow systems. Minimum 4 clean temperature bins required.
 
 **Result fields:**
-- `Tg_K` — primary Tg from F-stat exhaustive split (guess-free)
+- `Tg_K` — primary Tg from F-stat exhaustive split
 - `Tg_alternative_K` — cross-check via scipy curve_fit bilinear
-- `r_squared` — goodness of fit (R²)
-- `f_statistic` — F-statistic of two-line vs single-line model
-- `f_statistic_pvalue` — p-value for F-stat test (< 0.01 = reliable split)
-- `fit_quality` — EXCELLENT / GOOD / ACCEPTABLE / POOR (stricter of R² and F-stat checks)
-- `fit_quality_r2` — quality rating from R² alone
-- `fit_quality_fstat` — quality rating from F-stat alone
-- `fit_method` — fit method used (`"fstat_split"`)
-- `binning_method` — plateau detection method used
-- `n_plateaus_skipped_drift` — plateaus excluded for excessive density drift (> 1%)
-- `n_temperature_bins` — number of clean plateaus used for fitting
-- `temp_range_K` — `[T_min, T_max]` of data used
-- `bins_csv` — path to `tg_density_bins.csv` (use for publication plots)
-- `summary_json` — path to full analysis JSON
-
-**Tuning `equilibration_fraction`:**
-- 0.5 (default): standard for 2 ns/T runs
-- 0.7: for large/slow systems
-- Minimum 4 clean temperature bins required for fit
+- `r_squared`, `f_statistic`, `f_statistic_pvalue`
+- `fit_quality` — EXCELLENT / GOOD / ACCEPTABLE / POOR
+- `n_plateaus_skipped_drift`, `n_temperature_bins`, `temp_range_K`
+- `bins_csv` — path to `tg_density_bins.csv`
 
 ---
 
-## Tool: `extract_end_to_end_vectors`
+## Tool: `check_equilibration_comprehensive`
 
-Computes per-chain end-to-end distance R and vector for every trajectory frame. Uses `sort_backbone()` for backbone-aware terminal atom identification via bond graph from the topology file. Auto-unwraps coordinates via MDAnalysis transformations.
+Returns `overall_pass` verdict and a ready-to-paste D-05 markdown block. Copy `result["d05_markdown"]` directly into run_log.md as the D-05 CONVERGENCE DETAIL section.
 
-```python
-run = extract_end_to_end_vectors(
-    dump_file="/home/arz2/simulations/<run_dir>/eq/nvt_prod.dump",
-    data_file="/home/arz2/simulations/<run_dir>/cell.data",  # Required for bond topology
-    backbone_types=[2],    # REQUIRED — LAMMPS atom type IDs for backbone atoms
-                           # Get these from parse_data_file(); e.g. for PE (GAFF: hc=1, c3=2) → [2]
-                           # For PEO (hc=1, c3=2, os=3) → [2, 3]
-    skip_frames=0,         # Initial frames to skip (burn-in)
-    max_frames=None,       # Cap on frames after skip
-    num_chains=None,       # Auto-detected from resids if None
-    chain_ids=None,        # Analyse subset of chains if needed
-    output_dir=None        # Defaults to <dump_dir>/analysis/
-)
-```
+`backbone_types` is **REQUIRED** — from `inspect_data_file()`; do not guess.
 
-**Result fields:**
-- `overall_mean_R` — mean end-to-end distance (Å) across all chains and frames
-- `overall_mean_R2` — mean ⟨R²⟩ (Å²) — connects to characteristic ratio C∞
-- `per_chain` — list of per-chain stats: `mean_R`, `std_R`, `mean_R2`, `n_frames`
-- `csv_file` — path to `end_to_end_vectors.csv`
-
-**`backbone_types` is required.** Always determine these from `parse_data_file()` output — do not assume. The tool traces the backbone bond graph to find true chain termini; incorrect backbone_types will return wrong terminal atoms.
-
-**Diagnostic:** Large per-chain variance in R suggests poor equilibration.
-
----
-
-## Tool: `calculate_rdf`
-
-Computes g(r) radial distribution functions for specified atom-type pairs using MDAnalysis InterRDF.
-
-```python
-run = calculate_rdf(
-    dump_file="/home/arz2/simulations/<run_dir>/eq/nvt_prod.dump",
-    data_file="/home/arz2/simulations/<run_dir>/cell.data",  # REQUIRED — topology for MDAnalysis
-    atom_type_pairs=[[2,2], [1,1], [1,2]],  # C-C, H-H, C-H for PE (types from parse_data_file)
-    rmax=15.0,       # Å — covers 4-5 coordination shells
-    nbins=150,
-    skip_frames=0,
-    max_frames=None,   # Cap on frames after skip; useful for quick checks
-    output_dir=None,
-    atom_style="id resid type charge x y z"  # Match your dump format
-)
-```
-
-**Result fields:**
-- `rdf_files` — dict of pair → CSV path on Lambda, e.g., `{"2-2": "/path/rdf_t2-t2.csv"}`
-- `pairs_computed` — list of computed pair strings
-
-**`data_file` is required.** MDAnalysis needs the topology to parse atom types correctly from the dump.
-
-**Atom type IDs:** Get these from `parse_data_file()` output — do not assume. For PE: C=2, H=1. For other polymers, check the data file output.
-
-**Expected peaks for PE:**
-- C-C first peak: ~1.54 Å (bonded)
-- C-C second peak: ~2.54 Å
-- Convergence to g(r)=1 beyond ~10 Å confirms amorphous bulk behavior
-
-**Memory note:** For a 10k-atom system, each pair requires O(N1 × N2 × 24 bytes) RAM per frame. Specify only the pairs you need.
+Hard gates and soft warnings are identical to Stage 2 — see `STAGE_2_EQUILIBRATION.md`. If `overall_pass=False`, flag all properties as ⚠ but do not abort — report what failed.
 
 ---
 
 ## Tool: `extract_equilibrated_density`
 
-Extracts the stable density plateau from an NPT equilibration log using reverse-cumulative-mean detection (more robust than a fixed burn-in fraction).
-
-```python
-run = extract_equilibrated_density(
-    log_file="/home/arz2/simulations/<run_dir>/eq/final_eq.log",
-    output_dir=None,
-    eq_fraction=0.5,           # Discard first 50% as initial burn-in
-    target_temp=None,          # Filter to a specific temperature (K) if log is multi-T
-    temp_tolerance=50,         # ±50 K window around target_temp
-    plateau_shift_sigma=1.0,   # Sensitivity of plateau edge detection
-    density_col="Density",
-    temp_col="Temp"
-)
-```
+Key params:
+- `eq_fraction` — discard first N% as burn-in (default 0.5)
+- `target_temp` — filter to a specific temperature if log is multi-T
+- `plateau_shift_sigma` — sensitivity of plateau edge detection (default 1.0)
 
 **Result fields:**
-- `plateau_density_mean` — equilibrated density (g/cm³)
-- `plateau_density_std` — standard deviation within the plateau
-- `plateau_density_sem` — standard error of the mean
-- `plateau_n_points` — number of thermo rows in the identified plateau
-- `plateau_fraction` — fraction of the production window identified as plateau
-- `naive_mean` / `naive_std` — simple average of full production window (compare to plateau for sanity)
-- `plateau_step_range` — `[start_step, end_step]` of the identified plateau
-- `summary_json` — path to JSON
-
-**Use for:** Getting a clean density value from equilibration logs before comparing to experiment. Better than manual inspection of the log.
+- `plateau_density_mean`, `plateau_density_std`, `plateau_density_sem`
+- `plateau_n_points`, `plateau_fraction`, `plateau_step_range`
+- `naive_mean`, `naive_std` — compare to plateau for sanity
 
 ---
 
 ## Tool: `extract_bulk_modulus`
 
-Extracts isothermal bulk modulus from an NPT log via volume fluctuations: K_T = k_B T ⟨V⟩ / Var(V).
+Use for rubbery polymers (`is_glassy=False`) — volume-fluctuation method from NPT log.
 
-```python
-run = extract_bulk_modulus(
-    log_file="/home/arz2/simulations/<run_dir>/eq/final_eq.log",
-    output_dir=None,
-    eq_fraction=0.5,    # Use last 50% as production window
-    block_count=5,      # Blocks for uncertainty estimation
-    vol_col="Volume",   # Column name — tries Volume, Vol, vol
-    temp_col="Temp",
-    press_col="Press",
-    density_col="Density"
-)
-```
+Key params:
+- `eq_fraction` — use only the most stable portion (default 0.5; increase if drifting)
+- `block_count` — blocks for uncertainty estimation (default 5)
 
 **Result fields:**
-- `bulk_modulus_GPa` — isothermal bulk modulus K in GPa
-- `bulk_modulus_atm` — K in atm
-- `bulk_modulus_sem_GPa` — block-average SEM (uncertainty estimate)
-- `isothermal_compressibility_per_Pa` — β_T = 1/K
-- `V_mean_A3`, `V_std_A3` — volume statistics
-- `block_averaging` — per-block K values
+- `bulk_modulus_GPa`, `bulk_modulus_sem_GPa`
+- `isothermal_compressibility_per_Pa`
+- `V_mean_A3`, `V_std_A3`
 - `diagnostics` — T, P, density means + volume drift check
-- `summary_json` — path to JSON
-
-**Requirements:** Must be an NPT run that is well-equilibrated. Check `check_equilibration` first. If the diagnostics show volume drift > 1% (p < 0.01), a warning is issued — extend equilibration before trusting K.
 
 ---
 
-## Tool: `check_equilibration`
+## Tool: `extract_bulk_modulus_deform`
 
-Checks whether a simulation is equilibrated based on density and energy convergence. Applies both a drift test (linear regression) and a block-average test (Flyvbjerg-Petersen). Now **async** — runs in the background.
+Use for glassy polymers (`is_glassy=True`) — stress-strain fit from npt_deform log.
 
-```python
-run = check_equilibration(
-    log_file="/home/arz2/simulations/<run_dir>/eq/final_eq.log",
-    output_dir=None,             # Defaults to <log_dir>/eq_analysis/
-    eq_fraction=0.5,             # Fraction of rows used as production window
-    drift_threshold_pct=1.0,     # Max allowed drift as % of mean
-    drift_pvalue=0.01,           # p-value threshold for drift significance
-    block_count=5,               # Number of blocks for block-average test
-    temp_col="Temp",
-    press_col="Press",
-    density_col="Density",
-    energy_col="TotEng"
-)
-```
+Key params:
+- `strain_rate` — in 1/fs (convert from `K_deform_rate_inv_s × 1e-15`)
+- `strain_max` — from `polymer_rules.json`
+- `eq_steps` — N_EQ_STEPS used in npt_deform.in (default 200000)
+- `strain_start` — skip initial transient (default 0.002)
+
+**Acceptance criteria:**
+- Both `fit_r2_C11` and `fit_r2_C12_yy` ≥ 0.90
+- K > 0 and G > 0
+- `isotropy_delta_pct` < 20%
+
+**Experimental ranges for common glassy polymers:**
+
+| Polymer | K (GPa) | G (GPa) | E (GPa) |
+|---------|---------|---------|---------|
+| BPA-PC | 3–4 | 1.0–1.5 | 2.5–3.5 |
+| PSU/Udel | 3–5 | 1.0–1.5 | 2.5–4.0 |
+| Kapton (PIMD) | 4–6 | 1.5–2.5 | 4–7 |
 
 **Result fields:**
-- `equilibrated` — overall bool (True only if density AND energy both pass both tests)
-- `density_equilibrated` — bool
-- `energy_equilibrated` — bool
-- `density` / `energy` — sub-dicts with:
-  - `drift` — `{pass: bool, slope, p_value, drift_pct}`
-  - `block_avg` — `{pass: bool, sem, sem_pct}`
-- `meta` — `{T_mean, P_mean, n_rows_total, n_rows_production}`
-- `summary_json` — path to JSON
-
-**Before any property extraction:** Always run `check_equilibration` first. Do not proceed if `equilibrated=False`.
+- `C11_GPa`, `C12_GPa`, `K_GPa`, `G_GPa`, `E_GPa`, `nu_Poisson`
+- `fit_r2_C11`, `fit_r2_C12_yy`, `isotropy_delta_pct`
+- `stress_strain_csv`, `summary_json`
 
 ---
 
-## Tool: `check_equilibration_extended`
+## Tool: `extract_end_to_end_vectors`
 
-Structural equilibration checks that go beyond thermo convergence — required for reviewer-grade validation of polymer systems, especially below Tg or for long chains. Launches four background jobs simultaneously from the production dump file.
+`backbone_types` is **REQUIRED** — always determine from `inspect_data_file()` output; do not assume. Incorrect types return wrong terminal atoms.
 
-```python
-ext = check_equilibration_extended(
-    log_file="/home/arz2/simulations/<run>/eq/06_nvt_production/06_nvt_production.log",
-    data_file="/home/arz2/simulations/<run>/cell.data",
-    dump_file="/home/arz2/simulations/<run>/eq/06_nvt_production/06_nvt_production.dump",
-    backbone_types=[2, 3],      # LAMMPS type IDs of backbone atoms
-    skip_frames=50,             # Skip burn-in frames
-    timestep_fs=1.0,
-    n_backbone_bonds=118,       # DP-1 bonds per chain (for C∞ = 6·⟨Rg²⟩/(N·l²))
-)
-# Returns four run_ids — monitor each:
-# ext["rg_run_id"], ext["msd_run_id"], ext["p2_run_id"], ext["density_run_id"]
-```
+**Result fields:**
+- `overall_mean_R` — mean end-to-end distance (Å)
+- `overall_mean_R2` — mean ⟨R²⟩ (Å²)
+- `per_chain` — list of per-chain stats: `mean_R`, `std_R`, `n_frames`
+- `csv_file`
 
-**Four parallel sub-jobs and their flags:**
+Large per-chain variance in R suggests poor equilibration.
 
-| Sub-job | Tool | Flag that fires | Meaning |
-|---------|------|-----------------|---------|
-| Radius of gyration | `extract_radius_of_gyration` | `rg_spread_flag` (CV > 30%) | Unequal chain conformations — poor equilibration |
-| MSD | `calculate_msd` | `kinetic_trap_flag` (MSD_max < Rg²) | Chains immobile relative to their own size |
-| Orientation order | `check_orientation_order` | `ordered_flag` (P2 > 0.10) | Residual backbone alignment from packing |
-| Density homogeneity | `check_density_homogeneity` | `heterogeneous_flag` (CV > 0.25) | Voids, droplets, or crystalline domains |
+---
 
-**Interpreting MSD α exponent:**
-- α ≈ 1.0 → Fickian diffusion (well above Tg — chains fully mobile)
-- α 0.3–0.7 → subdiffusive (Rouse/reptation near Tg — normal for production window)
-- α < 0.2 → strongly caged — potential kinetic trap; check `kinetic_trap_flag`
+## Tool: `calculate_rdf`
 
-**Note on kinetic_trap_flag for glassy systems:** Below Tg, `kinetic_trap_flag=True` is *expected* — chains should not diffuse. The flag is diagnostic context, not a failure criterion in that regime. Flag becomes a problem if the system is intended to be in the melt state.
+Always pass `atom_type_pairs` explicitly (Rule B). `data_file` is required for MDAnalysis topology.
 
-**Workflow after extended checks:**
+**Result fields:**
+- `rdf_files` — dict of pair → CSV path, e.g. `{"2-2": "/path/rdf_t2-t2.csv"}`
+- `pairs_computed`
 
-```python
-# Pass overall_mean_Rg2_A2 from Rg result into MSD for trap flag:
-rg_summary = get_run_status(ext["rg_run_id"])   # when completed
-msd_run = calculate_msd(
-    ...,
-    rg_sq_A2=rg_summary["result"]["overall_mean_Rg2_A2"],
-)
-```
-
-Alternatively, use `check_equilibration_extended` which launches all four without the Rg→MSD handoff (MSD runs without the trap flag in that case; run MSD manually if you need it).
+Expected peaks for PE: C-C first peak ~1.54 Å (bonded), second ~2.54 Å; convergence to g(r)=1 beyond ~10 Å.
 
 ---
 
 ## Tool: `unwrap_coordinates`
 
-Writes a new dump file with image-flag unwrapped coordinates. Usually not needed if using `extract_end_to_end_vectors` (it auto-unwraps via MDAnalysis transformations).
-
-```python
-run = unwrap_coordinates(
-    dump_file="/path/to/trajectory.dump",
-    output_file=None    # Defaults to <stem>_unwrapped.dump in same directory
-)
-```
+Use only when feeding dump files to external tools (OVITO, VMD) that don't handle image flags. Output file is same size as input — check disk space first.
 
 **Result fields:** `output_file`, `frames_written`, `natoms`, `size_bytes`
 
-**Use only when:** Feeding dump files to external tools (OVITO, VMD) that don't handle image flags. Check local disk space first — output file is same size as input.
+---
+
+## Final Step: `generate_run_summary`
+
+Call after all analysis tools have completed. Reads every JSON in `output_dir`, assembles `run_summary.json` with sections: `run`, `decisions` (D-01–D-06), `results` (Tg/density/K with PASS/FAIL vs experiment), `convergence`, `structural_checks`, `artifacts` (all figure and CSV paths), `provenance`.
+
+```python
+generate_run_summary(
+    output_dir   = "/home/arz2/PolyJarvis/data/<run_name>/raw/",
+    run_name     = run_name,
+    smiles       = smiles,
+    polymer_class = polymer_class,
+    ff           = ff,
+    simulation_dir = sim_base,
+    d05          = "PASS",        # from check_equilibration_comprehensive verdict
+    d06          = fit_quality,   # from extract_tg result
+    exp_tg_min   = exp_tg_range[0],
+    exp_tg_max   = exp_tg_range[1],
+    exp_density_min = exp_density_range[0],
+    exp_density_max = exp_density_range[1],
+    # ...other metadata from run_params
+)
+```
+
+**Result fields:** `status`, `summary_json` (absolute path to `run_summary.json`)
 
 ---
 
 ## Validation Against Experimental Data
-
-After extracting properties, compare against experimental benchmarks and cite your source.
-
-### Acceptance Criteria
 
 | Property | Acceptable Error | Source |
 |---|---|---|
 | Tg | ±20 K | Afzal 2021, Webb 2024 |
 | Density | ±5% | Multiple studies |
 | Thermal conductivity | ±30% | High uncertainty property |
-
-### Benchmark Targets
 
 | Polymer | Exp Tg | Exp Density (300K) |
 |---|---|---|
@@ -363,102 +195,34 @@ After extracting properties, compare against experimental benchmarks and cite yo
 | PMMA | ~378 K | ~1.18 g/cm³ |
 | PEO/PEG | ~206 K | ~1.12 g/cm³ |
 
-### Red Flags (Investigate Before Reporting)
-
+**Red flags — investigate before reporting:**
 - Density outside ±10% of experimental
 - Tg outside ±50 K of experimental
 - R² < 0.90 on bilinear fit
 - `Tg_K` and `Tg_alternative_K` disagree by >20 K
-- RDF shows no clear peaks or does not converge to 1.0 at large r
-- Per-chain variance in end-to-end R is very large (poor equilibration)
+- RDF shows no clear peaks or does not converge to 1.0
+- Large per-chain variance in end-to-end R
 
 ---
 
-## Recommended Analysis Sequence
+## Common Failures
 
-### Step 0: Check equilibration first
+**`extract_tg` fails with "fewer than 4 temperature bins":** Sweep range too narrow, T_STEP too large, log incomplete, or too many plateaus excluded for excessive drift (check `n_plateaus_skipped_drift`).
 
-```python
-eq_run = check_equilibration(log_file=nvt_prod_log)
-while get_run_status(eq_run["run_id"])["status"] not in ("completed", "failed"):
-    time.sleep(15)
-eq_result = get_run_output(eq_run["run_id"])["result"]
-assert eq_result["equilibrated"], f"Not equilibrated: {eq_result}"
-```
+**`Tg_K` and `Tg_alternative_K` disagree by >20 K:** Noisy density data or range doesn't bracket the transition — increase N_STEPS_PER_T or extend range.
 
-### Step 1: Submit all analysis jobs in parallel (independent)
+**`fit_quality` is POOR despite clean log:** Plot `tg_density_bins.csv` manually. Check for velocity re-initialization discontinuities (Stage 3 Rule A). Check `n_plateaus_skipped_drift`.
 
-```python
-# Get backbone atom types from data file first
-info = parse_data_file(data_file=data_file, remote=False)
-# Identify backbone type IDs from info["atom_types"] — e.g. [2] for PE
+**`calculate_rdf` runs out of memory:** `atom_type_pairs=None` was used (Rule B), or `data_file` not passed.
 
-tg_run  = extract_tg(log_file=tg_log_path, initial_tg_guess=200)
-ree_run = extract_end_to_end_vectors(
-    dump_file=nvt_dump, data_file=data_file,
-    backbone_types=[2]   # ← REQUIRED; replace with your backbone type IDs
-)
-rdf_run = calculate_rdf(
-    dump_file=nvt_dump, data_file=data_file,
-    atom_type_pairs=[[2,2],[1,1],[1,2]]
-)
-den_run = extract_equilibrated_density(log_file=nvt_prod_log)
+**`extract_end_to_end_vectors` returns unreasonably large R:** `backbone_types` not set correctly — confirm from `inspect_data_file()`. Check dump includes image flags (ix, iy, iz).
 
-# Poll all
-for run in [tg_run, ree_run, rdf_run, den_run]:
-    while get_run_status(run["run_id"])["status"] not in ("completed", "failed"):
-        time.sleep(15)
+**`check_equilibration_comprehensive` returns `overall_pass=False`:** Extend final NPT by 1–2 ns and re-run. Check `warnings` to identify which gate failed.
 
-# Retrieve
-tg_result  = get_run_output(tg_run["run_id"])["result"]
-ree_result = get_run_output(ree_run["run_id"])["result"]
-rdf_result = get_run_output(rdf_run["run_id"])["result"]
-den_result = get_run_output(den_run["run_id"])["result"]
-```
+**`extract_bulk_modulus` gives unreasonable K:** Not fully equilibrated — `diagnostics.drift_check` will warn. Increase `eq_fraction`.
 
-### Step 2: Download CSV files for plotting
+**`extract_tg` returns "Bilinear curve_fit failed":** Before retrying with different params, parse the Temp column of the sweep log. If Temp spans < ~100 K total or collapses to a single bin, the log is a defective single-isothermal run (no staircase). Return FAIL and recommend regenerating the Tg sweep. Do NOT tune `initial_tg_guess` — that won't help.
 
-```python
-download_file_from_remote(tg_result["bins_csv"],   local_path="./results/tg_density_bins.csv")
-download_file_from_remote(ree_result["csv_file"],  local_path="./results/end_to_end_vectors.csv")
-for pair, path in rdf_result["rdf_files"].items():
-    download_file_from_remote(path, local_path=f"./results/rdf_{pair}.csv")
-```
+**`check_equilibration_comprehensive` labels an NPT run as "N/A (NVT — fixed volume)":** For PHYC/TraPPE-UA systems the tool's ensemble auto-detection can misclassify production NPT logs as fixed-volume. The numeric density-drift and density-SEM values are still computed and correct — trust them. Verify ensemble by checking that Lx/Ly/Lz/Volume vary in the log header. This is a labelling bug, not a run failure.
 
----
-
-## Common Failures at This Stage
-
-**`extract_tg` fails with "fewer than 4 temperature bins":**
-- Sweep range too narrow or T_STEP too large
-- Log file incomplete (simulation crashed) — check stdout log
-- Plateaus with excessive density drift are excluded; if `n_plateaus_skipped_drift` is high, the simulation needs more time per T
-
-**`Tg_K` and `Tg_alternative_K` disagree by >20 K:**
-- Noisy density data — increase N_STEPS_PER_T and re-run sweep
-- Temperature range doesn't bracket the transition — extend range
-
-**`fit_quality` is POOR despite a seemingly clean log:**
-- Download `tg_density_bins.csv` and plot ρ(T) manually
-- Look for discontinuities from velocity re-initialization (Rule C in Stage 3)
-- Check `n_plateaus_skipped_drift` — if many were skipped, data quality is the problem
-
-**`calculate_rdf` runs out of memory / crashes:**
-- `atom_type_pairs=None` was used — always specify explicit pairs (Rule D)
-- `data_file` not passed — now required for MDAnalysis topology
-
-**`extract_end_to_end_vectors` returns unreasonably large R:**
-- `backbone_types` not set correctly — confirm type IDs from `parse_data_file()`
-- Image flags (ix, iy, iz) missing from the dump — MDAnalysis can't unwrap without them
-
-**`check_equilibration` returns `equilibrated=False`:**
-- Extend the final NPT run by 1–2 ns and re-run the check
-- Check `density.drift` and `energy.drift` sub-dicts to identify which property is drifting
-
-**`extract_bulk_modulus` gives unreasonable K:**
-- Simulation not fully equilibrated — `diagnostics.drift_check` will warn if volume is drifting
-- Increase `eq_fraction` to use only the most stable portion of the trajectory
-
----
-
-**→ Stage 4 complete. Summarize results, compare to experimental benchmarks, and document findings in SUMMARY_LOG.md.**
+**C∞ > 15 warning for PE/PHYC:** This is soft INFO, not a gate failure. Semicrystalline-tendency PE at melt temperature legitimately sits at the top of the [3, 15] heuristic. Confirm conformational pass (Rg CV < 30%, MSID slope ≈ 1.0 ±20%, P2 < 0.10) and proceed.
