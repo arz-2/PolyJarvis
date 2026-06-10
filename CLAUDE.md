@@ -13,8 +13,18 @@ Read `guides/STAGE_INDEX.md` first on every task.
 | `guides/` | Stage-by-stage workflow guides; `STAGE_INDEX.md` is always read first |
 | `guides/polymer_rules.json` | Per-class Tg ranges, density targets, DP defaults, annealing cycles |
 | `data/TEMPLATE/run_log.md` | Run log template — copy to `data/[RUN]/run_log.md` at task start |
-| `data/[RUN]/` | One directory per simulation run |
-| `emc_pipeline.py` | EMC cell builder — 19 classes (PCFF: 15 classes; OPLS-AA: PHAL; TraPPE-UA: PHYC/PDIE/PSTR). RadonPy only: PSIL, PURA. |
+| `data/[RUN]/` | All run files: `run_log.md`, `lammps/`, `raw/`, `graphs/` (git-excluded) |
+
+---
+
+## Path Convention
+
+All run files live under `data/<run_name>/` (repo-relative, git-excluded). Use absolute paths in all tool calls.
+
+`<lammps_base>` = `/home/arz2/PolyJarvis/data/<run_name>/lammps/`
+
+**Cross-stage derived paths** follow `<lammps_base>/<NN_stage>/<NN_stage>[_out].{data,log,dump}`.
+Exceptions: `tg_log = tg/tg_sweep/tg_sweep.log`, `deform_log = prop/05_deform/05_deform.log` (null if rubbery).
 
 ---
 
@@ -28,16 +38,14 @@ Copy `data/TEMPLATE/run_log.md` to `data/[RUN]/run_log.md` at task start. Fill i
 
 The default mode is multi-agent. The orchestrator (this session) spawns specialist workers via `Agent(subagent_type=...)` calls. Workers are stateless — the orchestrator holds all state and recovery logic.
 
-### Dispatch table
-
-| After completing... | Spawn... |
-|---|---|
-| `classify_polymer` + `polymer_rules.json` lookup | `molecule-builder` |
-| `molecule-builder` returns `data_path` | `equilibration-worker` → then Monitor |
-| Monitor returns (equilibration done) | `check_equilibration_comprehensive` → if PASS, spawn `tg-sweep-worker` |
-| Monitor returns (Tg sweep done) | `analysis-worker(tasks=[...])` |
-
-See `guides/WORKER_CONFIGS.md` for prompt templates and RESULT block schemas for each worker.
+| Worker | Color | Role |
+|--------|-------|------|
+| `molecule-builder` | 🔵 blue | SMILES → `.data` file (EMC or RadonPy) |
+| `equilibration-worker` | 🟠 orange | `.data` → submitted equilibration chain |
+| `tg-sweep-worker` | 🟣 purple | equil `.data` → submitted Tg sweep run |
+| `tg-analysis-worker` | 🟢 green | Tg sweep log → Tg_K + fit quality |
+| `deform-worker` | 🔵 blue | NPT `.data` → submitted uniaxial deformation run (glassy only) |
+| `property-analysis-worker` | 🟢 green | simulation logs → density, bulk modulus, run summary |
 
 ### Orchestrator workflow
 
@@ -45,65 +53,91 @@ See `guides/WORKER_CONFIGS.md` for prompt templates and RESULT block schemas for
 1. Read CLAUDE.md + STAGE_INDEX.md only (never read stage guides directly)
 2. Copy data/TEMPLATE/run_log.md → data/[RUN]/run_log.md
 3. classify_polymer(smiles) → extract class entry: `Bash: jq '.classes.CLASS_ID' guides/polymer_rules.json` → build run_params
-4. Agent(subagent_type="molecule-builder", description="🔵 Build {polymer_name} cell", prompt=<smiles + run_params>)
+3a. Check builder_status: `jq -r '.classes.CLASS_ID.builder_status // "supported"' guides/polymer_rules.json`
+    If result == "unsupported": write UNRESOLVED to run_log.md and stop — no builder path exists for this class.
+3b. Generate worker prompts with `scripts/gen_prompt.py` — do NOT read WORKER_CONFIGS.md or polymer_rules.json manually:
+    `Bash: python3 scripts/gen_prompt.py --stage <STAGE> --run_name <RUN> --polymer_class <CLASS> [--smiles ...] [--data_path ...]`
+    Each call prints a ready-to-use prompt block. Override any field by passing the flag explicitly.
+    The script inlines STAGE_INDEX.md (cross-stage rules) so workers receive full context.
+4. Agent(subagent_type="molecule-builder", description="🔵 Build {polymer_name} cell", prompt=<output of gen_prompt.py --stage build>)
      → parse RESULT block → extract data_path, lammps_flags
-5. Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polymer_name}", prompt=<data_path + params>)
-     → parse RESULT block → extract chain_id, monitor_command
+5. Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polymer_name}", prompt=<output of gen_prompt.py --stage equil --data_path ...>)
+     → parse RESULT block → extract chain_id, monitor_command, expected_equil_data
 6. Write SIMULATION STATE to run_log.md (status=monitoring)
 7. Monitor(command=monitor_command)          # orchestrator owns this
-7a. /compact focus on simulation state, run IDs, and run_log.md checkpoint  # run before step 8 if context > 40%
+7a. /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), run_log.md absolute path, last worker RESULT block  # run before step 8 if context > 40%
 8. get_run_status(chain_id) → check success/failure
 9. check_equilibration_comprehensive(equil_log, dump, data, backbone_types) → PASS / EXTEND / ESCALATE
-10. Agent(subagent_type="tg-sweep-worker", description="🟣 Tg sweep {polymer_name}", prompt=<equil_data_path + tg_params>)
+10. Agent(subagent_type="tg-sweep-worker", description="🟣 Tg sweep {polymer_name}", prompt=<output of gen_prompt.py --stage tg --data_path equil_data_path>)
       → parse RESULT block → extract run_id, monitor_command
 11. Write SIMULATION STATE to run_log.md (status=monitoring)
 12. Monitor(command=monitor_command)          # orchestrator owns this
-12a. /compact focus on simulation state, run IDs, and run_log.md checkpoint  # run before step 13 if context > 40%
-13. Agent(subagent_type="analysis-worker", description="🟢 Analyze {polymer_name} results", prompt=<logs + tasks=[...]>)
-      → parse RESULT block → write RESULTS to run_log.md
+12a. /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), run_log.md absolute path, last worker RESULT block  # run before step 13 if context > 40%
+13. Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg {polymer_name}", prompt=<output of gen_prompt.py --stage analyze-tg --data_path tg_log_path>)
+      → parse RESULT block → extract Tg_K, Tg_fit_quality → write D-06 to run_log.md
+14. is_glassy = (Tg_K > 300)                 # safe default: True if Tg_K is None or fit ABORT
+15. if is_glassy:
+      Agent(subagent_type="deform-worker", description="🔵 Deform {polymer_name}", prompt=<output of gen_prompt.py --stage deform --data_path npt_prod_data_path>)
+        → parse RESULT block → extract run_id_deform, monitor_command_deform
+      Write SIMULATION STATE to run_log.md (status=monitoring)
+      Monitor(command=monitor_command_deform)   # orchestrator owns this
+      /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), run_log.md absolute path, last worker RESULT block  # run before step 16 if context > 40%
+16. Agent(subagent_type="property-analysis-worker", description="🟢 Analyze {polymer_name} properties",
+          prompt=<output of gen_prompt.py --stage analyze-full --data_path npt_prod_data_path --is_glassy true|false --smiles ... --ff ... --tg_fit_quality ... [--deform_log ...]>)
+      → parse RESULT block → write RESULTS to run_log.md; run_summary.json written to raw_dir
 ```
-
-### Analysis tasks construction
-
-Build the `tasks` list from `polymer_rules.json` defaults plus any user-requested extras:
-- Always include: `check_equilibration_comprehensive`, `extract_tg`, `extract_density`, `extract_bulk_modulus`
-- Add per user request: `calculate_rdf`, `extract_end_to_end_vectors`
-- For one-off non-standard requests (NEMD, literature search), handle inline — do not spawn a custom worker.
 
 ### Checkpoint protocol
 
-Before every `Monitor` call, write to `run_log.md`:
+Before every `Monitor` call, write SIMULATION STATE to `run_log.md` (see `data/TEMPLATE/run_log.md` for format). Update status to `done` or `failed` after Monitor returns.
 
-```markdown
-## SIMULATION STATE
-| Stage         | chain_id / run_id | status     | output_path              |
-|---------------|-------------------|------------|--------------------------|
-| Equilibration | chain-abc123      | monitoring | /path/to/stages/         |
-| Tg sweep      | —                 | pending    | —                        |
+On session restart: read SIMULATION STATE table → find row with `status=monitoring` → `get_run_status(id)` → `watch_run(id)` → re-issue Monitor.
+
+### Auto-compact
+
+Manual /compact focus string (steps 7a, 12a, before step 16):
 ```
-
-Update status to `done` after Monitor returns successfully, or `failed` on error. On session restart, read this table first — if a row shows `monitoring`, call `get_run_status(id)` to determine actual state before proceeding.
+/compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), run_log.md absolute path, last worker RESULT block
+```
+After any compact: read `run_log.md` SIMULATION STATE before the next tool call.
 
 ### Recovery ownership
 
 The orchestrator decides all recovery actions. Workers are re-spawned with adjusted prompts:
+
 - **Chain failed (Mode A):** Monitor fires → `get_run_status` returns FAILED → read error log → adjust params → re-spawn worker
-- **Session ended mid-Monitor (Mode B):** On restart, read SIMULATION STATE → `get_run_status` → if still running, re-issue Monitor; if done, continue; if failed, enter recovery
+- **Session ended mid-Monitor (Mode B):** Two sub-cases:
+
+  **B-1 — tmux alive:** `ssh lambda && pj` to re-attach; Monitor is still blocking, no action needed.
+
+  **B-2 — Claude process died (no tmux, machine rebooted, or session killed):**
+  1. `ssh lambda && pj && claude --continue` (or start fresh if conversation unavailable)
+  2. Read `data/[RUN]/run_log.md` → find the row where `status = monitoring`; note the `id` column value
+  3. Call `get_run_status(id)`:
+     - **running** → `watch_run(id)` → re-issue `Monitor(command=monitor_command)` → update run_log.md back to `monitoring`
+     - **completed** → update run_log.md to `done` → continue from the next orchestrator step
+     - **failed** → `get_run_output(id)` → diagnose → re-spawn worker (counts as recovery attempt)
+     - **not found** → wait 60–90 s for MCP server restart, retry; if still missing, treat as failed
+  4. **`monitor_command` is deterministic:** `watch_run(id)` regenerates it from the ID alone — always safe to re-call
+
 - Max 2 recovery attempts per stage; after that, write `UNRESOLVED` and stop
 
+### Recovery Reference
+
+#### Equilibration verdict (step 9)
+
+**PASS/EXTEND/ESCALATE** — `check_equilibration_comprehensive` returns a `recovery_hint` field with the exact action. Max 2 extensions; after that ESCALATE with `--density_initial` = class default − 0.05 g/cm³. Pass `ct_min_decay=0.25` for the melt/NVT log; omit for 300 K NPT and rubbery checks.
+
+#### Tg sweep verdict (steps 13–14)
+
+**EXCELLENT/ACCEPTABLE/BORDERLINE/ABORT** — `extract_tg` returns a `recovery_hint` field with the exact action.
+
+#### LAMMPS error taxonomy
+
+See `guides/LAMMPS_TROUBLESHOOTING.md` for error strings, root causes, and recovery actions.
+
+#### RadonPy QM failure (step 4)
+
+If `get_job_status` returns `failed` for a conformer search or charge assignment job: retry once with `n_conformers` halved. If still fails, fall back to AM1-BCC charges and note in DECISIONS D-02 ("RESP failed — AM1-BCC fallback"). Do not retry a third time.
+
 ---
-
-## Auto-Continuation After Simulation
-
-The orchestrator owns all `Monitor` calls. Workers (`equilibration-worker`, `tg-sweep-worker`) submit jobs and return `chain_id`/`run_id` + `monitor_command` without calling Monitor themselves.
-
-```
-1. result = Agent(subagent_type="equilibration-worker", ...)   # submits chain
-2. chain_id = parse(result, "chain_id")
-3. monitor_command = parse(result, "monitor_command")
-4. write_checkpoint(run_log, chain_id, status="monitoring")
-5. Monitor(command=monitor_command)   # block until done — harness re-invokes Claude
-6. continue workflow                  # Claude picks up here automatically
-```
-
-Never poll `get_run_status` in a loop. The Monitor tool + sentinel file is how PolyJarvis avoids requiring the user to manually re-trigger Claude after each simulation stage.
