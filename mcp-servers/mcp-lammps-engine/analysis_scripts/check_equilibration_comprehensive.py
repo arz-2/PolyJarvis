@@ -450,6 +450,8 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
             "beta": r(beta, 3) if beta is not None else None,
             "decay_fraction_at_end": r(decay_fraction, 3),
             "trajectory_ps": r(float(n_frames * dt_ps), 1),
+            # True when no gate requested (ct_min_decay=None) or decay meets threshold
+            "pass": True if args.ct_min_decay is None else bool(decay_fraction >= args.ct_min_decay),
         }
 
     # ── MSD ──
@@ -663,6 +665,8 @@ def main():
     parser.add_argument("--data_file",         required=True)
     parser.add_argument("--backbone_types",    type=int, nargs="+", required=True)
     parser.add_argument("--output_dir",        default=None)
+    parser.add_argument("--graphs_dir",        default=None,
+                        help="Directory for PNG figures (accepted for interface parity; currently unused).")
     parser.add_argument("--skip_frames",       type=int,   default=50)
     parser.add_argument("--timestep_fs",       type=float, default=1.0)
     parser.add_argument("--dump_every",        type=int,   default=1000)
@@ -676,6 +680,10 @@ def main():
     parser.add_argument("--density_col",       default="Density")
     parser.add_argument("--energy_col",        default="TotEng")
     parser.add_argument("--atom_style",        default="id resid type charge x y z")
+    parser.add_argument("--ct_min_decay",      type=float, default=None,
+                        help="Minimum C(t) decay fraction to pass hard gate (0–1). "
+                             "Omit for soft-warning-only behaviour (backwards compat). "
+                             "Use 0.25 for melt equilibration checks.")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir) if args.output_dir else Path(args.dump_file).parent / "eq_comprehensive"
@@ -765,6 +773,8 @@ def main():
         structural["rg"].get("pass", False),
         structural["p2"].get("pass", False),
         structural["density_homogeneity"].get("pass", False),
+        # C(t) gate — only active when --ct_min_decay supplied; defaults True otherwise
+        structural.get("ct", {}).get("pass", True),
     ]
     overall_pass = all(hard_checks)
 

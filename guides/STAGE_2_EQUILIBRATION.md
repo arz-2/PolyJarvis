@@ -16,7 +16,7 @@ with open("npt.in", "w") as f:
 workflow = generate_equilibration_workflow(
     data_file="<work_dir>/cell.data",
     work_dir_base="<work_dir>",
-    use_pcff=True,   # or use_opls=True / use_trappe=True for PHYC/PDIE/PSTR
+    use_pcff=True,   # or use_opls=True for PHAL/PSIL; use_trappe=True for PHYC/PDIE/PSTR
     params_file="<work_dir>/emc_build.params",  # EMC only
 )
 ```
@@ -125,8 +125,8 @@ Use `generate_script` for two stages starting from `07_npt_production_out.data`:
 2. NPT production: 300 K / 1 atm, ~2 ns → `09_npt_prod300/`
 
 Downstream inputs from Phase 2 (not stage 07):
-- `analysis-worker` `npt_prod_log_path` → `09_npt_prod300/09_npt_prod300.log`
-- `analysis-worker` `npt_prod_dump_path` → `09_npt_prod300/09_npt_prod300.dump`
+- `property-analysis-worker` `npt_prod_log_path` → `09_npt_prod300/09_npt_prod300.log`
+- `property-analysis-worker` `npt_prod_dump_path` → `09_npt_prod300/09_npt_prod300.dump`
 - `deform-worker` `equil_data_path` → `09_npt_prod300/09_npt_prod300_out.data`
 
 ---
