@@ -126,7 +126,7 @@ The orchestrator decides all recovery actions. Workers are re-spawned with adjus
 
 #### Equilibration verdict (step 9)
 
-**PASS/EXTEND/ESCALATE** — `check_equilibration_comprehensive` returns a `recovery_hint` field with the exact action. Max 2 extensions; after that ESCALATE with `--density_initial` = class default − 0.05 g/cm³. Pass `ct_min_decay=0.25` for the melt/NVT log; omit for 300 K NPT and rubbery checks.
+**PASS/EXTEND/ESCALATE** — `check_equilibration_comprehensive` returns a `recovery_hint` field with the exact action. Max 2 extensions; after that ESCALATE with `--density_initial` = class default − 0.05 g/cm³. Pass `ct_min_decay` = `ct_min_decay_melt` from `polymer_rules.json[class]` for the melt/NVT log (0.10 standard; 0.25 for fast rubbery PHYC/PDIE/PSIL; lit. basis: Auhl 2003 J. Chem. Phys. 119:12718). Omit for 300 K NPT and rubbery checks.
 
 #### Tg sweep verdict (steps 13–14)
 

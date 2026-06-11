@@ -22,15 +22,24 @@
 
 `atom_type_pairs=None` computes all pairs and can exceed 2 GB RAM per frame for 10k-atom systems. Always pass explicit pairs.
 
-### Rule C: Always Pass `output_dir` to Every Analysis Tool
+### Rule C: Always Pass `output_dir` and `graphs_dir` to Every Analysis Tool
 
-Default `output_dir` for each tool scatters files into different subdirectories next to its input file. Always pass:
+Default `output_dir` for each tool scatters files into different subdirectories next to its input file. Always pass both:
 
 ```python
 output_dir = "/home/arz2/PolyJarvis/data/<run_name>/raw/"
+graphs_dir = "/home/arz2/PolyJarvis/data/<run_name>/graphs/"
 ```
 
 Omitting `output_dir` means outputs land in `tg_analysis/`, `eq_comprehensive/`, `deform_analysis/`, etc. — `generate_run_summary` won't find them.
+
+Omitting `graphs_dir` means PNG figures land in `raw/figures/` instead of `graphs/`. The following tools produce PNG figures (always pass `graphs_dir`):
+- `extract_tg` → `tg_fit.png`
+- `extract_bulk_modulus` → `volume_fluctuations.png`
+- `extract_bulk_modulus_deform` → `stress_strain.png`
+- `check_equilibration_comprehensive` → `equilibration_convergence.png`
+- `calculate_rdf` → `rdf_all_pairs.png`
+- `extract_end_to_end_vectors` → `end_to_end_distribution.png`
 
 ---
 
@@ -57,6 +66,10 @@ Returns `overall_pass` verdict and a ready-to-paste D-05 markdown block. Copy `r
 `backbone_types` is **REQUIRED** — from `inspect_data_file()`; do not guess.
 
 Hard gates and soft warnings are identical to Stage 2 — see `STAGE_2_EQUILIBRATION.md`. If `overall_pass=False`, flag all properties as ⚠ but do not abort — report what failed.
+
+**`ct_min_decay` usage:** When checking the melt/NVT-production log (Stage 6 at T_equil), pass `ct_min_decay` = the `ct_min_decay_melt` value from the worker prompt. Thresholds are class-specific (0.10–0.25) and calibrated to the LAMMPS community standard of ≥10% decay as the practical lower bound (Auhl et al. 2003, J. Chem. Phys. 119:12718, DOI:10.1063/1.1628670). Omit for the 300 K NPT production log (Stage 9) and all rubbery polymer checks — C(t) cannot decay below Tg.
+
+**Do not remove this gate for stiff/high-Tg polymers.** C(t)=0% means chains are still frozen in the builder geometry; the gate distinguishes this from a genuine melt. Fast/rubbery classes (PHYC, PDIE, PSIL) use 0.25; most others use 0.10.
 
 ---
 
@@ -161,6 +174,7 @@ Call after all analysis tools have completed. Reads every JSON in `output_dir`, 
 ```python
 generate_run_summary(
     output_dir   = "/home/arz2/PolyJarvis/data/<run_name>/raw/",
+    graphs_dir   = "/home/arz2/PolyJarvis/data/<run_name>/graphs/",
     run_name     = run_name,
     smiles       = smiles,
     polymer_class = polymer_class,
