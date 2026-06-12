@@ -55,9 +55,11 @@ def parse_lammps_log(path):
                 continue
             if header is not None:
                 tokens = line.split()
-                if len(tokens) == len(header):
+                n = len(header)
+                if len(tokens) > 0 and len(tokens) % n == 0:
+                    chunks = [tokens[i*n:(i+1)*n] for i in range(len(tokens) // n)]
                     try:
-                        rows.append([float(t) for t in tokens])
+                        rows.extend([[float(t) for t in chunk] for chunk in chunks])
                         continue
                     except ValueError:
                         pass

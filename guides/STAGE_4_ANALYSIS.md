@@ -95,6 +95,10 @@ Key params:
 - `eq_fraction` — use only the most stable portion (default 0.5; increase if drifting)
 - `block_count` — blocks for uncertainty estimation (default 5)
 
+**Volume drift handling:**
+- **`volume_equilibrated=false`:** Re-run with `eq_fraction=0.25`; bracket the result between this value and `K_block_mean_GPa`. Flag K as WARNING in the run log.
+- **`B_def R² < 0.1`:** Cross-check is not usable; report K_dyn only.
+
 **Result fields:**
 - `bulk_modulus_GPa`, `bulk_modulus_sem_GPa`
 - `isothermal_compressibility_per_Pa`

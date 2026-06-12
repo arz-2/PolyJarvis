@@ -1,2 +1,0 @@
-- [Equilibration check quirks](equilibration_check_quirks.md) — check_equilibration_comprehensive can mislabel NPT logs as NVT; PE C∞ borderline warning is benign [ingested 2026-06-05]
-- [Tg sweep failure modes](tg_sweep_failure_modes.md) — "Bilinear curve_fit failed" usually = defective sweep log (no T staircase); parse Temp column before retrying [ingested 2026-06-05]
