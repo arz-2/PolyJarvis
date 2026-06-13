@@ -360,8 +360,8 @@
         "PVAc",
         "PVF"
       ],
-      "forcefield": "GAFF2",
-      "charge_method": "AM1-BCC",
+      "forcefield": "PCFF",
+      "charge_method": "none",
       "dp_typical": 60,
       "dp_min": 30,
       "nchain": 10,
@@ -406,7 +406,7 @@
         "PVA has hydroxyl groups capable of strong hydrogen bonding — PPPM required for proper electrostatics.",
         "PVAc ester side chain carries carbonyl dipole — PPPM recommended.",
         "PVC chloride gives significant partial charges on backbone carbons — PPPM required.",
-        "AM1-BCC adequate for polar vinyl side chains without aromatic conjugation; RESP not required.",
+        "Charges are embedded by EMC/PCFF (charge_method=none); no separate charge job. On the retired RadonPy route, AM1-BCC was adequate for polar vinyl side chains without aromatic conjugation (RESP not required).",
         "MD Tg expected 380-470 K for PVA/PVC after 80-120 K overestimation. Sweep to 550 K is safe.",
         "Strong H-bonding in PVA can trap chain conformations; extra annealing cycles recommended (5 minimum).",
         "Exp. RT density: PVC=1.38 g/cm³, PVA=1.26 g/cm³, PVAc=1.19 g/cm³. Initial 0.55 g/cm³ is conservative (avoids overlaps for full class range)."
@@ -424,8 +424,8 @@
         "PAA",
         "PEA"
       ],
-      "forcefield": "GAFF2_mod",
-      "charge_method": "RESP",
+      "forcefield": "PCFF",
+      "charge_method": "none",
       "dp_typical": 50,
       "dp_min": 30,
       "nchain": 10,
@@ -469,14 +469,14 @@
         "Tang2022"
       ],
       "notes": [
-        "GAFF2_mod + RESP for polyacrylics is established protocol: ester carbonyl dipole and methacrylate torsions require recalibrated parameters (Hayashi2022; Webb2024).",
+        "Build route is EMC + PCFF with embedded bond-increment charges (charge_method=none); the RadonPy/GAFF2_mod+RESP path was replaced (see ff_note). The ester carbonyl dipole and methacrylate torsions that motivated recalibrated GAFF2_mod parameters (Hayashi2022; Webb2024) are covered by PCFF Class II terms.",
         "PAA has ionizable carboxyl groups; in neutral form PPPM accounts for C=O dipole adequately.",
         "MD Tg for PMMA expected ~430-500 K; Webb2024 protocol: 40-540 K sweep, 20 K steps.",
         "Ester carbonyl dipole in PMMA/PMA requires PPPM to avoid significant electrostatic errors.",
         "PMA has flexible ester side chain → lower Tg; sweep lower bound at 150 K to sample deep glassy state.",
         "GAFF2_mod preferred over bare GAFF2 for methacrylate torsions; recalibrated ester/methacrylate torsional parameters (Hayashi2022).",
         "Exp. RT density: PMMA=1.19 g/cm³, PMA=1.22 g/cm³. Initial 0.60 g/cm³ = ~0.5x PMMA density.",
-        "GAFF2 Tg failure (critical): NkepsuMbitou2025 benchmark shows GAFF Tg error >45% for both PMMA and PIB — the largest error of all tested FFs. Class II FFs (PCFF, IFF) reproduce PMMA density within 2% and Tg within ~10% after WLF rate correction. GAFF2_mod is used here for Tg screening only; quantitative thermomechanical properties (Young's modulus, bulk modulus) require Class II FF. Route PACR to EMC/PCFF when accuracy is critical."
+        "GAFF2 Tg failure (critical): NkepsuMbitou2025 benchmark shows GAFF Tg error >45% for both PMMA and PIB — the largest error of all tested FFs. Class II FFs (PCFF, IFF) reproduce PMMA density within 2% and Tg within ~10% after WLF rate correction. PolyJarvis therefore builds PACR with PCFF (Class II) via EMC; GAFF2_mod would be a Tg-screening-only fallback on the retired RadonPy route, inadequate for quantitative thermomechanical properties (Young's modulus, bulk modulus)."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
@@ -647,8 +647,8 @@
         "POM",
         "poly(tetrahydrofuran)"
       ],
-      "forcefield": "GAFF2_mod",
-      "charge_method": "AM1-BCC",
+      "forcefield": "PCFF",
+      "charge_method": "none",
       "dp_typical": 100,
       "dp_min": 50,
       "nchain": 10,
@@ -691,7 +691,7 @@
         "Klajmon2023"
       ],
       "notes": [
-        "GAFF2_mod + AM1-BCC for ether systems: ether O torsions are recalibrated in GAFF2_mod; AM1-BCC adequate for ether oxygen polarization without RESP cost. Webb2024 uses GAFF with PME (PPPM-equivalent) for PEO as canonical example.",
+        "Build route is EMC + PCFF with embedded bond-increment charges (charge_method=none); the RadonPy/GAFF2_mod+AM1-BCC path was replaced (see ff_note). Ether-O torsions and oxygen polarization (handled on the GAFF2_mod route via AM1-BCC; Webb2024 uses GAFF+PME for PEO) are covered by PCFF with PPPM.",
         "Ether oxygen carries significant negative partial charge (~-0.3 to -0.4 e in GAFF2) — PPPM required.",
         "MD Tg for PEO: ~270 K (Wu2011 OPLS-AA stepwise-cooling AA-MD, 20×50 chains, 5 ns/step, 20 K steps). Overestimation vs experiment ~63–65 K — LESS than the typical 80–120 K for most classes. Apply ~65 K correction for PEO/PEG; sweep 100–440 K brackets this well.",
         "POM Tm=453 K (semicrystalline): T_equil=500 K exceeds Tm; PEO/PPO/PVME amorphous with Tg+150 K < 500 K.",
@@ -713,8 +713,8 @@
         "poly(ethylene sulfide)",
         "PPSO2"
       ],
-      "forcefield": "GAFF2_mod",
-      "charge_method": "RESP",
+      "forcefield": "PCFF",
+      "charge_method": "none",
       "dp_typical": 40,
       "dp_min": 20,
       "nchain": 10,
@@ -749,8 +749,8 @@
         "Afzal2021"
       ],
       "notes": [
-        "Sulfone S carries very large partial charges (S ~+1.3 e, O ~-0.55 e in GAFF2): RESP mandatory for aryl sulfone/sulfide.",
-        "GAFF2_mod for aromatic aryl-sulfide/sulfone torsions (PSU aryl-SO2-aryl dihedral recalibrated).",
+        "Sulfone S carries very large partial charges (S ~+1.3 e, O ~-0.55 e): PPPM mandatory for aryl sulfone/sulfide. Charges are embedded by EMC/PCFF (charge_method=none); RESP was the retired RadonPy-route method.",
+        "Aryl-sulfide/sulfone torsions (PSU aryl-SO2-aryl dihedral) are handled by PCFF, which has sulfone/sulfide types; GAFF2_mod recalibration was the retired RadonPy-route approach.",
         "PPS: MD Tg expected ~440-480 K after overestimation; upper sweep 600 K is safe.",
         "PPS is semi-crystalline above Tg — ensure amorphous cell construction. Rapid quench from 700 K helps suppress crystallization.",
         "Slow equilibration from rigid aryl-sulfide/sulfone backbone: 8 ns and 8 cycles required.",
@@ -772,8 +772,8 @@
         "PBS",
         "PHB"
       ],
-      "forcefield": "GAFF2_mod",
-      "charge_method": "RESP",
+      "forcefield": "PCFF",
+      "charge_method": "none",
       "dp_typical": 50,
       "dp_min": 25,
       "nchain": 10,
@@ -814,7 +814,7 @@
       ],
       "notes": [
         "Ester linkage carries C=O dipole (~0.7 D); PPPM required for all polyesters.",
-        "GAFF2_mod for ester/lactide torsions; RESP required for ester C=O dipole (HF/6-31G*).",
+        "Build route is EMC + PCFF (explicit ester types c_1, o_2, oe) with embedded bond-increment charges (charge_method=none); the RadonPy/GAFF2_mod+RESP path for ester/lactide torsions and the ester C=O dipole was replaced (see ff_note).",
         "PET Tm=533 K, PBT Tm~498 K, PBS Tm~388 K, PLA Tm~430 K, PCL Tm~333 K: T_equil=620 K exceeds all Tm values.",
         "PET MD Tg expected ~420-460 K; PLA ~410-450 K; PCL ~290-330 K. Sweep 100-600 K covers all.",
         "PCL: very low Tg (-60°C, 213 K); lower sweep bound must reach 100 K to fully sample glassy state.",
@@ -897,8 +897,8 @@
         "PU",
         "segmented polyurethane"
       ],
-      "forcefield": "GAFF2_mod",
-      "charge_method": "RESP",
+      "forcefield": "PCFF",
+      "charge_method": "none",
       "dp_typical": 40,
       "dp_min": 20,
       "nchain": 10,
@@ -929,7 +929,7 @@
       ],
       "notes": [
         "Urethane linkage (-O-CO-NH-) carries strong dipole and H-bond donor/acceptor — PPPM mandatory.",
-        "GAFF2_mod for urethane torsional parameters (analogous to amide/ester). RESP required for urethane C=O and N-H partial charges.",
+        "Build route is EMC + PCFF with embedded bond-increment charges (charge_method=none); the RadonPy/GAFF2_mod+RESP path for urethane torsions (analogous to amide/ester) and urethane C=O / N-H charges was replaced (see ff_note).",
         "H-bonding and microphase complexity: 8 annealing cycles and 8 ns equilibration required.",
         "Segmented polyurethanes exhibit micro-phase separation; MD of simplified homopolymer model may not capture both Tg values.",
         "For repeat-unit-based simulation (PoLyInfo): treat as single-phase urethane-linked chain. Expect single MD Tg ~350-480 K.",
@@ -1058,8 +1058,8 @@
         "poly(sebacic anhydride)",
         "PLGA-like anhydrides"
       ],
-      "forcefield": "GAFF2_mod",
-      "charge_method": "RESP",
+      "forcefield": "PCFF",
+      "charge_method": "none",
       "dp_typical": 40,
       "dp_min": 20,
       "nchain": 10,
@@ -1089,7 +1089,7 @@
       ],
       "notes": [
         "Anhydride linkage (-CO-O-CO-) contains two carbonyls and an ether-like oxygen — significant partial charges; PPPM required.",
-        "GAFF2_mod for anhydride linkage torsions (analogous to ester). RESP for dual carbonyl partial charges.",
+        "Build route is EMC + PCFF (ester-like types cover the anhydride linkage) with embedded bond-increment charges (charge_method=none); the RadonPy/GAFF2_mod+RESP path for anhydride torsions and dual-carbonyl charges was replaced (see ff_note).",
         "MD Tg expected ~400-450 K after overestimation. Upper sweep 550 K safe.",
         "Polyanhydrides are hydrolytically labile: MD in vacuum/implicit solvent without water is standard.",
         "PLGA (poly(lactic-co-glycolic acid)) is technically a polyester-co-glycolide; anhydride-linkage variants follow similar parameters.",
@@ -1161,8 +1161,8 @@
         "Ultem",
         "DGEBA-amine epoxy"
       ],
-      "forcefield": "GAFF2_mod",
-      "charge_method": "RESP",
+      "forcefield": "PCFF",
+      "charge_method": "none",
       "dp_typical": 20,
       "dp_min": 10,
       "nchain": 10,
@@ -1194,7 +1194,7 @@
       ],
       "notes": [
         "Amine nitrogen is a strong H-bond donor and acceptor — PPPM mandatory.",
-        "GAFF2_mod for glycidyl-ether ring-opened and aryl ether torsions; RESP for N-H, aryl ether, and ring-opened epoxide partial charges.",
+        "Build route is EMC + PCFF (has amine N types) with embedded bond-increment charges (charge_method=none); the RadonPy/GAFF2_mod+RESP path for glycidyl-ether/aryl-ether torsions and N-H / aryl-ether / ring-opened epoxide charges was replaced (see ff_note).",
         "Ultem (polyetherimide): contains both ether and imide linkages — very high Tg 488 K experimental.",
         "MD Tg for Ultem expected 570-610 K after overestimation. Sweep to 750 K required.",
         "dp_typical=20: short segment between crosslinks for epoxy network model; linear polyimine also uses ~20.",
@@ -1269,8 +1269,8 @@
         "PDCP",
         "poly(ethoxyphosphazene)"
       ],
-      "forcefield": "GAFF2_mod",
-      "charge_method": "RESP",
+      "forcefield": "PCFF",
+      "charge_method": "none",
       "dp_typical": 30,
       "dp_min": 15,
       "nchain": 10,
@@ -1300,10 +1300,10 @@
       ],
       "notes": [
         "Phosphazene backbone (P=N alternating) carries large partial charges on P (~+1.2 e) and N (~-0.8 e) — PPPM mandatory.",
-        "GAFF2_mod for P=N-P torsion. GAFF2 p3/p5 atom types designed for bio-phosphates; validate applicability to inorganic-backbone polyphosphazenes.",
+        "Build route is EMC + PCFF (pcff.frc has explicit polyphosphazene types) with embedded bond-increment charges (charge_method=none). On the retired RadonPy route, GAFF2 p3/p5 types (designed for bio-phosphates) needed validation for inorganic-backbone polyphosphazenes.",
         "Highly tunable: Tg depends strongly on substituents (alkoxy, fluoroalkoxy, phenoxy). Wide temperature sweep 80-550 K covers full experimental range plus 80-120 K MD overestimation.",
         "Exp. RT density estimated ~1.15-1.25 g/cm³ (no direct GAFF2 polyphosphazene MD reference; estimated from literature). Initial 0.55 g/cm³.",
-        "COMPASS force field used in published polyphosphazene MD (ScienceDirect); GAFF2 is preferable for PolyJarvis but validate P atom type parameters.",
+        "COMPASS force field used in published polyphosphazene MD (ScienceDirect); PolyJarvis uses PCFF via EMC (pcff.frc P=N types) — validate P atom-type parameters.",
         "Fox equation can predict Tg for copolymer variants (Allcock et al. ScienceDirect 2021).",
         "WARNING: Low confidence — polyphosphazene-specific GAFF2 parameterization may be incomplete. Consider custom P=N parameters."
       ],
@@ -1431,8 +1431,8 @@
         "poly(p-phenylene)",
         "P3HT-like"
       ],
-      "forcefield": "GAFF2_mod",
-      "charge_method": "RESP",
+      "forcefield": "PCFF",
+      "charge_method": "none",
       "dp_typical": 25,
       "dp_min": 20,
       "nchain": 10,
@@ -1464,7 +1464,7 @@
       ],
       "notes": [
         "Conjugated pi-system: significant partial charges on all backbone atoms due to delocalization — PPPM required.",
-        "GAFF2_mod for phenylene/vinylene torsional barriers (aromatic sp2 carbons 'ca', vinyl bonds 'c2'). RESP for aromatic pi partial charges and aryl ether O.",
+        "Build route is EMC + PCFF with embedded bond-increment charges (charge_method=none); the RadonPy/GAFF2_mod+RESP path for phenylene/vinylene torsional barriers and aromatic-pi / aryl-ether-O charges was replaced (see ff_note).",
         "PPO/PPE Tg=480 K + 150 = 630 K; PPV Tg=416 K; T_equil=650 K covers PPO and provides margin for PPP.",
         "PPV Tg=416±8 K from MD simulation (Venkatanarayanan & Ananth, Macromol. Theory Simul. 2016 DOI:10.1002/mats.201600006).",
         "MEH-PPV: bulky 2-ethylhexyloxy side chain lowers Tg. MD Tg expected ~440-480 K after overestimation.",
