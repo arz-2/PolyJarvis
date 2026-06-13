@@ -1,0 +1,7 @@
+# Lightweight dependencies for the pure-logic test suite.
+# These are the only packages needed to run `pytest` (default selection) — no
+# LAMMPS, EMC, RadonPy, conda, or GPU required.
+pytest>=7.0
+numpy>=1.23
+scipy>=1.9
+pandas>=1.5
