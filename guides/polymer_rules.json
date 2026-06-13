@@ -344,11 +344,11 @@
       ],
       "notes": [
         "PSTR builds with TraPPE-UA via EMC (embedded charges; charge_method=none). On the retired RadonPy route, GAFF2_mod + RESP captured aromatic pi-system polarization (Hayashi2022; Afzal2021).",
-        "P2VP contains a basic pyridine nitrogen — weak partial charges; PPPM is conservative and correct.",
+        "Electrostatics is a class-level compromise: pure PS (aPS) is all-C/H united-atom with charge_method=none, so it carries no partial charges and would qualify for lj_cut by the electrostatics_decision_guide. pppm is kept as the conservative class default because the polar members (P2VP/P4VP pyridine N, SAN nitrile) do carry partial charges; pppm is harmless-but-wasted for neutral PS and correct for the polar members. Split the class if PS-only throughput matters.",
         "PS: MD Tg ~430-500 K expected (SimPoly: 399±22 K vs exp 373 K); upper sweep at 600 K covers this.",
         "On the retired RadonPy route, RESP charges (HF/6-31G*) were recommended for PS/PSTR ring pi-system polarization (AM1-BCC acceptable fallback); the EMC/TraPPE-UA route embeds charges instead (charge_method=none).",
         "Atactic stereochemistry matters: DP≥30 needed to average tacticity fluctuations in Tg.",
-        "1.0 fs timestep chosen to resolve phenyl ring torsions accurately (GAFF2_mod parameterization).",
+        "1.0 fs timestep chosen to resolve phenyl ring torsions accurately (TraPPE-UA united-atom phenyl: cac/cah aromatic types).",
         "Exp. RT density: PS=1.05 g/cm³. Initial density 0.53 g/cm³ = ~0.5x PS density."
       ]
     },
