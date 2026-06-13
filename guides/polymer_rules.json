@@ -837,7 +837,7 @@
         "aramid"
       ],
       "forcefield": "PCFF",
-      "charge_method": "RESP",
+      "charge_method": "none",
       "dp_typical": 50,
       "dp_min": 25,
       "nchain": 10,
@@ -876,7 +876,7 @@
       ],
       "notes": [
         "Amide group has strong C=O dipole and N-H hydrogen bond donor — PPPM mandatory.",
-        "GAFF2_mod for amide bond torsions; RESP mandatory for strong amide C=O and N-H partial charges (Hayashi2022).",
+        "Build route is EMC + PCFF with embedded bond-increment charges (no separate charge job; charge_method=none). The GAFF2_mod amide-torsion tuning and RESP amide C=O / N-H charges (Hayashi2022) are cited as chemistry rationale / RadonPy-fallback only — the strong amide dipoles make PPPM mandatory regardless of route.",
         "PA6 Tm=493 K, PA66 Tm=538 K, PAMXD6 Tm~516 K: T_equil=650 K exceeds all PA Tm values.",
         "MD Tg for Nylon-6,6 expected ~400-440 K after overestimation; upper bound 600 K is safe.",
         "Dense H-bonding between amide groups significantly raises Tg and slows equilibration; 8 annealing cycles, 8 ns required.",
@@ -1002,7 +1002,7 @@
         "BPDA-ODA"
       ],
       "forcefield": "PCFF",
-      "charge_method": "RESP",
+      "charge_method": "none",
       "dp_typical": 24,
       "dp_min": 15,
       "nchain": 8,
@@ -1035,7 +1035,7 @@
       ],
       "notes": [
         "Imide ring has large conjugated pi-system with C=O and N partial charges — PPPM mandatory.",
-        "GAFF2_mod for imide ring and dianhydride torsions; RESP for imide C=O and aromatic conjugated charges.",
+        "Build route is EMC + PCFF with embedded bond-increment charges (no separate charge job; charge_method=none). The GAFF2_mod imide-ring/dianhydride-torsion tuning and RESP imide C=O / aromatic conjugated charges are cited as chemistry rationale / RadonPy-fallback only.",
         "Wen2020 protocol: 15 repeat units, 10 chains, 1 fs timestep, 20 K/ns cooling from 900 K; Tg validated 451-691 K.",
         "MD Tg expected 730-810 K for high-Tg polyimides after overestimation. Sweep to 900 K required.",
         "High Tg means long equilibration: 15 ns and 8 cycles required (rigid-rod backbone, slow chain relaxation).",
@@ -1111,7 +1111,7 @@
         "PC-PDMS"
       ],
       "forcefield": "PCFF",
-      "charge_method": "RESP",
+      "charge_method": "none",
       "dp_typical": 40,
       "dp_min": 20,
       "nchain": 10,
@@ -1141,9 +1141,9 @@
       ],
       "notes": [
         "Carbonate linkage (-O-CO-O-) plus bisphenol aromatic rings: significant partial charges. PPPM mandatory.",
-        "GAFF2_mod for aryl carbonate and bisphenol ether torsions; RESP required for carbonate C=O dipole and aromatic pi partial charges.",
+        "Build route is EMC + PCFF with embedded bond-increment charges (no separate charge job; charge_method=none). The GAFF2_mod aryl-carbonate/bisphenol-ether-torsion tuning and RESP carbonate C=O / aromatic pi charges are cited as chemistry rationale / RadonPy-fallback only.",
         "MD Tg for BPA-PC expected ~500-540 K after overestimation. Upper sweep 700 K covers this.",
-        "GAFF2 is applicable but PCFF+ outperforms GAFF for PC Tg in comparative studies (Tang2022). GAFF2_mod is preferred for PolyJarvis.",
+        "PCFF+ outperforms GAFF for PC Tg in comparative studies (Tang2022); PolyJarvis builds BPA-PC with PCFF via EMC. GAFF2 is an applicable alternative only on the RadonPy fallback route.",
         "BPA phenyl ring flip motions: important sub-Tg relaxation. Requires adequate sampling: 8 ns equilibration (Tang2022).",
         "Exp. RT density: BPA-PC=1.20 g/cm³. Initial 0.60 g/cm³ = ~0.5x PC density.",
         "Langevin thermostat at 500 K then NPT equilibration at 500 K before cooling is a documented protocol for PC MD."
@@ -1321,7 +1321,7 @@
         "poly(ether ketone)"
       ],
       "forcefield": "PCFF",
-      "charge_method": "RESP",
+      "charge_method": "none",
       "dp_typical": 32,
       "dp_min": 15,
       "nchain": 10,
@@ -1353,7 +1353,7 @@
       ],
       "notes": [
         "Ketone carbonyl C=O and ether oxygen: both carry significant partial charges — PPPM required.",
-        "GAFF2_mod for aromatic ketone carbonyl and aryl ether torsions; RESP for ketone C=O and aryl ether partial charges.",
+        "Build route is EMC + PCFF with embedded bond-increment charges (no separate charge job; charge_method=none). The GAFF2_mod ketone-carbonyl/aryl-ether-torsion tuning and RESP ketone C=O / aryl-ether charges are cited as chemistry rationale / RadonPy-fallback only.",
         "PEEK Tm=616 K: T_equil=770 K exceeds Tm and Tg+MD_overestimate (418+120=538 K). PEK Tm~638 K: check if 770 K is sufficient.",
         "COMPASS II gives Tg=424-429 K for PEEK variants (PMC7285100), close to experimental 418 K.",
         "MD Tg for PEEK expected ~500-540 K after overestimation. Sweep to 750 K safely brackets this.",
@@ -1376,7 +1376,7 @@
         "poly(aryl ether sulfone)"
       ],
       "forcefield": "PCFF",
-      "charge_method": "RESP",
+      "charge_method": "none",
       "dp_typical": 25,
       "dp_min": 15,
       "nchain": 10,
@@ -1408,7 +1408,7 @@
       ],
       "notes": [
         "Sulfone group (-SO2-) has very large partial charges on S (~+1.3 e) and O (~-0.55 e) — PPPM mandatory.",
-        "GAFF2_mod for aryl-SO2-aryl torsion and aryl ether torsion. GAFF2 S atom types: sulfone uses s4 (tetravalent S). Verify in RadonPy GAFF2 assignment.",
+        "Build route is EMC + PCFF with embedded bond-increment charges (no separate charge job; charge_method=none). The GAFF2_mod aryl-SO2-aryl/aryl-ether-torsion tuning (GAFF2 sulfone S = s4 tetravalent type, verify on RadonPy assignment) is cited as chemistry rationale / RadonPy-fallback only.",
         "Ether linkages add additional polarity. Combined sulfone+ether: strong electrostatic interactions throughout chain.",
         "T_equil=700 K: PES Tg=493 K + 150 K = 643 K → 700 K conservative for slow-relaxing rigid backbone.",
         "MD Tg for PSU expected ~540-580 K after overestimation. Sweep to 750 K safely brackets this.",
