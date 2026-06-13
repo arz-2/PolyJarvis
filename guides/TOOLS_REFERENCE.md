@@ -53,7 +53,7 @@ Quick index of all available MCP tools.
 - PAMD: amide N adjacent to C=O (not split across `*`)
 - PIMD: all imide ring atoms lowercase for sp2 `npc` type; uppercase N → crash
 - PDIE: cis/trans microstructure in SMILES; `*C/C=C\C*` for cis-PBD
-- PSTR/PHYC: tacticity only via `[C@@H]`/`[C@H]` with OPLS-AA; **not** with TraPPE-UA (UA has no explicit H)
+- PSTR (OPLS-AA, all-atom): tacticity via `[C@@H]`/`[C@H]` is supported. PHYC/PDIE (TraPPE-UA): **not** supported (UA has no explicit H) → atactic only
 
 **params file:** After every EMC build, `smiles_to_emc.py` auto-strips style lines from `.params`. If using a pre-2026-05-30 build, strip manually: `sed -i '/^pair_style\b/d; /^bond_style\b/d; ...' emc_build.params`
 

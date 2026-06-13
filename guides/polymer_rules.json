@@ -1,10 +1,10 @@
 {
   "_metadata": {
-    "description": "PolyJarvis polymer class parameter rules for LAMMPS MD simulations. Nine classes route to EMC (emc_pipeline.py): PHYC/PDIE/PSTR → TraPPE-UA, PHAL → OPLS-AA, PCBN/PAMD/PKTN/PSFO/PIMD → PCFF. Twelve classes route to RadonPy (GAFF2_mod + QM charges). preferred_builder in each class block is authoritative for routing. Drives force field selection, cell construction, equilibration, Tg sweep, and bulk modulus protocols per PoLyInfo 21-class taxonomy.",
+    "description": "PolyJarvis polymer class parameter rules for LAMMPS MD simulations. Nine classes route to EMC (emc_pipeline.py): PHYC/PDIE → TraPPE-UA, PHAL/PSTR → OPLS-AA, PCBN/PAMD/PKTN/PSFO/PIMD → PCFF. Twelve classes route to RadonPy (GAFF2_mod + QM charges). preferred_builder in each class block is authoritative for routing. Drives force field selection, cell construction, equilibration, Tg sweep, and bulk modulus protocols per PoLyInfo 21-class taxonomy.",
     "version": "2.1.0",
     "created": "2026-05-23",
     "units": {
-      "forcefield": "Active force field for the class. EMC-routed classes: TraPPE-UA (PHYC/PDIE/PSTR), PCFF (PCBN/PAMD/PKTN/PSFO/PIMD), OPLS-AA (PHAL). RadonPy-routed classes: GAFF2_mod (most) or GAFF2 (PVNL, PSIL). preferred_builder and preferred_ff fields are authoritative for routing; forcefield is the active RadonPy FF when preferred_builder=radonpy.",
+      "forcefield": "Active force field for the class. EMC-routed classes: TraPPE-UA (PHYC/PDIE), PCFF (PCBN/PAMD/PKTN/PSFO/PIMD), OPLS-AA (PHAL/PSTR). RadonPy-routed classes: GAFF2_mod (most) or GAFF2 (PVNL, PSIL). preferred_builder and preferred_ff fields are authoritative for routing; forcefield is the active RadonPy FF when preferred_builder=radonpy.",
       "charge_method": "Method for partial charge assignment: Gasteiger (apolar), AM1-BCC (moderately polar), RESP/HF/6-31G* (aromatic/strongly polar)",
       "dp_typical": "Degree of polymerization (repeat units per chain) for production runs",
       "dp_min": "Minimum DP for chain-length-independent Tg (Fox-Flory plateau)",
@@ -36,7 +36,7 @@
       "lj/cut is acceptable only for purely apolar backbones (PE, PIB, PBD, PI) where charge magnitudes on backbone atoms are < 0.1 e (Afzal et al. ACS Appl. Polym. Mater. 2021 DOI:10.1021/acsapm.0c00524).",
       "Annealing: 10 heat-cool cycles (300→600 K, 3 ns each) are used in PolyPal (Roos et al. PMC12249339 2025); RadonPy uses a single rapid 1 ns anneal at 700 K then stepwise cooling.",
       "For halogenated polymers (PHAL), improved GAFF2 fluorine parameters are needed for CF2/CF3 backbones. Key sources: Damm et al. J. Comput. Chem. 1997, 18, 1955 (OPLS-AA F params); Byutner & Smith Macromolecules 2000, 33, 4264 (PVDF-specific QM FF); Kamath & Potoff Fluid Phase Equilib. 2006, 246, 218 (PTFE/perfluorocarbon).",
-      "Builder routing (expanded 2026-05-31): 19 of 21 classes use EMC. PCFF (Class II, 15 classes): PCBN PAMD PKTN PSFO PIMD POXI PEST PSUL PURT PANH PPHS PACR PIMN PVNL PPNL. OPLS-AA (1 class): PHAL. TraPPE-UA (3 classes): PHYC PDIE PSTR. RadonPy only (2 classes): PSIL (si/osi increment missing), PURA (n_2/hn increment missing). PURT warning: aliphatic urethanes only — aromatic MDI fails. preferred_builder field in each class block is authoritative.",
+      "Builder routing (expanded 2026-05-31): 19 of 21 classes use EMC. PCFF (Class II, 15 classes): PCBN PAMD PKTN PSFO PIMD POXI PEST PSUL PURT PANH PPHS PACR PIMN PVNL PPNL. OPLS-AA (2 classes): PHAL PSTR. TraPPE-UA (2 classes): PHYC PDIE. RadonPy only (2 classes): PSIL (si/osi increment missing), PURA (n_2/hn increment missing). PURT warning: aliphatic urethanes only — aromatic MDI fails. preferred_builder field in each class block is authoritative.",
       "Primary Tg observable: density (or specific volume) is the most reliable and consistent observable for Tg extraction across all polymer classes and FFs (Wu2011; Klajmon2023; NkepsuMbitou2025). Tg from Coulombic energy is systematically 20–40 K lower than density-based Tg (Wu2011 PEO); do not use electrostatic energy slope-change as primary Tg signal. Tg from E_vdW tracks density Tg closely and is an acceptable secondary check.",
       "Asymptote convergence is required before reporting Tg (Patrone2016): temperature sweep must extend far enough beyond the transition region to achieve ≥90% convergence to both glassy and rubbery asymptotes. Inadequate sweep range is a leading source of Tg bias in high-throughput MD (Klajmon2023).",
       "GAFF/GAFF2 Tg accuracy warning: for Class I FFs, Tg errors >40% have been reported for PMMA and PIB (NkepsuMbitou2025). Class II FFs (PCFF, IFF) give <10% error. PolyJarvis routes 9 classes to EMC/PCFF precisely for this reason. For the 12 RadonPy/GAFF2_mod classes, Tg results are screening-quality (±20–30 K) unless validated against experiment.",
@@ -117,7 +117,7 @@
         "id": "Martin1998",
         "citation": "Martin, M. G.; Siepmann, J. I. Transferable Potentials for Phase Equilibria. 1. United-Atom Description of n-Alkanes. J. Phys. Chem. B 1998, 102, 2569–2577.",
         "doi": null,
-        "relevance": "Original TraPPE-UA force field for n-alkanes (CH3/CH2 united atoms): LJ parameters fitted to vapor–liquid coexistence of C1–C12 alkanes. Foundation for all TraPPE-UA-routed classes (PHYC, PDIE, PSTR) via EMC."
+        "relevance": "Original TraPPE-UA force field for n-alkanes (CH3/CH2 united atoms): LJ parameters fitted to vapor–liquid coexistence of C1–C12 alkanes. Foundation for all TraPPE-UA-routed classes (PHYC, PDIE) via EMC."
       },
       {
         "id": "Keasler2012",
@@ -296,11 +296,11 @@
         "SAN",
         "aPS"
       ],
-      "preferred_ff": "trappe-ua",
+      "preferred_ff": "opls-aa/2024",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1021/jp302975c",
-      "ff_note": "TraPPE-UA via EMC: cac (aromatic C with alkyl substituent) and cah (aromatic CH) atom types confirmed in trappe-ua.define. EMC author t_glass example (in 't Veld 2023) uses trappe-ua with *C(c1ccccc1)C* (atactic PS) explicitly for Tg calculations. Supersedes OPLS-AA path (Afzal 2021 R²=0.40 for styrene subset).",
-      "forcefield": "TraPPE-UA",
+      "ff_justification_doi": "10.1021/acs.macromol.3c01508",
+      "ff_note": "OPLS-AA via EMC (opls/2024/opls-aa; embedded charges, charge_method=none). Density: OPLS-AA reproduces atactic-PS density to ~0.4% (Al Otmi, Willmore & Sampath, Macromolecules 2023, 10.1021/acs.macromol.3c01508 — 1.054±0.002 g/cm³ at 300 K in LAMMPS with PPPM). Tg caveat: OPLS over-predicts aPS Tg (~+79 K; Afzal 2021 OPLS3e, 10.1021/acsapm.0c00524; multi-polymer OPLS Tg benchmark Klajmon 2023, 10.1021/acs.iecr.3c03038) — the 600 K upper sweep brackets the expected 430-500 K MD value. Electrostatics is pppm, not lj_cut: OPLS-AA all-atom phenyl carries explicit ±0.115 e aromatic ring charges and every published OPLS-AA PS study uses long-range Coulomb (Al Otmi 2023; Ndoro et al. JCP 2018). NOTE: prior 'Afzal R²=0.40 styrene-subset' justification for the retired TraPPE-UA path was a paywalled, unverified figure (likely a Tg, not density, weakness) and is not relied upon here.",
+      "forcefield": "OPLS-AA",
       "charge_method": "none",
       "dp_typical": 50,
       "dp_min": 30,
@@ -335,20 +335,21 @@
         "P2VP": 374,
         "notes": "PS: ~100°C (373 K). P2VP similar to PS due to similar backbone rigidity."
       },
-      "confidence": "high",
+      "confidence": "medium",
       "citations": [
-        "Hayashi2022",
+        "AlOtmi2023",
+        "Klajmon2023",
         "Afzal2021",
-        "Srivastava2026",
-        "Keasler2012"
+        "Hayashi2022",
+        "Srivastava2026"
       ],
       "notes": [
-        "PSTR builds with TraPPE-UA via EMC (embedded charges; charge_method=none). On the retired RadonPy route, GAFF2_mod + RESP captured aromatic pi-system polarization (Hayashi2022; Afzal2021).",
-        "Electrostatics is a class-level compromise: pure PS (aPS) is all-C/H united-atom with charge_method=none, so it carries no partial charges and would qualify for lj_cut by the electrostatics_decision_guide. pppm is kept as the conservative class default because the polar members (P2VP/P4VP pyridine N, SAN nitrile) do carry partial charges; pppm is harmless-but-wasted for neutral PS and correct for the polar members. Split the class if PS-only throughput matters.",
-        "PS: MD Tg ~430-500 K expected (SimPoly: 399±22 K vs exp 373 K); upper sweep at 600 K covers this.",
-        "On the retired RadonPy route, RESP charges (HF/6-31G*) were recommended for PS/PSTR ring pi-system polarization (AM1-BCC acceptable fallback); the EMC/TraPPE-UA route embeds charges instead (charge_method=none).",
+        "PSTR builds with OPLS-AA via EMC (opls/2024/opls-aa; embedded charges, charge_method=none). All polystyrenic members (PS; P2VP/P4VP pyridine N; SAN nitrile) share the one OPLS-AA + pppm route — the all-atom partial charges make pppm correct for every member, so no PS-only sub-class is needed (a class split was considered and rejected on these grounds).",
+        "FF choice trade-off: OPLS-AA reproduces aPS density to ~0.4% (Al Otmi 2023) but over-predicts aPS Tg (~+79 K; Afzal 2021). The retired TraPPE-UA path (in 't Veld 2023 EMC t_glass example, *C(c1ccccc1)C*) was closer for Tg; OPLS-AA chosen here for the validated all-atom density and consistency with the PHAL OPLS-AA route. confidence=medium reflects the Tg bias.",
+        "PS: MD Tg ~430-500 K expected (OPLS over-predicts; SimPoly 399±22 K vs exp 373 K); upper sweep at 600 K covers this.",
+        "On the retired RadonPy route, RESP charges (HF/6-31G*) captured PS/PSTR ring pi-system polarization (AM1-BCC acceptable fallback); the EMC/OPLS-AA route embeds the force field's own charges instead (charge_method=none).",
         "Atactic stereochemistry matters: DP≥30 needed to average tacticity fluctuations in Tg.",
-        "1.0 fs timestep chosen to resolve phenyl ring torsions accurately (TraPPE-UA united-atom phenyl: cac/cah aromatic types).",
+        "1.0 fs timestep: all-atom OPLS-AA has explicit aromatic H and runs at 1 fs without constraints (no SHAKE, as with the PCFF all-atom classes); resolves C-H stretch and phenyl ring torsions.",
         "Exp. RT density: PS=1.05 g/cm³. Initial density 0.53 g/cm³ = ~0.5x PS density."
       ]
     },

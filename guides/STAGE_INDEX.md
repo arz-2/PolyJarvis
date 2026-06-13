@@ -49,9 +49,9 @@ SMILES
        │    ⚠ PURT: aliphatic only (aromatic MDI fails)
        │    ⚠ PPHS: alkoxy substituents tested (Cl-substituted untested)
        │
-       ├─ EMC (opls/2024/opls-aa): PHAL
+       ├─ EMC (opls/2024/opls-aa): PHAL PSTR
        │
-       ├─ EMC (trappe-ua): PHYC PDIE PSTR
+       ├─ EMC (trappe-ua): PHYC PDIE
        │
        │    └─ all EMC paths: submit_emc_cell_job() → poll → data_path + lammps_flags
        │

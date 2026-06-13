@@ -19,9 +19,9 @@ Seeds: EMC=[N or "random"]  |  SEED_HOT=[N]  |  SEED_COLD=[N]
 | D-06 Tg fit quality | [EXCELLENT / ACCEPTABLE / BORDERLINE / ABORT]       | [R²=[X], F-stat tier=[TIER], N=[N] temperature bins] |
 
 <!-- Example — PS1 completed run:
-| D-01 | TraPPE-UA | classify_polymer returned PSTR → EMC TraPPE-UA auto-routed |
-| D-02 | embedded in FF | TraPPE-UA: UA charges embedded, no QM step |
-| D-03 | lj/cut 12 Å | Pure C/H backbone, no heteroatoms, ~3× faster than PPPM |
+| D-01 | OPLS-AA | classify_polymer returned PSTR → EMC OPLS-AA auto-routed |
+| D-02 | embedded in FF | OPLS-AA: force-field charges embedded, no QM step |
+| D-03 | pppm 12 Å | All-atom OPLS-AA phenyl carries ±0.115 e ring charges → long-range Coulomb |
 | D-04 | DP=50, 10 chains, 5320 atoms | polymer_rules.json default; consistent with Afzal 2021 12k-atom floor |
 | D-05 | PASS | density drift 0.4% over last 500 ps; energy plateau confirmed |
 | D-06 | ACCEPTABLE | R²=0.93, F-stat GOOD, N=19 bins; range 550→250K in 20K steps |

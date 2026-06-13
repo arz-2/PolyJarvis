@@ -2,7 +2,7 @@
 """
 EMC MCP Server
 ==============
-Builds amorphous polymer cells via EMC for Track C (PCFF), PHAL (OPLS-AA),
+Builds amorphous polymer cells via EMC for Track C (PCFF), PHAL/PSTR (OPLS-AA),
 and PHYC/PDIE (TraPPE-UA) classes using EMC v9.4.4.
 
 Wraps mcp-servers/mcp-emc-server/smiles_to_emc.py's build_cell() pipeline:
@@ -10,8 +10,8 @@ Wraps mcp-servers/mcp-emc-server/smiles_to_emc.py's build_cell() pipeline:
 
 Force field auto-selection by polymer_class:
     PCBN, PAMD, PKTN, PSFO, PIMD  →  pcff               (use_pcff=True downstream)
-    PHAL                           →  opls/2024/opls-aa  (use_opls=True downstream)
-    PHYC, PDIE, PSTR               →  trappe-ua          (use_opls=False downstream)
+    PHAL, PSTR                     →  opls/2024/opls-aa  (use_opls=True downstream)
+    PHYC, PDIE                     →  trappe-ua          (use_opls=False downstream)
 
 Tools
 -----
@@ -179,8 +179,8 @@ _PCFF_CLASSES   = {
     "PVNL",  # polyvinyls (PVC, PVAc, PVA) — tested with PVC+PVAc+PVA
     "PPNL",  # conjugated/polyphenylene (PPV, MEH-PPV)
 }
-_OPLS_CLASSES   = {"PHAL"}
-_TRAPPE_CLASSES = {"PHYC", "PDIE", "PSTR"}  # PSTR: cac/cah aromatic UA types; see EMC t_glass example
+_OPLS_CLASSES   = {"PHAL", "PSTR"}  # PSTR: OPLS-AA all-atom aPS; density validated (Al Otmi 2023), pppm for ring charges
+_TRAPPE_CLASSES = {"PHYC", "PDIE"}
 # PSIL (PDMS) and PURA (polyurea): EMC build fails on both pcff and opls-aa — remain on RadonPy
 
 def _select_field(polymer_class: str) -> str:
@@ -289,11 +289,11 @@ mcp = FastMCP(
 
     SUPPORTED CLASSES → opls/2024/opls-aa:
       PHAL  Polyhalogenated      (e.g. PTFE, PVDF, PCTFE)
+      PSTR  Polystyrenics        (e.g. PS, P2VP, SAN)
 
     SUPPORTED CLASSES → trappe-ua:
       PHYC  Polyhydrocarbons     (e.g. PE, PP, PIB)
       PDIE  Polydienes           (e.g. PBD, PI)
-      PSTR  Polystyrenics        (e.g. PS, P2VP, SAN)
 
     RadonPy only (EMC build fails):
       PSIL  Polysiloxanes        (e.g. PDMS) — pcff missing {si,osi} increment
@@ -335,8 +335,8 @@ def submit_emc_cell_job(
 
     The force field is selected automatically from polymer_class:
         PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL  →  pcff
-        PHAL                                                                            →  opls/2024/opls-aa
-        PHYC/PDIE/PSTR                                                                  →  trappe-ua
+        PHAL/PSTR                                                                       →  opls/2024/opls-aa
+        PHYC/PDIE                                                                        →  trappe-ua
 
     Runs emc_setup.pl + EMC binary in a background thread; returns job_id
     immediately. Poll get_emc_job_status() then call get_emc_job_output() for
@@ -348,7 +348,7 @@ def submit_emc_cell_job(
                          in the repeat unit and put * on aromatic carbons.
         polymer_class:   PolyInfo class name — determines force field; required.
                          PCFF: PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL
-                         OPLS-AA: PHAL.  TraPPE-UA: PHYC/PDIE/PSTR.
+                         OPLS-AA: PHAL/PSTR.  TraPPE-UA: PHYC/PDIE.
         dp:              Degree of polymerization (repeat units per chain). [20]
         nchains:         Number of polymer chains (informational — EMC determines
                          actual chain count from ntotal and dp). [10]

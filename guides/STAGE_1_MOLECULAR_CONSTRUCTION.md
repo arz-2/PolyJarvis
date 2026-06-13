@@ -108,8 +108,8 @@ result = classify_polymer(smiles="*CC(c1ccccc1)*")  # PS
 > ```
 > classify_polymer()
 >   ├─ PCBN, PAMD, PKTN, PSFO, PIMD  →  EMC  (pcff)
->   ├─ PHAL                           →  EMC  (opls/2024/opls-aa)
->   ├─ PHYC, PDIE, PSTR               →  EMC  (trappe-ua)
+>   ├─ PHAL, PSTR                     →  EMC  (opls/2024/opls-aa)
+>   ├─ PHYC, PDIE                     →  EMC  (trappe-ua)
 >   └─ all other classes              →  RadonPy  (GAFF2_mod + QM charges)
 > ```
 > Use the **EMC path** section below for the first three rows. Use the **RadonPy path** (rest of this document) for all others.
@@ -118,7 +118,7 @@ result = classify_polymer(smiles="*CC(c1ccccc1)*")  # PS
 |---|---|---|---|---|---|---|
 | 0 | UNKNOWN | Unclassified | Bad SMILES | ❌ Stop | — | — |
 | 1 | PHYC | Polyhydrocarbon | PE, PP, PIB | **TraPPE-UA** | EMC | lj/cut |
-| 2 | PSTR | Polystyrenic | PS, P2VP | **TraPPE-UA** | EMC | lj/cut |
+| 2 | PSTR | Polystyrenic | PS, P2VP | **OPLS-AA** | EMC | pppm |
 | 3 | PVNL | Polyvinyl | PVA, PVC | **OPLS-AA** | RadonPy | pppm |
 | 4 | PACR | Polyacrylic | PMMA, PAA | **OPLS-AA** | RadonPy | pppm |
 | 5 | PHAL | Polyhalogenated | PVDF, PTFE | **OPLS-AA** | EMC | pppm |
@@ -213,13 +213,13 @@ lammps_flags = out["result"]["lammps_flags"]  # e.g. {"use_pcff": True, "use_opl
 | PHYC | trappe-ua | PE | `*CC*` | — |
 | PHYC | trappe-ua | PP (atactic) | `*CC(C)*` | No chirality → atactic; use `*[C@@H](C)C*` for isotactic |
 | PDIE | trappe-ua | cis-PBD | `*C/C=C\C*` | cis/trans microstructure must be encoded in SMILES |
-| PSTR | trappe-ua | PS (atactic) | `*CC(c1ccccc1)*` | No chirality → atactic |
+| PSTR | opls-aa | PS (atactic) | `*CC(c1ccccc1)*` | No chirality → atactic; all-atom OPLS-AA supports `*[C@@H](c1ccccc1)C*` for isotactic |
 
 > **PCBN SMILES critical detail:** The carbonate group (`-O-C(=O)-O-`) must be fully contained within the repeat unit. If `*` is placed on the carbonyl oxygen, `oz`/`oo` PCFF templates fail silently and EMC exits with "Missing force field parameters." Always put `*` on the aromatic carbon at both chain ends.
 
 > **PIMD SMILES critical detail:** All imide ring atoms must be lowercase (aromatic notation), including carbonyl carbons. Uppercase `N` → EMC assigns sp3 `na` type → no `c_1` increment pair.
 
-> **TraPPE-UA tacticity note:** `[C@@H]`/`[C@H]` chirality notation works with OPLS-AA but **not** with TraPPE-UA (united-atom has no explicit H). For PHYC/PDIE/PSTR, atactic is the only option via TraPPE-UA. Use RadonPy with `tacticity="isotactic"` if stereospecific chains are required.
+> **TraPPE-UA tacticity note:** `[C@@H]`/`[C@H]` chirality notation works with OPLS-AA but **not** with TraPPE-UA (united-atom has no explicit H). For PHYC/PDIE (TraPPE-UA), atactic is the only option; PSTR is all-atom OPLS-AA so chirality notation does work. Use RadonPy with `tacticity="isotactic"` if stereospecific TraPPE-UA chains are required.
 
 ### Recommended density_initial by class
 
@@ -244,7 +244,7 @@ Use ~0.5× experimental — low enough to avoid steric clashes; LAMMPS equilibra
 |---|---|---|
 | D-01 | Force field | auto-selected from polymer_class (see `lammps_flags` in output) |
 | D-02 | Charge method | embedded in FF — no separate step |
-| D-03 | Electrostatics | pppm (all except PHYC/PDIE/PSTR which use lj/cut) |
+| D-03 | Electrostatics | pppm (all except PHYC/PDIE which use lj/cut) |
 | D-04 | System size | dp and ntotal passed to submit_emc_cell_job |
 
 ---

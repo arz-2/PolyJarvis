@@ -14,7 +14,7 @@ Read `guides/STAGE_INDEX.md` first on every task.
 | `guides/polymer_rules.json` | Per-class Tg ranges, density targets, DP defaults, annealing cycles |
 | `data/TEMPLATE/run_log.md` | Run log template — copy to `data/[RUN]/run_log.md` at task start |
 | `data/[RUN]/` | One directory per simulation run |
-| `emc_pipeline.py` | EMC cell builder — 19 classes (PCFF: 15 classes; OPLS-AA: PHAL; TraPPE-UA: PHYC/PDIE/PSTR). RadonPy only: PSIL, PURA. |
+| `emc_pipeline.py` | EMC cell builder — 19 classes (PCFF: 15 classes; OPLS-AA: PHAL/PSTR; TraPPE-UA: PHYC/PDIE). RadonPy only: PSIL, PURA. |
 
 ---
 
