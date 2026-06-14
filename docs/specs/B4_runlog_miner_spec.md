@@ -131,7 +131,30 @@ CI runs the miner in `--strict` over fixtures; it must never crash on the real (
   parsing of the current free-form blocks is sufficient (and is the fallback even after).
 - **Guarded by** the existing schema test suite for any applied rule change.
 
-## 7. Open questions
+## 7. Packaging: tool vs. skill
+
+Decision: **build the miner as a CLI tool first; add a thin skill later, once the procedure is
+proven.** Do not skillify the implementation itself.
+
+- **Heavy logic stays in code** (`tools/runlog_miner/`). Skills are a poor home for deterministic
+  parsing/aggregation — that would hide a Python module behind prose.
+- **The skill, when it comes, is thin:** a `SKILL.md` that carries the *judgment + safety
+  procedure* (run miner → review which suggestions to accept → check the diff against
+  `tests/test_polymer_rules_schema.py` → propose a reviewed branch) and delegates all parsing to
+  the CLI.
+- **Timing:** skills codify a *proven* procedure. Build and validate **P0a/P0b** against the real
+  corpus first; wrapping an unbuilt workflow in a skill bakes in guesses. Skillify at the end of
+  P0b/P0c.
+- **Why skill-form pays off here:** it composes with the existing **`recover`** skill. `recover`
+  is reactive (one live failure); this learning loop is retrospective (accumulated recoveries).
+  The miner's **playbook output (§2.2) feeds `recover`** — recover writes incidents → miner
+  distills them → recover consults the distilled playbook. That closed loop is the strongest
+  argument for eventual skill-form. On-demand/periodic invocation also fits the skill trigger
+  model (and could be scheduled via the `loop` skill).
+- **Out of scope for skillification:** the Part A fault-injection benchmark — it's a
+  run-occasionally experiment with little recurring judgment to package; keep it a script.
+
+## 8. Open questions
 
 1. Minimum support N — 2 (responsive) vs 3 (conservative) before a default is suggested?
 2. Should P0a ship first as a standalone "corpus dashboard" to prove parsing before any
