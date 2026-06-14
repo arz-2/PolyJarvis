@@ -14,6 +14,8 @@ from .parse import (
 )
 from .report import summarize
 from .suggest import aggregate, build_suggestions, extract_signals, propose_diff
+from .cluster import build_playbook, cluster_recoveries
+from .calibrate import build_calibration, calibrate
 
 __all__ = [
     "Decision",
@@ -28,4 +30,8 @@ __all__ = [
     "build_suggestions",
     "extract_signals",
     "propose_diff",
+    "build_playbook",
+    "cluster_recoveries",
+    "build_calibration",
+    "calibrate",
 ]
