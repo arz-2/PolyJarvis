@@ -2,7 +2,9 @@
 
 Usage:
     python -m tools.runlog_miner [--data-dir data] [--glob '*/run_log.md']
-                                 [--json] [-o OUTPUT]
+                                 [--json | --suggest | --diff]
+                                 [--rules guides/polymer_rules.json]
+                                 [--min-support 2] [-o OUTPUT]
 """
 from __future__ import annotations
 
@@ -12,6 +14,7 @@ import sys
 
 from .parse import load_corpus
 from .report import summarize
+from .suggest import build_suggestions
 
 
 def main(argv=None) -> int:
@@ -21,16 +24,26 @@ def main(argv=None) -> int:
     )
     ap.add_argument("--data-dir", default="data", help="root dir holding data/[RUN]/run_log.md (default: data)")
     ap.add_argument("--glob", default="*/run_log.md", help="glob under --data-dir (default: */run_log.md)")
-    ap.add_argument("--json", action="store_true", help="emit JSON RunRecords instead of the markdown report")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--json", action="store_true", help="emit JSON RunRecords")
+    mode.add_argument("--suggest", action="store_true", help="emit proposed polymer_rules changes (P0b, advisory)")
+    mode.add_argument("--diff", action="store_true", help="emit a unified diff of the numeric suggestions (not applied)")
+    ap.add_argument("--rules", default="guides/polymer_rules.json", help="polymer_rules.json path (for --suggest/--diff)")
+    ap.add_argument("--min-support", type=int, default=2, help="min distinct runs agreeing before a change is suggested (default: 2)")
     ap.add_argument("-o", "--output", help="write to this file instead of stdout")
     args = ap.parse_args(argv)
 
     records = load_corpus(args.data_dir, args.glob)
-    out = (
-        json.dumps([r.to_dict() for r in records], indent=2, ensure_ascii=False)
-        if args.json
-        else summarize(records)
-    )
+    if args.json:
+        out = json.dumps([r.to_dict() for r in records], indent=2, ensure_ascii=False)
+    elif args.suggest or args.diff:
+        suggestions, diff = build_suggestions(records, args.rules, args.min_support)
+        if args.diff:
+            out = diff or "# no numeric suggestions (insufficient support or no change)\n"
+        else:
+            out = json.dumps(suggestions, indent=2, ensure_ascii=False)
+    else:
+        out = summarize(records)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:

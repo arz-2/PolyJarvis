@@ -13,6 +13,7 @@ from .parse import (
     parse_text,
 )
 from .report import summarize
+from .suggest import aggregate, build_suggestions, extract_signals, propose_diff
 
 __all__ = [
     "Decision",
@@ -23,4 +24,8 @@ __all__ = [
     "parse_run_log",
     "parse_text",
     "summarize",
+    "aggregate",
+    "build_suggestions",
+    "extract_signals",
+    "propose_diff",
 ]
