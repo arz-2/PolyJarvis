@@ -1,0 +1,11 @@
+# Lightweight dependencies for the pure-logic test suite.
+# These are the only packages needed to run `pytest` (default selection) — no
+# LAMMPS, EMC, RadonPy, conda, or GPU required.
+pytest>=7.0
+numpy>=1.23
+scipy>=1.9
+pandas>=1.5
+# check_equilibration_comprehensive.py imports MDAnalysis at module load (used by
+# the chain-conformation/spatial checks), so it's needed to import the module and
+# unit-test its thermo drift gate. Pip wheel only — still no LAMMPS/EMC/GPU.
+MDAnalysis>=2.4

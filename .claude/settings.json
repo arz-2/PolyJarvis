@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/bash_tool_guard.py"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/bash_tool_guard.py\""
           }
         ]
       }

@@ -154,6 +154,85 @@ def curvefit_bilinear(T, rho, tg_hint=None):
         return None
 
 
+def hyperbola_indep(T, rho0, m_bar, delta, Tg, c):
+    """Smoothed-bilinear (hyperbola) model: two linear asymptotes joined by a
+    crossover of half-width c.  Low-T (glassy) slope = m_bar - delta, high-T
+    (rubbery) slope = m_bar + delta; both asymptotes pass through (Tg, rho0).
+    c -> 0 recovers a sharp bilinear kink at Tg."""
+    return rho0 + m_bar * (T - Tg) + delta * np.sqrt((T - Tg) ** 2 + c ** 2)
+
+
+def curvefit_hyperbola(T, rho, seed=None):
+    """Global hyperbola fit of density vs T (Patrone-style smoothed model).
+
+    Fits all points at once (no fit-range selection) and explicitly models the
+    finite transition width via the parameter c.  `seed` is an optional dict from
+    curvefit_bilinear used to initialise the nonlinear fit (the key robustness
+    step).  Returns a dict mirroring curvefit_bilinear's keys plus
+    transition_width_c_K and tg_uncertainty_K, or None on failure so the caller
+    can fall back to the bilinear method.
+    """
+    idx = np.argsort(T)
+    T, rho = T[idx], rho[idx]
+    T_min, T_max = float(T[0]), float(T[-1])
+    T_span = T_max - T_min
+    if len(T) < 5 or T_span <= 0:
+        return None
+
+    # Initial guesses: prefer the bilinear seed, else crude polyfit halves.
+    if seed is not None:
+        a_g, a_r = seed["a_glassy"], seed["a_rubbery"]
+        Tg0 = float(np.clip(seed["Tg_K"], T_min + 5, T_max - 5))
+        rho0_0 = a_g * Tg0 + seed["b_glassy"]
+    else:
+        mid = (T_min + T_max) / 2
+        lo, hi = T < mid, T >= mid
+        p_lo = np.polyfit(T[lo], rho[lo], 1) if lo.sum() >= 2 else [0.0, float(rho.mean())]
+        p_hi = np.polyfit(T[hi], rho[hi], 1) if hi.sum() >= 2 else [0.0, float(rho.mean())]
+        a_g, a_r = float(p_lo[0]), float(p_hi[0])
+        Tg0, rho0_0 = mid, float(rho.mean())
+    p0 = [rho0_0, (a_g + a_r) / 2, (a_r - a_g) / 2, Tg0, T_span / 10.0]
+
+    try:
+        popt, pcov = optimize.curve_fit(
+            hyperbola_indep, T, rho, p0=p0,
+            bounds=([-np.inf, -np.inf, -np.inf, T_min + 5, 1e-3],
+                    [ np.inf,  np.inf,  np.inf, T_max - 5, T_span]),
+            maxfev=40000,
+        )
+    except Exception:
+        return None
+
+    rho0, m_bar, delta, Tg, c = popt
+    a_glassy  = float(m_bar - delta)   # low-T asymptote slope
+    a_rubbery = float(m_bar + delta)   # high-T asymptote slope
+
+    pred = hyperbola_indep(T, *popt)
+    ss_res = float(np.sum((rho - pred) ** 2))
+    ss_tot = float(np.sum((rho - np.mean(rho)) ** 2))
+    r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+
+    # Tg uncertainty from the fit covariance (parameter index 3 = Tg).
+    try:
+        tg_sigma = float(np.sqrt(abs(pcov[3, 3])))
+        if not np.isfinite(tg_sigma):
+            tg_sigma = None
+    except Exception:
+        tg_sigma = None
+
+    return {
+        "Tg_K":                 float(Tg),
+        "Tg_alt_K":             float(Tg),   # asymptotes meet at Tg by construction
+        "a_glassy":             a_glassy,
+        "b_glassy":             float(rho0 - a_glassy * Tg),
+        "a_rubbery":            a_rubbery,
+        "b_rubbery":            float(rho0 - a_rubbery * Tg),
+        "r_squared":            float(r2),
+        "transition_width_c_K": float(abs(c)),
+        "tg_uncertainty_K":     tg_sigma,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -175,6 +254,10 @@ def main():
                         help="Temperature column name in thermo output.")
     parser.add_argument("--density_col", default="Density",
                         help="Density column name in thermo output.")
+    parser.add_argument("--fit_method", choices=["auto", "hyperbola", "bilinear"],
+                        default="auto",
+                        help="Primary fit: 'auto' (hyperbola, fall back to bilinear), "
+                             "'hyperbola', or legacy 'bilinear'.")
     args = parser.parse_args()
 
     log_file = args.log_file
@@ -184,6 +267,7 @@ def main():
     equilibration_fraction = args.equilibration_fraction
     temp_col = args.temp_col
     density_col = args.density_col
+    fit_method = args.fit_method
 
     # -------------------------------------------------------------------
     # 1. Parse LAMMPS log
@@ -329,9 +413,22 @@ def main():
     densities = df_bins["mean_density"].values
 
     # -------------------------------------------------------------------
-    # 3. PRIMARY: bilinear curve_fit (standard polymer MD literature method)
+    # 3. PRIMARY: hyperbola (smoothed-bilinear) fit, seeded from and falling back
+    #    to the legacy bilinear fit.  --fit_method selects the behaviour.
     # -------------------------------------------------------------------
-    cf_result = curvefit_bilinear(temps, densities, tg_hint=initial_tg_guess)
+    bilinear_result = curvefit_bilinear(temps, densities, tg_hint=initial_tg_guess)
+    hyperbola_result = (curvefit_hyperbola(temps, densities, seed=bilinear_result)
+                        if fit_method in ("auto", "hyperbola") else None)
+
+    if fit_method == "bilinear":
+        cf_result, fit_method_used = bilinear_result, "bilinear_curvefit"
+    elif fit_method == "hyperbola":
+        cf_result, fit_method_used = hyperbola_result, "hyperbola_curvefit"
+    else:  # auto: hyperbola if it converged, else bilinear
+        if hyperbola_result is not None:
+            cf_result, fit_method_used = hyperbola_result, "hyperbola_curvefit"
+        else:
+            cf_result, fit_method_used = bilinear_result, "bilinear_curvefit"
 
     # -------------------------------------------------------------------
     # 4. Assemble final result
@@ -339,9 +436,11 @@ def main():
     if cf_result:
         Tg_primary = cf_result["Tg_K"]
         r2_primary = cf_result["r_squared"]
+        # Cross-check from the alternative method (bilinear when hyperbola is primary).
+        alt_result = bilinear_result if fit_method_used == "hyperbola_curvefit" else None
     else:
         print(json.dumps({"status": "failed",
-                           "error": "Bilinear curve_fit failed — check temperature range and data quality"}))
+                           "error": f"{fit_method_used} failed — check temperature range and data quality"}))
         sys.exit(0)
 
     # Quality rating based on bilinear R²
@@ -371,6 +470,21 @@ def main():
             f"a_glassy={a_g:.4e} (rubbery expansion coefficient should exceed glassy)"
         )
 
+    # Transition-width sanity (hyperbola only): a crossover wider than half the
+    # sweep span means the transition is not well localised — sweep too narrow or
+    # data too noisy.  Cap quality at ACCEPTABLE and warn.
+    c_width = cf_result.get("transition_width_c_K")
+    if c_width is not None:
+        half_span = 0.5 * (float(temps.max()) - float(temps.min()))
+        if c_width > half_span:
+            _order = {"EXCELLENT": 3, "GOOD": 2, "ACCEPTABLE": 1, "POOR": 0}
+            if _order.get(fit_quality, 1) > 1:
+                fit_quality = "ACCEPTABLE"
+            fit_warnings.append(
+                f"transition_width_too_broad: c={c_width:.1f} K exceeds half the sweep "
+                f"span ({half_span:.0f} K) — transition poorly localised"
+            )
+
     # -------------------------------------------------------------------
     # 5. Save outputs
     # -------------------------------------------------------------------
@@ -388,10 +502,14 @@ def main():
         "log_file":            log_file,
         "output_dir":          str(output_dir),
         "Tg_K":                round(Tg_primary, 1),
-        "Tg_alternative_K":    round(cf_result["Tg_alt_K"], 1),
+        "Tg_alternative_K":    round(alt_result["Tg_K"], 1) if alt_result else round(cf_result["Tg_alt_K"], 1),
         "r_squared":           round(r2_primary, 4),
         "fit_quality":         fit_quality,
-        "fit_method":          "bilinear_curvefit",
+        "fit_method":          fit_method_used,
+        "transition_width_c_K": (round(cf_result["transition_width_c_K"], 1)
+                                 if cf_result.get("transition_width_c_K") is not None else None),
+        "tg_uncertainty_K":    (round(cf_result["tg_uncertainty_K"], 1)
+                                if cf_result.get("tg_uncertainty_K") is not None else None),
         "binning_method":      binning_method,
         "fit_params": {
             "a_glassy":  cf_result["a_glassy"],
