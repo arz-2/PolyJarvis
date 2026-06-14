@@ -28,6 +28,7 @@ Tools exposed:
   14. check_equilibration_comprehensive - All convergence + structural checks, one call, one verdict
   15. extract_equilibrated_density      - Plateau density via reverse-cumulative-mean
   16. extract_tg                        - Tg via bilinear curve_fit (standard polymer MD method)
+  16b. extract_tg_multirate             - Multi-rate Tg: log-linear + VF fit across cooling rates
   17. extract_bulk_modulus              - Isothermal K via NPT volume fluctuations
 """
 
@@ -43,7 +44,7 @@ import time
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 # Load root .env (PolyJarvis/.env) — single source of truth for all MCP servers
 try:
@@ -268,7 +269,7 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
             f"cd {wdir}",  # FIX: cd into stage workdir so relative paths in .in files resolve correctly
             f"log_start {name}",
             f"mpirun -np $MPI $LMP -sf gpu -pk gpu $N_GPU "
-            f"-in {script} > {wdir}/{log} 2>&1 \\",
+            f"-in {script} >> {wdir}/{log} 2>&1 \\",
             f"  && log_done {name} \\",
             f"  || {{ log_fail {name}; "
             f"echo \"{{\\\"stage\\\":\\\"__chain__\\\",\\\"status\\\":\\\"failed\\\","
@@ -308,12 +309,15 @@ def _lammps_run_background(
         # Write a small wrapper script and launch it under nohup — identical to
         # how run_lammps_chain launches stages, so it uses the system PATH (not
         # conda's) and finds the GPU-enabled lmp binary correctly.
+        # Capture wrapper stdout to a separate file so it never overwrites the LAMMPS
+        # internal log (e.g. tg_sweep.log opened with 'log ... append' in the script).
+        wrapper_stdout = f"{work_dir}/{run_id}_wrapper.stdout"
         wrapper = (
             f"#!/bin/bash\n"
             f"export CUDA_VISIBLE_DEVICES={gpu_ids}\n"
             f"cd {work_dir}\n"
             f"mpirun -np {mpi} {LAMBDA_LAMMPS} -sf gpu -pk gpu {n_gpu} "
-            f"-in {script} > {full_log} 2>&1\n"
+            f"-in {script} >> {wrapper_stdout} 2>&1\n"
             f"RC=$?\n"
             f"if [ $RC -eq 0 ]; then\n"
             f"  echo '{{\"run_id\":\"{run_id}\",\"status\":\"completed\","
@@ -1017,14 +1021,20 @@ def generate_equilibration_workflow(
     n_atoms: Optional[int] = None,
     use_pcff: bool = False,
     use_trappe: bool = False,
+    use_opls: bool = False,
     params_file: str = "",
+    npt_prod_steps: Optional[int] = None,
+    add_melt_npt: bool = False,
+    t_equil_K: Optional[float] = None,
+    melt_npt_steps: Optional[int] = None,
+    add_300k_production: bool = True,
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
     LAMMPS scripts. Mirrors the Larsen 21-step logic but with full
     parameter control.
 
-    Protocol (7 stages):
+    Protocol (7 stages, rubbery: temp ≤ 300 K):
       Stage 01: minimize         - energy minimization in amorphous cell
       Stage 02: nvt_softheat     - NVT heat from 300 K to max_temp
       Stage 03: npt_compress     - NPT compress to max_press at max_temp
@@ -1032,6 +1042,18 @@ def generate_equilibration_workflow(
       Stage 05: npt_cool         - NPT cool from max_temp to target temp
       Stage 06: nvt_production   - NVT production at target temp (GPU on; MSD/C(t) analysis)
       Stage 07: npt_production   - NPT constant-T/P at target conditions (GPU on; bulk modulus)
+
+    Protocol (9 stages, glassy: temp > 300 K, add_300k_production=True [default]):
+      Stages 01-07: same as above (run at melt temperature)
+      Stage 08: npt_cool300      - NPT cool temp → 300 K (~1 ns)
+      Stage 09: npt_prod300      - NPT constant-T at 300 K (~2 ns) — density and deform source
+
+    Protocol (9 stages, add_melt_npt=True, rubbery only: temp < t_equil_K):
+      Stages 01-04: unchanged
+      Stage 05a: npt_cool_melt   - NPT cool max_temp → t_equil_K
+      Stage 05b: npt_melt        - NPT isothermal at t_equil_K (melt density extraction)
+      Stage 05c: npt_cool        - NPT cool t_equil_K → temp  (replaces original 05)
+      Stages 06-07: unchanged
 
     Args:
         data_file:      Path to the .data file.
@@ -1043,6 +1065,9 @@ def generate_equilibration_workflow(
         max_press:      Compression pressure (atm), typically 50000.
         n_chains:       Number of polymer chains (informational).
         n_atoms:        Total atom count. Auto-detected if not provided.
+        npt_prod_steps: Explicit step count for Stage 7 NPT production. When None
+                        (default), uses steps_npt // 2 from the atom-count tier.
+                        Convert from ns: int(t_ns * 1e6 / dt_fs).
         use_pcff:       Set True for EMC/PCFF class2 systems (PCBN, PAMD, PKTN,
                         PSFO, PIMD, POXI, PEST, PSUL, PURT, PANH, PPHS, PACR,
                         PIMN, PVNL, PPNL). Switches all templates to class2
@@ -1050,13 +1075,33 @@ def generate_equilibration_workflow(
                         SHAKE is disabled (PCFF runs cleanly at 1 fs without it).
         use_trappe:     Set True for EMC/TraPPE-UA systems (PHYC, PDIE, PSTR).
                         Switches all templates to pair_style lj/cut 14.0 (no
-                        kspace), multi/harmonic dihedrals, and SHAKE disabled
-                        (united-atom force field has no explicit H atoms).
+                        kspace), multi/harmonic dihedrals, and SHAKE on all
+                        C-C bond types (enables dt=2 fs for stages 04-07).
+        use_opls:       Set True for EMC/OPLS-AA systems (PHAL, PSIL).
+                        Switches all templates to pair_style lj/cut/coul/long 9.5,
+                        multi/harmonic dihedrals, geometric mixing, special_bonds
+                        lj/coul 0 0 0.5, and SHAKE disabled (OPLS H-type mix
+                        h1/h1o/h1si untested with SHAKE; 1 fs is stable without it).
         params_file:    Optional path to an EMC-generated .params file containing
                         force field coefficients (pair_coeff, bond_coeff, etc.).
                         When provided, Coeffs validation is skipped on the .data
                         file (EMC stores coefficients separately) and each script
                         includes the file via `include {params_file}`.
+        add_melt_npt:        If True and temp < t_equil_K, split stage 05 into 05a
+                             (cool max_temp→t_equil_K) + 05b (isothermal NPT at t_equil_K)
+                             + 05c (cool t_equil_K→temp). Stage 05b is the melt density
+                             extraction target. Default False (standard 7-stage workflow).
+        t_equil_K:           Melt equilibration temperature (K). Required when
+                             add_melt_npt=True. Must satisfy temp < t_equil_K < max_temp.
+        melt_npt_steps:      Step count for stage 05b NPT isothermal run. Defaults to
+                             int(1.0e6 / dt_prod) (≈1 ns at the production timestep).
+        add_300k_production: When True (default) and temp > 300.0, append two stages
+                             after stage 07: 08_npt_cool300 (T→300 K, ~1 ns) and
+                             09_npt_prod300 (300 K constant-T, ~2 ns). These provide
+                             the density and deformation input for glassy polymers.
+                             npt_production_log/dir in the return dict point to stage 09
+                             when these stages are present. Set False only to suppress
+                             for diagnostic or rubbery-at-high-T runs.
 
     Returns:
         dict with:
@@ -1111,15 +1156,30 @@ def generate_equilibration_workflow(
         # PCFF class2 cells from EMC start at ~0.5× experimental density — no
         # separate soft-heat or cutoff-only compression phase needed.
         # SHAKE is off: PCFF runs stably at 1 fs all-atom without constraints.
-        # TraPPE-UA: united-atom (no H), pure lj/cut, no kspace, no SHAKE.
+        # TraPPE-UA: united-atom (no H), pure lj/cut, no kspace.
+        # SHAKE is disabled — UA removes fast C-H stretch modes, so 2 fs is stable
+        # WITHOUT bond constraints. fix shake on a continuous backbone would fail in
+        # LAMMPS anyway (interior atoms have 2 bonds; cluster-build requires terminal atoms).
+        # The 2 fs speedup comes from timestep increase alone (dt_prod below).
         if use_pcff:
             ff_base = {"use_pcff": True, "use_shake": False}
         elif use_trappe:
-            ff_base = {"use_trappe": True, "use_shake": False, "use_pppm": False, "LJ_CUTOFF": 14.0}
+            ff_base = {
+                "use_trappe": True,
+                "use_shake":  False,
+                "use_pppm":   False,
+                "LJ_CUTOFF":  14.0,
+            }
+        elif use_opls:
+            ff_base = {"use_opls": True, "use_shake": False}
         else:
             ff_base = {}
         if params_file:
             ff_base["params_file"] = params_file
+
+        # TraPPE-UA with SHAKE enables 2 fs timestep for stages 04-07.
+        # Stages 02-03 keep 0.5 fs (chain overlap risk at startup is too high for large dt).
+        dt_prod = 2.0 if use_trappe else 1.0
 
         stages = []
 
@@ -1175,7 +1235,13 @@ def generate_equilibration_workflow(
         }, s1["output_data"])
         stages.append(s2)
 
-        # Stage 3: NPT compression to target density — GPU + PPPM
+        # Stage 3: NPT compression to target density.
+        # OPLS-AA: use short-range Coulomb (use_pppm=False → lj/cut/coul/cut) during compression
+        # to prevent PPPM "out of range atoms" crash when the box shrinks rapidly at high pressure.
+        # Mirrors the GAFF2 cutoff-compression path. Full PPPM resumes at stage 04.
+        # ff_base temporarily overridden here so use_pppm=False wins over ff_base's use_opls=True.
+        saved_ff_base = ff_base
+        ff_base = {**ff_base, "use_pppm": False} if use_opls else ff_base
         s3 = _stage("03_npt_compress", "npt_compress", {
             "T_START":   max_temp,
             "T_FINAL":   max_temp,
@@ -1183,12 +1249,13 @@ def generate_equilibration_workflow(
             "P_START":   1.0,
             "P_FINAL":   max_press,
             "P_DAMP":    1000.0,
-            "TIMESTEP":  1.0,
+            "TIMESTEP":  0.5,
             "N_STEPS":   steps_comp,
-            "use_pppm":  True,
+            "use_pppm":  False,
             "use_gpu":   True,
         }, s2["output_data"])
         stages.append(s3)
+        ff_base = saved_ff_base  # restore PPPM for all subsequent stages
 
         # Stage 4: NPT decompress — GPU + PPPM
         s4 = _stage("04_npt_pppm", "npt", {
@@ -1198,7 +1265,7 @@ def generate_equilibration_workflow(
             "P_START":   max_press,
             "P_FINAL":   press,
             "P_DAMP":    1000.0,
-            "TIMESTEP":  1.0,
+            "TIMESTEP":  dt_prod,
             "N_STEPS":   steps_comp,
             "use_pppm":  True,
             "use_gpu":   True,
@@ -1206,28 +1273,80 @@ def generate_equilibration_workflow(
         }, s3["output_data"])
         stages.append(s4)
 
-        # Stage 5: NPT cool to target temp — GPU + PPPM
-        s5 = _stage("05_npt_cool", "npt", {
-            "T_START":   max_temp,
-            "T_FINAL":   temp,
-            "T_DAMP":    100.0,
-            "P_START":   press,
-            "P_FINAL":   press,
-            "P_DAMP":    1000.0,
-            "TIMESTEP":  1.0,
-            "N_STEPS":   steps_npt,
-            "use_pppm":  True,
-            "use_gpu":   True,
-            "write_restart": True,
-        }, s4["output_data"])
-        stages.append(s5)
+        # Stage 5: NPT cool to target temp.
+        # With add_melt_npt=True (rubbery validation runs): split into 05a/05b/05c
+        # to capture an isothermal NPT run at t_equil_K for melt density extraction.
+        _use_melt_npt = (
+            add_melt_npt
+            and t_equil_K is not None
+            and temp < t_equil_K
+        )
+        if _use_melt_npt:
+            _melt_steps = melt_npt_steps or int(1.0e6 / dt_prod)
+            s5a = _stage("05a_npt_cool_melt", "npt", {
+                "T_START":   max_temp,
+                "T_FINAL":   t_equil_K,
+                "T_DAMP":    100.0,
+                "P_START":   press,
+                "P_FINAL":   press,
+                "P_DAMP":    1000.0,
+                "TIMESTEP":  dt_prod,
+                "N_STEPS":   steps_npt // 2,
+                "use_pppm":  True,
+                "use_gpu":   True,
+                "write_restart": True,
+            }, s4["output_data"])
+            stages.append(s5a)
+            s5b = _stage("05b_npt_melt", "npt", {
+                "T_START":   t_equil_K,
+                "T_FINAL":   t_equil_K,
+                "T_DAMP":    100.0,
+                "P_START":   press,
+                "P_FINAL":   press,
+                "P_DAMP":    1000.0,
+                "TIMESTEP":  dt_prod,
+                "N_STEPS":   _melt_steps,
+                "use_pppm":  True,
+                "use_gpu":   True,
+                "write_restart": True,
+            }, s5a["output_data"])
+            stages.append(s5b)
+            s5 = _stage("05c_npt_cool", "npt", {
+                "T_START":   t_equil_K,
+                "T_FINAL":   temp,
+                "T_DAMP":    100.0,
+                "P_START":   press,
+                "P_FINAL":   press,
+                "P_DAMP":    1000.0,
+                "TIMESTEP":  dt_prod,
+                "N_STEPS":   steps_npt,
+                "use_pppm":  True,
+                "use_gpu":   True,
+                "write_restart": True,
+            }, s5b["output_data"])
+            stages.append(s5)
+        else:
+            s5 = _stage("05_npt_cool", "npt", {
+                "T_START":   max_temp,
+                "T_FINAL":   temp,
+                "T_DAMP":    100.0,
+                "P_START":   press,
+                "P_FINAL":   press,
+                "P_DAMP":    1000.0,
+                "TIMESTEP":  dt_prod,
+                "N_STEPS":   steps_npt,
+                "use_pppm":  True,
+                "use_gpu":   True,
+                "write_restart": True,
+            }, s4["output_data"])
+            stages.append(s5)
 
         # Stage 6: NVT production — GPU + PPPM
         s6 = _stage("06_nvt_production", "nvt", {
             "T_START":   temp,
             "T_FINAL":   temp,
             "T_DAMP":    100.0,
-            "TIMESTEP":  1.0,
+            "TIMESTEP":  dt_prod,
             "N_STEPS":   steps_nvt,
             "use_pppm":  True,
             "use_gpu":   True,
@@ -1238,7 +1357,7 @@ def generate_equilibration_workflow(
         # Stage 7: NPT production at target conditions — dedicated for K_T measurement.
         # Must be constant-T/P; the Stage 5 cooling ramp is invalid for the volume
         # fluctuation method. Reads from Stage 6 NVT output (best-equilibrated config).
-        steps_npt_prod = steps_npt // 2
+        steps_npt_prod = npt_prod_steps if npt_prod_steps is not None else steps_npt // 2
         s7 = _stage("07_npt_production", "npt", {
             "T_START":       temp,
             "T_FINAL":       temp,
@@ -1246,7 +1365,7 @@ def generate_equilibration_workflow(
             "P_START":       press,
             "P_FINAL":       press,
             "P_DAMP":        1000.0,
-            "TIMESTEP":      1.0,
+            "TIMESTEP":      dt_prod,
             "N_STEPS":       steps_npt_prod,
             "use_pppm":      True,
             "use_gpu":       True,
@@ -1254,7 +1373,46 @@ def generate_equilibration_workflow(
         }, s6["output_data"])
         stages.append(s7)
 
-        return {
+        # Stages 08/09: cool and produce at 300 K for glassy polymers.
+        # temp > 300 means the chain runs at melt T; density and deform inputs
+        # must come from a constant-T 300 K run, not the cooling-ramp tail.
+        _add_300k = add_300k_production and temp > 300.0
+        s8 = s9 = None
+        if _add_300k:
+            steps_cool300 = int(1.0e6 / dt_prod)   # ~1 ns
+            steps_prod300 = int(2.0e6 / dt_prod)   # ~2 ns
+            s8 = _stage("08_npt_cool300", "npt", {
+                "T_START":       temp,
+                "T_FINAL":       300.0,
+                "T_DAMP":        100.0,
+                "P_START":       press,
+                "P_FINAL":       press,
+                "P_DAMP":        1000.0,
+                "TIMESTEP":      dt_prod,
+                "N_STEPS":       steps_cool300,
+                "use_pppm":      True,
+                "use_gpu":       True,
+                "write_restart": False,
+            }, s7["output_data"])
+            stages.append(s8)
+            s9 = _stage("09_npt_prod300", "npt", {
+                "T_START":       300.0,
+                "T_FINAL":       300.0,
+                "T_DAMP":        100.0,
+                "P_START":       press,
+                "P_FINAL":       press,
+                "P_DAMP":        1000.0,
+                "TIMESTEP":      dt_prod,
+                "N_STEPS":       steps_prod300,
+                "use_pppm":      True,
+                "use_gpu":       True,
+                "write_restart": False,
+            }, s8["output_data"])
+            stages.append(s9)
+
+        # npt_production_log/dir point to the last NPT stage (09 when present, else 07)
+        _npt_final = s9 if _add_300k else s7
+        ret = {
             "status":     "success",
             "polymer":    polymer_name,
             "n_atoms":    n_atoms,
@@ -1263,18 +1421,30 @@ def generate_equilibration_workflow(
             "n_stages":   len(stages),
             "stages":     stages,
             "run_order":  [s["name"] for s in stages],
-            "npt_production_log": f"{s7['work_dir']}/{s7['params']['LOG_FILE']}",
-            "npt_production_dir": s7["work_dir"],
+            "npt_production_log": f"{_npt_final['work_dir']}/{_npt_final['params']['LOG_FILE']}",
+            "npt_production_dir": _npt_final["work_dir"],
             "preflight_warnings": vr["warnings"],
             "preflight_stats":    vr["stats"],
             "instructions": (
                 f"Generated {len(stages)} staged scripts for {polymer_name}.\n"
                 "Execute in order using run_lammps_script().\n"
                 "GPU is ON for all stages.\n"
-                "Stage 7 (07_npt_production) is a constant-T/P NPT run for bulk modulus (volume fluctuation method).\n"
-                "Submit stages as a chain using run_lammps_chain()."
+                + (
+                    "Stages 08/09 cool to 300 K and produce at 300 K — use these for density and deformation.\n"
+                    if _add_300k else
+                    "Stage 7 (07_npt_production) is a constant-T/P NPT run for bulk modulus (volume fluctuation method).\n"
+                )
+                + "Submit stages as a chain using run_lammps_chain()."
             ),
         }
+        if _add_300k:
+            ret["npt_prod300_log"]  = f"{s9['work_dir']}/{s9['params']['LOG_FILE']}"
+            ret["npt_prod300_data"] = s9["output_data"]
+            ret["npt_prod300_dump"] = f"{s9['work_dir']}/{s9['params']['DUMP_FILE']}"
+        if _use_melt_npt:
+            ret["melt_npt_log"] = f"{s5b['work_dir']}/{s5b['params']['LOG_FILE']}"
+            ret["melt_npt_dir"] = s5b["work_dir"]
+        return ret
 
     except Exception as e:
         logger.error(f"generate_equilibration_workflow failed: {e}")
@@ -1389,6 +1559,7 @@ def _run_extract_end_to_end(
     skip_frames: int,
     max_frames: Optional[int],
     output_dir: str,
+    graphs_dir: Optional[str] = None,
     atom_style: str = "id resid type charge x y z",
 ) -> dict:
     """Background worker — runs mda_end_to_end.py via CLI."""
@@ -1406,6 +1577,8 @@ def _run_extract_end_to_end(
     if max_frames is not None:
         parts.append(f"--max_frames {max_frames}")
     parts.append(f"--output_dir {output_dir}")
+    if graphs_dir:
+        parts.append(f"--graphs_dir {graphs_dir}")
     parts.append(f'--atom_style "{atom_style}"')
 
     command = " ".join(parts)
@@ -1428,6 +1601,7 @@ def extract_end_to_end_vectors(
     skip_frames: int = 0,
     max_frames: Optional[int] = None,
     output_dir: Optional[str] = None,
+    graphs_dir: Optional[str] = None,
     atom_style: str = "id resid type charge x y z",
 ) -> dict:
     """
@@ -1487,6 +1661,7 @@ def extract_end_to_end_vectors(
             skip_frames    = skip_frames,
             max_frames     = max_frames,
             output_dir     = output_dir,
+            graphs_dir     = graphs_dir,
             atom_style     = atom_style,
         )),
         daemon=True,
@@ -1513,6 +1688,7 @@ def _run_calculate_rdf(
     skip_frames: int,
     max_frames: Optional[int],
     output_dir: str,
+    graphs_dir: Optional[str] = None,
     atom_style: str = "id resid type charge x y z",
 ) -> dict:
     """Background worker — runs mda_rdf.py via CLI."""
@@ -1529,6 +1705,8 @@ def _run_calculate_rdf(
     if max_frames is not None:
         parts.append(f"--max_frames {max_frames}")
     parts.append(f"--output_dir {output_dir}")
+    if graphs_dir:
+        parts.append(f"--graphs_dir {graphs_dir}")
     parts.append(f'--atom_style "{atom_style}"')
 
     command = " ".join(parts)
@@ -1551,6 +1729,7 @@ def calculate_rdf(
     skip_frames: int = 0,
     max_frames: Optional[int] = None,
     output_dir: Optional[str] = None,
+    graphs_dir: Optional[str] = None,
     atom_style: str = "id resid type charge x y z",
 ) -> dict:
     """
@@ -1593,6 +1772,7 @@ def calculate_rdf(
             skip_frames     = skip_frames,
             max_frames      = max_frames,
             output_dir      = output_dir,
+            graphs_dir      = graphs_dir,
             atom_style      = atom_style,
         )),
         daemon=True,
@@ -1617,6 +1797,10 @@ def _run_extract_tg(
     equilibration_fraction: float,
     temp_col: str,
     density_col: str,
+    graphs_dir: Optional[str] = None,
+    per_t_dump_file: Optional[str] = None,
+    tg_data_file: Optional[str] = None,
+    backbone_types: Optional[List[str]] = None,
 ) -> dict:
     """Background worker — runs extract_tg.py via CLI."""
 
@@ -1628,6 +1812,14 @@ def _run_extract_tg(
     parts.append(f"--equilibration_fraction {equilibration_fraction}")
     parts.append(f"--temp_col {temp_col}")
     parts.append(f"--density_col {density_col}")
+    if graphs_dir:
+        parts.append(f"--graphs_dir {graphs_dir}")
+    if per_t_dump_file:
+        parts.append(f"--per_t_dump_file {per_t_dump_file}")
+    if tg_data_file:
+        parts.append(f"--tg_data_file {tg_data_file}")
+    if backbone_types:
+        parts.append(f"--backbone_types {' '.join(str(t) for t in backbone_types)}")
 
     command = " ".join(parts)
     logger.info(f"Running Tg extraction via CLI: {command}")
@@ -1636,33 +1828,61 @@ def _run_extract_tg(
 
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
-    return _parse_json_from_stdout(stdout, stderr)
+    result = _parse_json_from_stdout(stdout, stderr)
+    r2 = result.get("r_squared", 0) or 0
+    n_bins = result.get("n_temperature_bins", 0) or 0
+    if n_bins < 4 or r2 < 0.80:
+        result["recovery_hint"] = (
+            "ABORT: R² < 0.80 or < 4 temperature bins — "
+            "re-spawn tg-sweep-worker with --tg_t_high_K +50 and --tg_t_low_K −50."
+        )
+    elif r2 < 0.90:
+        result["recovery_hint"] = (
+            "BORDERLINE: R² 0.80–0.90 — "
+            "re-spawn tg-sweep-worker with --tg_t_step_K halved."
+        )
+    elif r2 < 0.95:
+        result["recovery_hint"] = "ACCEPTABLE: R² 0.90–0.95 — report Tg with caveat."
+    else:
+        result["recovery_hint"] = "EXCELLENT: R² ≥ 0.95 — report Tg with confidence."
+    return result
 
 
 @mcp.tool()
 def extract_tg(
     log_file: str,
     output_dir: Optional[str] = None,
+    graphs_dir: Optional[str] = None,
     initial_tg_guess: Optional[float] = None,
     equilibration_fraction: float = 0.5,
     temp_col: str = "Temp",
     density_col: str = "Density",
+    per_t_dump_file: Optional[str] = None,
+    tg_data_file: Optional[str] = None,
+    backbone_types: Optional[List[str]] = None,
 ) -> dict:
     """
     Extract glass transition temperature (Tg) from a LAMMPS MD temperature-sweep log.
 
-    Methodology (v4 — May 2026):
+    Methodology (v5 — June 2026):
       Data: Plateau detection (|ΔT|>15 K jump = new set-point) with
       equilibration burn-in, producing one clean (T, ρ) point per plateau.
       Plateaus with density drift > 1% are excluded from fitting: ≥20-row
       plateaus require drift > 1% AND p < 0.01; 3–19-row plateaus use
       magnitude-only (p-value unreliable for short autocorrelated series).
+      Log-based relaxation: each plateau gets an effective-sample count (n_eff)
+      via integrated density ACF.  n_eff < 5 raises relax_warning (soft flag).
       Fitting: Bilinear curve_fit — two OLS lines simultaneously fit to the
       glassy and rubbery regions; Tg = line intersection.  Physics constraints
       enforced (both slopes negative, rubbery steeper than glassy).  This is
       the standard method used in polymer MD literature (Afzal 2021, Hayashi/
       RadonPy 2022, Klajmon 2023, NkepsuMbitou 2025).
       Quality: Rated by bilinear R².
+      Structural (optional): if per_t_dump_file + tg_data_file are given,
+      computes per-T Rg and P2 nematic order. Flags anomalous P2 > 0.10 and
+      Rg CV > 0.30 for T > Tg (rubbery regime only — glassy regime is expected
+      to be structurally frozen). Also fits Rg(T) bilinearly to extract an
+      independent dynamic Tg (Rg-kink method) for cross-validation.
 
     References:
       Afzal et al., ACS Appl. Polym. Mater. 3 (2021) 6213–6228
@@ -1679,12 +1899,23 @@ def extract_tg(
                                 averaging (0.5 = last 50 %).
         temp_col:               Temperature column name (default: 'Temp').
         density_col:            Density column name (default: 'Density').
+        per_t_dump_file:        Path to per-T structural dump written by the
+                                Tg staircase (one frame per T step, cooling order).
+                                Enables dump-based structural analysis.
+        tg_data_file:           LAMMPS .data file used as input to the Tg sweep
+                                (topology/masses for MDAnalysis). Required when
+                                per_t_dump_file is provided.
+        backbone_types:         Backbone atom type IDs (list of strings/ints).
+                                Used for P2 nematic order computation.
 
     Returns:
         dict with run_id.  Result includes Tg_K, Tg_alternative_K,
         r_squared, fit_quality, fit_method, binning_method,
-        n_plateaus_skipped_drift, fit_params, n_temperature_bins,
-        temp_range_K, bins_csv, summary_json.
+        n_plateaus_skipped_drift, n_plateaus_low_n_eff,
+        relaxation_metrics (per-plateau n_eff + tau_int),
+        fit_params, n_temperature_bins, temp_range_K, bins_csv, summary_json.
+        When per_t_dump_file is provided: also Tg_dynamic_K (Rg-kink),
+        n_T_steps_p2_flag, n_T_steps_rg_cv_flag, structural_metrics_per_T.
     """
     if output_dir is None:
         output_dir = str(Path(log_file).parent / "tg_analysis")
@@ -1699,6 +1930,10 @@ def extract_tg(
             equilibration_fraction = equilibration_fraction,
             temp_col               = temp_col,
             density_col            = density_col,
+            graphs_dir             = graphs_dir,
+            per_t_dump_file        = per_t_dump_file,
+            tg_data_file           = tg_data_file,
+            backbone_types         = backbone_types,
         )),
         daemon=True,
     )
@@ -1708,6 +1943,93 @@ def extract_tg(
         "run_id":     run_id,
         "run_type":   "extract_tg",
         "log_file":   log_file,
+        "output_dir": output_dir,
+        "message":    "Poll with get_run_status(run_id)",
+    }
+
+
+# ── Tool: extract_tg_multirate ───────────────────────────────────────────────
+
+def _run_extract_tg_multirate(
+    rates: list,
+    tg_values: list,
+    output_dir: str,
+    polymer_name: str,
+    slow_rate_ref: float,
+) -> dict:
+    """Background worker — runs extract_tg_multirate.py via CLI."""
+    rate_args = " ".join(str(r) for r in rates)
+    tg_args   = " ".join(str(t) for t in tg_values)
+    parts = [
+        f"python {MDA_SCRIPTS_DIR}/extract_tg_multirate.py",
+        f"--rates {rate_args}",
+        f"--tg_values {tg_args}",
+        f"--output_dir {output_dir}",
+        f"--polymer_name {polymer_name}",
+        f"--slow_rate_ref {slow_rate_ref}",
+        "--no_plot",
+    ]
+    command = " ".join(parts)
+    logger.info(f"Running multi-rate Tg analysis: {command}")
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=120)
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def extract_tg_multirate(
+    rates_K_per_ns: list,
+    tg_values_K: list,
+    output_dir: str,
+    polymer_name: str = "polymer",
+    slow_rate_ref_K_per_ns: float = 5.0,
+) -> dict:
+    """
+    Fit a log-linear trend and attempt a Vogel-Fulcher (VF) extrapolation
+    across multiple cooling-rate Tg_MD values.
+
+    Primary output: log-linear slope (K per ln(K/ns)) and Tg at the
+    reference slow rate — this is the reliable deliverable for comparing
+    trend vs. Ramos 2015 Fig. 3.
+
+    Secondary output: VF extrapolated Tg0 (at Γ → 0).  Note that < 2 decades
+    of rate coverage gives a poorly-constrained VF fit; CI > 100 K is flagged
+    POORLY_CONSTRAINED.
+
+    The job runs in the background — poll with get_run_status(run_id).
+
+    Args:
+        rates_K_per_ns:          List of cooling rates in K/ns (same order as tg_values_K).
+        tg_values_K:             Tg_MD values in K from extract_tg runs at each rate.
+        output_dir:              Directory for JSON, markdown, and plot outputs.
+        polymer_name:            Label for outputs and plot title.
+        slow_rate_ref_K_per_ns:  Reference rate for log-linear Tg reporting (default 5.0).
+
+    Returns:
+        dict with run_id.  Result includes loglinear_slope_K, loglinear_r_squared,
+        tg_at_slow_rate_K, vf_fit_quality, tg0_K (if VF converged), d06_markdown.
+    """
+    run_id = run_manager.create(
+        "extract_tg_multirate",
+        {"output_dir": output_dir, "n_rates": len(rates_K_per_ns)},
+    )
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_extract_tg_multirate, dict(
+            rates       = rates_K_per_ns,
+            tg_values   = tg_values_K,
+            output_dir  = output_dir,
+            polymer_name = polymer_name,
+            slow_rate_ref = slow_rate_ref_K_per_ns,
+        )),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":     "submitted",
+        "run_id":     run_id,
+        "run_type":   "extract_tg_multirate",
         "output_dir": output_dir,
         "message":    "Poll with get_run_status(run_id)",
     }
@@ -1734,6 +2056,8 @@ def _run_check_equilibration_comprehensive(
     density_col: str,
     energy_col: str,
     atom_style: str,
+    graphs_dir: Optional[str] = None,
+    ct_min_decay: Optional[float] = None,
 ) -> dict:
     """Background worker — runs check_equilibration_comprehensive.py via CLI."""
     bt_str = " ".join(str(t) for t in backbone_types)
@@ -1759,13 +2083,29 @@ def _run_check_equilibration_comprehensive(
     ]
     if n_backbone_bonds is not None:
         parts.append(f"--n_backbone_bonds {n_backbone_bonds}")
+    if graphs_dir:
+        parts.append(f"--graphs_dir {graphs_dir}")
+    if ct_min_decay is not None:
+        parts.append(f"--ct_min_decay {ct_min_decay}")
 
     command = " ".join(parts)
     logger.info(f"Running comprehensive equilibration check: {command}")
     stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=72000)
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
-    return _parse_json_from_stdout(stdout, stderr)
+    result = _parse_json_from_stdout(stdout, stderr)
+    overall_pass = result.get("overall_pass", False)
+    if overall_pass:
+        result["recovery_hint"] = "PASS → proceed to Tg sweep (step 10)."
+    else:
+        result["recovery_hint"] = (
+            "EXTEND → extend final NPT by 1 ns, re-run check; max 2 extensions. "
+            "If density ≥ 110% of experimental after extensions, re-spawn build with lower density_initial. "
+            "ESCALATE (after 2 failed extensions) → re-run --stage build with "
+            "--density_initial = class_default − 0.05 g/cm³. "
+            "C(t) gate: pass ct_min_decay=0.25 for melt/NVT log; omit for 300K NPT and rubbery."
+        )
+    return result
 
 
 @mcp.tool()
@@ -1775,6 +2115,7 @@ def check_equilibration_comprehensive(
     data_file: str,
     backbone_types: list,
     output_dir: Optional[str] = None,
+    graphs_dir: Optional[str] = None,
     skip_frames: int = 50,
     timestep_fs: float = 1.0,
     dump_every: int = 1000,
@@ -1788,6 +2129,7 @@ def check_equilibration_comprehensive(
     density_col: str = "Density",
     energy_col: str = "TotEng",
     atom_style: str = "id resid type charge x y z",
+    ct_min_decay: Optional[float] = None,
 ) -> dict:
     """
     Comprehensive polymer equilibration validator — thermo + structural checks in
@@ -1802,11 +2144,12 @@ def check_equilibration_comprehensive(
       F. P2 nematic order < 0.10    (residual backbone alignment)
       G. Density homogeneity voxel CV < 25%  (adaptive grid; corrects 10³ false positives)
 
-    Soft warnings (reported but never block):
+    Soft warnings (reported but never block unless ct_min_decay supplied):
       - τ_eff / T_traj > 10%  (trajectory too short for good statistics)
       - C∞ outside broad expected range
       - MSID(n) power-law slope deviation > 20% from Gaussian (slope=1)
-      - C(t) end-to-end autocorrelation not fully decayed (τ_relax reported)
+      - C(t) end-to-end autocorrelation not fully decayed (τ_relax reported);
+        promoted to hard gate H when ct_min_decay is provided (use 0.25 for melt)
       - MSD kinetic-trap  (MSD_max < Rg² — expected below Tg)
 
     The job runs in the background — poll with get_run_status(run_id).
@@ -1831,6 +2174,12 @@ def check_equilibration_comprehensive(
         density_col:         Density column name.
         energy_col:          Total energy column name.
         atom_style:          LAMMPS dump atom_style columns.
+        ct_min_decay:        Optional. Minimum C(t) decay fraction (0–1) to pass a
+                             hard gate. Use 0.25 for melt equilibration checks (flags
+                             kinetic traps where τ_relax >> T_traj). Omit for
+                             soft-warning-only behaviour (backwards compatible default).
+                             Do NOT set for production checks below Tg — C(t) never
+                             decays in the glassy state.
 
     Returns:
         dict with run_id. When completed, result includes:
@@ -1871,6 +2220,8 @@ def check_equilibration_comprehensive(
             density_col         = density_col,
             energy_col          = energy_col,
             atom_style          = atom_style,
+            graphs_dir          = graphs_dir,
+            ct_min_decay        = ct_min_decay,
         )),
         daemon=True,
     )
@@ -2027,6 +2378,7 @@ def _run_extract_bulk_modulus(
     temp_col: str,
     press_col: str,
     density_col: str,
+    graphs_dir: Optional[str] = None,
 ) -> dict:
     """Background worker — runs extract_bulk_modulus.py via CLI."""
 
@@ -2039,6 +2391,8 @@ def _run_extract_bulk_modulus(
     parts.append(f"--temp_col {temp_col}")
     parts.append(f"--press_col {press_col}")
     parts.append(f"--density_col {density_col}")
+    if graphs_dir:
+        parts.append(f"--graphs_dir {graphs_dir}")
 
     command = " ".join(parts)
     logger.info(f"Running bulk modulus extraction via CLI: {command}")
@@ -2054,6 +2408,7 @@ def _run_extract_bulk_modulus(
 def extract_bulk_modulus(
     log_file: str,
     output_dir: Optional[str] = None,
+    graphs_dir: Optional[str] = None,
     eq_fraction: float = 0.5,
     block_count: int = 5,
     vol_col: str = "Volume",
@@ -2128,6 +2483,7 @@ def extract_bulk_modulus(
             temp_col    = temp_col,
             press_col   = press_col,
             density_col = density_col,
+            graphs_dir  = graphs_dir,
         )),
         daemon=True,
     )
@@ -2152,6 +2508,10 @@ def _run_extract_bulk_modulus_deform(
     timestep: float,
     eq_steps: int,
     strain_start: float,
+    avg_window: int = 2000,
+    graphs_dir: Optional[str] = None,
+    log_file_2: Optional[str] = None,
+    strain_rate_2: Optional[float] = None,
 ) -> dict:
     """Background worker — runs extract_bulk_modulus_deform.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/extract_bulk_modulus_deform.py"]
@@ -2162,6 +2522,13 @@ def _run_extract_bulk_modulus_deform(
     parts.append(f"--timestep {timestep}")
     parts.append(f"--eq_steps {eq_steps}")
     parts.append(f"--strain_start {strain_start}")
+    parts.append(f"--avg_window {avg_window}")
+    if graphs_dir:
+        parts.append(f"--graphs_dir {graphs_dir}")
+    if log_file_2:
+        parts.append(f"--log_file_2 {log_file_2}")
+    if strain_rate_2 is not None:
+        parts.append(f"--strain_rate_2 {strain_rate_2}")
 
     command = " ".join(parts)
     logger.info(f"Running deformation bulk modulus extraction via CLI: {command}")
@@ -2177,11 +2544,15 @@ def _run_extract_bulk_modulus_deform(
 def extract_bulk_modulus_deform(
     log_file: str,
     output_dir: Optional[str] = None,
+    graphs_dir: Optional[str] = None,
     strain_rate: float = 1e-7,
     strain_max: float = 0.03,
     timestep: float = 1.0,
     eq_steps: int = 200000,
     strain_start: float = 0.002,
+    avg_window: int = 2000,
+    log_file_2: Optional[str] = None,
+    strain_rate_2: Optional[float] = None,
 ) -> dict:
     """
     Extract elastic constants from a LAMMPS uniaxial deformation log
@@ -2221,6 +2592,13 @@ def extract_bulk_modulus_deform(
         timestep:     MD timestep in fs (must match simulation). Default 1.0.
         eq_steps:     NVT pre-equilibration steps (N_EQ_STEPS) — skipped in analysis.
         strain_start: Minimum strain to include in fit (skip initial transient). Default 0.002.
+        avg_window:   Rolling-average window in thermo frames applied to stress before fitting.
+                      Thermal noise (~0.2 GPa at THERMO_FREQ=100) swamps the elastic signal
+                      (~0.09 GPa at 3% strain) on individual thermo rows. Default 2000 = 200 ps
+                      at THERMO_FREQ=100. Set to 1 to disable. Scale with THERMO_FREQ if changed.
+        log_file_2:   Optional second deformation log (slow-rate run) for rate-sensitivity check.
+                      When provided, K is extracted independently from both logs and compared.
+        strain_rate_2: Strain rate for log_file_2 in 1/fs. Required if log_file_2 is set.
 
     Returns:
         dict with run_id.  When completed, result includes:
@@ -2241,13 +2619,17 @@ def extract_bulk_modulus_deform(
     t = threading.Thread(
         target=_analysis_run_background,
         args=(run_id, _run_extract_bulk_modulus_deform, dict(
-            log_file     = log_file,
-            output_dir   = output_dir,
-            strain_rate  = strain_rate,
-            strain_max   = strain_max,
-            timestep     = timestep,
-            eq_steps     = eq_steps,
-            strain_start = strain_start,
+            log_file      = log_file,
+            output_dir    = output_dir,
+            strain_rate   = strain_rate,
+            strain_max    = strain_max,
+            timestep      = timestep,
+            eq_steps      = eq_steps,
+            strain_start  = strain_start,
+            avg_window    = avg_window,
+            graphs_dir    = graphs_dir,
+            log_file_2    = log_file_2,
+            strain_rate_2 = strain_rate_2,
         )),
         daemon=True,
     )
@@ -2259,6 +2641,251 @@ def extract_bulk_modulus_deform(
         "log_file":   log_file,
         "output_dir": output_dir,
         "message":    "Poll with get_run_status(run_id)",
+    }
+
+
+# ── Tool: run_bulk_modulus_series ─────────────────────────────────────────────
+
+@mcp.tool()
+def run_bulk_modulus_series(
+    data_file: str,
+    work_dir: str,
+    pressures_atm: list,
+    temp_K: float,
+    run_name: str,
+    npt_steps: int = 500000,
+    dt_fs: float = 1.0,
+    thermo_freq: int = 100,
+    mpi: int = 2,
+    gpu_ids: str = "0,1",
+    output_dir: Optional[str] = None,
+) -> dict:
+    """
+    Run a series of constant-pressure NPT simulations to support Murnaghan
+    EOS fitting (rubbery polymer bulk modulus).
+
+    For each pressure in pressures_atm, generates an NPT script (constant T,
+    constant P) from the standard npt template and submits all as a chain.
+    After the chain completes, pass the resulting log files to
+    extract_bulk_modulus_murnaghan to fit B0, B0', V0.
+
+    Recommended pressures for soft melts: [1, 100, 300, 600, 1000] atm.
+    Each NPT run equilibrates the box at that pressure; the mean volume is
+    extracted from the production window (last 50%% by default).
+
+    Args:
+        data_file:      Equilibrated .data file (e.g. 07_npt_production_out.data).
+        work_dir:       Base directory; subdirs bm_P{P}/ are created per pressure.
+        pressures_atm:  List of target pressures in atm (at least 3).
+        temp_K:         Simulation temperature (K). Use 300 K for property measurement.
+        run_name:       Human-readable label for logging.
+        npt_steps:      MD steps per pressure point. Default 500000 (500 ps at dt=1 fs).
+        dt_fs:          Timestep in fs. Default 1.0.
+        thermo_freq:    Thermo output frequency. Default 100.
+        mpi:            MPI processes. Default 2.
+        gpu_ids:        Comma-separated GPU IDs. Default "0,1".
+        output_dir:     Where to store the list of log file paths (JSON).
+                        Defaults to work_dir.
+
+    Returns:
+        dict with chain_id, monitor_command, log_files (list of expected log paths),
+        and pressures_atm. Pass log_files and pressures_atm to
+        extract_bulk_modulus_murnaghan after the chain completes.
+    """
+    try:
+        if len(pressures_atm) < 3:
+            return {
+                "status": "error",
+                "error": f"At least 3 pressure points required for Murnaghan fit "
+                         f"(got {len(pressures_atm)})."
+            }
+
+        out_dir = Path(output_dir or work_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        stages = []
+        log_files = []
+        for p_atm in pressures_atm:
+            tag = f"bm_P{int(p_atm)}"
+            stage_dir = str(Path(work_dir) / tag)
+            script_path = f"{stage_dir}/{tag}.in"
+            log_path = f"{stage_dir}/{tag}.log"
+            log_files.append(log_path)
+
+            gen_result = generate_script(
+                template_name="npt",
+                data_file=data_file,
+                output_script=script_path,
+                params={
+                    "T_START":     temp_K,
+                    "T_FINAL":     temp_K,
+                    "P_START":     float(p_atm),
+                    "P_FINAL":     float(p_atm),
+                    "N_STEPS":     npt_steps,
+                    "TIMESTEP":    dt_fs,
+                    "THERMO_FREQ": thermo_freq,
+                    "LOG_FILE":    log_path,
+                    "use_gpu":     True,
+                    "DUMP_FILE":   f"{stage_dir}/{tag}.dump",
+                    "LAST_DUMP_FILE":  f"{stage_dir}/{tag}_last.dump",
+                    "WRITE_DATA_FILE": f"{stage_dir}/{tag}_out.data",
+                },
+            )
+            if gen_result.get("status") == "error":
+                return {
+                    "status": "error",
+                    "error": f"generate_script failed for P={p_atm} atm: "
+                             f"{gen_result.get('error')}"
+                }
+            stages.append({
+                "name":     tag,
+                "script":   script_path,
+                "work_dir": stage_dir,
+                "log_file": log_path,
+            })
+
+        # Save log file manifest alongside output
+        manifest_path = str(out_dir / "bm_series_manifest.json")
+        with open(manifest_path, "w") as mf:
+            json.dump({"pressures_atm": pressures_atm, "log_files": log_files,
+                       "temp_K": temp_K, "npt_steps": npt_steps}, mf, indent=2)
+
+        chain_result = run_lammps_chain(
+            stages=stages,
+            mpi=mpi,
+            gpu_ids=gpu_ids,
+            data_file=data_file,
+        )
+        if chain_result.get("status") == "error":
+            return chain_result
+
+        chain_id = chain_result["chain_id"]
+        return {
+            "status":        "submitted",
+            "chain_id":      chain_id,
+            "run_name":      run_name,
+            "pressures_atm": pressures_atm,
+            "log_files":     log_files,
+            "temp_K":        temp_K,
+            "npt_steps":     npt_steps,
+            "n_stages":      len(stages),
+            "manifest_json": manifest_path,
+            "monitor_command": f"watch_run('{chain_id}')",
+            "next_step": (
+                f"After chain completes: call extract_bulk_modulus_murnaghan("
+                f"log_files={log_files}, pressures_atm={pressures_atm}, "
+                f"output_dir='<raw_dir>', graphs_dir='<graphs_dir>')"
+            ),
+            **{k: v for k, v in chain_result.items() if k not in ("status", "chain_id")},
+        }
+
+    except Exception as e:
+        logger.error(f"run_bulk_modulus_series failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+# ── Tool: extract_bulk_modulus_murnaghan ─────────────────────────────────────
+
+def _run_extract_bulk_modulus_murnaghan(
+    log_files: list,
+    pressures_atm: list,
+    output_dir: str,
+    eq_fraction: float,
+    graphs_dir: Optional[str] = None,
+) -> dict:
+    """Background worker — runs extract_bulk_modulus_murnaghan.py via CLI."""
+    parts = [f"python {MDA_SCRIPTS_DIR}/extract_bulk_modulus_murnaghan.py"]
+    parts.append("--log_files " + " ".join(str(f) for f in log_files))
+    parts.append("--pressures_atm " + " ".join(str(p) for p in pressures_atm))
+    parts.append(f"--output_dir {output_dir}")
+    parts.append(f"--eq_fraction {eq_fraction}")
+    if graphs_dir:
+        parts.append(f"--graphs_dir {graphs_dir}")
+
+    command = " ".join(parts)
+    logger.info(f"Running Murnaghan bulk modulus extraction via CLI: {command}")
+
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
+
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def extract_bulk_modulus_murnaghan(
+    log_files: list,
+    pressures_atm: list,
+    output_dir: str,
+    graphs_dir: Optional[str] = None,
+    eq_fraction: float = 0.5,
+) -> dict:
+    """
+    Fit the Murnaghan equation of state to a multi-pressure NPT series and
+    extract the isothermal bulk modulus B0.
+
+    Input: N NPT log files (one per pressure) from run_bulk_modulus_series.
+    Each log is parsed; the last eq_fraction of rows is used as production
+    window to compute mean equilibrium volume at that pressure.
+
+    Murnaghan EOS: P = (B0/B0') * [(V0/V)^B0' - 1]
+    Free parameters: B0 (bulk modulus, GPa), B0' (pressure derivative), V0 (Å³).
+
+    Advantages over volume-fluctuation B_dyn:
+      - Barostat-independent (P_DAMP has no effect)
+      - Captures EOS nonlinearity typical of soft polymer melts (B0' ~ 7-11)
+
+    Falls back to linear P vs ln V fit if curve_fit fails to converge.
+
+    Output files written to output_dir:
+        bulk_modulus_murnaghan.json  — B0_GPa, B0_prime, V0_A3, r_squared, …
+                                       Also contains bulk_modulus_GPa alias for
+                                       compatibility with generate_run_summary.
+        murnaghan_eos.png            — P vs V scatter with fit curve
+
+    The job runs in the background — poll with get_run_status(run_id).
+
+    Args:
+        log_files:      List of LAMMPS log file paths, one per pressure point.
+                        Same order as pressures_atm. From run_bulk_modulus_series.
+        pressures_atm:  List of target pressures (atm), same order as log_files.
+        output_dir:     Directory for bulk_modulus_murnaghan.json output.
+        graphs_dir:     Directory for PNG figures. Defaults to output_dir/figures.
+        eq_fraction:    Fraction of each log used as production window. Default 0.5.
+
+    Returns:
+        dict with run_id.  When completed, result includes:
+            B0_GPa          — isothermal bulk modulus (Murnaghan B0)
+            B0_prime        — pressure derivative dB/dP
+            V0_A3           — reference volume at P=0
+            r_squared       — goodness of fit (goal > 0.999)
+            bulk_modulus_GPa — alias for B0_GPa (used by generate_run_summary)
+            fit_converged   — True if Murnaghan converged, False if linear fallback
+            warnings        — list of any quality flags
+    """
+    run_id = run_manager.create(
+        "extract_bulk_modulus_murnaghan",
+        {"log_files": log_files, "output_dir": output_dir}
+    )
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_extract_bulk_modulus_murnaghan, dict(
+            log_files     = log_files,
+            pressures_atm = pressures_atm,
+            output_dir    = output_dir,
+            eq_fraction   = eq_fraction,
+            graphs_dir    = graphs_dir,
+        )),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":        "submitted",
+        "run_id":        run_id,
+        "run_type":      "extract_bulk_modulus_murnaghan",
+        "n_pressure_points": len(log_files),
+        "output_dir":    output_dir,
+        "message":       "Poll with get_run_status(run_id)",
     }
 
 
@@ -2289,6 +2916,7 @@ def _run_generate_run_summary(
     exp_density_max: Optional[float],
     exp_K_min: Optional[float],
     exp_K_max: Optional[float],
+    graphs_dir: Optional[str] = None,
 ) -> dict:
     """Background worker — runs generate_run_summary.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/generate_run_summary.py"]
@@ -2316,6 +2944,7 @@ def _run_generate_run_summary(
     if exp_density_max is not None: parts.append(f"--exp_density_max {exp_density_max}")
     if exp_K_min is not None:       parts.append(f"--exp_K_min {exp_K_min}")
     if exp_K_max is not None:       parts.append(f"--exp_K_max {exp_K_max}")
+    if graphs_dir:                  parts.append(f"--graphs_dir {graphs_dir}")
 
     command = " ".join(parts)
     logger.info(f"Running generate_run_summary via CLI: {command}")
@@ -2329,6 +2958,7 @@ def _run_generate_run_summary(
 def generate_run_summary(
     output_dir: str,
     run_name: str,
+    graphs_dir: Optional[str] = None,
     smiles: str = "",
     polymer_class: str = "",
     ff: str = "",
@@ -2398,6 +3028,7 @@ def generate_run_summary(
             exp_tg_min=exp_tg_min, exp_tg_max=exp_tg_max,
             exp_density_min=exp_density_min, exp_density_max=exp_density_max,
             exp_K_min=exp_K_min, exp_K_max=exp_K_max,
+            graphs_dir=graphs_dir,
         )),
         daemon=True,
     )

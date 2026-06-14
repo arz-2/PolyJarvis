@@ -52,6 +52,11 @@ import pandas as pd
 from pathlib import Path
 from scipy import stats as sp_stats
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from plot_style import apply_style, save_fig
+
 from analysis_utils import compute_tau_eff
 
 
@@ -178,6 +183,30 @@ def compute_bulk_modulus(volumes, temperature):
 
 
 # ---------------------------------------------------------------------------
+# Plot
+# ---------------------------------------------------------------------------
+
+def plot_volume_fluctuations(volumes, V_mean, V_std, block_count, block_size, graphs_dir):
+    apply_style()
+    fig, ax = plt.subplots()
+    frames = np.arange(len(volumes))
+    ax.plot(frames, volumes, color='steelblue', lw=0.8, alpha=0.8, label='V(t)')
+    ax.axhline(V_mean, color='black', lw=1.5, ls='-', label=f'Mean = {V_mean:.1f} Å³')
+    ax.fill_between(frames, V_mean - 2 * V_std, V_mean + 2 * V_std,
+                    color='steelblue', alpha=0.15, label='±2σ band')
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for i in range(block_count):
+        lo, hi = i * block_size, min((i + 1) * block_size, len(volumes))
+        ax.axvspan(lo, hi, alpha=0.08 if i % 2 == 0 else 0,
+                   color=colors[i % len(colors)])
+    ax.set_xlabel('Production frame')
+    ax.set_ylabel('Volume (Å³)')
+    ax.set_title('NPT volume time series')
+    ax.legend()
+    save_fig(fig, str(graphs_dir / 'volume_fluctuations.png'))
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -203,10 +232,14 @@ def main():
                         help="Pressure column name in thermo output.")
     parser.add_argument("--density_col", default="Density",
                         help="Density column name in thermo output.")
+    parser.add_argument("--graphs_dir", default=None,
+                        help="Directory for PNG figures (default: <output_dir>/figures/).")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    graphs_dir = Path(args.graphs_dir) if args.graphs_dir else output_dir / 'figures'
+    graphs_dir.mkdir(parents=True, exist_ok=True)
 
     # -------------------------------------------------------------------
     # 1. Parse log
@@ -439,6 +472,25 @@ def main():
             f"disagree by {B_def_result['agreement_with_B_dyn_pct']:.1f}%. "
             "Possible barostat artefact or insufficient equilibration — see Wu 2020."
         )
+    if (B_def_result is not None
+            and B_def_result.get("r_squared") is not None
+            and B_def_result["r_squared"] < 0.98):
+        result["warning_bdef_unreliable"] = (
+            f"B_def R²={B_def_result['r_squared']:.4f} < 0.98 — the P vs ln V relationship "
+            "is nonlinear, indicating a large pressure derivative B0' (typical for soft melts). "
+            "The B_def cross-check is unreliable here; B_dyn may also be biased by barostat "
+            "damping. Use the Murnaghan multi-pressure series (run_bulk_modulus_series) for "
+            "accurate K on rubbery polymers."
+        )
+
+    vol_fig_png = None
+    try:
+        plot_volume_fluctuations(volumes, meta["V_mean_A3"], meta["V_std_A3"],
+                                 actual_block_count, bs, graphs_dir)
+        vol_fig_png = str(graphs_dir / "volume_fluctuations.png")
+    except Exception as _pe:
+        print(f"  WARNING: volume_fluctuations plot failed: {_pe}", flush=True)
+    result["volume_fluctuations_fig"] = vol_fig_png
 
     summary_path = str(output_dir / "bulk_modulus.json")
     with open(summary_path, "w") as jf:

@@ -372,7 +372,18 @@
         40,
         160,
         640
-      ]
+      ],
+      "bm_pressures_atm": [
+        1,
+        100,
+        300,
+        600,
+        1000
+      ],
+      "exp_K_GPa": {
+        "min": 0.3,
+        "max": 0.8
+      }
     },
     "PSTR": {
       "name": "Polystyrenic",
@@ -455,7 +466,12 @@
         "Exp. RT density: PS=1.05 g/cm\u00b3. Initial density 0.53 g/cm\u00b3 = ~0.5x PS density.",
         "SCREENING dp: dp_typical=40 for 48h-budget Tg sweep (6,400 atoms, ~10h/4GPU). Tg is chain-length independent above dp\u226530 (Soldera2006: DP\u226530 required to average atactic tacticity fluctuations). ENTANGLEMENT NOTE: a-PS Me=16,600 g/mol \u2192 DP@Me=160 (Mark2007 Table 25.4). At dp=40 < Me: K from uniaxial deformation will be systematically underestimated by ~30-50% vs converged value. dp_min=30 is the Tg-convergence floor; for accurate K use dp\u2265160 in a dedicated property run.",
         "STRAIN RATE ARTIFACT: MD uniaxial deformation uses strain rates 10^8-10^10 /s, 6-9 orders of magnitude faster than experiment. This systematically overestimates K by ~1.5-2x relative to quasistatic experiment, independent of system size. Report MD K alongside exp reference and flag the offset."
-      ]
+      ],
+      "exp_K_GPa": {
+        "min": 3.5,
+        "max": 5.5
+      },
+      "K_deform_rate_slow_inv_s": 1000000.0
     },
     "PVNL": {
       "name": "Polyvinyl",
@@ -526,7 +542,8 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1007/s10118-019-2249-5",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PVC PASS, PVAc PASS, PVA PASS). Note: OPLS-AA failed for PVC and PVAc; PCFF succeeded."
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PVC PASS, PVAc PASS, PVA PASS). Note: OPLS-AA failed for PVC and PVAc; PCFF succeeded.",
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PACR": {
       "name": "Polyacrylic",
@@ -611,7 +628,12 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1016/j.commatsci.2025.113861",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PMMA PASS). PCFF (Class II) strongly preferred: NkepsuMbitou2025 shows GAFF Tg error >45% for PMMA; PCFF within 10%."
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PMMA PASS). PCFF (Class II) strongly preferred: NkepsuMbitou2025 shows GAFF Tg error >45% for PMMA; PCFF within 10%.",
+      "exp_K_GPa": {
+        "min": 3.5,
+        "max": 5.0
+      },
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PHAL": {
       "name": "Polyhalogenated",
@@ -685,7 +707,8 @@
         "PCTFE may have crystallization artifacts \u2014 run at low cooling rate (5-10 K/ns equivalent).",
         "WARNING: PTFE atom type (CF2 backbone) \u2014 verify opls_f / opls_935 types are assigned by EMC before run.",
         "Amorphous PVDF density validation target: 1.75\u20131.78 g/cm\u00b3 at 283 K (Byutner2000 Fig 5; experimental Kynar amorphous PVDF). Simulation density at 283 K below 1.70 g/cm\u00b3 indicates incorrect charge scaling or wrong nonbonded parameters."
-      ]
+      ],
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PDIE": {
       "name": "Polydiene",
@@ -758,7 +781,18 @@
         "Fewer annealing cycles needed due to flexible rubbery backbone (fast equilibration above Tg).",
         "Exp. RT density: PBD=0.90 g/cm\u00b3, PI=0.91 g/cm\u00b3. Initial density 0.57 g/cm\u00b3 = ~71% of PBD \u03c1_melt(400K)\u22480.80 g/cm\u00b3; previous 0.45 required heavy compression.",
         "TraPPE-UA includes validated alkene types for cis/trans-1,4 repeat units (Martin1998); verify RDF against experiment for new PDIE SMILES."
-      ]
+      ],
+      "bm_pressures_atm": [
+        1,
+        100,
+        300,
+        600,
+        1000
+      ],
+      "exp_K_GPa": {
+        "min": 0.2,
+        "max": 0.6
+      }
     },
     "POXI": {
       "name": "Polyoxide / Polyether",
@@ -838,7 +872,8 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested 2026-05-31: PEO PASS). PCFF Class II outperforms GAFF2 for thermomechanical properties (NkepsuMbitou2025). EMC recommended."
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested 2026-05-31: PEO PASS). PCFF Class II outperforms GAFF2 for thermomechanical properties (NkepsuMbitou2025). EMC recommended.",
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PSUL": {
       "name": "Polythioether / Polysulfide",
@@ -906,7 +941,12 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PPS PASS). PCFF has sulfone/sulfide types."
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PPS PASS). PCFF has sulfone/sulfide types.",
+      "exp_K_GPa": {
+        "min": 3.5,
+        "max": 5.5
+      },
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PEST": {
       "name": "Polyester",
@@ -983,7 +1023,12 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PLA PASS, PET PASS). PCFF has explicit ester types (c_1, o_2, oe). Klajmon2023 benchmarks PLA/PEG with AA-MD."
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PLA PASS, PET PASS). PCFF has explicit ester types (c_1, o_2, oe). Klajmon2023 benchmarks PLA/PEG with AA-MD.",
+      "exp_K_GPa": {
+        "min": 3.0,
+        "max": 4.5
+      },
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PAMD": {
       "name": "Polyamide",
@@ -1058,7 +1103,12 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/ja00086a030",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md) Confidence lowered to medium: PCFF used here by EMC builder constraint (no AMBER path available). AMBER99sb/CHARMM36 would be more accurate for H-bonded polyamides (Lukasheva2017 Soft Matter); PCFF QEq charges underrepresent amide H-bond geometry vs HF/6-31G* RESP charges."
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md) Confidence lowered to medium: PCFF used here by EMC builder constraint (no AMBER path available). AMBER99sb/CHARMM36 would be more accurate for H-bonded polyamides (Lukasheva2017 Soft Matter); PCFF QEq charges underrepresent amide H-bond geometry vs HF/6-31G* RESP charges.",
+      "exp_K_GPa": {
+        "min": 3.5,
+        "max": 5.5
+      },
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PURT": {
       "name": "Polyurethane",
@@ -1117,7 +1167,8 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.3390/polym18060679",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: aliphatic TPU PASS). WARNING: aromatic MDI-type urethane SMILES fail with {o,c_2} increment error \u2014 test build before submitting aromatic TPU."
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: aliphatic TPU PASS). WARNING: aromatic MDI-type urethane SMILES fail with {o,c_2} increment error \u2014 test build before submitting aromatic TPU.",
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PURA": {
       "name": "Polyurea",
@@ -1237,7 +1288,12 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1002/pol.20200050",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md)."
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md).",
+      "exp_K_GPa": {
+        "min": 4.0,
+        "max": 6.0
+      },
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PANH": {
       "name": "Polyanhydride",
@@ -1295,7 +1351,8 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(sebacic anhydride) PASS). PCFF ester-like types cover anhydride linkage."
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(sebacic anhydride) PASS). PCFF ester-like types cover anhydride linkage.",
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PCBN": {
       "name": "Polycarbonate",
@@ -1357,7 +1414,12 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1016/j.polymer.2022.125044",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; Tang2022 validates AA-MD Tg and Rg for BPA-PC specifically."
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; Tang2022 validates AA-MD Tg and Rg for BPA-PC specifically.",
+      "exp_K_GPa": {
+        "min": 3.0,
+        "max": 4.0
+      },
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PIMN": {
       "name": "Polyamine / Polyetherimide / Epoxy",
@@ -1418,7 +1480,8 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1002/pol.20200050",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PEI PASS). PCFF has amine N types. Wen2020 validates PCFF for Ultem (4,4-BPADA+MPD): MD Tg=525K vs exp ~490K (+7%)."
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PEI PASS). PCFF has amine N types. Wen2020 validates PCFF for Ultem (4,4-BPADA+MPD): MD Tg=525K vs exp ~490K (+7%).",
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PSIL": {
       "builder_status": "supported",
@@ -1541,7 +1604,8 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.3390/polym14071451",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(ethoxyphosphazene) PASS; pcff.frc explicitly added polyphosphazene types). WARNING: Cl-substituted PDCP not tested."
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(ethoxyphosphazene) PASS; pcff.frc explicitly added polyphosphazene types). WARNING: Cl-substituted PDCP not tested.",
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PKTN": {
       "name": "Polyketone / Polyetherketone",
@@ -1608,7 +1672,12 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.3390/polym12051054",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md). PEEK2020 validates COMPASS II (Class II family) for PEEK: Tg=424-429K vs exp 418K (+1-3%)."
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md). PEEK2020 validates COMPASS II (Class II family) for PEEK: Tg=424-429K vs exp 418K (+1-3%).",
+      "exp_K_GPa": {
+        "min": 4.0,
+        "max": 7.0
+      },
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PSFO": {
       "name": "Polysulfone",
@@ -1674,7 +1743,12 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/ja00086a030",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md)."
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md).",
+      "exp_K_GPa": {
+        "min": 3.0,
+        "max": 5.0
+      },
+      "K_deform_rate_slow_inv_s": 10000000.0
     },
     "PPNL": {
       "name": "Polyphenylenevinylene / Conjugated Polymer",
@@ -1739,7 +1813,8 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1002/mats.201600006",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PPV PASS). Note: OPLS-AA failed for PPV (no vinyl rule); PCFF succeeded. Conjugated torsional accuracy not yet validated. Venkatanarayanan2016 validates PCFF directly for PPV: Tg=416\u00b18K vs exp ~416K."
+      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PPV PASS). Note: OPLS-AA failed for PPV (no vinyl rule); PCFF succeeded. Conjugated torsional accuracy not yet validated. Venkatanarayanan2016 validates PCFF directly for PPV: Tg=416\u00b18K vs exp ~416K.",
+      "K_deform_rate_slow_inv_s": 10000000.0
     }
   },
   "global_defaults": {

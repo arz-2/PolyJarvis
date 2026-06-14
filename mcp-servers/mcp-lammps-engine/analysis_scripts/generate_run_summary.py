@@ -80,18 +80,23 @@ def main():
     p.add_argument("--exp_density_max", type=float, default=None)
     p.add_argument("--exp_K_min",       type=float, default=None)
     p.add_argument("--exp_K_max",       type=float, default=None)
+    p.add_argument("--graphs_dir",      default=None,
+                   help="Directory where PNG figures were saved (default: <output_dir>/figures/)")
     args = p.parse_args()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    graphs_dir = Path(args.graphs_dir) if args.graphs_dir else output_dir / 'figures'
 
     # -----------------------------------------------------------------------
     # Load all analysis JSON outputs
     # -----------------------------------------------------------------------
-    tg      = _load_json(output_dir / "tg_summary.json")
-    eq_dens = _load_json(output_dir / "equilibrated_density.json")
-    eq_chk  = _load_json(output_dir / "equilibration_check.json")
-    bulk    = _load_json(output_dir / "bulk_modulus.json")
+    tg           = _load_json(output_dir / "tg_summary.json")
+    eq_dens      = _load_json(output_dir / "equilibrated_density.json")
+    eq_chk       = _load_json(output_dir / "equilibration_check.json")
+    bulk         = _load_json(output_dir / "bulk_modulus.json")
+    bulk_deform  = _load_json(output_dir / "bulk_modulus_deform.json")
+    bulk_murnaghan = _load_json(output_dir / "bulk_modulus_murnaghan.json")
     e2e     = _load_json(output_dir / "end_to_end_summary.json")
     rdf     = _load_json(output_dir / "rdf_summary.json")
     rg      = _load_json(output_dir / "rg_summary.json")
@@ -122,8 +127,23 @@ def main():
         rho_err = round(abs(rho_val - exp_mid) / exp_mid * 100, 1)
         rho_status = "PASS" if exp_rho[0] <= rho_val <= exp_rho[1] else "FAIL"
 
-    K_val = bulk.get("bulk_modulus_GPa")
-    K_sem = bulk.get("bulk_modulus_sem_GPa")
+    # K-source precedence: murnaghan > deform > fluctuation
+    # Murnaghan is barostat-independent and handles EOS nonlinearity (rubbery).
+    # Deform is the authoritative method for glassy polymers.
+    # Fluctuation (B_dyn) is a diagnostic fallback.
+    if bulk_murnaghan.get("B0_GPa") is not None:
+        K_val    = bulk_murnaghan.get("B0_GPa")
+        K_sem    = bulk_murnaghan.get("B0_sem_GPa")
+        K_method = "murnaghan"
+    elif bulk_deform.get("K_GPa") is not None:
+        K_val    = bulk_deform.get("K_GPa")
+        K_sem    = bulk_deform.get("K_sem_GPa")
+        K_method = "deformation"
+    else:
+        K_val    = bulk.get("bulk_modulus_GPa")
+        K_sem    = bulk.get("bulk_modulus_sem_GPa")
+        K_method = "fluctuation" if K_val is not None else None
+
     exp_K = ([args.exp_K_min, args.exp_K_max]
              if args.exp_K_min is not None and args.exp_K_max is not None else None)
     K_status = "no exp ref"
@@ -137,13 +157,13 @@ def main():
     # Artifact pointers (relative to data/[RUN]/)
     # -----------------------------------------------------------------------
     def rel(fname):
-        """Return outputs/<fname> if file exists, else None."""
+        """Return raw/<fname> if file exists, else None."""
         full = output_dir / fname
-        return f"outputs/{fname}" if full.exists() else None
+        return f"raw/{fname}" if full.exists() else None
 
     def rel_fig(fname):
-        full = output_dir / "figures" / fname
-        return f"outputs/figures/{fname}" if full.exists() else None
+        full = graphs_dir / fname
+        return f"graphs/{fname}" if full.exists() else None
 
     artifacts = {
         "tg_summary":              rel("tg_summary.json"),
@@ -153,8 +173,13 @@ def main():
         "equilibration_check":     rel("equilibration_check.json"),
         "equilibration_fig":       rel_fig("equilibration_convergence.png"),
         "bulk_modulus":            rel("bulk_modulus.json"),
+        "bulk_modulus_deform":     rel("bulk_modulus_deform.json"),
+        "bulk_modulus_murnaghan":  rel("bulk_modulus_murnaghan.json"),
         "volume_timeseries":       rel("volume_timeseries.csv"),
         "volume_fig":              rel_fig("volume_fluctuations.png"),
+        "murnaghan_eos_fig":       rel_fig("murnaghan_eos.png"),
+        "stress_strain_csv":       rel("stress_strain.csv"),
+        "stress_strain_fig":       rel_fig("stress_strain.png"),
         "rdf_summary":             rel("rdf_summary.json"),
         "rdf_fig":                 rel_fig("rdf_all_pairs.png"),
         "end_to_end_summary":      rel("end_to_end_summary.json"),
@@ -226,6 +251,7 @@ def main():
                 "exp_range_GPa":  exp_K,
                 "error_pct":      K_err,
                 "status":         K_status,
+                "method":         K_method,
             },
         },
         "convergence": {

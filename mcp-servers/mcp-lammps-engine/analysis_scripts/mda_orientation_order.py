@@ -50,6 +50,8 @@ def parse_args():
                    help="Atom type IDs that form the backbone (e.g. 2 3 for PVDF)")
     p.add_argument("--p2_threshold",    type=float, default=0.10,
                    help="P2 threshold above which ordered_flag fires (default 0.10)")
+    p.add_argument("--graphs_dir",      type=str,   default=None,
+                   help="Directory for PNG figures (default: <output_dir>/figures/)")
     return p.parse_args()
 
 
@@ -112,7 +114,7 @@ def get_backbone_bond_vectors(u, chain_ids, backbone_set, box):
     return np.array(vectors) if vectors else np.zeros((0, 3))
 
 
-def _plot_orientation_p2(df, p2_mean, p2_std, p2_threshold, ordered_flag, output_dir):
+def _plot_orientation_p2(df, p2_mean, p2_std, p2_threshold, ordered_flag, graphs_dir):
     apply_style()
     frames = df['frame'].values
     p2_vals = df['p2'].values
@@ -128,7 +130,7 @@ def _plot_orientation_p2(df, p2_mean, p2_std, p2_threshold, ordered_flag, output
     ax.set_title(f'Backbone orientation order — {flag_str}')
     ax.set_ylim(bottom=max(-0.55, min(p2_vals.min() - 0.05, -0.05)))
     ax.legend()
-    save_fig(fig, str(Path(output_dir) / 'figures' / 'orientation_p2.png'))
+    save_fig(fig, str(graphs_dir / 'orientation_p2.png'))
 
 
 def main():
@@ -137,6 +139,8 @@ def main():
 
     output_dir = Path(args.output_dir) if args.output_dir else Path(args.dump_file).parent / "analysis"
     output_dir.mkdir(parents=True, exist_ok=True)
+    graphs_dir = Path(args.graphs_dir) if args.graphs_dir else output_dir / 'figures'
+    graphs_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading topology: {args.data_file}", flush=True)
     print(f"Loading trajectory: {args.dump_file}", flush=True)
@@ -202,9 +206,9 @@ def main():
         "mdanalysis_version": mda.__version__,
     })
 
-    p2_fig_png = str(output_dir / "figures" / "orientation_p2.png")
+    p2_fig_png = str(graphs_dir / "orientation_p2.png")
     try:
-        _plot_orientation_p2(df, p2_mean, p2_std, args.p2_threshold, ordered_flag, output_dir)
+        _plot_orientation_p2(df, p2_mean, p2_std, args.p2_threshold, ordered_flag, graphs_dir)
     except Exception as _pe:
         print(f"  WARNING: orientation_p2 plot failed: {_pe}", flush=True)
         p2_fig_png = None

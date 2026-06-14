@@ -41,6 +41,8 @@ def parse_args():
     p.add_argument("--skip_frames",     type=int,   default=0)
     p.add_argument("--max_frames",      type=int,   default=None)
     p.add_argument("--output_dir",      type=str,   default=None)
+    p.add_argument("--graphs_dir",      type=str,   default=None,
+                   help="Directory for PNG figures (default: <output_dir>/figures/)")
     p.add_argument("--atom_style",      type=str,   default="id resid type charge x y z")
     p.add_argument("--timestep_fs",     type=float, default=1.0,
                    help="MD timestep in fs (used to convert frames → ps)")
@@ -121,7 +123,7 @@ def fit_power_law(lags, msd, min_points=5):
     return A, alpha, r2
 
 
-def _plot_msd_log(lag_times_ps, msd_vals, alpha, A, r2_fit, output_dir):
+def _plot_msd_log(lag_times_ps, msd_vals, alpha, A, r2_fit, graphs_dir):
     apply_style()
     mask = (lag_times_ps > 0) & (msd_vals > 0)
     fig, ax = plt.subplots()
@@ -135,7 +137,7 @@ def _plot_msd_log(lag_times_ps, msd_vals, alpha, A, r2_fit, output_dir):
     ax.set_ylabel('MSD (Å²)')
     ax.set_title('Chain center-of-mass MSD')
     ax.legend()
-    save_fig(fig, str(Path(output_dir) / 'figures' / 'msd_log.png'))
+    save_fig(fig, str(graphs_dir / 'msd_log.png'))
 
 
 def main():
@@ -143,6 +145,8 @@ def main():
 
     output_dir = Path(args.output_dir) if args.output_dir else Path(args.dump_file).parent / "analysis"
     output_dir.mkdir(parents=True, exist_ok=True)
+    graphs_dir = Path(args.graphs_dir) if args.graphs_dir else output_dir / 'figures'
+    graphs_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading topology: {args.data_file}", flush=True)
     print(f"Loading trajectory: {args.dump_file}", flush=True)
@@ -252,9 +256,9 @@ def main():
         "mdanalysis_version": mda.__version__,
     })
 
-    msd_fig_png = str(output_dir / "figures" / "msd_log.png")
+    msd_fig_png = str(graphs_dir / "msd_log.png")
     try:
-        _plot_msd_log(lag_times_ps, msd_vals, alpha, A, r2, output_dir)
+        _plot_msd_log(lag_times_ps, msd_vals, alpha, A, r2, graphs_dir)
     except Exception as _pe:
         print(f"  WARNING: msd_log plot failed: {_pe}", flush=True)
         msd_fig_png = None

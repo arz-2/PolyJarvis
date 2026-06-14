@@ -270,7 +270,7 @@ def _kww_fit(lags_ps, ct_values):
 
 def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
                             n_backbone_bonds, bond_length_A, timestep_fs, dump_every,
-                            grid_n, trajectory_slice):
+                            grid_n, trajectory_slice, ct_min_decay=None):
     """Single-pass over dump frames. Returns raw per-frame arrays for all checks."""
     # Storage
     rg_sq_per_frame = []   # (n_frames, n_chains)
@@ -451,7 +451,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
             "decay_fraction_at_end": r(decay_fraction, 3),
             "trajectory_ps": r(float(n_frames * dt_ps), 1),
             # True when no gate requested (ct_min_decay=None) or decay meets threshold
-            "pass": True if args.ct_min_decay is None else bool(decay_fraction >= args.ct_min_decay),
+            "pass": True if ct_min_decay is None else bool(decay_fraction >= ct_min_decay),
         }
 
     # ── MSD ──
@@ -762,6 +762,7 @@ def main():
         dump_every=dump_every,
         grid_n=grid_n,
         trajectory_slice=traj_slice,
+        ct_min_decay=args.ct_min_decay,
     )
 
     # ── overall_pass ──

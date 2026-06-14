@@ -4,11 +4,9 @@
 Quick index of all available MCP tools.
 
 **Three MCP servers:**
-- **Mol-Builder server** (`mcp-mol-builder-server`) — molecular construction (Stage 1, RadonPy/GAFF2 path for remaining classes)
-- **EMC server** (`mcp-emc-server`) — amorphous cell builder for PCFF, OPLS-AA, and TraPPE-UA (Stage 1, 9 classes)
+- **Mol-Builder server** (`mcp-mol-builder-server`) — molecular construction (Stage 1, RadonPy/GAFF2_mod path for PURA only)
+- **EMC server** (`mcp-emc-server`) — amorphous cell builder for PCFF, OPLS-AA, and TraPPE-UA (Stage 1, 20 of 21 classes)
 - **LAMMPS Engine server** (`mcp-lammps-engine`) — simulation execution and analysis (Stages 2–4)
-
-**Routing rule:** See `CLAUDE.md` (Force Field Routing table) or `STAGE_1_MOLECULAR_CONSTRUCTION.md` (full 21-class table with examples). `classify_polymer` returns `class_name`; that determines builder and FF automatically.
 
 ---
 
@@ -22,7 +20,7 @@ Quick index of all available MCP tools.
 | `submit_assign_charges_job` | async | RESP / AM1-BCC / ESP / Gasteiger charge assignment |
 | `submit_polymerize_job` | async | Homopolymer chain construction |
 | `submit_copolymerize_job` | async | Copolymer chain construction (alternating/random/block) |
-| `assign_forcefield` | sync | Assign GAFF2 / GAFF2_mod parameters to polymer chain |
+| `assign_forcefield` | sync | Assign GAFF2_mod parameters to PURA polymer chain (RadonPy path only) |
 | `submit_generate_cell_job` | async | Single-component amorphous cell |
 | `submit_generate_copolymer_cell_job` | async | Multi-chain copolymer amorphous cell |
 | `save_molecule` | sync | Save mol to json/pdb/xyz/mol |
@@ -44,9 +42,6 @@ Quick index of all available MCP tools.
 | `get_emc_job_output` | sync | Retrieve result; `data_path` = LAMMPS `.data` file; `lammps_flags` = `{use_pcff, use_opls}` |
 | `list_emc_jobs` | sync | List all EMC jobs with status |
 
-**`field` is NOT a parameter** — auto-selected from `polymer_class`. Do not pass it.
-
-**`lammps_flags` from `get_emc_job_output`** — pass directly to `generate_equilibration_workflow` as `**lammps_flags`.
 
 **SMILES conventions (critical):**
 - PCBN: full carbonate `-O-C(=O)-O-` in repeat unit; `*` on aromatic C
@@ -54,8 +49,6 @@ Quick index of all available MCP tools.
 - PIMD: all imide ring atoms lowercase for sp2 `npc` type; uppercase N → crash
 - PDIE: cis/trans microstructure in SMILES; `*C/C=C\C*` for cis-PBD
 - PSTR/PHYC: tacticity only via `[C@@H]`/`[C@H]` with OPLS-AA; **not** with TraPPE-UA (UA has no explicit H)
-
-**params file:** After every EMC build, `smiles_to_emc.py` auto-strips style lines from `.params`. If using a pre-2026-05-30 build, strip manually: `sed -i '/^pair_style\b/d; /^bond_style\b/d; ...' emc_build.params`
 
 ---
 
@@ -65,12 +58,10 @@ Quick index of all available MCP tools.
 
 | Tool | Type | Purpose |
 |---|---|---|
-| `list_templates` | sync | All templates with descriptions |
-| `get_template_defaults` | sync | Parameters and defaults for a template |
-| `validate_data_file` | sync | Pre-flight: charges, Coeffs, box size |
-| `parse_data_file` | sync | Atom count, box dims, H-type IDs |
+| `list_templates` | sync | All templates; pass `template_name` for defaults |
+| `inspect_data_file` | sync | Parse + validate in one call: atom count, box dims, H-type IDs, pre-flight checks |
 | `generate_script` | sync | Fill template → write `.in` file; `use_pcff=True` for PCFF class2 |
-| `generate_equilibration_workflow` | sync | Auto-generate 6-stage GPU equilibration; `use_pcff=True` for PCFF; `params_file=` for EMC builds |
+| `generate_equilibration_workflow` | sync | Auto-generate 7-stage GPU equilibration; `use_pcff=True` for PCFF; `params_file=` for EMC builds |
 | `run_lammps_script` | async | Run single script (daemon thread) |
 | `run_lammps_chain` | async | Run ordered pipeline under nohup; crash-safe |
 
@@ -82,7 +73,6 @@ Quick index of all available MCP tools.
 | `get_run_output` | sync | Full result + last 100 log lines |
 | `list_runs` | sync | All submitted runs |
 | `watch_run` | sync | Return Monitor command for auto-continuation |
-| `read_log` | sync | Live-tail a LAMMPS log by run_id or path |
 
 ### Analysis
 
@@ -111,4 +101,3 @@ Quick index of all available MCP tools.
 | `submit_generate_copolymer_cell_job` | List of polymer JSONs (after FF assignment) |
 | `save_lammps_data` | Cell JSON (after `submit_generate_*_cell_job`) |
 
-⚠️ **Force field must be assigned after polymerization, never before.**

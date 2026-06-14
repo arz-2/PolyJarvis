@@ -9,9 +9,9 @@ Wraps mcp-servers/mcp-emc-server/smiles_to_emc.py's build_cell() pipeline:
     SMILES → .esh → emc_setup.pl → EMC binary → LAMMPS .data
 
 Force field auto-selection by polymer_class:
-    PCBN, PAMD, PKTN, PSFO, PIMD  →  pcff               (use_pcff=True downstream)
-    PHAL, PSIL                     →  opls/2024/opls-aa  (use_opls=True downstream)
-    PHYC, PDIE, PSTR               →  trappe-ua          (use_opls=False downstream)
+    PCBN, PAMD, PKTN, PSFO, PIMD, PSTR  →  pcff               (use_pcff=True downstream)
+    PHAL, PSIL                           →  opls/2024/opls-aa  (use_opls=True downstream)
+    PHYC, PDIE                           →  trappe-ua          (use_opls=False downstream)
 
 Tools
 -----
@@ -113,7 +113,57 @@ class JobManager:
                 self._jobs[job_id]["completed_at"]  = datetime.now().isoformat()
             logger.error(f"Job {job_id} failed after {elapsed:.1f}s: {exc}")
 
+    def _resolve_sentinel(self, job_id: str) -> None:
+        """If status is 'running' but the .data output file exists, mark completed."""
+        with self._lock:
+            j = self._jobs.get(job_id)
+            if j is None or j["status"] != JobStatus.RUNNING.value:
+                return
+            output_dir = j.get("kwargs", {}).get("output_dir")
+        if not output_dir:
+            return
+        try:
+            data_files = sorted(
+                Path(output_dir).glob("*.data"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+        except Exception:
+            return
+        if not data_files:
+            return
+        data_path = str(data_files[0])
+        field = j["kwargs"].get("field", "")
+        natoms = None
+        try:
+            with open(data_path) as fh:
+                for line in fh:
+                    if "atoms" in line and not line.strip().startswith("#"):
+                        natoms = int(line.split()[0])
+                        break
+        except Exception:
+            pass
+        result = {
+            "status":       "success",
+            "data_path":    data_path,
+            "output_dir":   output_dir,
+            "smiles":       j["kwargs"].get("smiles", ""),
+            "field":        field,
+            "dp":           j["kwargs"].get("dp"),
+            "density":      j["kwargs"].get("density"),
+            "natoms":       natoms,
+            "lammps_flags": _lammps_flags(field) if field else {},
+            "message":      f"LAMMPS .data file written: {data_path} [recovered via sentinel]",
+        }
+        with self._lock:
+            if self._jobs[job_id]["status"] == JobStatus.RUNNING.value:
+                self._jobs[job_id]["status"]       = JobStatus.COMPLETED.value
+                self._jobs[job_id]["result"]        = result
+                self._jobs[job_id]["completed_at"]  = datetime.now().isoformat()
+                logger.info(f"Job {job_id} recovered via .data sentinel: {data_path}")
+
     def status(self, job_id: str) -> dict:
+        self._resolve_sentinel(job_id)
         with self._lock:
             if job_id not in self._jobs:
                 return {"error": f"Job {job_id} not found"}
@@ -130,6 +180,7 @@ class JobManager:
             }
 
     def output(self, job_id: str) -> dict:
+        self._resolve_sentinel(job_id)
         with self._lock:
             if job_id not in self._jobs:
                 return {"error": f"Job {job_id} not found"}
@@ -178,12 +229,13 @@ _PCFF_CLASSES   = {
     "PIMN",  # polyamines/polyetherimides (PEI, linear amines)
     "PVNL",  # polyvinyls (PVC, PVAc, PVA) — tested with PVC+PVAc+PVA
     "PPNL",  # conjugated/polyphenylene (PPV, MEH-PPV)
+    "PSTR",  # polystyrenics (PS, P2VP, SAN) — PCFF preferred; TraPPE-UA lacks aromatic ring charges/π-dihedrals and has no direct PS Tg validation
 }
 _OPLS_CLASSES   = {
     "PHAL",  # polyhalogenated (PTFE, PVDF, PCTFE)
     "PSIL",  # polysiloxanes (PDMS) — opls/2024/opls-aa has si4/o2 Si-O params; pcff missing {si,osi}
 }
-_TRAPPE_CLASSES = {"PHYC", "PDIE", "PSTR"}  # PSTR: cac/cah aromatic UA types; see EMC t_glass example
+_TRAPPE_CLASSES = {"PHYC", "PDIE"}  # PSTR moved to _PCFF_CLASSES — PCFF preferred (see PSTR entry above)
 # PURA (polyurea): EMC build fails on pcff (missing {n_2,hn}) — remains on RadonPy
 
 def _select_field(polymer_class: str) -> str:
@@ -289,6 +341,7 @@ mcp = FastMCP(
       PIMN  Polyamines/etherimides (e.g. PEI, linear poly(ethylenimine))
       PVNL  Polyvinyls           (e.g. PVC, PVAc, PVA)
       PPNL  Conjugated/PPV       (e.g. PPV, MEH-PPV)
+      PSTR  Polystyrenics        (e.g. PS, P2VP, SAN) — PCFF preferred over TraPPE-UA (aromatic ring charges)
 
     SUPPORTED CLASSES → opls/2024/opls-aa:
       PHAL  Polyhalogenated      (e.g. PTFE, PVDF, PCTFE)
@@ -297,7 +350,6 @@ mcp = FastMCP(
     SUPPORTED CLASSES → trappe-ua:
       PHYC  Polyhydrocarbons     (e.g. PE, PP, PIB)
       PDIE  Polydienes           (e.g. PBD, PI)
-      PSTR  Polystyrenics        (e.g. PS, P2VP, SAN)
 
     RadonPy only (EMC build fails):
       PURA  Polyureas            — pcff missing {n_2,hn} increment
@@ -337,9 +389,9 @@ def submit_emc_cell_job(
     Build an amorphous polymer cell with EMC and return a LAMMPS .data file.
 
     The force field is selected automatically from polymer_class:
-        PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL  →  pcff
-        PHAL                                                                            →  opls/2024/opls-aa
-        PHYC/PDIE/PSTR                                                                  →  trappe-ua
+        PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL/PSTR  →  pcff
+        PHAL/PSIL                                                                            →  opls/2024/opls-aa
+        PHYC/PDIE                                                                            →  trappe-ua
 
     Runs emc_setup.pl + EMC binary in a background thread; returns job_id
     immediately. Poll get_emc_job_status() then call get_emc_job_output() for

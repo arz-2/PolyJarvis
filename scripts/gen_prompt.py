@@ -48,6 +48,8 @@ Physics knob overrides (all optional; defaults from polymer_rules.json):
   --K_strain_max FLOAT    Max engineering strain for uniaxial deformation
   --K_deform_rate_inv_s FLOAT  Engineering strain rate (s⁻¹)
   --dt_fs FLOAT           MD timestep (fs); set 0.5 for "lost atoms" recovery
+  --properties LIST       Comma-separated: density,tg,bulk_modulus or 'all' (default).
+                          Filters tasks: in analyze-full; orchestrator uses it for stage gating.
 """
 
 import argparse
@@ -130,6 +132,13 @@ def _exp_tg_range(cls: dict) -> list:
     return ["<exp_tg_min>", "<exp_tg_max>"]
 
 
+def _exp_K_range(cls: dict) -> list:
+    exp = cls.get("exp_K_GPa")
+    if isinstance(exp, dict) and "min" in exp and "max" in exp:
+        return [exp["min"], exp["max"]]
+    return [None, None]
+
+
 def _exp_density_range(cls: dict) -> list:
     exp = cls.get("experimental_density_gcm3")
     if isinstance(exp, dict):
@@ -182,15 +191,34 @@ def equil_prompt(args, cls: dict, stage_index: str) -> str:
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
     T_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
     T_anneal = _pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0)
-    if args.npt_prod_ns is not None:
-        npt_prod_steps = int(args.npt_prod_ns * 1e6 / dt)
+    npt_prod_ns_val = _pick(args.npt_prod_ns, cls, 'npt_prod_ns', None)
+    if npt_prod_ns_val is not None:
+        npt_prod_steps = int(npt_prod_ns_val * 1e6 / dt)
         npt_prod_line = (
-            f"t_npt_prod_ns:     {args.npt_prod_ns}\n"
+            f"t_npt_prod_ns:     {npt_prod_ns_val}\n"
             f"npt_prod_steps:    {npt_prod_steps}  "
             f"# pass as npt_prod_steps= to generate_equilibration_workflow"
         )
     else:
         npt_prod_line = "t_npt_prod_ns:     null  # auto: steps_npt // 2 by atom-count tier"
+    add_melt_npt = getattr(args, 'add_melt_npt', False) or False
+    melt_npt_ns_val = _pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None
+    if add_melt_npt and melt_npt_ns_val is not None:
+        melt_npt_steps = int(melt_npt_ns_val * 1e6 / dt)
+        melt_npt_line = (
+            f"add_melt_npt:      true\n"
+            f"t_equil_K:         {T_equil}  # melt isothermal stage temperature\n"
+            f"melt_npt_ns:       {melt_npt_ns_val}\n"
+            f"melt_npt_steps:    {melt_npt_steps}  "
+            f"# pass as melt_npt_steps= to generate_equilibration_workflow"
+        )
+    elif add_melt_npt:
+        melt_npt_line = (
+            f"add_melt_npt:      true\n"
+            f"t_equil_K:         {T_equil}  # melt isothermal stage temperature"
+        )
+    else:
+        melt_npt_line = "add_melt_npt:      false"
     return f"""\
 data_path:         {_v(args.data_path)}
 lammps_flags:      {json.dumps(flags)}
@@ -204,6 +232,7 @@ T_anneal_high_K:   {T_anneal}
 anneal_cycles:     {cls.get('eq_annealing_cycles', 5)}
 dt_fs:             {dt}
 {npt_prod_line}
+{melt_npt_line}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
 
@@ -218,20 +247,49 @@ def tg_prompt(args, cls: dict, stage_index: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
     work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/tg"
     stage_guide = load_stage_guide("tg")
+    dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
+
+    # Multi-rate support: pick the rate at tg_rate_index if provided
+    tg_rates = cls.get('tg_rates_K_per_ns', [])
+    rate_idx = getattr(args, 'tg_rate_index', None)
+    if rate_idx is not None and tg_rates and rate_idx < len(tg_rates):
+        selected_rate = tg_rates[rate_idx]
+        # Compute n_steps_per_t for this rate: rate = T_step / (n_steps * dt * 1e-6)
+        t_step = _pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)
+        n_steps_for_rate = int(t_step / (selected_rate * dt * 1e-6))
+        n_steps_per_t = n_steps_for_rate
+        rate_line = (
+            f"tg_rate_index:     {rate_idx}  # rate {selected_rate} K/ns\n"
+            f"  cooling_rate:    {selected_rate} K/ns  # one of {tg_rates}"
+        )
+    else:
+        n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
+        rate_line = f"tg_rate_index:     null  # standard single-rate run"
+        if tg_rates:
+            rate_line += f"\n  all_rates_K_per_ns: {tg_rates}  # use --tg_rate_index N for multi-rate"
+
+    tg_sweep_dir = f"{work_dir}/tg_sweep"
     return f"""\
 equil_data_path:   {_v(args.data_path)}
 lammps_flags:      {json.dumps(flags)}
 polymer_class:     {args.polymer_class.upper()}
 run_name:          {args.run_name}
 work_dir:          {work_dir}
+tg_sweep_dir:      {tg_sweep_dir}
 tg_params:
   T_start:         {_pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600)}
   T_end:           {_pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200)}
   T_step:          {_pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)}
-  n_steps_per_t:   {_pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)}
-dt_fs:             {_pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+  n_steps_per_t:   {n_steps_per_t}
+{rate_line}
+dt_fs:             {dt}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+per_t_dump:
+  enabled:         true
+  file:            {tg_sweep_dir}/per_t_structs.dump   # one final frame per T step
+  param_key:       WRITE_PER_T_DUMP=True, PER_T_DUMP_FILE=per_t_structs.dump
+  note:            Pass these in generate_script params alongside T_START/T_END/etc.
 
 --- Stage Guide (STAGE_3_TG_MEASUREMENT) ---
 {stage_guide}
@@ -253,6 +311,8 @@ run_name:          {args.run_name}
 work_dir:          {work_dir}
 is_glassy:         {str(is_glassy).lower()}
 K_deform_rate_inv_s: {_pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 1e8)}
+K_deform_rate_slow_inv_s: {cls.get('K_deform_rate_slow_inv_s', 'null')}
+K_rate_comparison: {str(cls.get('K_deform_rate_slow_inv_s') is not None).lower()}
 K_strain_max:      {_pick(args.K_strain_max, cls, 'K_strain_max', 0.03)}
 dt_fs:             {_pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 gpu_ids:           "{args.gpu_ids}"
@@ -268,16 +328,27 @@ mpi_ranks:         {args.mpi_ranks}
 def analyze_tg_prompt(args, cls: dict, stage_index: str) -> str:
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    tg_log = args.data_path or _v(None, f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/tg/tg_sweep/tg_sweep.log")
+    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
+    tg_log = args.data_path or f"{lammps_base}/tg/tg_sweep/tg_sweep.log"
+    tg_sweep_dir = f"{lammps_base}/tg/tg_sweep"
+    per_t_dump = f"{tg_sweep_dir}/per_t_structs.dump"
+    # equil_data_path is the .data file fed into the Tg sweep (Stage 7 NPT output)
+    equil_data = args.equil_data_path or f"{lammps_base}/equil/09_npt_prod300/09_npt_prod300_out.data"
+    backbone_types_line = (f"backbone_types:    {args.backbone_types}"
+                           if args.backbone_types else
+                           "backbone_types:    <FILL from parse_data_file or lammps_flags>")
     stage_guide = load_stage_guide("analyze-tg")
     return f"""\
 tg_log_path:       {tg_log}
+per_t_dump_file:   {per_t_dump}    # present if WRITE_PER_T_DUMP=True was used in tg sweep
+tg_data_file:      {equil_data}    # LAMMPS .data input to the Tg sweep (for MDAnalysis topology)
+{backbone_types_line}
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
 tasks:
-  - extract_tg
+  - extract_tg     # pass per_t_dump_file + tg_data_file + backbone_types to enable structural analysis
 
 --- Stage Guide (STAGE_4_ANALYSIS) ---
 {stage_guide}
@@ -293,7 +364,16 @@ def analyze_full_prompt(args, cls: dict, stage_index: str) -> str:
     is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
     exp_tg = _exp_tg_range(cls)
     exp_density = _exp_density_range(cls)
-    bm_task = "extract_bulk_modulus_deform" if is_glassy else "extract_bulk_modulus"
+    _k_from_cls = _exp_K_range(cls)
+    exp_K = [
+        args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0],
+        args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1],
+    ]
+    bm_pressures_atm = cls.get("bm_pressures_atm", None)
+    bm_task = "extract_bulk_modulus_deform" if is_glassy else (
+        "run_bulk_modulus_series+extract_bulk_modulus_murnaghan"
+        if bm_pressures_atm else "extract_bulk_modulus"
+    )
     ct_decay = cls.get("ct_min_decay_melt", 0.10)
 
     lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
@@ -302,6 +382,20 @@ def analyze_full_prompt(args, cls: dict, stage_index: str) -> str:
     npt_dump = args.npt_prod_dump or f"{lammps_base}/equil/09_npt_prod300/09_npt_prod300.dump"
     npt_data = args.data_path or f"{lammps_base}/equil/09_npt_prod300/09_npt_prod300_out.data"
     deform_log_line = f"deform_log_path:   {args.deform_log}" if args.deform_log else f"deform_log_path:   null"
+
+    props_str = args.properties if args.properties else "all"
+    if props_str.strip().lower() == "all":
+        props = {"density", "tg", "bulk_modulus"}
+    else:
+        props = {p.strip().lower() for p in props_str.split(",")}
+
+    task_lines = ["  - check_equilibration_comprehensive"]
+    if "density" in props:
+        task_lines.append("  - extract_density")
+    if "bulk_modulus" in props:
+        task_lines.append(f"  - {bm_task}")
+    task_lines.append("  - generate_run_summary")
+    tasks_block = "\n".join(task_lines)
 
     stage_guide = load_stage_guide("analyze-full")
     return f"""\
@@ -317,19 +411,19 @@ ff:                {args.ff or cls.get('preferred_ff', 'pcff')}
 d06_tg_fit_quality: {_v(args.tg_fit_quality, 'ACCEPTABLE')}
 exp_tg_range:      {exp_tg}
 exp_density_range: {exp_density}
+exp_K_range:       {exp_K}
+bm_pressures_atm:  {bm_pressures_atm}
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
 is_glassy:         {str(is_glassy).lower()}
 K_deform_rate_inv_s: {_pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 1e8)}
+K_deform_rate_slow_inv_s: {cls.get('K_deform_rate_slow_inv_s', 'null')}
 K_strain_max:      {_pick(args.K_strain_max, cls, 'K_strain_max', 0.03)}
 dt_fs:             {_pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 backbone_types:    {args.backbone_types or '<FILL from parse_data_file>'}
 ct_min_decay_melt: {ct_decay}
 tasks:
-  - check_equilibration_comprehensive
-  - extract_density
-  - {bm_task}
-  - generate_run_summary
+{tasks_block}
 
 --- Stage Guide (STAGE_4_ANALYSIS) ---
 {stage_guide}
@@ -376,9 +470,13 @@ def main():
     p.add_argument("--ff")
     p.add_argument("--backbone_types")
     p.add_argument("--output_dir")
+    p.add_argument("--equil_data_path",
+                   help="Path to equilibrated .data file (input to Tg sweep, used as topology for structural analysis)")
     # Physics knob overrides (all optional; default None → falls back to polymer_rules.json)
     p.add_argument("--npt_prod_ns", type=float,
                    help="Stage 7 NPT production time (ns); auto-sized by atom count if omitted")
+    p.add_argument("--add_melt_npt", action="store_true", default=False,
+                   help="Inject 05b melt isothermal NPT stage for rubbery classes (FF validation only)")
     p.add_argument("--T_equil_K", type=float,
                    help="Equilibration temperature (K) → temp= in generate_equilibration_workflow")
     p.add_argument("--T_anneal_high_K", type=float,
@@ -391,6 +489,8 @@ def main():
                    help="Tg sweep step (K); halve for BORDERLINE R² recovery")
     p.add_argument("--tg_steps_per_t", type=int,
                    help="MD steps per temperature window")
+    p.add_argument("--tg_rate_index", type=int,
+                   help="Index into tg_rates_K_per_ns list for multi-rate sweeps (0=slowest)")
     p.add_argument("--K_strain_max", type=float,
                    help="Max engineering strain for uniaxial deformation")
     p.add_argument("--K_deform_rate_inv_s", type=float,
@@ -399,6 +499,12 @@ def main():
                    help="MD timestep (fs); set 0.5 for 'lost atoms' recovery")
     p.add_argument("--density_initial", type=float,
                    help="Initial packing density (g/cm³); use for ESCALATE recovery (class default − 0.05) or Energy-NaN recovery (class default − 0.10)")
+    p.add_argument("--properties", default="all",
+                   help="Comma-separated properties to extract: density,tg,bulk_modulus or 'all'")
+    p.add_argument("--exp_K_min", type=float,
+                   help="Experimental bulk modulus lower bound (GPa); overrides polymer_rules.json")
+    p.add_argument("--exp_K_max", type=float,
+                   help="Experimental bulk modulus upper bound (GPa); overrides polymer_rules.json")
 
     args = p.parse_args()
 

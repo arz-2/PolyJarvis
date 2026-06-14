@@ -133,7 +133,7 @@ def analyse(values, name, drift_threshold_pct, drift_pvalue, block_count):
 # Plot
 # ---------------------------------------------------------------------------
 
-def _plot_equilibration_convergence(prod, density_col, energy_col, equilibrated, output_dir):
+def _plot_equilibration_convergence(prod, density_col, energy_col, equilibrated, graphs_dir):
     apply_style()
     steps = prod['Step'].values if 'Step' in prod.columns else np.arange(len(prod))
     fig, ax1 = plt.subplots()
@@ -154,7 +154,7 @@ def _plot_equilibration_convergence(prod, density_col, energy_col, equilibrated,
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
-    save_fig(fig, str(Path(output_dir) / 'figures' / 'equilibration_convergence.png'))
+    save_fig(fig, str(graphs_dir / 'equilibration_convergence.png'))
 
 
 # ---------------------------------------------------------------------------
@@ -186,10 +186,14 @@ def main():
                         help="Density column name.")
     parser.add_argument("--energy_col", default="TotEng",
                         help="Energy column name.")
+    parser.add_argument("--graphs_dir", default=None,
+                        help="Directory for PNG figures (default: <output_dir>/figures/).")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    graphs_dir = Path(args.graphs_dir) if args.graphs_dir else output_dir / 'figures'
+    graphs_dir.mkdir(parents=True, exist_ok=True)
 
     df = parse_lammps_log(args.log_file)
 
@@ -251,10 +255,10 @@ def main():
         "energy": results.get("energy"),
     }
 
-    eq_fig_png = str(output_dir / "figures" / "equilibration_convergence.png")
+    eq_fig_png = str(graphs_dir / "equilibration_convergence.png")
     try:
         _plot_equilibration_convergence(prod, args.density_col, args.energy_col,
-                                        bool(density_ok and energy_ok), output_dir)
+                                        bool(density_ok and energy_ok), graphs_dir)
     except Exception as _pe:
         print(f"  WARNING: equilibration_convergence plot failed: {_pe}", flush=True)
         eq_fig_png = None

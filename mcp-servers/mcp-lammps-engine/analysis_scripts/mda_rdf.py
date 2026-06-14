@@ -45,12 +45,14 @@ def parse_args():
     p.add_argument("--max_frames", type=int, default=None, help="Max frames to analyse")
     p.add_argument("--output_dir", type=str, default=None,
                    help="Output directory (default: <dump_dir>/analysis)")
+    p.add_argument("--graphs_dir", type=str, default=None,
+                   help="Directory for PNG figures (default: <output_dir>/figures/)")
     p.add_argument("--atom_style", type=str, default="id resid type charge x y z",
                    help="LAMMPS atom_style column order for the data file")
     return p.parse_args()
 
 
-def _plot_rdf_all_pairs(rdf_data, output_dir):
+def _plot_rdf_all_pairs(rdf_data, graphs_dir):
     # rdf_data: dict of {pair_label: (bins_array, gr_array)}
     if not rdf_data:
         return
@@ -65,7 +67,7 @@ def _plot_rdf_all_pairs(rdf_data, output_dir):
     ax.set_title('Radial distribution functions')
     ncol = min(3, max(1, (len(rdf_data) + 4) // 5))
     ax.legend(loc='upper right', ncol=ncol, fontsize=9)
-    save_fig(fig, str(Path(output_dir) / 'figures' / 'rdf_all_pairs.png'))
+    save_fig(fig, str(graphs_dir / 'rdf_all_pairs.png'))
 
 
 def main():
@@ -77,6 +79,8 @@ def main():
     else:
         output_dir = Path(args.dump_file).parent / "analysis"
     output_dir.mkdir(parents=True, exist_ok=True)
+    graphs_dir = Path(args.graphs_dir) if args.graphs_dir else output_dir / 'figures'
+    graphs_dir.mkdir(parents=True, exist_ok=True)
 
     # Load universe
     print(f"Loading topology: {args.data_file}", flush=True)
@@ -163,9 +167,9 @@ def main():
         "mdanalysis_version": mda.__version__,
     }
 
-    rdf_fig_png = str(output_dir / "figures" / "rdf_all_pairs.png")
+    rdf_fig_png = str(graphs_dir / "rdf_all_pairs.png")
     try:
-        _plot_rdf_all_pairs(rdf_memory, output_dir)
+        _plot_rdf_all_pairs(rdf_memory, graphs_dir)
     except Exception as _pe:
         print(f"  WARNING: rdf_all_pairs plot failed: {_pe}", flush=True)
         rdf_fig_png = None

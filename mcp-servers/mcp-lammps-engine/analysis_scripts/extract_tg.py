@@ -43,10 +43,19 @@ import argparse
 import json
 import re
 import sys
+import warnings
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from scipy import optimize, stats
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from plot_style import apply_style, save_fig
+
+warnings.filterwarnings("ignore", message="Reader has no dt information")
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +102,146 @@ def parse_lammps_log(path):
         raise ValueError(f"No thermo data found in {path}")
 
     return pd.concat(all_dfs, ignore_index=True)
+
+
+# ---------------------------------------------------------------------------
+# Statistical relaxation helpers
+# ---------------------------------------------------------------------------
+
+def _compute_n_eff(x):
+    """
+    Estimate effective independent samples via integrated ACF (Sokal window).
+    Returns (n_eff, tau_int_steps).
+    """
+    n = len(x)
+    if n < 4:
+        return float(n), 0.5
+    x = np.asarray(x, dtype=float) - np.mean(x)
+    acf_full = np.correlate(x, x, mode='full')
+    acf = acf_full[n - 1:]
+    if acf[0] == 0:
+        return float(n), 0.5
+    acf = acf / acf[0]
+    cutoff = n
+    for k in range(1, n):
+        if acf[k] <= 0:
+            cutoff = k
+            break
+    tau_int = max(0.5, 0.5 + float(acf[1:cutoff].sum()))
+    return float(n) / (2.0 * tau_int), float(tau_int)
+
+
+# ---------------------------------------------------------------------------
+# Structural analysis from per-T dump
+# ---------------------------------------------------------------------------
+
+def _saupe_p2(bond_vectors):
+    if len(bond_vectors) == 0:
+        return 0.0
+    norms = np.linalg.norm(bond_vectors, axis=1, keepdims=True)
+    valid = norms.flatten() > 0
+    if valid.sum() < 2:
+        return 0.0
+    u = bond_vectors[valid] / norms[valid]
+    Q = (3 * np.einsum("ni,nj->ij", u, u) - np.eye(3) * len(u)) / (2 * len(u))
+    return float(np.linalg.eigvalsh(Q).max())
+
+
+def _analyze_per_t_dump(per_t_dump_file, tg_data_file, backbone_types_list, detected_tg_K, group_temps_ordered):
+    """
+    Load per-T structural dump (one frame per temperature step) and compute
+    per-T Rg, P2, and the Rg-kink dynamic Tg.
+
+    backbone_types_list: list of int atom type IDs for backbone selection.
+    group_temps_ordered: temperatures in dump-frame order (cooling order).
+    detected_tg_K:       density-kink Tg (used to label rubbery vs glassy frames).
+    """
+    try:
+        import MDAnalysis as mda
+        import MDAnalysis.transformations as trans
+    except ImportError:
+        return {"status": "failed", "error": "MDAnalysis not available", "metrics": []}
+
+    try:
+        u = mda.Universe(tg_data_file, per_t_dump_file,
+                         format="LAMMPSDUMP",
+                         atom_style="id resid type charge x y z")
+    except Exception as e:
+        return {"status": "failed", "error": f"MDAnalysis load failed: {e}", "metrics": []}
+
+    backbone_set = set(int(t) for t in backbone_types_list) if backbone_types_list else set()
+    chain_ids = sorted(set(int(r) for r in u.atoms.resids))
+
+    try:
+        u.trajectory.add_transformations(trans.unwrap(u.atoms))
+    except Exception:
+        pass
+
+    metrics = []
+    for fi, ts in enumerate(u.trajectory):
+        T = group_temps_ordered[fi] if fi < len(group_temps_ordered) else None
+        above_tg = bool(T is not None and detected_tg_K is not None and T > detected_tg_K)
+
+        rg_values = []
+        bb_bond_vecs = []
+
+        for cid in chain_ids:
+            chain = u.select_atoms(f"resid {cid}")
+            if chain.n_atoms == 0:
+                continue
+            try:
+                rg_values.append(float(chain.radius_of_gyration()))
+            except Exception:
+                pass
+
+            if backbone_set:
+                try:
+                    types = np.array([int(t) for t in chain.types])
+                    mask = np.isin(types, list(backbone_set))
+                    if mask.sum() >= 2:
+                        bb = chain.atoms[mask]
+                        order = np.argsort(bb.indices)
+                        bb_pos = bb.positions[order]
+                        for k in range(len(bb_pos) - 1):
+                            bb_bond_vecs.append(bb_pos[k + 1] - bb_pos[k])
+                except Exception:
+                    pass
+
+        mean_rg = float(np.mean(rg_values)) if rg_values else None
+        rg_cv = (float(np.std(rg_values) / np.mean(rg_values))
+                 if len(rg_values) > 1 and np.mean(rg_values) > 0 else None)
+        p2 = _saupe_p2(np.array(bb_bond_vecs)) if bb_bond_vecs else None
+
+        metrics.append({
+            "temperature":       T,
+            "mean_rg_A":         round(mean_rg, 3) if mean_rg is not None else None,
+            "rg_cv":             round(rg_cv, 3)   if rg_cv  is not None else None,
+            "p2":                round(p2, 4)       if p2    is not None else None,
+            "structural_regime": "rubbery" if above_tg else "glassy",
+            "p2_flag":           bool(p2 is not None and p2 > 0.10 and above_tg),
+            "rg_cv_flag":        bool(rg_cv is not None and rg_cv > 0.30 and above_tg),
+        })
+
+    # Dynamic Tg from Rg-kink bilinear fit
+    tg_dynamic_K = None
+    valid_pts = [(m["temperature"], m["mean_rg_A"]) for m in metrics
+                 if m["temperature"] is not None and m["mean_rg_A"] is not None]
+    if len(valid_pts) >= 6:
+        T_arr = np.array([p[0] for p in valid_pts])
+        rg_arr = np.array([p[1] for p in valid_pts])
+        rg_fit = curvefit_bilinear(T_arr, rg_arr, tg_hint=detected_tg_K)
+        if rg_fit:
+            tg_dynamic_K = round(rg_fit["Tg_K"], 1)
+
+    return {
+        "status":              "success",
+        "n_frames":            len(metrics),
+        "n_chains":            len(chain_ids),
+        "Tg_dynamic_K":        tg_dynamic_K,
+        "n_T_steps_p2_flag":   sum(1 for m in metrics if m.get("p2_flag")),
+        "n_T_steps_rg_cv_flag": sum(1 for m in metrics if m.get("rg_cv_flag")),
+        "metrics":             metrics,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +383,29 @@ def curvefit_hyperbola(T, rho, seed=None):
 
 
 # ---------------------------------------------------------------------------
+# Plot
+# ---------------------------------------------------------------------------
+
+def plot_tg_fit(temps, densities, cf_result, Tg_K, r2, fit_quality, graphs_dir):
+    apply_style()
+    fig, ax = plt.subplots()
+    T_plot = np.linspace(temps.min(), temps.max(), 300)
+    pred = np.where(
+        T_plot < Tg_K,
+        cf_result["a_glassy"] * T_plot + cf_result["b_glassy"],
+        cf_result["a_rubbery"] * T_plot + cf_result["b_rubbery"],
+    )
+    ax.scatter(temps, densities, color='steelblue', s=40, zorder=3, label='Binned data')
+    ax.plot(T_plot, pred, color='tomato', lw=2, label='Bilinear fit')
+    ax.axvline(Tg_K, color='gray', ls='--', lw=1.5, label=f'Tg = {Tg_K:.0f} K')
+    ax.set_xlabel('Temperature (K)')
+    ax.set_ylabel('Density (g/cm³)')
+    ax.set_title(f'Tg fit — R² = {r2:.4f} ({fit_quality})')
+    ax.legend()
+    save_fig(fig, str(graphs_dir / 'tg_fit.png'))
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -258,16 +430,30 @@ def main():
                         default="auto",
                         help="Primary fit: 'auto' (hyperbola, fall back to bilinear), "
                              "'hyperbola', or legacy 'bilinear'.")
+    parser.add_argument("--graphs_dir", default=None,
+                        help="Directory for PNG figures (default: <output_dir>/figures/).")
+    parser.add_argument("--per_t_dump_file", default=None,
+                        help="Path to per-T structural dump (one frame per T step). "
+                             "Enables dump-based structural analysis (Rg, P2, dynamic Tg).")
+    parser.add_argument("--tg_data_file", default=None,
+                        help="LAMMPS .data file used for the Tg sweep (topology/masses for MDAnalysis).")
+    parser.add_argument("--backbone_types", nargs="*", type=int, default=None,
+                        help="Backbone atom type IDs for P2 nematic order computation.")
     args = parser.parse_args()
 
     log_file = args.log_file
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    graphs_dir = Path(args.graphs_dir) if args.graphs_dir else output_dir / 'figures'
+    graphs_dir.mkdir(parents=True, exist_ok=True)
     initial_tg_guess = args.initial_tg_guess
     equilibration_fraction = args.equilibration_fraction
     temp_col = args.temp_col
     density_col = args.density_col
     fit_method = args.fit_method
+    per_t_dump_file = args.per_t_dump_file
+    tg_data_file = args.tg_data_file
+    backbone_types = args.backbone_types
 
     # -------------------------------------------------------------------
     # 1. Parse LAMMPS log
@@ -318,11 +504,17 @@ def main():
     groups.append((start_idx, len(all_temps_raw)))
 
     records_plateau = []
+    group_temps_ordered = []   # all group median-Ts in log order, for dump frame mapping
     n_plateaus_skipped = 0
+    n_plateaus_low_n_eff = 0
     for g_start, g_end in groups:
         g_temps = all_temps_raw[g_start:g_end]
         g_rhos = all_rho_raw[g_start:g_end]
         n_total = len(g_temps)
+
+        # Always record the group temperature for dump-frame mapping, even if filtered
+        if n_total > 0:
+            group_temps_ordered.append(round(float(np.median(g_temps)) / 5) * 5)
 
         if n_total < 5:
             continue
@@ -357,13 +549,22 @@ def main():
                 equilibrated = False
                 n_plateaus_skipped += 1
 
+        # n_eff: effective independent samples via integrated density ACF
+        n_eff, tau_int = _compute_n_eff(eq_rhos)
+        relax_warning = bool(n_eff < 5.0)
+        if relax_warning:
+            n_plateaus_low_n_eff += 1
+
         set_T = round(float(np.median(eq_temps)) / 5) * 5
         records_plateau.append({
-            "temperature":  float(set_T),
-            "mean_density": float(np.mean(eq_rhos)),
-            "std_density":  float(np.std(eq_rhos, ddof=1) if len(eq_rhos) > 1 else 0.0),
-            "n_points":     int(len(eq_rhos)),
-            "equilibrated": equilibrated,
+            "temperature":    float(set_T),
+            "mean_density":   float(np.mean(eq_rhos)),
+            "std_density":    float(np.std(eq_rhos, ddof=1) if len(eq_rhos) > 1 else 0.0),
+            "n_points":       int(len(eq_rhos)),
+            "equilibrated":   equilibrated,
+            "n_eff":          round(n_eff, 2),
+            "tau_int_steps":  round(tau_int, 1),
+            "relax_warning":  relax_warning,
         })
 
     # Merge duplicate set-point temperatures (weighted average)
@@ -431,7 +632,7 @@ def main():
             cf_result, fit_method_used = bilinear_result, "bilinear_curvefit"
 
     # -------------------------------------------------------------------
-    # 4. Assemble final result
+    # 4. Bilinear fit quality + physics checks
     # -------------------------------------------------------------------
     if cf_result:
         Tg_primary = cf_result["Tg_K"]
@@ -486,7 +687,7 @@ def main():
             )
 
     # -------------------------------------------------------------------
-    # 5. Save outputs
+    # 5. Save density bin CSVs
     # -------------------------------------------------------------------
     bins_csv_5k = str(output_dir / "tg_density_bins.csv")
     df_bins_5k.to_csv(bins_csv_5k, index=False)
@@ -497,6 +698,40 @@ def main():
     else:
         bins_csv_plateau = None
 
+    # -------------------------------------------------------------------
+    # 4a. Build relaxation_metrics from plateau records (log-based n_eff)
+    # -------------------------------------------------------------------
+    relaxation_metrics = [
+        {
+            "temperature":   r["temperature"],
+            "n_eff":         r["n_eff"],
+            "tau_int_steps": r["tau_int_steps"],
+            "relax_warning": r["relax_warning"],
+        }
+        for r in records_plateau
+    ]
+
+    # -------------------------------------------------------------------
+    # 4b. Dump-based structural analysis (optional)
+    # -------------------------------------------------------------------
+    structural_analysis = None
+    if per_t_dump_file and tg_data_file:
+        print(f"  Running dump-based structural analysis: {per_t_dump_file}", flush=True)
+        try:
+            structural_analysis = _analyze_per_t_dump(
+                per_t_dump_file   = per_t_dump_file,
+                tg_data_file      = tg_data_file,
+                backbone_types_list = backbone_types or [],
+                detected_tg_K     = Tg_primary,
+                group_temps_ordered = group_temps_ordered,
+            )
+        except Exception as _se:
+            structural_analysis = {"status": "failed", "error": str(_se), "metrics": []}
+            print(f"  WARNING: structural analysis failed: {_se}", flush=True)
+
+    # -------------------------------------------------------------------
+    # 5. Assemble final result
+    # -------------------------------------------------------------------
     result = {
         "status":              "success",
         "log_file":            log_file,
@@ -517,19 +752,39 @@ def main():
             "a_rubbery": cf_result["a_rubbery"],
             "b_rubbery": cf_result["b_rubbery"],
         },
-        "n_temperature_bins":       int(len(temps)),
-        "n_plateau_bins":           int(len(df_bins_plateau)) if df_bins_plateau is not None else 0,
-        "n_plateaus_skipped_drift": int(n_plateaus_skipped),
-        "temp_range_K":             [float(temps.min()), float(temps.max())],
-        "bins_csv":                 bins_csv_5k,
-        "bins_csv_plateau":         bins_csv_plateau,
-        "equilibration_fraction":   equilibration_fraction,
-        "temp_col":                 temp_col,
-        "density_col":              density_col,
-        "slope_signs_valid":        slope_signs_valid,
-        "slope_ordering_valid":     slope_ordering_valid,
-        "fit_warnings":             fit_warnings,
+        "n_temperature_bins":        int(len(temps)),
+        "n_plateau_bins":            int(len(df_bins_plateau)) if df_bins_plateau is not None else 0,
+        "n_plateaus_skipped_drift":  int(n_plateaus_skipped),
+        "n_plateaus_low_n_eff":      int(n_plateaus_low_n_eff),
+        "temp_range_K":              [float(temps.min()), float(temps.max())],
+        "bins_csv":                  bins_csv_5k,
+        "bins_csv_plateau":          bins_csv_plateau,
+        "equilibration_fraction":    equilibration_fraction,
+        "temp_col":                  temp_col,
+        "density_col":               density_col,
+        "slope_signs_valid":         slope_signs_valid,
+        "slope_ordering_valid":      slope_ordering_valid,
+        "fit_warnings":              fit_warnings,
+        "relaxation_metrics":        relaxation_metrics,
     }
+
+    # Structural analysis results (present only when dump was provided)
+    if structural_analysis is not None:
+        result["Tg_dynamic_K"]            = structural_analysis.get("Tg_dynamic_K")
+        result["n_T_steps_p2_flag"]       = structural_analysis.get("n_T_steps_p2_flag")
+        result["n_T_steps_rg_cv_flag"]    = structural_analysis.get("n_T_steps_rg_cv_flag")
+        result["structural_metrics_per_T"] = structural_analysis.get("metrics", [])
+        result["structural_analysis_status"] = structural_analysis.get("status", "unknown")
+        if structural_analysis.get("status") == "failed":
+            result["structural_analysis_error"] = structural_analysis.get("error")
+
+    tg_fig_png = None
+    try:
+        plot_tg_fit(temps, densities, cf_result, Tg_primary, r2_primary, fit_quality, graphs_dir)
+        tg_fig_png = str(graphs_dir / "tg_fit.png")
+    except Exception as _pe:
+        print(f"  WARNING: tg_fit plot failed: {_pe}", flush=True)
+    result["tg_fit_png"] = tg_fig_png
 
     summary_json = str(output_dir / "tg_summary.json")
     with open(summary_json, "w") as jf:

@@ -76,6 +76,11 @@ PAIR_STYLE_OPLS_PPPM = (
     "kspace_style pppm 1e-6"
 )
 
+# Short-range-only variant for compression stage — avoids PPPM "out of range atoms"
+# crash at high pressure / rapidly shrinking box. Mirrors GAFF2's lj/charmm/coul/charmm
+# compress path. Switch back to lj/cut/coul/long after reaching target density (stage 04+).
+PAIR_STYLE_OPLS_CUTOFF = "pair_style lj/cut/coul/cut 9.5 9.5"
+
 OPLS_SPECIAL_BONDS = "special_bonds lj/coul 0 0 0.5"
 OPLS_PAIR_MODIFY   = "mix geometric tail yes"
 
@@ -312,6 +317,30 @@ TEMPLATE_DEFAULTS = {
         "use_gpu":          False,   # no restart GPU issues but SLLOD+GPU needs testing
         "use_pppm":         True,
     },
+    # ── Uniaxial deformation (Stage 5b: elastic constants) ───────────────
+    "npt_deform": {
+        "LOG_FILE":         "npt_deform.log",
+        "LOG_APPEND":       False,
+        "DUMP_FILE":        "",           # disabled by default — log is sufficient
+        "LAST_DUMP_FILE":   "npt_deform_last.dump",
+        "WRITE_DATA_FILE":  "npt_deform_out.data",
+        "T_TARGET":         300.0,
+        "T_DAMP":           100.0,
+        # STRAIN_RATE in 1/fs (LAMMPS real units).
+        # K_deform_rate_inv_s = 1e8 s^-1 → 1e-7 /fs.
+        "STRAIN_RATE":      1e-7,
+        # N_STEPS = STRAIN_MAX / (STRAIN_RATE * TIMESTEP)
+        # = 0.03 / (1e-7 * 1.0) = 300000 steps for 3% strain at 1e8 s^-1, 1 fs dt
+        "N_STEPS":          300000,
+        "N_EQ_STEPS":       200000,  # 0.2 ns NVT pre-equilibration
+        "TIMESTEP":         1.0,
+        "THERMO_FREQ":      100,     # ~3000 data points for stress-strain fit
+        "DUMP_FREQ":        0,
+        "use_shake":        True,
+        "init_velocity":    None,    # velocities inherited from starting .data
+        "use_gpu":          True,    # no restarts — GPU-safe
+        "use_pppm":         True,
+    },
     # ── Langevin direct-thermostat NEMD ──────────────────────────────────
     "nemd_langevin": {
         "LOG_FILE":         "nemd_lang.log",
@@ -358,6 +387,7 @@ TEMPLATE_DOCS = {
     "nemd_supercell": "NEMD Muller-Plathe on pre-replicated supercell (for short boxes). SHAKE=OFF, dt=0.2fs.",
     "nemd_langevin":  "NEMD direct Langevin thermostat method. SHAKE=OK, dt=1.0fs. Needs longer box.",
     "nemd_shear":     "NEMD SLLOD shear viscosity. fix deform xy + fix nvt/sllod. SHAKE=OFF, dt=1.0fs. Extracts eta, N1, N2.",
+    "npt_deform":     "Uniaxial x-strain at constant rate (Stage 5b). NVT, no barostat. Records pxx/pyy/pzz for C11/C12 → K, G, E. GPU-safe (no restarts).",
 }
 
 
@@ -767,6 +797,12 @@ class ScriptGenerator:
         # Build all substitution blocks
         subs = self._build_substitutions(template_name, cfg, data_file)
 
+        # Staircase expansion: npt_tg_step + T_END + T_STEP → full cooling loop
+        if (template_name == "npt_tg_step"
+                and "T_END" in params and "T_STEP" in params):
+            script = self._generate_tg_staircase(cfg, subs, output_path)
+            return script
+
         # Load template
         tpl_path = self.templates_dir / f"{template_name}.in"
         with open(tpl_path, "r") as f:
@@ -776,6 +812,106 @@ class ScriptGenerator:
         script = self._fill_template(template, subs)
 
         # Write output
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        with open(output_path, "w") as f:
+            f.write(script)
+
+        return script
+
+    def _generate_tg_staircase(self, cfg: dict, subs: dict, output_path: str) -> str:
+        """
+        Generate a full Tg cooling staircase script using a LAMMPS variable-index loop.
+        Triggered when T_END and T_STEP are both present in the caller's params.
+        Velocities are initialized once at T_START; subsequent steps inherit momenta.
+        """
+        t_start    = float(cfg.get("T_START",       450.0))
+        t_end      = float(cfg.get("T_END",         100.0))
+        t_step     = float(cfg.get("T_STEP",         20.0))
+        n_steps    = int(cfg.get("N_STEPS_PER_T",
+                         cfg.get("N_STEPS",         500000)))
+        p_target   = cfg.get("P_TARGET",   1.0)
+        p_damp     = cfg.get("P_DAMP",  1000.0)
+        t_damp     = cfg.get("T_DAMP",   100.0)
+        timestep   = cfg.get("TIMESTEP",    1.0)
+        thermo_freq = int(cfg.get("THERMO_FREQ", 500))
+        log_file   = subs["LOG_FILE"]
+        write_per_t_dump = bool(cfg.get("WRITE_PER_T_DUMP", False))
+        per_t_dump_file  = str(cfg.get("PER_T_DUMP_FILE", "per_t_structs.dump"))
+
+        # Build temperature list: T_START down to T_END, always include T_END
+        temps: list[float] = []
+        t = t_start
+        while t > t_end + 1e-6:
+            temps.append(t)
+            t -= t_step
+        if not temps or abs(temps[-1] - t_end) > 1e-6:
+            temps.append(t_end)
+
+        temp_list_str = " ".join(str(int(t) if t == int(t) else t) for t in temps)
+
+        seed = random.randint(10000, 999999)
+
+        if write_per_t_dump:
+            per_t_dump_block = (
+                f"  dump per_t_snap all atom 1 {per_t_dump_file}\n"
+                f"  dump_modify per_t_snap append yes\n"
+                f"  run 0\n"
+                f"  undump per_t_snap\n"
+            )
+        else:
+            per_t_dump_block = ""
+
+        script = f"""\
+# ============================================================
+# PolyJarvis LAMMPS Engine - Tg Sweep Staircase
+# T_START={t_start} → T_END={t_end} K, step={t_step} K
+# {len(temps)} temperature points × {n_steps} steps/T
+# ============================================================
+
+log {log_file} append
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+{subs["PAIR_STYLE_BLOCK"]}
+dielectric 1.000000
+bond_style {subs["BOND_STYLE"]}
+angle_style {subs["ANGLE_STYLE"]}
+dihedral_style {subs["DIHEDRAL_STYLE"]}
+improper_style {subs["IMPROPER_STYLE"]}
+{subs["SPECIAL_BONDS"]}
+pair_modify {subs["PAIR_MODIFY"]}
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+{subs["GPU_PACKAGE"]}
+
+read_data {subs["DATA_FILE"]}
+{subs["INCLUDE_PARAMS_BLOCK"]}
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo {thermo_freq}
+
+# --- Velocity initialization at T_START (once only — Rule A) ---
+velocity all create {t_start} {seed} mom yes rot yes dist gaussian
+
+# --- Temperature staircase (inherits momenta across steps — Rule A) ---
+variable temps index {temp_list_str}
+label TEMP_LOOP
+  timestep {timestep}
+  fix npt_tg all npt temp ${{temps}} ${{temps}} {t_damp} iso {p_target} {p_target} {p_damp}
+  run {n_steps}
+  unfix npt_tg
+{per_t_dump_block}  print "STAGE COMPLETE: Tg step T=${{temps}}K P={p_target}atm steps={n_steps}"
+  next temps
+  jump SELF TEMP_LOOP
+
+write_data tg_step_out.data
+"""
+
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         with open(output_path, "w") as f:
             f.write(script)
@@ -819,7 +955,7 @@ class ScriptGenerator:
         elif use_pcff:
             subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_PCFF_PPPM if use_pppm else PAIR_STYLE_PCFF_CUTOFF
         elif use_opls:
-            subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_OPLS_PPPM
+            subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_OPLS_PPPM if use_pppm else PAIR_STYLE_OPLS_CUTOFF
         else:
             subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_PPPM if use_pppm else PAIR_STYLE_CUTOFF
 
@@ -843,7 +979,7 @@ class ScriptGenerator:
             subs["READ_COMMAND"] = "read_data"
 
         # ── Restart block ─────────────────────────────────────────────────
-        if cfg.get("write_restart", True) and template_name not in ("npt_tg_step", "nemd_thermal", "minimize"):
+        if cfg.get("write_restart", True) and template_name not in ("npt_tg_step", "nemd_thermal", "minimize", "npt_deform"):
             rst1 = cfg.get("RESTART_FILE_1", f"{template_name}_1.rst")
             rst2 = cfg.get("RESTART_FILE_2", f"{template_name}_2.rst")
             freq = cfg.get("RESTART_FREQ", 10000)
@@ -858,7 +994,13 @@ class ScriptGenerator:
             subs["RESTART_FREQ"]   = 0
 
         # ── SHAKE block ───────────────────────────────────────────────────
-        if cfg.get("use_shake", True):
+        if cfg.get("use_trappe") and cfg.get("use_shake"):
+            # TraPPE-UA has no explicit H atoms; constrain C-C bond types by ID
+            bond_ids = cfg.get("shake_bond_type_ids", [cfg.get("shake_bond_type_id", 1)])
+            b_args = " ".join(f"b {bid}" for bid in bond_ids)
+            subs["SHAKE_BLOCK"]   = f"fix shake_fix all shake 1e-4 1000 0 {b_args}"
+            subs["UNSHAKE_BLOCK"] = "unfix shake_fix"
+        elif cfg.get("use_shake", True):
             # SHAKE constrains H-X bonds (m 1.008 targets all hydrogen mass)
             subs["SHAKE_BLOCK"]   = "fix shake_fix all shake 1e-4 1000 0 m 1.008"
             subs["UNSHAKE_BLOCK"] = "unfix shake_fix"
@@ -966,6 +1108,10 @@ class ScriptGenerator:
         # Legacy placeholder kept for backward compat (old nemd_thermal used these)
         subs["NEMD_BIN_WIDTH"] = cfg.get("NEMD_BIN_WIDTH", round(box_len / n_slabs, 4) if box_len > 0 else 2.0)
         subs["NEMD_HEAT_RATE"] = cfg.get("NEMD_HEAT_RATE", 0.0)
+
+        # ── Uniaxial deformation specifics (npt_deform) ──────────────────────
+        subs["STRAIN_RATE"]  = cfg.get("STRAIN_RATE", 1e-7)
+        subs["N_EQ_STEPS"]   = cfg.get("N_EQ_STEPS",  200000)
 
         # ── SLLOD shear viscosity specifics ──────────────────────────────────
         subs["SHEAR_RATE"]    = cfg.get("SHEAR_RATE",   1e-5)

@@ -13,7 +13,7 @@
 #   [POLYMER_SMILES]      — Repeat-unit SMILES with exactly two * attachment points
 #                           e.g. "*CC*", "*CC(c1ccccc1)*", "*CC(C(=O)OC)*"
 #   [TACTICITY]           — atactic / isotactic / syndiotactic
-#   [TARGET_PROPERTIES]   — Comma-separated: Tg, density, bulk modulus
+#   [TARGET_PROPERTIES]   — Comma-separated: Tg, density, bulk modulus  (or "all" for full pipeline)
 #   [CPU_CORES]           — Integer, e.g. 4 or 24
 #   [NUM_GPUS]            — Integer, e.g. 4
 #   [MEMORY_GB]           — Integer GB, e.g. 64
@@ -27,39 +27,6 @@
 **Target properties:** [TARGET_PROPERTIES]
 
 **Resources:**
-- CPU cores: [CPU_CORES] | GPUs: [NUM_GPUS] | Memory: [MEMORY_GB] GB
+- CPU cores: [CPU_CORES] | GPU ids: [GPU_IDS] | Memory: [MEMORY_GB] GB
 - Max runtime: [MAX_RUNTIME]
 
----
-
-Read `guides/STAGE_INDEX.md` first, then run the full pipeline autonomously. All workflow decisions, force-field routing, and error recovery are documented there. Stay within [MAX_RUNTIME].
-
----
-
-## Example Fills
-
-### Example A — Polyethylene, Tg + Density
-```
-Run name:          PE_001
-System:            Polyethylene (PE)
-SMILES:            *CC*
-Tacticity:         atactic
-Target Properties: Tg, density
-CPU Cores:         4
-Remote GPUs:       4
-Memory:            64 GB
-Max Runtime:       1 week
-```
-
-### Example B — Atactic Polystyrene, Tg only
-```
-Run name:          PS_atactic_tg
-System:            Atactic Polystyrene (PS)
-SMILES:            *CC(c1ccccc1)*
-Tacticity:         atactic
-Target Properties: Tg
-CPU Cores:         24
-Remote GPUs:       4
-Memory:            64 GB
-Max Runtime:       48 hours
-```

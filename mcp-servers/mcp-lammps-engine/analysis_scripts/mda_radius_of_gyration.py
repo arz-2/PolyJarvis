@@ -41,6 +41,8 @@ def parse_args():
     p.add_argument("--skip_frames",    type=int, default=0)
     p.add_argument("--max_frames",     type=int, default=None)
     p.add_argument("--output_dir",     type=str, default=None)
+    p.add_argument("--graphs_dir",     type=str, default=None,
+                   help="Directory for PNG figures (default: <output_dir>/figures/)")
     p.add_argument("--atom_style",     type=str, default="id resid type charge x y z")
     p.add_argument("--n_backbone_bonds", type=int, default=None,
                    help="Number of backbone bonds per chain (for C∞ = <R²>/(N·l²))")
@@ -127,7 +129,7 @@ def compute_cn_vs_n(u, chain_ids, backbone_types, bond_length_A, start, stop):
     return np.array(ns, dtype=float), np.array(cn_values)
 
 
-def _plot_rg_distribution(df, overall_mean_Rg, overall_std_Rg, output_dir):
+def _plot_rg_distribution(df, overall_mean_Rg, overall_std_Rg, graphs_dir):
     apply_style()
     fig, ax = plt.subplots()
     chain_ids = sorted(df['chain'].unique())
@@ -145,10 +147,10 @@ def _plot_rg_distribution(df, overall_mean_Rg, overall_std_Rg, output_dir):
     ax.set_title('Rg distribution per chain')
     if len(chain_ids) <= 10:
         ax.legend(loc='upper right', fontsize=8)
-    save_fig(fig, str(Path(output_dir) / 'figures' / 'rg_distribution.png'))
+    save_fig(fig, str(graphs_dir / 'rg_distribution.png'))
 
 
-def _plot_cn_vs_n(ns, cn_values, char_ratio, output_dir):
+def _plot_cn_vs_n(ns, cn_values, char_ratio, graphs_dir):
     apply_style()
     fig, ax = plt.subplots()
     ax.plot(ns, cn_values, 'o-', color='steelblue', ms=4, lw=1.5, label='C_n')
@@ -159,7 +161,7 @@ def _plot_cn_vs_n(ns, cn_values, char_ratio, output_dir):
     ax.set_ylabel('C_n = ⟨r²(n)⟩ / (n·l²)')
     ax.set_title('Characteristic ratio vs backbone separation')
     ax.legend()
-    save_fig(fig, str(Path(output_dir) / 'figures' / 'cn_vs_n.png'))
+    save_fig(fig, str(graphs_dir / 'cn_vs_n.png'))
 
 
 def main():
@@ -167,6 +169,8 @@ def main():
 
     output_dir = Path(args.output_dir) if args.output_dir else Path(args.dump_file).parent / "analysis"
     output_dir.mkdir(parents=True, exist_ok=True)
+    graphs_dir = Path(args.graphs_dir) if args.graphs_dir else output_dir / 'figures'
+    graphs_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading topology: {args.data_file}", flush=True)
     print(f"Loading trajectory: {args.dump_file}", flush=True)
@@ -280,9 +284,9 @@ def main():
                 cn_csv_path = str(output_dir / "cn_vs_n.csv")
                 cn_df.to_csv(cn_csv_path, index=False)
                 print(f"  Wrote {cn_csv_path}", flush=True)
-                cn_fig_png = str(output_dir / "figures" / "cn_vs_n.png")
+                cn_fig_png = str(graphs_dir / "cn_vs_n.png")
                 try:
-                    _plot_cn_vs_n(ns_arr, cn_arr, char_ratio_from_rg, output_dir)
+                    _plot_cn_vs_n(ns_arr, cn_arr, char_ratio_from_rg, graphs_dir)
                 except Exception as _pe:
                     print(f"  WARNING: cn_vs_n plot failed: {_pe}", flush=True)
                     cn_fig_png = None
@@ -293,9 +297,9 @@ def main():
     summary["cn_vs_n_png"] = cn_fig_png
 
     # Rg distribution figure
-    rg_fig_png = str(output_dir / "figures" / "rg_distribution.png")
+    rg_fig_png = str(graphs_dir / "rg_distribution.png")
     try:
-        _plot_rg_distribution(df, overall_mean_Rg, overall_std_Rg, output_dir)
+        _plot_rg_distribution(df, overall_mean_Rg, overall_std_Rg, graphs_dir)
     except Exception as _pe:
         print(f"  WARNING: rg_distribution plot failed: {_pe}", flush=True)
         rg_fig_png = None

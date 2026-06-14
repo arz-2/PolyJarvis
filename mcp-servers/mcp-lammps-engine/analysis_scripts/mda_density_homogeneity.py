@@ -52,6 +52,8 @@ def parse_args():
                    help="Number of voxels per axis (default 10 → 1000 voxels total)")
     p.add_argument("--cv_threshold", type=float, default=0.25,
                    help="CV threshold above which heterogeneity flag fires (default 0.25)")
+    p.add_argument("--graphs_dir",   type=str,   default=None,
+                   help="Directory for PNG figures (default: <output_dir>/figures/)")
     return p.parse_args()
 
 
@@ -91,7 +93,7 @@ def compute_density_cv(positions, masses, box_lengths, grid_n):
 
 
 def _plot_density_homogeneity(df, cv_mean, cv_std, cv_threshold, heterogeneous_flag,
-                              poisson_limited, output_dir):
+                              poisson_limited, graphs_dir):
     apply_style()
     frames = df['frame'].values
     cv_vals = df['cv'].values
@@ -111,7 +113,7 @@ def _plot_density_homogeneity(df, cv_mean, cv_std, cv_threshold, heterogeneous_f
     ax.set_ylabel('Density CV (σ/μ)')
     ax.set_title(f'Spatial density homogeneity{suffix}')
     ax.legend()
-    save_fig(fig, str(Path(output_dir) / 'figures' / 'density_homogeneity.png'))
+    save_fig(fig, str(graphs_dir / 'density_homogeneity.png'))
 
 
 def main():
@@ -119,6 +121,8 @@ def main():
 
     output_dir = Path(args.output_dir) if args.output_dir else Path(args.dump_file).parent / "analysis"
     output_dir.mkdir(parents=True, exist_ok=True)
+    graphs_dir = Path(args.graphs_dir) if args.graphs_dir else output_dir / 'figures'
+    graphs_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading topology: {args.data_file}", flush=True)
     print(f"Loading trajectory: {args.dump_file}", flush=True)
@@ -207,10 +211,10 @@ def main():
         "mdanalysis_version": mda.__version__,
     })
 
-    dh_fig_png = str(output_dir / "figures" / "density_homogeneity.png")
+    dh_fig_png = str(graphs_dir / "density_homogeneity.png")
     try:
         _plot_density_homogeneity(df, cv_mean, cv_std, args.cv_threshold,
-                                  heterogeneous_flag, poisson_limited, output_dir)
+                                  heterogeneous_flag, poisson_limited, graphs_dir)
     except Exception as _pe:
         print(f"  WARNING: density_homogeneity plot failed: {_pe}", flush=True)
         dh_fig_png = None

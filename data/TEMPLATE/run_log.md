@@ -1,6 +1,6 @@
 # [POLYMER_NAME] Run [N] · [START_DATE] → [END_DATE]
 SMILES: `[SMILES]`  |  FF: [FF]  |  Charges: [CHARGE_METHOD]  |  DP: [DP]  |  Chains: [N_CHAINS]  |  GPU: [IDs used]
-Seeds: EMC=[N or "random"]  |  SEED_HOT=[N]  |  SEED_COLD=[N]
+Requested: [PROPERTIES]  |  Seeds: EMC=[N or "random"]  |  SEED_HOT=[N]  |  SEED_COLD=[N]
 
 ---
 
@@ -16,7 +16,8 @@ Seeds: EMC=[N or "random"]  |  SEED_HOT=[N]  |  SEED_COLD=[N]
 | D-03 Electrostatics | [PPPM / lj/cut [CUTOFF] Å]                         | [heteroatoms present → PPPM / pure C/H → lj/cut 12 Å, ~3× speedup] |
 | D-04 System size    | DP=[N], [N] chains, [N] atoms                       | [polymer_rules.json default / literature: N chains adequate for amorphous Tg / stiff chain: longer DP needed] |
 | D-05 Convergence    | [PASS / EXTEND×N / ESCALATE]                        | [overall_pass=true — see D-05 CONVERGENCE DETAIL below / [N] extension(s) needed] |
-| D-06 Tg fit quality | [EXCELLENT / ACCEPTABLE / BORDERLINE / ABORT]       | [R²=[X], F-stat tier=[TIER], N=[N] temperature bins] |
+| D-06 Tg fit quality | [EXCELLENT / ACCEPTABLE / BORDERLINE / ABORT]       | [R²=[X], F-stat tier=[TIER], N=[N] temperature bins; if multi-rate: slope=[X] K/ln, Tg@5K/ns=[X] K, VF Tg⁰=[X]±[Y] K] |
+| D-07 Property method | [deformation (glassy) / murnaghan (rubbery) / fluctuation (rubbery fallback)] | [Tg=[X] K → is_glassy=[true/false] → method chosen; bm_pressures_atm present=[Y/N]] |
 
 <!-- Example — PS1 completed run:
 | D-01 | TraPPE-UA | classify_polymer returned PSTR → EMC TraPPE-UA auto-routed |
@@ -69,7 +70,9 @@ Example recovery block:
 |-------|-----------|-----------|-----------|------------|
 | 1 — Cell build | [HH:MM] | [HH:MM] | [Xh Ym] | — |
 | 2 — Equilibration | [HH:MM] | [HH:MM] | [Xh Ym] | [X ns/day] |
-| 3 — Tg sweep | [HH:MM] | [HH:MM] | [Xh Ym] | [X ns/day] |
+| 3 — Tg sweep | [HH:MM] | [HH:MM] | [Xh Ym / — not requested] | [X ns/day] |
+| 5a — Density NPT | [HH:MM] | [HH:MM] | [Xh Ym] | [X ns/day] |
+| 5b — Deformation | [HH:MM] | [HH:MM] | [Xh Ym / — not requested] | — |
 | **Total** | | | **[Xh Ym]** | |
 
 <!-- Times are local wall clock. Throughput from LAMMPS log "Performance" line. Stage 1 times from job poll (submitted → completed status). -->
@@ -81,16 +84,22 @@ GPU inventory (`nvidia-smi` at run start):
 
 ## RESULTS
 
-| Property | Computed | Experimental | Error | Status |
-|----------|----------|--------------|-------|--------|
-| Tg       | [X] K    | [X]–[X] K   | [X]%  | [✓ / ⚠ outside bounds] |
-| ρ        | [X] g/cm³| [X]–[X] g/cm³| [X]% | [✓ / ⚠] |
-| K        | [X] GPa  | [X]–[X] GPa  | [X]%  | [✓ / ⚠ / — no exp. ref.] |
-| cooling rate | [X] K/ns | ~10⁻⁷ K/ns (exp) | — | annotation only |
-| expected Tg offset | [80–120 K (screening) / 50–80 K (production)] | — | — | from polymer_rules.json + cooling rate |
+| Property | Computed | Experimental | Error | Method | Status |
+|----------|----------|--------------|-------|--------|--------|
+| Tg       | [X] K    | [X]–[X] K   | [X]%  | bilinear fit | [✓ / ⚠ outside bounds / N/A — not requested] |
+| ρ (300 K)| [X] g/cm³| [X]–[X] g/cm³| [X]% | NPT 300K plateau | [✓ / ⚠ / N/A — not requested] |
+| ρ (T_equil) | [X] g/cm³ | [X]–[X] g/cm³ | [X]% | NPT melt plateau (05b) | [✓ / ⚠ / N/A (no --add_melt_npt)] |
+| K        | [X] GPa  | [X]–[X] GPa  | [X]%  | murnaghan / deformation / fluctuation | [✓ / ⚠ / — no exp. ref. / N/A — not requested] |
+| B0'      | [X]      | 7–11 (typical) | —   | Murnaghan fit (rubbery only)  | [annotation / N/A (glassy)] |
+| G        | [X] GPa  | [X]–[X] GPa  | [X]%  | deformation (glassy only) | [✓ / ⚠ / N/A] |
+| E        | [X] GPa  | [X]–[X] GPa  | [X]%  | deformation (glassy only) | [✓ / ⚠ / N/A] |
+| cooling rate | [X] K/ns | ~10⁻⁷ K/ns (exp) | — | — | annotation only |
+| expected Tg offset | [80–120 K (screening) / 50–80 K (production)] | — | — | — | from polymer_rules.json + cooling rate |
 
 <!-- cooling_rate_K_per_ns = T_STEP / (N_STEPS_PER_T × timestep_fs × 1e-6)
-     e.g. 20 K / (500000 × 1 fs × 1e-6) = 40 K/ns  →  expected offset 80–120 K (screening)
+     e.g. 20 K / (250000 × 2 fs × 1e-6) = 40 K/ns  (TraPPE-UA dt=2 fs)
+          20 K / (500000 × 1 fs × 1e-6) = 40 K/ns  (standard dt=1 fs)  →  expected offset 80–120 K (screening)
           20 K / (4000000 × 1 fs × 1e-6) =  5 K/ns  →  expected offset 50–80 K (production) -->
 
-Simulation dir: `[REMOTE_PATH]`
+Simulation dir: `[PATH]`
+Outputs: `data/[RUN]/outputs/` — CSVs, JSONs, `figures/*.png`, `run_summary.json`

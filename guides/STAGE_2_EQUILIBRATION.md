@@ -16,7 +16,7 @@ with open("npt.in", "w") as f:
 workflow = generate_equilibration_workflow(
     data_file="<work_dir>/cell.data",
     work_dir_base="<work_dir>",
-    use_pcff=True,   # or use_opls=True for PHAL/PSIL; use_trappe=True for PHYC/PDIE/PSTR
+    use_pcff=True,   # or use_opls=True for PHAL/PSIL; use_trappe=True for PHYC/PDIE
     params_file="<work_dir>/emc_build.params",  # EMC only
 )
 ```
@@ -96,10 +96,43 @@ workflow = generate_equilibration_workflow(
     max_press=50000.0,
     n_atoms=<from inspect_data_file>,
     use_pcff=<from lammps_flags>,
-    use_trappe=<from lammps_flags>,  # now populated by EMC server for PHYC/PDIE/PSTR
+    use_trappe=<from lammps_flags>,  # now populated by EMC server for PHYC/PDIE
     params_file="<work_dir>/emc_build.params",  # EMC only — omit for RadonPy
+    # Optional — gen_prompt.py passes these when set in polymer_rules.json or CLI:
+    npt_prod_steps=<int or None>,   # Stage 07 length; PHYC default=2.5M (5 ns at 2 fs)
+    add_melt_npt=False,             # set True for FF validation runs (see below)
 )
 ```
+
+#### Optional: `npt_prod_steps`
+
+Controls the length of Stage 07 (NPT production). Pass directly from `gen_prompt.py` output.
+For PHYC (TraPPE-UA, PE), `polymer_rules.json` sets `npt_prod_ns: 5.0`, which `gen_prompt.py` converts
+to 2,500,000 steps at `dt_prod=2.0 fs`. Other classes inherit the default (half of the Stage 05 length).
+
+#### Optional: Melt-NPT (`add_melt_npt=True`)
+
+For FF validation runs only (not default). When `add_melt_npt=True` and `temp < t_equil_K`, Stage 05
+is split into three sub-stages to capture an isothermal NPT run at the melt temperature:
+
+```python
+workflow = generate_equilibration_workflow(
+    ...
+    temp=300.0,             # final production temperature (rubbery condition: temp < t_equil_K)
+    add_melt_npt=True,      # inject 05a/05b/05c instead of single 05
+    t_equil_K=550.0,        # melt temperature — required when add_melt_npt=True
+    melt_npt_steps=500000,  # stage 05b length; defaults to int(1e6/dt_prod) ≈ 1 ns
+)
+```
+
+This produces a 9-stage workflow:
+- **05a** (`npt_cool_melt`): NPT cool `max_temp → t_equil_K`
+- **05b** (`npt_melt`): NPT isothermal at `t_equil_K` — **extract melt density from this log**
+- **05c** (`npt_cool`): NPT cool `t_equil_K → temp`
+- 06, 07: unchanged (NVT production, NPT production at `temp`)
+
+Melt density is extracted from `05b_npt_melt.log` using `extract_equilibrated_density`. This path
+is returned in `workflow["melt_npt_log"]` and `workflow["melt_npt_dir"]` when the flag is set.
 
 ### Step 5: Run the chain
 
@@ -115,16 +148,16 @@ w = watch_run(result["chain_id"])
 # Return chain_id and w["monitor_command"] to the orchestrator — do not call Monitor.
 ```
 
-`generate_equilibration_workflow` produces **7 stages** (01_minimize → 07_npt_production). The last two are:
-- **Stage 6 — NVT production** (`06_nvt_production`): runs at T_equil_K (melt); source of `equil_data_path` → Tg sweep and convergence check
-- **Stage 7 — NPT production** (`07_npt_production`): NPT at T_equil_K (melt); feeds nothing downstream directly — Phase 2 takes over
+`generate_equilibration_workflow` produces **7 stages** (rubbery, `temp ≤ 300 K`) or **9 stages** (glassy, `temp > 300 K`, default `add_300k_production=True`).
 
-**Phase 2 — Cool and Measure at 300 K (launch in parallel with Tg sweep):**
-Use `generate_script` for two stages starting from `07_npt_production_out.data`:
-1. NPT cool: T_equil_K → 300 K, ~1 ns → `08_npt_cool300/`
-2. NPT production: 300 K / 1 atm, ~2 ns → `09_npt_prod300/`
+- **Stage 6 — NVT production** (`06_nvt_production`): runs at T_equil_K (melt); source for `check_equilibration_comprehensive` and Tg sweep input
+- **Stage 7 — NPT production** (`07_npt_production`): NPT at T_equil_K (melt); intermediate only — not used as downstream density/deform source for glassy polymers
+- **Stage 8 — NPT cool** (`08_npt_cool300`, glassy only): NPT ramp T_equil_K → 300 K, ~1 ns
+- **Stage 9 — NPT production 300 K** (`09_npt_prod300`, glassy only): NPT constant-T at 300 K, ~2 ns — **primary source for density, deformation, and property analysis**
 
-Downstream inputs from Phase 2 (not stage 07):
+Stages 08/09 are auto-appended by `generate_equilibration_workflow` whenever `temp > 300.0`. Pass `add_300k_production=False` only if running a rubbery polymer incorrectly at high T (rare). `npt_production_log` and `npt_production_dir` in the return dict always point to the last NPT stage (09 when present, else 07).
+
+Downstream inputs (from stage 09 for glassy, stage 07 for rubbery):
 - `property-analysis-worker` `npt_prod_log_path` → `09_npt_prod300/09_npt_prod300.log`
 - `property-analysis-worker` `npt_prod_dump_path` → `09_npt_prod300/09_npt_prod300.dump`
 - `deform-worker` `equil_data_path` → `09_npt_prod300/09_npt_prod300_out.data`

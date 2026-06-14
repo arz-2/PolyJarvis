@@ -34,24 +34,7 @@ import tempfile
 import json
 from pathlib import Path
 from typing import Optional, Literal
-import numpy as np
-import pandas as pd
-from scipy import optimize, stats
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-
-
 from mcp.server.fastmcp import FastMCP
-from rdkit import Chem
-
-# Import RadonPy modules
-from radonpy.core import utils, calc, poly
-from radonpy.ff.gaff2_mod import GAFF2_mod
-from radonpy.ff.gaff2 import GAFF2
-from radonpy.ff.gaff import GAFF
-from radonpy.sim import qm
-from radonpy.sim.lammps import Analyze
 import logging
 import time as time_module
 
@@ -61,7 +44,39 @@ logging.basicConfig(
     stream=__import__("sys").stderr,
 )
 logger = logging.getLogger("mol_builder_mcp")
+# Also log to file so we can confirm subprocess launch even from Claude Code
+_fh = logging.FileHandler("/tmp/mol-builder-startup.log", mode='a')
+_fh.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+logger.addHandler(_fh)
 logger.info("Mol-Builder MCP Server starting...")
+
+# Heavy libs loaded in a background thread so the MCP handshake completes fast
+np = pd = optimize = stats = plt = Chem = utils = calc = poly = None
+GAFF2_mod = GAFF2 = GAFF = qm = Analyze = None
+_libs_ready = threading.Event()
+
+def _load_heavy_libs():
+    global np, pd, optimize, stats, plt, Chem, utils, calc, poly
+    global GAFF2_mod, GAFF2, GAFF, qm, Analyze
+    import numpy as _np
+    import pandas as _pd
+    from scipy import optimize as _opt, stats as _stats
+    import matplotlib as _mpl; _mpl.use('Agg')
+    import matplotlib.pyplot as _plt
+    from rdkit import Chem as _Chem
+    from radonpy.core import utils as _utils, calc as _calc, poly as _poly
+    from radonpy.ff.gaff2_mod import GAFF2_mod as _GAFF2_mod
+    from radonpy.ff.gaff2 import GAFF2 as _GAFF2
+    from radonpy.ff.gaff import GAFF as _GAFF
+    from radonpy.sim import qm as _qm
+    from radonpy.sim.lammps import Analyze as _Analyze
+    np = _np; pd = _pd; optimize = _opt; stats = _stats; plt = _plt; Chem = _Chem
+    utils = _utils; calc = _calc; poly = _poly
+    GAFF2_mod = _GAFF2_mod; GAFF2 = _GAFF2; GAFF = _GAFF; qm = _qm; Analyze = _Analyze
+    _libs_ready.set()
+    logger.info("Heavy libs loaded in background")
+
+threading.Thread(target=_load_heavy_libs, daemon=True).start()
 
 # ============================================================================
 # JOB MANAGEMENT SYSTEM
@@ -133,7 +148,7 @@ class JobManager:
             
             job_logger.info("Job execution started")
             self.logger.info(f"Job {job_id} execution started")
-            
+            _libs_ready.wait()
             result = func(*args, **kwargs)
             
             elapsed = time_module.time() - start_time
@@ -994,6 +1009,7 @@ def classify_polymer(smiles: str) -> dict:
         dict with class_id, class_name, description, flags (all 21 groups),
         co_occurring_groups, and any warnings
     """
+    _libs_ready.wait()
     try:
         class_id, flags = poly.polyinfo_classifier(smiles, return_flag=True)
 
@@ -1068,6 +1084,7 @@ def build_molecule_from_smiles(smiles: str, add_hydrogens: bool = True) -> dict:
     Returns:
         dict with status, num_atoms, num_bonds, and temp_file path
     """
+    _libs_ready.wait()
     try:
         mol = utils.mol_from_smiles(smiles)
         if mol is None:
@@ -1104,6 +1121,7 @@ def assign_forcefield(
     Returns:
         dict with force field assignment status
     """
+    _libs_ready.wait()
     try:
         mol = utils.JSONToMol(mol_file)
         
@@ -1157,6 +1175,7 @@ def save_molecule(
     Returns:
         dict with save status
     """
+    _libs_ready.wait()
     try:
         mol = utils.JSONToMol(mol_file)
         
@@ -1209,6 +1228,7 @@ def save_lammps_data(
     Returns:
         dict with output path, atom count, atom types, and box dimensions
     """
+    _libs_ready.wait()
     try:
         from radonpy.sim import lammps as lmp_module
         from radonpy.core import utils, calc
@@ -1275,6 +1295,7 @@ def get_molecule_info(mol_file: str) -> dict:
     Returns:
         dict with molecule information
     """
+    _libs_ready.wait()
     try:
         mol = utils.JSONToMol(mol_file)
         

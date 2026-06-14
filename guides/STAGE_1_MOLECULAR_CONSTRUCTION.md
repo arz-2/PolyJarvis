@@ -9,9 +9,8 @@
 ```
 classify_polymer(smiles)
   ├─ PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL  →  Path A — EMC (pcff)
-  ├─ PHAL                      →  Path A — EMC (opls/2024/opls-aa)
-  ├─ PSIL                      →  ⚠ unsupported (EMC FieldsApply typing gap; RadonPy has no Si)
-  ├─ PHYC, PDIE, PSTR          →  Path A — EMC (trappe-ua)
+  ├─ PHAL, PSIL                →  Path A — EMC (opls/2024/opls-aa)
+  ├─ PHYC, PDIE                 →  Path A — EMC (trappe-ua)
   └─ PURA                      →  Path B — RadonPy (GAFF2_mod + QM charges)
 ```
 
@@ -37,7 +36,7 @@ EMC builds the amorphous cell and assigns all FF parameters in one step — no c
 |---|---|---|---|---|---|
 | 0 | UNKNOWN | Unclassified | Bad SMILES | ❌ Stop | — |
 | 1 | PHYC | Polyhydrocarbon | PE, PP, PIB | TraPPE-UA | lj/cut |
-| 2 | PSTR | Polystyrenic | PS, P2VP | TraPPE-UA | lj/cut |
+| 2 | PSTR | Polystyrenic | PS, P2VP | PCFF | pppm |
 | 3 | PVNL | Polyvinyl | PVA, PVC | PCFF | pppm |
 | 4 | PACR | Polyacrylic | PMMA, PAA | PCFF | pppm |
 | 5 | PHAL | Polyhalogenated | PVDF, PTFE | OPLS-AA | pppm |
@@ -51,7 +50,7 @@ EMC builds the amorphous cell and assigns all FF parameters in one step — no c
 | 14 | PANH | Polyanhydride | Polyanhydride | PCFF | pppm |
 | 15 | PCBN | Polycarbonate | BPA-PC | PCFF | pppm |
 | 16 | PIMN | Polyamine | PEI, epoxy | PCFF | pppm |
-| 17 | PSIL ⚠ | Polysiloxane | PDMS | OPLS-AA | pppm |
+| 17 | PSIL | Polysiloxane | PDMS | OPLS-AA | pppm |
 | 18 | PPHS | Polyphosphazene | Polyphosphazene | PCFF ⚠️ | pppm |
 | 19 | PKTN | Polyketone/PEEK | PEEK | PCFF | pppm |
 | 20 | PSFO | Polysulfone | PSU | PCFF | pppm |
@@ -75,13 +74,13 @@ EMC builds the amorphous cell and assigns all FF parameters in one step — no c
 | PHYC | trappe-ua | PE | `*CC*` | — |
 | PHYC | trappe-ua | PP (atactic) | `*CC(C)*` | No chirality → atactic; use `*[C@@H](C)C*` for isotactic |
 | PDIE | trappe-ua | cis-PBD | `*C/C=C\C*` | cis/trans microstructure must be encoded in SMILES |
-| PSTR | trappe-ua | PS (atactic) | `*CC(c1ccccc1)*` | No chirality → atactic |
+| PSTR | pcff | PS (atactic) | `*CC(c1ccccc1)*` | No chirality → atactic |
 
 > **PCBN:** The carbonate group (`-O-C(=O)-O-`) must be fully contained within the repeat unit. Placing `*` on the carbonyl oxygen causes `oz`/`oo` PCFF templates to fail silently — EMC exits with "Missing force field parameters."
 
 > **PIMD:** All imide ring atoms must be lowercase (aromatic notation), including carbonyl carbons. Uppercase `N` → EMC assigns sp3 `na` type → no `c_1` increment pair.
 
-> **TraPPE-UA tacticity:** `[C@@H]`/`[C@H]` chirality notation works with OPLS-AA but not TraPPE-UA (united-atom has no explicit H). For PHYC/PDIE/PSTR, atactic is the only option via EMC. Use RadonPy with `tacticity="isotactic"` if stereospecific chains are required.
+> **TraPPE-UA tacticity:** `[C@@H]`/`[C@H]` chirality notation works with OPLS-AA but not TraPPE-UA (united-atom has no explicit H). For PHYC/PDIE, atactic is the only option via EMC. Use RadonPy with `tacticity="isotactic"` if stereospecific chains are required.
 
 ### `submit_emc_cell_job`
 
@@ -103,9 +102,20 @@ Poll with `get_emc_job_status(job_id)` until `status == "completed"`, then:
 ```python
 out = get_emc_job_output(job_id)
 data_path    = out["result"]["data_path"]     # absolute path to LAMMPS .data file
+params_path  = out["result"]["params_path"]   # absolute path to emc_build.params (may be None)
 lammps_flags = out["result"]["lammps_flags"]  # e.g. {"use_pcff": True, "use_opls": False}
 # Pass both to generate_equilibration_workflow() in Stage 2
 ```
+
+**Output placement:** After the job completes, copy both outputs into `{work_dir}/cell/`:
+
+```bash
+mkdir -p {work_dir}/cell
+cp <data_path>   {work_dir}/cell/cell.data
+cp <params_path> {work_dir}/cell/emc_build.params   # skip if params_path is None
+```
+
+Report `data_path = {work_dir}/cell/cell.data` and `emc_params_path = {work_dir}/cell/emc_build.params` in the RESULT block.
 
 ### density_initial Reference
 
@@ -126,8 +136,6 @@ Use ~0.5× experimental — low enough to avoid steric clashes; Stage 2 compress
 
 ### Known Warnings
 
-- **PSIL (class 17) — builder_status: unsupported:** EMC accepts `submit_emc_cell_job(polymer_class="PSIL")` at the API level (routes to opls/2024/opls-aa) but the job fails during execution at `FieldsApply` — typing rules cover only tetraalkylsilane `[Si](C)(C)(C)(C)`, not siloxane `[Si](O)(O)(C)(C)`. RadonPy GAFF2 has no Si branch. The orchestrator blocks PSIL at step 3a via `builder_status` check. Do not attempt a build.
-
 - **PDIE (class 6):** `"Diene polymer: verify cis/trans geometry in SMILES — cis vs trans isomers can differ by ~60K in Tg."` Encode cis/trans microstructure explicitly (e.g. `*C/C=C\C*` for cis-PBD).
 
 ### Decision IDs for run_log.md (EMC path)
@@ -136,7 +144,7 @@ Use ~0.5× experimental — low enough to avoid steric clashes; Stage 2 compress
 |---|---|---|
 | D-01 | Force field | auto-selected from polymer_class (see `lammps_flags` in output) |
 | D-02 | Charge method | embedded in FF — no separate step |
-| D-03 | Electrostatics | pppm (all except PHYC/PDIE/PSTR which use lj/cut) |
+| D-03 | Electrostatics | pppm (all except PHYC/PDIE which use lj/cut) |
 | D-04 | System size | dp and ntotal passed to submit_emc_cell_job |
 
 ---
@@ -185,7 +193,7 @@ build_molecule_from_smiles(smiles)
 
 **`submit_generate_cell_job`** — always use `density=0.05` to prevent overlap during packing; Stage 2 compresses to full density. Chain count: 6 ≈ 12 k atoms (fast), 10 ≈ 20 k (standard), 20 ≈ 40 k (publication).
 
-**`save_lammps_data`** — synchronous. Pass the returned local path to Stage 2.
+**`save_lammps_data`** — synchronous. Save to `{work_dir}/cell/cell.data` (create the directory first: `mkdir -p {work_dir}/cell`). Pass this path to Stage 2.
 
 ### Checkpoint Saves
 
@@ -214,7 +222,7 @@ save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="
 
 **`submit_polymerize_job` overwrites `mol_file` in place:** Save checkpoints to distinct paths before running (see Checkpoint Saves).
 
-**EMC exits with "Missing force field parameters":** Check SMILES conventions for the class — most common cause is `*` placement error (PCBN: `*` on aromatic C; PIMD: ring atoms must be lowercase).
+**EMC exits with "Missing force field parameters":** Check SMILES conventions for the class — most common cause is `*` placement error (PCBN: `*` on aromatic C; PIMD: ring atoms must be lowercase). Verify the SMILES has exactly two `*` atoms. If `dp=20` fails, retry with `dp=15` — occasionally shorter chains avoid missing-increment errors.
 
 ---
 

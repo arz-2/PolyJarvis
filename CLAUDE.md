@@ -59,31 +59,48 @@ The default mode is multi-agent. The orchestrator (this session) spawns speciali
     `Bash: python3 scripts/gen_prompt.py --stage <STAGE> --run_name <RUN> --polymer_class <CLASS> [--smiles ...] [--data_path ...]`
     Each call prints a ready-to-use prompt block. Override any field by passing the flag explicitly.
     The script inlines STAGE_INDEX.md (cross-stage rules) so workers receive full context.
+3c. Parse requested properties from task TARGET_PROPERTIES field:
+    properties_requested = {"density", "tg", "bulk_modulus"}  # default: all three
+    If task says "all" or field is absent/empty → use full set (unchanged behavior)
+    Otherwise normalize to lowercase set (e.g. "Tg, density" → {"tg", "density"})
+    Write "Requested: {properties_requested}" to run_log.md metadata line.
+    If "tg" not in properties_requested:
+      # derive glassy_hint from polymer_rules.json experimental Tg
+      Bash: jq -r '.classes.CLASS_ID.experimental_tg_K // 350' guides/polymer_rules.json
+      If result is a number: glassy_hint = (result > 300)
+      If result is an object (dict of variants): use first numeric value; default True if absent
+      # glassy_hint used at step 14 in place of Tg sweep result
 4. Agent(subagent_type="molecule-builder", description="🔵 Build {polymer_name} cell", prompt=<output of gen_prompt.py --stage build>)
      → parse RESULT block → extract data_path, lammps_flags
 5. Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polymer_name}", prompt=<output of gen_prompt.py --stage equil --data_path ...>)
      → parse RESULT block → extract chain_id, monitor_command, expected_equil_data
 6. Write SIMULATION STATE to run_log.md (status=monitoring)
 7. Monitor(command=monitor_command)          # orchestrator owns this
-7a. /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), run_log.md absolute path, last worker RESULT block  # run before step 8 if context > 40%
+7a. /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block  # run before step 8 if context > 40%
 8. get_run_status(chain_id) → check success/failure
 9. check_equilibration_comprehensive(equil_log, dump, data, backbone_types) → PASS / EXTEND / ESCALATE
-10. Agent(subagent_type="tg-sweep-worker", description="🟣 Tg sweep {polymer_name}", prompt=<output of gen_prompt.py --stage tg --data_path equil_data_path>)
-      → parse RESULT block → extract run_id, monitor_command
-11. Write SIMULATION STATE to run_log.md (status=monitoring)
-12. Monitor(command=monitor_command)          # orchestrator owns this
-12a. /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), run_log.md absolute path, last worker RESULT block  # run before step 13 if context > 40%
-13. Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg {polymer_name}", prompt=<output of gen_prompt.py --stage analyze-tg --data_path tg_log_path>)
-      → parse RESULT block → extract Tg_K, Tg_fit_quality → write D-06 to run_log.md
-14. is_glassy = (Tg_K > 300)                 # safe default: True if Tg_K is None or fit ABORT
-15. if is_glassy:
+10. if "tg" in properties_requested:
+      Agent(subagent_type="tg-sweep-worker", description="🟣 Tg sweep {polymer_name}", prompt=<output of gen_prompt.py --stage tg --data_path equil_data_path>)
+        → parse RESULT block → extract run_id, monitor_command
+11.   Write SIMULATION STATE to run_log.md (status=monitoring)
+12.   Monitor(command=monitor_command)          # orchestrator owns this
+12a.  /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block  # run before step 13 if context > 40%
+13.   Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg {polymer_name}", prompt=<output of gen_prompt.py --stage analyze-tg --data_path tg_log_path>)
+        → parse RESULT block → extract Tg_K, Tg_fit_quality → write D-06 to run_log.md
+14. is_glassy determination:
+    if "tg" in properties_requested:
+      is_glassy = (Tg_K > 300)          # safe default: True if Tg_K is None or fit ABORT
+    else:
+      is_glassy = glassy_hint            # from step 3c; write D-06 = "N/A — tg not requested"
+      Tg_K = None; Tg_fit_quality = "N/A (not requested)"
+15. if "bulk_modulus" in properties_requested AND is_glassy:
       Agent(subagent_type="deform-worker", description="🔵 Deform {polymer_name}", prompt=<output of gen_prompt.py --stage deform --data_path npt_prod_data_path>)
         → parse RESULT block → extract run_id_deform, monitor_command_deform
       Write SIMULATION STATE to run_log.md (status=monitoring)
       Monitor(command=monitor_command_deform)   # orchestrator owns this
-      /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), run_log.md absolute path, last worker RESULT block  # run before step 16 if context > 40%
+      /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block  # run before step 16 if context > 40%
 16. Agent(subagent_type="property-analysis-worker", description="🟢 Analyze {polymer_name} properties",
-          prompt=<output of gen_prompt.py --stage analyze-full --data_path npt_prod_data_path --is_glassy true|false --smiles ... --ff ... --tg_fit_quality ... [--deform_log ...]>)
+          prompt=<output of gen_prompt.py --stage analyze-full --data_path npt_prod_data_path --is_glassy true|false --smiles ... --ff ... --tg_fit_quality ... --properties <comma-joined properties_requested> [--deform_log ...]>)
       → parse RESULT block → write RESULTS to run_log.md; run_summary.json written to raw_dir
 ```
 
@@ -97,7 +114,7 @@ On session restart: read SIMULATION STATE table → find row with `status=monito
 
 Manual /compact focus string (steps 7a, 12a, before step 16):
 ```
-/compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), run_log.md absolute path, last worker RESULT block
+/compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block
 ```
 After any compact: read `run_log.md` SIMULATION STATE before the next tool call.
 
@@ -122,22 +139,3 @@ The orchestrator decides all recovery actions. Workers are re-spawned with adjus
 
 - Max 2 recovery attempts per stage; after that, write `UNRESOLVED` and stop
 
-### Recovery Reference
-
-#### Equilibration verdict (step 9)
-
-**PASS/EXTEND/ESCALATE** — `check_equilibration_comprehensive` returns a `recovery_hint` field with the exact action. Max 2 extensions; after that ESCALATE with `--density_initial` = class default − 0.05 g/cm³. Pass `ct_min_decay` = `ct_min_decay_melt` from `polymer_rules.json[class]` for the melt/NVT log (0.10 standard; 0.25 for fast rubbery PHYC/PDIE/PSIL; lit. basis: Auhl 2003 J. Chem. Phys. 119:12718). Omit for 300 K NPT and rubbery checks.
-
-#### Tg sweep verdict (steps 13–14)
-
-**EXCELLENT/ACCEPTABLE/BORDERLINE/ABORT** — `extract_tg` returns a `recovery_hint` field with the exact action.
-
-#### LAMMPS error taxonomy
-
-See `guides/LAMMPS_TROUBLESHOOTING.md` for error strings, root causes, and recovery actions.
-
-#### RadonPy QM failure (step 4)
-
-If `get_job_status` returns `failed` for a conformer search or charge assignment job: retry once with `n_conformers` halved. If still fails, fall back to AM1-BCC charges and note in DECISIONS D-02 ("RESP failed — AM1-BCC fallback"). Do not retry a third time.
-
----

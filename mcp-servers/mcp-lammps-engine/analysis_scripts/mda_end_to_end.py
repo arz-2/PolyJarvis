@@ -49,6 +49,8 @@ def parse_args():
     p.add_argument("--max_frames", type=int, default=None, help="Max frames to analyse")
     p.add_argument("--output_dir", type=str, default=None,
                    help="Output directory (default: <dump_dir>/analysis)")
+    p.add_argument("--graphs_dir", type=str, default=None,
+                   help="Directory for PNG figures (default: <output_dir>/figures/)")
     p.add_argument("--atom_style", type=str, default="id resid type charge x y z",
                    help="LAMMPS atom_style column order for the data file")
     p.add_argument("--unwrap", action="store_true", default=True,
@@ -71,7 +73,7 @@ def to_native(obj):
     return obj
 
 
-def _plot_end_to_end_distribution(df_out, per_chain, overall_mean_R, output_dir):
+def _plot_end_to_end_distribution(df_out, per_chain, overall_mean_R, graphs_dir):
     apply_style()
     fig, ax = plt.subplots()
     distances = df_out['distance'].values
@@ -83,7 +85,7 @@ def _plot_end_to_end_distribution(df_out, per_chain, overall_mean_R, output_dir)
     ax.set_ylabel('Probability density')
     ax.set_title('End-to-end vector distribution')
     ax.legend()
-    save_fig(fig, str(Path(output_dir) / 'figures' / 'end_to_end_distribution.png'))
+    save_fig(fig, str(graphs_dir / 'end_to_end_distribution.png'))
 
 
 def main():
@@ -95,6 +97,8 @@ def main():
     else:
         output_dir = Path(args.dump_file).parent / "analysis"
     output_dir.mkdir(parents=True, exist_ok=True)
+    graphs_dir = Path(args.graphs_dir) if args.graphs_dir else output_dir / 'figures'
+    graphs_dir.mkdir(parents=True, exist_ok=True)
 
     # Load universe
     print(f"Loading topology: {args.data_file}", flush=True)
@@ -230,10 +234,10 @@ def main():
         "mdanalysis_version": mda.__version__,
     })
 
-    e2e_fig_png = str(output_dir / "figures" / "end_to_end_distribution.png")
+    e2e_fig_png = str(graphs_dir / "end_to_end_distribution.png")
     try:
         _plot_end_to_end_distribution(df_out, per_chain,
-                                      summary["overall_mean_R"], output_dir)
+                                      summary["overall_mean_R"], graphs_dir)
     except Exception as _pe:
         print(f"  WARNING: end_to_end_distribution plot failed: {_pe}", flush=True)
         e2e_fig_png = None
