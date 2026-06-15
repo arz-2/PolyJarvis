@@ -145,6 +145,7 @@ w = watch_run(run["run_id"])
 **Tg sweep killed mid-run:**
 - *User action (intentional kill):* Stop immediately; do not re-queue or continue — wait for user instruction.
 - *System failure (GPU/LAMMPS error):* Attempt to restart from the last completed temperature (max 2 recovery attempts). If still failing, return the error to the user.
+- *Partial completion (OOM kill / GPU preemption, no error in log):* Attempt `extract_tg` on available data if (a) ≥ 60% of planned temperature points completed AND (b) both the glassy and rubbery slopes are present in the log. If `extract_tg` returns ≥ 4 valid bins and `fit_quality` ≥ ACCEPTABLE, accept the result and proceed. Restart the full sweep only if < 60% complete or `extract_tg` returns < 4 bins. Observed: PDMS1 (18/31 temps, R²=0.9975 ✓).
 
 **Intermediate / non-protocol NPT runs:** Do not submit these automatically. Only run if the user explicitly requests it; they do not have Monitor integration by design.
 

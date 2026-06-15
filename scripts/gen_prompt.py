@@ -201,6 +201,15 @@ def equil_prompt(args, cls: dict, stage_index: str) -> str:
         )
     else:
         npt_prod_line = "t_npt_prod_ns:     null  # auto: steps_npt // 2 by atom-count tier"
+    exp_tg_override = getattr(args, 'exp_tg_K', None)
+    if exp_tg_override is not None:
+        exp_tg = exp_tg_override
+    else:
+        exp_tg = cls.get('experimental_tg_K')
+        if isinstance(exp_tg, dict):
+            vals = sorted(v for v in exp_tg.values() if isinstance(v, (int, float)))
+            exp_tg = vals[len(vals) // 2]  # median: avoids low-Tg outliers (e.g. PCL in PEST)
+    T_workflow = 300.0 if isinstance(exp_tg, (int, float)) and exp_tg < 300 else T_equil
     add_melt_npt = getattr(args, 'add_melt_npt', False) or False
     melt_npt_ns_val = _pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None
     if add_melt_npt and melt_npt_ns_val is not None:
@@ -226,6 +235,7 @@ run_name:          {args.run_name}
 work_dir:          {work_dir}
 polymer_class:     {args.polymer_class.upper()}
 T_equil_K:         {T_equil}
+T_workflow_K:      {T_workflow}   # 300.0 if rubbery (exp_Tg<300 K), else T_equil_K — pass as temp= to generate_equilibration_workflow
 P_equil_atm:       {cls.get('P_equil_atm', 1.0)}
 t_equil_ns:        {cls.get('t_equil_ns', 5.0)}
 T_anneal_high_K:   {T_anneal}
@@ -505,6 +515,9 @@ def main():
                    help="Experimental bulk modulus lower bound (GPa); overrides polymer_rules.json")
     p.add_argument("--exp_K_max", type=float,
                    help="Experimental bulk modulus upper bound (GPa); overrides polymer_rules.json")
+    p.add_argument("--exp_tg_K", type=float,
+                   help="Experimental Tg override (K) for T_workflow_K decision; use for specific polymer "
+                        "within a multi-polymer class (e.g. --exp_tg_K 213 for PCL within PEST)")
 
     args = p.parse_args()
 

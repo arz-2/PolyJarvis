@@ -1390,7 +1390,7 @@ def generate_equilibration_workflow(
                 "P_DAMP":        1000.0,
                 "TIMESTEP":      dt_prod,
                 "N_STEPS":       steps_cool300,
-                "use_pppm":      True,
+                "use_pppm":      not use_trappe,
                 "use_gpu":       True,
                 "write_restart": False,
             }, s7["output_data"])
@@ -1404,7 +1404,7 @@ def generate_equilibration_workflow(
                 "P_DAMP":        1000.0,
                 "TIMESTEP":      dt_prod,
                 "N_STEPS":       steps_prod300,
-                "use_pppm":      True,
+                "use_pppm":      not use_trappe,
                 "use_gpu":       True,
                 "write_restart": False,
             }, s8["output_data"])

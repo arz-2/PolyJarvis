@@ -118,24 +118,7 @@ Manual /compact focus string (steps 7a, 12a, before step 16):
 ```
 After any compact: read `run_log.md` SIMULATION STATE before the next tool call.
 
-### Recovery ownership
+### Recovery
 
-The orchestrator decides all recovery actions. Workers are re-spawned with adjusted prompts:
-
-- **Chain failed (Mode A):** Monitor fires → `get_run_status` returns FAILED → read error log → adjust params → re-spawn worker
-- **Session ended mid-Monitor (Mode B):** Two sub-cases:
-
-  **B-1 — tmux alive:** `ssh lambda && pj` to re-attach; Monitor is still blocking, no action needed.
-
-  **B-2 — Claude process died (no tmux, machine rebooted, or session killed):**
-  1. `ssh lambda && pj && claude --continue` (or start fresh if conversation unavailable)
-  2. Read `data/[RUN]/run_log.md` → find the row where `status = monitoring`; note the `id` column value
-  3. Call `get_run_status(id)`:
-     - **running** → `watch_run(id)` → re-issue `Monitor(command=monitor_command)` → update run_log.md back to `monitoring`
-     - **completed** → update run_log.md to `done` → continue from the next orchestrator step
-     - **failed** → `get_run_output(id)` → diagnose → re-spawn worker (counts as recovery attempt)
-     - **not found** → wait 60–90 s for MCP server restart, retry; if still missing, treat as failed
-  4. **`monitor_command` is deterministic:** `watch_run(id)` regenerates it from the ID alone — always safe to re-call
-
-- Max 2 recovery attempts per stage; after that, write `UNRESOLVED` and stop
+Use `/recover` to diagnose any stage failure, plan the fix, and re-spawn the worker. Max 2 recovery attempts per stage — after that write `UNRESOLVED` to run_log.md and stop. For session restart after a killed Claude process, read the SIMULATION STATE table in run_log.md and call `get_run_status` on the monitoring row — `/recover` handles this too.
 

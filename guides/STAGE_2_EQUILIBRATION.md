@@ -88,9 +88,9 @@ workflow = generate_equilibration_workflow(
     data_file="<work_dir>/cell.data",
     work_dir_base="<work_dir>",          # all stage outputs written here
     polymer_name="<name>",
-    temp=300.0 if exp_Tg_K < 300 else T_equil_K,
-    # rubbery (exp_Tg_K<300): 300 K direct — stage 07 NPT feeds density + fluctuation K directly
-    # glassy  (exp_Tg_K≥300): T_equil_K melt — Phase 2 cool→300 K mandatory after chain
+    temp=T_workflow_K,   # from gen_prompt.py: 300.0 if rubbery (exp_Tg<300 K), else T_equil_K
+    # rubbery (T_workflow_K=300): 7-stage workflow; stage 07 NPT feeds density + fluctuation K directly
+    # glassy  (T_workflow_K=T_equil_K): 9-stage workflow; Phase 2 stages 08/09 cool→300 K auto-appended
     max_temp=T_anneal_high_K,  # annealing ceiling; always from polymer_rules.json
     press=1.0,
     max_press=50000.0,
@@ -215,6 +215,18 @@ Copy `result["d05_markdown"]` directly into run_log.md as the D-05 CONVERGENCE D
 
 ---
 
+## Pre-submission wall-time estimate
+
+Before submitting, estimate wall time to catch budget overruns (observed: Nylon1 exceeded 48 h at 500k steps/T × 23 T-steps):
+
+```
+wall_hours ≈ (N_T_steps × n_steps_per_T × dt_fs × 1e-6) / throughput_ns_per_day × 24
+```
+
+If estimate > 48 h, reduce `n_steps_per_T` by half before submitting. Check GPU throughput from a prior run log ("Performance" line) or assume 5–10 ns/day for PCFF systems.
+
+---
+
 ## Common Failures
 
 **GPU crash during NPT:** Check the log for the actual error. Do NOT switch to CPU — GPU NPT works correctly. Common causes: out-of-memory (reduce system size or use fewer GPUs), bad initial geometry (run more minimize steps), or pair style mismatch (check params file was stripped of style lines).
@@ -224,3 +236,5 @@ Copy `result["d05_markdown"]` directly into run_log.md as the D-05 CONVERGENCE D
 **Chain droplets / vacuum voids visible:** Initial density too high. Rebuild cell at `density=0.05`. Add more annealing.
 
 **Another user is on the GPU:** Always check `nvidia-smi` first. Pin to free GPUs via `gpu_ids`.
+
+**"Out of range atoms — cannot compute PPPM" in npt_compress:** Rapidly shrinking box during high-pressure compression pushes atoms outside the PPPM ghost region. Fix: switch stage 03 pair_style to `lj/cut/coul/cut` (short-range Coulomb, no kspace) in the generated script; increase neighbor skin 2.0 → 3.0 Å; reduce dt to 0.5 fs for that stage only. Restore `lj/cut/coul/long` + kspace_style for stages 04 onward. Observed: PDMS1 (OPLS-AA/PSIL at high compression).

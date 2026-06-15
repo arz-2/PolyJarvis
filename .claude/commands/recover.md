@@ -22,7 +22,7 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
 
 **5. Diagnose using this taxonomy:**
 
-| Error string in log | Root cause | Recovery action |
+| Error string / condition | Root cause | Recovery action |
 |---|---|---|
 | "lost atoms" | Timestep too large or bad geometry | Re-spawn worker with `dt_fs: 0.5` |
 | "out of memory" / GPU OOM | Cell too large for VRAM | Re-spawn with `mpi_ranks` halved |
@@ -33,12 +33,18 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
 | Tg sweep R² 0.80–0.90 | Borderline bilinear fit | Re-run sweep with `T_step` halved |
 | RadonPy conformer/charge job `failed` | QM instability | Retry once with `n_conformers` halved; if still fails, use AM1-BCC and note in D-02 |
 | "missing FF parameters" (EMC build) | SMILES attachment points wrong | Verify exactly two `*` atoms; try `dp: 15` if `dp: 20` fails |
+| LAMMPS crashes steps 0–10, wrong style keyword (`fourier` / `none` / `lj/charmm`) | FF directive mismatch: `generate_script` called without explicit FF flag | Confirm `**lammps_flags` is in `params_deform`; re-generate script passing `use_trappe=True` / `use_pcff=True` / `use_opls=True` explicitly |
+| Log truncated, no LAMMPS error string, process gone | External kill (OOM killer / GPU preemption) | Identify last completed stage `_out.data` via `ls`; submit remaining stages as new chain from that checkpoint |
+| Monitor hangs indefinitely after `run_lammps_chain` | `watch_run` sentinel lost on MCP server restart | `grep -r "STAGE COMPLETE" <work_dir>/` — if all stages present, proceed without Monitor and mark done in run_log |
+| "Out of range atoms — cannot compute PPPM" in npt_compress | PPPM ghost region exceeded during high-pressure box shrink | Switch compress stage pair_style to `lj/cut/coul/cut`; skin=3.0 Å; dt=0.5 fs; restore kspace for all production stages |
+| K = negative or density at melt value (~0.8–0.9 g/cm³) for a glassy polymer | deform-worker received Stage 7 (melt) data instead of Stage 9 (300 K) data | Verify `equil_data_path` is `09_npt_prod300_out.data`; if Stage 9 missing, run Phase 2 (cool+prod at 300 K) first; re-spawn deform-worker |
+| `extract_tg` returns "fewer than 4 temperature bins" after partial sweep kill | Sweep killed before sufficient T coverage | If ≥ 60% of planned T points completed AND both glassy+rubbery slopes present, attempt `extract_tg`; if fit_quality ≥ ACCEPTABLE accept; else restart full sweep |
 
 **6. Output a recovery plan in this format:**
 ```
 RECOVERY PLAN
-  Stage:        <molecule-builder | equilibration | tg-sweep>
-  Failure:      <exact error string from log>
+  Stage:        <molecule-builder | equilibration | tg-sweep | deform-worker | property-analysis-worker | phase-2>
+  Failure:      <exact error string or condition from log>
   Root cause:   <diagnosis from taxonomy above>
   Action:       <parameter change or step to re-run>
   Worker:       <subagent_type to re-spawn>
@@ -56,3 +62,20 @@ RECOVERY PLAN
 ```
 
 **Max attempts rule:** After 2 recovery attempts at any stage, write `UNRESOLVED` as the outcome and stop. Do not attempt a third retry without human review.
+
+---
+
+## Session Recovery (Mode B)
+
+When the Claude process dies mid-Monitor (no tmux, machine reboot, or session killed):
+
+1. `ssh lambda && pj && claude --continue` (or start fresh if conversation unavailable)
+2. Read `data/[RUN]/run_log.md` → find the row where `status = monitoring`; note the `id` value
+3. Call `get_run_status(id)`:
+   - **running** → `watch_run(id)` → re-issue `Monitor(command=monitor_command)` → update run_log back to `monitoring`
+   - **completed** → update run_log to `done` → continue from the next orchestrator step
+   - **failed** → `get_run_output(id)` → diagnose with taxonomy above → re-spawn worker (counts as attempt 1)
+   - **not found** → wait 60–90 s for MCP server restart; retry; if still missing, treat as failed
+4. `monitor_command` is deterministic — `watch_run(id)` regenerates it from the ID alone; always safe to re-call
+
+If tmux is still alive (B-1): `ssh lambda && pj` to re-attach; Monitor is still blocking, no action needed.
