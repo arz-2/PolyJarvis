@@ -1,0 +1,119 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - NVT Born Matrix Template
+# ============================================================
+# Stage: NVT-Born (Stage 8, glassy polymers only)
+# Purpose: Compute isothermal bulk modulus via Born + NVT stress
+#   fluctuation method. Requires LAMMPS compiled with EXTRA-COMPUTE
+#   (compute born/matrix numdiff).
+#
+# Formula:  K_T = K_Born + NkT/V − (V/kT)·Var(P)_NVT
+#   K_Born  — from compute born/matrix numdiff (time-averaged)
+#   NkT/V   — kinetic term (ideal gas contribution)
+#   Var(P)  — variance of isotropic pressure in NVT (stress-fluctuation)
+#
+# Tunable parameters (injected by script_generator.py):
+#   DATA_FILE        - .data or .restart file to read
+#   READ_COMMAND     - "read_data" or "read_restart"
+#   LOG_FILE         - log filename
+#   LOG_APPEND       - "append" or "" (overwrite)
+#   DUMP_FILE        - trajectory filename
+#   LAST_DUMP_FILE   - final snapshot filename
+#   WRITE_DATA_FILE  - output .data filename
+#   RESTART_FILE_1   - restart checkpoint file 1
+#   RESTART_FILE_2   - restart checkpoint file 2
+#   RESTART_FREQ     - steps between restart writes
+#   RESTART_BLOCK    - full restart command or empty
+#   PAIR_STYLE_BLOCK - pair + kspace style lines
+#   BOND_STYLE, ANGLE_STYLE, DIHEDRAL_STYLE, IMPROPER_STYLE
+#   GPU_PACKAGE      - "package gpu 1 neigh no" or empty
+#   T_START          - temperature (K) — constant for NVT-Born (300.0)
+#   T_FINAL          - must equal T_START for production run
+#   T_DAMP           - thermostat damping (fs), recommended 100*timestep
+#   TIMESTEP         - integration timestep (fs), typically 1.0
+#   N_STEPS          - number of MD steps (default 4000000 = 4 ns)
+#   THERMO_FREQ      - thermo output frequency (steps)
+#   DUMP_FREQ        - dump output frequency (steps)
+#   SHAKE_BLOCK      - "fix shake..." or empty
+#   UNSHAKE_BLOCK    - "unfix shake..." or empty
+#   INIT_VELOCITY_BLOCK - "velocity all create..." or empty
+#   BORN_NUMDIFF_DELTA  - finite-diff displacement for born/matrix (Å, default 0.0001)
+#   BORN_EVERY          - sampling interval for fix ave/time (steps, default 10)
+#   BORN_REPEAT         - number of samples per average block (default 100)
+#   BORN_FREQ           - output/average frequency (steps, default 1000)
+#   BORN_MATRIX_FILE    - output file for Born matrix averages
+# ============================================================
+
+log {LOG_FILE} {LOG_APPEND}
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+{PAIR_STYLE_BLOCK}
+dielectric 1.000000
+bond_style {BOND_STYLE}
+angle_style {ANGLE_STYLE}
+dihedral_style {DIHEDRAL_STYLE}
+improper_style {IMPROPER_STYLE}
+{SPECIAL_BONDS}
+pair_modify {PAIR_MODIFY}
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+{GPU_PACKAGE}
+
+{READ_COMMAND} {DATA_FILE}
+{INCLUDE_PARAMS_BLOCK}
+
+# --- Thermo Output ---
+# pxx pyy pzz are required for Var(P) in the Born bulk modulus analysis
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo {THERMO_FREQ}
+
+# --- Trajectory ---
+dump dump_nvt_born all custom {DUMP_FREQ} {DUMP_FILE} id type mol x y z ix iy iz vx vy vz
+
+# --- Restart Checkpointing ---
+{RESTART_BLOCK}
+
+# --- Initial Velocities (optional) ---
+{INIT_VELOCITY_BLOCK}
+
+# --- SHAKE Constraints ---
+{SHAKE_BLOCK}
+
+# --- NVT Thermostat (Nose-Hoover) ---
+timestep {TIMESTEP}
+fix nvt_fix all nvt temp {T_START} {T_FINAL} {T_DAMP}
+
+# --- Born Matrix (EXTRA-COMPUTE package required) ---
+# compute born/matrix numdiff uses finite differences of per-atom virial stress
+# to compute the Born elastic constants tensor (6x6, Voigt notation, units: atm).
+# BORN_NUMDIFF_DELTA = {BORN_NUMDIFF_DELTA} Å (finite-difference displacement)
+compute born_matrix all born/matrix numdiff {BORN_NUMDIFF_DELTA}
+variable b11 equal c_born_matrix[1][1]
+variable b22 equal c_born_matrix[2][2]
+variable b33 equal c_born_matrix[3][3]
+variable b12 equal c_born_matrix[1][2]
+variable b13 equal c_born_matrix[1][3]
+variable b23 equal c_born_matrix[2][3]
+# Average Born elements every BORN_FREQ steps using BORN_REPEAT samples taken BORN_EVERY steps apart.
+# Bulk modulus Born term: K_Born = (b11+b22+b33 + 2*b12+2*b13+2*b23) / 9
+fix born_avg all ave/time {BORN_EVERY} {BORN_REPEAT} {BORN_FREQ} v_b11 v_b22 v_b33 v_b12 v_b13 v_b23 file {BORN_MATRIX_FILE}
+
+run {N_STEPS}
+
+# --- Cleanup ---
+unfix nvt_fix
+unfix born_avg
+uncompute born_matrix
+{UNSHAKE_BLOCK}
+undump dump_nvt_born
+
+# --- Write Output ---
+write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
+write_data {WRITE_DATA_FILE}
+
+print "STAGE COMPLETE: NVT-Born T={T_START}K steps={N_STEPS} born_matrix={BORN_MATRIX_FILE}"
+quit

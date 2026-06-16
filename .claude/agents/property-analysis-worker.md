@@ -7,6 +7,7 @@ tools:
   - mcp__mcp-lammps-engine__check_equilibration_comprehensive
   - mcp__mcp-lammps-engine__extract_equilibrated_density
   - mcp__mcp-lammps-engine__extract_bulk_modulus
+  - mcp__mcp-lammps-engine__extract_bulk_modulus_born
   - mcp__mcp-lammps-engine__extract_bulk_modulus_deform
   - mcp__mcp-lammps-engine__run_bulk_modulus_series
   - mcp__mcp-lammps-engine__extract_bulk_modulus_murnaghan
@@ -41,7 +42,8 @@ Run ONLY the tools in the `tasks` list. For tasks that can run in parallel (extr
 **Critical rules:**
 - Always run `check_equilibration_comprehensive` first. If `overall_pass=False`, flag all properties as ⚠ but do not abort — mark them and continue. Paste `result["d05_markdown"]` into the notes field.
 - **Bulk modulus routing (from `is_glassy` and `bm_pressures_atm` in your prompt):**
-  - `is_glassy=True` → `extract_bulk_modulus_deform` (stress-strain from deform log)
+  - `is_glassy=True` → `extract_bulk_modulus_born(born_matrix_file=born_matrix_file, log_file=born_log_path, n_atoms=born_n_atoms, output_dir=output_dir, graphs_dir=graphs_dir)`
+    Report `bulk_modulus_method: born_nvt`. If `born_log_path` is null, fall back to `extract_bulk_modulus_deform` and log the fallback reason.
   - `is_glassy=False` and `bm_pressures_atm` is set → Murnaghan path:
     1. `run_bulk_modulus_series(data_file=equil_data_path, work_dir=<lammps_base>/prop/bm_series, pressures_atm=bm_pressures_atm, temp_K=300.0, run_name=run_name, ...)` → get `chain_id` and `log_files`
     2. Monitor chain with `watch_run(chain_id)` then poll `get_run_status(chain_id)` until complete
@@ -66,7 +68,7 @@ RESULT:
   density_status: OK (±<pct>%) | WARNING | N/A
   bulk_modulus_GPa: <value or N/A>
   bulk_modulus_uncertainty: <value or N/A>
-  bulk_modulus_method: murnaghan | deformation | fluctuation | N/A
+  bulk_modulus_method: born_nvt | murnaghan | deformation | fluctuation | N/A
   bulk_modulus_status: OK | WARNING | N/A
   shear_modulus_GPa: <value or N/A>
   youngs_modulus_GPa: <value or N/A>

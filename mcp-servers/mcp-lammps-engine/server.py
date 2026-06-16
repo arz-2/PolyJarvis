@@ -292,6 +292,7 @@ def _lammps_run_background(
     mpi: int,
     gpu_ids: str,
     log_file: str,
+    use_gpu: bool = True,
 ):
     """Background thread: executes LAMMPS and updates run_manager.
 
@@ -312,12 +313,23 @@ def _lammps_run_background(
         # Capture wrapper stdout to a separate file so it never overwrites the LAMMPS
         # internal log (e.g. tg_sweep.log opened with 'log ... append' in the script).
         wrapper_stdout = f"{work_dir}/{run_id}_wrapper.stdout"
+        if use_gpu:
+            cuda_line = f"export CUDA_VISIBLE_DEVICES={gpu_ids}\n"
+            lammps_cmd = (
+                f"mpirun -np {mpi} {LAMBDA_LAMMPS} -sf gpu -pk gpu {n_gpu} "
+                f"-in {script} >> {wrapper_stdout} 2>&1\n"
+            )
+        else:
+            cuda_line = "export CUDA_VISIBLE_DEVICES=\n"  # hide GPUs from LAMMPS
+            lammps_cmd = (
+                f"mpirun -np {mpi} {LAMBDA_LAMMPS} "
+                f"-in {script} >> {wrapper_stdout} 2>&1\n"
+            )
         wrapper = (
             f"#!/bin/bash\n"
-            f"export CUDA_VISIBLE_DEVICES={gpu_ids}\n"
+            f"{cuda_line}"
             f"cd {work_dir}\n"
-            f"mpirun -np {mpi} {LAMBDA_LAMMPS} -sf gpu -pk gpu {n_gpu} "
-            f"-in {script} >> {wrapper_stdout} 2>&1\n"
+            f"{lammps_cmd}"
             f"RC=$?\n"
             f"if [ $RC -eq 0 ]; then\n"
             f"  echo '{{\"run_id\":\"{run_id}\",\"status\":\"completed\","
@@ -561,6 +573,7 @@ def run_lammps_script(
     log_file: str = "lammps_run.log",
     mpi: int = 2,
     gpu_ids: str = "0,1",
+    use_gpu: bool = True,
 ) -> dict:
     """
     Execute a LAMMPS .in script on the local GPU in the background.
@@ -573,6 +586,10 @@ def run_lammps_script(
                           Use 1 for small systems (<5k atoms), 2 for medium (5-10k),
                           4 for large (>10k) or Tg sweeps.
         gpu_ids:          Comma-separated GPU IDs to use (e.g. "0,1" or "0,1,2,3").
+        use_gpu:          If False, launch without -sf gpu/-pk gpu flags and hide GPUs
+                          via CUDA_VISIBLE_DEVICES=. Required for compute born/matrix
+                          numdiff, which displaces atoms in CPU arrays and is
+                          incompatible with GPU device-side neighbor lists.
 
     Returns:
         dict with run_id for status polling via get_run_status().
@@ -587,12 +604,13 @@ def run_lammps_script(
             "log_file":        log_file,
             "mpi":             mpi,
             "gpu_ids":         gpu_ids,
+            "use_gpu":         use_gpu,
         }
         run_id = run_manager.create("lammps_run", meta)
 
         thread = threading.Thread(
             target=_lammps_run_background,
-            args=(run_id, work_dir, script, mpi, gpu_ids, log_file),
+            args=(run_id, work_dir, script, mpi, gpu_ids, log_file, use_gpu),
             daemon=True,
         )
         thread.start()
@@ -2952,6 +2970,126 @@ def _run_generate_run_summary(
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
     return _parse_json_from_stdout(stdout, stderr)
+
+
+# ── Tool: extract_bulk_modulus_born ──────────────────────────────────────────
+
+def _run_extract_bulk_modulus_born(
+    born_matrix_file: str,
+    log_file: str,
+    n_atoms: int,
+    output_dir: str,
+    eq_fraction: float,
+    block_count: int,
+    graphs_dir: Optional[str] = None,
+) -> dict:
+    """Background worker — runs extract_bulk_modulus_born.py via CLI."""
+    parts = [f"python {MDA_SCRIPTS_DIR}/extract_bulk_modulus_born.py"]
+    parts.append(f"--born_matrix_file {born_matrix_file}")
+    parts.append(f"--log_file {log_file}")
+    parts.append(f"--n_atoms {n_atoms}")
+    parts.append(f"--output_dir {output_dir}")
+    parts.append(f"--eq_fraction {eq_fraction}")
+    parts.append(f"--block_count {block_count}")
+    if graphs_dir:
+        parts.append(f"--graphs_dir {graphs_dir}")
+
+    command = " ".join(parts)
+    logger.info(f"Running Born bulk modulus extraction via CLI: {command}")
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def extract_bulk_modulus_born(
+    born_matrix_file: str,
+    log_file: str,
+    n_atoms: int,
+    output_dir: Optional[str] = None,
+    graphs_dir: Optional[str] = None,
+    eq_fraction: float = 0.5,
+    block_count: int = 5,
+) -> dict:
+    """
+    Extract isothermal bulk modulus via the Born + NVT stress-fluctuation
+    method from an nvt_born simulation (Stage 8, glassy polymers only).
+
+    Method:
+        K_T = K_Born + NkT/V − (V/kT)·Var(P)_NVT
+
+    where K_Born is the Born elastic constant bulk average from
+    compute born/matrix numdiff (time-averaged over the NVT trajectory),
+    NkT/V is the kinetic (ideal-gas) contribution, and Var(P) is the
+    variance of isotropic pressure P = (pxx+pyy+pzz)/3 in the NVT ensemble.
+
+    This gives the unrelaxed (high-frequency) isothermal bulk modulus,
+    appropriate for comparison with ultrasonic or Brillouin scattering data.
+    Rate-free: no NEMD strain-rate artifacts.
+
+    Requires:
+      - born_matrix_file: fix ave/time output from nvt_born template
+        (columns: TimeStep b11 b22 b33 b12 b13 b23 in atm)
+      - log_file: NVT log with pxx, pyy, pzz, vol, temp columns
+      - n_atoms: total atom count (from inspect_data_file or born-worker RESULT)
+
+    Output files written to output_dir:
+        bulk_modulus_born.json   — full results and diagnostics
+        born_matrix_timeseries.png — Born elements + pressure time series
+
+    The job runs in the background — poll with get_run_status(run_id).
+
+    Args:
+        born_matrix_file: Path to fix ave/time Born matrix output.
+        log_file:         Path to nvt_born LAMMPS log.
+        n_atoms:          Number of atoms in simulation cell.
+        output_dir:       Output directory (defaults to <log_dir>/born_analysis).
+        eq_fraction:      Fraction of rows used as production window (last eq_fraction).
+        block_count:      Number of blocks for block-average uncertainty.
+
+    Returns:
+        dict with run_id. When completed, result includes:
+            bulk_modulus_GPa         — K_T in GPa
+            bulk_modulus_sem_GPa     — block-average SEM in GPa
+            K_Born_GPa               — Born contribution alone
+            kinetic_term_GPa         — NkT/V contribution
+            fluctuation_correction_GPa — (V/kT)·Var(P) correction
+            V_mean_A3, T_mean_K      — thermodynamic averages
+            Var_P_atm2               — pressure variance
+            n_effective_samples      — τ_eff-corrected sample count
+            block_averaging          — per-block K values and SEM
+            diagnostics              — full term breakdown and statistics
+            summary_json             — path to bulk_modulus_born.json
+    """
+    if output_dir is None:
+        output_dir = str(Path(log_file).parent / "born_analysis")
+
+    run_id = run_manager.create("extract_bulk_modulus_born",
+                                {"born_matrix_file": born_matrix_file, "output_dir": output_dir})
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_extract_bulk_modulus_born, dict(
+            born_matrix_file = born_matrix_file,
+            log_file         = log_file,
+            n_atoms          = n_atoms,
+            output_dir       = output_dir,
+            eq_fraction      = eq_fraction,
+            block_count      = block_count,
+            graphs_dir       = graphs_dir,
+        )),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":            "submitted",
+        "run_id":            run_id,
+        "run_type":          "extract_bulk_modulus_born",
+        "born_matrix_file":  born_matrix_file,
+        "log_file":          log_file,
+        "output_dir":        output_dir,
+        "message":           "Poll with get_run_status(run_id)",
+    }
 
 
 @mcp.tool()

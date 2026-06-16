@@ -24,7 +24,7 @@ All run files live under `data/<run_name>/` (repo-relative, git-excluded). Use a
 `<lammps_base>` = `/home/arz2/PolyJarvis/data/<run_name>/lammps/`
 
 **Cross-stage derived paths** follow `<lammps_base>/<NN_stage>/<NN_stage>[_out].{data,log,dump}`.
-Exceptions: `tg_log = tg/tg_sweep/tg_sweep.log`, `deform_log = prop/05_deform/05_deform.log` (null if rubbery).
+Exceptions: `tg_log = tg/tg_sweep/tg_sweep.log`, `born_log = prop/08_nvt_born/08_nvt_born.log` (null if rubbery), `born_matrix = prop/08_nvt_born/born_matrix.dat`.
 
 ---
 
@@ -44,7 +44,7 @@ The default mode is multi-agent. The orchestrator (this session) spawns speciali
 | `equilibration-worker` | 🟠 orange | `.data` → submitted equilibration chain |
 | `tg-sweep-worker` | 🟣 purple | equil `.data` → submitted Tg sweep run |
 | `tg-analysis-worker` | 🟢 green | Tg sweep log → Tg_K + fit quality |
-| `deform-worker` | 🔵 blue | NPT `.data` → submitted uniaxial deformation run (glassy only) |
+| `born-worker` | 🔵 blue | NPT `.data` → submitted NVT Born matrix run (glassy only; EXTRA-COMPUTE required) |
 | `property-analysis-worker` | 🟢 green | simulation logs → density, bulk modulus, run summary |
 
 ### Orchestrator workflow
@@ -94,13 +94,13 @@ The default mode is multi-agent. The orchestrator (this session) spawns speciali
       is_glassy = glassy_hint            # from step 3c; write D-06 = "N/A — tg not requested"
       Tg_K = None; Tg_fit_quality = "N/A (not requested)"
 15. if "bulk_modulus" in properties_requested AND is_glassy:
-      Agent(subagent_type="deform-worker", description="🔵 Deform {polymer_name}", prompt=<output of gen_prompt.py --stage deform --data_path npt_prod_data_path>)
-        → parse RESULT block → extract run_id_deform, monitor_command_deform
+      Agent(subagent_type="born-worker", description="🔵 NVT-Born {polymer_name}", prompt=<output of gen_prompt.py --stage born --data_path npt_prod_data_path>)
+        → parse RESULT block → extract run_id_born, born_log_path, born_matrix_file, n_atoms, monitor_command_born
       Write SIMULATION STATE to run_log.md (status=monitoring)
-      Monitor(command=monitor_command_deform)   # orchestrator owns this
+      Monitor(command=monitor_command_born)     # orchestrator owns this
       /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block  # run before step 16 if context > 40%
 16. Agent(subagent_type="property-analysis-worker", description="🟢 Analyze {polymer_name} properties",
-          prompt=<output of gen_prompt.py --stage analyze-full --data_path npt_prod_data_path --is_glassy true|false --smiles ... --ff ... --tg_fit_quality ... --properties <comma-joined properties_requested> [--deform_log ...]>)
+          prompt=<output of gen_prompt.py --stage analyze-full --data_path npt_prod_data_path --is_glassy true|false --smiles ... --ff ... --tg_fit_quality ... --properties <comma-joined properties_requested> [--born_log born_log_path --born_matrix born_matrix_file --born_n_atoms n_atoms]>)
       → parse RESULT block → write RESULTS to run_log.md; run_summary.json written to raw_dir
 ```
 

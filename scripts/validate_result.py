@@ -5,7 +5,7 @@ validate_result.py — Validate a worker RESULT block before inter-stage handoff
 Usage:
   python3 scripts/validate_result.py --stage <STAGE> --result '<YAML block>'
 
-Stages: build | equil | tg | tg-analysis | deform | property-analysis
+Stages: build | equil | tg | tg-analysis | deform | born | property-analysis
 
 Exit 0 if valid, exit 1 with error messages if any required field is missing or null.
 
@@ -25,6 +25,7 @@ REQUIRED_FIELDS: dict[str, list[str]] = {
     "tg": ["run_id", "tg_log_path", "monitor_command"],
     "tg-analysis": ["run_name", "Tg_K", "Tg_fit_quality", "Tg_r_squared", "overall_verdict", "output_dir"],
     "deform": ["run_id", "monitor_command", "deform_log_path", "is_glassy"],
+    "born": ["run_id", "born_log_path", "born_matrix_file", "n_atoms", "monitor_command"],
     "property-analysis": [
         "run_name", "equilibrated", "density_gcm3", "bulk_modulus_GPa",
         "bulk_modulus_method", "equilibration_overall_pass", "overall_verdict",

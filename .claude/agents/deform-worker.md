@@ -53,7 +53,7 @@ Then `watch_run(run_id)` to get monitor_command.
 
 **Stop after watch_run. Do NOT call Monitor.** Return run_id and monitor_command to the orchestrator.
 
-### Optional: Two-rate comparison (Gap 4)
+### Optional: Two-rate comparison
 
 If `K_rate_comparison=true` is present in your prompt AND `K_deform_rate_slow_inv_s` is non-null:
 - Generate a second `npt_deform` script at `STRAIN_RATE = K_deform_rate_slow_inv_s × 1e-15 / dt_fs` in a separate work subdir (e.g. `05_deform_slow/`)

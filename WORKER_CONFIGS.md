@@ -19,7 +19,9 @@ Each worker's RESULT feeds the next worker's prompt. The table below is the auth
 | `tg-analysis-worker.Tg_K` | → | orchestrator `is_glassy` decision only (not passed to any worker) |
 | `tg-analysis-worker.Tg_fit_quality` | → | `property-analysis-worker` `d06_tg_fit_quality`; `gen_prompt.py --tg_fit_quality` |
 | `equilibration-worker.npt_prod_log_path` | → | `property-analysis-worker` `npt_prod_log_path` |
-| `deform-worker.deform_log_path` | → | `property-analysis-worker` `deform_log_path` |
+| `born-worker.born_log_path` | → | `property-analysis-worker` `born_log_path` |
+| `born-worker.born_matrix_file` | → | `property-analysis-worker` `born_matrix_file` |
+| `born-worker.n_atoms` | → | `property-analysis-worker` `born_n_atoms` |
 
 ### RESULT validation
 
@@ -106,7 +108,30 @@ mpi_ranks:         4
 
 ---
 
+## 🔵 born-worker
+
+**Stage 8 (glassy only).** Runs NVT Born matrix simulation (nvt_born template). Requires LAMMPS with EXTRA-COMPUTE.
+
+### Prompt template
+
+```
+equil_data_path:   <absolute path to 09_npt_prod300_out.data (300 K, Phase 2)>
+lammps_flags:      {"use_pcff": false, "use_opls": false}
+polymer_class:     <class_name>
+run_name:          <RUN_NAME>
+work_dir:          /home/arz2/PolyJarvis/data/<RUN_NAME>/lammps/prop
+is_glassy:         true | false
+born_run_ns:       4.0
+dt_fs:             <float>
+gpu_ids:           "0,1,2,3"
+mpi_ranks:         4
+```
+
+---
+
 ## 🔵 deform-worker
+
+**Retained for optional cross-check.** No longer called in the default glassy path (replaced by born-worker). Can be invoked manually for rate-sensitivity diagnostics.
 
 ### Prompt template
 
@@ -160,7 +185,9 @@ tasks:
 ```
 equil_log_path:    <absolute path to 06_nvt_production log (melt, Phase 1)>
 npt_prod_log_path: <absolute path to 09_npt_prod300 log (300 K, Phase 2)>
-deform_log_path:   <absolute path to npt_deform log | null>
+born_log_path:     <absolute path to nvt_born log | null>
+born_matrix_file:  <absolute path to born_matrix.dat | null>
+born_n_atoms:      <int from born-worker RESULT | null>
 equil_data_path:   <absolute path to 09_npt_prod300_out.data (300 K, Phase 2)>
 npt_prod_dump_path: <absolute path to 09_npt_prod300 dump (300 K, Phase 2) | null>
 run_name:          <RUN_NAME>
@@ -173,14 +200,12 @@ exp_density_range: [<min_gcm3>, <max_gcm3>]
 output_dir:        /home/arz2/PolyJarvis/data/<RUN_NAME>/raw/
 graphs_dir:        /home/arz2/PolyJarvis/data/<RUN_NAME>/graphs/
 is_glassy:         true | false
-K_deform_rate_inv_s: <float>
-K_strain_max:      <float>
 dt_fs:             <float>
 backbone_types:    [<int>, ...]
 tasks:
   - check_equilibration_comprehensive
   - extract_density
-  - extract_bulk_modulus_deform  # if is_glassy=True
+  - extract_bulk_modulus_born    # if is_glassy=True (Born+NVT method)
   - extract_bulk_modulus         # if is_glassy=False
   - generate_run_summary
   # - calculate_rdf              # optional

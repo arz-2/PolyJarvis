@@ -5,7 +5,7 @@ gen_prompt.py — Generate fully-formed worker prompts for PolyJarvis orchestrat
 Usage:
   python3 scripts/gen_prompt.py --stage <STAGE> [options]
 
-Stages: build | equil | tg | deform | analyze-tg | analyze-full
+Stages: build | equil | tg | deform | born | analyze-tg | analyze-full
 
 The script reads polymer_rules.json (for class defaults) and STAGE_INDEX.md
 (for recovery thresholds and cross-stage rules) at runtime, so prompts always
@@ -69,6 +69,7 @@ STAGE_GUIDES = {
     "analyze-tg":   "STAGE_4_ANALYSIS.md",
     "analyze-full": "STAGE_4_ANALYSIS.md",
     "deform":       "STAGE_5_PROPERTY_EXTRACTION.md",
+    "born":         "STAGE_5_PROPERTY_EXTRACTION.md",
 }
 
 
@@ -335,6 +336,34 @@ mpi_ranks:         {args.mpi_ranks}
 """
 
 
+def born_prompt(args, cls: dict, stage_index: str) -> str:
+    flags = _lammps_flags(args.lammps_flags, cls)
+    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/prop"
+    is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
+    dt_fs = _pick(args.dt_fs, cls, "dt_fs", 1.0)
+    born_run_ns = args.born_run_ns if args.born_run_ns is not None else 4.0
+    n_steps = int(born_run_ns * 1e6 / dt_fs)
+    stage_guide = load_stage_guide("born")
+    return f"""\
+equil_data_path:   {_v(args.data_path)}
+lammps_flags:      {json.dumps(flags)}
+polymer_class:     {args.polymer_class.upper()}
+run_name:          {args.run_name}
+work_dir:          {work_dir}
+is_glassy:         {str(is_glassy).lower()}
+born_run_ns:       {born_run_ns}
+n_steps:           {n_steps}
+dt_fs:             {dt_fs}
+gpu_ids:           "{args.gpu_ids}"
+mpi_ranks:         {args.mpi_ranks}
+
+--- Stage Guide (STAGE_5_PROPERTY_EXTRACTION) ---
+{stage_guide}
+--- Stage Index (error recovery & cross-stage rules) ---
+{stage_index}
+"""
+
+
 def analyze_tg_prompt(args, cls: dict, stage_index: str) -> str:
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
@@ -380,7 +409,7 @@ def analyze_full_prompt(args, cls: dict, stage_index: str) -> str:
         args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1],
     ]
     bm_pressures_atm = cls.get("bm_pressures_atm", None)
-    bm_task = "extract_bulk_modulus_deform" if is_glassy else (
+    bm_task = "extract_bulk_modulus_born" if is_glassy else (
         "run_bulk_modulus_series+extract_bulk_modulus_murnaghan"
         if bm_pressures_atm else "extract_bulk_modulus"
     )
@@ -391,7 +420,9 @@ def analyze_full_prompt(args, cls: dict, stage_index: str) -> str:
     npt_log = args.npt_prod_log or f"{lammps_base}/equil/09_npt_prod300/09_npt_prod300.log"
     npt_dump = args.npt_prod_dump or f"{lammps_base}/equil/09_npt_prod300/09_npt_prod300.dump"
     npt_data = args.data_path or f"{lammps_base}/equil/09_npt_prod300/09_npt_prod300_out.data"
-    deform_log_line = f"deform_log_path:   {args.deform_log}" if args.deform_log else f"deform_log_path:   null"
+    born_log_line    = f"born_log_path:     {args.born_log}" if args.born_log else "born_log_path:     null"
+    born_matrix_line = f"born_matrix_file:  {args.born_matrix}" if args.born_matrix else "born_matrix_file:  null"
+    born_n_atoms_line = f"born_n_atoms:      {args.born_n_atoms}" if args.born_n_atoms else "born_n_atoms:      null"
 
     props_str = args.properties if args.properties else "all"
     if props_str.strip().lower() == "all":
@@ -411,7 +442,9 @@ def analyze_full_prompt(args, cls: dict, stage_index: str) -> str:
     return f"""\
 equil_log_path:    {equil_log}
 npt_prod_log_path: {npt_log}
-{deform_log_line}
+{born_log_line}
+{born_matrix_line}
+{born_n_atoms_line}
 equil_data_path:   {npt_data}
 npt_prod_dump_path: {npt_dump}
 run_name:          {args.run_name}
@@ -426,9 +459,6 @@ bm_pressures_atm:  {bm_pressures_atm}
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
 is_glassy:         {str(is_glassy).lower()}
-K_deform_rate_inv_s: {_pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 1e8)}
-K_deform_rate_slow_inv_s: {cls.get('K_deform_rate_slow_inv_s', 'null')}
-K_strain_max:      {_pick(args.K_strain_max, cls, 'K_strain_max', 0.03)}
 dt_fs:             {_pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 backbone_types:    {args.backbone_types or '<FILL from parse_data_file>'}
 ct_min_decay_melt: {ct_decay}
@@ -449,6 +479,7 @@ STAGE_MAP = {
     "equil": equil_prompt,
     "tg": tg_prompt,
     "deform": deform_prompt,
+    "born": born_prompt,
     "analyze-tg": analyze_tg_prompt,
     "analyze-full": analyze_full_prompt,
 }
@@ -458,9 +489,11 @@ def main():
     p = argparse.ArgumentParser(
         description="Generate a fully-formed PolyJarvis worker prompt.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Stages: build | equil | tg | deform | analyze-tg | analyze-full",
+        epilog="Stages: build | equil | tg | deform | born | analyze-tg | analyze-full",
     )
-    p.add_argument("--stage", required=True, choices=list(STAGE_MAP))
+    p.add_argument("--stage", required=True, choices=list(STAGE_MAP),
+                   metavar="STAGE",
+                   help="build|equil|tg|deform|born|analyze-tg|analyze-full")
     p.add_argument("--run_name", required=True)
     p.add_argument("--polymer_class", required=True)
     p.add_argument("--smiles")
@@ -474,7 +507,14 @@ def main():
     p.add_argument("--is_glassy", default="true")
     p.add_argument("--tg_k", type=float)
     p.add_argument("--tg_fit_quality")
-    p.add_argument("--deform_log")
+    p.add_argument("--born_log",
+                   help="Path to nvt_born log (analyze-full, glassy)")
+    p.add_argument("--born_matrix",
+                   help="Path to born_matrix.dat from fix ave/time (analyze-full, glassy)")
+    p.add_argument("--born_n_atoms", type=int,
+                   help="Number of atoms in Born cell (from born-worker RESULT)")
+    p.add_argument("--born_run_ns", type=float,
+                   help="NVT-Born run length in ns (born stage, default 4.0)")
     p.add_argument("--npt_prod_log")
     p.add_argument("--npt_prod_dump")
     p.add_argument("--ff")
