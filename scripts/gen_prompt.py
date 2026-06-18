@@ -5,38 +5,40 @@ gen_prompt.py — Generate fully-formed worker prompts for PolyJarvis orchestrat
 Usage:
   python3 scripts/gen_prompt.py --stage <STAGE> [options]
 
-Stages: build | equil | tg | deform | born | analyze-tg | analyze-full
+Workers: build | equil | tg | deform | born | murnaghan | analyze-tg | equil-check | analyze-bm | run-summary
 
-The script reads polymer_rules.json (for class defaults) and STAGE_INDEX.md
-(for recovery thresholds and cross-stage rules) at runtime, so prompts always
-reflect the current configuration without the orchestrator needing to read
-either file directly.
+The script reads polymer_rules.json (for class defaults) and cross-track rules
+from CLAUDE.md at runtime, so prompts always reflect the current configuration
+without the orchestrator needing to read either file directly.
 
-Required for all stages:
+Required for all workers:
   --run_name NAME
   --polymer_class CLASS   (e.g. PSTR, PACR, PHYC)
 
 Optional overrides (defaults come from polymer_rules.json):
   --smiles SMILES
   --data_path PATH        input .data file (equil, tg, deform, analyze)
-  --work_dir PATH         base directory for stage outputs
+  --work_dir PATH         base directory for worker outputs
   --gpu_ids IDS           default: "0,1,2,3"
   --mpi_ranks N           default: 4
   --dp N                  degree of polymerisation override
   --nchain N              number of chains override
   --lammps_flags JSON     e.g. '{"use_pcff":true,"use_opls":false}'
-  --is_glassy BOOL        true|false (deform + analyze-full)
-  --tg_k FLOAT            Tg in K (analyze-full, from first analysis call)
-  --tg_fit_quality STR    (analyze-full)
-  --deform_log PATH       (analyze-full, glassy only)
-  --npt_prod_log PATH     (analyze-full)
-  --npt_prod_dump PATH    (analyze-full)
-  --ff STR                force field string (analyze-full)
-  --backbone_types JSON   atom type IDs as JSON list (analyze-full)
+  --is_glassy BOOL        true|false (deform, born, murnaghan, analyze-bm)
+  --tg_k FLOAT            Tg in K (from tg-analysis-worker RESULT)
+  --tg_fit_quality STR    Tg fit quality (run-summary + analyze-bm)
+  --deform_log PATH       npt_deform log (analyze-bm, glassy deform fallback)
+  --murnaghan_logs JSON   JSON list of log paths (analyze-bm, rubbery+pressures path)
+  --d05 STR               equil_verdict from equil-checker RESULT (run-summary worker)
+  --npt_prod_log PATH     NPT production log (equil-check, analyze-bm)
+  --npt_prod_dump PATH    NPT production dump (equil-check)
+  --ff STR                force field string (run-summary, analyze-bm)
+  --backbone_types JSON   atom type IDs as JSON list (equil-check only)
+  --enthalpy_col STR      LAMMPS thermo column name for enthalpy (analyze-tg; default "Enthalpy")
   --output_dir PATH       raw/ output directory
 
 Physics knob overrides (all optional; defaults from polymer_rules.json):
-  --npt_prod_ns FLOAT     Stage 7 NPT production time in ns (equil). Auto-sized by
+  --npt_prod_ns FLOAT     NPT production time in ns (equil). Auto-sized by
                           atom count when omitted. Converted to npt_prod_steps and
                           passed to generate_equilibration_workflow.
   --T_equil_K FLOAT       Equilibration temperature — maps to temp= in generate_equilibration_workflow
@@ -49,27 +51,31 @@ Physics knob overrides (all optional; defaults from polymer_rules.json):
   --K_deform_rate_inv_s FLOAT  Engineering strain rate (s⁻¹)
   --dt_fs FLOAT           MD timestep (fs); set 0.5 for "lost atoms" recovery
   --properties LIST       Comma-separated: density,tg,bulk_modulus or 'all' (default).
-                          Filters tasks: in analyze-full; orchestrator uses it for stage gating.
+                          Orchestrator uses it for track gating.
 """
 
 import argparse
 import json
+import re
 import sys
 import textwrap
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
-STAGE_INDEX_PATH = REPO_ROOT / "guides" / "STAGE_INDEX.md"
+CLAUDE_MD_PATH = REPO_ROOT / "CLAUDE.md"
 
-STAGE_GUIDES = {
-    "build":        "STAGE_1_MOLECULAR_CONSTRUCTION.md",
-    "equil":        "STAGE_2_EQUILIBRATION.md",
-    "tg":           "STAGE_3_TG_MEASUREMENT.md",
-    "analyze-tg":   "STAGE_4_ANALYSIS.md",
-    "analyze-full": "STAGE_4_ANALYSIS.md",
-    "deform":       "STAGE_5_PROPERTY_EXTRACTION.md",
-    "born":         "STAGE_5_PROPERTY_EXTRACTION.md",
+WORKER_GUIDES = {
+    "build":        "MOLECULE_BUILDER.md",
+    "equil":        "EQUILIBRATION.md",
+    "tg":           "THERMAL_SWEEP.md",
+    "analyze-tg":   "THERMAL_ANALYSIS.md",
+    "equil-check":  "EQUIL_CHECK.md",
+    "analyze-bm":   "BM_ANALYSIS.md",
+    "deform":       "DEFORM.md",
+    "born":         "BORN_MATRIX.md",
+    "murnaghan":    "MURNAGHAN.md",
+    "run-summary":  None,
 }
 
 
@@ -80,12 +86,16 @@ def load_rules() -> dict:
         return json.load(f)
 
 
-def load_stage_index() -> str:
-    return STAGE_INDEX_PATH.read_text()
+def load_cross_track_rules() -> str:
+    text = CLAUDE_MD_PATH.read_text()
+    m = re.search(r'<!-- CROSS_STAGE_RULES_START -->(.*?)<!-- CROSS_STAGE_RULES_END -->', text, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    return "[Cross-track rules not found in CLAUDE.md — check CROSS_STAGE_RULES_START/END markers]"
 
 
-def load_stage_guide(stage: str) -> str:
-    filename = STAGE_GUIDES.get(stage)
+def load_worker_guide(stage: str) -> str:
+    filename = WORKER_GUIDES.get(stage)
     if not filename:
         return ""
     path = REPO_ROOT / "guides" / filename
@@ -98,6 +108,32 @@ def get_class_entry(rules: dict, polymer_class: str) -> dict:
         print(f"WARNING: class '{polymer_class}' not found in polymer_rules.json; using global_defaults", file=sys.stderr)
         entry = rules["global_defaults"]
     return entry
+
+
+def load_plan(plan_path: str) -> dict:
+    with open(plan_path) as f:
+        return json.load(f)
+
+
+def apply_plan(cls: dict, plan: dict, args) -> dict:
+    """Overlay an approved run_plan.json's decided_params onto the class entry.
+
+    The plan carries the Planner's *scientific decisions* (FF, system size, T-schedule,
+    property knobs); runtime wiring (paths, gpu_ids, mpi_ranks) stays in CLI args. For a
+    deterministic plan, decided_params is a subset of cls with identical values, so this
+    overlay is an identity and worker prompts are byte-identical to the no-plan path
+    (enforced by tests/test_plan_reproducibility.py). For a reasoned plan, decided_params
+    may differ and those values take effect here.
+
+    Also backfills --smiles and --properties from the plan when not given on the CLI, so
+    the plan artifact is a self-contained source of truth.
+    """
+    effective = {**cls, **plan.get("decided_params", {})}
+    if args.smiles is None and plan.get("smiles"):
+        args.smiles = plan["smiles"]
+    if (args.properties is None or args.properties == "all") and plan.get("properties"):
+        args.properties = ",".join(plan["properties"])
+    return effective
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -157,10 +193,10 @@ def _exp_density_range(cls: dict) -> list:
 
 # ─── Stage prompt builders ────────────────────────────────────────────────────
 
-def build_prompt(args, cls: dict, stage_index: str) -> str:
+def build_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
     work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
-    stage_guide = load_stage_guide("build")
+    guide = load_worker_guide("build")
     return f"""\
 smiles:            {_v(args.smiles)}
 run_name:          {args.run_name}
@@ -178,17 +214,17 @@ dt_fs:             {cls.get('dt_fs', 1.0)}
 phal_patch:        {str(args.polymer_class.upper() == 'PHAL').lower()}
 ff_confidence:     {cls.get('confidence', 'low')}
 
---- Stage Guide (STAGE_1_MOLECULAR_CONSTRUCTION) ---
-{stage_guide}
---- Stage Index (error recovery & cross-stage rules) ---
-{stage_index}
+--- Worker Guide (MOLECULE_BUILDER) ---
+{guide}
+--- Cross-Track Rules ---
+{cross_track_rules}
 """
 
 
-def equil_prompt(args, cls: dict, stage_index: str) -> str:
+def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
     work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/equil"
-    stage_guide = load_stage_guide("equil")
+    guide = load_worker_guide("equil")
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
     T_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
     T_anneal = _pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0)
@@ -210,7 +246,10 @@ def equil_prompt(args, cls: dict, stage_index: str) -> str:
         if isinstance(exp_tg, dict):
             vals = sorted(v for v in exp_tg.values() if isinstance(v, (int, float)))
             exp_tg = vals[len(vals) // 2]  # median: avoids low-Tg outliers (e.g. PCL in PEST)
-    T_workflow = 300.0 if isinstance(exp_tg, (int, float)) and exp_tg < 300 else T_equil
+    if "T_workflow_K" in cls:
+        T_workflow = cls["T_workflow_K"]
+    else:
+        T_workflow = 300.0 if isinstance(exp_tg, (int, float)) and exp_tg < 300 else T_equil
     add_melt_npt = getattr(args, 'add_melt_npt', False) or False
     melt_npt_ns_val = _pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None
     if add_melt_npt and melt_npt_ns_val is not None:
@@ -247,17 +286,17 @@ dt_fs:             {dt}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
 
---- Stage Guide (STAGE_2_EQUILIBRATION) ---
-{stage_guide}
---- Stage Index (error recovery & cross-stage rules) ---
-{stage_index}
+--- Worker Guide (EQUILIBRATION) ---
+{guide}
+--- Cross-Track Rules ---
+{cross_track_rules}
 """
 
 
-def tg_prompt(args, cls: dict, stage_index: str) -> str:
+def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/tg"
-    stage_guide = load_stage_guide("tg")
+    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/thermal"
+    guide = load_worker_guide("tg")
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
 
     # Multi-rate support: pick the rate at tg_rate_index if provided
@@ -302,18 +341,18 @@ per_t_dump:
   param_key:       WRITE_PER_T_DUMP=True, PER_T_DUMP_FILE=per_t_structs.dump
   note:            Pass these in generate_script params alongside T_START/T_END/etc.
 
---- Stage Guide (STAGE_3_TG_MEASUREMENT) ---
-{stage_guide}
---- Stage Index (error recovery & cross-stage rules) ---
-{stage_index}
+--- Worker Guide (THERMAL_SWEEP) ---
+{guide}
+--- Cross-Track Rules ---
+{cross_track_rules}
 """
 
 
-def deform_prompt(args, cls: dict, stage_index: str) -> str:
+def deform_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/prop"
+    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
     is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
-    stage_guide = load_stage_guide("deform")
+    guide = load_worker_guide("deform")
     return f"""\
 equil_data_path:   {_v(args.data_path)}
 lammps_flags:      {json.dumps(flags)}
@@ -329,21 +368,21 @@ dt_fs:             {_pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
 
---- Stage Guide (STAGE_5_PROPERTY_EXTRACTION) ---
-{stage_guide}
---- Stage Index (error recovery & cross-stage rules) ---
-{stage_index}
+--- Worker Guide (DEFORM) ---
+{guide}
+--- Cross-Track Rules ---
+{cross_track_rules}
 """
 
 
-def born_prompt(args, cls: dict, stage_index: str) -> str:
+def born_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/prop"
+    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
     is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
     dt_fs = _pick(args.dt_fs, cls, "dt_fs", 1.0)
     born_run_ns = args.born_run_ns if args.born_run_ns is not None else 4.0
     n_steps = int(born_run_ns * 1e6 / dt_fs)
-    stage_guide = load_stage_guide("born")
+    guide = load_worker_guide("born")
     return f"""\
 equil_data_path:   {_v(args.data_path)}
 lammps_flags:      {json.dumps(flags)}
@@ -357,50 +396,158 @@ dt_fs:             {dt_fs}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
 
---- Stage Guide (STAGE_5_PROPERTY_EXTRACTION) ---
-{stage_guide}
---- Stage Index (error recovery & cross-stage rules) ---
-{stage_index}
+--- Worker Guide (BORN_MATRIX) ---
+{guide}
+--- Cross-Track Rules ---
+{cross_track_rules}
 """
 
 
-def analyze_tg_prompt(args, cls: dict, stage_index: str) -> str:
+def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
     lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
-    tg_log = args.data_path or f"{lammps_base}/tg/tg_sweep/tg_sweep.log"
-    tg_sweep_dir = f"{lammps_base}/tg/tg_sweep"
-    per_t_dump = f"{tg_sweep_dir}/per_t_structs.dump"
-    # equil_data_path is the .data file fed into the Tg sweep (Stage 7 NPT output)
-    equil_data = args.equil_data_path or f"{lammps_base}/equil/09_npt_prod300/09_npt_prod300_out.data"
-    backbone_types_line = (f"backbone_types:    {args.backbone_types}"
-                           if args.backbone_types else
-                           "backbone_types:    <FILL from parse_data_file or lammps_flags>")
-    stage_guide = load_stage_guide("analyze-tg")
+    tg_log = args.data_path or f"{lammps_base}/thermal/tg_sweep/tg_sweep.log"
+    # equil_data_path: NPT 300 K production output — passed to extract_thermal as tg_data_file for ΔCp mass normalisation
+    equil_data = args.equil_data_path or f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
+    enthalpy_col = getattr(args, "enthalpy_col", None) or "Enthalpy"
+    guide = load_worker_guide("analyze-tg")
     return f"""\
 tg_log_path:       {tg_log}
-per_t_dump_file:   {per_t_dump}    # present if WRITE_PER_T_DUMP=True was used in tg sweep
-tg_data_file:      {equil_data}    # LAMMPS .data input to the Tg sweep (for MDAnalysis topology)
-{backbone_types_line}
+tg_data_file:      {equil_data}    # LAMMPS .data input to the Tg sweep; required for ΔCp mass normalisation
+enthalpy_col:      {enthalpy_col}  # LAMMPS thermo column for enthalpy (must match log output)
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
 tasks:
-  - extract_tg     # pass per_t_dump_file + tg_data_file + backbone_types to enable structural analysis
+  - extract_thermal  # tg_data_file required for ΔCp; enthalpy_col must match log thermo output
 
---- Stage Guide (STAGE_4_ANALYSIS) ---
-{stage_guide}
---- Stage Index (error recovery & cross-stage rules) ---
-{stage_index}
+--- Worker Guide (THERMAL_ANALYSIS) ---
+{guide}
+--- Cross-Track Rules ---
+{cross_track_rules}
 """
 
 
-def analyze_full_prompt(args, cls: dict, stage_index: str) -> str:
-    flags = _lammps_flags(args.lammps_flags, cls)
+def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    """Prompt for equilibration-checker (equil-check gate — equil check + density)."""
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
+    exp_density = _exp_density_range(cls)
+    ct_decay = cls.get("ct_min_decay_melt", 0.10)
+
+    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
+    equil_log = f"{lammps_base}/equil/nvt_production/nvt_production.log"
+    npt_log = args.npt_prod_log or f"{lammps_base}/equil/npt_prod300/npt_prod300.log"
+    npt_dump = args.npt_prod_dump or f"{lammps_base}/equil/npt_prod300/npt_prod300.dump"
+    npt_data = args.data_path or f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
+
+    guide = load_worker_guide("equil-check")
+    return f"""\
+equil_log_path:    {equil_log}
+npt_prod_log_path: {npt_log}
+npt_prod_dump_path: {npt_dump}
+equil_data_path:   {npt_data}
+run_name:          {args.run_name}
+polymer_class:     {args.polymer_class.upper()}
+backbone_types:    {args.backbone_types or '<FILL from parse_data_file or lammps_flags>'}
+ct_min_decay_melt: {ct_decay}
+exp_density_range: {exp_density}
+output_dir:        {output_dir}
+graphs_dir:        {graphs_dir}
+tasks:
+  - check_equilibration_comprehensive
+  - extract_equilibrated_density
+
+--- Worker Guide (EQUIL_CHECK) ---
+{guide}
+--- Cross-Track Rules ---
+{cross_track_rules}
+"""
+
+
+def murnaghan_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    """Prompt for murnaghan-worker (rubbery BM pressure series submission)."""
+    flags = _lammps_flags(args.lammps_flags, cls)
+    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
+    is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else False
+    bm_pressures_atm = cls.get("bm_pressures_atm", None)
+    dt = _pick(args.dt_fs, cls, "dt_fs", 1.0)
+    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
+    equil_data = args.data_path or f"{lammps_base}/equil/npt_production/npt_production_out.data"
+    guide = load_worker_guide("murnaghan")
+    return f"""\
+equil_data_path:   {equil_data}
+lammps_flags:      {flags}
+polymer_class:     {args.polymer_class.upper()}
+run_name:          {args.run_name}
+work_dir:          {work_dir}/bm_series
+is_glassy:         {str(is_glassy).lower()}
+bm_pressures_atm:  {bm_pressures_atm}
+temp_K:            300.0
+npt_steps:         500000
+dt_fs:             {dt}
+gpu_ids:           "{args.gpu_ids}"
+mpi_ranks:         {args.mpi_ranks}
+
+--- Worker Guide (MURNAGHAN) ---
+{guide}
+--- Cross-Track Rules ---
+{cross_track_rules}
+"""
+
+
+def analyze_bm_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    """Prompt for bulk-modulus-extractor (BM extraction, all four routing paths)."""
+    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
+    graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
+    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
+    npt_log = args.npt_prod_log or f"{lammps_base}/equil/npt_prod300/npt_prod300.log"
+    _k_from_cls = _exp_K_range(cls)
+    exp_K = [
+        args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0],
+        args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1],
+    ]
+    bm_pressures_atm = cls.get("bm_pressures_atm", None)
+    # Deform extraction params
+    strain_rate_per_fs = cls.get("K_deform_rate_inv_s", 1e8) * 1e-15
+    K_strain_max = cls.get("K_strain_max", 0.03)
+
+    born_log_line     = f"born_log_path:       {args.born_log}" if args.born_log else "born_log_path:       null"
+    born_matrix_line  = f"born_matrix_file:    {args.born_matrix}" if args.born_matrix else "born_matrix_file:    null"
+    born_n_atoms_line = f"born_n_atoms:        {args.born_n_atoms}" if args.born_n_atoms else "born_n_atoms:        null"
+    deform_log_line   = f"deform_log_path:     {args.deform_log}" if getattr(args, 'deform_log', None) else "deform_log_path:     null"
+    murnaghan_line    = f"murnaghan_log_files: {args.murnaghan_logs}" if getattr(args, 'murnaghan_logs', None) else "murnaghan_log_files: null"
+
+    guide = load_worker_guide("analyze-bm")
+    return f"""\
+{born_log_line}
+{born_matrix_line}
+{born_n_atoms_line}
+{deform_log_line}
+{murnaghan_line}
+npt_prod_log_path: {npt_log}
+bm_pressures_atm:  {bm_pressures_atm}
+exp_K_range:       {exp_K}
+strain_rate_per_fs: {strain_rate_per_fs:.2e}
+K_strain_max:      {K_strain_max}
+run_name:          {args.run_name}
+polymer_class:     {args.polymer_class.upper()}
+output_dir:        {output_dir}
+graphs_dir:        {graphs_dir}
+
+--- Worker Guide (BM_ANALYSIS) ---
+{guide}
+--- Cross-Track Rules ---
+{cross_track_rules}
+"""
+
+
+def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    """Prompt for run-summary-worker (always-terminal, calls generate_run_summary)."""
+    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
+    graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
     exp_tg = _exp_tg_range(cls)
     exp_density = _exp_density_range(cls)
     _k_from_cls = _exp_K_range(cls)
@@ -408,80 +555,34 @@ def analyze_full_prompt(args, cls: dict, stage_index: str) -> str:
         args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0],
         args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1],
     ]
-    bm_pressures_atm = cls.get("bm_pressures_atm", None)
-    bm_task = "extract_bulk_modulus_born" if is_glassy else (
-        "run_bulk_modulus_series+extract_bulk_modulus_murnaghan"
-        if bm_pressures_atm else "extract_bulk_modulus"
-    )
-    ct_decay = cls.get("ct_min_decay_melt", 0.10)
-
-    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
-    equil_log = f"{lammps_base}/equil/06_nvt_production/06_nvt_production.log"
-    npt_log = args.npt_prod_log or f"{lammps_base}/equil/09_npt_prod300/09_npt_prod300.log"
-    npt_dump = args.npt_prod_dump or f"{lammps_base}/equil/09_npt_prod300/09_npt_prod300.dump"
-    npt_data = args.data_path or f"{lammps_base}/equil/09_npt_prod300/09_npt_prod300_out.data"
-    born_log_line    = f"born_log_path:     {args.born_log}" if args.born_log else "born_log_path:     null"
-    born_matrix_line = f"born_matrix_file:  {args.born_matrix}" if args.born_matrix else "born_matrix_file:  null"
-    born_n_atoms_line = f"born_n_atoms:      {args.born_n_atoms}" if args.born_n_atoms else "born_n_atoms:      null"
-
-    props_str = args.properties if args.properties else "all"
-    if props_str.strip().lower() == "all":
-        props = {"density", "tg", "bulk_modulus"}
-    else:
-        props = {p.strip().lower() for p in props_str.split(",")}
-
-    task_lines = ["  - check_equilibration_comprehensive"]
-    if "density" in props:
-        task_lines.append("  - extract_density")
-    if "bulk_modulus" in props:
-        task_lines.append(f"  - {bm_task}")
-    task_lines.append("  - generate_run_summary")
-    tasks_block = "\n".join(task_lines)
-
-    stage_guide = load_stage_guide("analyze-full")
     return f"""\
-equil_log_path:    {equil_log}
-npt_prod_log_path: {npt_log}
-{born_log_line}
-{born_matrix_line}
-{born_n_atoms_line}
-equil_data_path:   {npt_data}
-npt_prod_dump_path: {npt_dump}
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 smiles:            {_v(args.smiles)}
 ff:                {args.ff or cls.get('preferred_ff', 'pcff')}
-d06_tg_fit_quality: {_v(args.tg_fit_quality, 'ACCEPTABLE')}
+d05_verdict:       {getattr(args, 'd05', None) or '<FILL from equil-checker RESULT>'}
+d06_tg_fit_quality: {_v(args.tg_fit_quality, 'N/A (not requested)')}
 exp_tg_range:      {exp_tg}
 exp_density_range: {exp_density}
 exp_K_range:       {exp_K}
-bm_pressures_atm:  {bm_pressures_atm}
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
-is_glassy:         {str(is_glassy).lower()}
-dt_fs:             {_pick(args.dt_fs, cls, 'dt_fs', 1.0)}
-backbone_types:    {args.backbone_types or '<FILL from parse_data_file>'}
-ct_min_decay_melt: {ct_decay}
-tasks:
-{tasks_block}
-
---- Stage Guide (STAGE_4_ANALYSIS) ---
-{stage_guide}
---- Stage Index (error recovery & cross-stage rules) ---
-{stage_index}
 """
 
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
 STAGE_MAP = {
-    "build": build_prompt,
-    "equil": equil_prompt,
-    "tg": tg_prompt,
-    "deform": deform_prompt,
-    "born": born_prompt,
-    "analyze-tg": analyze_tg_prompt,
-    "analyze-full": analyze_full_prompt,
+    "build":        build_prompt,
+    "equil":        equil_prompt,
+    "tg":           tg_prompt,
+    "deform":       deform_prompt,
+    "born":         born_prompt,
+    "murnaghan":    murnaghan_prompt,
+    "analyze-tg":   analyze_tg_prompt,
+    "equil-check":  equil_check_prompt,
+    "analyze-bm":   analyze_bm_prompt,
+    "run-summary":  run_summary_prompt,
 }
 
 
@@ -489,13 +590,18 @@ def main():
     p = argparse.ArgumentParser(
         description="Generate a fully-formed PolyJarvis worker prompt.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Stages: build | equil | tg | deform | born | analyze-tg | analyze-full",
+        epilog="Workers: build | equil | tg | deform | born | murnaghan | analyze-tg | equil-check | analyze-bm | run-summary",
     )
     p.add_argument("--stage", required=True, choices=list(STAGE_MAP),
                    metavar="STAGE",
-                   help="build|equil|tg|deform|born|analyze-tg|analyze-full")
+                   help="build|equil|tg|deform|born|murnaghan|analyze-tg|equil-check|analyze-bm|run-summary")
     p.add_argument("--run_name", required=True)
     p.add_argument("--polymer_class", required=True)
+    p.add_argument("--plan",
+                   help="Path to an approved run_plan.json. Overlays the plan's "
+                        "decided_params onto the class defaults (scientific decisions); "
+                        "runtime paths/gpu stay in the flags below. Deterministic plans "
+                        "produce byte-identical output to the no-plan path.")
     p.add_argument("--smiles")
     p.add_argument("--data_path")
     p.add_argument("--work_dir")
@@ -508,23 +614,32 @@ def main():
     p.add_argument("--tg_k", type=float)
     p.add_argument("--tg_fit_quality")
     p.add_argument("--born_log",
-                   help="Path to nvt_born log (analyze-full, glassy)")
+                   help="Path to nvt_born log (analyze-bm, glassy born path)")
     p.add_argument("--born_matrix",
-                   help="Path to born_matrix.dat from fix ave/time (analyze-full, glassy)")
+                   help="Path to born_matrix.dat from fix ave/time (analyze-bm, glassy born path)")
     p.add_argument("--born_n_atoms", type=int,
-                   help="Number of atoms in Born cell (from born-worker RESULT)")
+                   help="Number of atoms in Born cell (analyze-bm, from born-worker RESULT)")
+    p.add_argument("--deform_log",
+                   help="Path to npt_deform log (analyze-bm, glassy deform fallback)")
+    p.add_argument("--murnaghan_logs",
+                   help="JSON list of absolute log paths from murnaghan-worker (analyze-bm, rubbery+pressures)")
+    p.add_argument("--d05",
+                   help="equil_verdict from equil-checker RESULT: PASS|EXTEND|FAIL (run-summary stage)")
     p.add_argument("--born_run_ns", type=float,
                    help="NVT-Born run length in ns (born stage, default 4.0)")
     p.add_argument("--npt_prod_log")
     p.add_argument("--npt_prod_dump")
     p.add_argument("--ff")
-    p.add_argument("--backbone_types")
+    p.add_argument("--backbone_types",
+                   help="Atom type IDs as JSON list (equil-check only)")
+    p.add_argument("--enthalpy_col", default="Enthalpy",
+                   help="LAMMPS thermo column name for enthalpy (analyze-tg; default 'Enthalpy')")
     p.add_argument("--output_dir")
     p.add_argument("--equil_data_path",
-                   help="Path to equilibrated .data file (input to Tg sweep, used as topology for structural analysis)")
+                   help="Path to equilibrated .data file (LAMMPS .data input to Tg sweep; required for ΔCp mass normalisation in extract_thermal)")
     # Physics knob overrides (all optional; default None → falls back to polymer_rules.json)
     p.add_argument("--npt_prod_ns", type=float,
-                   help="Stage 7 NPT production time (ns); auto-sized by atom count if omitted")
+                   help="NPT production time (ns); auto-sized by atom count if omitted")
     p.add_argument("--add_melt_npt", action="store_true", default=False,
                    help="Inject 05b melt isothermal NPT stage for rubbery classes (FF validation only)")
     p.add_argument("--T_equil_K", type=float,
@@ -562,11 +677,14 @@ def main():
     args = p.parse_args()
 
     rules = load_rules()
-    stage_index = load_stage_index()
+    cross_track_rules = load_cross_track_rules()
     cls = get_class_entry(rules, args.polymer_class)
 
+    if args.plan:
+        cls = apply_plan(cls, load_plan(args.plan), args)
+
     prompt_fn = STAGE_MAP[args.stage]
-    print(prompt_fn(args, cls, stage_index))
+    print(prompt_fn(args, cls, cross_track_rules))
 
 
 if __name__ == "__main__":

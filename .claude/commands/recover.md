@@ -37,8 +37,8 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
 | Log truncated, no LAMMPS error string, process gone | External kill (OOM killer / GPU preemption) | Identify last completed stage `_out.data` via `ls`; submit remaining stages as new chain from that checkpoint |
 | Monitor hangs indefinitely after `run_lammps_chain` | `watch_run` sentinel lost on MCP server restart | `grep -r "STAGE COMPLETE" <work_dir>/` — if all stages present, proceed without Monitor and mark done in run_log |
 | "Out of range atoms — cannot compute PPPM" in npt_compress | PPPM ghost region exceeded during high-pressure box shrink | Switch compress stage pair_style to `lj/cut/coul/cut`; skin=3.0 Å; dt=0.5 fs; restore kspace for all production stages |
-| K = negative or density at melt value (~0.8–0.9 g/cm³) for a glassy polymer | deform-worker received Stage 7 (melt) data instead of Stage 9 (300 K) data | Verify `equil_data_path` is `09_npt_prod300_out.data`; if Stage 9 missing, run Phase 2 (cool+prod at 300 K) first; re-spawn deform-worker |
-| `extract_tg` returns "fewer than 4 temperature bins" after partial sweep kill | Sweep killed before sufficient T coverage | If ≥ 60% of planned T points completed AND both glassy+rubbery slopes present, attempt `extract_tg`; if fit_quality ≥ ACCEPTABLE accept; else restart full sweep |
+| K = negative or density at melt value (~0.8–0.9 g/cm³) for a glassy polymer | deform-worker received `npt_production` (melt) data instead of `npt_prod300` (300 K) data | Verify `equil_data_path` is `npt_prod300_out.data`; if `npt_prod300` missing, run the cool+prod 300 K phase first; re-spawn deform-worker |
+| `extract_thermal` returns "fewer than 4 temperature bins" after partial sweep kill | Sweep killed before sufficient T coverage | If ≥ 60% of planned T points completed AND both glassy+rubbery slopes present, attempt `extract_thermal`; if fit_quality ≥ ACCEPTABLE accept; else restart full sweep |
 
 **6. Output a recovery plan in this format:**
 ```

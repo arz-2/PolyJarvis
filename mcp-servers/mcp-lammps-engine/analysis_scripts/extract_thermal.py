@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-extract_tg.py — Extract glass transition temperature (Tg) from a LAMMPS
+extract_thermal.py — Extract thermal properties (Tg, CTE, ΔCp) from a LAMMPS
 temperature-sweep log file.
 
-Methodology (v4 — May 2026):
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Methodology (v5 — June 2026):
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Data preparation:
   1. Parse LAMMPS log file into a DataFrame of thermo rows.
   2. Detect temperature plateaus via jump detection (|ΔT| > 15 K
      between consecutive rows starts a new plateau).
   3. Within each plateau, discard burn-in, then average the remaining
-     density values to get one (T_setpoint, ρ_mean) data point.
+     density and enthalpy values to get one (T_setpoint, ρ_mean, H_mean)
+     data point.
   4. Equilibration drift check: fit ρ(t) within each plateau's
      production window.  If drift > 1% and p < 0.01, exclude.
   5. Also produce standard 5 K bins as a secondary output.
@@ -23,6 +24,14 @@ Fitting:
   constraints (both slopes negative, rubbery steeper) are enforced via
   bounds.  Quality is assessed by the overall bilinear R².
 
+Thermal properties extracted:
+  - Tg:  density-kink glass transition temperature (K)
+  - CTE: α_g = -a_glassy / ρ_mean_glassy, α_r = -a_rubbery / ρ_mean_rubbery  (K⁻¹)
+  - ΔCp: from bilinear fit of H(T) = enthalpy vs T; requires tg_data_file for
+         mass normalisation.  ΔCp [J/(g·K)] = (a_H_rubbery - a_H_glassy) × 4184 /
+         system_mass_g_per_mol.  Skipped gracefully if Enthalpy column absent or
+         tg_data_file not provided.
+
 Output contract:
   - Prints a JSON summary to stdout as the last line.
   - Writes CSV and JSON files to --output_dir.
@@ -34,9 +43,10 @@ References:
   Patrone et al., Polymer 87 (2016) 246–259
 
 Usage:
-    python extract_tg.py --log_file /path/to/log.lammps \
-                         --output_dir /path/to/tg_analysis \
-                         --equilibration_fraction 0.5
+    python extract_thermal.py --log_file /path/to/log.lammps \
+                              --output_dir /path/to/tg_analysis \
+                              --tg_data_file /path/to/system.data \
+                              --equilibration_fraction 0.5
 """
 
 import argparse
@@ -383,6 +393,111 @@ def curvefit_hyperbola(T, rho, seed=None):
 
 
 # ---------------------------------------------------------------------------
+# System mass from LAMMPS .data file (needed for ΔCp normalisation)
+# ---------------------------------------------------------------------------
+
+def _parse_system_mass_from_data_file(data_file_path):
+    """
+    Compute total system mass (g/mol) from a LAMMPS .data file.
+
+    Reads the Masses section (atom type → atomic mass) and counts atoms per
+    type from the Atoms section.  Returns (mass_g_per_mol, error_msg); on
+    failure mass_g_per_mol is None and error_msg explains why.
+
+    Supports LAMMPS `full` atom style (PCFF/EMC output: atom_id mol_id type_id
+    charge x y z — type at column 2) and `charge`/`molecular` styles (type at
+    column 1).  Style is auto-detected from the `Atoms  # full` comment.
+    """
+    try:
+        p = Path(data_file_path)
+        if not p.exists():
+            return None, f"file not found: {data_file_path}"
+
+        n_atoms_total = 0
+        type_masses = {}
+        type_counts = {}
+        in_masses = False
+        in_atoms = False
+        atom_style = "full"  # default (PCFF/EMC)
+
+        with open(p) as fh:
+            for raw in fh:
+                line = raw.strip()
+
+                if not line:
+                    continue  # blank lines are separators, not section terminators
+
+                # Header: "N atoms"
+                m = re.match(r'^(\d+)\s+atoms\s*$', line)
+                if m:
+                    n_atoms_total = int(m.group(1))
+                    continue
+
+                # Section headers
+                if re.match(r'^Masses\b', line):
+                    in_masses = True
+                    in_atoms = False
+                    continue
+                if re.match(r'^Atoms\b', line):
+                    in_atoms = True
+                    in_masses = False
+                    if '# full' in line:
+                        atom_style = 'full'
+                    elif '# charge' in line:
+                        atom_style = 'charge'
+                    elif '# molecular' in line:
+                        atom_style = 'molecular'
+                    continue
+                # Any new uppercase section header ends current section
+                if re.match(r'^[A-Z][A-Za-z]', line):
+                    if in_atoms:
+                        break
+                    in_masses = False
+                    continue
+
+                if line.startswith('#'):
+                    continue
+
+                if in_masses:
+                    tokens = line.split()
+                    if len(tokens) >= 2:
+                        try:
+                            type_masses[int(tokens[0])] = float(tokens[1])
+                        except ValueError:
+                            pass
+
+                elif in_atoms:
+                    tokens = line.split()
+                    # full style: atom_id mol_id type_id charge x y z  → type at index 2
+                    # charge/molecular style: atom_id type_id ...       → type at index 1
+                    type_col = 2 if atom_style == 'full' else 1
+                    if len(tokens) > type_col:
+                        try:
+                            type_id = int(tokens[type_col])
+                            if type_id in type_masses:
+                                type_counts[type_id] = type_counts.get(type_id, 0) + 1
+                        except ValueError:
+                            pass
+
+        if not type_masses:
+            return None, "Masses section not found or empty"
+
+        if type_counts:
+            total_mass = sum(cnt * type_masses.get(tid, 0.0)
+                             for tid, cnt in type_counts.items())
+        elif n_atoms_total > 0:
+            mean_mass = float(np.mean(list(type_masses.values())))
+            total_mass = n_atoms_total * mean_mass
+        else:
+            return None, "no atom count information"
+
+        return round(float(total_mass), 2), None
+
+    except Exception as exc:
+        return None, f"parse error: {exc}"
+
+
+# ---------------------------------------------------------------------------
 # Plot
 # ---------------------------------------------------------------------------
 
@@ -411,8 +526,8 @@ def plot_tg_fit(temps, densities, cf_result, Tg_K, r2, fit_quality, graphs_dir):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Extract glass transition temperature (Tg) from a LAMMPS "
-                    "temperature-sweep log via bilinear density-vs-temperature fitting."
+        description="Extract thermal properties (Tg, CTE, ΔCp) from a LAMMPS "
+                    "temperature-sweep log via bilinear fitting."
     )
     parser.add_argument("--log_file", required=True,
                         help="Path to the LAMMPS log file.")
@@ -426,6 +541,8 @@ def main():
                         help="Temperature column name in thermo output.")
     parser.add_argument("--density_col", default="Density",
                         help="Density column name in thermo output.")
+    parser.add_argument("--enthalpy_col", default="Enthalpy",
+                        help="Enthalpy column name in thermo output (for ΔCp).")
     parser.add_argument("--fit_method", choices=["auto", "hyperbola", "bilinear"],
                         default="auto",
                         help="Primary fit: 'auto' (hyperbola, fall back to bilinear), "
@@ -436,7 +553,8 @@ def main():
                         help="Path to per-T structural dump (one frame per T step). "
                              "Enables dump-based structural analysis (Rg, P2, dynamic Tg).")
     parser.add_argument("--tg_data_file", default=None,
-                        help="LAMMPS .data file used for the Tg sweep (topology/masses for MDAnalysis).")
+                        help="LAMMPS .data file used for the Tg sweep (topology/masses). "
+                             "Required for ΔCp mass normalisation and MDAnalysis structural analysis.")
     parser.add_argument("--backbone_types", nargs="*", type=int, default=None,
                         help="Backbone atom type IDs for P2 nematic order computation.")
     args = parser.parse_args()
@@ -450,6 +568,7 @@ def main():
     equilibration_fraction = args.equilibration_fraction
     temp_col = args.temp_col
     density_col = args.density_col
+    enthalpy_col = args.enthalpy_col
     fit_method = args.fit_method
     per_t_dump_file = args.per_t_dump_file
     tg_data_file = args.tg_data_file
@@ -470,6 +589,11 @@ def main():
             f"Column '{density_col}' not found. "
             f"Available columns: {list(df_all.columns)}"
         )
+
+    # Detect enthalpy column (optional — needed for ΔCp)
+    _enth_col = enthalpy_col if enthalpy_col in df_all.columns else next(
+        (c for c in df_all.columns if c.lower() == enthalpy_col.lower()), None)
+    all_enthalpy_raw = df_all[_enth_col].values if _enth_col else None
 
     # -------------------------------------------------------------------
     # 2a. Standard 5 K binning
@@ -687,6 +811,93 @@ def main():
             )
 
     # -------------------------------------------------------------------
+    # 4c. CTE from bilinear density fit slopes
+    #     α = -(1/ρ) dρ/dT = -a_branch / ρ_mean_branch   [K⁻¹]
+    # -------------------------------------------------------------------
+    cte_glassy_per_K = None
+    cte_rubbery_per_K = None
+    if cf_result and slope_signs_valid:
+        glassy_pts  = df_bins[df_bins["temperature"] <  Tg_primary]["mean_density"].values
+        rubbery_pts = df_bins[df_bins["temperature"] >= Tg_primary]["mean_density"].values
+        if len(glassy_pts) >= 2:
+            rho_g = float(glassy_pts.mean())
+            if rho_g > 0:
+                cte_glassy_per_K = round(-cf_result["a_glassy"] / rho_g, 9)
+        if len(rubbery_pts) >= 2:
+            rho_r = float(rubbery_pts.mean())
+            if rho_r > 0:
+                cte_rubbery_per_K = round(-cf_result["a_rubbery"] / rho_r, 9)
+
+    # -------------------------------------------------------------------
+    # 4d. ΔCp from bilinear fit of enthalpy vs T
+    #     ΔCp [J/(g·K)] = (a_H_rubbery − a_H_glassy) × 4184 / system_mass_g_per_mol
+    #     Requires: Enthalpy column in log + tg_data_file for mass.
+    # -------------------------------------------------------------------
+    dCp_fields = {}
+    if all_enthalpy_raw is None:
+        dCp_fields["dCp_status"] = f"skipped (column '{enthalpy_col}' not in log)"
+    elif tg_data_file is None:
+        dCp_fields["dCp_status"] = "skipped (tg_data_file not provided for mass calculation)"
+    else:
+        system_mass, mass_err = _parse_system_mass_from_data_file(tg_data_file)
+        if system_mass is None:
+            dCp_fields["dCp_status"] = f"skipped (mass parse failed: {mass_err})"
+        else:
+            # Plateau averages of enthalpy (same groups as density)
+            h_records = []
+            for g_start, g_end in groups:
+                g_t = all_temps_raw[g_start:g_end]
+                g_h = all_enthalpy_raw[g_start:g_end]
+                n_total = len(g_t)
+                if n_total < 5:
+                    continue
+                n_discard = int(n_total * (1 - equilibration_fraction))
+                eq_t = g_t[n_discard:]
+                eq_h = g_h[n_discard:]
+                if len(eq_h) < 3:
+                    continue
+                set_T = round(float(np.median(eq_t)) / 5) * 5
+                h_records.append({
+                    "temperature":   float(set_T),
+                    "mean_enthalpy": float(np.mean(eq_h)),
+                    "n_points":      int(len(eq_h)),
+                })
+
+            if len(h_records) >= 4:
+                df_h = (pd.DataFrame(h_records)
+                        .sort_values("temperature").reset_index(drop=True))
+                h_fit = curvefit_bilinear(
+                    df_h["temperature"].values,
+                    df_h["mean_enthalpy"].values,
+                    tg_hint=Tg_primary,
+                )
+                if h_fit:
+                    delta_dH_dT = h_fit["a_rubbery"] - h_fit["a_glassy"]  # kcal/mol/K
+                    dCp_J_per_g_K = delta_dH_dT * 4184.0 / system_mass
+                    H_r2 = h_fit["r_squared"]
+                    H_fit_quality = (
+                        "EXCELLENT"  if H_r2 >= 0.995 else
+                        "GOOD"       if H_r2 >= 0.98  else
+                        "ACCEPTABLE" if H_r2 >= 0.95  else
+                        "POOR"
+                    )
+                    dCp_fields = {
+                        "dCp_status":                    "success",
+                        "dCp_J_per_g_K":                 round(dCp_J_per_g_K, 4),
+                        "H_slope_glassy_kcal_per_mol_K": round(h_fit["a_glassy"], 4),
+                        "H_slope_rubbery_kcal_per_mol_K": round(h_fit["a_rubbery"], 4),
+                        "H_r_squared":                   round(H_r2, 4),
+                        "H_fit_quality":                 H_fit_quality,
+                        "system_mass_g_per_mol":         system_mass,
+                    }
+                else:
+                    dCp_fields["dCp_status"] = "skipped (enthalpy bilinear fit failed)"
+            else:
+                dCp_fields["dCp_status"] = (
+                    f"skipped (only {len(h_records)} enthalpy plateau(s) — need ≥ 4)"
+                )
+
+    # -------------------------------------------------------------------
     # 5. Save density bin CSVs
     # -------------------------------------------------------------------
     bins_csv_5k = str(output_dir / "tg_density_bins.csv")
@@ -730,7 +941,7 @@ def main():
             print(f"  WARNING: structural analysis failed: {_se}", flush=True)
 
     # -------------------------------------------------------------------
-    # 5. Assemble final result
+    # 6. Assemble final result
     # -------------------------------------------------------------------
     result = {
         "status":              "success",
@@ -766,7 +977,13 @@ def main():
         "slope_ordering_valid":      slope_ordering_valid,
         "fit_warnings":              fit_warnings,
         "relaxation_metrics":        relaxation_metrics,
+        # CTE (always present when bilinear fit succeeds and slopes are physical)
+        "cte_glassy_per_K":          cte_glassy_per_K,
+        "cte_rubbery_per_K":         cte_rubbery_per_K,
     }
+
+    # ΔCp fields (present only when enthalpy column + tg_data_file available)
+    result.update(dCp_fields)
 
     # Structural analysis results (present only when dump was provided)
     if structural_analysis is not None:

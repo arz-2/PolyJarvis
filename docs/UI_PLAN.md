@@ -168,7 +168,7 @@ orchestrator to watch). The UI only ever writes files it owns — never a run's
     "gpu_ids": "0",
     "overrides": {}
   },
-  "analysis_tasks": ["check_equilibration_comprehensive","extract_tg","extract_density","extract_bulk_modulus"],
+  "analysis_tasks": ["check_equilibration_comprehensive","extract_thermal","extract_density","extract_bulk_modulus"],
   "notes": "free text"
 }
 ```

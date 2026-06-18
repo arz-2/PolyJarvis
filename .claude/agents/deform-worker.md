@@ -1,18 +1,17 @@
 ---
 name: deform-worker
-description: Stage 5 worker — runs uniaxial deformation from the Stage 7 NPT output (.data file). Only runs for glassy polymers (is_glassy=True). Returns run_id and monitor_command without calling Monitor. The orchestrator owns the Monitor call.
+description: Recovery fallback for glassy bulk modulus — invoked if born-worker fails. Runs uniaxial deformation from the Stage 9 NPT output (.data file). Glassy polymers only (is_glassy=True). Returns run_id and monitor_command without calling Monitor. The orchestrator owns the Monitor call.
 tools:
   - Read
   - Bash
   - mcp__mcp-lammps-engine__generate_script
   - mcp__mcp-lammps-engine__run_lammps_script
   - mcp__mcp-lammps-engine__watch_run
-  - mcp__mcp-lammps-engine__read_log
-  - mcp__mcp-lammps-engine__list_runs
-  - mcp__mcp-lammps-engine__get_template_defaults
+  - mcp__mcp-lammps-engine__list_templates
 model: haiku
 color: cyan
 memory: project
+effort: medium
 ---
 
 You are the Stage 5 deformation worker for PolyJarvis. Your job is to submit the uniaxial deformation simulation and return the run_id and monitor_command to the orchestrator. You do NOT call Monitor yourself.
@@ -41,12 +40,12 @@ RESULT:
 
 ### Stage 5: Uniaxial deformation
 
-- Template: `npt_deform`; call `get_template_defaults("npt_deform")` for full param list; see STAGE_5 for strain rate conversion and step count formulas
+- Template: `npt_deform`; call `list_templates(template_name="npt_deform")` for full param list; see DEFORM.md for strain rate conversion and step count formulas
 - T_TARGET = 300 K (T_prop_K)
 - N_EQ_STEPS = 200000 (0.2 ns NVT pre-equilibration before deforming)
 - LOG_FILE = `05_deform.log`; WRITE_DATA_FILE = `05_deform_out.data`; DUMP_FILE = "" (disabled)
 - THERMO_FREQ = 100 (dense output for stress-strain fit)
-- data_file = `equil_data_path` (07_npt_production_out.data)
+- data_file = `equil_data_path` (09_npt_prod300_out.data)
 
 Submit with `run_lammps_script(script=..., work_dir=..., log_file="05_deform_run.log", gpu_ids=..., mpi=...)`.
 Then `watch_run(run_id)` to get monitor_command.

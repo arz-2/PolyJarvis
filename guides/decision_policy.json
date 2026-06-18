@@ -1,0 +1,125 @@
+{
+  "_metadata": {
+    "description": "Decision policy layer for PolyJarvis. Encodes the EVALUATION FRAMEWORK for each scientific decision the agent makes, rather than prescribing the action. The Planner consults this when proposing a run_plan.json; the Critic ENFORCES that every decision in the plan addresses each criterion in its policy and cites evidence. Modeled on the electrostatics_decision_guide pattern in polymer_rules.json. 'The agent is free, but the evaluation framework is fixed.'",
+    "version": "1.0",
+    "created": "2026-06-17",
+    "consumed_by": ["planner", "critic"],
+    "see_also": "polymer_rules.json:electrostatics_decision_guide is the prototype for this structure (D-03 policy).",
+    "evidence_levels": {
+      "high":   "Class-specific MD validation paper reproduces a target property (density or Tg) within ~10%, with DOI.",
+      "medium": "Force field validated for a related class or by builder constraint; no class-specific MD Tg/density paper yet.",
+      "low":    "No validation; choice made by analogy or builder availability only. Reasoned planning REQUIRED."
+    }
+  },
+
+  "confidence_gate": {
+    "description": "Controls planning DEPTH. Read class 'confidence' from polymer_rules.json. This is the 'uncertainty-driven planning' mechanism — grounded in an existing field so reproducible fixed-seed runs are never disturbed.",
+    "high": {
+      "plan_mode": "deterministic",
+      "behavior": "Planner transcribes polymer_rules.json defaults verbatim into run_plan.json decided_params (a subset of class keys with identical values). Critic auto-approves (trivial pass, 0 reasoning rounds). Worker prompts are byte-identical to the pre-architecture pipeline. Use fixed seeds from guides/REVISION_PARAMS.md.",
+      "rationale": "These classes are validated; reproducibility outranks re-derivation. Do not re-reason a settled, cited decision."
+    },
+    "medium_low_or_offtable": {
+      "plan_mode": "reasoned",
+      "behavior": "Planner reasons each decision against its policy below, records evidence/confidence/alternatives, names the dominant uncertainty and an optional uncertainty-reduction probe. Critic challenges; loop until approved or escalate (max 2 critic rounds).",
+      "applies_to": "confidence in {medium, low} OR polymer_class absent from polymer_rules.json.classes"
+    }
+  },
+
+  "policies": {
+    "forcefield": {
+      "decision_id": "D-01_ff",
+      "evidence_required": true,
+      "evaluate": ["literature_support", "parameter_coverage", "validation_data", "computational_cost"],
+      "evidence_fields": ["ff_justification_doi", "ff_note", "citations"],
+      "require": ["the chosen FF must have parameter coverage for every atom type in the SMILES", "force field assigned AFTER polymerization for RadonPy path (never before; cross-stage rule 0)"],
+      "rationale": "FF choice dominates property accuracy. A choice without literature_support + validation_data is low-confidence and the Critic must flag it. Alternatives with their known error must be recorded (e.g. GAFF2_mod Tg error >45% for PMMA).",
+      "default_source": "polymer_rules.json:classes.<CLASS>.preferred_ff"
+    },
+    "charges": {
+      "decision_id": "D-02_charges",
+      "evidence_required": false,
+      "evaluate": ["backbone_polarity", "charge_method_cost", "ff_embedded_vs_qm"],
+      "require": ["charge method consistent with the chosen FF (e.g. TraPPE-UA embeds charges; PCFF uses bond-increment/Gasteiger)"],
+      "rationale": "Apolar UA backbones embed charges in the FF (no QM). Polar all-atom systems need explicit charges. Solubility/CED accuracy degrades for Gasteiger-charged apolar systems — flag charge_method downstream.",
+      "default_source": "polymer_rules.json:classes.<CLASS>.charge_method"
+    },
+    "electrostatics": {
+      "decision_id": "D-03_electrostatics",
+      "evidence_required": true,
+      "evaluate": ["backbone_heteroatoms", "max_partial_charge", "computational_cost"],
+      "require": ["heteroatom-containing or |q|>0.1e backbones MUST use pppm; pure C/H backbones MAY use lj_cut"],
+      "rationale": "Already encoded as polymer_rules.json:electrostatics_decision_guide. This policy points the Critic at that guide; neglecting long-range Coulomb biases density/Tg by 5-20% for polar polymers.",
+      "default_source": "polymer_rules.json:electrostatics_decision_guide"
+    },
+    "system_size": {
+      "decision_id": "D-04_system_size",
+      "evidence_required": false,
+      "evaluate": ["property_target", "finite_size_effects", "gpu_budget"],
+      "require": ["DP above the Fox-Flory plateau (DP>=20) for Tg targets", "bulk_modulus targets need DP/nchain above the entanglement-MW threshold (per-class)", "cell large enough to avoid self-imaging at the chosen cutoff_A"],
+      "rationale": "Too-small DP biases Tg low and K high. Too-large wastes GPU budget. The probe option (fast small-cell density screen, ROADMAP E3) reduces finite-size uncertainty cheaply before committing the full cell.",
+      "default_source": "polymer_rules.json:classes.<CLASS>.{dp_typical,nchain,density_initial_gcm3}"
+    },
+    "equilibration": {
+      "decision_id": "D-05_convergence",
+      "evidence_required": false,
+      "evaluate": ["density_convergence", "energy_convergence", "chain_statistic_convergence"],
+      "require": ["check_equilibration_comprehensive overall_pass=True before ANY property extraction (cross-stage rule 2)"],
+      "rationale": "This is the philosophy's 'convince me it is equilibrated' gate — already implemented as check_equilibration_comprehensive. The policy makes it a hard plan success_criterion, not an afterthought. The Validator enforces it after the equil stage.",
+      "default_source": "tool:check_equilibration_comprehensive"
+    },
+    "tg_protocol": {
+      "decision_id": "D-06_tg_fit_quality",
+      "evidence_required": false,
+      "evaluate": ["t_range_brackets_experimental_tg", "n_temperature_bins", "bilinear_fit_r_squared", "cooling_rate_artifact"],
+      "require": ["never report Tg without verifying bilinear fit R^2 (cross-stage rule 3)", "T sweep range must bracket experimental_tg_K with margin"],
+      "rationale": "A too-narrow T range gives R^2<0.80 / <4 bins (known /recover failure mode). Planning the range from experimental_tg_K +/- margin catches this before the sweep runs.",
+      "default_source": "polymer_rules.json:tg_protocol_reference"
+    },
+    "property_method": {
+      "decision_id": "D-07_property_method",
+      "evidence_required": true,
+      "evaluate": ["phase_glassy_vs_rubbery", "method_physics_validity", "gpu_vs_cpu", "rate_artifact"],
+      "require": ["glassy bulk_modulus via Born+NVT (rate-free, full elastic tensor); rubbery via Murnaghan EOS sweep; volume fluctuation is cross-check only; deform is fallback only", "is_glassy from measured Tg>300K when tg requested, else from experimental_tg_K glassy_hint"],
+      "rationale": "Method must match phase. Born is glassy-only/CPU-only and cannot be the unified path; Murnaghan is the GPU-compatible both-phase candidate (ROADMAP I2). Deform overestimates K 20-50% and is a tertiary fallback.",
+      "default_source": "polymer_rules.json:classes.<CLASS>.{bm_pressures_atm,exp_K_GPa}"
+    }
+  },
+
+  "stage_schema_requirements": {
+    "description": "Schema that every planned_stages entry must satisfy. The Critic enforces this in step 3 for reasoned plans; make_deterministic_plan.py satisfies it automatically via the STAGE_TRACK dict.",
+    "required_fields": ["stage", "track", "success_criteria"],
+    "valid_tracks": ["foundation", "thermal", "mechanical", "summary"],
+    "track_map": {
+      "build":        "foundation",
+      "equil":        "foundation",
+      "equil-check":  "foundation",
+      "tg":           "thermal",
+      "analyze-tg":   "thermal",
+      "born":         "mechanical",
+      "deform":       "mechanical",
+      "murnaghan":    "mechanical",
+      "analyze-bm":   "mechanical",
+      "run-summary":  "summary"
+    }
+  },
+
+  "uncertainty_reduction_probes": {
+    "description": "Optional cheap experiments a reasoned plan may schedule BEFORE the full pipeline to reduce the dominant uncertainty. Each maps to an existing or planned ROADMAP capability.",
+    "fast_density_screen": {
+      "reduces": "ff_transferability, system_size finite-size error",
+      "mechanism": "small-cell short NPT; compare density to experimental within +/-10%; max 2 FF retries (ROADMAP E3, currently BLOCKED on A1/A2 — record as planned, not executed, until unblocked).",
+      "cost": "minutes"
+    },
+    "literature_anchor": {
+      "reduces": "ff_transferability for novel/unclassified polymers",
+      "mechanism": "search_ff_literature(smiles, name) -> reference FF + density/Tg targets + DOI (ROADMAP E2).",
+      "cost": "no simulation"
+    },
+    "born_vs_murnaghan_crosscheck": {
+      "reduces": "bulk_modulus method validity for glassy polymers",
+      "mechanism": "run both on one glassy test polymer; agreement within ~10% promotes Murnaghan as glassy fallback (ROADMAP I2-A).",
+      "cost": "one extra glassy run"
+    }
+  }
+}

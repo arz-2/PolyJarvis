@@ -7,9 +7,9 @@ tools:
   - mcp__mcp-lammps-engine__generate_script
   - mcp__mcp-lammps-engine__run_lammps_script
   - mcp__mcp-lammps-engine__watch_run
-  - mcp__mcp-lammps-engine__read_log
-  - mcp__mcp-lammps-engine__list_runs
-  - mcp__mcp-lammps-engine__get_template_defaults
+  - mcp__mcp-lammps-engine__list_templates
+  - Write
+  - Edit
 model: haiku
 color: purple
 memory: project

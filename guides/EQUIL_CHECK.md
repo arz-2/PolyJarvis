@@ -1,0 +1,81 @@
+# Equilibration Check Guide
+**Read when:** You are `equilibration-checker` and need to validate the equil chain and extract density.
+**Scope:** Equilibration quality check + density extraction only.
+
+---
+
+## Rule: Always Pass `output_dir` and `graphs_dir`
+
+Default `output_dir` scatters files into subdirectories next to the input log. Always pass both:
+
+```python
+output_dir = "/home/arz2/PolyJarvis/data/<run_name>/raw/"
+graphs_dir = "/home/arz2/PolyJarvis/data/<run_name>/graphs/"
+```
+
+Tools that produce PNG figures (always pass `graphs_dir`):
+- `check_equilibration_comprehensive` → `equilibration_convergence.png`
+- `extract_equilibrated_density` → density plateau PNG
+
+---
+
+## Tool: `check_equilibration_comprehensive`
+
+Returns `overall_pass` verdict and a ready-to-paste D-05 markdown block. Copy `result["d05_markdown"]` directly into run_log.md as the D-05 CONVERGENCE DETAIL section.
+
+`backbone_types` is **REQUIRED** — from `inspect_data_file()`; do not guess.
+
+**`ct_min_decay` usage:** Pass the value from the worker prompt (`ct_min_decay_melt`). Pass `None` for the NPT 300 K log (`npt_prod300`) and all rubbery polymer checks.
+
+**Call signature:**
+```python
+check_equilibration_comprehensive(
+    equil_log=equil_log_path,        # nvt_production.log — melt NVT at T_equil
+    npt_log=npt_prod_log_path,       # npt_prod300.log — 300 K NPT
+    dump_file=npt_prod_dump_path,
+    data_file=equil_data_path,
+    backbone_types=backbone_types,
+    ct_min_decay=ct_min_decay_melt,  # from prompt; pass None for rubbery
+    output_dir=output_dir,
+    graphs_dir=graphs_dir,
+)
+```
+
+**Key result fields:**
+- `overall_pass` — True/False gate
+- `d05_markdown` — ready-to-paste run_log.md block
+- `density_converged`, `energy_converged`, `ct_decayed`
+- `warnings` — list of soft warnings (non-fatal)
+
+---
+
+## Tool: `extract_equilibrated_density`
+
+**Call signature:**
+```python
+extract_equilibrated_density(
+    log_file=npt_prod_log_path,
+    output_dir=output_dir,
+    graphs_dir=graphs_dir,
+    eq_fraction=0.5,       # discard first 50% as burn-in (default)
+    target_temp=300.0,     # filter to 300 K rows if log is multi-T
+)
+```
+
+**Result fields:**
+- `plateau_density_mean`, `plateau_density_std` — primary output
+- `plateau_step_range` — verify plateau starts after compression ramp ends
+- `naive_mean`, `naive_std` — compare to plateau for sanity
+
+Density passes if `plateau_density_mean` is within ±5% of experimental; flag if outside ±10%.
+
+---
+
+## Common Failures
+
+**`check_equilibration_comprehensive` returns `overall_pass=False`:**
+- Convergence failure (density drift, energy not plateaued) → return `EXTEND` — orchestrator extends chain 1–2 ns and re-Monitors
+- Hard structural failure (box collapse, charge imbalance, C(t)=0% for a rubbery class) → return `FAIL` — orchestrator writes UNRESOLVED
+
+**`extract_equilibrated_density` returns implausibly low density (<0.5 g/cm³):**
+The NPT production log may contain the compression ramp rather than the production plateau. Verify `plateau_step_range` starts after the ramp ends. Increase `eq_fraction` to 0.7.

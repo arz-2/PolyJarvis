@@ -82,6 +82,10 @@ def main():
     p.add_argument("--exp_K_max",       type=float, default=None)
     p.add_argument("--graphs_dir",      default=None,
                    help="Directory where PNG figures were saved (default: <output_dir>/figures/)")
+    p.add_argument("--run_plan",        default=None,
+                   help="Path to the approved run_plan.json. When given, its structured "
+                        "decisions (evidence/confidence/alternatives) and critique are carried "
+                        "into the summary, closing the planned→executed→validated loop.")
     args = p.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -204,6 +208,13 @@ def main():
     artifacts = {k: v for k, v in artifacts.items() if v is not None}
 
     # -----------------------------------------------------------------------
+    # Plan provenance — carry the approved run_plan.json decisions through
+    # -----------------------------------------------------------------------
+    plan = _load_json(args.run_plan) if args.run_plan else {}
+    if plan:
+        artifacts["run_plan"] = "raw/run_plan.json"
+
+    # -----------------------------------------------------------------------
     # Provenance
     # -----------------------------------------------------------------------
     mda_version = (e2e.get("mdanalysis_version") or rg.get("mdanalysis_version")
@@ -230,6 +241,14 @@ def main():
             "D-05_convergence":  args.d05,
             "D-06_tg_fit_quality": args.d06,
         },
+        "plan": {
+            "plan_mode":      plan.get("plan_mode"),
+            "confidence":     plan.get("confidence"),
+            "critique":       plan.get("critique"),
+            "uncertainties":  plan.get("uncertainties"),
+            # structured decisions with evidence/confidence/alternatives, keyed by id
+            "decisions":      {d.get("id"): d for d in plan.get("decisions", [])},
+        } if plan else None,
         "results": {
             "tg": {
                 "value_K":        Tg_val,

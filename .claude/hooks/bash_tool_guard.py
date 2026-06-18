@@ -22,7 +22,7 @@ SCRIPT_TO_TOOL = [
     ("mda_orientation_order.py",        "check_orientation_order"),
     ("mda_density_homogeneity.py",      "check_density_homogeneity"),
     ("check_equilibration.py",          "check_equilibration_comprehensive"),
-    ("extract_tg.py",                   "extract_tg"),
+    ("extract_thermal.py",              "extract_thermal"),
     ("extract_bulk_modulus.py",         "extract_bulk_modulus"),
     ("extract_equilibrated_density.py", "extract_equilibrated_density"),
     ("unwrap_dump.py",                  "unwrap_coordinates"),

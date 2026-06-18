@@ -23,7 +23,7 @@ REQUIRED_FIELDS: dict[str, list[str]] = {
     "build": ["data_path", "lammps_flags", "polymer_class", "ff"],
     "equil": ["chain_id", "expected_equil_data", "npt_prod_log_path", "monitor_command"],
     "tg": ["run_id", "tg_log_path", "monitor_command"],
-    "tg-analysis": ["run_name", "Tg_K", "Tg_fit_quality", "Tg_r_squared", "overall_verdict", "output_dir"],
+    "tg-analysis": ["run_name", "Tg_K", "Tg_fit_quality", "Tg_r_squared", "cte_glassy_per_K", "cte_rubbery_per_K", "overall_verdict", "output_dir"],
     "deform": ["run_id", "monitor_command", "deform_log_path", "is_glassy"],
     "born": ["run_id", "born_log_path", "born_matrix_file", "n_atoms", "monitor_command"],
     "property-analysis": [

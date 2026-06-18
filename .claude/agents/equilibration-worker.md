@@ -4,13 +4,12 @@ description: Stage 2 worker — validates a .data file, generates the equilibrat
 tools:
   - Read
   - Bash
-  - mcp__mcp-lammps-engine__parse_data_file
-  - mcp__mcp-lammps-engine__validate_data_file
+  - mcp__mcp-lammps-engine__inspect_data_file
   - mcp__mcp-lammps-engine__generate_equilibration_workflow
   - mcp__mcp-lammps-engine__run_lammps_chain
   - mcp__mcp-lammps-engine__watch_run
-  - mcp__mcp-lammps-engine__read_log
-  - mcp__mcp-lammps-engine__list_runs
+  - Write
+  - Edit
 model: sonnet
 color: orange
 memory: project
@@ -27,11 +26,10 @@ Check agent memory for known validation failures or GPU submission issues before
 Your full stage guide is inlined at the bottom of this prompt — read it before using any tools. Run `nvidia-smi --query-gpu=index,memory.used,memory.free --format=csv,noheader` to confirm GPU availability and that the requested gpu_ids are free before submission.
 
 Follow the inlined stage guide exactly:
-1. `parse_data_file(data_path)` — extract n_atoms, box dims, H type IDs
-2. `validate_data_file(data_path, ...)` — confirm charge neutrality, Coeffs present, box size OK
-3. `generate_equilibration_workflow(data_file=data_path, work_dir_base=work_dir, use_pcff=..., use_opls=...)` — generates 6-stage chain
-4. `run_lammps_chain(stages=workflow["stages"], gpu_ids=gpu_ids, mpi=mpi_ranks)` — submit async
-5. `watch_run(chain_id)` — get the monitor_command string
+1. `inspect_data_file(data_file=data_path)` — extract n_atoms, box dims, H type IDs, charge neutrality, Coeffs present, box size OK (parse + validate in one call)
+2. `generate_equilibration_workflow(data_file=data_path, work_dir_base=work_dir, use_pcff=..., use_opls=...)` — generates 6-stage chain
+3. `run_lammps_chain(stages=workflow["stages"], gpu_ids=gpu_ids, mpi=mpi_ranks)` — submit async
+4. `watch_run(chain_id)` — get the monitor_command string
 
 **Temperature mapping — use exp_Tg_K from polymer_rules.json to select path:**
 
@@ -67,7 +65,7 @@ RESULT:
   npt_prod_data_path: <workflow["npt_production_dir"]>/<stage>_out.data
   monitor_command: <monitor_command string from watch_run>
   gpu_ids_used: "0,1,2,3"
-  n_atoms: <n_atoms from parse_data_file>
+  n_atoms: <n_atoms from inspect_data_file>
   n_stages: <workflow["n_stages"]>
 ```
 
@@ -75,6 +73,6 @@ If validation fails or submission fails, end with:
 ```
 RESULT:
   error: <concise description>
-  step_failed: validate_data_file | generate_equilibration_workflow | run_lammps_chain
+  step_failed: inspect_data_file | generate_equilibration_workflow | run_lammps_chain
   action_needed: <what orchestrator should adjust>
 ```

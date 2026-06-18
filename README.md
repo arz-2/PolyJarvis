@@ -59,7 +59,7 @@ SMILES string
 │  STAGE 3 · T_g Measurement                 │
 │  Temperature sweep T_start → 300K          │
 │  (25–20K steps, 0.5–1 ns/T)               │
-│  extract_tg → bilinear F-stat fit          │
+│  extract_thermal → Tg + CTE + ΔCp          │
 └────────────────────┬────────────────────────┘
                      │
                      ▼
@@ -101,7 +101,7 @@ PolyJarvis/
 │   └── mcp-lammps-engine/          # Simulation & analysis (LAMMPS)
 │       ├── server.py               # 25 MCP tools
 │       ├── script_generator.py     # Template filler — GAFF2, OPLS-AA, PCFF
-│       ├── analysis_scripts/       # Bundled MDAnalysis scripts (extract_tg, RDF, MSD…)
+│       ├── analysis_scripts/       # Bundled MDAnalysis scripts (extract_thermal, RDF, MSD…)
 │       └── templates/              # 9 validated LAMMPS script templates
 ├── data/                           # Completed example runs
 │   ├── PE{1,2,3}/                  # Polyethylene

@@ -7,7 +7,7 @@ is written into a temp file at test time rather than committed as a fixture --
 """
 import pytest
 
-from extract_tg import parse_lammps_log
+from extract_thermal import parse_lammps_log
 
 # Two thermo run blocks (5 data rows total) wrapped in realistic log noise.
 SAMPLE_LOG = """\

@@ -1,6 +1,6 @@
 ---
 name: molecule-builder
-description: Stage 1 worker — builds a LAMMPS-ready .data file from a SMILES string. Use when given SMILES, polymer_class, run_name, work_dir, dp, nchain, density_initial. Routes all 19 EMC classes to mcp-emc-server: PCFF→PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL; OPLS-AA→PHAL; TraPPE-UA→PHYC/PDIE/PSTR. RadonPy path for PURA only. PSIL (polysiloxane) has no working builder — builder_status=unsupported.
+description: Stage 1 worker — builds a LAMMPS-ready .data file from a SMILES string. Use when given SMILES, polymer_class, run_name, work_dir, dp, nchain, density_initial.
 tools:
   - Read
   - Bash

@@ -1,4 +1,4 @@
-"""Unit tests for the Tg bilinear fit (extract_tg).
+"""Unit tests for the thermal property bilinear fits (extract_thermal).
 
 curvefit_bilinear *is* the reported glass-transition temperature. We feed it a
 synthetic density-vs-temperature curve with a known kink and confirm it recovers
@@ -6,7 +6,7 @@ that temperature with a near-perfect fit.
 """
 import numpy as np
 
-from extract_tg import (
+from extract_thermal import (
     bilinear_indep,
     curvefit_bilinear,
     curvefit_hyperbola,

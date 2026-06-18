@@ -27,7 +27,7 @@ Tools exposed:
   13. calculate_rdf                     - g(r) via MDAnalysis InterRDF
   14. check_equilibration_comprehensive - All convergence + structural checks, one call, one verdict
   15. extract_equilibrated_density      - Plateau density via reverse-cumulative-mean
-  16. extract_tg                        - Tg via bilinear curve_fit (standard polymer MD method)
+  16. extract_thermal                   - Tg, CTE (α_g, α_r), ΔCp via bilinear curve_fit (standard polymer MD method)
   16b. extract_tg_multirate             - Multi-rate Tg: log-linear + VF fit across cooling rates
   17. extract_bulk_modulus              - Isothermal K via NPT volume fluctuations
 """
@@ -1052,26 +1052,26 @@ def generate_equilibration_workflow(
     LAMMPS scripts. Mirrors the Larsen 21-step logic but with full
     parameter control.
 
-    Protocol (7 stages, rubbery: temp ≤ 300 K):
-      Stage 01: minimize         - energy minimization in amorphous cell
-      Stage 02: nvt_softheat     - NVT heat from 300 K to max_temp
-      Stage 03: npt_compress     - NPT compress to max_press at max_temp
-      Stage 04: npt_pppm         - NPT decompress from max_press to 1 atm
-      Stage 05: npt_cool         - NPT cool from max_temp to target temp
-      Stage 06: nvt_production   - NVT production at target temp (GPU on; MSD/C(t) analysis)
-      Stage 07: npt_production   - NPT constant-T/P at target conditions (GPU on; bulk modulus)
+    Protocol (7-run chain, rubbery: temp ≤ 300 K):
+      minimize         - energy minimization in amorphous cell
+      nvt_softheat     - NVT heat from 300 K to max_temp
+      npt_compress     - NPT compress to max_press at max_temp
+      npt_pppm         - NPT decompress from max_press to 1 atm
+      npt_cool         - NPT cool from max_temp to target temp
+      nvt_production   - NVT production at target temp (GPU on; MSD/C(t) analysis)
+      npt_production   - NPT constant-T/P at target conditions (GPU on; bulk modulus)
 
-    Protocol (9 stages, glassy: temp > 300 K, add_300k_production=True [default]):
-      Stages 01-07: same as above (run at melt temperature)
-      Stage 08: npt_cool300      - NPT cool temp → 300 K (~1 ns)
-      Stage 09: npt_prod300      - NPT constant-T at 300 K (~2 ns) — density and deform source
+    Protocol (9-run chain, glassy: temp > 300 K, add_300k_production=True [default]):
+      Runs 1–7: same as above (at melt temperature)
+      npt_cool300      - NPT cool temp → 300 K (~1 ns)
+      npt_prod300      - NPT constant-T at 300 K (~2 ns) — density and deform source
 
-    Protocol (9 stages, add_melt_npt=True, rubbery only: temp < t_equil_K):
-      Stages 01-04: unchanged
-      Stage 05a: npt_cool_melt   - NPT cool max_temp → t_equil_K
-      Stage 05b: npt_melt        - NPT isothermal at t_equil_K (melt density extraction)
-      Stage 05c: npt_cool        - NPT cool t_equil_K → temp  (replaces original 05)
-      Stages 06-07: unchanged
+    Protocol (9-run chain, add_melt_npt=True, rubbery only: temp < t_equil_K):
+      Runs 1–4: unchanged
+      npt_cool_melt    - NPT cool max_temp → t_equil_K
+      npt_melt         - NPT isothermal at t_equil_K (melt density extraction)
+      npt_cool         - NPT cool t_equil_K → temp  (replaces standard npt_cool)
+      Runs 6–7: unchanged
 
     Args:
         data_file:      Path to the .data file.
@@ -1083,7 +1083,7 @@ def generate_equilibration_workflow(
         max_press:      Compression pressure (atm), typically 50000.
         n_chains:       Number of polymer chains (informational).
         n_atoms:        Total atom count. Auto-detected if not provided.
-        npt_prod_steps: Explicit step count for Stage 7 NPT production. When None
+        npt_prod_steps: Explicit step count for npt_production run. When None
                         (default), uses steps_npt // 2 from the atom-count tier.
                         Convert from ns: int(t_ns * 1e6 / dt_fs).
         use_pcff:       Set True for EMC/PCFF class2 systems (PCBN, PAMD, PKTN,
@@ -1094,7 +1094,7 @@ def generate_equilibration_workflow(
         use_trappe:     Set True for EMC/TraPPE-UA systems (PHYC, PDIE, PSTR).
                         Switches all templates to pair_style lj/cut 14.0 (no
                         kspace), multi/harmonic dihedrals, and SHAKE on all
-                        C-C bond types (enables dt=2 fs for stages 04-07).
+                        C-C bond types (enables dt=2 fs for npt_pppm through npt_production).
         use_opls:       Set True for EMC/OPLS-AA systems (PHAL, PSIL).
                         Switches all templates to pair_style lj/cut/coul/long 9.5,
                         multi/harmonic dihedrals, geometric mixing, special_bonds
@@ -1105,21 +1105,20 @@ def generate_equilibration_workflow(
                         When provided, Coeffs validation is skipped on the .data
                         file (EMC stores coefficients separately) and each script
                         includes the file via `include {params_file}`.
-        add_melt_npt:        If True and temp < t_equil_K, split stage 05 into 05a
-                             (cool max_temp→t_equil_K) + 05b (isothermal NPT at t_equil_K)
-                             + 05c (cool t_equil_K→temp). Stage 05b is the melt density
-                             extraction target. Default False (standard 7-stage workflow).
+        add_melt_npt:        If True and temp < t_equil_K, replace npt_cool with three
+                             runs: npt_cool_melt (max_temp→t_equil_K), npt_melt
+                             (isothermal at t_equil_K), npt_cool (t_equil_K→temp).
+                             npt_melt is the melt density extraction target.
+                             Default False (standard 7-run workflow).
         t_equil_K:           Melt equilibration temperature (K). Required when
                              add_melt_npt=True. Must satisfy temp < t_equil_K < max_temp.
-        melt_npt_steps:      Step count for stage 05b NPT isothermal run. Defaults to
+        melt_npt_steps:      Step count for npt_melt isothermal run. Defaults to
                              int(1.0e6 / dt_prod) (≈1 ns at the production timestep).
-        add_300k_production: When True (default) and temp > 300.0, append two stages
-                             after stage 07: 08_npt_cool300 (T→300 K, ~1 ns) and
-                             09_npt_prod300 (300 K constant-T, ~2 ns). These provide
-                             the density and deformation input for glassy polymers.
-                             npt_production_log/dir in the return dict point to stage 09
-                             when these stages are present. Set False only to suppress
-                             for diagnostic or rubbery-at-high-T runs.
+        add_300k_production: When True (default) and temp > 300.0, append npt_cool300
+                             (T→300 K, ~1 ns) and npt_prod300 (300 K constant-T, ~2 ns).
+                             These provide density and deformation input for glassy polymers.
+                             npt_production_log/dir in the return dict point to npt_prod300
+                             when present. Set False only for diagnostic or rubbery-at-high-T runs.
 
     Returns:
         dict with:
@@ -1195,7 +1194,7 @@ def generate_equilibration_workflow(
         if params_file:
             ff_base["params_file"] = params_file
 
-        # TraPPE-UA with SHAKE enables 2 fs timestep for stages 04-07.
+        # TraPPE-UA with SHAKE enables 2 fs timestep for npt_pppm through npt_production.
         # Stages 02-03 keep 0.5 fs (chain overlap risk at startup is too high for large dt).
         dt_prod = 2.0 if use_trappe else 1.0
 
@@ -1230,8 +1229,8 @@ def generate_equilibration_workflow(
                 "params":          p,
             }
 
-        # Stage 1: Minimize
-        s1 = _stage("01_minimize", "minimize", {
+        # minimize
+        s1 = _stage("minimize", "minimize", {
             "use_pppm":  True,
             "use_gpu":   True,
             "MIN_STYLE": "cg",
@@ -1239,8 +1238,8 @@ def generate_equilibration_workflow(
         }, data_file)
         stages.append(s1)
 
-        # Stage 2: NVT soft heat — GPU + PPPM throughout
-        s2 = _stage("02_nvt_softheat", "nvt", {
+        # nvt_softheat — GPU + PPPM throughout
+        s2 = _stage("nvt_softheat", "nvt", {
             "T_START":    300.0,
             "T_FINAL":    max_temp,
             "T_DAMP":     50.0,
@@ -1253,14 +1252,13 @@ def generate_equilibration_workflow(
         }, s1["output_data"])
         stages.append(s2)
 
-        # Stage 3: NPT compression to target density.
+        # npt_compress — NPT compression to target density.
         # OPLS-AA: use short-range Coulomb (use_pppm=False → lj/cut/coul/cut) during compression
         # to prevent PPPM "out of range atoms" crash when the box shrinks rapidly at high pressure.
-        # Mirrors the GAFF2 cutoff-compression path. Full PPPM resumes at stage 04.
-        # ff_base temporarily overridden here so use_pppm=False wins over ff_base's use_opls=True.
+        # Full PPPM resumes at npt_pppm. ff_base temporarily overridden so use_pppm=False wins.
         saved_ff_base = ff_base
         ff_base = {**ff_base, "use_pppm": False} if use_opls else ff_base
-        s3 = _stage("03_npt_compress", "npt_compress", {
+        s3 = _stage("npt_compress", "npt_compress", {
             "T_START":   max_temp,
             "T_FINAL":   max_temp,
             "T_DAMP":    100.0,
@@ -1275,8 +1273,8 @@ def generate_equilibration_workflow(
         stages.append(s3)
         ff_base = saved_ff_base  # restore PPPM for all subsequent stages
 
-        # Stage 4: NPT decompress — GPU + PPPM
-        s4 = _stage("04_npt_pppm", "npt", {
+        # npt_pppm — NPT decompress, GPU + PPPM
+        s4 = _stage("npt_pppm", "npt", {
             "T_START":   max_temp,
             "T_FINAL":   max_temp,
             "T_DAMP":    100.0,
@@ -1291,8 +1289,8 @@ def generate_equilibration_workflow(
         }, s3["output_data"])
         stages.append(s4)
 
-        # Stage 5: NPT cool to target temp.
-        # With add_melt_npt=True (rubbery validation runs): split into 05a/05b/05c
+        # npt_cool — NPT cool to target temp.
+        # With add_melt_npt=True (rubbery validation runs): split into npt_cool_melt/npt_melt/npt_cool
         # to capture an isothermal NPT run at t_equil_K for melt density extraction.
         _use_melt_npt = (
             add_melt_npt
@@ -1301,7 +1299,7 @@ def generate_equilibration_workflow(
         )
         if _use_melt_npt:
             _melt_steps = melt_npt_steps or int(1.0e6 / dt_prod)
-            s5a = _stage("05a_npt_cool_melt", "npt", {
+            s5a = _stage("npt_cool_melt", "npt", {
                 "T_START":   max_temp,
                 "T_FINAL":   t_equil_K,
                 "T_DAMP":    100.0,
@@ -1315,7 +1313,7 @@ def generate_equilibration_workflow(
                 "write_restart": True,
             }, s4["output_data"])
             stages.append(s5a)
-            s5b = _stage("05b_npt_melt", "npt", {
+            s5b = _stage("npt_melt", "npt", {
                 "T_START":   t_equil_K,
                 "T_FINAL":   t_equil_K,
                 "T_DAMP":    100.0,
@@ -1329,7 +1327,7 @@ def generate_equilibration_workflow(
                 "write_restart": True,
             }, s5a["output_data"])
             stages.append(s5b)
-            s5 = _stage("05c_npt_cool", "npt", {
+            s5 = _stage("npt_cool", "npt", {
                 "T_START":   t_equil_K,
                 "T_FINAL":   temp,
                 "T_DAMP":    100.0,
@@ -1344,7 +1342,7 @@ def generate_equilibration_workflow(
             }, s5b["output_data"])
             stages.append(s5)
         else:
-            s5 = _stage("05_npt_cool", "npt", {
+            s5 = _stage("npt_cool", "npt", {
                 "T_START":   max_temp,
                 "T_FINAL":   temp,
                 "T_DAMP":    100.0,
@@ -1359,8 +1357,8 @@ def generate_equilibration_workflow(
             }, s4["output_data"])
             stages.append(s5)
 
-        # Stage 6: NVT production — GPU + PPPM
-        s6 = _stage("06_nvt_production", "nvt", {
+        # nvt_production — NVT production, GPU + PPPM
+        s6 = _stage("nvt_production", "nvt", {
             "T_START":   temp,
             "T_FINAL":   temp,
             "T_DAMP":    100.0,
@@ -1372,11 +1370,11 @@ def generate_equilibration_workflow(
         }, s5["output_data"])
         stages.append(s6)
 
-        # Stage 7: NPT production at target conditions — dedicated for K_T measurement.
-        # Must be constant-T/P; the Stage 5 cooling ramp is invalid for the volume
-        # fluctuation method. Reads from Stage 6 NVT output (best-equilibrated config).
+        # npt_production — NPT production at target conditions, dedicated for K_T measurement.
+        # Must be constant-T/P; the npt_cool ramp is invalid for volume fluctuation method.
+        # Reads from nvt_production output (best-equilibrated config).
         steps_npt_prod = npt_prod_steps if npt_prod_steps is not None else steps_npt // 2
-        s7 = _stage("07_npt_production", "npt", {
+        s7 = _stage("npt_production", "npt", {
             "T_START":       temp,
             "T_FINAL":       temp,
             "T_DAMP":        100.0,
@@ -1391,7 +1389,7 @@ def generate_equilibration_workflow(
         }, s6["output_data"])
         stages.append(s7)
 
-        # Stages 08/09: cool and produce at 300 K for glassy polymers.
+        # npt_cool300 + npt_prod300 (glassy only): cool and produce at 300 K.
         # temp > 300 means the chain runs at melt T; density and deform inputs
         # must come from a constant-T 300 K run, not the cooling-ramp tail.
         _add_300k = add_300k_production and temp > 300.0
@@ -1399,7 +1397,7 @@ def generate_equilibration_workflow(
         if _add_300k:
             steps_cool300 = int(1.0e6 / dt_prod)   # ~1 ns
             steps_prod300 = int(2.0e6 / dt_prod)   # ~2 ns
-            s8 = _stage("08_npt_cool300", "npt", {
+            s8 = _stage("npt_cool300", "npt", {
                 "T_START":       temp,
                 "T_FINAL":       300.0,
                 "T_DAMP":        100.0,
@@ -1413,7 +1411,7 @@ def generate_equilibration_workflow(
                 "write_restart": False,
             }, s7["output_data"])
             stages.append(s8)
-            s9 = _stage("09_npt_prod300", "npt", {
+            s9 = _stage("npt_prod300", "npt", {
                 "T_START":       300.0,
                 "T_FINAL":       300.0,
                 "T_DAMP":        100.0,
@@ -1428,7 +1426,7 @@ def generate_equilibration_workflow(
             }, s8["output_data"])
             stages.append(s9)
 
-        # npt_production_log/dir point to the last NPT stage (09 when present, else 07)
+        # npt_production_log/dir point to npt_prod300 (glassy) or npt_production (rubbery)
         _npt_final = s9 if _add_300k else s7
         ret = {
             "status":     "success",
@@ -1448,9 +1446,9 @@ def generate_equilibration_workflow(
                 "Execute in order using run_lammps_script().\n"
                 "GPU is ON for all stages.\n"
                 + (
-                    "Stages 08/09 cool to 300 K and produce at 300 K — use these for density and deformation.\n"
+                    "npt_cool300 + npt_prod300 cool to 300 K and produce at 300 K — use npt_prod300 for density and deformation.\n"
                     if _add_300k else
-                    "Stage 7 (07_npt_production) is a constant-T/P NPT run for bulk modulus (volume fluctuation method).\n"
+                    "npt_production is a constant-T/P NPT run for bulk modulus (volume fluctuation method).\n"
                 )
                 + "Submit stages as a chain using run_lammps_chain()."
             ),
@@ -1806,23 +1804,24 @@ def calculate_rdf(
     }
 
 
-# ── Tool: extract_tg ──────────────────────────────────────────────────────────
+# ── Tool: extract_thermal ─────────────────────────────────────────────────────
 
-def _run_extract_tg(
+def _run_extract_thermal(
     log_file: str,
     output_dir: str,
     initial_tg_guess: Optional[float],
     equilibration_fraction: float,
     temp_col: str,
     density_col: str,
+    enthalpy_col: str = "Enthalpy",
     graphs_dir: Optional[str] = None,
     per_t_dump_file: Optional[str] = None,
     tg_data_file: Optional[str] = None,
     backbone_types: Optional[List[str]] = None,
 ) -> dict:
-    """Background worker — runs extract_tg.py via CLI."""
+    """Background worker — runs extract_thermal.py via CLI."""
 
-    parts = [f"python {MDA_SCRIPTS_DIR}/extract_tg.py"]
+    parts = [f"python {MDA_SCRIPTS_DIR}/extract_thermal.py"]
     parts.append(f"--log_file {log_file}")
     parts.append(f"--output_dir {output_dir}")
     if initial_tg_guess is not None:
@@ -1830,6 +1829,7 @@ def _run_extract_tg(
     parts.append(f"--equilibration_fraction {equilibration_fraction}")
     parts.append(f"--temp_col {temp_col}")
     parts.append(f"--density_col {density_col}")
+    parts.append(f"--enthalpy_col {enthalpy_col}")
     if graphs_dir:
         parts.append(f"--graphs_dir {graphs_dir}")
     if per_t_dump_file:
@@ -1840,7 +1840,7 @@ def _run_extract_tg(
         parts.append(f"--backbone_types {' '.join(str(t) for t in backbone_types)}")
 
     command = " ".join(parts)
-    logger.info(f"Running Tg extraction via CLI: {command}")
+    logger.info(f"Running thermal extraction via CLI: {command}")
 
     stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
 
@@ -1867,7 +1867,7 @@ def _run_extract_tg(
 
 
 @mcp.tool()
-def extract_tg(
+def extract_thermal(
     log_file: str,
     output_dir: Optional[str] = None,
     graphs_dir: Optional[str] = None,
@@ -1875,16 +1875,17 @@ def extract_tg(
     equilibration_fraction: float = 0.5,
     temp_col: str = "Temp",
     density_col: str = "Density",
+    enthalpy_col: str = "Enthalpy",
     per_t_dump_file: Optional[str] = None,
     tg_data_file: Optional[str] = None,
     backbone_types: Optional[List[str]] = None,
 ) -> dict:
     """
-    Extract glass transition temperature (Tg) from a LAMMPS MD temperature-sweep log.
+    Extract thermal properties (Tg, CTE, ΔCp) from a LAMMPS MD temperature-sweep log.
 
     Methodology (v5 — June 2026):
       Data: Plateau detection (|ΔT|>15 K jump = new set-point) with
-      equilibration burn-in, producing one clean (T, ρ) point per plateau.
+      equilibration burn-in, producing one clean (T, ρ, H) point per plateau.
       Plateaus with density drift > 1% are excluded from fitting: ≥20-row
       plateaus require drift > 1% AND p < 0.01; 3–19-row plateaus use
       magnitude-only (p-value unreliable for short autocorrelated series).
@@ -1895,12 +1896,12 @@ def extract_tg(
       enforced (both slopes negative, rubbery steeper than glassy).  This is
       the standard method used in polymer MD literature (Afzal 2021, Hayashi/
       RadonPy 2022, Klajmon 2023, NkepsuMbitou 2025).
-      Quality: Rated by bilinear R².
+      CTE: α = -(1/ρ) dρ/dT = -a_branch / ρ_mean_branch from the density fit.
+      ΔCp: bilinear fit of H(T) from the Enthalpy thermo column (kcal/mol);
+           normalised by system mass parsed from tg_data_file.  Skipped if
+           Enthalpy column absent or tg_data_file not provided.
       Structural (optional): if per_t_dump_file + tg_data_file are given,
-      computes per-T Rg and P2 nematic order. Flags anomalous P2 > 0.10 and
-      Rg CV > 0.30 for T > Tg (rubbery regime only — glassy regime is expected
-      to be structurally frozen). Also fits Rg(T) bilinearly to extract an
-      independent dynamic Tg (Rg-kink method) for cross-validation.
+      computes per-T Rg and P2 nematic order.
 
     References:
       Afzal et al., ACS Appl. Polym. Mater. 3 (2021) 6213–6228
@@ -1917,18 +1918,22 @@ def extract_tg(
                                 averaging (0.5 = last 50 %).
         temp_col:               Temperature column name (default: 'Temp').
         density_col:            Density column name (default: 'Density').
+        enthalpy_col:           Enthalpy column name (default: 'Enthalpy').
+                                Used for ΔCp calculation.
         per_t_dump_file:        Path to per-T structural dump written by the
                                 Tg staircase (one frame per T step, cooling order).
                                 Enables dump-based structural analysis.
         tg_data_file:           LAMMPS .data file used as input to the Tg sweep
-                                (topology/masses for MDAnalysis). Required when
-                                per_t_dump_file is provided.
+                                (topology/masses). Required for ΔCp mass
+                                normalisation and MDAnalysis structural analysis.
         backbone_types:         Backbone atom type IDs (list of strings/ints).
                                 Used for P2 nematic order computation.
 
     Returns:
         dict with run_id.  Result includes Tg_K, Tg_alternative_K,
         r_squared, fit_quality, fit_method, binning_method,
+        cte_glassy_per_K, cte_rubbery_per_K (always when fit succeeds),
+        dCp_J_per_g_K, dCp_status (when Enthalpy column + tg_data_file present),
         n_plateaus_skipped_drift, n_plateaus_low_n_eff,
         relaxation_metrics (per-plateau n_eff + tau_int),
         fit_params, n_temperature_bins, temp_range_K, bins_csv, summary_json.
@@ -1938,16 +1943,17 @@ def extract_tg(
     if output_dir is None:
         output_dir = str(Path(log_file).parent / "tg_analysis")
 
-    run_id = run_manager.create("extract_tg", {"log_file": log_file, "output_dir": output_dir})
+    run_id = run_manager.create("extract_thermal", {"log_file": log_file, "output_dir": output_dir})
     t = threading.Thread(
         target=_analysis_run_background,
-        args=(run_id, _run_extract_tg, dict(
+        args=(run_id, _run_extract_thermal, dict(
             log_file               = log_file,
             output_dir             = output_dir,
             initial_tg_guess       = initial_tg_guess,
             equilibration_fraction = equilibration_fraction,
             temp_col               = temp_col,
             density_col            = density_col,
+            enthalpy_col           = enthalpy_col,
             graphs_dir             = graphs_dir,
             per_t_dump_file        = per_t_dump_file,
             tg_data_file           = tg_data_file,
@@ -1959,7 +1965,7 @@ def extract_tg(
     return {
         "status":     "submitted",
         "run_id":     run_id,
-        "run_type":   "extract_tg",
+        "run_type":   "extract_thermal",
         "log_file":   log_file,
         "output_dir": output_dir,
         "message":    "Poll with get_run_status(run_id)",
@@ -2019,7 +2025,7 @@ def extract_tg_multirate(
 
     Args:
         rates_K_per_ns:          List of cooling rates in K/ns (same order as tg_values_K).
-        tg_values_K:             Tg_MD values in K from extract_tg runs at each rate.
+        tg_values_K:             Tg_MD values in K from extract_thermal runs at each rate.
         output_dir:              Directory for JSON, markdown, and plot outputs.
         polymer_name:            Label for outputs and plot title.
         slow_rate_ref_K_per_ns:  Reference rate for log-linear Tg reporting (default 5.0).

@@ -45,7 +45,7 @@
       "GAFF/GAFF2 Tg accuracy warning: for Class I FFs, Tg errors >40% have been reported for PMMA and PIB (NkepsuMbitou2025). Class II FFs (PCFF, IFF) give <10% error. PolyJarvis routes 20 classes to EMC/PCFF or EMC/TraPPE-UA/OPLS-AA precisely for this reason. For PURA (RadonPy/GAFF2_mod, the only remaining RadonPy class), Tg results are screening-quality (\u00b120\u201330 K) unless validated against experiment.",
       "No quantitative density-drift pass/fail threshold exists in published literature (Turney & Matta Macromolecules 2025 DOI:10.1021/acs.macromol.5c01166). PolyJarvis 1%/500 ps criterion is more rigorous than any published protocol.",
       "PCFF system size: Bejagam et al. Phys. Chem. Chem. Phys. 2020 (DOI:10.1039/D0CP03163A) recommends 20 chains \u00d7 100-mer as the minimum converged production system for PCFF PHA simulations. Klajmon 2023 reports Tg converges at ~4,000 g/mol and density converges at ~9,000 g/mol per chain. Current nchain=10 is validated by Hayashi2022 (low variance at 10 chains across 1,138 polymers) and is a throughput compromise; nchain=20 is the literature-recommended production minimum for PCFF classes.",
-      "Objective Tg extraction: Carmona Esteva et al. J. Chem. Phys. 2024 (DOI:10.1063/5.0207835) shows bilinear fitting-range selection introduces \u00b120\u201340 K analyst variability. Proposes Shapiro-Wilk normality test on residuals to objectively identify valid linear regimes. Open-source code available. Recommended upgrade to the Patrone bilinear method used in extract_tg."
+      "Objective Tg extraction: Carmona Esteva et al. J. Chem. Phys. 2024 (DOI:10.1063/5.0207835) shows bilinear fitting-range selection introduces \u00b120\u201340 K analyst variability. Proposes Shapiro-Wilk normality test on residuals to objectively identify valid linear regimes. Open-source code available. Recommended upgrade to the Patrone bilinear method used in extract_thermal."
     ],
     "primary_sources": [
       {
@@ -188,7 +188,7 @@
         "id": "CarmonaEsteva2024",
         "citation": "Carmona Esteva, F. J.; Zhang, Y.; Maginn, E. J.; Col\u00f3n, Y. J. Consistent and reproducible computation of the glass transition temperature from molecular dynamics simulations. J. Chem. Phys. 2024, 161, 014108.",
         "doi": "10.1063/5.0207835",
-        "relevance": "Bilinear fitting-range selection introduces \u00b120\u201340 K analyst variability in Tg. Proposes Shapiro-Wilk normality test on residuals to objectively identify valid linear regimes in both glassy and melt phases. Open-source code available. Recommended upgrade to the Patrone bilinear method used in extract_tg."
+        "relevance": "Bilinear fitting-range selection introduces \u00b120\u201340 K analyst variability in Tg. Proposes Shapiro-Wilk normality test on residuals to objectively identify valid linear regimes in both glassy and melt phases. Open-source code available. Recommended upgrade to the Patrone bilinear method used in extract_thermal."
       },
       {
         "id": "Suter2025",

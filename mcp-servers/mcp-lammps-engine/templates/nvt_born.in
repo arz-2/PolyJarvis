@@ -88,16 +88,20 @@ timestep {TIMESTEP}
 fix nvt_fix all nvt temp {T_START} {T_FINAL} {T_DAMP}
 
 # --- Born Matrix (EXTRA-COMPUTE package required) ---
-# compute born/matrix numdiff uses finite differences of per-atom virial stress
-# to compute the Born elastic constants tensor (6x6, Voigt notation, units: atm).
-# BORN_NUMDIFF_DELTA = {BORN_NUMDIFF_DELTA} Å (finite-difference displacement)
-compute born_matrix all born/matrix numdiff {BORN_NUMDIFF_DELTA}
-variable b11 equal c_born_matrix[1][1]
-variable b22 equal c_born_matrix[2][2]
-variable b33 equal c_born_matrix[3][3]
-variable b12 equal c_born_matrix[1][2]
-variable b13 equal c_born_matrix[1][3]
-variable b23 equal c_born_matrix[2][3]
+# compute born/matrix numdiff syntax: numdiff delta virial_compute_ID
+# delta = finite-difference strain displacement; virial_compute_ID = named pressure compute.
+# Output vector (21 elements, Voigt notation, units: atm):
+#   [1]=C11, [2]=C22, [3]=C33, [4]=C44, [5]=C55, [6]=C66,
+#   [7]=C12, [8]=C13, ..., [12]=C23, ...
+# K_Born = (C11+C22+C33 + 2*C12 + 2*C13 + 2*C23) / 9
+compute born_press all pressure thermo_temp
+compute born_matrix all born/matrix numdiff {BORN_NUMDIFF_DELTA} born_press
+variable b11 equal c_born_matrix[1]
+variable b22 equal c_born_matrix[2]
+variable b33 equal c_born_matrix[3]
+variable b12 equal c_born_matrix[7]
+variable b13 equal c_born_matrix[8]
+variable b23 equal c_born_matrix[12]
 # Average Born elements every BORN_FREQ steps using BORN_REPEAT samples taken BORN_EVERY steps apart.
 # Bulk modulus Born term: K_Born = (b11+b22+b33 + 2*b12+2*b13+2*b23) / 9
 fix born_avg all ave/time {BORN_EVERY} {BORN_REPEAT} {BORN_FREQ} v_b11 v_b22 v_b33 v_b12 v_b13 v_b23 file {BORN_MATRIX_FILE}
@@ -108,6 +112,7 @@ run {N_STEPS}
 unfix nvt_fix
 unfix born_avg
 uncompute born_matrix
+uncompute born_press
 {UNSHAKE_BLOCK}
 undump dump_nvt_born
 

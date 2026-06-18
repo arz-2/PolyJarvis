@@ -8,8 +8,7 @@ tools:
   - mcp__mcp-lammps-engine__run_lammps_script
   - mcp__mcp-lammps-engine__watch_run
   - mcp__mcp-lammps-engine__inspect_data_file
-  - mcp__mcp-lammps-engine__list_runs
-  - mcp__mcp-lammps-engine__get_template_defaults
+  - mcp__mcp-lammps-engine__list_templates
   - Write
   - Edit
 model: haiku
@@ -50,7 +49,7 @@ RESULT:
 
 1. Parse `n_atoms` from the data file: call `inspect_data_file(data_file=equil_data_path)` → extract `n_atoms` from result.
 
-2. Get template defaults: `get_template_defaults("nvt_born")` — review all parameters before overriding.
+2. Get template defaults: `list_templates(template_name="nvt_born")` — review all parameters before overriding.
 
 3. Compute N_STEPS from born_run_ns in your prompt:
    ```
