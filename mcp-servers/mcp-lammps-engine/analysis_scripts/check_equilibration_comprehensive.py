@@ -47,6 +47,9 @@ import MDAnalysis.transformations as trans
 from scipy import stats as sp_stats
 from scipy.optimize import curve_fit
 from scipy.special import gamma as sp_gamma
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 from analysis_utils import compute_tau_eff
 
@@ -270,7 +273,7 @@ def _kww_fit(lags_ps, ct_values):
 
 def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
                             n_backbone_bonds, bond_length_A, timestep_fs, dump_every,
-                            grid_n, trajectory_slice, ct_min_decay=None):
+                            grid_n, trajectory_slice, ct_min_decay=None, graphs_dir=None):
     """Single-pass over dump frames. Returns raw per-frame arrays for all checks."""
     # Storage
     rg_sq_per_frame = []   # (n_frames, n_chains)
@@ -454,6 +457,34 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
             "pass": True if ct_min_decay is None else bool(decay_fraction >= ct_min_decay),
         }
 
+    # ── R_ee (end-to-end distance distribution) ──
+    ree_result = {"available": False}
+    ree_mags = np.linalg.norm(ree_arr, axis=-1)  # (n_frames, n_chains)
+    if not np.allclose(ree_arr, 0) and ree_mags.size > 0:
+        overall_mean_ree = float(ree_mags.mean())
+        overall_std_ree = float(ree_mags.std())
+        ree_result = {
+            "available": True,
+            "mean_R_ee_A": r(overall_mean_ree, 2),
+            "std_R_ee_A": r(overall_std_ree, 2),
+            "n_chains": int(ree_mags.shape[1]),
+            "end_to_end_distribution_png": None,
+        }
+        if graphs_dir is not None:
+            try:
+                fig, ax = plt.subplots(figsize=(5, 3.5))
+                ax.hist(ree_mags.flatten(), bins=20, edgecolor="white", linewidth=0.5)
+                ax.set_xlabel("|R$_{ee}$| (Å)")
+                ax.set_ylabel("Count")
+                ax.set_title("End-to-end distance distribution")
+                fig.tight_layout()
+                png_path = str(Path(graphs_dir) / "end_to_end_distribution.png")
+                fig.savefig(png_path, dpi=150)
+                plt.close(fig)
+                ree_result["end_to_end_distribution_png"] = png_path
+            except Exception as exc:
+                ree_result["end_to_end_distribution_png"] = f"failed: {exc}"
+
     # ── MSD ──
     max_lag_msd = n_frames // 2
     msd_lags = np.arange(1, max_lag_msd + 1)
@@ -517,6 +548,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
 
     return {
         "rg": rg_result,
+        "ree": ree_result,
         "msid": msid_result,
         "ct": ct_result,
         "msd": msd_result,
@@ -601,6 +633,15 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
     rg2 = rg.get("mean_Rg2_A2")
     label = "⚠ trapped" if trap else "OK"
     lines.append(f"| MSD kinetic trap | {'yes' if trap else 'no'} (α={alpha}, MSD={msd_max} Å²{'>>Rg²='+str(rg2) if rg2 else ''}) | — | {label} |")
+
+    ree = structural.get("ree", {})
+    if ree.get("available"):
+        lines.append(
+            f"| R_ee mean ± std | {ree.get('mean_R_ee_A')} ± {ree.get('std_R_ee_A')} Å "
+            f"(N={ree.get('n_chains')} chains) | — | INFO |"
+        )
+    else:
+        lines.append("| R_ee mean ± std | — | — | not available |")
 
     lines += ["", "### C. Spatial / packing",
               "| Check | Value | Threshold | Result |",
@@ -763,6 +804,7 @@ def main():
         grid_n=grid_n,
         trajectory_slice=traj_slice,
         ct_min_decay=args.ct_min_decay,
+        graphs_dir=args.graphs_dir,
     )
 
     # ── overall_pass ──
@@ -804,6 +846,7 @@ def main():
         },
         "chain": {
             "rg": structural["rg"],
+            "ree": structural["ree"],
             "msid": structural["msid"],
             "ct": structural["ct"],
             "msd": structural["msd"],

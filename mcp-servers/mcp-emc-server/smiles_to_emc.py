@@ -51,6 +51,7 @@ def make_esh(
     density: float = 0.9,
     ntotal: int = 3000,
     dp: int = 20,
+    nchains: int = 0,
 ) -> str:
     """
     Generate EMC .esh file content from a repeat-unit SMILES.
@@ -58,6 +59,12 @@ def make_esh(
     The SMILES must contain exactly two * atoms:
       - First * = left chain-end connection point
       - Second * = right chain-end connection point
+
+    Chain count:
+      - nchains > 0  → exact chain count via EMC "number" mode: emit
+        `number true` in ITEM OPTIONS and use nchains as the ITEM CLUSTERS
+        fraction. EMC then builds exactly nchains chains and ignores ntotal.
+      - nchains <= 0 → ntotal-driven sizing (chains ≈ ntotal / sites_per_chain).
 
     seed and temperature are passed as emc_setup.pl CLI flags (not .esh options).
     Returns the .esh file as a string (does not write to disk).
@@ -85,6 +92,13 @@ def make_esh(
     else:
         repeat_connect = f"{smiles},1,repeat:2"
         cap_line = "*[H],1,repeat:1,1,repeat:2"
+
+    # Chain count: with nchains>0, EMC "number" mode reads the cluster fraction
+    # as a literal molecule count (n_poly = f_poly); otherwise EMC sizes the cell
+    # from ntotal (n_poly = int(f_poly*ntotal/l_poly+0.5)).
+    use_number = nchains > 0
+    number_opt = "number          true\n" if use_number else ""
+    cluster_fraction = nchains if use_number else 1
     return f"""\
 ITEM OPTIONS
 
@@ -92,7 +106,7 @@ replace         true
 field           {field}
 density         {density:.6f}
 ntotal          {ntotal}
-
+{number_opt}
 ITEM END
 
 ITEM GROUPS
@@ -104,7 +118,7 @@ ITEM END
 
 ITEM CLUSTERS
 
-poly    alternate    1
+poly    alternate    {cluster_fraction}
 
 ITEM END
 
@@ -246,13 +260,14 @@ def build_cell(
         Target packing density in g/cm³. Use ~0.5× experimental for initial
         build to avoid overlaps; EMC scales to this density.
     ntotal : int
-        Target total atom count. EMC chooses the number of chains to
-        approximate this count given dp.
+        Fallback target total atom count — used only when nchains <= 0. EMC then
+        chooses the number of chains to approximate this count given dp.
     dp : int
         Degree of polymerization — repeat units per chain.
     nchains : int
-        Number of polymer chains. When set, overrides ntotal-based scaling.
-        Pass 0 to let EMC determine chain count from ntotal (default path).
+        Number of polymer chains. When > 0, builds exactly this many chains via
+        EMC "number" mode (ntotal is then ignored). Pass 0 (or negative) to let
+        EMC determine chain count from ntotal instead.
     temperature : float
         Build temperature in K (used for velocity assignments in the
         generated LAMMPS run script).
@@ -273,7 +288,8 @@ def build_cell(
     # ("emc_build") never collides with the cluster name ("poly") in the .esh.
     esh_path = output_dir / "emc_build.esh"
     esh_path.write_text(
-        make_esh(smiles, field=field, density=density, ntotal=ntotal, dp=dp)
+        make_esh(smiles, field=field, density=density, ntotal=ntotal, dp=dp,
+                 nchains=nchains)
     )
 
     build_emc = run_emc_setup(esh_path, field=field, seed=seed, temperature=temperature)
@@ -296,11 +312,13 @@ def main():
     parser.add_argument("--density", type=float, default=0.9,
                         help="Target packing density in g/cm³ [0.9]")
     parser.add_argument("--ntotal", type=int, default=3000,
-                        help="Target total atom count [3000]")
+                        help="Target total atom count; fallback sizing when "
+                             "--nchains<=0 [3000]")
     parser.add_argument("--dp", type=int, default=20,
                         help="Repeat units per chain [20]")
     parser.add_argument("--nchains", type=int, default=10,
-                        help="Number of chains (informational; EMC uses ntotal) [10]")
+                        help="Exact number of chains (EMC number mode); "
+                             "0 = size from ntotal [10]")
     parser.add_argument("--temperature", type=float, default=300.0,
                         help="Build temperature in K [300.0]")
     parser.add_argument("--seed", type=int, default=-1,
@@ -321,6 +339,7 @@ def main():
                 density=args.density,
                 ntotal=args.ntotal,
                 dp=args.dp,
+                nchains=args.nchains,
             )
         )
         print(f"Written: {esh_path}")

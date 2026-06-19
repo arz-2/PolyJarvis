@@ -19,8 +19,10 @@ Optional overrides (defaults come from polymer_rules.json):
   --smiles SMILES
   --data_path PATH        input .data file (equil, tg, deform, analyze)
   --work_dir PATH         base directory for worker outputs
-  --gpu_ids IDS           default: "0,1,2,3"
-  --mpi_ranks N           default: 4
+  --gpu_ids IDS           comma-separated GPU IDs, e.g. "0" or "0,1"; if omitted,
+                          derived from polymer_rules.json hardware_policy by FF
+  --mpi_ranks N           MPI processes per run; if omitted, derived from
+                          hardware_policy (never mpi=1 for PPPM classes)
   --dp N                  degree of polymerisation override
   --nchain N              number of chains override
   --lammps_flags JSON     e.g. '{"use_pcff":true,"use_opls":false}'
@@ -138,6 +140,33 @@ def apply_plan(cls: dict, plan: dict, args) -> dict:
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+def resolve_hardware(args, cls: dict, rules: dict) -> None:
+    """Fill mpi_ranks / gpu_ids from the FF×size hardware_policy when the CLI omits
+    them, so a run can never default to the mpi=1 anti-pattern. Explicit CLI values
+    always win (keeps deterministic-plan output byte-identical — runtime wiring stays
+    CLI-authoritative per apply_plan's contract). Specific gpu_ids remain runtime;
+    use scripts/pick_gpu.py to claim a non-colliding GPU at submit time."""
+    hp = rules.get("hardware_policy")
+    if not hp:
+        return
+    ff_raw = cls.get("preferred_ff") or cls.get("forcefield") or ""
+    fam = hp.get("ff_aliases", {}).get(ff_raw) or hp.get("ff_aliases", {}).get(ff_raw.upper())
+    if fam is None:
+        fl = ff_raw.lower()
+        fam = ("pcff" if "pcff" in fl else "opls" if "opls" in fl
+               else "trappe" if "trappe" in fl else "gaff")
+    pol = hp.get("by_forcefield", {}).get(fam, {})
+    if args.mpi_ranks is None:
+        args.mpi_ranks = pol.get("mpi", 8)
+        print(f"INFO: mpi_ranks not given — derived {args.mpi_ranks} from "
+              f"hardware_policy[{fam}] (engine={pol.get('engine')})", file=sys.stderr)
+    if args.gpu_ids is None:
+        args.gpu_ids = "" if pol.get("engine") == "cpu" else "0"
+        print(f"INFO: gpu_ids not given — derived \"{args.gpu_ids}\" from "
+              f"hardware_policy[{fam}]; claim a free GPU with scripts/pick_gpu.py",
+              file=sys.stderr)
+
+
 def _v(val, fallback="<FILL>"):
     return val if val is not None else fallback
 
@@ -154,6 +183,7 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
     return {
         "use_pcff": ff == "pcff",
         "use_opls": ff in ("opls-aa", "opls"),
+        "use_trappe": ff in ("trappe-ua", "trappe"),
     }
 
 
@@ -605,8 +635,13 @@ def main():
     p.add_argument("--smiles")
     p.add_argument("--data_path")
     p.add_argument("--work_dir")
-    p.add_argument("--gpu_ids", default="0,1,2,3")
-    p.add_argument("--mpi_ranks", type=int, default=4)
+    p.add_argument("--gpu_ids", required=False, default=None,
+                   help='Comma-separated GPU IDs, e.g. "0" or "0,1". '
+                        'If omitted, derived from polymer_rules.json hardware_policy by FF '
+                        '("" for CPU engine). Claim a free GPU with scripts/pick_gpu.py.')
+    p.add_argument("--mpi_ranks", type=int, required=False, default=None,
+                   help="MPI processes per run. If omitted, derived from "
+                        "hardware_policy by FF (never mpi=1 for PPPM classes).")
     p.add_argument("--dp", type=int)
     p.add_argument("--nchain", type=int)
     p.add_argument("--lammps_flags")
@@ -682,6 +717,8 @@ def main():
 
     if args.plan:
         cls = apply_plan(cls, load_plan(args.plan), args)
+
+    resolve_hardware(args, cls, rules)
 
     prompt_fn = STAGE_MAP[args.stage]
     print(prompt_fn(args, cls, cross_track_rules))

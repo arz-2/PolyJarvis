@@ -69,6 +69,11 @@ extract_bulk_modulus_born(
 - `K_Born_GPa > 0.5` — very low Born term is unusual for a glassy polymer; check log convergence
 - `fluctuation_correction_GPa < 0.5 × K_Born_GPa` — if fluctuation dominates, K_T is unreliable
 
+**Reporting (R1M9 — include in RESULT block):**
+- `bulk_modulus_sem_GPa`, `n_effective_samples`
+- Derived: `tau_ac_ps = (born_run_ns × 1e3 × (1 − eq_fraction)) / (2 × n_effective_samples)`
+- Gate: N_eff < 20 → add WARNING "born run too short for reliable block averaging; consider extending"
+
 ---
 
 ## Tool: `extract_bulk_modulus_deform`
@@ -97,6 +102,8 @@ extract_bulk_modulus_deform(
 - `C11_GPa`, `C12_GPa`, `K_GPa`, `G_GPa`, `E_GPa`, `nu_Poisson`
 - `fit_r2_C11`, `fit_r2_C12_yy`, `isotropy_delta_pct`
 - `stress_strain_csv`, `summary_json`
+
+**Reporting (R1M9):** Deterministic stress-strain fit — no autocorrelation concern. Report `fit_r2_C11` and `fit_r2_C12_yy` as the reliability indicators.
 
 ---
 
@@ -130,6 +137,8 @@ extract_bulk_modulus_murnaghan(
 - B0' in [4, 20] — outside this range is unphysical for polymers
 - `r_squared ≥ 0.999` for a 5-point series; lower suggests poor equilibration at one or more pressures
 
+**Reporting (R1M9 — include in RESULT block):** `bulk_modulus_sem_GPa`, `r_squared`, `B0_prime`
+
 ---
 
 ## Tool: `extract_bulk_modulus`
@@ -155,7 +164,10 @@ extract_bulk_modulus(
 - `bulk_modulus_GPa`, `bulk_modulus_sem_GPa`
 - `isothermal_compressibility_per_Pa`
 - `V_mean_A3`, `V_std_A3`
+- `tau_eff_frames`, `tau_eff_fraction`, `n_effective_samples`
 - `diagnostics` — T, P, density means + volume drift check
+
+**Reporting (R1M9 — include in RESULT block):** `bulk_modulus_sem_GPa`, `n_effective_samples`, `tau_eff_frames`, `tau_eff_fraction`
 
 ---
 

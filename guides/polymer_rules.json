@@ -1,4 +1,27 @@
 {
+  "hardware_policy": {
+    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (scripts/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default: chosen so up to 4 runs fit in 18 cores (4 x mpi=4 = 16) — this is what gen_prompt derives. `mpi_single_run_hint` is the (faster) value to use only when the box is dedicated to one run; it is a provisional GUESS pending scripts/benchmark_hardware.py (see guides/HARDWARE.md), NOT yet benchmark-derived. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
+    "host": {"gpus": 4, "gpu_model": "Quadro RTX 6000 24GB", "phys_cores": 18},
+    "concurrency_rule": "Sum of mpi over all concurrent runs <= 18 physical cores; at most one GPU-heavy run per physical GPU. At the default mpi=4 this permits 4 concurrent runs (16 ranks). Raise mpi toward mpi_single_run_hint only when fewer runs share the box; check with `scripts/pick_gpu.py budget --mpi N` before launch.",
+    "min_mpi_for_pppm": 4,
+    "values_are_benchmarked": false,
+    "directional_probe": {
+      "date": "2026-06-19", "cell": "PSU1 npt_production_out.data (PCFF, 8656 atoms)",
+      "caveat": "contended (29 background ranks) — absolute ns/day depressed; ratios at equal load are the signal",
+      "pcff_ns_per_day": {"cpu_mpi4": 2.99, "gpu_mpi1": 1.13, "gpu_mpi2": 2.17, "gpu1_mpi4": 4.96, "gpu2_mpi2": 2.20, "gpu4_mpi4": 4.48},
+      "conclusion": "PCFF: (1) GPU mpi=4 (4.96) > CPU mpi=4 (2.99, Pair offloads 44%->7%) > mpi=1 (1.13, ~4.4x slower) — engine=gpu + mpi>=4 confirmed. (2) Near-linear rank scaling on 1 GPU (1.13->2.17->4.96 for mpi 1->2->4) because the run is CPU-bound on Bond/Kspace/Neigh, so mpi=8 single-run should gain further. (3) MULTI-GPU does NOT help: gpu1_mpi4 (4.96, 1 GPU) > gpu4_mpi4 (4.48, 4 GPUs), and gpu1_mpi2==gpu2_mpi2 (2.17 vs 2.20) — extra GPUs add comm overhead with zero benefit for <10k-atom cells. gpu_per_run=1 confirmed; live PSU1 on mpi=4/4-GPU was wasting 3 GPUs. Reproducible: gpu1_mpi4=4.96 here vs 4.95 on a different GPU.",
+      "ua_cell": "PE1 (PHYC, 4840 atoms, lj/cut no kspace), CONTENDED: GPU scales near-linearly mpi1->2->4 = 25.6/40.7/80.0 ns/day; CPU mpi4/mpi8 = 21.6/22.7 (barely scaling = cores starved by 29 background ranks). CAUTION: this shows GPU winning ONLY because CPU is saturated; it does NOT overturn the isolation finding that UA is faster on CPU mpi=8. UA engine kept CPU pending a DRAINED-box CPU run (where cpu_mpi8 should ~2x). GPU scaling curve is reliable; CPU-vs-GPU verdict is not.",
+      "special_templates": "BORN (nvt_born, compute born/matrix numdiff): CPU-ONLY — loads lj/class2/coul/long/gpu but crashes at the first matrix eval under -sf gpu; CPU mpi=4 ran (1.57 ns/day, Modify ~60% = numdiff cost). DEFORM (npt_deform, fix deform/SLLOD): GPU FUNCTIONAL — runs under -sf gpu (54.4 vs 14.1 cpu, but contended/CPU-starved so magnitude unreliable); contradicts the old 'GPU+SLLOD untested' default. TG_STEP: cost structure = PCFF NPT+pppm, so the PCFF std-MD result applies.",
+      "still_pending": "Full polite drained-box sweep: UA + PCFF CPU mpi=8/16 (the contention-free CPU-vs-GPU verdict), clean absolute numbers, and TEMPLATE_DEFAULTS use_gpu flips for deform/tg_step."
+    },
+    "ff_aliases": {"PCFF": "pcff", "TraPPE-UA": "trappe", "OPLS-AA": "opls", "opls/2024/opls-aa": "opls", "GAFF2_mod": "gaff"},
+    "by_forcefield": {
+      "pcff":   {"engine": "gpu", "mpi": 4, "mpi_single_run_hint": 8, "gpu_per_run": 1, "note": "class2+pppm; NEVER mpi=1 (~75x slow, kspace CPU-serial); 1 GPU not 4 for <10k atoms; CPU mpi=16 may rival GPU — confirm via benchmark"},
+      "opls":   {"engine": "gpu", "mpi": 4, "mpi_single_run_hint": 8, "gpu_per_run": 1, "note": "lj/cut+pppm; same mpi>=4 rule as pcff"},
+      "trappe": {"engine": "cpu", "mpi": 4, "mpi_single_run_hint": 8, "gpu_per_run": 0, "note": "lj/cut, no kspace; neigh-build dominated (~70%); CPU >> GPU mpi=1"},
+      "gaff":   {"engine": "gpu", "mpi": 4, "mpi_single_run_hint": 8, "gpu_per_run": 1, "note": "fallback; pppm present"}
+    }
+  },
   "_metadata": {
     "description": "PolyJarvis polymer class parameter rules for LAMMPS MD simulations. 20 of 21 classes route to EMC: TraPPE-UA (PHYC/PDIE/PSTR), OPLS-AA (PHAL/PSIL), PCFF (PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL). RadonPy only for PURA (GAFF2_mod + QM charges, EMC missing n_2/hn increment). preferred_builder in each class block is authoritative for routing. Drives force field selection, cell construction, equilibration, Tg sweep, and bulk modulus protocols per PoLyInfo 21-class taxonomy.",
     "version": "2.1.0",

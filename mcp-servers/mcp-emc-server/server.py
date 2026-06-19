@@ -405,13 +405,14 @@ def submit_emc_cell_job(
                          PCFF: PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL
                          OPLS-AA: PHAL.  TraPPE-UA: PHYC/PDIE/PSTR.
         dp:              Degree of polymerization (repeat units per chain). [20]
-        nchains:         Number of polymer chains (informational — EMC determines
-                         actual chain count from ntotal and dp). [10]
+        nchains:         Exact number of polymer chains to build (EMC "number"
+                         mode). When > 0 this sets the chain count precisely and
+                         ntotal is ignored; pass 0 to size from ntotal instead. [10]
         density_initial: Target packing density in g/cm³. Use ~0.5× experimental
                          to avoid steric clashes during initial build; LAMMPS
                          equilibration will compress to target density. [0.6]
-        ntotal:          Target total atom count; EMC sets chain count accordingly.
-                         [3000]
+        ntotal:          Fallback target total atom count — used only when
+                         nchains <= 0 (EMC sets chain count ≈ ntotal/sites). [3000]
         temperature:     Build temperature in K (used for velocity assignment in
                          generated LAMMPS run script). [300.0]
         seed:            Random seed. -1 selects a new random seed each run. [-1]

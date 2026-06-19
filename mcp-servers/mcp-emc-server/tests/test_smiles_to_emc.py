@@ -157,6 +157,38 @@ class TestMakeEshStructure:
         assert "cap,2" in s["POLYMERS"]
 
 
+class TestMakeEshChainCount:
+    """nchains>0 selects EMC 'number' mode (exact chain count); otherwise the
+    ntotal-driven default sizing is used."""
+
+    def test_default_no_number_mode(self):
+        # nchains defaults to 0 → no 'number' option, cluster fraction stays 1
+        esh = make_esh("*CC*")
+        s = sections(esh)
+        assert "number" not in s["OPTIONS"].lower().split()
+        assert "poly    alternate    1" in s["CLUSTERS"]
+
+    def test_nchains_zero_no_number_mode(self):
+        esh = make_esh("*CC*", nchains=0)
+        s = sections(esh)
+        assert "number" not in s["OPTIONS"].lower().split()
+
+    def test_nchains_enables_number_mode(self):
+        esh = make_esh("*CC*", nchains=20)
+        s = sections(esh)
+        opts = s["OPTIONS"].split()
+        # 'number true' must be present in ITEM OPTIONS
+        assert "number" in opts
+        idx = opts.index("number")
+        assert opts[idx + 1] == "true"
+
+    def test_nchains_sets_cluster_fraction(self):
+        esh = make_esh("*CC*", nchains=20)
+        s = sections(esh)
+        # cluster fraction field carries the literal chain count
+        assert "poly    alternate    20" in s["CLUSTERS"]
+
+
 class TestMakeEshValidation:
     def test_wrong_star_count_zero(self):
         with pytest.raises(ValueError, match="exactly 2"):

@@ -72,7 +72,7 @@ When the Claude process dies mid-Monitor (no tmux, machine reboot, or session ki
 1. `ssh lambda && pj && claude --continue` (or start fresh if conversation unavailable)
 2. Read `data/[RUN]/run_log.md` → find the row where `status = monitoring`; note the `id` value
 3. Call `get_run_status(id)`:
-   - **running** → `watch_run(id)` → re-issue `Monitor(command=monitor_command)` → update run_log back to `monitoring`
+   - **running** → `watch_run(id)` → re-issue `Monitor(command=monitor_command, timeout_ms=3600000)` → update run_log back to `monitoring`. A bare Monitor timeout (no `RUN_COMPLETE`/`PROCESS_DEAD` line) is not completion — re-arm via `watch_run` and Monitor again. `PROCESS_DEAD_NO_SENTINEL` → treat as **failed** below.
    - **completed** → update run_log to `done` → continue from the next orchestrator step
    - **failed** → `get_run_output(id)` → diagnose with taxonomy above → re-spawn worker (counts as attempt 1)
    - **not found** → wait 60–90 s for MCP server restart; retry; if still missing, treat as failed

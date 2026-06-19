@@ -27,6 +27,19 @@
   },
 
   "policies": {
+    "hardware": {
+      "decision_id": "D-08_hardware",
+      "evidence_required": false,
+      "evaluate": ["forcefield_cost_structure", "atom_count", "concurrent_load"],
+      "require": [
+        "mpi>=4 for any PPPM/charged class2 system (mpi=1 starves kspace ~75x — never launch it)",
+        "UA classes (TraPPE: PHYC/PDIE) route to CPU engine (gpu_ids empty), not GPU mpi=1",
+        "small (<10k-atom) cells use 1 GPU per run, not 4 (comm overhead, GPU underfill)",
+        "Sum of mpi across concurrent runs <= 18 physical cores (one GPU-heavy run per GPU)"
+      ],
+      "rationale": "Hardware config is a deterministic function of FF cost structure (UA lj/cut vs PCFF class2+pppm) and cell size, so it belongs in policy, not ad-hoc submit-time choice. The two live anti-patterns (mpi=1 PCFF ~2.4 ns/day; UA on GPU mpi=1) are both ~7-75x slower than the policy default. gen_prompt.py derives mpi/engine from hardware_policy when the CLI omits them; specific gpu_ids stay runtime via scripts/pick_gpu.py.",
+      "default_source": "polymer_rules.json:hardware_policy.by_forcefield.<FF_FAMILY>"
+    },
     "forcefield": {
       "decision_id": "D-01_ff",
       "evidence_required": true,
@@ -120,6 +133,11 @@
       "reduces": "bulk_modulus method validity for glassy polymers",
       "mechanism": "run both on one glassy test polymer; agreement within ~10% promotes Murnaghan as glassy fallback (ROADMAP I2-A).",
       "cost": "one extra glassy run"
+    },
+    "hardware_benchmark": {
+      "reduces": "mpi/gpu config uncertainty for an off-table FF or an unusually sized cell",
+      "mechanism": "scripts/benchmark_hardware.py sweeps the mpi/gpu matrix on the built .data per template cost class, reports ns/day + Pair/Kspace/Neigh/Comm breakdown, and names the winner; refines hardware_policy and TEMPLATE_DEFAULTS use_gpu. Runs politely around live runs (idle GPU + spare cores only).",
+      "cost": "minutes"
     }
   }
 }

@@ -47,6 +47,17 @@ check_equilibration_comprehensive(
 - `density_converged`, `energy_converged`, `ct_decayed`
 - `warnings` — list of soft warnings (non-fatal)
 
+**C(t) and R_ee numeric fields** (extract from result dict — all from a single `check_equilibration_comprehensive` call):
+- `result["chain"]["ct"]["decay_fraction_at_end"]`  → `ct_decay_fraction` (0.0–1.0)
+- `result["chain"]["ct"]["tau_relax_ps"]`            → `ct_tau_relax_ps` (KWW chain relaxation time in ps)
+- `result["chain"]["ree"]["mean_R_ee_A"]`            → `end_to_end_r_mean_A`
+- `result["chain"]["ree"]["std_R_ee_A"]`             → `end_to_end_r_std_A`
+- `result["chain"]["ree"]["n_chains"]`               → `end_to_end_n_chains`
+- Histogram PNG auto-saved to `graphs_dir/end_to_end_distribution.png`
+- For rubbery classes (`ct_min_decay=None`): set `ct_decay_fraction` and `ct_tau_relax_ps` to N/A; R_ee is still available
+
+For PHYC class (PE): `ct_decayed=True` plus `tau_relax_ps` is the chain relaxation evidence R1M10 requires. Include both in the RESULT block even for passes.
+
 ---
 
 ## Tool: `extract_equilibrated_density`

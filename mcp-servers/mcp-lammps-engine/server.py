@@ -56,6 +56,7 @@ except ImportError:
 # Add server directory to path so we can import script_generator
 sys.path.insert(0, str(Path(__file__).parent))
 from script_generator import ScriptGenerator, TEMPLATE_DOCS, TEMPLATE_DEFAULTS
+from monitor_utils import build_watch_command, pidfile_path
 
 from mcp.server.fastmcp import FastMCP
 
@@ -253,7 +254,19 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
         "log_start() { echo \"{\\\"stage\\\":\\\"$1\\\",\\\"status\\\":\\\"running\\\",\\\"ts\\\":\\\"$(date -Iseconds)\\\"}\""
             " >> \"$PROGRESS\"; }",
         "",
+        "# Completion sentinel — written by THIS nohup'd script so it survives an",
+        "# MCP-server restart (the in-process chain monitor is only a fast-path).",
+        f"mkdir -p {SENTINEL_DIR}",
+        f"SENTINEL={SENTINEL_DIR}/done_{chain_id}.json",
+        f"PIDFILE={pidfile_path(chain_id, SENTINEL_DIR)}",
+        f"sentinel_ok()   {{ echo \"{{\\\"run_id\\\":\\\"{chain_id}\\\",\\\"status\\\":\\\"completed\\\"}}\""
+            " > \"$SENTINEL\"; }",
+        f"sentinel_fail() {{ echo \"{{\\\"run_id\\\":\\\"{chain_id}\\\",\\\"status\\\":\\\"failed\\\",\\\"stage\\\":\\\"$1\\\"}}\""
+            " > \"$SENTINEL\"; }",
+        "",
         f"export CUDA_VISIBLE_DEVICES={gpu_ids}",
+        "# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).",
+        'echo $$ > "$PIDFILE"',
         "",
     ]
 
@@ -271,7 +284,7 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
             f"mpirun -np $MPI $LMP -sf gpu -pk gpu $N_GPU "
             f"-in {script} >> {wdir}/{log} 2>&1 \\",
             f"  && log_done {name} \\",
-            f"  || {{ log_fail {name}; "
+            f"  || {{ log_fail {name}; sentinel_fail {name}; "
             f"echo \"{{\\\"stage\\\":\\\"__chain__\\\",\\\"status\\\":\\\"failed\\\","
             f"\\\"failed_at\\\":\\\"{name}\\\",\\\"ts\\\":\\\"$(date -Iseconds)\\\"}}\" >> \"$PROGRESS\"; exit 1; }}",
             "",
@@ -280,6 +293,8 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
     lines += [
         f"echo \"{{\\\"stage\\\":\\\"__chain__\\\",\\\"status\\\":\\\"completed\\\","
         f"\\\"n_stages\\\":{len(stages)},\\\"ts\\\":\\\"$(date -Iseconds)\\\"}}\" >> \"$PROGRESS\"",
+        "sentinel_ok",
+        'rm -f "$PIDFILE"',
     ]
 
     return "\n".join(lines) + "\n"
@@ -306,6 +321,7 @@ def _lammps_run_background(
         n_gpu = len(gpu_ids.split(","))
         full_log = f"{work_dir}/{log_file}"
         sentinel_path = SENTINEL_DIR / f"done_{run_id}.json"
+        pidfile = pidfile_path(run_id, SENTINEL_DIR)
 
         # Write a small wrapper script and launch it under nohup — identical to
         # how run_lammps_chain launches stages, so it uses the system PATH (not
@@ -328,6 +344,10 @@ def _lammps_run_background(
         wrapper = (
             f"#!/bin/bash\n"
             f"{cuda_line}"
+            # Record our own PID first so watch_run can check liveness. $$ is the
+            # long-lived wrapper; $! at launch is the short-lived setsid parent.
+            f"mkdir -p {SENTINEL_DIR}\n"
+            f"echo $$ > {pidfile}\n"
             f"cd {work_dir}\n"
             f"{lammps_cmd}"
             f"RC=$?\n"
@@ -338,6 +358,7 @@ def _lammps_run_background(
             f"  echo '{{\"run_id\":\"{run_id}\",\"status\":\"failed\","
             f"\"exit_code\":\"'$RC'\"}}' > {sentinel_path}\n"
             f"fi\n"
+            f"rm -f {pidfile}\n"
         )
         wrapper_path = f"{work_dir}/{run_id}_run.sh"
         launch = (
@@ -570,9 +591,9 @@ def generate_script(
 def run_lammps_script(
     script: str,
     work_dir: str,
+    gpu_ids: str,
+    mpi: int,
     log_file: str = "lammps_run.log",
-    mpi: int = 2,
-    gpu_ids: str = "0,1",
     use_gpu: bool = True,
 ) -> dict:
     """
@@ -581,11 +602,13 @@ def run_lammps_script(
     Args:
         script:    Full path to .in file.
         work_dir:  Working directory for outputs.
-        log_file:         Name of the stdout/stderr capture log (in work_dir).
-        mpi:              Number of MPI processes (= number of GPUs used).
+        gpu_ids:          Comma-separated GPU IDs to use (e.g. "0" or "0,1").
+                          Required — no default; the engine no longer falls back to
+                          GPU 0,1. Pass exactly the device(s) you intend to use.
+        mpi:              Number of MPI processes. Required — no default.
                           Use 1 for small systems (<5k atoms), 2 for medium (5-10k),
                           4 for large (>10k) or Tg sweeps.
-        gpu_ids:          Comma-separated GPU IDs to use (e.g. "0,1" or "0,1,2,3").
+        log_file:         Name of the stdout/stderr capture log (in work_dir).
         use_gpu:          If False, launch without -sf gpu/-pk gpu flags and hide GPUs
                           via CUDA_VISIBLE_DEVICES=. Required for compute born/matrix
                           numdiff, which displaces atoms in CPU arrays and is
@@ -633,8 +656,8 @@ def run_lammps_script(
 @mcp.tool()
 def run_lammps_chain(
     stages: list,
-    mpi: int = 2,
-    gpu_ids: str = "0,1",
+    gpu_ids: str,
+    mpi: int,
     data_file: Optional[str] = None,
     h_type_ids: Optional[list] = None,
     backbone_types: Optional[list] = None,
@@ -660,8 +683,9 @@ def run_lammps_chain(
                           - script   (str)  full path to .in file
                           - work_dir (str)  working directory for outputs
                           - log_file        (str)  run log filename (optional)
-        mpi:            MPI processes (same for all stages).
-        gpu_ids:        Comma-separated GPU IDs (same for all stages).
+        gpu_ids:        Comma-separated GPU IDs (same for all stages). Required —
+                        no default; the engine no longer falls back to GPU 0,1.
+        mpi:            MPI processes (same for all stages). Required — no default.
         data_file:      Optional path to the .data file. When provided, runs
                         pre-flight validation before launching the chain.
         h_type_ids:     SHAKE H type IDs — validated against the data file.
@@ -1002,25 +1026,34 @@ def watch_run(run_id: str) -> dict:
         run_id: The run_id or chain_id to watch.
 
     Returns:
-        monitor_command to pass directly to the Monitor tool.
-        Also returns sentinel_path for reference.
+        monitor_command:        pass to the Monitor tool with timeout_ms=3600000.
+        recommended_timeout_ms: 3600000 (the Monitor max; runs may exceed it —
+                                re-arm by calling watch_run again on a bare timeout).
+        sentinel_path:          completion sentinel JSON (status: completed|failed).
+        pidfile:                liveness pidfile the command reads for the run.
     """
     sentinel_path = SENTINEL_DIR / f"done_{run_id}.json"
-    # The command blocks until the sentinel file exists, then prints its contents.
-    # The Monitor tool streams stdout line-by-line; the final line is the JSON payload.
-    monitor_command = (
-        f"until [ -f {sentinel_path} ]; do sleep 30; done"
-        f" && echo 'RUN_COMPLETE'"
-        f" && cat {sentinel_path}"
-    )
+    pidfile = pidfile_path(run_id, SENTINEL_DIR)
+    # Chains expose per-stage progress; single runs have none.
+    run = run_manager.get(run_id) or {}
+    meta = run.get("meta", {})
+    progress_file = meta.get("progress_file", "") if run.get("run_type") == "lammps_nohup_chain" else ""
+    n_stages = meta.get("n_stages", 0) if progress_file else 0
+    monitor_command = build_watch_command(str(sentinel_path), pidfile, progress_file, n_stages)
     return {
-        "run_id":          run_id,
-        "sentinel_path":   str(sentinel_path),
-        "monitor_command": monitor_command,
-        "usage":           (
-            "Pass monitor_command to the Monitor tool. "
-            "When it prints RUN_COMPLETE, read sentinel_path to get the status, "
-            "then continue the workflow."
+        "run_id":                run_id,
+        "sentinel_path":         str(sentinel_path),
+        "pidfile":               pidfile,
+        "progress_file":         progress_file,
+        "monitor_command":       monitor_command,
+        "recommended_timeout_ms": 3600000,
+        "usage":                 (
+            "Pass monitor_command to the Monitor tool with timeout_ms=3600000 (the max). "
+            "When it prints RUN_COMPLETE, read sentinel_path for the status, then continue. "
+            "If Monitor exits with NO 'RUN_COMPLETE' or 'PROCESS_DEAD' line, that is a "
+            "timeout (not completion) — the run is still going; call watch_run again and "
+            "re-issue Monitor. 'PROCESS_DEAD_NO_SENTINEL' or a sentinel with status=failed "
+            "means the run died → use /recover."
         ),
     }
 
@@ -2677,11 +2710,11 @@ def run_bulk_modulus_series(
     pressures_atm: list,
     temp_K: float,
     run_name: str,
+    gpu_ids: str,
+    mpi: int,
     npt_steps: int = 500000,
     dt_fs: float = 1.0,
     thermo_freq: int = 100,
-    mpi: int = 2,
-    gpu_ids: str = "0,1",
     output_dir: Optional[str] = None,
 ) -> dict:
     """
@@ -2706,8 +2739,9 @@ def run_bulk_modulus_series(
         npt_steps:      MD steps per pressure point. Default 500000 (500 ps at dt=1 fs).
         dt_fs:          Timestep in fs. Default 1.0.
         thermo_freq:    Thermo output frequency. Default 100.
-        mpi:            MPI processes. Default 2.
-        gpu_ids:        Comma-separated GPU IDs. Default "0,1".
+        gpu_ids:        Comma-separated GPU IDs (e.g. "0" or "0,1"). Required —
+                        no default; the engine no longer falls back to GPU 0,1.
+        mpi:            MPI processes. Required — no default.
         output_dir:     Where to store the list of log file paths (JSON).
                         Defaults to work_dir.
 

@@ -14,8 +14,9 @@
 #                           e.g. "*CC*", "*CC(c1ccccc1)*", "*CC(C(=O)OC)*"
 #   [TACTICITY]           — atactic / isotactic / syndiotactic
 #   [TARGET_PROPERTIES]   — Comma-separated: Tg, density, bulk modulus  (or "all" for full pipeline)
-#   [CPU_CORES]           — Integer, e.g. 4 or 24
-#   [NUM_GPUS]            — Integer, e.g. 4
+#   [CPU_CORES]           — Integer total cores available, e.g. 8 or 24
+#   [MPI_RANKS]           — Integer MPI processes per simulation run, e.g. 4 or 8 (≤ CPU cores)
+#   [GPU_IDS]             — Comma-separated GPU IDs to use, e.g. "0", "0,1", "0,1,2,3"
 #   [MEMORY_GB]           — Integer GB, e.g. 64
 #   [MAX_RUNTIME]         — e.g. "48 hours", "1 week"
 # ============================================================
@@ -27,6 +28,6 @@
 **Target properties:** [TARGET_PROPERTIES]
 
 **Resources:**
-- CPU cores: [CPU_CORES] | GPU ids: [GPU_IDS] | Memory: [MEMORY_GB] GB
+- CPU cores: [CPU_CORES] | MPI ranks: [MPI_RANKS] | GPU ids: [GPU_IDS] | Memory: [MEMORY_GB] GB
 - Max runtime: [MAX_RUNTIME]
 

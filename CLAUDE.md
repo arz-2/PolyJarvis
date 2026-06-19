@@ -112,14 +112,17 @@ PHASE A — FOUNDATION (always)
         prompt=<gen_prompt.py --stage equil --plan PLAN_PATH --data_path ...>)
     → parse RESULT → extract chain_id, monitor_command, expected_equil_data
   Write SIMULATION STATE to run_log.md (status=monitoring)
-  Monitor(command=monitor_command)
+  Monitor(command=monitor_command, timeout_ms=3600000)   # see Monitor semantics below
   /compact Preserve: current phase (A), run_name, all chain_id/run_id values, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block  # run if context > 40%
   get_run_status(chain_id) → check success/failure
 
   [Equil-check gate]
   Agent(subagent_type="equilibration-checker", description="🟠 Equil check {polymer_name}",
         prompt=<gen_prompt.py --stage equil-check --plan PLAN_PATH --data_path npt_prod_data_path>)
-    → parse RESULT → extract equil_verdict, density_gcm3 → write D-05 to run_log.md
+    → parse RESULT → extract equil_verdict, density_gcm3,
+        ct_decay_fraction, ct_tau_relax_ps,
+        end_to_end_r_mean_A, end_to_end_r_std_A, end_to_end_n_chains
+      → write D-05 to run_log.md (populate Chain Structure Summary rows from these fields)
   If equil_verdict=EXTEND: extend chain by 1–2 ns and re-Monitor (max 2 extensions)
   If equil_verdict=FAIL: write UNRESOLVED and stop
 
@@ -130,7 +133,7 @@ PHASE B — TRACKS (property-conditional)
         prompt=<gen_prompt.py --stage tg --plan PLAN_PATH --data_path equil_data_path>)
     → parse RESULT → extract run_id, monitor_command
   Write SIMULATION STATE (status=monitoring)
-  Monitor(command=monitor_command)
+  Monitor(command=monitor_command, timeout_ms=3600000)   # see Monitor semantics below
   /compact Preserve: current phase (B/thermal), run_name, all chain_id/run_id values, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block
   Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg {polymer_name}",
         prompt=<gen_prompt.py --stage analyze-tg --plan PLAN_PATH --data_path tg_log_path>)
@@ -149,21 +152,21 @@ PHASE B — TRACKS (property-conditional)
           prompt=<gen_prompt.py --stage born --plan PLAN_PATH --data_path npt_prod_data_path>)
       → parse RESULT → extract run_id_born, born_log_path, born_matrix_file, n_atoms, monitor_command_born
     Write SIMULATION STATE (status=monitoring)
-    Monitor(command=monitor_command_born)
+    Monitor(command=monitor_command_born, timeout_ms=3600000)
     /compact Preserve: current phase (B/mechanical), run_name, all chain_id/run_id values, is_glassy, properties_requested, run_log.md absolute path, last worker RESULT block
     Recovery if born-worker fails: spawn deform-worker as fallback —
       Agent(subagent_type="deform-worker", description="🔵 Deform fallback {polymer_name}",
             prompt=<gen_prompt.py --stage deform --plan PLAN_PATH --data_path npt_prod_data_path>)
         → parse RESULT → extract run_id_deform, deform_log_path, monitor_command_deform
       Write SIMULATION STATE (status=monitoring)
-      Monitor(command=monitor_command_deform)
+      Monitor(command=monitor_command_deform, timeout_ms=3600000)
       /compact (same preserve list + deform_log_path)
   elif bm_pressures_atm is non-null in plan.decided_params:   # rubbery + pressures
     Agent(subagent_type="murnaghan-worker", description="🟠 Murnaghan BM {polymer_name}",
           prompt=<gen_prompt.py --stage murnaghan --plan PLAN_PATH --data_path equil_data_path>)
       → parse RESULT → extract chain_id_murnaghan, log_files (murnaghan_log_files), monitor_command_murnaghan
     Write SIMULATION STATE (status=monitoring)
-    Monitor(command=monitor_command_murnaghan)
+    Monitor(command=monitor_command_murnaghan, timeout_ms=3600000)
     /compact Preserve: current phase (B/mechanical), run_name, all chain_id/run_id values, is_glassy, murnaghan_log_files, properties_requested, run_log.md absolute path, last worker RESULT block
   # else (rubbery + no pressures): skip — fluctuation path, equil log already present
 
@@ -191,11 +194,20 @@ The Planner proposes; the Executor **never improvises**. After each worker's `Mo
 - **Not met** → invoke `/recover` (max 2 attempts/worker). The equil-check gate is `check_equilibration_comprehensive.overall_pass=True`; the tg-analysis gate is the bilinear-fit R² floor. These are already enforced — the plan records them as explicit criteria rather than implicit rules.
 - **Probe contradicts a plan assumption** → if a planned `reduction_probe` comes back inconsistent with a plan assumption (e.g. the chosen FF is wrong), return control to the **planner** to revise downstream stages (re-spawn `planner` with the finding, then re-`critic`). Do not let a worker silently improvise a different parameter.
 
+### Monitor semantics
+
+Always call `Monitor(command=monitor_command, timeout_ms=3600000)` — 3600000 ms (1 h) is the tool's max, and a LAMMPS run can exceed it. Interpret the outcome by what Monitor prints, not by the fact that it exited:
+
+- prints `PROGRESS [##-------] 2/9 done: <stage>` (chains only) → live per-stage progress as each equilibration/series stage finishes; informational, no action — relay to the user.
+- prints `RUN_COMPLETE` → run finished; `cat`'d sentinel JSON carries `status: completed | failed`. `completed` → proceed; `failed` → `/recover`.
+- prints `PROCESS_DEAD_NO_SENTINEL` → the job process died without writing a sentinel (OOM/reboot) → `/recover`.
+- exits with **neither** line → this is a Monitor **timeout, not completion**. The run is still going. Call `watch_run(id)` again and re-issue Monitor (re-arm). Do NOT treat a bare timeout as done or failed.
+
 ### Checkpoint protocol
 
 Before every `Monitor` call, write SIMULATION STATE to `run_log.md` (see `data/TEMPLATE/run_log.md` for format). Update status to `done` or `failed` after Monitor returns.
 
-On session restart: read SIMULATION STATE table → find row with `status=monitoring` → `get_run_status(id)` → `watch_run(id)` → re-issue Monitor.
+On session restart: read SIMULATION STATE table → find row with `status=monitoring` → `get_run_status(id)` → `watch_run(id)` → re-issue Monitor (with `timeout_ms=3600000`).
 
 ### Auto-compact
 

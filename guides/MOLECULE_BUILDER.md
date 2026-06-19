@@ -29,13 +29,17 @@ job = submit_emc_cell_job(
     smiles="...",
     polymer_class="PCBN",
     dp=20,
+    nchains=10,          # exact chain count — pass the `nchain` value from the prompt
     density_initial=0.6,
-    ntotal=3000,
     temperature=300.0,
     seed=-1,
     output_name="polymer",
 )
 ```
+
+`nchains` sets the **exact** number of chains EMC builds (EMC "number" mode); always
+pass the `nchain` value from your prompt. `ntotal` is only a fallback used when
+`nchains<=0` — leave it unset.
 
 Poll with `get_emc_job_status(job_id)` until `status == "completed"`, then:
 
@@ -63,7 +67,7 @@ Report `data_path = {work_dir}/cell/cell.data` and `emc_params_path = {work_dir}
 | D-01 | Force field | auto-selected from polymer_class (see `lammps_flags` in output) |
 | D-02 | Charge method | embedded in FF — no separate step |
 | D-03 | Electrostatics | pppm (all except PHYC/PDIE which use lj/cut) |
-| D-04 | System size | dp and ntotal passed to submit_emc_cell_job |
+| D-04 | System size | dp and nchain passed to submit_emc_cell_job |
 
 ---
 

@@ -55,6 +55,19 @@ extract_equilibrated_density(
 
 Compare `plateau_density_mean` to `exp_density_range` from prompt (OK within ±5%).
 
+### Step 3: Extract R_ee and C(t) fields from Step 1 result dict
+
+No extra tool call needed — `check_equilibration_comprehensive` computes these in the same pass:
+- `result["chain"]["ree"]["mean_R_ee_A"]`           → `end_to_end_r_mean_A`
+- `result["chain"]["ree"]["std_R_ee_A"]`            → `end_to_end_r_std_A`
+- `result["chain"]["ree"]["n_chains"]`              → `end_to_end_n_chains`
+- `result["chain"]["ct"]["decay_fraction_at_end"]`  → `ct_decay_fraction`
+- `result["chain"]["ct"]["tau_relax_ps"]`           → `ct_tau_relax_ps`
+
+For rubbery classes (`ct_min_decay=None`): set `ct_decay_fraction` and `ct_tau_relax_ps` to N/A. R_ee is still available for all classes.
+
+Histogram PNG is auto-saved to `graphs_dir/end_to_end_distribution.png` by the tool.
+
 ### Verdict mapping
 
 - `overall_pass=True` → `equil_verdict=PASS`
@@ -76,6 +89,11 @@ RESULT:
   density_SEM: <value or N/A>
   density_exp_gcm3: <midpoint of exp_density_range from prompt>
   density_status: OK (±<pct>%) | WARNING | N/A
+  ct_decay_fraction: <0.0–1.0 or N/A — rubbery>
+  ct_tau_relax_ps: <value or N/A — rubbery>
+  end_to_end_r_mean_A: <value or N/A>
+  end_to_end_r_std_A: <value or N/A>
+  end_to_end_n_chains: <value or N/A>
   equilibration_warnings: <list or none>
   d05_markdown: |
     <paste result["d05_markdown"] verbatim>
