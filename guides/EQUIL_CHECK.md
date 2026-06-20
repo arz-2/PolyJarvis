@@ -30,9 +30,11 @@ Returns `overall_pass` verdict and a ready-to-paste D-05 markdown block. Copy `r
 **Call signature:**
 ```python
 check_equilibration_comprehensive(
-    equil_log=equil_log_path,        # nvt_production.log — melt NVT at T_equil
-    npt_log=npt_prod_log_path,       # npt_prod300.log — 300 K NPT
-    dump_file=npt_prod_dump_path,
+    log_file=npt_prod_log_path,   # npt_prod300.log (glassy) or npt_production.log (rubbery)
+                                  # → thermo convergence: density/energy drift + block-SEM
+    dump_file=melt_dump_path,     # nvt_production.dump — always the MELT dump, both phases
+                                  # → structural checks: C(t)/MSD/Rg/R_ee on MOBILE chains
+                                  # Do NOT use npt_prod300.dump — chains are frozen below Tg
     data_file=equil_data_path,
     backbone_types=backbone_types,
     ct_min_decay=ct_min_decay_melt,  # from prompt; pass None for rubbery
