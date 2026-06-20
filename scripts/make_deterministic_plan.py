@@ -99,6 +99,7 @@ STAGE_TRACK = {
     "equil-check": "foundation",
     "tg":          "thermal",
     "analyze-tg":  "thermal",
+    "analyze-tg-multirate": "thermal",
     "born":        "mechanical",
     "deform":      "mechanical",
     "murnaghan":   "mechanical",
@@ -126,6 +127,11 @@ def build_planned_stages(cls: dict, properties: set) -> list:
         stages.append(_s("tg", {"bilinear_fit_r_squared_min": 0.80,
                                 "t_range_brackets_exp_tg": exp_tg}))
         stages.append(_s("analyze-tg", {}))
+        # Multirate aggregation: log-linear Tg(Γ) fit across cooling rates,
+        # extrapolated to the DSC-equivalent rate. Log-linear R² is the gate
+        # (always reliable); VF is diagnostic only at <2 decades of span.
+        stages.append(_s("analyze-tg-multirate",
+                         {"loglinear_r_squared_min": 0.90, "n_rates_min": 2}))
     if "bulk_modulus" in properties:
         if glassy_hint:
             stages.append(_s("born", {"born_matrix_written": True}, fallback="deform"))
@@ -144,6 +150,10 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
     exp_tg = _exp_tg_scalar(cls)
     T_equil = decided_params.get("T_equil_K", 600.0)
     decided_params["T_workflow_K"] = 300.0 if (exp_tg is not None and exp_tg < 300) else T_equil
+    # Derived constant (like T_workflow_K, not snapshotted from cls): the DSC-equivalent
+    # cooling rate (10 K/min = 1.6667e-10 K/ns) that the multirate Tg fit extrapolates to.
+    # Class entries may override via polymer_rules.json; otherwise this default applies.
+    decided_params["dsc_equiv_rate_K_per_ns"] = cls.get("dsc_equiv_rate_K_per_ns", 1.6667e-10)
     return {
         "schema_version": "1.0",
         "goal": f"Predict {', '.join(sorted(properties))} for {polymer_class.upper()}"

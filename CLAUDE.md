@@ -24,7 +24,7 @@ All run files live under `data/<run_name>/` (repo-relative, git-excluded). Use a
 **Equilibration internals** — directory names are tool-defined by `generate_equilibration_workflow`. Use the return dict keys (`npt_production_dir`, `npt_prod300_data`, etc.) — do not construct these paths manually. Key file names: `nvt_production.log` (melt NVT), `npt_production_out.data` (rubbery final), `npt_prod300_out.data` (glassy 300 K final).
 
 **Track output paths** (orchestrator-chosen, under `<lammps_base>`):
-- thermal: `thermal/tg_sweep/tg_sweep.log`
+- thermal (multirate): one sweep per cooling rate → `thermal/tg_sweep_r<rate>/tg_sweep.log` (e.g. `tg_sweep_r40/`, `tg_sweep_r160/`, `tg_sweep_r400/`); per-rate analysis JSON in `raw/tg_r<rate>/`; aggregated multirate result in `raw/tg_multirate_result.json`. Single-rate (no `--tg_rate_index`) keeps the legacy `thermal/tg_sweep/`.
 - mechanical (born): `mechanical/born/nvt_born.log`, `mechanical/born/born_matrix.dat`
 - mechanical (deform): `mechanical/deform/npt_deform.log`
 - mechanical (murnaghan): `mechanical/bm_series/` (log files listed in murnaghan-worker RESULT)
@@ -138,23 +138,61 @@ PHASE A — FOUNDATION (always)
 
 PHASE B — TRACKS (property-conditional)
 
-  [thermal track — if "tg" in properties_requested]
-  Agent(subagent_type="tg-sweep-worker", description="🟣 Tg sweep {polymer_name}",
-        prompt=<gen_prompt.py --stage tg --plan PLAN_PATH --data_path equil_data_path>)
-    → parse RESULT → extract run_id, monitor_command
-  Write SIMULATION STATE (status=monitoring)
-  Monitor(command=monitor_command, timeout_ms=3600000)   # see Monitor semantics below
-  /compact Preserve: current phase (B/thermal), run_name, all chain_id/run_id values, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block
-  Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg {polymer_name}",
-        prompt=<gen_prompt.py --stage analyze-tg --plan PLAN_PATH --data_path tg_log_path>)
-    → parse RESULT → extract Tg_K, Tg_fit_quality → write D-06 to run_log.md
+  [thermal track — if "tg" in properties_requested]  # MULTIRATE: one sweep PER cooling rate
+  Read multirate config from the plan:
+    TG_RATES=$(jq -r '.decided_params.tg_rates_K_per_ns | @csv' PLAN_PATH)     # e.g. 40,160,400
+    DSC_RATE=$(jq -r '.decided_params.dsc_equiv_rate_K_per_ns // 1.6667e-10' PLAN_PATH)
+  Read replicate N from run_log.md header ("Replicate: N of M").
+
+  For idx, rate in enumerate(TG_RATES):                # idx = 0,1,2 → rates 40,160,400 K/ns
+    [Tg sweep @ rate]
+    Claim GPU(s): scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
+      → on shortfall (exit 1) defer/retry; NEVER --allow-busy on the shared box.
+    Agent(subagent_type="tg-sweep-worker", description="🟣 Tg sweep r{rate} {polymer_name}",
+          prompt=<gen_prompt.py --stage tg --plan PLAN_PATH --data_path equil_data_path
+                  --tg_rate_index {idx} --gpu_ids <claimed>>)
+      → parse RESULT → run_id, tg_log_path (now .../thermal/tg_sweep_r{rate}/tg_sweep.log), monitor_command
+    Write SIMULATION STATE (status=monitoring) to run_log.md
+    Monitor(command=monitor_command, timeout_ms=3600000)   # see Monitor semantics below
+    scripts/pick_gpu.py release --run <RUN>
+    get_run_status(run_id) → completed → proceed; failed → /recover (max 2/worker)
+
+    [Tg analysis @ rate]
+    Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg r{rate} {polymer_name}",
+          prompt=<gen_prompt.py --stage analyze-tg --plan PLAN_PATH
+                  --data_path {tg_log_path} --tg_rate_index {idx}>)
+      → parse RESULT → Tg_K, Tg_fit_quality, Tg_r_squared, cooling_rate_K_per_ns
+    Append one row to the multirate registry (see Multirate Tg registry below):
+      replicate=N, rate, Tg_K, Tg_r_squared, Tg_fit_quality, run_name, timestamp_utc
+    /compact Preserve: phase B/thermal, idx, all (rate,Tg) pairs so far, run_name, run_ids, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block
+
+  # On a single-GPU host (e.g. PEG1, GPU 0 only) the three sweeps run SEQUENTIALLY → ~3× thermal
+  # wall time (the 40 K/ns rate has 10× the steps of 400 K/ns and dominates). On a multi-GPU host
+  # with ≥3 free GPUs the rates are independent: you MAY claim a distinct GPU per rate and run the
+  # three sweeps + Monitors in parallel (still politely — defer on shortfall, never --allow-busy).
+
+  [multirate extrapolation → DSC-equivalent Tg]
+  Build --mr_rates / --mr_tg_values from ALL registry rows for this polymer/class
+    (filter to fit_quality >= ACCEPTABLE; if < 2 rows survive, skip aggregation and fall back
+     to the single highest-rate Tg). Across replicates this list grows → the fit tightens.
+  Agent(subagent_type="tg-analysis-worker", description="🟢 Multirate Tg {polymer_name}",
+        prompt=<gen_prompt.py --stage analyze-tg-multirate --plan PLAN_PATH
+                --mr_rates <rates> --mr_tg_values <tgs>>)
+    → parse RESULT → tg_dsc_equiv_K, loglinear_slope_K, loglinear_r_squared, vf_fit_quality
+    → write D-06b to run_log.md from d06_markdown_path. Report tg_dsc_equiv_K as the headline
+      "theoretical DSC-equivalent experimental Tg".
+  Validator gate: loglinear_r_squared >= plan success_criteria.loglinear_r_squared_min (0.90).
+    Not met → /recover (re-run a noisy rate with more steps, or re-plan), max 2 attempts.
 
   [is_glassy determination]
   if "tg" in properties_requested:
-    is_glassy = (Tg_K > 300)    # safe default: True if Tg_K is None or fit ABORT
+    Tg_for_glassy = Tg_K at the HIGHEST screening rate (400 K/ns)  # directly-measured, most-converged
+    is_glassy = (Tg_for_glassy > 300)   # safe default: True if None or fit ABORT
+    # Drive is_glassy off the highest-rate MD Tg, NOT tg_dsc_equiv_K: the extrapolated value
+    # shifts as replicates accumulate and could flip the mechanical-track branch mid-campaign.
   else:
     is_glassy = glassy_hint      # from plan; write D-06 = "N/A — tg not requested"
-    Tg_K = None; Tg_fit_quality = "N/A (not requested)"
+    Tg_K = None; Tg_fit_quality = "N/A (not requested)"; tg_dsc_equiv_K = None
 
   [mechanical track — if "bulk_modulus" in properties_requested]
   if is_glassy:
@@ -192,16 +230,36 @@ PHASE C — SUMMARY (always)
 
   Agent(subagent_type="run-summary-worker", description="🟢 Run summary {polymer_name}",
         prompt=<gen_prompt.py --stage run-summary --plan PLAN_PATH
-               --smiles ... --ff ... --tg_fit_quality ... --d05 equil_verdict>)
+               --smiles ... --ff ... --tg_fit_quality ... --d05 equil_verdict
+               --n_replicates <distinct replicates in the multirate registry>>)  # multirate Tg
     → parse RESULT → run_summary_path → write RESULTS to run_log.md
 ```
+
+### Multirate Tg registry
+
+The thermal track runs the Tg sweep at each `tg_rates_K_per_ns` rate (40, 160, 400 K/ns) and
+extrapolates `Tg = a + b·ln(Γ)` down to `dsc_equiv_rate_K_per_ns` (10 K/min = 1.6667e-10 K/ns) to
+report the **theoretical DSC-equivalent experimental Tg** — correcting the 80–120 K MD overestimate
+from fast cooling. The per-rate (rate, Tg_MD) pairs accumulate across replicates so the fit tightens
+over time.
+
+- **File:** `data/_tg_registry/<CLASS_ID>__<polymer_slug>.csv` (append-only; survives across runs of
+  the same polymer). `<polymer_slug>` = a filesystem-safe slug of the SMILES.
+- **Header:** `replicate,rate_K_per_ns,Tg_MD_K,r_squared,fit_quality,run_name,timestamp_utc`
+- **Write:** the orchestrator appends one row after each per-rate `analyze-tg` (3 rows/replicate).
+- **Read/refit:** the `analyze-tg-multirate` step reads ALL rows for this polymer (filtering to
+  `fit_quality >= ACCEPTABLE`), passing the full `rate`/`Tg_MD` columns as `--mr_rates`/`--mr_tg_values`.
+  More replicates ⇒ more points per rate ⇒ tighter log-linear slope SE ⇒ tighter DSC Tg.
+- **Note:** the 40→400 K/ns span is ~1 decade — the **log-linear** `tg_at_slow_rate_K` is the reported
+  value; the Vogel-Fulcher `Tg0` stays diagnostic only (needs ≥3 decades; accumulation adds points, not
+  span). One orchestrator per polymer at a time (append race is acceptable for that model).
 
 ### Validator gate
 
 The Planner proposes; the Executor **never improvises**. After each worker's `Monitor` + status check, validate the result against that worker's `success_criteria` in the approved `run_plan.json` (`planned_stages[].success_criteria`):
 
 - **Met** → proceed.
-- **Not met** → invoke `/recover` (max 2 attempts/worker). The equil-check gate is `check_equilibration_comprehensive.overall_pass=True`; the tg-analysis gate is the bilinear-fit R² floor. These are already enforced — the plan records them as explicit criteria rather than implicit rules.
+- **Not met** → invoke `/recover` (max 2 attempts/worker). The equil-check gate is `check_equilibration_comprehensive.overall_pass=True`; the per-rate tg-analysis gate is the bilinear-fit R² floor; the `analyze-tg-multirate` gate is `loglinear_r_squared >= loglinear_r_squared_min` (0.90). These are already enforced — the plan records them as explicit criteria rather than implicit rules.
 - **Probe contradicts a plan assumption** → if a planned `reduction_probe` comes back inconsistent with a plan assumption (e.g. the chosen FF is wrong), return control to the **planner** to revise downstream stages (re-spawn `planner` with the finding, then re-`critic`). Do not let a worker silently improvise a different parameter.
 - **`hardware_benchmark` probe** → when the plan schedules it (off-table FF, unusual cell size, or a host where `hardware_policy.values_are_benchmarked=false`), run it **politely before** the affected GPU stage: `scripts/calibrate_hardware.py --cell <built .data> --ff <fam>` (idle-GPU + spare-core gated, niced — never `--allow-busy` on a shared box). If the measured winner contradicts the plan's D-08 choice, route back to the **planner** (re-plan → re-`critic`) exactly like any other contradicting probe — do not let the worker pick a different engine/mpi on its own.
 

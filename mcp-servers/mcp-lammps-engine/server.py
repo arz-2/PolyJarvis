@@ -2975,6 +2975,7 @@ def _run_generate_run_summary(
     exp_K_min: Optional[float],
     exp_K_max: Optional[float],
     graphs_dir: Optional[str] = None,
+    n_replicates: Optional[int] = None,
 ) -> dict:
     """Background worker — runs generate_run_summary.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/generate_run_summary.py"]
@@ -3003,6 +3004,7 @@ def _run_generate_run_summary(
     if exp_K_min is not None:       parts.append(f"--exp_K_min {exp_K_min}")
     if exp_K_max is not None:       parts.append(f"--exp_K_max {exp_K_max}")
     if graphs_dir:                  parts.append(f"--graphs_dir {graphs_dir}")
+    if n_replicates is not None:    parts.append(f"--n_replicates {n_replicates}")
 
     command = " ".join(parts)
     logger.info(f"Running generate_run_summary via CLI: {command}")
@@ -3159,6 +3161,7 @@ def generate_run_summary(
     exp_density_max: Optional[float] = None,
     exp_K_min: Optional[float] = None,
     exp_K_max: Optional[float] = None,
+    n_replicates: Optional[int] = None,
 ) -> dict:
     """
     Aggregate all Stage 4 analysis outputs into a single run_summary.json.
@@ -3188,6 +3191,8 @@ def generate_run_summary(
         exp_tg_min/max:   Experimental Tg range (K) for PASS/FAIL status.
         exp_density_min/max: Experimental density range (g/cm³).
         exp_K_min/max:    Experimental bulk modulus range (GPa).
+        n_replicates:     Distinct replicates in the multi-rate Tg registry (for the
+                          DSC-equivalent extrapolation reported in results.tg).
 
     Returns:
         dict with status and summary_json path on success.
@@ -3206,7 +3211,7 @@ def generate_run_summary(
             exp_tg_min=exp_tg_min, exp_tg_max=exp_tg_max,
             exp_density_min=exp_density_min, exp_density_max=exp_density_max,
             exp_K_min=exp_K_min, exp_K_max=exp_K_max,
-            graphs_dir=graphs_dir,
+            graphs_dir=graphs_dir, n_replicates=n_replicates,
         )),
         daemon=True,
     )

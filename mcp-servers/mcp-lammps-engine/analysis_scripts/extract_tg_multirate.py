@@ -210,8 +210,15 @@ def main():
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # A sub-µ reference rate is the DSC-equivalent target (10 K/min = 1.6667e-10 K/ns),
+    # not a near-data "slow MD" rate. This switches labels/plot range and avoids the
+    # "{:.0f}" formatter printing "0 K/ns" for the tiny DSC rate.
+    is_dsc = args.slow_rate_ref < 1e-6
+    ref_label = "DSC-equivalent, 10 K/min" if is_dsc else "slow MD"
+
     result = fit_multirate(args.rates, args.tg_values, slow_rate_ref=args.slow_rate_ref)
     result["polymer_name"] = args.polymer_name
+    result["is_dsc_extrapolation"] = is_dsc
 
     # ── D-06 markdown block ────────────────────────────────────────────────
     if result.get("status") == "success":
@@ -226,12 +233,15 @@ def main():
         ci95       = result.get("tg0_K_ci95", float("nan"))
         r2_vf      = result.get("vf_r_squared", float("nan"))
 
+        slow_rate_str = f"{slow_rate:.2e}" if is_dsc else f"{slow_rate:.0f}"
+        tg_slow_label = ("theoretical DSC-equivalent experimental Tg" if is_dsc
+                         else "slow-MD Tg")
         d06_md = (
             f"### Multi-rate Tg analysis\n\n"
             f"| Rate | Tg_MD |\n|------|-------|\n{rate_rows}\n\n"
             f"**Log-linear**: Tg = {result.get('loglinear_intercept_K', 0):.1f} + {slope:.2f}·ln(Γ)  "
             f"R²={r2_lin:.4f}\n"
-            f"→ Tg at {slow_rate:.0f} K/ns (slow MD) = **{tg_slow:.1f} K**\n\n"
+            f"→ Tg at {slow_rate_str} K/ns ({ref_label}) = **{tg_slow:.1f} K**  ({tg_slow_label})\n\n"
             f"**VF extrapolation** (Tg0 at Γ→0): "
         )
         if "tg0_K" in result:
@@ -255,11 +265,13 @@ def main():
 
             rates_arr = np.array(args.rates)
             tg_arr    = np.array(args.tg_values)
-            x_range   = np.linspace(np.log(rates_arr.min() * 0.5),
-                                    np.log(rates_arr.max() * 2.0), 200)
+            # x-axis spans from the reference rate (DSC, far left) up to the data, so the
+            # extrapolated log-linear line visibly reaches the reference vline.
+            x_lo = np.log(args.slow_rate_ref * 0.5) if is_dsc else np.log(rates_arr.min() * 0.5)
+            x_range   = np.linspace(x_lo, np.log(rates_arr.max() * 2.0), 200)
             r_range   = np.exp(x_range)
 
-            # Log-linear curve
+            # Log-linear curve (extrapolated across the full range)
             a_ll = result.get("loglinear_intercept_K", 0.0)
             b_ll = result.get("loglinear_slope_K", 0.0)
             tg_ll = a_ll + b_ll * x_range
@@ -268,21 +280,31 @@ def main():
             ax.semilogx(rates_arr, tg_arr, "o", color="#2196F3", ms=7, zorder=3, label="MD data")
             ax.semilogx(r_range, tg_ll, "--", color="#4CAF50", lw=1.5, label="log-linear")
 
-            # VF curve (if successful)
+            # VF curve (if successful) — plotted ONLY over the data range. VF has a
+            # singularity at ln Γ = -c; extrapolating it ~12 decades to DSC would blow up
+            # the y-axis, and VF is diagnostic-only at <2 decades anyway.
             if "tg0_K" in result:
                 tg0 = result["tg0_K"]
                 a   = result["vf_A"]
                 c   = result["vf_c"]
-                tg_vf = vf_model(x_range, tg0, a, c)
-                ax.semilogx(r_range, tg_vf, "-", color="#F44336", lw=1.8, label="VF fit")
+                x_vf = np.linspace(np.log(rates_arr.min()), np.log(rates_arr.max()), 100)
+                ax.semilogx(np.exp(x_vf), vf_model(x_vf, tg0, a, c),
+                            "-", color="#F44336", lw=1.8, label="VF fit (data range)")
                 ax.axhline(tg0, ls=":", color="#9C27B0", lw=1.2,
                            label=f"VF Tg⁰ = {tg0:.1f} K")
 
-            ax.axvline(args.slow_rate_ref, ls=":", color="#607D8B", lw=1.0,
-                       label=f"slow ref = {args.slow_rate_ref:.0f} K/ns")
+            # Reference rate + the extrapolated Tg there
+            tg_slow_pt = result.get("tg_at_slow_rate_K")
+            vline_lbl = (f"{ref_label} ({args.slow_rate_ref:.1e} K/ns)" if is_dsc
+                         else f"slow ref = {args.slow_rate_ref:.0f} K/ns")
+            ax.axvline(args.slow_rate_ref, ls=":", color="#607D8B", lw=1.0, label=vline_lbl)
+            if tg_slow_pt is not None:
+                ax.plot([args.slow_rate_ref], [tg_slow_pt], "*", color="#FF9800", ms=12,
+                        zorder=4, label=f"Tg @ ref = {tg_slow_pt:.1f} K")
             ax.set_xlabel("Cooling rate (K/ns)")
             ax.set_ylabel("Tg (K)")
-            ax.set_title(f"{args.polymer_name} — Multi-rate Tg")
+            title_suffix = " (DSC extrapolation)" if is_dsc else ""
+            ax.set_title(f"{args.polymer_name} — Multi-rate Tg{title_suffix}")
             ax.legend(fontsize=7)
             fig.tight_layout()
             plot_path = out_dir / "tg_multirate.png"

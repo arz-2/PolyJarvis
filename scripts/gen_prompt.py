@@ -33,7 +33,8 @@ Optional overrides (defaults come from polymer_rules.json):
   --murnaghan_logs JSON   JSON list of log paths (analyze-bm, rubbery+pressures path)
   --d05 STR               equil_verdict from equil-checker RESULT (run-summary worker)
   --npt_prod_log PATH     NPT production log (equil-check, analyze-bm)
-  --npt_prod_dump PATH    NPT production dump (equil-check)
+  --npt_prod_dump PATH    structural-check dump override (equil-check); defaults to the
+                          melt nvt_production.dump — NOT the production NPT dump
   --ff STR                force field string (run-summary, analyze-bm)
   --backbone_types JSON   atom type IDs as JSON list (equil-check only)
   --enthalpy_col STR      LAMMPS thermo column name for enthalpy (analyze-tg; default "Enthalpy")
@@ -75,6 +76,7 @@ WORKER_GUIDES = {
     "equil":        "EQUILIBRATION.md",
     "tg":           "THERMAL_SWEEP.md",
     "analyze-tg":   "THERMAL_ANALYSIS.md",
+    "analyze-tg-multirate": "THERMAL_ANALYSIS.md",
     "equil-check":  "EQUIL_CHECK.md",
     "analyze-bm":   "BM_ANALYSIS.md",
     "deform":       "DEFORM.md",
@@ -270,6 +272,25 @@ ff_confidence:     {cls.get('confidence', 'low')}
 """
 
 
+def _resolve_t_workflow(args, cls: dict) -> float:
+    """Equilibration workflow temperature (K). Plan's T_workflow_K wins; otherwise 300 K for
+    rubbery (exp_Tg < 300) and T_equil_K for glassy. Mirrors generate_equilibration_workflow,
+    whose chain ends at npt_production when T ≤ 300 (rubbery, 7-run) and appends npt_prod300
+    when T > 300 (glassy, 9-run)."""
+    exp_tg_override = getattr(args, 'exp_tg_K', None)
+    if exp_tg_override is not None:
+        exp_tg = exp_tg_override
+    else:
+        exp_tg = cls.get('experimental_tg_K')
+        if isinstance(exp_tg, dict):
+            vals = sorted(v for v in exp_tg.values() if isinstance(v, (int, float)))
+            exp_tg = vals[len(vals) // 2] if vals else None  # median: avoids low-Tg outliers (e.g. PCL in PEST)
+    if "T_workflow_K" in cls:
+        return cls["T_workflow_K"]
+    T_equil = _pick(getattr(args, 'T_equil_K', None), cls, 'T_equil_K', 600.0)
+    return 300.0 if isinstance(exp_tg, (int, float)) and exp_tg < 300 else T_equil
+
+
 def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
     work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/equil"
@@ -287,18 +308,7 @@ def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
         )
     else:
         npt_prod_line = "t_npt_prod_ns:     null  # auto: steps_npt // 2 by atom-count tier"
-    exp_tg_override = getattr(args, 'exp_tg_K', None)
-    if exp_tg_override is not None:
-        exp_tg = exp_tg_override
-    else:
-        exp_tg = cls.get('experimental_tg_K')
-        if isinstance(exp_tg, dict):
-            vals = sorted(v for v in exp_tg.values() if isinstance(v, (int, float)))
-            exp_tg = vals[len(vals) // 2]  # median: avoids low-Tg outliers (e.g. PCL in PEST)
-    if "T_workflow_K" in cls:
-        T_workflow = cls["T_workflow_K"]
-    else:
-        T_workflow = 300.0 if isinstance(exp_tg, (int, float)) and exp_tg < 300 else T_equil
+    T_workflow = _resolve_t_workflow(args, cls)
     add_melt_npt = getattr(args, 'add_melt_npt', False) or False
     melt_npt_ns_val = _pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None
     if add_melt_npt and melt_npt_ns_val is not None:
@@ -342,6 +352,18 @@ mpi_ranks:         {args.mpi_ranks}
 """
 
 
+def _resolve_tg_rate(args, cls: dict):
+    """Resolve the selected cooling rate + a per-rate output-dir suffix for multi-rate
+    Tg sweeps. Returns (selected_rate | None, rate_suffix). When --tg_rate_index is unset,
+    suffix is "" so the single-rate path stays byte-identical to the legacy pipeline."""
+    tg_rates = cls.get('tg_rates_K_per_ns', [])
+    rate_idx = getattr(args, 'tg_rate_index', None)
+    if rate_idx is not None and tg_rates and rate_idx < len(tg_rates):
+        selected_rate = tg_rates[rate_idx]
+        return selected_rate, f"_r{int(selected_rate)}"
+    return None, ""
+
+
 def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
     work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/thermal"
@@ -351,8 +373,8 @@ def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     # Multi-rate support: pick the rate at tg_rate_index if provided
     tg_rates = cls.get('tg_rates_K_per_ns', [])
     rate_idx = getattr(args, 'tg_rate_index', None)
-    if rate_idx is not None and tg_rates and rate_idx < len(tg_rates):
-        selected_rate = tg_rates[rate_idx]
+    selected_rate, rate_suffix = _resolve_tg_rate(args, cls)
+    if selected_rate is not None:
         # Compute n_steps_per_t for this rate: rate = T_step / (n_steps * dt * 1e-6)
         t_step = _pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)
         n_steps_for_rate = int(t_step / (selected_rate * dt * 1e-6))
@@ -367,7 +389,9 @@ def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
         if tg_rates:
             rate_line += f"\n  all_rates_K_per_ns: {tg_rates}  # use --tg_rate_index N for multi-rate"
 
-    tg_sweep_dir = f"{work_dir}/tg_sweep"
+    # Per-rate output dir so concurrent/sequential multi-rate sweeps don't collide on
+    # one tg_sweep/tg_sweep.log. Single-rate path keeps the legacy "tg_sweep" dir.
+    tg_sweep_dir = f"{work_dir}/tg_sweep{rate_suffix}"
     return f"""\
 equil_data_path:   {_v(args.data_path)}
 lammps_flags:      {json.dumps(flags)}
@@ -453,24 +477,74 @@ mpi_ranks:         {args.mpi_ranks}
 
 
 def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
-    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
+    selected_rate, rate_suffix = _resolve_tg_rate(args, cls)
+    # Per-rate analysis dir so the three tg_summary.json files don't overwrite each other.
+    # Single-rate (no --tg_rate_index) keeps the legacy raw/ output → reproducibility preserved.
+    raw_suffix = f"tg_r{int(selected_rate)}/" if selected_rate is not None else ""
+    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/{raw_suffix}"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
     lammps_base = f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
-    tg_log = args.data_path or f"{lammps_base}/thermal/tg_sweep/tg_sweep.log"
+    tg_log = args.data_path or f"{lammps_base}/thermal/tg_sweep{rate_suffix}/tg_sweep.log"
     # equil_data_path: NPT 300 K production output — passed to extract_thermal as tg_data_file for ΔCp mass normalisation
     equil_data = args.equil_data_path or f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
     enthalpy_col = getattr(args, "enthalpy_col", None) or "Enthalpy"
     guide = load_worker_guide("analyze-tg")
+    rate_line = (f"cooling_rate_K_per_ns: {selected_rate}  # tg_rate_index={args.tg_rate_index}; "
+                 f"report this (rate, Tg_K) pair to the multirate registry\n"
+                 if selected_rate is not None else "")
     return f"""\
 tg_log_path:       {tg_log}
 tg_data_file:      {equil_data}    # LAMMPS .data input to the Tg sweep; required for ΔCp mass normalisation
 enthalpy_col:      {enthalpy_col}  # LAMMPS thermo column for enthalpy (must match log output)
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
-output_dir:        {output_dir}
+{rate_line}output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
 tasks:
   - extract_thermal  # tg_data_file required for ΔCp; enthalpy_col must match log thermo output
+
+--- Worker Guide (THERMAL_ANALYSIS) ---
+{guide}
+--- Cross-Track Rules ---
+{cross_track_rules}
+"""
+
+
+def analyze_tg_multirate_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    """Aggregate per-rate (rate, Tg_MD) pairs: log-linear + VF fit, extrapolated to the
+    DSC-equivalent rate. The orchestrator supplies --mr_rates / --mr_tg_values from the
+    cross-replicate registry; the worker runs the emitted command verbatim."""
+    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
+    script = ("/home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/"
+              "analysis_scripts/extract_tg_multirate.py")
+    dsc_rate = cls.get("dsc_equiv_rate_K_per_ns", 1.6667e-10)
+    guide = load_worker_guide("analyze-tg-multirate")
+    rates = (args.mr_rates or "").replace(",", " ").strip()
+    tg_vals = (args.mr_tg_values or "").replace(",", " ").strip()
+    polymer_name = args.run_name
+    command = (
+        f"python3 {script} \\\n"
+        f"  --rates {rates or '<FILL: space-separated rates from registry, e.g. 40 160 400>'} \\\n"
+        f"  --tg_values {tg_vals or '<FILL: matching Tg_MD values from registry>'} \\\n"
+        f"  --slow_rate_ref {dsc_rate} \\\n"
+        f"  --polymer_name {polymer_name} \\\n"
+        f"  --output_dir {output_dir}"
+    )
+    return f"""\
+task:              extract_tg_multirate
+run_name:          {args.run_name}
+polymer_class:     {args.polymer_class.upper()}
+output_dir:        {output_dir}
+dsc_equiv_rate_K_per_ns: {dsc_rate}   # 10 K/min — the extrapolation target (slow_rate_ref)
+mr_rates:          {rates or '<FILL from registry>'}
+mr_tg_values:      {tg_vals or '<FILL from registry>'}
+command: |
+  {command}
+note: |
+  Run the command above verbatim. It writes tg_multirate_result.json, d06_multirate_block.md,
+  and tg_multirate.png to output_dir. The primary reported value is tg_at_slow_rate_K
+  (= the theoretical DSC-equivalent experimental Tg). VF (tg0_K) is diagnostic only —
+  a <2-decade rate span leaves it POORLY_CONSTRAINED.
 
 --- Worker Guide (THERMAL_ANALYSIS) ---
 {guide}
@@ -487,21 +561,39 @@ def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
     ct_decay = cls.get("ct_min_decay_melt", 0.10)
 
     lammps_base = f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
-    equil_log = f"{lammps_base}/equil/nvt_production/nvt_production.log"
-    npt_log = args.npt_prod_log or f"{lammps_base}/equil/npt_prod300/npt_prod300.log"
-    npt_dump = args.npt_prod_dump or f"{lammps_base}/equil/npt_prod300/npt_prod300.dump"
-    npt_data = args.data_path or f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
+    # Phase-aware NPT production files: rubbery (T_workflow ≤ 300) ends at npt_production (7-run
+    # chain — no npt_prod300 exists); glassy (T_workflow > 300) appends npt_prod300. The melt-NVT
+    # log (nvt_production.log) is present in both. CLI --npt_prod_log/--npt_prod_dump/--data_path
+    # still override when given.
+    T_workflow = _resolve_t_workflow(args, cls)
+    # Production NPT (thermo/density): rubbery (T ≤ 300) ends at npt_production; glassy (T > 300)
+    # at npt_prod300 (cooled to 300 K). The structural/chain-relaxation checks (C(t), MSD, Rg, R_ee)
+    # must run on the MELT trajectory — nvt_production at T_workflow, where chains are mobile — NOT
+    # the production NPT, which for a glassy polymer is below Tg and yields trapped dynamics by
+    # construction. check_equilibration_comprehensive decouples thermo (log_file) from structural
+    # (dump_file), so a single call covers both: log_file = production NPT log, dump_file = melt dump.
+    if T_workflow <= 300:
+        prod, npt_prod_temp = "npt_production", T_workflow
+    else:
+        prod, npt_prod_temp = "npt_prod300", 300.0
+    npt_log = args.npt_prod_log or f"{lammps_base}/equil/{prod}/{prod}.log"
+    npt_data = args.data_path or f"{lammps_base}/equil/{prod}/{prod}_out.data"
+    melt_dump = args.npt_prod_dump or f"{lammps_base}/equil/nvt_production/nvt_production.dump"
 
     guide = load_worker_guide("equil-check")
     return f"""\
-equil_log_path:    {equil_log}
+# check_equilibration_comprehensive decouples thermo (from log_file) and structural (from dump_file):
+#   log_file  ← npt_prod_log_path  — density/energy convergence at the production (300 K) state
+#   dump_file ← melt_dump_path     — C(t)/MSD/Rg/R_ee on mobile melt chains (NOT the glassy NPT dump)
+#   data_file ← equil_data_path    — topology
 npt_prod_log_path: {npt_log}
-npt_prod_dump_path: {npt_dump}
+melt_dump_path:    {melt_dump}
+npt_prod_temp_K:   {npt_prod_temp}   # target_temp= for extract_equilibrated_density (runs on npt_prod_log_path)
 equil_data_path:   {npt_data}
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 backbone_types:    {args.backbone_types or '<FILL from parse_data_file or lammps_flags>'}
-ct_min_decay_melt: {ct_decay}
+ct_min_decay_melt: {ct_decay}   # ct_min_decay= — always active; the structural dump is the melt in both phases
 exp_density_range: {exp_density}
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
@@ -614,6 +706,7 @@ d06_tg_fit_quality: {_v(args.tg_fit_quality, 'N/A (not requested)')}
 exp_tg_range:      {exp_tg}
 exp_density_range: {exp_density}
 exp_K_range:       {exp_K}
+n_replicates:      {_v(getattr(args, 'n_replicates', None), 'N/A')}   # distinct replicates in the multi-rate Tg registry; pass to generate_run_summary --n_replicates
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
 """
@@ -629,6 +722,7 @@ STAGE_MAP = {
     "born":         born_prompt,
     "murnaghan":    murnaghan_prompt,
     "analyze-tg":   analyze_tg_prompt,
+    "analyze-tg-multirate": analyze_tg_multirate_prompt,
     "equil-check":  equil_check_prompt,
     "analyze-bm":   analyze_bm_prompt,
     "run-summary":  run_summary_prompt,
@@ -639,11 +733,11 @@ def main():
     p = argparse.ArgumentParser(
         description="Generate a fully-formed PolyJarvis worker prompt.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Workers: build | equil | tg | deform | born | murnaghan | analyze-tg | equil-check | analyze-bm | run-summary",
+        epilog="Workers: build | equil | tg | deform | born | murnaghan | analyze-tg | analyze-tg-multirate | equil-check | analyze-bm | run-summary",
     )
     p.add_argument("--stage", required=True, choices=list(STAGE_MAP),
                    metavar="STAGE",
-                   help="build|equil|tg|deform|born|murnaghan|analyze-tg|equil-check|analyze-bm|run-summary")
+                   help="build|equil|tg|deform|born|murnaghan|analyze-tg|analyze-tg-multirate|equil-check|analyze-bm|run-summary")
     p.add_argument("--run_name", required=True)
     p.add_argument("--polymer_class", required=True)
     p.add_argument("--plan",
@@ -710,6 +804,13 @@ def main():
                    help="MD steps per temperature window")
     p.add_argument("--tg_rate_index", type=int,
                    help="Index into tg_rates_K_per_ns list for multi-rate sweeps (0=slowest)")
+    p.add_argument("--mr_rates",
+                   help="analyze-tg-multirate: comma/space-separated cooling rates (K/ns) "
+                        "from the cross-replicate registry, e.g. '40,160,400'")
+    p.add_argument("--mr_tg_values",
+                   help="analyze-tg-multirate: matching Tg_MD values (K), same order as --mr_rates")
+    p.add_argument("--n_replicates", type=int,
+                   help="run-summary: number of distinct replicates in the multi-rate Tg registry")
     p.add_argument("--K_strain_max", type=float,
                    help="Max engineering strain for uniaxial deformation")
     p.add_argument("--K_deform_rate_inv_s", type=float,

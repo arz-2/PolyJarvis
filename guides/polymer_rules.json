@@ -428,7 +428,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -530,7 +530,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 10000000.0,
       "K_strain_max": 0.03,
@@ -604,7 +604,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -686,7 +686,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -770,7 +770,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -845,7 +845,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -933,7 +933,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1002,7 +1002,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1077,7 +1077,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1158,7 +1158,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1230,7 +1230,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1289,7 +1289,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1348,7 +1348,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1416,7 +1416,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1475,7 +1475,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1542,7 +1542,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1606,9 +1606,9 @@
       "tg_t_step_K": 10,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        20,
-        80,
-        320
+        40,
+        160,
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1669,7 +1669,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1728,7 +1728,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1800,7 +1800,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1872,7 +1872,7 @@
       "tg_rates_K_per_ns": [
         40,
         160,
-        640
+        400
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1935,8 +1935,9 @@
     "tg_rates_K_per_ns": [
       40,
       160,
-      640
+      400
     ],
+    "dsc_equiv_rate_K_per_ns": 1.6667e-10,
     "K_deform_rate_inv_s": 100000000.0,
     "K_strain_max": 0.03,
     "confidence": "low",
@@ -2008,7 +2009,7 @@
     "dt_fs": 1.0,
     "time_per_point_ns": 0.5,
     "cooling_rate_K_per_ns_equivalent": 40,
-    "note_on_steps": "500,000 steps at 1 fs = 500 ps per temperature point (= 40 K/ns screening rate). For TraPPE-UA PHYC/PDIE classes with dt=2 fs, 250,000 steps also = 500 ps per point (same 40 K/ns). Webb2024 recommends 4 ns/point (2+2 ns eq+prod). Multi-rate Tg (screening-robust): run tg_rates_K_per_ns list [40, 160, 640] in parallel on 3 GPUs; each rate is \u226424h wall time for all classes. Fit log-linear Tg(\u0393) = a + b\u00b7ln(\u0393) as primary result; VF extrapolation Tg(\u0393) = Tg0 + A/ln(B\u00b7\u0393) as secondary (poorly constrained at 1.2 decades). Validation only (PHYC): add 10 K/ns rate [10, 40, 160, 640] from tg_rates_validation_K_per_ns to compare with Ramos 2015 Fig. 3 (increases PHYC budget to ~14h at 2 fs).",
+    "note_on_steps": "500,000 steps at 1 fs = 500 ps per temperature point (= 40 K/ns screening rate). For TraPPE-UA PHYC/PDIE classes with dt=2 fs, 250,000 steps also = 500 ps per point (same 40 K/ns). Webb2024 recommends 4 ns/point (2+2 ns eq+prod). Multi-rate Tg (screening-robust): run tg_rates_K_per_ns list [40, 160, 400] in parallel on 3 GPUs; each rate is \u226424h wall time for all classes. Fit log-linear Tg(\u0393) = a + b\u00b7ln(\u0393) and extrapolate to dsc_equiv_rate_K_per_ns=1.6667e-10 K/ns (10 K/min) as the reported theoretical DSC-equivalent experimental Tg; VF extrapolation Tg(\u0393) = Tg0 + A/ln(B\u00b7\u0393) as secondary diagnostic (poorly constrained at <2 decades). Validation only (PHYC): add 10 K/ns rate [10, 40, 160, 640] from tg_rates_validation_K_per_ns to compare with Ramos 2015 Fig. 3 (increases PHYC budget to ~14h at 2 fs).",
     "analysis": "Bilinear fit of density vs T; Tg at breakpoint. Recommended: slope-temperature method (rolling 50 K window) to reduce fitting bias (Webb2024).",
     "pre_sweep_equilibration": [
       "1. Energy minimization (CG, FTOL=1e-6)",

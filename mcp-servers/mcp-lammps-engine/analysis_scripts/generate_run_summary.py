@@ -86,6 +86,9 @@ def main():
                    help="Path to the approved run_plan.json. When given, its structured "
                         "decisions (evidence/confidence/alternatives) and critique are carried "
                         "into the summary, closing the planned→executed→validated loop.")
+    p.add_argument("--n_replicates",    type=int, default=None,
+                   help="Number of replicates contributing to the multi-rate Tg registry "
+                        "(distinct replicate rows). Reported in results.tg for the DSC extrapolation.")
     args = p.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -96,6 +99,7 @@ def main():
     # Load all analysis JSON outputs
     # -----------------------------------------------------------------------
     tg           = _load_json(output_dir / "tg_summary.json")
+    tg_mr        = _load_json(output_dir / "tg_multirate_result.json")
     eq_dens      = _load_json(output_dir / "equilibrated_density.json")
     eq_chk       = _load_json(output_dir / "equilibration_check.json")
     bulk         = _load_json(output_dir / "bulk_modulus.json")
@@ -173,6 +177,9 @@ def main():
         "tg_summary":              rel("tg_summary.json"),
         "tg_density_bins":         rel("tg_density_bins.csv"),
         "tg_fit_fig":              rel_fig("tg_fit.png"),
+        "tg_multirate_result":     rel("tg_multirate_result.json"),
+        "tg_multirate_d06":        rel("d06_multirate_block.md"),
+        "tg_multirate_fig":        rel("tg_multirate.png"),
         "equilibrated_density":    rel("equilibrated_density.json"),
         "equilibration_check":     rel("equilibration_check.json"),
         "equilibration_fig":       rel_fig("equilibration_convergence.png"),
@@ -257,6 +264,16 @@ def main():
                 "status":         tg_status,
                 "r_squared":      tg.get("r_squared"),
                 "fit_quality":    tg.get("fit_quality"),
+                # Multi-rate DSC extrapolation (log-linear Tg(Γ) → DSC-equivalent rate).
+                # tg_dsc_equiv_K is the reported "theoretical DSC-equivalent experimental Tg".
+                "tg_dsc_equiv_K":      tg_mr.get("tg_at_slow_rate_K"),
+                "loglinear_slope_K":   tg_mr.get("loglinear_slope_K"),
+                "loglinear_r_squared": tg_mr.get("loglinear_r_squared"),
+                "vf_fit_quality":      tg_mr.get("vf_fit_quality"),
+                "n_rates":             tg_mr.get("n_points"),
+                "n_replicates":        args.n_replicates,
+                "rates_span_decades":  tg_mr.get("rates_span_decades"),
+                "slow_rate_ref_K_per_ns": tg_mr.get("slow_rate_ref_K_per_ns"),
             },
             "density": {
                 "value_g_cm3":    rho_val,
