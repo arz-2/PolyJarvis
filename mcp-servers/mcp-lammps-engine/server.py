@@ -237,7 +237,13 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
     CUDA_VISIBLE_DEVICES="" so the GPUs are hidden. Required for small united-atom
     systems below the GPU break-even point (see feedback_small_ua_cpu_faster).
     """
-    n_gpu = len(gpu_ids.split(","))
+    # Empty/blank gpu_ids means CPU-only. The hardware policy emits gpu_ids="" for
+    # CPU classes (TraPPE-UA UA melts); without this coercion use_gpu stays True and
+    # we emit `-sf gpu -pk gpu` while CUDA_VISIBLE_DEVICES="" hides every GPU →
+    # LAMMPS aborts (feedback_small_ua_cpu_faster / feedback_born_matrix_syntax).
+    if not gpu_ids.strip():
+        use_gpu = False
+    n_gpu = len(gpu_ids.split(",")) if gpu_ids.strip() else 1
     lines = [
         "#!/bin/bash",
         f"# PolyJarvis chain {chain_id} — auto-generated, do not edit",
@@ -331,7 +337,11 @@ def _lammps_run_background(
     try:
         run_manager.start(run_id)
 
-        n_gpu = len(gpu_ids.split(","))
+        # Empty gpu_ids means CPU-only — coerce so we don't emit -sf gpu while
+        # CUDA_VISIBLE_DEVICES="" hides every device (feedback_small_ua_cpu_faster).
+        if not gpu_ids.strip():
+            use_gpu = False
+        n_gpu = len(gpu_ids.split(",")) if gpu_ids.strip() else 1
         full_log = f"{work_dir}/{log_file}"
         sentinel_path = SENTINEL_DIR / f"done_{run_id}.json"
         pidfile = pidfile_path(run_id, SENTINEL_DIR)
@@ -2798,6 +2808,11 @@ def run_bulk_modulus_series(
 
         out_dir = Path(output_dir or work_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
+
+        # Coerce CPU-only when gpu_ids is empty (hardware policy emits "" for
+        # TraPPE-UA melts); prevents -sf gpu + hidden-GPU crash.
+        if not gpu_ids.strip():
+            use_gpu = False
 
         stages = []
         log_files = []
