@@ -22,8 +22,8 @@
 ## Rule B: Always Pass `output_dir` and `graphs_dir`
 
 ```python
-output_dir = "/home/arz2/PolyJarvis/data/<run_name>/raw/"
-graphs_dir = "/home/arz2/PolyJarvis/data/<run_name>/graphs/"
+output_dir = "/home/alexzhao/PolyJarvis/data/<run_name>/raw/"
+graphs_dir = "/home/alexzhao/PolyJarvis/data/<run_name>/graphs/"
 ```
 
 ---

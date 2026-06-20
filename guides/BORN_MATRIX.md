@@ -31,7 +31,7 @@ RESULT:
 
 `compute born/matrix numdiff` is in the EXTRA-COMPUTE package. Verify the binary has this capability by checking:
 ```
-/home/arz2/lammps/build/lmp_gpu -h 2>&1 | grep -i born
+/home/alexzhao/lammps/build/lmp_gpu -h 2>&1 | grep -i born
 ```
 If the output is empty, the binary lacks EXTRA-COMPUTE — escalate to orchestrator.
 

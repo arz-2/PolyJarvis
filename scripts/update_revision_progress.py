@@ -13,9 +13,9 @@ import os
 import re
 from pathlib import Path
 
-DATA_DIR    = Path("/home/arz2/PolyJarvis/data")
-SIM_DIR     = Path("/home/arz2/simulations")
-PARAMS_FILE = Path("/home/arz2/PolyJarvis/guides/REVISION_PARAMS.md")
+DATA_DIR    = Path("/home/alexzhao/PolyJarvis/data")
+SIM_DIR     = Path("/home/alexzhao/simulations")
+PARAMS_FILE = Path("/home/alexzhao/PolyJarvis/guides/REVISION_PARAMS.md")
 
 # Per polymer: regex to match run dirs, which dirs to scan, and how many reps are needed.
 # PE scans DATA_DIR only — old PE_run1-3 (10 chains) are deprecated for the revision.

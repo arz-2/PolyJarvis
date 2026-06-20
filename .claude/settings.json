@@ -52,8 +52,8 @@
       "mcp__mcp-emc-server__list_emc_jobs"
     ],
     "additionalDirectories": [
-      "/home/arz2/simulations",
-      "/home/arz2/polyjarvis_emc_jobs"
+      "/home/alexzhao/simulations",
+      "/home/alexzhao/polyjarvis_emc_jobs"
     ]
   },
   "hooks": {
@@ -86,7 +86,7 @@
           },
           {
             "type": "command",
-            "command": "pending=$(find /home/arz2/PolyJarvis/.claude/agent-memory -name '*.md' ! -name 'MEMORY.md' 2>/dev/null | xargs grep -rL 'ingested_at:' 2>/dev/null | head -5); [ -n \"$pending\" ] && printf 'INGEST: Pending agent memories found — run /ingest-memory before stopping:\\n%s\\n' \"$(echo \"$pending\" | sed 's|.*/||')\" || true"
+            "command": "pending=$(find /home/alexzhao/PolyJarvis/.claude/agent-memory -name '*.md' ! -name 'MEMORY.md' 2>/dev/null | xargs grep -rL 'ingested_at:' 2>/dev/null | head -5); [ -n \"$pending\" ] && printf 'INGEST: Pending agent memories found — run /ingest-memory before stopping:\\n%s\\n' \"$(echo \"$pending\" | sed 's|.*/||')\" || true"
           }
         ]
       }
@@ -178,7 +178,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /home/arz2/PolyJarvis/scripts/update_revision_progress.py  # REVISION-TEMP: remove after ACS paper review closes"
+            "command": "python3 /home/alexzhao/PolyJarvis/scripts/update_revision_progress.py  # REVISION-TEMP: remove after ACS paper review closes"
           }
         ]
       }

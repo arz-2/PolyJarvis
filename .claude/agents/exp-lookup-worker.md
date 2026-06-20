@@ -21,7 +21,7 @@ You are the experimental lookup worker for PolyJarvis. Your sole job is to run `
 Your full stage guide is inlined at the bottom of this prompt — read it before running anything.
 
 1. Build the command from the provided inputs. Always pass `--output_path` as an absolute path.
-2. Run `python3 /home/arz2/PolyJarvis/db/query_best_match.py <args>` via Bash.
+2. Run `python3 /home/alexzhao/PolyJarvis/db/query_best_match.py <args>` via Bash.
 3. Read the output JSON to extract ranges for the RESULT block.
 4. If `match_method="none"`, set all range fields to `null` — do not treat this as a failure.
 5. Count distinct `source_key` values across all property rows for `n_sources`.
@@ -96,13 +96,13 @@ If `match_method="none"`: set all range fields to `null` in RESULT — the orche
 ## Running the script
 
 ```bash
-python3 /home/arz2/PolyJarvis/db/query_best_match.py \
+python3 /home/alexzhao/PolyJarvis/db/query_best_match.py \
   --polymer_name "Poly(methyl methacrylate)" \
   --polymer_class PACR \
   --T_sim_K 300.0 \
   --is_glassy true \
   --properties tg,density,bulk_modulus \
-  --output_path /home/arz2/PolyJarvis/data/<run_name>/raw/exp_lookup.json
+  --output_path /home/alexzhao/PolyJarvis/data/<run_name>/raw/exp_lookup.json
 ```
 
 All args:

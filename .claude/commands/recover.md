@@ -7,7 +7,7 @@ Recovery procedure for a failed PolyJarvis simulation. Follow these steps exactl
 
 **1. Find the active run_log.md:**
 ```bash
-find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/data/TEMPLATE/run_log.md | sort -t/ -k6 | tail -5
+find /home/alexzhao/PolyJarvis/data -name "run_log.md" -newer /home/alexzhao/PolyJarvis/data/TEMPLATE/run_log.md | sort -t/ -k6 | tail -5
 ```
 
 **2. Read the SIMULATION STATE table** from that run_log.md. Identify the row with status `monitoring` or `failed` and note the `chain_id` / `run_id`.

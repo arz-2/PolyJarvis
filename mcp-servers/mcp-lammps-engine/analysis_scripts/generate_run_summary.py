@@ -14,7 +14,7 @@ Usage:
         --smiles "*CC(c1ccccc1)*" \
         --polymer_class PSTR \
         --ff TraPPE-UA \
-        --simulation_dir /home/arz2/simulations/PS1_20260602 \
+        --simulation_dir /home/alexzhao/simulations/PS1_20260602 \
         [--charge_method "embedded in FF"] \
         [--dp 50] [--n_chains 10] [--n_atoms 5320] \
         [--date_start 2026-06-02] [--date_end 2026-06-03] \

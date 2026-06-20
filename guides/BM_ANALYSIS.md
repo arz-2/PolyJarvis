@@ -24,8 +24,8 @@ Only one path runs per invocation. The `murnaghan` path additionally calls `extr
 Always pass both to every extraction call:
 
 ```python
-output_dir = "/home/arz2/PolyJarvis/data/<run_name>/raw/"
-graphs_dir = "/home/arz2/PolyJarvis/data/<run_name>/graphs/"
+output_dir = "/home/alexzhao/PolyJarvis/data/<run_name>/raw/"
+graphs_dir = "/home/alexzhao/PolyJarvis/data/<run_name>/graphs/"
 ```
 
 Tools that produce PNG figures:

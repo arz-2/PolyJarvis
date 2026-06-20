@@ -35,13 +35,13 @@ If `match_method="none"`: set all range fields to `null` in RESULT — the orche
 ## Running the script
 
 ```bash
-python3 /home/arz2/PolyJarvis/db/query_best_match.py \
+python3 /home/alexzhao/PolyJarvis/db/query_best_match.py \
   --polymer_name "Poly(methyl methacrylate)" \
   --polymer_class PACR \
   --T_sim_K 300.0 \
   --is_glassy true \
   --properties tg,density,bulk_modulus \
-  --output_path /home/arz2/PolyJarvis/data/<run_name>/raw/exp_lookup.json
+  --output_path /home/alexzhao/PolyJarvis/data/<run_name>/raw/exp_lookup.json
 ```
 
 All args:

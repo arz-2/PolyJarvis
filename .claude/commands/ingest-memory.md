@@ -12,7 +12,7 @@ Ingest pending subagent memory findings into authoritative codebase sources. For
 ## Step 1 — Scan for pending memories
 
 ```bash
-find /home/arz2/PolyJarvis/.claude/agent-memory -name "*.md" \
+find /home/alexzhao/PolyJarvis/.claude/agent-memory -name "*.md" \
   ! -name "MEMORY.md" | xargs grep -rL "ingested_at:" 2>/dev/null
 ```
 
