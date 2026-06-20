@@ -275,6 +275,11 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
         script = stage["script"]
         wdir  = stage["work_dir"]
         log   = stage.get("log_file", f"{name}_run.log")
+        # log_file may be absolute (e.g. run_bulk_modulus_series passes full paths)
+        # or relative (e.g. equilibration passes "minimize.log"). Only prepend the
+        # stage work_dir for relative paths — otherwise we get a doubled path like
+        # "bm_P1//home/.../bm_P1/bm_P1.log" and the redirect fails.
+        log_target = log if os.path.isabs(log) else f"{wdir}/{log}"
 
         lines += [
             f"# --- Stage {i+1}/{len(stages)}: {name} ---",
@@ -282,7 +287,7 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
             f"cd {wdir}",  # FIX: cd into stage workdir so relative paths in .in files resolve correctly
             f"log_start {name}",
             f"mpirun -np $MPI $LMP -sf gpu -pk gpu $N_GPU "
-            f"-in {script} >> {wdir}/{log} 2>&1 \\",
+            f"-in {script} >> {log_target} 2>&1 \\",
             f"  && log_done {name} \\",
             f"  || {{ log_fail {name}; sentinel_fail {name}; "
             f"echo \"{{\\\"stage\\\":\\\"__chain__\\\",\\\"status\\\":\\\"failed\\\","

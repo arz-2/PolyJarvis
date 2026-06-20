@@ -77,8 +77,10 @@
       "decision_id": "D-05_convergence",
       "evidence_required": false,
       "evaluate": ["density_convergence", "energy_convergence", "chain_statistic_convergence"],
-      "require": ["check_equilibration_comprehensive overall_pass=True before ANY property extraction (cross-stage rule 2)"],
+      "require": ["check_equilibration_comprehensive overall_pass=True before ANY property extraction (cross-stage rule 2); EXCEPT glassy DP>=30 systems, which use require_glassy (see below)"],
+      "require_glassy": ["for regime=glassy AND DP>=30: gate on density plateau within experimental range AND density homogeneity CV<0.25 AND P2 nematic<0.10 AND energy drift/SEM within bounds. The melt chain-self-diffusion metrics (C(t) decay, MSD diffusivity, MSID slope, Rg chain-chain CV) are ADVISORY (logged, non-blocking). overall_pass may be False on these advisory metrics without blocking property extraction."],
       "rationale": "This is the philosophy's 'convince me it is equilibrated' gate — already implemented as check_equilibration_comprehensive. The policy makes it a hard plan success_criterion, not an afterthought. The Validator enforces it after the equil stage.",
+      "rationale_glassy": "For glassy high-MW polymers (DP>=30) melt chain self-diffusion is unattainable on MD timescales (measured tau_relax ~3.6e9 ps for DP=60 PVC; a 1-2 ns extend moves C(t) only ~0.4%->0.5%), so overall_pass=True is unsatisfiable by construction. The 5-cycle high-T anneal substitutes for melt self-diffusion. The metrics that actually bound structural quality for density/Tg/glassy-K_T — density plateau, homogeneity CV, P2 — are gating; the diffusion-limited metrics are advisory. Authorized 2026-06-20 (PVC1 route-back, user-approved). Applies campaign-wide to glassy revision polymers.",
       "default_source": "tool:check_equilibration_comprehensive"
     },
     "tg_protocol": {
