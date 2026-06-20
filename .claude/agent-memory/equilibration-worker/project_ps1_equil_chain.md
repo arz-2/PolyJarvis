@@ -13,7 +13,7 @@ PS1 atactic Polystyrene (PSTR class) equilibration submitted 2026-06-20.
 
 **Prior chain:** 76ded65d — FAILED due to mpirun not on PATH; params unchanged.
 **Active chain_id:** 6f8a5143 (retry, mpirun shim fixed at orchestrator level)
-**work_dir:** /home/alexzhao/PolyJarvis/data/PS1/lammps/equil/
+**work_dir:** /home/arz2/PolyJarvis/data/PS1/lammps/equil/
 
 **Why:** PSTR uses PCFF (Class II); glassy polymer (exp Tg ~370 K); 9-stage chain mandatory so stage 09 (npt_prod300) produces 300 K density and serves as deformation source. temp=550 K chosen as T_workflow_K above MD Tg.
 

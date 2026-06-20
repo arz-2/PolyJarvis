@@ -527,8 +527,8 @@ def analyze_tg_multirate_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Aggregate per-rate (rate, Tg_MD) pairs: log-linear + VF fit, extrapolated to the
     DSC-equivalent rate. The orchestrator supplies --mr_rates / --mr_tg_values from the
     cross-replicate registry; the worker runs the emitted command verbatim."""
-    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
-    script = ("/home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/"
+    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
+    script = ("/home/arz2/PolyJarvis/mcp-servers/mcp-lammps-engine/"
               "analysis_scripts/extract_tg_multirate.py")
     dsc_rate = cls.get("dsc_equiv_rate_K_per_ns", 1.6667e-10)
     guide = load_worker_guide("analyze-tg-multirate")
