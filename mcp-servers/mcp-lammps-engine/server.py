@@ -223,7 +223,8 @@ run_manager = RunManager()
 # Helper: execute LAMMPS in a background thread
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> str:
+def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
+                        use_gpu: bool = True) -> str:
     """
     Generate a self-contained bash script that runs LAMMPS stages sequentially.
     Designed to run under nohup so it is fully independent of the MCP server process.
@@ -231,6 +232,10 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
     Each completed stage appends a JSON line to chain_progress.jsonl:
         {"stage": "name", "status": "done"|"failed", "ts": "ISO timestamp"}
     A final line with stage=__chain__ marks overall completion or failure.
+
+    use_gpu=False launches each stage CPU-only: no `-sf gpu -pk gpu` flags and
+    CUDA_VISIBLE_DEVICES="" so the GPUs are hidden. Required for small united-atom
+    systems below the GPU break-even point (see feedback_small_ua_cpu_faster).
     """
     n_gpu = len(gpu_ids.split(","))
     lines = [
@@ -264,11 +269,14 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
         f"sentinel_fail() {{ echo \"{{\\\"run_id\\\":\\\"{chain_id}\\\",\\\"status\\\":\\\"failed\\\",\\\"stage\\\":\\\"$1\\\"}}\""
             " > \"$SENTINEL\"; }",
         "",
-        f"export CUDA_VISIBLE_DEVICES={gpu_ids}",
+        f"export CUDA_VISIBLE_DEVICES={gpu_ids if use_gpu else ''}",
         "# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).",
         'echo $$ > "$PIDFILE"',
         "",
     ]
+
+    # CPU-only runs drop the GPU accelerator flags entirely.
+    gpu_flags = "-sf gpu -pk gpu $N_GPU " if use_gpu else ""
 
     for i, stage in enumerate(stages):
         name  = stage.get("name", f"stage_{i+1}")
@@ -286,7 +294,7 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
             f"mkdir -p {wdir}",
             f"cd {wdir}",  # FIX: cd into stage workdir so relative paths in .in files resolve correctly
             f"log_start {name}",
-            f"mpirun -np $MPI $LMP -sf gpu -pk gpu $N_GPU "
+            f"mpirun -np $MPI $LMP {gpu_flags}"
             f"-in {script} >> {log_target} 2>&1 \\",
             f"  && log_done {name} \\",
             f"  || {{ log_fail {name}; sentinel_fail {name}; "
@@ -667,6 +675,7 @@ def run_lammps_chain(
     h_type_ids: Optional[list] = None,
     backbone_types: Optional[list] = None,
     params_file: str = "",
+    use_gpu: bool = True,
 ) -> dict:
     """
     Execute a sequence of LAMMPS scripts as a fully chained pipeline.
@@ -699,6 +708,10 @@ def run_lammps_chain(
                         provided, "Coeffs section missing" pre-flight errors are
                         suppressed — EMC TraPPE-UA and PCFF .data files store
                         coefficients in the params file, not the .data file.
+        use_gpu:        GPU acceleration for all stages (default True). Set False
+                        to run CPU-only (no -sf gpu/-pk gpu, CUDA hidden) — faster
+                        for small united-atom systems below the GPU break-even
+                        point (see feedback_small_ua_cpu_faster).
 
     Returns:
         dict with chain_id, paths, and poll instructions.
@@ -754,7 +767,7 @@ def run_lammps_chain(
         progress_file = f"{chain_dir}/chain_{chain_id}_progress.jsonl"
 
         # Build and upload the bash script
-        script_body = _build_chain_script(chain_id, stages, mpi, gpu_ids)
+        script_body = _build_chain_script(chain_id, stages, mpi, gpu_ids, use_gpu=use_gpu)
         # Override progress path to the one we computed
         script_body = script_body.replace(
             "PROGRESS=$( dirname $0 )/chain_progress.jsonl",
@@ -781,6 +794,7 @@ def run_lammps_chain(
             "stages":        stages,
             "mpi":           mpi,
             "gpu_ids":       gpu_ids,
+            "use_gpu":       use_gpu,
             "chain_script":  chain_script,
             "progress_file": progress_file,
             "chain_log":     f"{chain_dir}/chain_{chain_id}.log",
@@ -2721,6 +2735,13 @@ def run_bulk_modulus_series(
     dt_fs: float = 1.0,
     thermo_freq: int = 100,
     output_dir: Optional[str] = None,
+    use_gpu: bool = True,
+    use_trappe: bool = False,
+    use_opls: bool = False,
+    use_pcff: bool = False,
+    use_pppm: bool = True,
+    lj_cutoff: Optional[float] = None,
+    params_file: str = "",
 ) -> dict:
     """
     Run a series of constant-pressure NPT simulations to support Murnaghan
@@ -2749,6 +2770,18 @@ def run_bulk_modulus_series(
         mpi:            MPI processes. Required — no default.
         output_dir:     Where to store the list of log file paths (JSON).
                         Defaults to work_dir.
+        use_gpu:        GPU acceleration (default True). Set False for CPU-only —
+                        faster for small united-atom melts (PDIE/PHYC).
+        use_trappe/use_opls/use_pcff:
+                        Force-field selector — MUST match the .data file's FF. If
+                        none is set, generate_script falls through to the AMBER/
+                        CHARMM-style default pair style (WRONG for TraPPE/OPLS/PCFF
+                        cells). Always pass the correct flag for the polymer class.
+        use_pppm:       Long-range electrostatics (default True). False for the
+                        nonpolar lj/cut classes (TraPPE-UA polydienes/hydrocarbons).
+        lj_cutoff:      LJ cutoff (Å); forwarded as LJ_CUTOFF for TraPPE pair style.
+        params_file:    EMC-generated .params include. REQUIRED for TraPPE-UA/PCFF
+                        cells — without it the pair/bonded coefficients are missing.
 
     Returns:
         dict with chain_id, monitor_command, log_files (list of expected log paths),
@@ -2775,24 +2808,45 @@ def run_bulk_modulus_series(
             log_path = f"{stage_dir}/{tag}.log"
             log_files.append(log_path)
 
+            script_params = {
+                "T_START":     temp_K,
+                "T_FINAL":     temp_K,
+                "P_START":     float(p_atm),
+                "P_FINAL":     float(p_atm),
+                "N_STEPS":     npt_steps,
+                "TIMESTEP":    dt_fs,
+                "THERMO_FREQ": thermo_freq,
+                "LOG_FILE":    log_path,
+                "use_gpu":     use_gpu,
+                "DUMP_FILE":   f"{stage_dir}/{tag}.dump",
+                "LAST_DUMP_FILE":  f"{stage_dir}/{tag}_last.dump",
+                "WRITE_DATA_FILE": f"{stage_dir}/{tag}_out.data",
+            }
+            # Derive force-field style implications the same way
+            # generate_equilibration_workflow does (server.py ~:1219), so a caller
+            # only needs to set the FF selector (use_trappe/use_pcff/use_opls).
+            # Without this, generate_script defaults to the AMBER/CHARMM pair style
+            # + pppm — wrong for TraPPE/OPLS/PCFF cells and a silent source of
+            # corrupted K (PE1 R-03).
+            if use_trappe:
+                ff_base = {"use_trappe": True, "use_shake": False, "use_pppm": False,
+                           "LJ_CUTOFF": lj_cutoff if lj_cutoff is not None else 14.0}
+            elif use_pcff:
+                ff_base = {"use_pcff": True, "use_shake": False}
+            elif use_opls:
+                ff_base = {"use_opls": True, "use_shake": False, "use_pppm": False}
+            else:
+                ff_base = {"use_pppm": use_pppm}
+                if lj_cutoff is not None:
+                    ff_base["LJ_CUTOFF"] = lj_cutoff
+            if params_file:
+                ff_base["params_file"] = params_file
+            script_params.update(ff_base)  # FF keys win
             gen_result = generate_script(
                 template_name="npt",
                 data_file=data_file,
                 output_script=script_path,
-                params={
-                    "T_START":     temp_K,
-                    "T_FINAL":     temp_K,
-                    "P_START":     float(p_atm),
-                    "P_FINAL":     float(p_atm),
-                    "N_STEPS":     npt_steps,
-                    "TIMESTEP":    dt_fs,
-                    "THERMO_FREQ": thermo_freq,
-                    "LOG_FILE":    log_path,
-                    "use_gpu":     True,
-                    "DUMP_FILE":   f"{stage_dir}/{tag}.dump",
-                    "LAST_DUMP_FILE":  f"{stage_dir}/{tag}_last.dump",
-                    "WRITE_DATA_FILE": f"{stage_dir}/{tag}_out.data",
-                },
+                params=script_params,
             )
             if gen_result.get("status") == "error":
                 return {
@@ -2818,6 +2872,8 @@ def run_bulk_modulus_series(
             mpi=mpi,
             gpu_ids=gpu_ids,
             data_file=data_file,
+            params_file=params_file,
+            use_gpu=use_gpu,
         )
         if chain_result.get("status") == "error":
             return chain_result
@@ -3244,6 +3300,7 @@ def _recover_interrupted_chains():
         stages   = meta.get("stages", [])
         mpi      = meta.get("mpi", 2)
         gpu_ids  = meta.get("gpu_ids", "0")
+        use_gpu  = meta.get("use_gpu", True)
 
         if not stages:
             run_manager.fail(chain_id, "Cannot recover: full stage list not persisted (pre-fix chain)")
@@ -3268,7 +3325,7 @@ def _recover_interrupted_chains():
         logger.info(f"[{chain_id}] Recovering: {len(remaining)} stages remaining")
         thread = threading.Thread(
             target=_lammps_chain_background,
-            args=(chain_id, remaining, mpi, gpu_ids),
+            args=(chain_id, remaining, mpi, gpu_ids, use_gpu),
             daemon=True,
         )
         thread.start()

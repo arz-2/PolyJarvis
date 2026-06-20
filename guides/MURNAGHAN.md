@@ -40,6 +40,14 @@ run_bulk_modulus_series(
 
 Default: 500,000 steps (0.5 ns at 1 fs) at `temp_K=300.0 K`.
 
+### Rule F: Pass the Force-Field Flags from `lammps_flags`
+
+Pass `use_trappe` / `use_pcff` / `use_opls` from your prompt's `lammps_flags` dict into
+`run_bulk_modulus_series`. **The tool defaults to the AMBER/CHARMM npt template** (`lj/charmm/coul/long`
++ `pppm` + `dihedral fourier`), which mismatches TraPPE-UA/PCFF `.data` coeffs and **silently corrupts
+K** (PE1 R-03). The tool derives `use_pppm`/`LJ_CUTOFF`/`use_shake` internally from the FF selector — you
+only set the one selector that is `true`.
+
 ---
 
 ## Murnaghan Workflow
@@ -54,6 +62,9 @@ result = run_bulk_modulus_series(
     gpu_ids=gpu_ids,
     mpi=mpi_ranks,
     npt_steps=npt_steps,        # from prompt (default 500000)
+    use_trappe=lammps_flags["use_trappe"],   # Rule F — FF selector from prompt's lammps_flags
+    use_pcff=lammps_flags["use_pcff"],       # tool derives pppm/cutoff/shake internally
+    use_opls=lammps_flags["use_opls"],
 )
 chain_id = result["chain_id"]
 log_files = result["log_files"]  # list of absolute paths, one per pressure

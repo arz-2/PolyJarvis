@@ -388,7 +388,8 @@
         "dp_min=60 to exceed Fox-Flory plateau for flexible backbone (Patrone 2016). dp_typical=120 for PE-like flexibility (large chains needed for reliable Tg).",
         "Timestep: 2.0 fs (use_shake=False). TraPPE-UA removes explicit H atoms and their fast C-H stretch modes (period ~10 fs), so 2 fs is stable WITHOUT bond constraints. LAMMPS fix shake builds bond clusters requiring terminal atoms; interior CH2 atoms each have 2 bonds so cluster-build fails on a continuous backbone. The 2\u00d7 throughput gain comes from the timestep increase alone and offsets the nchain=20 cost increase.",
         "Exp. RT density: PE=0.95 g/cm\u00b3, PP=0.91 g/cm\u00b3, PIB=0.92 g/cm\u00b3. Initial density 0.65 g/cm\u00b3 = ~94% of \u03c1_melt(550K)=0.691 g/cm\u00b3 (Ramos2015 Table 3); previous 0.48 required heavy compression. Validation target (TraPPE-UA): volumetric thermal expansion \u03b1=8.57\u00d710\u207b\u2074 K\u207b\u00b9 vs experimental HDPE ~7.7\u20137.9\u00d710\u207b\u2074 K\u207b\u00b9 (+7%; Ramos2015 Table 2). Characteristic ratio C\u221e=8.2 at 500 K vs experimental 7.4\u20138.1 (Ramos2015).",
-        "VdW cutoff: 14.0 \u00c5 (1.4 nm) used in Ramos2015 TraPPE-UA PE study; gives density within ~7% of experiment. 12 \u00c5 is a safe minimum but 14 \u00c5 is more accurate for long-chain UA alkanes."
+        "VdW cutoff: 14.0 \u00c5 (1.4 nm) used in Ramos2015 TraPPE-UA PE study; gives density within ~7% of experiment. 12 \u00c5 is a safe minimum but 14 \u00c5 is more accurate for long-chain UA alkanes.",
+        "exp_K_GPa [0.3,0.8] is likely mis-scoped (compliant shear/Young's-style range, NOT isothermal BULK modulus). PE bulk K_T is ~1.5-2.0 GPa even in the amorphous melt (rubbers are nearly incompressible). PE1 TraPPE-UA gave Murnaghan B0=1.46 GPa and fluctuation B_dyn=1.59 GPa (consistent, physically reasonable). FLAGGED for citation review per project_phyc_exp_k_range; cf. the PDIE exp_K_GPa correction. Do NOT massage computed K against [0.3,0.8] \u2014 report truthfully and treat the range as non-binding until reviewed."
       ],
       "tg_rates_validation_K_per_ns": [
         10,
@@ -788,6 +789,11 @@
         "notes": "Polybutadiene: ~-92\u00b0C (181 K); cis-polyisoprene (natural rubber): ~-73\u00b0C (200 K). Very low Tg rubbers.",
         "multi_member_note": "Multi-member class \u2014 the planner MUST pin the specific member's Tg/density/K from the SMILES (PBD C4 *C/C=C\\C*=181 K/0.90; cis-PI C5 *CC(C)=CC*=200 K). A SMILES matching no listed member (e.g. C6 diene) requires a reasoned override, not borrowing a member value. make_deterministic_plan.py leaves the tg bracket null rather than guessing."
       },
+      "experimental_density_gcm3": {
+        "PBD": 0.90,
+        "PI": 0.91,
+        "notes": "RT amorphous densities (PBD 0.90, cis-PI 0.91 g/cm\u00b3). gen_prompt derives a \u00b15% band from these; prevents the zero-width [0.9,0.9] band seen when only a single plan scalar was passed."
+      },
       "confidence": "high",
       "citations": [
         "Polyisoprene2021",
@@ -799,8 +805,9 @@
       "notes": [
         "Purely apolar hydrocarbon backbone with C=C double bonds \u2014 lj_cut sufficient.",
         "Very low experimental Tg (180-200 K): sweep must go down to 80 K to sample deep glassy state.",
-        "MD Tg expected 260-320 K (overestimation). Upper sweep bound 400 K safely brackets this.",
+        "Cooling-rate Tg offset is small and method-dependent for these low-Tg, low-fragility flexible rubbers — observed both below and above experiment (cis-PBD1: 172.5 K primary vs 214.1 K alternative, exp 181 K; 41.6 K method spread). Do NOT apply a fixed +80-120 K overestimation offset for PDIE Tg validation gating. Upper sweep bound 400 K is still a safe bracket.",
         "DP=50-200 studied by polyisoprene MD: mechanical properties converge above DP=50 (PMC9698502).",
+        "Equil-check backbone auto-detect over-counts C∞ on polydiene backbones (cis-PBD1: C∞=15.0 at edge of [3,15], INFO). Pass backbone_types explicitly when available and treat the C∞/C(t) flags as non-binding for local properties — they do not gate density/Tg. See feedback_equilcheck_backbone_aromatic.",
         "Microstructure matters: cis vs trans gives different Tg. Encode the target microstructure in the SMILES passed to EMC.",
         "Timestep: 2.0 fs (use_shake=False). TraPPE-UA removes explicit H atoms and their fast C-H stretch modes, so 2 fs is stable without bond constraints. LAMMPS fix shake cannot constrain a continuous backbone (every backbone atom has 2 bonds; cluster-build requires terminal atoms). The C=C torsional barrier is enforced by PCFF-style dihedral terms in the .params file, not SHAKE. Same logic as PHYC.",
         "Fewer annealing cycles needed due to flexible rubbery backbone (fast equilibration above Tg).",
@@ -815,9 +822,11 @@
         1000
       ],
       "exp_K_GPa": {
-        "min": 0.2,
-        "max": 0.6
-      }
+        "min": 1.38,
+        "max": 1.95,
+        "comment": "Isothermal BULK modulus K_T. Class span: cis-1,4-PBD 1.38 GPa, cis-1,4-PI 1.94-1.95 GPa. The planner should narrow to the SMILES member. Prior [0.2,0.6] was mis-scoped (neither bulk nor shear/Young's cleanly; provenance unknown) and is removed."
+      },
+      "exp_K_source": "PolymerDataHandbook1999 (Mark, J.E. ed., Polymer Data Handbook, OUP 1999); polymer_db.sqlite mechanical_measurements ids 2039 (cis-1,4-PBD K_T=1.38 GPa, compressibility-derived) and 2069 (cis-1,4-PI K_T=1.94/1.95 GPa, isothermal). Independent of simulation."
     },
     "POXI": {
       "name": "Polyoxide / Polyether",

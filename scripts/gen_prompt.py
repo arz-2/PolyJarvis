@@ -187,6 +187,14 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
     }
 
 
+def _nondegenerate(lo, hi, frac: float = 0.05) -> list:
+    """Guard against a zero-width [x, x] band, which can never PASS. A single
+    experimental anchor must become a ±frac tolerance band, not min==max."""
+    if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and lo == hi:
+        return [round(lo * (1 - frac), 3), round(hi * (1 + frac), 3)]
+    return [lo, hi]
+
+
 def _exp_tg_range(cls: dict) -> list:
     tg = cls.get("experimental_tg_K")
     if isinstance(tg, dict):
@@ -207,7 +215,12 @@ def _exp_K_range(cls: dict) -> list:
 
 
 def _exp_density_range(cls: dict) -> list:
+    # Accept both the rules key (experimental_density_gcm3) and the plan's
+    # decided_params scalar key (exp_density_gcm3) — a key mismatch here was the
+    # cause of the zero-width [0.9,0.9] density band in cis-PBD1.
     exp = cls.get("experimental_density_gcm3")
+    if exp is None:
+        exp = cls.get("exp_density_gcm3")
     if isinstance(exp, dict):
         vals = [v for k, v in exp.items() if isinstance(v, (int, float))]
         if vals:
@@ -438,7 +451,9 @@ def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
     lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
     tg_log = args.data_path or f"{lammps_base}/thermal/tg_sweep/tg_sweep.log"
-    # equil_data_path: NPT 300 K production output — passed to extract_thermal as tg_data_file for ΔCp mass normalisation
+    # equil_data_path: NPT 300 K production output — passed to extract_thermal as tg_data_file for ΔCp mass normalisation.
+    # NOTE: this default is the GLASSY filename (npt_prod300). RUBBERY runs end at npt_production —
+    # the orchestrator MUST pass --equil_data_path/--data_path explicitly for rubbery classes (PDIE/PHYC).
     equil_data = args.equil_data_path or f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
     enthalpy_col = getattr(args, "enthalpy_col", None) or "Enthalpy"
     guide = load_worker_guide("analyze-tg")
@@ -464,11 +479,13 @@ def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for equilibration-checker (equil-check gate — equil check + density)."""
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    exp_density = _exp_density_range(cls)
+    exp_density = _nondegenerate(*_exp_density_range(cls))
     ct_decay = cls.get("ct_min_decay_melt", 0.10)
 
     lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
     equil_log = f"{lammps_base}/equil/nvt_production/nvt_production.log"
+    # GLASSY defaults (npt_prod300). RUBBERY runs end at npt_production — orchestrator
+    # passes --npt_prod_log/--data_path explicitly for PDIE/PHYC (see CLAUDE.md equil-check gate).
     npt_log = args.npt_prod_log or f"{lammps_base}/equil/npt_prod300/npt_prod300.log"
     npt_dump = args.npt_prod_dump or f"{lammps_base}/equil/npt_prod300/npt_prod300.dump"
     npt_data = args.data_path or f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
@@ -501,7 +518,11 @@ def murnaghan_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for murnaghan-worker (rubbery BM pressure series submission)."""
     flags = _lammps_flags(args.lammps_flags, cls)
     work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
-    is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else False
+    # Murnaghan is the rubbery-only path: the orchestrator spawns born-worker (not
+    # murnaghan) for glassy polymers, so is_glassy is always false here. Deriving it
+    # from --is_glassy (which defaults "true") would emit is_glassy:true and trip the
+    # worker's Rule B rubbery-abort on every run that forgets --is_glassy false.
+    is_glassy = False
     bm_pressures_atm = cls.get("bm_pressures_atm", None)
     dt = _pick(args.dt_fs, cls, "dt_fs", 1.0)
     lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
@@ -578,13 +599,13 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for run-summary-worker (always-terminal, calls generate_run_summary)."""
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    exp_tg = _exp_tg_range(cls)
-    exp_density = _exp_density_range(cls)
+    exp_tg = _nondegenerate(*_exp_tg_range(cls))
+    exp_density = _nondegenerate(*_exp_density_range(cls))
     _k_from_cls = _exp_K_range(cls)
-    exp_K = [
+    exp_K = _nondegenerate(
         args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0],
         args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1],
-    ]
+    )
     return f"""\
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
