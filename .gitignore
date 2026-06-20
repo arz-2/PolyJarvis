@@ -19,6 +19,8 @@ mcp-lammps-engine/run_state.json
 mcp-radonpy-server/src/timer.dat
 
 # ── Simulation data and experiment database (local only) ──────────────────────
+# Calibration benchmark cells (data/CALIB_*) are local throwaways — kept for
+# re-calibration / directional_probe provenance, never committed (covered by data/*).
 data/*
 !data/TEMPLATE/
 db/

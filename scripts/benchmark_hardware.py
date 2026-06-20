@@ -18,10 +18,12 @@ GPU is driven *entirely* from the mpirun command line (`-sf gpu -pk gpu N neigh 
 never an in-file `package gpu` line — so the same .in serves every config and the
 multi-GPU count N is honored (an in-file `package gpu 1` would silently override N).
 
-POLITE SCHEDULING (default): never contends with in-flight screening runs. Each
-config only runs on a GPU at ~0% utilization and only if its MPI ranks fit in the
-spare physical cores (18 - live lmp ranks). Configs that don't fit are SKIPPED.
-Pass --allow-busy for the definitive clean sweep when the box is drained.
+POLITE SCHEDULING (default): never contends with other users' work. Each config
+only runs on a GPU that is ~idle AND free of any compute process (any user), and
+only if its MPI ranks fit in the spare physical cores (detected_cores − max(live
+lmp ranks, measured busy cores)). Configs that don't fit are SKIPPED. The core
+count and config ladder auto-scale to the box (see detect_phys_cores). Pass
+--allow-busy for the definitive clean sweep when the box is drained (dedicated only).
 
 Usage:
   # UA cell, plain NVT (lj/cut, no kspace)
@@ -42,6 +44,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -51,25 +54,41 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 ENGINE = REPO / "mcp-servers" / "mcp-lammps-engine"
 sys.path.insert(0, str(ENGINE))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# shared host/GPU probes (re-exported here so calibrate_hardware.py keeps using bh.detect_phys_cores / bh.gpu_status)
+from hw_common import detect_phys_cores, gpu_status
 
 LMP_DEFAULT = "/home/arz2/lammps-install/bin/lmp"
 CONDA_ACTIVATE = "source ~/miniforge3/etc/profile.d/conda.sh; conda activate mol-builder"
-PHYS_CORES = 18                       # i9-10980XE physical cores
+# Resolve mpirun to an absolute path so the launched subshell does not depend on its
+# own PATH (user-space Open MPI is often only on an interactive-login PATH). Override
+# with LAMBDA_MPIRUN if mpirun lives somewhere non-standard.
+MPIRUN = os.environ.get("LAMBDA_MPIRUN") or shutil.which("mpirun") or "mpirun"
 GPU_IDLE_UTIL = 5                     # % util at-or-below = idle
 GPU_IDLE_MEM_MB = 800                 # MB used at-or-below = idle (no run mid-setup)
 
+
+PHYS_CORES = detect_phys_cores()
+
+
+def _build_configs(phys: int) -> list[dict]:
+    """Config matrix scaled to the box: gpu = number of *physical* GPUs; mpi = rank
+    count (each rank ≈ 1 core). cpu/gpu1 rank ladders are capped at the physical-core
+    count so a 32-core box surfaces its mpi=32 optimum and an 18-core box does not."""
+    cfgs: list[dict] = []
+    for m in (4, 8, 16, 32, 64):
+        if m <= phys:
+            cfgs.append({"name": f"cpu_mpi{m}", "mpi": m, "gpu": 0})
+    for m in (1, 2, 4, 8, 16):
+        if m <= phys:
+            cfgs.append({"name": f"gpu1_mpi{m}", "mpi": m, "gpu": 1})
+    cfgs.append({"name": "gpu2_mpi2", "mpi": 2, "gpu": 2})
+    cfgs.append({"name": "gpu4_mpi4", "mpi": 4, "gpu": 4})
+    return cfgs
+
+
 # config matrix — gpu = number of *physical* GPUs; mpi = rank count (each rank = 1 core)
-DEFAULT_CONFIGS = [
-    {"name": "cpu_mpi4",   "mpi": 4,  "gpu": 0},
-    {"name": "cpu_mpi8",   "mpi": 8,  "gpu": 0},
-    {"name": "cpu_mpi16",  "mpi": 16, "gpu": 0},
-    {"name": "gpu1_mpi1",  "mpi": 1,  "gpu": 1},
-    {"name": "gpu1_mpi2",  "mpi": 2,  "gpu": 1},
-    {"name": "gpu1_mpi4",  "mpi": 4,  "gpu": 1},
-    {"name": "gpu1_mpi8",  "mpi": 8,  "gpu": 1},
-    {"name": "gpu2_mpi2",  "mpi": 2,  "gpu": 2},
-    {"name": "gpu4_mpi4",  "mpi": 4,  "gpu": 4},
-]
+DEFAULT_CONFIGS = _build_configs(PHYS_CORES)
 
 SECTION_RE = re.compile(
     r"^(Pair|Bond|Angle|Dihedral|Improper|Kspace|Neigh|Comm|Output|Modify|Other)\s*\|"
@@ -79,30 +98,53 @@ SECTION_RE = re.compile(
 # --------------------------------------------------------------------------
 # Hardware probing (politeness)
 # --------------------------------------------------------------------------
-def gpu_status() -> list[dict]:
-    """Return [{index, util, mem_used_mb}] from nvidia-smi, or [] if unavailable."""
+def gpus_with_compute_procs() -> set[int]:
+    """GPU indices that currently host a compute process from ANY user. Shared-box
+    politeness: even a low-util GPU is off-limits if someone else is running on it."""
     try:
+        uuid_to_idx: dict[str, int] = {}
         out = subprocess.run(
-            ["nvidia-smi",
-             "--query-gpu=index,utilization.gpu,memory.used",
-             "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=15,
-        ).stdout
-    except (FileNotFoundError, subprocess.SubprocessError):
-        return []
-    gpus = []
-    for line in out.strip().splitlines():
-        parts = [p.strip() for p in line.split(",")]
-        if len(parts) >= 3:
-            gpus.append({"index": int(parts[0]),
-                         "util": int(parts[1]),
-                         "mem_used_mb": int(parts[2])})
-    return gpus
+            ["nvidia-smi", "--query-gpu=index,uuid", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=15).stdout
+        for ln in out.strip().splitlines():
+            parts = [p.strip() for p in ln.split(",")]
+            if len(parts) >= 2:
+                uuid_to_idx[parts[1]] = int(parts[0])
+        apps = subprocess.run(
+            ["nvidia-smi", "--query-compute-apps=gpu_uuid", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=15).stdout
+        return {uuid_to_idx[u.strip()] for u in apps.strip().splitlines()
+                if u.strip() in uuid_to_idx}
+    except (FileNotFoundError, subprocess.SubprocessError, ValueError):
+        return set()
 
 
 def idle_gpu_ids() -> list[int]:
+    busy = gpus_with_compute_procs()
     return [g["index"] for g in gpu_status()
-            if g["util"] <= GPU_IDLE_UTIL and g["mem_used_mb"] <= GPU_IDLE_MEM_MB]
+            if g["util"] <= GPU_IDLE_UTIL and g["mem_used_mb"] <= GPU_IDLE_MEM_MB
+            and g["index"] not in busy]
+
+
+def busy_cores(phys: int) -> int:
+    """Estimate cores currently busy with ANY work (not just lmp), by sampling the
+    aggregate /proc/stat CPU line over ~0.7 s. Used to gate politely against other
+    users' non-lmp load, which the lmp-only rank count cannot see."""
+    def snap() -> tuple[int, int]:
+        with open("/proc/stat") as f:
+            v = list(map(int, f.readline().split()[1:]))
+        idle = v[3] + (v[4] if len(v) > 4 else 0)   # idle + iowait
+        return idle, sum(v)
+    try:
+        i0, t0 = snap()
+        time.sleep(0.7)
+        i1, t1 = snap()
+        dt = t1 - t0
+        if dt <= 0:
+            return 0
+        return int(round((1.0 - (i1 - i0) / dt) * phys))
+    except Exception:
+        return 0
 
 
 def live_lmp_ranks(lmp_path: str = "lmp") -> int:
@@ -175,6 +217,18 @@ def make_input_reuse(reuse_in: str, data_file: str, steps: int, out_in: Path) ->
 # --------------------------------------------------------------------------
 # Run + parse one config
 # --------------------------------------------------------------------------
+def _mpi_lib_export() -> str:
+    """Prepend the Open MPI prefix lib dir (derived from the absolute mpirun path) to
+    LD_LIBRARY_PATH, so a user-space MPI resolves even when the caller's environment
+    doesn't already export it (e.g. agent/slash-command runs)."""
+    if not os.path.isabs(MPIRUN):
+        return ""
+    libdir = Path(MPIRUN).resolve().parents[1] / "lib"
+    if libdir.is_dir():
+        return f"export LD_LIBRARY_PATH={shlex.quote(str(libdir))}:$LD_LIBRARY_PATH; "
+    return ""
+
+
 def build_cmd(lmp: str, in_file: Path, mpi: int, gpu_ids: list[int]) -> tuple[str, dict]:
     """Return (shell command string, env-note). GPU purely via -sf/-pk flags."""
     env_prefix = ""
@@ -182,9 +236,9 @@ def build_cmd(lmp: str, in_file: Path, mpi: int, gpu_ids: list[int]) -> tuple[st
     if gpu_ids:
         env_prefix = f"CUDA_VISIBLE_DEVICES={','.join(map(str, gpu_ids))} "
         gpu_flags = f" -sf gpu -pk gpu {len(gpu_ids)} neigh no"
-    inner = (f"{env_prefix}mpirun -np {mpi} {shlex.quote(lmp)}{gpu_flags} "
+    inner = (f"{env_prefix}{shlex.quote(MPIRUN)} -np {mpi} {shlex.quote(lmp)}{gpu_flags} "
              f"-in {shlex.quote(str(in_file))}")
-    cmd = f"bash -c {shlex.quote(CONDA_ACTIVATE + '; ' + inner)}"
+    cmd = f"bash -c {shlex.quote(CONDA_ACTIVATE + '; ' + _mpi_lib_export() + inner)}"
     return cmd, {"gpu_ids": gpu_ids, "gpu_flags": gpu_flags}
 
 
@@ -314,15 +368,16 @@ def main() -> int:
 
     results = []
     for cfg in configs:
-        # politeness gating
+        # politeness gating — account for ALL load, not just lmp ranks
         idle = idle_gpu_ids()
         live = live_lmp_ranks(args.lmp)
-        spare = args.max_cores - live
+        load = 0 if args.allow_busy else busy_cores(args.max_cores)
+        spare = args.max_cores - max(live, load)
         gpu_ids: list[int] = []
         skip = None
         if not args.allow_busy:
             if cfg["mpi"] > spare:
-                skip = f"needs {cfg['mpi']} cores, only {spare} spare (live ranks={live})"
+                skip = f"needs {cfg['mpi']} cores, only {spare} spare (live lmp={live}, busy~{load})"
             elif cfg["gpu"] > 0 and len(idle) < cfg["gpu"]:
                 skip = f"needs {cfg['gpu']} idle GPU(s), idle={idle}"
         if cfg["gpu"] > 0:

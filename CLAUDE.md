@@ -99,6 +99,16 @@ SETUP
     `T_workflow_K=$(jq -r '.decided_params.T_workflow_K // 600' PLAN_PATH)`
     Write T_workflow_K to run_log.md header (alongside plan_path + confidence).
   If "tg" not in properties_requested: glassy_hint = (T_workflow_K != 300.0)
+  Read hardware regime from approved plan (before any GPU stage):
+    `GPU_PER_RUN=$(jq -r '.decided_params.gpu_per_run // empty' PLAN_PATH)`  (empty ⇒ policy-derived, 1 GPU)
+    When the plan pins a D-08_hardware override (gpu_per_run/engine/mpi_ranks in decided_params),
+    let `gen_prompt.py` thread it into the worker prompt — do NOT also pass `--gpu_ids`/`--mpi_ranks`
+    (CLI wins and would shadow the plan). Claim the matching GPU count at submit time:
+    `scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}` → parse the JSON:
+    on success `{"claimed":[ids],...}` (use that list verbatim as the worker's gpu_ids); on
+    shortfall `{"error":...,"available":[…]}` with exit 1 (defer/retry, do not force). Release on
+    completion (`pick_gpu.py release --run <RUN>`). Write the chosen engine/gpu_per_run/mpi to
+    run_log.md (D-08 row).
 
 PHASE A — FOUNDATION (always)
 
@@ -193,6 +203,7 @@ The Planner proposes; the Executor **never improvises**. After each worker's `Mo
 - **Met** → proceed.
 - **Not met** → invoke `/recover` (max 2 attempts/worker). The equil-check gate is `check_equilibration_comprehensive.overall_pass=True`; the tg-analysis gate is the bilinear-fit R² floor. These are already enforced — the plan records them as explicit criteria rather than implicit rules.
 - **Probe contradicts a plan assumption** → if a planned `reduction_probe` comes back inconsistent with a plan assumption (e.g. the chosen FF is wrong), return control to the **planner** to revise downstream stages (re-spawn `planner` with the finding, then re-`critic`). Do not let a worker silently improvise a different parameter.
+- **`hardware_benchmark` probe** → when the plan schedules it (off-table FF, unusual cell size, or a host where `hardware_policy.values_are_benchmarked=false`), run it **politely before** the affected GPU stage: `scripts/calibrate_hardware.py --cell <built .data> --ff <fam>` (idle-GPU + spare-core gated, niced — never `--allow-busy` on a shared box). If the measured winner contradicts the plan's D-08 choice, route back to the **planner** (re-plan → re-`critic`) exactly like any other contradicting probe — do not let the worker pick a different engine/mpi on its own.
 
 ### Monitor semantics
 

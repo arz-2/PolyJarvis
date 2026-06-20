@@ -63,6 +63,9 @@ import sys
 import textwrap
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hw_common import load_rules, resolve_ff_family   # shared rules/FF-family access
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
 CLAUDE_MD_PATH = REPO_ROOT / "CLAUDE.md"
@@ -82,11 +85,7 @@ WORKER_GUIDES = {
 
 
 # ─── Loaders ──────────────────────────────────────────────────────────────────
-
-def load_rules() -> dict:
-    with open(RULES_PATH) as f:
-        return json.load(f)
-
+# load_rules() is imported from hw_common (single source of truth).
 
 def load_cross_track_rules() -> str:
     text = CLAUDE_MD_PATH.read_text()
@@ -135,7 +134,25 @@ def apply_plan(cls: dict, plan: dict, args) -> dict:
         args.smiles = plan["smiles"]
     if (args.properties is None or args.properties == "all") and plan.get("properties"):
         args.properties = ",".join(plan["properties"])
+    _apply_plan_hardware(args, plan.get("decided_params", {}))
     return effective
+
+
+def _apply_plan_hardware(args, dp: dict) -> None:
+    """Honor a reasoned plan's D-08_hardware override (engine / gpu_per_run / mpi_ranks in
+    decided_params) when the CLI omitted the value. Precedence: CLI > plan > policy — the CLI
+    stays authoritative, and resolve_hardware() fills anything still unset from hardware_policy.
+    Deterministic plans never carry these keys (make_deterministic_plan.SNAPSHOT_KEYS excludes
+    them), so the no-plan path stays byte-identical (tests/test_plan_reproducibility.py)."""
+    if args.mpi_ranks is None and dp.get("mpi_ranks") is not None:
+        args.mpi_ranks = dp["mpi_ranks"]
+    if args.gpu_ids is None and ("engine" in dp or "gpu_per_run" in dp):
+        engine, gpu_n = dp.get("engine"), dp.get("gpu_per_run")
+        if engine == "cpu" or gpu_n == 0:
+            args.gpu_ids = ""                                  # CPU engine — hide GPUs
+        elif gpu_n:                                            # explicit GPU count → placeholders
+            args.gpu_ids = ",".join(str(i) for i in range(int(gpu_n)))
+        # engine=="gpu" with no count → leave None; resolve_hardware fills from gpu_per_run policy
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -150,20 +167,22 @@ def resolve_hardware(args, cls: dict, rules: dict) -> None:
     if not hp:
         return
     ff_raw = cls.get("preferred_ff") or cls.get("forcefield") or ""
-    fam = hp.get("ff_aliases", {}).get(ff_raw) or hp.get("ff_aliases", {}).get(ff_raw.upper())
-    if fam is None:
-        fl = ff_raw.lower()
-        fam = ("pcff" if "pcff" in fl else "opls" if "opls" in fl
-               else "trappe" if "trappe" in fl else "gaff")
+    fam = resolve_ff_family(ff_raw, hp)
     pol = hp.get("by_forcefield", {}).get(fam, {})
     if args.mpi_ranks is None:
         args.mpi_ranks = pol.get("mpi", 8)
         print(f"INFO: mpi_ranks not given — derived {args.mpi_ranks} from "
               f"hardware_policy[{fam}] (engine={pol.get('engine')})", file=sys.stderr)
     if args.gpu_ids is None:
-        args.gpu_ids = "" if pol.get("engine") == "cpu" else "0"
+        if pol.get("engine") == "cpu":
+            args.gpu_ids = ""
+        else:
+            # emit gpu_per_run placeholder ids (e.g. "0,1" for a 2-GPU run); the orchestrator
+            # claims that many free GPUs via scripts/pick_gpu.py claim --need N at submit time.
+            n = max(1, int(pol.get("gpu_per_run", 1) or 1))
+            args.gpu_ids = ",".join(str(i) for i in range(n))
         print(f"INFO: gpu_ids not given — derived \"{args.gpu_ids}\" from "
-              f"hardware_policy[{fam}]; claim a free GPU with scripts/pick_gpu.py",
+              f"hardware_policy[{fam}]; claim free GPU(s) with scripts/pick_gpu.py",
               file=sys.stderr)
 
 
