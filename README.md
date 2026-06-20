@@ -205,6 +205,69 @@ PolyJarvis/mcp-servers/.venv/bin/python \
 
 See `PolyJarvis/.mcp.json` for the registered server configuration.
 
+### Hardware Calibration (first run on a new machine)
+
+PolyJarvis derives each run's `mpi`/`gpu` defaults from
+`guides/polymer_rules.json:hardware_policy` (consumed by `scripts/gen_prompt.py`). Those
+numbers are **box-specific** — after cloning onto new hardware you should re-measure them so
+the planner picks optimal, non-oversubscribing configs. This is the same benchmark used to
+produce the shipped defaults.
+
+> **Shared box?** The calibration is **polite by default**: it only benchmarks GPUs that are
+> idle *and* free of any other user's compute process, caps MPI ranks against measured CPU
+> load (leaving ≥25 % of cores free), runs everything `nice`d and sequentially, and skips
+> configs that would contend. On a contended box it records the measured evidence but does
+> **not** overwrite the consumed defaults (and leaves `values_are_benchmarked: false`) — re-run
+> on an idle/dedicated box (or with `--allow-busy`) for the authoritative update. Never use
+> `--allow-busy` on a machine you share.
+
+**0. Prerequisites:** LAMMPS (GPU build), EMC, and the `mol-builder` + MCP `.venv` envs from
+the Setup steps above must already work.
+
+**1. Build two small representative cells** — one PCFF (class2 + PPPM) and one TraPPE-UA
+(lj/cut, no kspace). These are throwaway benchmark cells (~2–5k atoms):
+
+```bash
+cd PolyJarvis
+mcp-servers/.venv/bin/python - <<'PY'
+import sys; sys.path.insert(0, "mcp-servers/mcp-emc-server"); import server
+server._build_emc_cell(smiles="*CC(*)(C)C(=O)OC", output_dir="data/CALIB_PCFF",
+    output_name="pmma", field="pcff",      density=0.6, ntotal=3000, dp=20, nchains=10,
+    temperature=300.0, seed=12345)                 # PCFF + PPPM (PMMA)
+server._build_emc_cell(smiles="*CC*",            output_dir="data/CALIB_UA",
+    output_name="pe",   field="trappe-ua", density=0.6, ntotal=3000, dp=40, nchains=20,
+    temperature=300.0, seed=12345)                 # TraPPE-UA (polyethylene) — bare * caps
+PY
+# each build writes <output_dir>/emc_build.data (+ a sibling *.params for pair coeffs)
+```
+
+**2. Run the calibration** (polite by default; `nice` keeps it courteous):
+
+```bash
+nice -n 19 python3 scripts/calibrate_hardware.py \
+    --cell data/CALIB_PCFF/emc_build.data --ff pcff \
+    --cell data/CALIB_UA/emc_build.data   --ff trappe \
+    --dry-run        # preview the polite matrix + planned policy change; writes nothing
+# drop --dry-run to measure and write guides/polymer_rules.json:hardware_policy
+```
+
+It auto-detects your GPU count/model and physical cores, runs the throughput matrix
+(`scripts/benchmark_hardware.py`) per cell on idle resources, and writes back the `host`,
+`directional_probe` evidence, and — on a clean sweep — the per-FF `engine`/`mpi`/`gpu_per_run`
+defaults, setting `values_are_benchmarked: true`.
+
+**3. Verify:**
+
+```bash
+python3 -c "import json;hp=json.load(open('guides/polymer_rules.json'))['hardware_policy'];print(hp['host'], hp['values_are_benchmarked'])"
+python3 scripts/pick_gpu.py status        # GPU allocation / spare-core view
+```
+
+**When to re-run:** any GPU or CPU change, or moving to a different machine. See
+[`guides/HARDWARE.md`](guides/HARDWARE.md) for the per-FF lookup table and
+[`guides/HARDWARE_STUDY.md`](guides/HARDWARE_STUDY.md) for the rationale. An agent can drive
+this whole procedure via the `/calibrate-hardware` slash-command.
+
 ---
 
 ## Usage
