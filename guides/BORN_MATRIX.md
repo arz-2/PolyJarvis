@@ -102,3 +102,5 @@ w = watch_run(run_id)
 **LAMMPS segfault or "unknown compute style born/matrix":** Binary lacks EXTRA-COMPUTE. Escalate to orchestrator — do not re-run with a different template.
 
 **Born matrix file empty after run:** Verify BORN_FREQ == BORN_EVERY × BORN_REPEAT (default: 10 × 100 = 1000).
+
+**Unphysical K (negative or far out of range):** Before suspecting column order or the formula, check `block_averaging.block_K_GPa_values` in `bulk_modulus_born.json`. Values growing in magnitude across blocks (e.g. `[-19,-18,-18,-29,-25]`) = non-stationary glass (failed upstream equil / under-density) inflating the `-(V/kT)Var(P)` fluctuation term — root cause is upstream, not the extractor. A converged glass gives stationary blocks. Recovery is the deform fallback, NOT re-running the born extractor with a different `eq_fraction`; report Born K as FAIL with the unphysical flag. (PMMA4: K_T=−21.9 GPa from CV=25.8% under-dense equil.)

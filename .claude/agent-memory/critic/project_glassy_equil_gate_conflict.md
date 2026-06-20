@@ -1,6 +1,7 @@
 ---
 name: glassy-equil-gate-conflict
 description: Glassy DP>=30 equil gate — resolved 2026-06-20 by require_glassy in decision_policy.json; plans whose glassy criteria match require_glassy are APPROVED, not escalated
+ingested_at: 2026-06-20
 metadata:
   type: project
 ---

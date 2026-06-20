@@ -544,7 +544,8 @@
         "PVA": 303,
         "PVC": 354,
         "PVAc": 304,
-        "notes": "PVA: ~30\u00b0C (303 K) from OpenLearn; PVC: ~80\u00b0C (354 K); PVAc: ~30\u00b0C (304 K)."
+        "notes": "PVA: ~30\u00b0C (303 K) from OpenLearn; PVC: ~80\u00b0C (354 K); PVAc: ~30\u00b0C (304 K).",
+        "multi_member_note": "Multi-member class \u2014 the planner MUST pin the specific member's Tg/density/K from the SMILES (PVC *CC(Cl)*=354 K/1.38; PVA=303 K/1.26; PVAc=304 K/1.19). make_deterministic_plan.py leaves the tg bracket null rather than guessing."
       },
       "confidence": "medium",
       "citations": [
@@ -784,7 +785,8 @@
       "experimental_tg_K": {
         "PBD": 181,
         "PI": 200,
-        "notes": "Polybutadiene: ~-92\u00b0C (181 K); cis-polyisoprene (natural rubber): ~-73\u00b0C (200 K). Very low Tg rubbers."
+        "notes": "Polybutadiene: ~-92\u00b0C (181 K); cis-polyisoprene (natural rubber): ~-73\u00b0C (200 K). Very low Tg rubbers.",
+        "multi_member_note": "Multi-member class \u2014 the planner MUST pin the specific member's Tg/density/K from the SMILES (PBD C4 *C/C=C\\C*=181 K/0.90; cis-PI C5 *CC(C)=CC*=200 K). A SMILES matching no listed member (e.g. C6 diene) requires a reasoned override, not borrowing a member value. make_deterministic_plan.py leaves the tg bracket null rather than guessing."
       },
       "confidence": "high",
       "citations": [
@@ -1644,6 +1646,8 @@
       "dp_min": 15,
       "nchain": 8,
       "density_initial_gcm3": 0.66,
+      "exp_density_gcm3": 1.263,
+      "density_ref": "amorphous PEEK ~1.263 g/cm3 (crystalline ~1.40). NOTE: the commonly cited 1.32 g/cm3 is the commercial/semicrystalline figure; Mark2007 mislabels it 'amorphous'. Compare MD amorphous cells against 1.263, not 1.32.",
       "electrostatics": "pppm",
       "cutoff_A": 12.0,
       "dt_fs": 1.0,
@@ -1668,12 +1672,13 @@
         "PEEK": 418,
         "PEK": 440,
         "PEKK": 433,
-        "notes": "PEEK: ~145\u00b0C (418 K); PEK: ~167\u00b0C (440 K); PEKK: ~160\u00b0C (433 K). Consensus from MD simulations and DSC."
+        "notes": "PEEK: ~145\u00b0C (418 K); PEK: ~167\u00b0C (440 K); PEKK: ~160\u00b0C (433 K). Consensus from MD simulations and DSC.",
+        "multi_member_note": "Multi-member class \u2014 the planner MUST pin the specific member's Tg/density/K from the SMILES (count ether-O vs ketone-C=O per repeat: PEEK=2 ether+1 ketone=418 K; PEK=1 ether=440 K; PEKK=2 ketone=433 K). make_deterministic_plan.py leaves the tg bracket null rather than guessing."
       },
       "exp_E_GPa": {
         "PEEK": 3.6,
         "source": "Mark2007_Table24.4",
-        "notes": "amorphous PEEK at RT; density=1.32 g/cm\u00b3"
+        "notes": "PEEK E~3.6 GPa at RT (Mark2007). The 1.32 g/cm3 cited there is the commercial/semicrystalline density, NOT amorphous; amorphous PEEK ~1.263 g/cm3 (see density_ref)."
       },
       "confidence": "high",
       "citations": [
@@ -1689,8 +1694,8 @@
         "MD Tg for PEEK expected ~500-540 K after overestimation. Sweep to 750 K safely brackets this.",
         "Very rigid aromatic backbone: slow chain relaxation \u2192 8 annealing cycles and 15 ns required.",
         "SCREENING dp/nchain: dp_typical=15 nchain=8 for 48h-budget Tg sweep (4,800 atoms, ~40h/4GPU). \u03c4_Rouse at dp=15 T_equil=770K \u2248 2.2 ns; tg_steps_per_t=2M = 2ns \u2248 0.91\u00d7\u03c4_Rouse \u2014 borderline adequate for screening. Tg may be overestimated by ~5-15% beyond standard MD bias. Original nchain=10 dp=32 MW ~9,216 g/mol crossed Klajmon2023 density convergence threshold (~9,000 g/mol); dp=15 nchain=8 MW ~3,456 g/mol is below threshold but acceptable for Tg screening.",
-        "Exp. RT density: PEEK=1.32 g/cm\u00b3. Initial 0.66 g/cm\u00b3 = ~0.5x PEEK density.",
-        "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. Verify density ~1.30 g/cm\u00b3 at 298 K before Tg sweep."
+        "Density references: amorphous PEEK ~1.263 g/cm\u00b3 (the MD comparator); 1.32 g/cm\u00b3 is commercial/semicrystalline; crystalline ~1.40. Initial 0.66 g/cm\u00b3 = ~0.5x amorphous density. See density_ref/exp_density_gcm3.",
+        "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. An MD amorphous cell should reach ~1.263 g/cm\u00b3 at 298 K (NOT 1.30-1.32, which is the semicrystalline figure) before Tg sweep."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",

@@ -100,6 +100,7 @@ def main():
     eq_chk       = _load_json(output_dir / "equilibration_check.json")
     bulk         = _load_json(output_dir / "bulk_modulus.json")
     bulk_deform  = _load_json(output_dir / "bulk_modulus_deform.json")
+    bulk_born    = _load_json(output_dir / "bulk_modulus_born.json")
     bulk_murnaghan = _load_json(output_dir / "bulk_modulus_murnaghan.json")
     e2e     = _load_json(output_dir / "end_to_end_summary.json")
     rdf     = _load_json(output_dir / "rdf_summary.json")
@@ -131,9 +132,11 @@ def main():
         rho_err = round(abs(rho_val - exp_mid) / exp_mid * 100, 1)
         rho_status = "PASS" if exp_rho[0] <= rho_val <= exp_rho[1] else "FAIL"
 
-    # K-source precedence: murnaghan > deform > fluctuation
+    # K-source precedence: murnaghan > deform > born > fluctuation
     # Murnaghan is barostat-independent and handles EOS nonlinearity (rubbery).
-    # Deform is the authoritative method for glassy polymers.
+    # Deform is the glassy fallback; born is the primary glassy method. If both
+    # deform and born files exist, deform ran *because* born failed/was unphysical,
+    # so deform wins; born is reported only when it is the sole mechanical artifact.
     # Fluctuation (B_dyn) is a diagnostic fallback.
     if bulk_murnaghan.get("B0_GPa") is not None:
         K_val    = bulk_murnaghan.get("B0_GPa")
@@ -143,6 +146,10 @@ def main():
         K_val    = bulk_deform.get("K_GPa")
         K_sem    = bulk_deform.get("K_sem_GPa")
         K_method = "deformation"
+    elif bulk_born.get("bulk_modulus_GPa") is not None:
+        K_val    = bulk_born.get("bulk_modulus_GPa")
+        K_sem    = bulk_born.get("bulk_modulus_sem_GPa")
+        K_method = "born"
     else:
         K_val    = bulk.get("bulk_modulus_GPa")
         K_sem    = bulk.get("bulk_modulus_sem_GPa")
@@ -178,6 +185,7 @@ def main():
         "equilibration_fig":       rel_fig("equilibration_convergence.png"),
         "bulk_modulus":            rel("bulk_modulus.json"),
         "bulk_modulus_deform":     rel("bulk_modulus_deform.json"),
+        "bulk_modulus_born":       rel("bulk_modulus_born.json"),
         "bulk_modulus_murnaghan":  rel("bulk_modulus_murnaghan.json"),
         "volume_timeseries":       rel("volume_timeseries.csv"),
         "volume_fig":              rel_fig("volume_fluctuations.png"),

@@ -1,6 +1,7 @@
 ---
 name: pktn-rigid-backbone-screening
 description: PKTN/PEEK melt-NVT C(t) never decays in feasible MD; accept screening-grade equil on static-structure+density, demote C(t)/MSD to advisory
+ingested_at: 2026-06-20
 metadata:
   type: project
 ---

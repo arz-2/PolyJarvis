@@ -56,10 +56,23 @@ def get_class_entry(rules: dict, polymer_class: str) -> dict:
 
 
 def _exp_tg_scalar(cls: dict):
+    """Tg used ONLY for the glassy-vs-rubbery REGIME (and hence equil temperature). For a
+    multi-member class the members sit on the same side of 300 K, so the dict median picks the
+    regime correctly — keep it, so the deterministic plan reproduces the no-plan equil prompt."""
     tg = cls.get("experimental_tg_K")
     if isinstance(tg, dict):
         vals = sorted(v for v in tg.values() if isinstance(v, (int, float)))
         return vals[len(vals) // 2] if vals else None
+    return tg if isinstance(tg, (int, float)) else None
+
+
+def _exp_tg_bracket(cls: dict):
+    """Tg ACCURACY success_criterion (t_range_brackets_exp_tg). A multi-member dict has no
+    SMILES->member mapping, so the scaffold cannot tell which member this run is — leave the
+    bracket UNPINNED (None) rather than silently picking a wrong member (the old median pick
+    gave PEKK/433 for a PEEK/418 run). The planner must pin the member from the SMILES (see each
+    class's experimental_tg_K.multi_member_note in polymer_rules.json). Single-member passes through."""
+    tg = cls.get("experimental_tg_K")
     return tg if isinstance(tg, (int, float)) else None
 
 
@@ -111,8 +124,9 @@ STAGE_TRACK = {
 
 def build_planned_stages(cls: dict, properties: set) -> list:
     """Experiment DAG with per-stage success_criteria the Validator enforces."""
-    exp_tg = _exp_tg_scalar(cls)
+    exp_tg = _exp_tg_scalar(cls)                 # regime/temperature (median ok for multi-member)
     glassy_hint = (exp_tg is not None and exp_tg > 300)
+    exp_tg_bracket = _exp_tg_bracket(cls)        # accuracy gate (None for multi-member → planner pins)
     bm_pressures_atm = cls.get("bm_pressures_atm")
 
     def _s(stage, criteria, **extra):
@@ -126,7 +140,7 @@ def build_planned_stages(cls: dict, properties: set) -> list:
     ]
     if "tg" in properties:
         stages.append(_s("tg", {"bilinear_fit_r_squared_min": 0.80,
-                                "t_range_brackets_exp_tg": exp_tg}))
+                                "t_range_brackets_exp_tg": exp_tg_bracket}))
         stages.append(_s("analyze-tg", {}))
     if "bulk_modulus" in properties:
         if glassy_hint:

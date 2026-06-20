@@ -1,6 +1,7 @@
 ---
 name: run_1_peek1_born_submission
 description: PEEK1 NVT Born matrix submission (run_id 0b5a1c8c) — GPU 3, PCFF, 4 ns, compute born/matrix numdiff verified
+ingested_at: 2026-06-20
 metadata:
   type: project
 ---

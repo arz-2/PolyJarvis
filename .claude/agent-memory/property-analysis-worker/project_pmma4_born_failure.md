@@ -1,6 +1,7 @@
 ---
 name: project_pmma4_born_failure
 description: PMMA4/PACR/PCFF Born+NVT gave K_T=-21.9 GPa (unphysical); root cause failed equilibration + under-density; block-K worsens
+ingested_at: 2026-06-20
 metadata:
   type: project
 ---

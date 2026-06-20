@@ -1,6 +1,7 @@
 ---
 name: multimember-class-exp-tg-resolution
 description: make_deterministic_plan.py grabs the wrong experimental_tg_K for multi-member classes (dict of values); must pin the specific member's Tg
+ingested_at: 2026-06-20
 metadata:
   type: feedback
 ---

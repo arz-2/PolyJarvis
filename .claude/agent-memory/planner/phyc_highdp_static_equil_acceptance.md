@@ -1,6 +1,7 @@
 ---
 name: phyc-highdp-static-equil-acceptance
 description: High-DP flexible PE/PDIE melt C(t) never fully decorrelates in feasible MD; accept equilibration on STATIC chain statistics, demote dynamic C(t) gate, and reconcile C_inf against temperature-matched finite-N ideal (not asymptotic 8.2)
+ingested_at: 2026-06-20
 metadata:
   type: project
 ---
