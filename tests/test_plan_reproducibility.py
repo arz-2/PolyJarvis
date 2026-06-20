@@ -104,6 +104,7 @@ def test_decided_params_subset_of_class_entry(plan_files):
     """
     COMPUTED_KEYS = {
         "T_workflow_K",  # derived: 300.0 if experimental_tg_K<300 else T_equil_K
+        "dsc_equiv_rate_K_per_ns",  # derived constant (10 K/min DSC target); class override optional
     }
     for cls, path in plan_files.items():
         plan = json.loads(Path(path).read_text())

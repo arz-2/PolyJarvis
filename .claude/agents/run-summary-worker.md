@@ -34,6 +34,7 @@ generate_run_summary(
     # Pass exp_K_min/max only if both non-null (omit if either is null):
     exp_K_min=exp_K_range[0],
     exp_K_max=exp_K_range[1],
+    n_replicates=n_replicates,     # from prompt; omit/None if not a multi-rate run
 )
 ```
 

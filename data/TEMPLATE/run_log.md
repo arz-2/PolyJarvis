@@ -17,6 +17,7 @@ Plan: `[PLAN_PATH = data/[RUN]/raw/run_plan.json]`  |  mode: [deterministic / re
 | D-04 System size    | DP=[N], [N] chains, [N] atoms                        | [polymer_rules.json default / literature N chains / stiff chain] |
 | D-05 Convergence    | [PASS / EXTEND×N / ESCALATE]                         | [overall_pass=true / [N] extension(s) needed] |
 | D-06 Tg fit quality | [EXCELLENT / ACCEPTABLE / BORDERLINE / ABORT / N/A]  | [R²=[X], F-stat=[TIER], N=[N] bins; α_g=[X]×10⁻⁵ K⁻¹, α_r=[X]×10⁻⁵ K⁻¹, ΔCp=[X] J/(g·K) / N/A — tg not requested] |
+| D-06b Multirate Tg  | [DSC-equiv=[X] K / N/A]                              | [log-linear Tg(Γ) b=[X] K/ln(K/ns), R²=[X], N_rates=[3] @ [40,160,400] K/ns, N_repl=[N]; extrapolated to 1.67e-10 K/ns (10 K/min DSC); VF=[quality] (diagnostic, <2 decades) / N/A — single-rate] |
 | D-07 Property method | [born (glassy) / deform fallback (glassy) / murnaghan (rubbery) / fluctuation (rubbery fallback) / N/A] | [Tg=[X] K → is_glassy=[true/false]; bm_pressures_atm=[Y/N] / N/A — bulk_modulus not requested] |
 
 <!-- Add rows for non-routine decisions (parameter overrides, custom protocols, etc.) -->
@@ -88,12 +89,13 @@ GPU inventory (`nvidia-smi` at run start):
 
 | Property | Computed | Experimental | Error | Method | Status |
 |----------|----------|--------------|-------|--------|--------|
-| Tg        | [X] K           | [X]–[X] K              | [X]% | bilinear fit              | [✓ / ⚠] |
+| Tg (DSC-equiv) | [X] K      | [X]–[X] K              | [X]% | log-linear Tg(Γ)→10 K/min (multirate) | [✓ / ⚠] |
+| Tg (MD @400 K/ns) | [X] K   | —                      | —    | bilinear fit, highest screening rate | annotation |
 | α_g (CTE) | [X]×10⁻⁵ K⁻¹   | [X]–[X]×10⁻⁵ K⁻¹      | [X]% | −a_glassy / ρ_mean_glassy | [✓ / ⚠] |
 | α_r (CTE) | [X]×10⁻⁵ K⁻¹   | [X]–[X]×10⁻⁵ K⁻¹      | [X]% | −a_rubbery / ρ_mean_rubbery | [✓ / ⚠] |
 | ΔCp at Tg | [X] J/(g·K)     | [X]–[X] J/(g·K)        | [X]% | H(T) bilinear fit         | [✓ / ⚠ / N/A] |
-| cooling rate | [X] K/ns    | ~10⁻⁷ K/ns (exp)       | —    | —                         | annotation |
-| expected Tg offset | [80–120 K (screening) / 50–80 K (production)] | — | — | — | annotation |
+| cooling rates | [40,160,400] K/ns | ~10⁻⁷ K/ns (exp) | —    | extrapolated to 1.67×10⁻¹⁰ K/ns (10 K/min DSC) | annotation |
+| expected Tg offset | [80–120 K (screening) / 50–80 K (production); multirate extrapolation corrects toward exp] | — | — | — | annotation |
 
 ### C — Mechanical
 
