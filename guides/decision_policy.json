@@ -30,15 +30,22 @@
     "hardware": {
       "decision_id": "D-08_hardware",
       "evidence_required": false,
-      "evaluate": ["forcefield_cost_structure", "atom_count", "concurrent_load"],
+      "evaluate": ["forcefield_cost_structure", "atom_count", "concurrent_load", "benchmark_evidence", "cell_size_vs_benchmark_cell", "host_match"],
       "require": [
         "mpi>=4 for any PPPM/charged class2 system (mpi=1 starves kspace ~75x — never launch it)",
         "UA classes (TraPPE: PHYC/PDIE) route to CPU engine (gpu_ids empty), not GPU mpi=1",
         "small (<10k-atom) cells use 1 GPU per run, not 4 (comm overhead, GPU underfill)",
-        "Sum of mpi across concurrent runs <= 18 physical cores (one GPU-heavy run per GPU)"
+        "Sum of mpi across concurrent runs <= 32 physical cores (one GPU-heavy run per GPU)",
+        "a multi-GPU pin (gpu_per_run>=2) requires BOTH an estimated cell >~10k atoms AND benchmark support (directional_probe.recommended_by_ff[fam].gpu>=2 on a matching host); otherwise use 1 GPU",
+        "when hardware_policy.values_are_benchmarked=false OR directional_probe.host != hardware_policy.host, any non-default D-08 pin MUST be accompanied by a planned hardware_benchmark probe and confidence:low — else keep the by_forcefield default"
       ],
-      "rationale": "Hardware config is a deterministic function of FF cost structure (UA lj/cut vs PCFF class2+pppm) and cell size, so it belongs in policy, not ad-hoc submit-time choice. The two live anti-patterns (mpi=1 PCFF ~2.4 ns/day; UA on GPU mpi=1) are both ~7-75x slower than the policy default. gen_prompt.py derives mpi/engine from hardware_policy when the CLI omits them; specific gpu_ids stay runtime via scripts/pick_gpu.py.",
-      "default_source": "polymer_rules.json:hardware_policy.by_forcefield.<FF_FAMILY>"
+      "prefer": [
+        "when values_are_benchmarked=true AND directional_probe.host matches the live host AND the estimated cell is within ~[0.5x, 2x] of directional_probe.recommended_by_ff[fam].cell_atoms: adopt recommended_by_ff[fam] (engine/gpu/mpi) over the by_forcefield default — this is how measured optima reach runs",
+        "otherwise treat directional_probe as a HINT only: keep the conservative by_forcefield default, never bake in a partial/contended sweep (e.g. a UA 'GPU-wins' result measured under CPU saturation)"
+      ],
+      "rationale": "Hardware config is a function of FF cost structure (UA lj/cut vs PCFF class2+pppm) AND cell size (the GPU-saturation / PPPM all-to-all crossover), so it belongs in policy, not ad-hoc submit-time choice. The two live anti-patterns (mpi=1 PCFF ~2.4 ns/day; UA on GPU mpi=1) are ~7-75x slower than the default. The planner emits a D-08_hardware decision grounded in directional_probe + the planned cell size; a deviation from the FF-family default flows to runtime via decided_params (engine/gpu_per_run/mpi_ranks) -> gen_prompt.apply_plan. The conservative gate above keeps the default until a CLEAN (values_are_benchmarked=true), host-matched, in-size benchmark exists.",
+      "evidence_source": "polymer_rules.json:hardware_policy.directional_probe.{recommended_by_ff,cells_atoms,host,date,values_are_benchmarked}",
+      "default_source": "polymer_rules.json:hardware_policy.directional_probe.recommended_by_ff[fam] when benchmarked+host-match+in-size, else by_forcefield.<FF_FAMILY>"
     },
     "forcefield": {
       "decision_id": "D-01_ff",
@@ -135,8 +142,8 @@
       "cost": "one extra glassy run"
     },
     "hardware_benchmark": {
-      "reduces": "mpi/gpu config uncertainty for an off-table FF or an unusually sized cell",
-      "mechanism": "scripts/benchmark_hardware.py sweeps the mpi/gpu matrix on the built .data per template cost class, reports ns/day + Pair/Kspace/Neigh/Comm breakdown, and names the winner; refines hardware_policy and TEMPLATE_DEFAULTS use_gpu. Runs politely around live runs (idle GPU + spare cores only).",
+      "reduces": "hardware_optimum — the mpi/gpu config uncertainty for an off-table FF, an unusually sized cell, or a host whose hardware_policy is not cleanly benchmarked (values_are_benchmarked=false or host mismatch)",
+      "mechanism": "scripts/calibrate_hardware.py (wrapping scripts/benchmark_hardware.py) sweeps the mpi/gpu matrix on the built .data per template cost class, reports ns/day + Pair/Kspace/Neigh/Comm breakdown, names the winner, and writes directional_probe + by_forcefield (the latter only on a clean uncontended sweep). Runs politely around live runs (idle GPU + spare cores only, niced, sequential).",
       "cost": "minutes"
     }
   }

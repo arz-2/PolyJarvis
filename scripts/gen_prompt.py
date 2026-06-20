@@ -63,6 +63,9 @@ import sys
 import textwrap
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hw_common import load_rules, resolve_ff_family   # shared rules/FF-family access
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
 CLAUDE_MD_PATH = REPO_ROOT / "CLAUDE.md"
@@ -82,11 +85,7 @@ WORKER_GUIDES = {
 
 
 # ─── Loaders ──────────────────────────────────────────────────────────────────
-
-def load_rules() -> dict:
-    with open(RULES_PATH) as f:
-        return json.load(f)
-
+# load_rules() is imported from hw_common (single source of truth).
 
 def load_cross_track_rules() -> str:
     text = CLAUDE_MD_PATH.read_text()
@@ -135,7 +134,25 @@ def apply_plan(cls: dict, plan: dict, args) -> dict:
         args.smiles = plan["smiles"]
     if (args.properties is None or args.properties == "all") and plan.get("properties"):
         args.properties = ",".join(plan["properties"])
+    _apply_plan_hardware(args, plan.get("decided_params", {}))
     return effective
+
+
+def _apply_plan_hardware(args, dp: dict) -> None:
+    """Honor a reasoned plan's D-08_hardware override (engine / gpu_per_run / mpi_ranks in
+    decided_params) when the CLI omitted the value. Precedence: CLI > plan > policy — the CLI
+    stays authoritative, and resolve_hardware() fills anything still unset from hardware_policy.
+    Deterministic plans never carry these keys (make_deterministic_plan.SNAPSHOT_KEYS excludes
+    them), so the no-plan path stays byte-identical (tests/test_plan_reproducibility.py)."""
+    if args.mpi_ranks is None and dp.get("mpi_ranks") is not None:
+        args.mpi_ranks = dp["mpi_ranks"]
+    if args.gpu_ids is None and ("engine" in dp or "gpu_per_run" in dp):
+        engine, gpu_n = dp.get("engine"), dp.get("gpu_per_run")
+        if engine == "cpu" or gpu_n == 0:
+            args.gpu_ids = ""                                  # CPU engine — hide GPUs
+        elif gpu_n:                                            # explicit GPU count → placeholders
+            args.gpu_ids = ",".join(str(i) for i in range(int(gpu_n)))
+        # engine=="gpu" with no count → leave None; resolve_hardware fills from gpu_per_run policy
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -150,20 +167,22 @@ def resolve_hardware(args, cls: dict, rules: dict) -> None:
     if not hp:
         return
     ff_raw = cls.get("preferred_ff") or cls.get("forcefield") or ""
-    fam = hp.get("ff_aliases", {}).get(ff_raw) or hp.get("ff_aliases", {}).get(ff_raw.upper())
-    if fam is None:
-        fl = ff_raw.lower()
-        fam = ("pcff" if "pcff" in fl else "opls" if "opls" in fl
-               else "trappe" if "trappe" in fl else "gaff")
+    fam = resolve_ff_family(ff_raw, hp)
     pol = hp.get("by_forcefield", {}).get(fam, {})
     if args.mpi_ranks is None:
         args.mpi_ranks = pol.get("mpi", 8)
         print(f"INFO: mpi_ranks not given — derived {args.mpi_ranks} from "
               f"hardware_policy[{fam}] (engine={pol.get('engine')})", file=sys.stderr)
     if args.gpu_ids is None:
-        args.gpu_ids = "" if pol.get("engine") == "cpu" else "0"
+        if pol.get("engine") == "cpu":
+            args.gpu_ids = ""
+        else:
+            # emit gpu_per_run placeholder ids (e.g. "0,1" for a 2-GPU run); the orchestrator
+            # claims that many free GPUs via scripts/pick_gpu.py claim --need N at submit time.
+            n = max(1, int(pol.get("gpu_per_run", 1) or 1))
+            args.gpu_ids = ",".join(str(i) for i in range(n))
         print(f"INFO: gpu_ids not given — derived \"{args.gpu_ids}\" from "
-              f"hardware_policy[{fam}]; claim a free GPU with scripts/pick_gpu.py",
+              f"hardware_policy[{fam}]; claim free GPU(s) with scripts/pick_gpu.py",
               file=sys.stderr)
 
 
@@ -225,7 +244,7 @@ def _exp_density_range(cls: dict) -> list:
 
 def build_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
+    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
     guide = load_worker_guide("build")
     return f"""\
 smiles:            {_v(args.smiles)}
@@ -253,7 +272,7 @@ ff_confidence:     {cls.get('confidence', 'low')}
 
 def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/equil"
+    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/equil"
     guide = load_worker_guide("equil")
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
     T_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
@@ -325,7 +344,7 @@ mpi_ranks:         {args.mpi_ranks}
 
 def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/thermal"
+    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/thermal"
     guide = load_worker_guide("tg")
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
 
@@ -380,7 +399,7 @@ per_t_dump:
 
 def deform_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
+    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/mechanical"
     is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
     guide = load_worker_guide("deform")
     return f"""\
@@ -407,7 +426,7 @@ mpi_ranks:         {args.mpi_ranks}
 
 def born_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
+    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/mechanical"
     is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
     dt_fs = _pick(args.dt_fs, cls, "dt_fs", 1.0)
     born_run_ns = args.born_run_ns if args.born_run_ns is not None else 4.0
@@ -434,9 +453,9 @@ mpi_ranks:         {args.mpi_ranks}
 
 
 def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
-    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
+    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
+    lammps_base = f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
     tg_log = args.data_path or f"{lammps_base}/thermal/tg_sweep/tg_sweep.log"
     # equil_data_path: NPT 300 K production output — passed to extract_thermal as tg_data_file for ΔCp mass normalisation
     equil_data = args.equil_data_path or f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
@@ -462,12 +481,12 @@ tasks:
 
 def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for equilibration-checker (equil-check gate — equil check + density)."""
-    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
+    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
     exp_density = _exp_density_range(cls)
     ct_decay = cls.get("ct_min_decay_melt", 0.10)
 
-    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
+    lammps_base = f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
     equil_log = f"{lammps_base}/equil/nvt_production/nvt_production.log"
     npt_log = args.npt_prod_log or f"{lammps_base}/equil/npt_prod300/npt_prod300.log"
     npt_dump = args.npt_prod_dump or f"{lammps_base}/equil/npt_prod300/npt_prod300.dump"
@@ -500,11 +519,11 @@ tasks:
 def murnaghan_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for murnaghan-worker (rubbery BM pressure series submission)."""
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
+    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/mechanical"
     is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else False
     bm_pressures_atm = cls.get("bm_pressures_atm", None)
     dt = _pick(args.dt_fs, cls, "dt_fs", 1.0)
-    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
+    lammps_base = f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
     equil_data = args.data_path or f"{lammps_base}/equil/npt_production/npt_production_out.data"
     guide = load_worker_guide("murnaghan")
     return f"""\
@@ -530,9 +549,9 @@ mpi_ranks:         {args.mpi_ranks}
 
 def analyze_bm_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for bulk-modulus-extractor (BM extraction, all four routing paths)."""
-    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
+    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
+    lammps_base = f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
     npt_log = args.npt_prod_log or f"{lammps_base}/equil/npt_prod300/npt_prod300.log"
     _k_from_cls = _exp_K_range(cls)
     exp_K = [
@@ -576,7 +595,7 @@ graphs_dir:        {graphs_dir}
 
 def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for run-summary-worker (always-terminal, calls generate_run_summary)."""
-    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
+    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
     exp_tg = _exp_tg_range(cls)
     exp_density = _exp_density_range(cls)

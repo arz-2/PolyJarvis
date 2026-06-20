@@ -12,13 +12,20 @@ mpi/gpu rules existed in agent memory but were never enforced at launch, so bad 
 helper (`scripts/pick_gpu.py`).
 
 ## Hardware
-- 4× NVIDIA Quadro RTX 6000 (24 GB, ids 0–3)
-- 1× Intel i9-10980XE — 18 physical cores / 36 threads, single NUMA node
-- LAMMPS `/home/arz2/lammps-install/bin/lmp` (GPU + EXTRA-COMPUTE built)
+- 4× NVIDIA A800 40GB (ids 0–3)
+- 1× AMD Ryzen Threadripper PRO 5975WX — 32 physical cores / 64 threads
+- LAMMPS `/home/alexzhao/lammps-install/bin/lmp` (GPU sm_80 + EXTRA-COMPUTE built)
 
 Each MPI rank ≈ 1 CPU core (GPU runs included — the rank still drives kspace/bonded/neighbor
 on the CPU). **Ranks, not GPUs, are the scarce resource.** Throughput governor for concurrent
-runs: **Σ mpi ≤ 18 physical cores**, ≤ 1 GPU-heavy run per GPU.
+runs: **Σ mpi ≤ 32 physical cores**, ≤ 1 GPU-heavy run per GPU.
+
+> ⚠ **Benchmark provenance:** every `ns/day` number in the Results/Conclusions below was
+> measured on the **prior box (4× RTX 6000 24GB / i9-10980XE 18-core)**, NOT these A800s.
+> They are retained for rationale only. The hardware descriptors and the Σmpi budget above
+> have been updated to the A800/32-core box, but the per-config timings and the per-run
+> `mpi`/`gpu` defaults they justify are **pending an A800 re-run** of
+> `scripts/benchmark_hardware.py` (`hardware_policy.values_are_benchmarked` is still `false`).
 
 ## Method
 `scripts/benchmark_hardware.py` runs a short (~2.5–3k step) LAMMPS run per config and parses
@@ -79,7 +86,7 @@ because those configs are equally contended. Absolute ns/day are depressed vs a 
 - PCFF/OPLS std MD: **GPU, 1 GPU, mpi=4 concurrent / 8 solo; never mpi=1; never >1 GPU.**
 - TraPPE-UA std MD: **CPU, mpi=4 concurrent / 8 solo** (isolation optimum; revisit only if running CPU-saturated).
 - born: **CPU-only.** deform: **GPU ok.** tg_step: **as PCFF.**
-- `mpi` defaults are **concurrent-safe** (4 runs × mpi=4 = 16 ≤ 18 cores), not single-run-optimal.
+- `mpi` defaults are **concurrent-safe** (4 runs × mpi=4 = 16 ≤ 32 cores), not single-run-optimal.
 
 ## Still pending (drained-box sweep)
 Contention-free CPU-vs-GPU verdict for UA and PCFF (CPU `mpi=8/16` need free cores), clean
