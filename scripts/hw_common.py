@@ -33,16 +33,11 @@ def hardware_policy(rules: dict | None = None) -> dict:
     return rules.get("hardware_policy", {})
 
 
-def detect_phys_cores() -> int:
-    """Physical-core count for this box. Prefer the calibrated hardware_policy host
-    value, fall back to an lscpu probe, then os.cpu_count(). Replaces the old
-    hardcoded 18 so callers scale to whatever box this clone runs on."""
-    try:
-        n = int(hardware_policy()["host"]["phys_cores"])
-        if n > 0:
-            return n
-    except Exception:
-        pass
+def _phys_cores_probe() -> int:
+    """Probe the box's physical-core count directly (lscpu, then os.cpu_count()),
+    WITHOUT consulting hardware_policy. Used by host_matches(), which must compare the
+    live machine against the saved fingerprint — trusting the policy value there would
+    make phys_cores always "match" itself."""
     try:
         out = subprocess.run(["lscpu"], capture_output=True, text=True, timeout=10).stdout
         cps = sockets = None
@@ -56,6 +51,19 @@ def detect_phys_cores() -> int:
     except Exception:
         pass
     return os.cpu_count() or 8
+
+
+def detect_phys_cores() -> int:
+    """Physical-core count for this box. Prefer the calibrated hardware_policy host
+    value, fall back to a direct probe. Replaces the old hardcoded 18 so callers scale
+    to whatever box this clone runs on."""
+    try:
+        n = int(hardware_policy()["host"]["phys_cores"])
+        if n > 0:
+            return n
+    except Exception:
+        pass
+    return _phys_cores_probe()
 
 
 def gpu_status() -> list[dict]:
@@ -77,6 +85,41 @@ def gpu_status() -> list[dict]:
                          "util": int(parts[1]),
                          "mem_used_mb": int(parts[2])})
     return gpus
+
+
+def gpu_model() -> str:
+    """The first GPU's marketing name from nvidia-smi (e.g. 'NVIDIA A800 40GB Active'),
+    or 'unknown'. The model + count fingerprints the box for host-match gating."""
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                             capture_output=True, text=True, timeout=15).stdout
+        names = [l.strip() for l in out.strip().splitlines() if l.strip()]
+        if names:
+            return names[0]
+    except Exception:
+        pass
+    return "unknown"
+
+
+def live_host() -> dict:
+    """Best-effort fingerprint of the box this is running on: GPU count + model + a
+    DIRECT physical-core probe (not the policy echo). Shape matches hardware_policy.host
+    so host_matches() and calibrate_hardware can compare/write the same dict."""
+    return {"gpus": len(gpu_status()), "gpu_model": gpu_model(),
+            "phys_cores": _phys_cores_probe()}
+
+
+def host_matches(rules: dict | None = None) -> bool:
+    """True iff the live box matches hardware_policy.host (GPU model + count + phys cores).
+    Used to decide whether the benchmarked per-FF defaults apply here or the user should
+    re-run /calibrate-hardware. Missing/empty saved host → False (never benchmarked here)."""
+    saved = hardware_policy(rules).get("host") or {}
+    if not saved:
+        return False
+    live = live_host()
+    return (live["gpu_model"] == saved.get("gpu_model")
+            and live["gpus"] == saved.get("gpus")
+            and live["phys_cores"] == saved.get("phys_cores"))
 
 
 def resolve_ff_family(ff_raw: str, hp: dict) -> str:
