@@ -70,7 +70,8 @@
         "parity_2026-06-20": "PASS. run-0 static eval on PEG1 npt_cool_out.data: class2/kk + pppm/kk vs GPU-package class2 agree to 0.000% on ALL energy terms (E_bond/E_angle/E_dihed/E_impro/E_vdwl/E_coul/E_long/PotEng) AND the full pressure tensor (Pxx/Pyy/Pzz) -> identical PES and forces, no KOKKOS bug. NOTE: an equilibrated-ensemble diff vs the ARCHIVED nvt_production.log spuriously FAILED on E_bond because that archived log was generated from a different npt_cool microstate than the current on-disk data (run-0 gives E_bond=995.77 for BOTH engines, not the archived 2320) -- a stale-baseline artifact, not physics.",
         "opls_parity_2026-06-20": "PASS. run-0 on decane-oplsaa (3200 atoms, OPLS-AA): lj/cut/coul/long/kk + harmonic bond/angle kk + dihedral opls/kk + pppm/kk vs GPU-package agree to 0.000% on E_bond/E_angle/E_dihed/E_vdwl/E_coul/E_long/PotEng and the pressure tensor. OPLS KOKKOS stack validated.",
         "gate": "GREEN as of 2026-06-20. pcff + opls FLIPPED to engine=kokkos, mpi=1, gpu_per_run=1 (both run-0 parity-validated). gaff pending its own parity (no cell yet); trappe stays cpu.",
-        "binary": "/home/alexzhao/lammps-install-kokkos/bin/lmp (env LAMBDA_LAMMPS_KOKKOS)"
+        "binary": "/home/alexzhao/lammps-install-kokkos/bin/lmp (env LAMBDA_LAMMPS_KOKKOS)",
+        "gpu_sharing_2026-06-20": "DO NOT pack >1 run/GPU for PPPM-heavy (PCFF/OPLS) KOKKOS runs. Measured on PEG1 7020 atoms, GPU2: solo=38.9 ns/day; 2 concurrent time-sliced (no MPS)=6.3 aggregate (0.16x, Kspace blows up 15x from GPU context-switching on PPPM sync points); 2 concurrent with CUDA MPS=39.0 aggregate (1.00x, clean 2x/section, 50% each) = ZERO gain. The GPU is already saturated by one PPPM job (pair kernel is tiny but the cuFFT pipeline keeps it busy). Optimal = 1 run/GPU, 4 concurrent across 4 GPUs (mpi=1, gpu_per_run=1)."
       }
     },
     "ff_aliases": {
