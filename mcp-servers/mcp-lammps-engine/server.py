@@ -71,7 +71,26 @@ logger = logging.getLogger("lammps_engine")
 LAMBDA_USER     = os.environ.get("LAMBDA_USER",    "arz2")
 LAMBDA_WORKDIR  = os.environ.get("LAMBDA_WORKDIR", f"/home/{LAMBDA_USER}/simulations")
 LAMBDA_LAMMPS   = os.environ.get("LAMBDA_LAMMPS",  f"/home/{LAMBDA_USER}/lammps-install/bin/lmp")
+# KOKKOS full-offload binary (pair + class2 bonded + pppm + neigh on GPU). Separate prefix so the
+# GPU-package binary above stays the production fallback; selected per run via engine="kokkos".
+LAMBDA_LAMMPS_KOKKOS = os.environ.get("LAMBDA_LAMMPS_KOKKOS",
+                                      f"/home/{LAMBDA_USER}/lammps-install-kokkos/bin/lmp")
 CONDA_ENV       = os.environ.get("CONDA_ENV",      "mol-builder")
+
+
+def _engine_launch(engine: str, n_gpu: int) -> tuple[str, str]:
+    """Map an execution engine to (lmp binary, mpirun offload flags).
+
+      gpu    → GPU package: pairwise forces on GPU, bonded/kspace/neigh on CPU (current default)
+      cpu    → no offload flags (CPU-only; required by compute born/matrix numdiff)
+      kokkos → KOKKOS full-offload: -sf kk rewrites pair/bonded/kspace/neigh to /kk on the GPU
+
+    n_gpu is the device count for this run (-pk gpu N / -k on g N)."""
+    if engine == "kokkos":
+        return LAMBDA_LAMMPS_KOKKOS, f"-k on g {n_gpu} -sf kk -pk kokkos"
+    if engine == "cpu":
+        return LAMBDA_LAMMPS, ""
+    return LAMBDA_LAMMPS, f"-sf gpu -pk gpu {n_gpu}"
 # Analysis scripts are bundled with the server; MDA_SCRIPTS_DIR env var overrides for dev use.
 MDA_SCRIPTS_DIR = os.environ.get("MDA_SCRIPTS_DIR",
                                   str(Path(__file__).parent / "analysis_scripts"))
@@ -223,7 +242,8 @@ run_manager = RunManager()
 # Helper: execute LAMMPS in a background thread
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> str:
+def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
+                        engine: str = "gpu") -> str:
     """
     Generate a self-contained bash script that runs LAMMPS stages sequentially.
     Designed to run under nohup so it is fully independent of the MCP server process.
@@ -233,13 +253,16 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
     A final line with stage=__chain__ marks overall completion or failure.
     """
     n_gpu = len(gpu_ids.split(","))
+    lmp_bin, offload_flags = _engine_launch(engine, n_gpu)
+    cuda_devices = "" if engine == "cpu" else gpu_ids
     lines = [
         "#!/bin/bash",
-        f"# PolyJarvis chain {chain_id} — auto-generated, do not edit",
+        f"# PolyJarvis chain {chain_id} — auto-generated, do not edit (engine={engine})",
         "set -euo pipefail",
         "",
         f"CHAIN_ID={chain_id}",
-        f"LMP={LAMBDA_LAMMPS}",
+        f"LMP={lmp_bin}",
+        f"OFFLOAD_FLAGS=\"{offload_flags}\"",
         f"MPI={mpi}",
         f"GPU_IDS={gpu_ids}",
         f"N_GPU={n_gpu}",
@@ -264,7 +287,7 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
         f"sentinel_fail() {{ echo \"{{\\\"run_id\\\":\\\"{chain_id}\\\",\\\"status\\\":\\\"failed\\\",\\\"stage\\\":\\\"$1\\\"}}\""
             " > \"$SENTINEL\"; }",
         "",
-        f"export CUDA_VISIBLE_DEVICES={gpu_ids}",
+        f"export CUDA_VISIBLE_DEVICES={cuda_devices}",
         "# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).",
         'echo $$ > "$PIDFILE"',
         "",
@@ -281,7 +304,7 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str) -> 
             f"mkdir -p {wdir}",
             f"cd {wdir}",  # FIX: cd into stage workdir so relative paths in .in files resolve correctly
             f"log_start {name}",
-            f"mpirun -np $MPI $LMP -sf gpu -pk gpu $N_GPU "
+            f"mpirun -np $MPI $LMP $OFFLOAD_FLAGS "
             f"-in {script} >> {wdir}/{log} 2>&1 \\",
             f"  && log_done {name} \\",
             f"  || {{ log_fail {name}; sentinel_fail {name}; "
@@ -308,6 +331,7 @@ def _lammps_run_background(
     gpu_ids: str,
     log_file: str,
     use_gpu: bool = True,
+    engine: str = "gpu",
 ):
     """Background thread: executes LAMMPS and updates run_manager.
 
@@ -329,18 +353,19 @@ def _lammps_run_background(
         # Capture wrapper stdout to a separate file so it never overwrites the LAMMPS
         # internal log (e.g. tg_sweep.log opened with 'log ... append' in the script).
         wrapper_stdout = f"{work_dir}/{run_id}_wrapper.stdout"
-        if use_gpu:
-            cuda_line = f"export CUDA_VISIBLE_DEVICES={gpu_ids}\n"
-            lammps_cmd = (
-                f"mpirun -np {mpi} {LAMBDA_LAMMPS} -sf gpu -pk gpu {n_gpu} "
-                f"-in {script} >> {wrapper_stdout} 2>&1\n"
-            )
-        else:
+        # use_gpu=False (e.g. compute born/matrix numdiff) forces the CPU engine regardless of the
+        # engine arg; otherwise honor engine (gpu | kokkos). _engine_launch picks binary + flags.
+        eff_engine = "cpu" if not use_gpu else engine
+        lmp_bin, offload_flags = _engine_launch(eff_engine, n_gpu)
+        if eff_engine == "cpu":
             cuda_line = "export CUDA_VISIBLE_DEVICES=\n"  # hide GPUs from LAMMPS
-            lammps_cmd = (
-                f"mpirun -np {mpi} {LAMBDA_LAMMPS} "
-                f"-in {script} >> {wrapper_stdout} 2>&1\n"
-            )
+        else:
+            cuda_line = f"export CUDA_VISIBLE_DEVICES={gpu_ids}\n"
+        flags = f"{offload_flags} " if offload_flags else ""
+        lammps_cmd = (
+            f"mpirun -np {mpi} {lmp_bin} {flags}"
+            f"-in {script} >> {wrapper_stdout} 2>&1\n"
+        )
         wrapper = (
             f"#!/bin/bash\n"
             f"{cuda_line}"
@@ -368,7 +393,7 @@ def _lammps_run_background(
             f"setsid nohup bash {wrapper_path} </dev/null & disown; echo $!"
         )
 
-        logger.info(f"[{run_id}] Launching LAMMPS via nohup wrapper: {LAMBDA_LAMMPS}")
+        logger.info(f"[{run_id}] Launching LAMMPS via nohup wrapper (engine={eff_engine}): {lmp_bin}")
         stdout, _, _ = _conda_run(launch, workdir=work_dir, timeout=30)
         pid = stdout.strip().splitlines()[-1] if stdout.strip() else "unknown"
         logger.info(f"[{run_id}] nohup PID={pid}")
@@ -595,6 +620,7 @@ def run_lammps_script(
     mpi: int,
     log_file: str = "lammps_run.log",
     use_gpu: bool = True,
+    engine: str = "gpu",
 ) -> dict:
     """
     Execute a LAMMPS .in script on the local GPU in the background.
@@ -613,6 +639,11 @@ def run_lammps_script(
                           via CUDA_VISIBLE_DEVICES=. Required for compute born/matrix
                           numdiff, which displaces atoms in CPU arrays and is
                           incompatible with GPU device-side neighbor lists.
+                          (use_gpu=False forces engine="cpu" regardless of engine.)
+        engine:           Execution engine: "gpu" (default; GPU package, pairwise on GPU),
+                          "kokkos" (full-offload — pair+class2 bonded+pppm+neigh on GPU via
+                          the KOKKOS binary, -sf kk), or "cpu". The KOKKOS path uses
+                          LAMBDA_LAMMPS_KOKKOS and is ~7.9× faster on PCFF at mpi=1.
 
     Returns:
         dict with run_id for status polling via get_run_status().
@@ -628,12 +659,13 @@ def run_lammps_script(
             "mpi":             mpi,
             "gpu_ids":         gpu_ids,
             "use_gpu":         use_gpu,
+            "engine":          engine,
         }
         run_id = run_manager.create("lammps_run", meta)
 
         thread = threading.Thread(
             target=_lammps_run_background,
-            args=(run_id, work_dir, script, mpi, gpu_ids, log_file, use_gpu),
+            args=(run_id, work_dir, script, mpi, gpu_ids, log_file, use_gpu, engine),
             daemon=True,
         )
         thread.start()
@@ -662,6 +694,7 @@ def run_lammps_chain(
     h_type_ids: Optional[list] = None,
     backbone_types: Optional[list] = None,
     params_file: str = "",
+    engine: str = "gpu",
 ) -> dict:
     """
     Execute a sequence of LAMMPS scripts as a fully chained pipeline.
@@ -694,6 +727,9 @@ def run_lammps_chain(
                         provided, "Coeffs section missing" pre-flight errors are
                         suppressed — EMC TraPPE-UA and PCFF .data files store
                         coefficients in the params file, not the .data file.
+        engine:         Execution engine for every stage: "gpu" (default; GPU package)
+                        or "kokkos" (full-offload via LAMBDA_LAMMPS_KOKKOS, -sf kk).
+                        The generated decks must match (KOKKOS decks omit `package gpu`).
 
     Returns:
         dict with chain_id, paths, and poll instructions.
@@ -749,7 +785,7 @@ def run_lammps_chain(
         progress_file = f"{chain_dir}/chain_{chain_id}_progress.jsonl"
 
         # Build and upload the bash script
-        script_body = _build_chain_script(chain_id, stages, mpi, gpu_ids)
+        script_body = _build_chain_script(chain_id, stages, mpi, gpu_ids, engine)
         # Override progress path to the one we computed
         script_body = script_body.replace(
             "PROGRESS=$( dirname $0 )/chain_progress.jsonl",
@@ -1079,6 +1115,7 @@ def generate_equilibration_workflow(
     t_equil_K: Optional[float] = None,
     melt_npt_steps: Optional[int] = None,
     add_300k_production: bool = True,
+    engine: str = "gpu",
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
@@ -1119,6 +1156,10 @@ def generate_equilibration_workflow(
         npt_prod_steps: Explicit step count for npt_production run. When None
                         (default), uses steps_npt // 2 from the atom-count tier.
                         Convert from ns: int(t_ns * 1e6 / dt_fs).
+        engine:         Execution engine stamped into every GPU stage deck: "gpu"
+                        (default; renders `package gpu`) or "kokkos" (renders no GPU
+                        package — `-sf kk` rewrites styles to /kk at launch). Submit
+                        the chain with the matching engine= in run_lammps_chain().
         use_pcff:       Set True for EMC/PCFF class2 systems (PCBN, PAMD, PKTN,
                         PSFO, PIMD, POXI, PEST, PSUL, PURT, PANH, PPHS, PACR,
                         PIMN, PVNL, PPNL). Switches all templates to class2
@@ -1226,6 +1267,10 @@ def generate_equilibration_workflow(
             ff_base = {}
         if params_file:
             ff_base["params_file"] = params_file
+        # Carry the execution engine into every stage deck. GPU-enabled stages render the matching
+        # accelerator package (gpu → `package gpu`; kokkos → none, -sf kk handles it); use_gpu=False
+        # stages ignore it and stay CPU. Submit the chain with the SAME engine (run_lammps_chain).
+        ff_base["engine"] = engine
 
         # TraPPE-UA with SHAKE enables 2 fs timestep for npt_pppm through npt_production.
         # Stages 02-03 keep 0.5 fs (chain overlap risk at startup is too high for large dt).
@@ -1468,6 +1513,7 @@ def generate_equilibration_workflow(
             "temp":       temp,
             "max_temp":   max_temp,
             "n_stages":   len(stages),
+            "engine":     engine,
             "stages":     stages,
             "run_order":  [s["name"] for s in stages],
             "npt_production_log": f"{_npt_final['work_dir']}/{_npt_final['params']['LOG_FILE']}",
@@ -1475,9 +1521,10 @@ def generate_equilibration_workflow(
             "preflight_warnings": vr["warnings"],
             "preflight_stats":    vr["stats"],
             "instructions": (
-                f"Generated {len(stages)} staged scripts for {polymer_name}.\n"
+                f"Generated {len(stages)} staged scripts for {polymer_name} (engine={engine}).\n"
                 "Execute in order using run_lammps_script().\n"
                 "GPU is ON for all stages.\n"
+                f"Pass engine='{engine}' to run_lammps_chain() so the launch flags match the decks.\n"
                 + (
                     "npt_cool300 + npt_prod300 cool to 300 K and produce at 300 K — use npt_prod300 for density and deformation.\n"
                     if _add_300k else

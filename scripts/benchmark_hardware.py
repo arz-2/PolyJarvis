@@ -59,7 +59,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hw_common import detect_phys_cores, gpu_status
 
 LMP_DEFAULT = "/home/alexzhao/lammps-install/bin/lmp"
+LMP_KOKKOS_DEFAULT = "/home/alexzhao/lammps-install-kokkos/bin/lmp"
 CONDA_ACTIVATE = "source ~/miniforge3/etc/profile.d/conda.sh; conda activate mol-builder"
+
+# Execution arms — how LAMMPS offloads work to the GPU. A0 is the current production
+# behavior (GPU package: pair on GPU; bonded/kspace/neigh on CPU). A1/A2 are the
+# no-rebuild "free wins" (move neighbor build and/or PPPM onto the idle GPU). A3 is the
+# KOKKOS full-offload (pair+bonded+kspace+neigh all on GPU) and needs the KOKKOS binary.
+#   engine  : "gpu" (GPU package) | "kokkos"
+#   neigh   : GPU-package neighbor-build location ("no"=CPU, "yes"=GPU); ignored for kokkos
+#   kspace  : "pppm" (CPU) | "pppm/gpu" (GPU pkg) | "kk" (kokkos -sf rewrites the deck)
+ARMS: dict[str, dict] = {
+    "A0": {"engine": "gpu",    "neigh": "no",  "kspace": "pppm",
+           "desc": "baseline: GPU pkg, pppm-CPU, neigh-no"},
+    "A1": {"engine": "gpu",    "neigh": "yes", "kspace": "pppm",
+           "desc": "GPU pkg + neigh-yes"},
+    "A2": {"engine": "gpu",    "neigh": "yes", "kspace": "pppm/gpu",
+           "desc": "GPU pkg + pppm/gpu + neigh-yes"},
+    "A3": {"engine": "kokkos", "neigh": None,  "kspace": "kk",
+           "desc": "KOKKOS full-offload (-sf kk -pk kokkos)"},
+}
 # Resolve mpirun to an absolute path so the launched subshell does not depend on its
 # own PATH (user-space Open MPI is often only on an interactive-login PATH). Override
 # with LAMBDA_MPIRUN if mpirun lives somewhere non-standard.
@@ -229,13 +248,20 @@ def _mpi_lib_export() -> str:
     return ""
 
 
-def build_cmd(lmp: str, in_file: Path, mpi: int, gpu_ids: list[int]) -> tuple[str, dict]:
-    """Return (shell command string, env-note). GPU purely via -sf/-pk flags."""
+def build_cmd(lmp: str, in_file: Path, mpi: int, gpu_ids: list[int],
+              arm: dict | None = None) -> tuple[str, dict]:
+    """Return (shell command string, env-note). GPU offload via -sf/-pk flags, selected
+    by the execution arm (defaults to A0 = GPU package, neigh on CPU)."""
+    arm = arm or ARMS["A0"]
     env_prefix = ""
     gpu_flags = ""
     if gpu_ids:
         env_prefix = f"CUDA_VISIBLE_DEVICES={','.join(map(str, gpu_ids))} "
-        gpu_flags = f" -sf gpu -pk gpu {len(gpu_ids)} neigh no"
+        n = len(gpu_ids)
+        if arm["engine"] == "kokkos":
+            gpu_flags = f" -k on g {n} -sf kk -pk kokkos"
+        else:                                          # GPU package
+            gpu_flags = f" -sf gpu -pk gpu {n} neigh {arm['neigh']}"
     inner = (f"{env_prefix}{shlex.quote(MPIRUN)} -np {mpi} {shlex.quote(lmp)}{gpu_flags} "
              f"-in {shlex.quote(str(in_file))}")
     cmd = f"bash -c {shlex.quote(CONDA_ACTIVATE + '; ' + _mpi_lib_export() + inner)}"
@@ -268,7 +294,7 @@ def parse_log(log_text: str) -> dict:
 
 
 def run_config(cfg: dict, in_file: Path, lmp: str, work: Path,
-               gpu_ids: list[int], timeout_s: int) -> dict:
+               gpu_ids: list[int], timeout_s: int, arm: dict | None = None) -> dict:
     rundir = work / cfg["name"]
     rundir.mkdir(parents=True, exist_ok=True)
     # fresh log path per config
@@ -278,7 +304,7 @@ def run_config(cfg: dict, in_file: Path, lmp: str, work: Path,
                   count=1, flags=re.M)
     cfg_in.write_text(text)
 
-    cmd, note = build_cmd(lmp, cfg_in, cfg["mpi"], gpu_ids)
+    cmd, note = build_cmd(lmp, cfg_in, cfg["mpi"], gpu_ids, arm)
     t0 = time.time()
     try:
         proc = subprocess.run(cmd, shell=True, capture_output=True, text=True,
@@ -318,6 +344,11 @@ def main() -> int:
     ap.add_argument("--label", help="cell label for output (default: data dir name)")
     ap.add_argument("--out", help="output json path")
     ap.add_argument("--lmp", default=os.environ.get("LAMBDA_LAMMPS", LMP_DEFAULT))
+    ap.add_argument("--lmp-kokkos", default=os.environ.get("LAMBDA_LAMMPS_KOKKOS", LMP_KOKKOS_DEFAULT),
+                    help="KOKKOS-enabled lmp binary (used when --arm A3)")
+    ap.add_argument("--arm", choices=list(ARMS), default="A0",
+                    help="execution arm: A0=baseline (default), A1=neigh-yes, "
+                         "A2=pppm/gpu+neigh-yes, A3=KOKKOS full-offload")
     ap.add_argument("--max-cores", type=int, default=PHYS_CORES)
     ap.add_argument("--timeout", type=int, default=1800, help="per-config timeout (s)")
     ap.add_argument("--allow-busy", action="store_true",
@@ -337,7 +368,10 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
-    label = args.label or Path(data).parent.name or "cell"
+    arm = ARMS[args.arm]
+    lmp = args.lmp_kokkos if arm["engine"] == "kokkos" else args.lmp
+    base_label = args.label or Path(data).parent.name or "cell"
+    label = f"{base_label}__{args.arm}"
     pppm = args.pppm
     if pppm is None:
         pppm = (args.ff in ("pcff", "opls", "gaff"))   # UA has no kspace
@@ -356,9 +390,21 @@ def main() -> int:
         mode = (f"generate:nvt ff={args.ff} pppm={pppm} dt={timestep}fs"
                 f" params={Path(params_file).name if params_file else 'none'}")
 
+    # Derive the per-arm deck: A2 moves PPPM onto the GPU (kspace_style pppm -> pppm/gpu);
+    # A3 (KOKKOS) keeps plain pppm and lets `-sf kk` rewrite every style at runtime.
+    arm_in = master_in
+    if arm["kspace"] == "pppm/gpu":
+        new_text, nsub = re.subn(r"(kspace_style\s+)pppm\b", r"\1pppm/gpu",
+                                 master_in.read_text())
+        arm_in = work / "deck_arm.in"
+        arm_in.write_text(new_text)
+        if nsub == 0:
+            print("   note:   no kspace_style pppm line (no-kspace cell) — A2 == A1 here")
+
     print(f"== benchmark {label} ==")
     print(f"   data:   {data}")
     print(f"   deck:   {mode}")
+    print(f"   arm:    {args.arm} — {arm['desc']}   lmp: {lmp}")
     print(f"   steps:  {args.steps}   work: {work}\n")
 
     configs = DEFAULT_CONFIGS
@@ -401,7 +447,7 @@ def main() -> int:
 
         print(f"  RUN  {cfg['name']:<11} mpi={cfg['mpi']} gpu_ids={gpu_ids} "
               f"(concurrent lmp ranks={live}) ... ", end="", flush=True)
-        r = run_config(cfg, master_in, args.lmp, work, gpu_ids, args.timeout)
+        r = run_config(cfg, arm_in, lmp, work, gpu_ids, args.timeout, arm)
         r["concurrent_lmp_ranks"] = live
         results.append(r)
         if r["status"] == "ok":
@@ -419,7 +465,8 @@ def main() -> int:
     summary = {
         "label": label, "data_file": data, "deck": mode, "steps": args.steps,
         "timestep_fs": timestep, "pppm": pppm,
-        "host": {"phys_cores": args.max_cores, "lmp": args.lmp},
+        "arm": args.arm, "arm_desc": arm["desc"],
+        "host": {"phys_cores": args.max_cores, "lmp": lmp},
         "results": results,
         "recommended": ok[0] if ok else None,
     }

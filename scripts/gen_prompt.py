@@ -148,6 +148,8 @@ def _apply_plan_hardware(args, dp: dict) -> None:
     them), so the no-plan path stays byte-identical (tests/test_plan_reproducibility.py)."""
     if args.mpi_ranks is None and dp.get("mpi_ranks") is not None:
         args.mpi_ranks = dp["mpi_ranks"]
+    if getattr(args, "engine", None) is None and dp.get("engine") is not None:
+        args.engine = dp["engine"]          # plan's D-08 engine (gpu | kokkos | cpu)
     if args.gpu_ids is None and ("engine" in dp or "gpu_per_run" in dp):
         engine, gpu_n = dp.get("engine"), dp.get("gpu_per_run")
         if engine == "cpu" or gpu_n == 0:
@@ -171,6 +173,14 @@ def resolve_hardware(args, cls: dict, rules: dict) -> None:
     ff_raw = cls.get("preferred_ff") or cls.get("forcefield") or ""
     fam = resolve_ff_family(ff_raw, hp)
     pol = hp.get("by_forcefield", {}).get(fam, {})
+    # Resolve the launch engine the worker forwards to the MCP run tools. Precedence:
+    # CLI/plan (already on args) > policy by_forcefield[fam].engine > "gpu". Only "kokkos" opts
+    # into full-offload; "cpu"/anything else normalizes to "gpu" so chain launches stay as today
+    # (per-stage use_gpu still governs CPU-only stages inside the deck).
+    if getattr(args, "engine", None) is None:
+        args.engine = pol.get("engine")
+    if args.engine != "kokkos":
+        args.engine = "gpu"
     if args.mpi_ranks is None:
         args.mpi_ranks = pol.get("mpi", 8)
         print(f"INFO: mpi_ranks not given — derived {args.mpi_ranks} from "
@@ -344,6 +354,7 @@ dt_fs:             {dt}
 {melt_npt_line}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
 
 --- Worker Guide (EQUILIBRATION) ---
 {guide}
@@ -408,6 +419,7 @@ tg_params:
 dt_fs:             {dt}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
 per_t_dump:
   enabled:         true
   file:            {tg_sweep_dir}/per_t_structs.dump   # one final frame per T step
@@ -440,6 +452,7 @@ K_strain_max:      {_pick(args.K_strain_max, cls, 'K_strain_max', 0.03)}
 dt_fs:             {_pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
 
 --- Worker Guide (DEFORM) ---
 {guide}
@@ -468,6 +481,7 @@ n_steps:           {n_steps}
 dt_fs:             {dt_fs}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
 
 --- Worker Guide (BORN_MATRIX) ---
 {guide}
@@ -631,6 +645,7 @@ npt_steps:         500000
 dt_fs:             {dt}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
 
 --- Worker Guide (MURNAGHAN) ---
 {guide}
@@ -755,6 +770,12 @@ def main():
     p.add_argument("--mpi_ranks", type=int, required=False, default=None,
                    help="MPI processes per run. If omitted, derived from "
                         "hardware_policy by FF (never mpi=1 for PPPM classes).")
+    p.add_argument("--engine", required=False, default=None,
+                   choices=["gpu", "kokkos"],
+                   help="Execution engine the worker forwards to run_lammps_chain / "
+                        "run_lammps_script / generate_equilibration_workflow. If omitted, "
+                        "derived from the plan's decided_params.engine or hardware_policy "
+                        "(kokkos = full-offload; anything else → gpu).")
     p.add_argument("--dp", type=int)
     p.add_argument("--nchain", type=int)
     p.add_argument("--lammps_flags")

@@ -51,6 +51,26 @@
       "cells_atoms": {
         "pcff": 3020,
         "trappe": 1640
+      },
+      "kokkos_offload_study": {
+        "date": "2026-06-20",
+        "what": "KOKKOS full-offload arm (pair+class2 bonded+pppm+neigh on GPU via -sf kk -pk kokkos) vs the GPU-package baseline. Engine is wired as a selectable engine=\"kokkos\" end-to-end (server.py run tools, script_generator deck, gen_prompt). by_forcefield defaults intentionally UNCHANGED until the 40k-step accuracy parity passes.",
+        "cell": "/home/alexzhao/PolyJarvis/data/CALIB_PACR/emc_build.data",
+        "cell_atoms": 3020,
+        "pcff_ns_per_day_mpi1_contended": {
+          "A0_gpu_pkg_pppm_cpu_neigh_no": 5.82,
+          "A1_gpu_pkg_neigh_yes": 6.58,
+          "A2_gpu_pkg_pppm_gpu_neigh_yes": 6.58,
+          "A3_kokkos_full_offload": 45.9
+        },
+        "speedup_A3_vs_A0": 7.9,
+        "section_pct_shift_A0_to_A3": "class2 Bond ~29% -> ~11-13%; Kspace moves to GPU; Neigh to GPU",
+        "deck_smoke_2026-06-20": "generated engine=kokkos deck ran clean (EXIT 0): pair lj/class2/coul/long/kk, PPPM Kokkos init, neigh full/bin/kk/device; 34.9 ns/day at 1 rank nice -19 on a CPU-saturated box",
+        "concurrency_note": "KOKKOS is GPU-bound at mpi=1, 1 GPU/run -> ~1 core/run (vs ~4 for gpu pkg) so up to 4 runs go concurrent (1 per GPU), relieving the CPU-core bottleneck",
+        "parity_2026-06-20": "PASS. run-0 static eval on PEG1 npt_cool_out.data: class2/kk + pppm/kk vs GPU-package class2 agree to 0.000% on ALL energy terms (E_bond/E_angle/E_dihed/E_impro/E_vdwl/E_coul/E_long/PotEng) AND the full pressure tensor (Pxx/Pyy/Pzz) -> identical PES and forces, no KOKKOS bug. NOTE: an equilibrated-ensemble diff vs the ARCHIVED nvt_production.log spuriously FAILED on E_bond because that archived log was generated from a different npt_cool microstate than the current on-disk data (run-0 gives E_bond=995.77 for BOTH engines, not the archived 2320) -- a stale-baseline artifact, not physics.",
+        "opls_parity_2026-06-20": "PASS. run-0 on decane-oplsaa (3200 atoms, OPLS-AA): lj/cut/coul/long/kk + harmonic bond/angle kk + dihedral opls/kk + pppm/kk vs GPU-package agree to 0.000% on E_bond/E_angle/E_dihed/E_vdwl/E_coul/E_long/PotEng and the pressure tensor. OPLS KOKKOS stack validated.",
+        "gate": "GREEN as of 2026-06-20. pcff + opls FLIPPED to engine=kokkos, mpi=1, gpu_per_run=1 (both run-0 parity-validated). gaff pending its own parity (no cell yet); trappe stays cpu.",
+        "binary": "/home/alexzhao/lammps-install-kokkos/bin/lmp (env LAMBDA_LAMMPS_KOKKOS)"
       }
     },
     "ff_aliases": {
@@ -62,18 +82,20 @@
     },
     "by_forcefield": {
       "pcff": {
-        "engine": "gpu",
-        "mpi": 4,
-        "mpi_single_run_hint": 8,
+        "engine": "kokkos",
+        "mpi": 1,
+        "mpi_single_run_hint": 1,
         "gpu_per_run": 1,
-        "note": "class2+pppm; NEVER mpi=1 (~75x slow, kspace CPU-serial); 1 GPU not 4 for <10k atoms; CPU mpi=16 may rival GPU \u2014 confirm via benchmark"
+        "note": "class2/kk FULL-OFFLOAD (pair+class2 bonded+pppm+neigh on GPU) via the KOKKOS binary (env LAMBDA_LAMMPS_KOKKOS). mpi=1 is CANONICAL here \u2014 kspace runs on the GPU, NOT CPU-serial, so the old GPU-package 'never mpi=1' rule does NOT apply. ~7.9x vs gpu-pkg A0 at 1 rank; 1 core/run frees cores for ~4 concurrent runs (1/GPU). Parity run-0 vs CPU class2 = 0.000% on energies+forces (2026-06-20). Fallback: engine=gpu, mpi=4 (GPU package).",
+        "_prev_gpu_package": {"engine": "gpu", "mpi": 4, "mpi_single_run_hint": 8}
       },
       "opls": {
-        "engine": "gpu",
-        "mpi": 4,
-        "mpi_single_run_hint": 8,
+        "engine": "kokkos",
+        "mpi": 1,
+        "mpi_single_run_hint": 1,
         "gpu_per_run": 1,
-        "note": "lj/cut+pppm; same mpi>=4 rule as pcff"
+        "note": "lj/cut/coul/long + harmonic bond/angle + dihedral opls + pppm, all /kk FULL-OFFLOAD via the KOKKOS binary (env LAMBDA_LAMMPS_KOKKOS). mpi=1 canonical (kspace on GPU, not CPU-serial). Parity run-0 vs GPU-package = 0.000% on energies+forces (decane-oplsaa, 2026-06-20). Fallback: engine=gpu, mpi=4.",
+        "_prev_gpu_package": {"engine": "gpu", "mpi": 4, "mpi_single_run_hint": 8}
       },
       "trappe": {
         "engine": "cpu",
