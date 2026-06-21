@@ -610,12 +610,28 @@ def generate_script(
             data_file_override=data_file,
         )
 
+        # For Tg staircases, compute and return the number of temperature steps so workers
+        # can pass n_stages to run_lammps_script without re-implementing the list logic.
+        n_tg_stages = 0
+        if template_name == "npt_tg_step" and "T_END" in params and "T_STEP" in params:
+            merged = {**TEMPLATE_DEFAULTS["npt_tg_step"], **params}
+            _t = float(merged.get("T_START", 450.0))
+            _end = float(params["T_END"])
+            _step = float(params["T_STEP"])
+            _temps: list = []
+            while _t > _end + 1e-6:
+                _temps.append(_t); _t -= _step
+            if not _temps or abs(_temps[-1] - _end) > 1e-6:
+                _temps.append(_end)
+            n_tg_stages = len(_temps)
+
         return {
             "status":         "success",
             "template":       template_name,
             "output_script":  output_script,
             "params_used":    {**TEMPLATE_DEFAULTS[template_name], **params},
             "system_info":    gen.get_system_info(),
+            "n_tg_stages":    n_tg_stages,
             "script_preview": script[:1500] + "\n..." if len(script) > 1500 else script,
         }
 
@@ -633,6 +649,8 @@ def run_lammps_script(
     log_file: str = "lammps_run.log",
     use_gpu: bool = True,
     engine: str = "gpu",
+    progress_file: str = "",
+    n_stages: int = 0,
 ) -> dict:
     """
     Execute a LAMMPS .in script on the local GPU in the background.
@@ -665,13 +683,15 @@ def run_lammps_script(
         Path(work_dir).mkdir(parents=True, exist_ok=True)
 
         meta = {
-            "script":   script,
-            "work_dir": work_dir,
-            "log_file":        log_file,
-            "mpi":             mpi,
-            "gpu_ids":         gpu_ids,
-            "use_gpu":         use_gpu,
-            "engine":          engine,
+            "script":        script,
+            "work_dir":      work_dir,
+            "log_file":      log_file,
+            "mpi":           mpi,
+            "gpu_ids":       gpu_ids,
+            "use_gpu":       use_gpu,
+            "engine":        engine,
+            "progress_file": progress_file,
+            "n_stages":      n_stages,
         }
         run_id = run_manager.create("lammps_run", meta)
 
@@ -1082,10 +1102,9 @@ def watch_run(run_id: str) -> dict:
     """
     sentinel_path = SENTINEL_DIR / f"done_{run_id}.json"
     pidfile = pidfile_path(run_id, SENTINEL_DIR)
-    # Chains expose per-stage progress; single runs have none.
     run = run_manager.get(run_id) or {}
     meta = run.get("meta", {})
-    progress_file = meta.get("progress_file", "") if run.get("run_type") == "lammps_nohup_chain" else ""
+    progress_file = meta.get("progress_file", "")
     n_stages = meta.get("n_stages", 0) if progress_file else 0
     monitor_command = build_watch_command(str(sentinel_path), pidfile, progress_file, n_stages)
     return {

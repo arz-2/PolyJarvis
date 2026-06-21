@@ -891,6 +891,14 @@ class ScriptGenerator:
         else:
             per_t_dump_block = ""
 
+        # Progress reporting: write a JSON event per temperature step if PROGRESS_FILE given.
+        pf = cfg.get("PROGRESS_FILE", "")
+        progress_line = (
+            '  shell echo \'{"stage":"T${temps}","status":"done"}\''
+            f' >> {pf}\n'
+            if pf else ""
+        )
+
         script = f"""\
 # ============================================================
 # PolyJarvis LAMMPS Engine - Tg Sweep Staircase
@@ -935,7 +943,7 @@ label TEMP_LOOP
   fix npt_tg all npt temp ${{temps}} ${{temps}} {t_damp} iso {p_target} {p_target} {p_damp}
   run {n_steps}
   unfix npt_tg
-{per_t_dump_block}  print "STAGE COMPLETE: Tg step T=${{temps}}K P={p_target}atm steps={n_steps}"
+{progress_line}{per_t_dump_block}  print "STAGE COMPLETE: Tg step T=${{temps}}K P={p_target}atm steps={n_steps}"
   next temps
   jump SELF TEMP_LOOP
 

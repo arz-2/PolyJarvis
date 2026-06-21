@@ -42,10 +42,12 @@ def build_watch_command(
     """
     pidfile = pidfile or ""
     progress_file = progress_file or ""
-    # emit_progress prints a PROGRESS line for each stage completed since last seen
-    # (SEEN counter), so it fires strictly once per stage. No-op without a file.
+    # emit_progress prints a PROGRESS line for each stage completed since last seen.
+    # SEEN is persisted to a checkpoint file so re-arms don't replay already-seen lines.
     emit = (
-        'SEEN=0\n'
+        # Load SEEN from checkpoint (survives re-arms); default 0 on first arm.
+        'SEEN_FILE="${SENTINEL}.seen"\n'
+        'SEEN=$(cat "$SEEN_FILE" 2>/dev/null || echo 0)\n'
         'emit_progress() {\n'
         '  [ -n "$PROGRESS" ] && [ -f "$PROGRESS" ] || return 0\n'
         '  local total name bar i\n'
@@ -55,6 +57,7 @@ def build_watch_command(
         '  [ -z "$total" ] && total=0\n'
         '  while [ "$SEEN" -lt "$total" ]; do\n'
         '    SEEN=$((SEEN+1))\n'
+        '    echo "$SEEN" > "$SEEN_FILE"\n'
         '    name=$(grep \'"status":"done"\' "$PROGRESS" | sed -n "${SEEN}p"'
         ' | sed -E \'s/.*"stage":"([^"]+)".*/\\1/\')\n'
         '    bar=""; i=0; while [ "$i" -lt "$NSTAGES" ]; do'
@@ -77,5 +80,6 @@ def build_watch_command(
         f'  sleep 30\n'
         f'done\n'
         f'emit_progress\n'
-        f"echo 'RUN_COMPLETE'; cat \"$SENTINEL\""
+        f"echo 'RUN_COMPLETE'; cat \"$SENTINEL\"\n"
+        f'rm -f "$SEEN_FILE"'
     )

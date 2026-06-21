@@ -36,6 +36,9 @@ Rule of thumb: start ~1.5× Tg, end ~0.75× Tg, span ≥300 K, step 10–20 K.
 
 `generate_script` is synchronous — returns the script path immediately.
 
+Choose a `progress_file` path before calling `generate_script`; pass it as `PROGRESS_FILE`
+in params so the generated script writes a JSON event after each temperature step completes.
+
 For TraPPE-UA systems (`use_trappe=True`), detect the number of bond types before generating the script:
 ```bash
 n_bond_types=$(grep -m1 "bond types" <equil_data_path> | awk '{print $1}')
@@ -43,6 +46,8 @@ n_bond_types=$(grep -m1 "bond types" <equil_data_path> | awk '{print $1}')
 ```
 
 ```python
+progress_file = "<work_dir>/thermal/tg_sweep/tg_progress.jsonl"
+
 result = generate_script(
     template_name="npt_tg_step",
     output_script="<work_dir>/thermal/tg_sweep/tg_sweep.in",
@@ -66,13 +71,18 @@ result = generate_script(
         "shake_bond_type_ids": <omit for TraPPE-UA and PCFF; only relevant for GAFF2>,
         "params_file":         "<work_dir>/emc_build.params",  # EMC only; omit for RadonPy
         "write_restart":       False,
+        "PROGRESS_FILE":       progress_file,   # enables per-T PROGRESS lines in Monitor
     }
 )
+# result["n_tg_stages"] is the number of temperature steps (used by run_lammps_script)
 ```
 
 ### Step 2: Submit sweep
 
 `run_lammps_script` is async — returns `run_id` immediately.
+
+Pass `progress_file` and `n_stages` so `watch_run` can expose them to the Monitor command,
+which will emit `PROGRESS [##---] 3/36 done: T560` as each temperature step completes.
 
 ```python
 run = run_lammps_script(
@@ -81,6 +91,8 @@ run = run_lammps_script(
     log_file="tg_sweep_run.log",
     gpu_ids="<from orchestrator>",
     mpi=<n>,
+    progress_file=progress_file,
+    n_stages=result["n_tg_stages"],
 )
 w = watch_run(run["run_id"])
 # Return run_id and w["monitor_command"] to the orchestrator — do not call Monitor.
