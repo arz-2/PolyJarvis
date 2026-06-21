@@ -38,11 +38,32 @@ Verify: STRAIN_RATE × N_STEPS × dt_fs should equal K_strain_max ± 0.001.
 Use `npt_deform` template for this stage.
 Call `list_templates("npt_deform")` for the full parameter list.
 
+### Rule F: Parse and Pass `lammps_flags` from the Prompt
+
+Parse `lammps_flags` from the prompt header (it is a JSON dict). Pass `use_pcff`, `use_trappe`,
+and `use_opls` **explicitly** into the params dict:
+
+```python
+lammps_flags = <parse from prompt header>
+
+params_deform = {
+    ...,
+    "use_pcff":   lammps_flags["use_pcff"],    # REQUIRED — do not omit
+    "use_trappe": lammps_flags["use_trappe"],  # REQUIRED — do not omit
+    "use_opls":   lammps_flags["use_opls"],    # REQUIRED — do not omit
+}
+```
+
+Without these, `generate_script` defaults to AMBER/CHARMM styles, which **crash on PCFF/TraPPE-UA
+.data files** with a `bond style harmonic mismatch` error (PMMA1 R-05: both deform runs died at
+read_data before taking a single step). Do not omit or guess the FF.
+
 ---
 
 ## Uniaxial Deformation Workflow (glassy only)
 
 ```python
+lammps_flags = <parse from prompt header>   # {"use_pcff": True/False, "use_trappe": ..., "use_opls": ...}
 strain_rate_per_fs = K_deform_rate_inv_s * 1e-15
 n_steps_deform = int(K_strain_max / (strain_rate_per_fs * dt_fs))
 
@@ -58,8 +79,9 @@ params_deform = {
     "TIMESTEP":         dt_fs,
     "THERMO_FREQ":      100,              # dense output for stress-strain fit
     "use_gpu":          True,
-    "use_pppm":         True,
-    **lammps_flags,
+    "use_pcff":         lammps_flags["use_pcff"],    # Rule F — explicit FF selector
+    "use_trappe":       lammps_flags["use_trappe"],  # Rule F — explicit FF selector
+    "use_opls":         lammps_flags["use_opls"],    # Rule F — explicit FF selector
 }
 # data_file = npt_prod300_out.data (passed as equil_data_path)
 generate_script(template_name="npt_deform",

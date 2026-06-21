@@ -55,6 +55,34 @@ reducing effective throughput to ~8–20 steps/s even on a fast CPU. Affine Born
 default is **0.5 ns**; do not exceed it without explicit orchestrator approval. (PEEK1 ran 4 ns →
 projected 130 h; affine terms were converged at 87 blocks / ~0.09 ns.)
 
+**PMMA1 validation (2026-06-21):** 0.5 ns NVT (250 production frames) was **insufficient** for
+glassy PCFF PMMA. Affine K≈+61 GPa minus fluctuation correction≈−72 GPa → net K=−10.5 GPa
+(undersampled Var(P), block-K = [−8.8, +0.5, +4.1, −46.6, −7.4] GPa, non-stationary).
+Converging Var(P) for PCFF glassy acrylics requires O(10–50 ns) — prohibitive for the Born path.
+
+**If K_Born < 0 or |SEM| > |K|: immediately spawn the deform fallback**. Do not attempt a
+longer Born run for glassy PCFF systems. Deform is the reliable primary for PCFF glassy polymers.
+
+### Rule H: Parse and Pass `lammps_flags` from the Prompt
+
+Parse `lammps_flags` from the prompt header (it is a JSON dict). Pass `use_pcff`, `use_trappe`,
+and `use_opls` **explicitly** into the params dict:
+
+```python
+lammps_flags = <parse from prompt header>
+
+params_born = {
+    ...,
+    "use_pcff":   lammps_flags["use_pcff"],    # REQUIRED — do not omit
+    "use_trappe": lammps_flags["use_trappe"],  # REQUIRED — do not omit
+    "use_opls":   lammps_flags["use_opls"],    # REQUIRED — do not omit
+}
+```
+
+Without these, `generate_script` defaults to AMBER/CHARMM styles, which crash on PCFF/TraPPE-UA
+.data files (same failure mode as DEFORM.md Rule F). The template's `**lammps_flags` is not
+sufficient — pass the keys explicitly.
+
 ---
 
 ## Born Matrix Workflow
@@ -82,7 +110,9 @@ params_born = {
     "BORN_FREQ":         1000,             # output frequency (= THERMO_FREQ)
     "BORN_MATRIX_FILE":  f"{work_dir}/mechanical/born/born_matrix.dat",
     "use_gpu":           False,    # CPU run: long NVT + restart safe
-    **lammps_flags,
+    "use_pcff":          lammps_flags["use_pcff"],    # Rule H — explicit FF selector
+    "use_trappe":        lammps_flags["use_trappe"],  # Rule H — explicit FF selector
+    "use_opls":          lammps_flags["use_opls"],    # Rule H — explicit FF selector
 }
 generate_script(
     template_name="nvt_born",

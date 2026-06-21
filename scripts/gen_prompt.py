@@ -221,9 +221,9 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
 def _exp_tg_range(cls: dict) -> list:
     tg = cls.get("experimental_tg_K")
     if isinstance(tg, dict):
-        vals = [v for k, v in tg.items() if isinstance(v, (int, float))]
+        vals = sorted(v for v in tg.values() if isinstance(v, (int, float)))
         if vals:
-            mid = sum(vals) / len(vals)
+            mid = vals[len(vals) // 2]  # median — avoids low-Tg outliers skewing the range
             return [round(mid - 20), round(mid + 20)]
     if isinstance(tg, (int, float)):
         return [round(tg - 20), round(tg + 20)]
@@ -240,9 +240,9 @@ def _exp_K_range(cls: dict) -> list:
 def _exp_density_range(cls: dict) -> list:
     exp = cls.get("experimental_density_gcm3")
     if isinstance(exp, dict):
-        vals = [v for k, v in exp.items() if isinstance(v, (int, float))]
+        vals = sorted(v for v in exp.values() if isinstance(v, (int, float)))
         if vals:
-            mid = sum(vals) / len(vals)
+            mid = vals[len(vals) // 2]  # median — avoids outliers skewing the comparison band
             return [round(mid * 0.95, 3), round(mid * 1.05, 3)]
     if isinstance(exp, (int, float)):
         return [round(exp * 0.95, 3), round(exp * 1.05, 3)]
@@ -704,7 +704,11 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for run-summary-worker (always-terminal, calls generate_run_summary)."""
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    exp_tg = _exp_tg_range(cls)
+    _tg_override = getattr(args, 'exp_tg_K', None)
+    if _tg_override is not None:
+        exp_tg = [round(_tg_override - 20), round(_tg_override + 20)]
+    else:
+        exp_tg = _exp_tg_range(cls)
     exp_density = _exp_density_range(cls)
     _k_from_cls = _exp_K_range(cls)
     exp_K = [
