@@ -59,6 +59,7 @@ Physics knob overrides (all optional; defaults from polymer_rules.json):
 
 import argparse
 import json
+import os
 import re
 import sys
 import textwrap
@@ -235,6 +236,38 @@ def _exp_K_range(cls: dict) -> list:
     if isinstance(exp, dict) and "min" in exp and "max" in exp:
         return [exp["min"], exp["max"]]
     return [None, None]
+
+
+def _db_exp_lookup(cls_id: str, polymer_name: str | None = None) -> dict:
+    """Query polymer_db.sqlite for polymer-specific experimental values.
+
+    Priority in callers:
+      --exp_tg_K (CLI)  >  this function (DB)  >  polymer_rules.json median
+    Returns dict with tg_median_K, density_gcm3, K_range_GPa (any may be None).
+    Never raises — a broken or missing DB just returns all-None.
+    """
+    try:
+        import sys as _sys
+        _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if _repo_root not in _sys.path:
+            _sys.path.insert(0, _repo_root)
+        from db.query_best_match import (
+            _connect, find_polymer_ids, get_tg_data, get_density_data, get_bulk_modulus_data,
+        )
+        conn = _connect()
+        ids, _method, _conf = find_polymer_ids(conn, polymer_name, cls_id)
+        if not ids:
+            return {"tg_median_K": None, "density_gcm3": None, "K_range_GPa": None}
+        tg = get_tg_data(conn, ids)
+        dens = get_density_data(conn, ids, 300.0)
+        bm = get_bulk_modulus_data(conn, ids, is_glassy=True)
+        return {
+            "tg_median_K": tg["agg_median_K"] if tg else None,
+            "density_gcm3": dens.get("value_gcm3") if dens else None,
+            "K_range_GPa": bm["agg_range_GPa"] if bm else None,
+        }
+    except Exception:
+        return {"tg_median_K": None, "density_gcm3": None, "K_range_GPa": None}
 
 
 def _exp_density_range(cls: dict) -> list:
@@ -704,16 +737,34 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for run-summary-worker (always-terminal, calls generate_run_summary)."""
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
+
+    # Three-tier priority: --exp_tg_K CLI > DB query > polymer_rules.json median
+    _db = _db_exp_lookup(args.polymer_class, getattr(args, 'polymer_name', None))
     _tg_override = getattr(args, 'exp_tg_K', None)
     if _tg_override is not None:
         exp_tg = [round(_tg_override - 20), round(_tg_override + 20)]
+    elif _db.get("tg_median_K") is not None:
+        exp_tg = [round(_db["tg_median_K"] - 20), round(_db["tg_median_K"] + 20)]
     else:
         exp_tg = _exp_tg_range(cls)
-    exp_density = _exp_density_range(cls)
+
+    # Density: DB value ±5% > polymer_rules.json median ±5%
+    if _db.get("density_gcm3") is not None:
+        _d = _db["density_gcm3"]
+        exp_density = [round(_d * 0.95, 3), round(_d * 1.05, 3)]
+    else:
+        exp_density = _exp_density_range(cls)
+
+    # K: CLI override > DB range > polymer_rules.json range
     _k_from_cls = _exp_K_range(cls)
+    _k_from_db = _db.get("K_range_GPa")
     exp_K = [
-        args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0],
-        args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1],
+        args.exp_K_min if args.exp_K_min is not None else (
+            _k_from_db[0] if _k_from_db else _k_from_cls[0]
+        ),
+        args.exp_K_max if args.exp_K_max is not None else (
+            _k_from_db[1] if _k_from_db else _k_from_cls[1]
+        ),
     ]
     return f"""\
 run_name:          {args.run_name}
@@ -853,6 +904,10 @@ def main():
     p.add_argument("--exp_tg_K", type=float,
                    help="Experimental Tg override (K) for T_workflow_K decision; use for specific polymer "
                         "within a multi-polymer class (e.g. --exp_tg_K 213 for PCL within PEST)")
+    p.add_argument("--polymer_name", default=None,
+                   help="Canonical DB name for experimental lookup (e.g. 'Poly(methyl methacrylate)'). "
+                        "Enables polymer-specific exp ranges from polymer_db.sqlite. "
+                        "When omitted, falls back to the class-representative canonical pattern.")
 
     args = p.parse_args()
 
