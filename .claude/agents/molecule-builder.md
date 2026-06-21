@@ -52,6 +52,7 @@ End your final message with this exact block (no trailing text after it):
 RESULT:
   data_path: /absolute/path/to/cell.data
   emc_params_path: /absolute/path/to/emc_build.params  # null for PURA/RadonPy
+  emc_seed: 123456   # integer passed to submit_emc_cell_job; null for RadonPy path
   lammps_flags: {"use_pcff": false, "use_opls": false}
   polymer_class: PSTR
   ff: GAFF2_mod

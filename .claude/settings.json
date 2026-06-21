@@ -151,7 +151,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'LOG: extract_thermal done — fill D-06 (fit quality, R², Tg K, CTE, ΔCp) and the Tg/CTE/ΔCp rows in RESULTS in run_log.md. Also compute and record cooling_rate_K_per_ns = (T_start - T_end) / (n_stages × n_steps × timestep_fs × 1e-6) from the Tg sweep stages.json and fill the cooling rate row in RESULTS.'"
+            "command": "echo 'LOG: extract_thermal done — fill D-06 (R², N_bins, F-stat, is_glassy + Tg K) and the α_g, α_r, ΔCp rows in RESULTS B of run_log.md. The Tg (MD @400 K/ns) row also goes in RESULTS B. D-06b (DSC-equiv Tg) is filled after extract_tg_multirate, not here.'"
           }
         ]
       },
@@ -179,6 +179,51 @@
           {
             "type": "command",
             "command": "python3 /home/arz2/PolyJarvis/scripts/update_revision_progress.py  # REVISION-TEMP: remove after ACS paper review closes"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-emc-server__submit_emc_cell_job",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: EMC cell submitted — record emc_seed in the Seeds: line of run_log.md header immediately. Never use seed=-1; seed must be the specific integer from your RESULT block.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__extract_bulk_modulus_born|mcp__mcp-lammps-engine__extract_bulk_modulus_deform|mcp__mcp-lammps-engine__extract_bulk_modulus_murnaghan",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: bulk modulus extracted — fill K row (with method label: born/deform/murnaghan) in RESULTS C of run_log.md now.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__extract_tg_multirate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: multirate Tg fit done — fill D-06b (DSC-equiv Tg, log-linear slope, R², N_rates, N_repl) and update Tg (DSC-equiv) row in RESULTS B of run_log.md.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__generate_run_summary",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'PHASE C: generate_run_summary done — now write RESULTS A, B, and C to run_log.md from run_summary.json (density, Tg/CTE/ΔCp, bulk modulus). Do not stop without filling these rows.'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__run_lammps_script",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'LOG: LAMMPS script submitted (born/deform/tg-sweep) — if this run fails, write a RECOVERY block in run_log.md before retrying.'"
           }
         ]
       }

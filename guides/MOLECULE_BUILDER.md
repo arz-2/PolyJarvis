@@ -25,6 +25,8 @@ EMC builds the amorphous cell and assigns all FF parameters in one step — no c
 ### `submit_emc_cell_job`
 
 ```python
+import random
+emc_seed = random.randint(1, 999999)   # never use seed=-1; EMC doesn't return the used seed
 job = submit_emc_cell_job(
     smiles="...",
     polymer_class="PCBN",
@@ -32,7 +34,7 @@ job = submit_emc_cell_job(
     nchains=10,          # exact chain count — pass the `nchain` value from the prompt
     density_initial=0.6,
     temperature=300.0,
-    seed=-1,
+    seed=emc_seed,       # always a specific integer so the run is reproducible
     output_name="polymer",
 )
 ```
@@ -48,6 +50,7 @@ out = get_emc_job_output(job_id)
 data_path    = out["result"]["data_path"]
 params_path  = out["result"]["params_path"]   # may be None
 lammps_flags = out["result"]["lammps_flags"]  # e.g. {"use_pcff": True, "use_opls": False}
+# emc_seed is the value you generated above — include it in your RESULT block
 ```
 
 **Output placement:** After the job completes, copy outputs into `{work_dir}/cell/`:
