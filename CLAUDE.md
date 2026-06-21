@@ -21,13 +21,7 @@ All run files live under `data/<run_name>/` (repo-relative, git-excluded). Use a
 
 `<lammps_base>` = `/home/arz2/PolyJarvis/data/<run_name>/lammps/`
 
-**Equilibration internals** — directory names are tool-defined by `generate_equilibration_workflow`. Use the return dict keys (`npt_production_dir`, `npt_prod300_data`, etc.) — do not construct these paths manually. Key file names: `nvt_production.log` (melt NVT), `npt_production_out.data` (rubbery final), `npt_prod300_out.data` (glassy 300 K final).
-
-**Track output paths** (orchestrator-chosen, under `<lammps_base>`):
-- thermal (multirate): one sweep per cooling rate → `thermal/tg_sweep_r<rate>/tg_sweep.log` (e.g. `tg_sweep_r40/`, `tg_sweep_r160/`, `tg_sweep_r400/`); per-rate analysis JSON in `raw/tg_r<rate>/`; aggregated multirate result in `raw/tg_multirate_result.json`. Single-rate (no `--tg_rate_index`) keeps the legacy `thermal/tg_sweep/`.
-- mechanical (born): `mechanical/born/nvt_born.log`, `mechanical/born/born_matrix.dat`
-- mechanical (deform): `mechanical/deform/npt_deform.log`
-- mechanical (murnaghan): `mechanical/bm_series/` (log files listed in murnaghan-worker RESULT)
+Equilibration paths are tool-defined — use worker RESULT dict keys (`npt_production_dir`, `npt_prod300_data`, etc.); do not construct them manually.
 
 ---
 
@@ -50,10 +44,9 @@ The default mode is multi-agent. The orchestrator (this session) spawns speciali
 | `equilibration-checker` | 🟠 orange | equil logs → PASS/EXTEND/FAIL verdict + density | haiku |
 | `tg-sweep-worker` | 🟣 purple | **thermal track** — equil `.data` → submitted Tg sweep run | haiku |
 | `tg-analysis-worker` | 🟢 green | **thermal track** — Tg sweep log → Tg_K, CTE (α_g, α_r), ΔCp | haiku |
-| `born-worker` | 🔵 blue | **mechanical track** — NPT `.data` → submitted NVT Born matrix run (glassy only) | sonnet |
-| `deform-worker` | 🔵 cyan | **mechanical track** — NPT `.data` → submitted uniaxial deformation run (born fallback) | haiku |
-| `murnaghan-worker` | 🟠 orange | **mechanical track** — equil `.data` → submitted Murnaghan pressure series (rubbery) | haiku |
-| `bulk-modulus-extractor` | 🟢 green | Born/deform/Murnaghan/fluctuation logs → bulk_modulus_GPa | sonnet |
+| `murnaghan-worker` | 🟠 orange | **mechanical track** — equil `.data` → submitted Murnaghan pressure series (glassy 300 K primary; rubbery T>Tg unchanged) | haiku |
+| `deform-worker` | 🔵 cyan | **mechanical track** — NPT `.data` → submitted 3-direction uniaxial deformation run (Murnaghan fallback) | haiku |
+| `bulk-modulus-extractor` | 🟢 green | Murnaghan/deform/fluctuation logs → bulk_modulus_GPa (Born+NVT removed) | sonnet |
 | `run-summary-worker` | 🟢 green | all output JSONs → `run_summary.json` | haiku |
 
 ### Track definitions
@@ -64,13 +57,13 @@ The pipeline groups workers into **tracks** — campaigns that share a simulatio
 |-------|---------|------------|
 | foundation | molecule-builder, equilibration-worker, equilibration-checker | density (from equil-check) |
 | thermal | tg-sweep-worker, tg-analysis-worker | Tg, CTE (α_g, α_r), ΔCp |
-| mechanical | born/deform/murnaghan-worker, bulk-modulus-extractor | K (bulk modulus), G, E |
+| mechanical | murnaghan-worker (primary), deform-worker (fallback), bulk-modulus-extractor | K (bulk modulus), G, E |
 
 ### Orchestrator workflow
 
 ```
 SETUP
-  Read CLAUDE.md only (never read worker guides directly)
+  Read CLAUDE.md at startup. At Phase B entry, Read guides/THERMAL_TRACK.md if tg requested and/or Read guides/MECHANICAL_TRACK.md if bulk_modulus requested. Never read worker guides (THERMAL_SWEEP.md, BM_ANALYSIS.md, etc.) directly — gen_prompt.py inlines those into worker prompts.
   Copy data/TEMPLATE/run_log.md → data/[RUN]/run_log.md
   classify_polymer(smiles) if class unknown → CLASS_ID. Check builder_status:
     `jq -r '.classes.CLASS_ID.builder_status // "supported"' guides/polymer_rules.json`
@@ -92,8 +85,7 @@ SETUP
     Deterministic plans (confidence=high) return approved in round 1 with 0 findings — no loop.
   Thread the approved plan. EVERY `gen_prompt.py` call MUST include `--plan PLAN_PATH` so the
   plan's decided_params drive the worker prompts. Do NOT read polymer_rules.json manually — the
-  plan is the source of truth. The Validator (see below) checks each worker result against the
-  plan's success_criteria; a deviation routes back to the planner, not the worker. Example:
+  plan is the source of truth. Example:
     `python3 scripts/gen_prompt.py --stage <STAGE> --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH [--data_path ...]`
   Read temperature regime from approved plan (before spawning any worker):
     `T_workflow_K=$(jq -r '.decided_params.T_workflow_K // 600' PLAN_PATH)`
@@ -122,8 +114,7 @@ PHASE A — FOUNDATION (always)
         prompt=<gen_prompt.py --stage equil --plan PLAN_PATH --data_path ...>)
     → parse RESULT → extract chain_id, monitor_command, expected_equil_data
   Write SIMULATION STATE to run_log.md (status=monitoring)
-  Monitor(command=monitor_command, timeout_ms=3600000)   # see Monitor semantics below
-  /compact Preserve: current phase (A), run_name, all chain_id/run_id values, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block  # run if context > 40%
+  Monitor(command=monitor_command, timeout_ms=3600000)
   get_run_status(chain_id) → check success/failure
 
   [Equil-check gate]
@@ -138,93 +129,13 @@ PHASE A — FOUNDATION (always)
 
 PHASE B — TRACKS (property-conditional)
 
-  [thermal track — if "tg" in properties_requested]  # MULTIRATE: one sweep PER cooling rate
-  Read multirate config from the plan:
-    TG_RATES=$(jq -r '.decided_params.tg_rates_K_per_ns | @csv' PLAN_PATH)     # e.g. 40,160,400
-    DSC_RATE=$(jq -r '.decided_params.dsc_equiv_rate_K_per_ns // 1.6667e-10' PLAN_PATH)
-  Read replicate N from run_log.md header ("Replicate: N of M").
-
-  For idx, rate in enumerate(TG_RATES):                # idx = 0,1,2 → rates 40,160,400 K/ns
-    [Tg sweep @ rate]
-    Claim GPU(s): scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
-      → on shortfall (exit 1) defer/retry; NEVER --allow-busy on the shared box.
-    Agent(subagent_type="tg-sweep-worker", description="🟣 Tg sweep r{rate} {polymer_name}",
-          prompt=<gen_prompt.py --stage tg --plan PLAN_PATH --data_path equil_data_path
-                  --tg_rate_index {idx} --gpu_ids <claimed>>)
-      → parse RESULT → run_id, tg_log_path (now .../thermal/tg_sweep_r{rate}/tg_sweep.log), monitor_command
-    Write SIMULATION STATE (status=monitoring) to run_log.md
-    Monitor(command=monitor_command, timeout_ms=3600000)   # see Monitor semantics below
-    scripts/pick_gpu.py release --run <RUN>
-    get_run_status(run_id) → completed → proceed; failed → /recover (max 2/worker)
-
-    [Tg analysis @ rate]
-    Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg r{rate} {polymer_name}",
-          prompt=<gen_prompt.py --stage analyze-tg --plan PLAN_PATH
-                  --data_path {tg_log_path} --tg_rate_index {idx}>)
-      → parse RESULT → Tg_K, Tg_fit_quality, Tg_r_squared, cooling_rate_K_per_ns
-    Append one row to the multirate registry (see Multirate Tg registry below):
-      replicate=N, rate, Tg_K, Tg_r_squared, Tg_fit_quality, run_name, timestamp_utc
-    /compact Preserve: phase B/thermal, idx, all (rate,Tg) pairs so far, run_name, run_ids, is_glassy (if known), properties_requested, run_log.md absolute path, last worker RESULT block
-
-  # On a single-GPU host (e.g. PEG1, GPU 0 only) the three sweeps run SEQUENTIALLY → ~3× thermal
-  # wall time (the 40 K/ns rate has 10× the steps of 400 K/ns and dominates). On a multi-GPU host
-  # with ≥3 free GPUs the rates are independent: you MAY claim a distinct GPU per rate and run the
-  # three sweeps + Monitors in parallel (still politely — defer on shortfall, never --allow-busy).
-
-  [multirate extrapolation → DSC-equivalent Tg]
-  Build --mr_rates / --mr_tg_values from ALL registry rows for this polymer/class
-    (filter to fit_quality >= ACCEPTABLE; if < 2 rows survive, skip aggregation and fall back
-     to the single highest-rate Tg). Across replicates this list grows → the fit tightens.
-  Agent(subagent_type="tg-analysis-worker", description="🟢 Multirate Tg {polymer_name}",
-        prompt=<gen_prompt.py --stage analyze-tg-multirate --plan PLAN_PATH
-                --mr_rates <rates> --mr_tg_values <tgs>>)
-    → parse RESULT → tg_dsc_equiv_K, loglinear_slope_K, loglinear_r_squared, vf_fit_quality
-    → write D-06b to run_log.md from d06_markdown_path. Report tg_dsc_equiv_K as the headline
-      "theoretical DSC-equivalent experimental Tg".
-  Validator gate: loglinear_r_squared >= plan success_criteria.loglinear_r_squared_min (0.90).
-    Not met → /recover (re-run a noisy rate with more steps, or re-plan), max 2 attempts.
-
-  [is_glassy determination]
-  if "tg" in properties_requested:
-    Tg_for_glassy = Tg_K at the HIGHEST screening rate (400 K/ns)  # directly-measured, most-converged
-    is_glassy = (Tg_for_glassy > 300)   # safe default: True if None or fit ABORT
-    # Drive is_glassy off the highest-rate MD Tg, NOT tg_dsc_equiv_K: the extrapolated value
-    # shifts as replicates accumulate and could flip the mechanical-track branch mid-campaign.
-  else:
-    is_glassy = glassy_hint      # from plan; write D-06 = "N/A — tg not requested"
-    Tg_K = None; Tg_fit_quality = "N/A (not requested)"; tg_dsc_equiv_K = None
+  [thermal track — if "tg" in properties_requested]
+  Read("guides/THERMAL_TRACK.md") now for the full multirate sweep + registry + is_glassy procedure.
+  On session restart mid-thermal-track: re-read guides/THERMAL_TRACK.md before resuming.
 
   [mechanical track — if "bulk_modulus" in properties_requested]
-  if is_glassy:
-    Agent(subagent_type="born-worker", description="🔵 NVT-Born {polymer_name}",
-          prompt=<gen_prompt.py --stage born --plan PLAN_PATH --data_path npt_prod_data_path>)
-      → parse RESULT → extract run_id_born, born_log_path, born_matrix_file, n_atoms, monitor_command_born
-    Write SIMULATION STATE (status=monitoring)
-    Monitor(command=monitor_command_born, timeout_ms=3600000)
-    /compact Preserve: current phase (B/mechanical), run_name, all chain_id/run_id values, is_glassy, properties_requested, run_log.md absolute path, last worker RESULT block
-    Recovery if born-worker fails: spawn deform-worker as fallback —
-      Agent(subagent_type="deform-worker", description="🔵 Deform fallback {polymer_name}",
-            prompt=<gen_prompt.py --stage deform --plan PLAN_PATH --data_path npt_prod_data_path>)
-        → parse RESULT → extract run_id_deform, deform_log_path, monitor_command_deform
-      Write SIMULATION STATE (status=monitoring)
-      Monitor(command=monitor_command_deform, timeout_ms=3600000)
-      /compact (same preserve list + deform_log_path)
-  elif bm_pressures_atm is non-null in plan.decided_params:   # rubbery + pressures
-    Agent(subagent_type="murnaghan-worker", description="🟠 Murnaghan BM {polymer_name}",
-          prompt=<gen_prompt.py --stage murnaghan --plan PLAN_PATH --data_path equil_data_path>)
-      → parse RESULT → extract chain_id_murnaghan, log_files (murnaghan_log_files), monitor_command_murnaghan
-    Write SIMULATION STATE (status=monitoring)
-    Monitor(command=monitor_command_murnaghan, timeout_ms=3600000)
-    /compact Preserve: current phase (B/mechanical), run_name, all chain_id/run_id values, is_glassy, murnaghan_log_files, properties_requested, run_log.md absolute path, last worker RESULT block
-  # else (rubbery + no pressures): skip — fluctuation path, equil log already present
-
-  Agent(subagent_type="bulk-modulus-extractor", description="🟢 Extract BM {polymer_name}",
-        prompt=<gen_prompt.py --stage analyze-bm --plan PLAN_PATH
-               [--born_log born_log_path --born_matrix born_matrix_file --born_n_atoms n_atoms]  # born path
-               [--deform_log deform_log_path]                                                     # deform fallback
-               [--murnaghan_logs '<JSON list of log_files>']                                      # Murnaghan path
-               --npt_prod_log npt_prod_log_path>)                                                 # fluctuation (always passed)
-    → parse RESULT → extract bulk_modulus_GPa, bulk_modulus_method → write D-07 to run_log.md
+  Read("guides/MECHANICAL_TRACK.md") now for the Murnaghan + deform-fallback + BM extraction procedure.
+  On session restart mid-mechanical-track: re-read guides/MECHANICAL_TRACK.md before resuming.
 
 PHASE C — SUMMARY (always)
 
@@ -235,60 +146,11 @@ PHASE C — SUMMARY (always)
     → parse RESULT → run_summary_path → write RESULTS to run_log.md
 ```
 
-### Multirate Tg registry
+### Cross-run protocol
 
-The thermal track runs the Tg sweep at each `tg_rates_K_per_ns` rate (40, 160, 400 K/ns) and
-extrapolates `Tg = a + b·ln(Γ)` down to `dsc_equiv_rate_K_per_ns` (10 K/min = 1.6667e-10 K/ns) to
-report the **theoretical DSC-equivalent experimental Tg** — correcting the 80–120 K MD overestimate
-from fast cooling. The per-rate (rate, Tg_MD) pairs accumulate across replicates so the fit tightens
-over time.
-
-- **File:** `data/_tg_registry/<CLASS_ID>__<polymer_slug>.csv` (append-only; survives across runs of
-  the same polymer). `<polymer_slug>` = a filesystem-safe slug of the SMILES.
-- **Header:** `replicate,rate_K_per_ns,Tg_MD_K,r_squared,fit_quality,run_name,timestamp_utc`
-- **Write:** the orchestrator appends one row after each per-rate `analyze-tg` (3 rows/replicate).
-- **Read/refit:** the `analyze-tg-multirate` step reads ALL rows for this polymer (filtering to
-  `fit_quality >= ACCEPTABLE`), passing the full `rate`/`Tg_MD` columns as `--mr_rates`/`--mr_tg_values`.
-  More replicates ⇒ more points per rate ⇒ tighter log-linear slope SE ⇒ tighter DSC Tg.
-- **Note:** the 40→400 K/ns span is ~1 decade — the **log-linear** `tg_at_slow_rate_K` is the reported
-  value; the Vogel-Fulcher `Tg0` stays diagnostic only (needs ≥3 decades; accumulation adds points, not
-  span). One orchestrator per polymer at a time (append race is acceptable for that model).
-
-### Validator gate
-
-The Planner proposes; the Executor **never improvises**. After each worker's `Monitor` + status check, validate the result against that worker's `success_criteria` in the approved `run_plan.json` (`planned_stages[].success_criteria`):
-
-- **Met** → proceed.
-- **Not met** → invoke `/recover` (max 2 attempts/worker). The equil-check gate is `check_equilibration_comprehensive.overall_pass=True`; the per-rate tg-analysis gate is the bilinear-fit R² floor; the `analyze-tg-multirate` gate is `loglinear_r_squared >= loglinear_r_squared_min` (0.90). These are already enforced — the plan records them as explicit criteria rather than implicit rules.
-- **Probe contradicts a plan assumption** → if a planned `reduction_probe` comes back inconsistent with a plan assumption (e.g. the chosen FF is wrong), return control to the **planner** to revise downstream stages (re-spawn `planner` with the finding, then re-`critic`). Do not let a worker silently improvise a different parameter.
-- **`hardware_benchmark` probe** → when the plan schedules it (off-table FF, unusual cell size, or a host where `hardware_policy.values_are_benchmarked=false`), run it **politely before** the affected GPU stage: `scripts/calibrate_hardware.py --cell <built .data> --ff <fam>` (idle-GPU + spare-core gated, niced — never `--allow-busy` on a shared box). If the measured winner contradicts the plan's D-08 choice, route back to the **planner** (re-plan → re-`critic`) exactly like any other contradicting probe — do not let the worker pick a different engine/mpi on its own.
-
-### Monitor semantics
-
-Always call `Monitor(command=monitor_command, timeout_ms=3600000)` — 3600000 ms (1 h) is the tool's max, and a LAMMPS run can exceed it. Interpret the outcome by what Monitor prints, not by the fact that it exited:
-
-- prints `PROGRESS [##-------] 2/9 done: <stage>` (chains only) → live per-stage progress as each equilibration/series stage finishes; informational, no action — relay to the user.
-- prints `RUN_COMPLETE` → run finished; `cat`'d sentinel JSON carries `status: completed | failed`. `completed` → proceed; `failed` → `/recover`.
-- prints `PROCESS_DEAD_NO_SENTINEL` → the job process died without writing a sentinel (OOM/reboot) → `/recover`.
-- exits with **neither** line → this is a Monitor **timeout, not completion**. The run is still going. Call `watch_run(id)` again and re-issue Monitor (re-arm). Do NOT treat a bare timeout as done or failed.
-
-### Checkpoint protocol
-
-Before every `Monitor` call, write SIMULATION STATE to `run_log.md` (see `data/TEMPLATE/run_log.md` for format). Update status to `done` or `failed` after Monitor returns.
-
-On session restart: read SIMULATION STATE table → find row with `status=monitoring` → `get_run_status(id)` → `watch_run(id)` → re-issue Monitor (with `timeout_ms=3600000`).
-
-### Auto-compact
-
-Manual /compact focus string (after each Monitor, before bulk-modulus-extractor, before run-summary-worker):
-```
-/compact Preserve: current phase (A/B/C) + last worker completed, run_name, all chain_id/run_id values, is_glassy (if known), murnaghan_log_files (if set), properties_requested, run_log.md absolute path, last worker RESULT block
-```
-After any compact: read `run_log.md` SIMULATION STATE before the next tool call.
-
-### Recovery
-
-Use `/recover` to diagnose any worker failure, plan the fix, and re-spawn the worker. Max 2 recovery attempts per worker — after that write `UNRESOLVED` to run_log.md and stop. For session restart after a killed Claude process, read the SIMULATION STATE table in run_log.md and call `get_run_status` on the monitoring row — `/recover` handles this too.
+Validate each worker result against `run_plan.json` `planned_stages[].success_criteria`; `/recover` if not met (max 2 attempts/worker), then write UNRESOLVED to run_log.md and stop.
+A probe result contradicting a plan assumption (wrong FF, D-08 mismatch) routes back to the planner (re-plan → re-critic); never let a worker improvise. For a planned `hardware_benchmark` probe: run `scripts/calibrate_hardware.py --cell <.data> --ff <fam>` politely before the affected GPU stage (idle-GPU + spare cores; never `--allow-busy`).
+Session restart: read SIMULATION STATE table in run_log.md → find `status=monitoring` → `get_run_status(id)` → `watch_run(id)` → re-issue Monitor; if in Phase B re-read the active track guide first.
 
 ---
 

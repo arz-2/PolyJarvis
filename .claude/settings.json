@@ -72,7 +72,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'CHECKPOINT: Before this Monitor call — (1) write/update run_log.md SIMULATION STATE table now; (2) if context >40% full, run: /compact Preserve: workflow step number, run_name, all chain_id/run_id values, is_glassy (if known), run_log.md absolute path, last worker RESULT block'"
+            "command": "echo 'CHECKPOINT: Before this Monitor call — write/update run_log.md SIMULATION STATE table now (status=monitoring, run_id, submit_time).'"
           }
         ]
       }
@@ -174,15 +174,6 @@
         ]
       },
       {
-        "matcher": "mcp__mcp-emc-server__get_emc_job_output|mcp__mcp-mol-builder-server__save_lammps_data|mcp__mcp-lammps-engine__watch_run|mcp__mcp-lammps-engine__extract_thermal|mcp__mcp-lammps-engine__extract_bulk_modulus",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 /home/arz2/PolyJarvis/scripts/update_revision_progress.py  # REVISION-TEMP: remove after ACS paper review closes"
-          }
-        ]
-      },
-      {
         "matcher": "mcp__mcp-emc-server__submit_emc_cell_job",
         "hooks": [
           {
@@ -224,6 +215,15 @@
           {
             "type": "command",
             "command": "echo 'LOG: LAMMPS script submitted (born/deform/tg-sweep) — if this run fails, write a RECOVERY block in run_log.md before retrying.'"
+          }
+        ]
+      },
+      {
+        "matcher": "Monitor",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'MONITOR RESULT — interpret by what was printed (not by exit): PROGRESS [##...] → relay to user, no action. RUN_COMPLETE → read sentinel JSON: status=completed→proceed; status=failed→/recover. PROCESS_DEAD_NO_SENTINEL → /recover (OOM/reboot). Neither line → TIMEOUT: run still going — call watch_run(run_id), re-issue Monitor. DO NOT treat timeout as done or failed. | If this was the EQUIL Monitor (equil chain): entering Phase B — Read(guides/THERMAL_TRACK.md) if tg requested; Read(guides/MECHANICAL_TRACK.md) if bulk_modulus requested.'"
           }
         ]
       }
