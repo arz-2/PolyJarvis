@@ -997,7 +997,20 @@ write_data tg_step_out.data
             subs["INCLUDE_PARAMS_BLOCK"] = ""
 
         # ── GPU package ───────────────────────────────────────────────────
-        if cfg.get("use_gpu", False):
+        # engine selects how the deck loads the accelerator. Absent → derive from use_gpu so
+        # existing callers stay byte-identical (gpu ⇒ "package gpu 1 neigh no", else CPU).
+        #   gpu    : GPU package — pairwise forces on GPU, bonded/kspace/neigh on CPU.
+        #   kokkos : NO `package gpu` line; the KOKKOS package is loaded by `-pk kokkos` on the
+        #            command line and `-sf kk` rewrites pair/bonded/kspace/neigh to /kk. The deck
+        #            keeps plain style names (e.g. `kspace_style pppm`) so the suffix machinery
+        #            rewrites them — an explicit `/kk` style here would conflict with `-sf kk`.
+        #   cpu    : no accelerator package.
+        # use_gpu=False stages (NPT+restart, born numdiff) stay CPU regardless of engine — those
+        # are intentionally off-GPU. Only GPU-enabled stages honor the engine choice.
+        engine = cfg.get("engine", "gpu") if cfg.get("use_gpu", False) else "cpu"
+        if engine == "kokkos":
+            subs["GPU_PACKAGE"] = "# KOKKOS: package loaded via -pk kokkos on the command line"
+        elif engine == "gpu":
             subs["GPU_PACKAGE"] = "package gpu 1 neigh no"
         else:
             subs["GPU_PACKAGE"] = "# GPU disabled (CPU run)"

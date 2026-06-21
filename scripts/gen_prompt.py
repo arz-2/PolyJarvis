@@ -148,6 +148,8 @@ def _apply_plan_hardware(args, dp: dict) -> None:
     them), so the no-plan path stays byte-identical (tests/test_plan_reproducibility.py)."""
     if args.mpi_ranks is None and dp.get("mpi_ranks") is not None:
         args.mpi_ranks = dp["mpi_ranks"]
+    if getattr(args, "engine", None) is None and dp.get("engine") is not None:
+        args.engine = dp["engine"]          # plan's D-08 engine (gpu | kokkos | cpu)
     if args.gpu_ids is None and ("engine" in dp or "gpu_per_run" in dp):
         engine, gpu_n = dp.get("engine"), dp.get("gpu_per_run")
         if engine == "cpu" or gpu_n == 0:
@@ -171,6 +173,14 @@ def resolve_hardware(args, cls: dict, rules: dict) -> None:
     ff_raw = cls.get("preferred_ff") or cls.get("forcefield") or ""
     fam = resolve_ff_family(ff_raw, hp)
     pol = hp.get("by_forcefield", {}).get(fam, {})
+    # Resolve the launch engine the worker forwards to the MCP run tools. Precedence:
+    # CLI/plan (already on args) > policy by_forcefield[fam].engine > "gpu". Only "kokkos" opts
+    # into full-offload; "cpu"/anything else normalizes to "gpu" so chain launches stay as today
+    # (per-stage use_gpu still governs CPU-only stages inside the deck).
+    if getattr(args, "engine", None) is None:
+        args.engine = pol.get("engine")
+    if args.engine != "kokkos":
+        args.engine = "gpu"
     if args.mpi_ranks is None:
         args.mpi_ranks = pol.get("mpi", 8)
         print(f"INFO: mpi_ranks not given — derived {args.mpi_ranks} from "
@@ -208,14 +218,6 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
     }
 
 
-def _nondegenerate(lo, hi, frac: float = 0.05) -> list:
-    """Guard against a zero-width [x, x] band, which can never PASS. A single
-    experimental anchor must become a ±frac tolerance band, not min==max."""
-    if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and lo == hi:
-        return [round(lo * (1 - frac), 3), round(hi * (1 + frac), 3)]
-    return [lo, hi]
-
-
 def _exp_tg_range(cls: dict) -> list:
     tg = cls.get("experimental_tg_K")
     if isinstance(tg, dict):
@@ -236,12 +238,7 @@ def _exp_K_range(cls: dict) -> list:
 
 
 def _exp_density_range(cls: dict) -> list:
-    # Accept both the rules key (experimental_density_gcm3) and the plan's
-    # decided_params scalar key (exp_density_gcm3) — a key mismatch here was the
-    # cause of the zero-width [0.9,0.9] density band in cis-PBD1.
     exp = cls.get("experimental_density_gcm3")
-    if exp is None:
-        exp = cls.get("exp_density_gcm3")
     if isinstance(exp, dict):
         vals = [v for k, v in exp.items() if isinstance(v, (int, float))]
         if vals:
@@ -357,6 +354,7 @@ dt_fs:             {dt}
 {melt_npt_line}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
 
 --- Worker Guide (EQUILIBRATION) ---
 {guide}
@@ -421,6 +419,7 @@ tg_params:
 dt_fs:             {dt}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
 per_t_dump:
   enabled:         true
   file:            {tg_sweep_dir}/per_t_structs.dump   # one final frame per T step
@@ -453,6 +452,7 @@ K_strain_max:      {_pick(args.K_strain_max, cls, 'K_strain_max', 0.03)}
 dt_fs:             {_pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
 
 --- Worker Guide (DEFORM) ---
 {guide}
@@ -481,6 +481,7 @@ n_steps:           {n_steps}
 dt_fs:             {dt_fs}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
 
 --- Worker Guide (BORN_MATRIX) ---
 {guide}
@@ -570,7 +571,7 @@ def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for equilibration-checker (equil-check gate — equil check + density)."""
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    exp_density = _nondegenerate(*_exp_density_range(cls))
+    exp_density = _exp_density_range(cls)
     ct_decay = cls.get("ct_min_decay_melt", 0.10)
 
     lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
@@ -625,11 +626,7 @@ def murnaghan_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for murnaghan-worker (rubbery BM pressure series submission)."""
     flags = _lammps_flags(args.lammps_flags, cls)
     work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
-    # Murnaghan is the rubbery-only path: the orchestrator spawns born-worker (not
-    # murnaghan) for glassy polymers, so is_glassy is always false here. Deriving it
-    # from --is_glassy (which defaults "true") would emit is_glassy:true and trip the
-    # worker's Rule B rubbery-abort on every run that forgets --is_glassy false.
-    is_glassy = False
+    is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else False
     bm_pressures_atm = cls.get("bm_pressures_atm", None)
     dt = _pick(args.dt_fs, cls, "dt_fs", 1.0)
     lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
@@ -648,6 +645,7 @@ npt_steps:         500000
 dt_fs:             {dt}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
+engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
 
 --- Worker Guide (MURNAGHAN) ---
 {guide}
@@ -706,13 +704,13 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for run-summary-worker (always-terminal, calls generate_run_summary)."""
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    exp_tg = _nondegenerate(*_exp_tg_range(cls))
-    exp_density = _nondegenerate(*_exp_density_range(cls))
+    exp_tg = _exp_tg_range(cls)
+    exp_density = _exp_density_range(cls)
     _k_from_cls = _exp_K_range(cls)
-    exp_K = _nondegenerate(
+    exp_K = [
         args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0],
         args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1],
-    )
+    ]
     return f"""\
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
@@ -772,6 +770,12 @@ def main():
     p.add_argument("--mpi_ranks", type=int, required=False, default=None,
                    help="MPI processes per run. If omitted, derived from "
                         "hardware_policy by FF (never mpi=1 for PPPM classes).")
+    p.add_argument("--engine", required=False, default=None,
+                   choices=["gpu", "kokkos"],
+                   help="Execution engine the worker forwards to run_lammps_chain / "
+                        "run_lammps_script / generate_equilibration_workflow. If omitted, "
+                        "derived from the plan's decided_params.engine or hardware_policy "
+                        "(kokkos = full-offload; anything else → gpu).")
     p.add_argument("--dp", type=int)
     p.add_argument("--nchain", type=int)
     p.add_argument("--lammps_flags")
