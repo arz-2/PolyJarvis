@@ -28,6 +28,7 @@ Usage:
 import os
 import re
 import random
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -119,6 +120,35 @@ TRAPPE_UA_STYLES = {
 # TraPPE-UA: exclude all 1-2/1-3/1-4 LJ (bonded terms handle short-range); no Coulomb.
 TRAPPE_SPECIAL_BONDS = "special_bonds lj 0 0 0"
 TRAPPE_PAIR_MODIFY   = "mix arithmetic tail yes"
+
+
+def _detect_ff_from_data_file(data_file: str) -> dict:
+    """Detect FF type from .data file content.
+
+    Handles two data-file origins:
+      - RadonPy (GAFF2/GAFF2_mod): atom_style charge, inline Pair Coeffs → return {} (no override)
+      - EMC (PCFF/OPLS-AA/TraPPE-UA): atom_style full, coeffs in .params → detect by header
+
+    Returns a dict with one of use_pcff/use_trappe/use_opls = True and the others False,
+    or {} when detection is inconclusive so callers fall back to explicit flags or GAFF2 default.
+    """
+    try:
+        content = Path(data_file).read_text(errors="replace")
+    except OSError:
+        return {}
+    # RadonPy GAFF2: has inline Pair Coeffs section (EMC stores these in a .params file)
+    if re.search(r"^Pair Coeffs", content, re.MULTILINE):
+        return {}
+    # From here: EMC-generated file (no inline coeffs; atom_style full; coeffs via include)
+    # PCFF (class2): always has improper types — class2 requires them
+    m = re.search(r"(\d+)\s+improper types", content)
+    if m and int(m.group(1)) > 0:
+        return {"use_pcff": True, "use_trappe": False, "use_opls": False}
+    # TraPPE-UA: united-atom names in Masses section (e.g. "# c4h2", "# c4h3")
+    if re.search(r"#\s*c\d+h\d+", content):
+        return {"use_pcff": False, "use_trappe": True, "use_opls": False}
+    # OPLS-AA: remaining EMC case — no impropers, non-UA atom types (PHAL/PSIL)
+    return {"use_pcff": False, "use_trappe": False, "use_opls": True}
 
 
 # ─── Template parameter catalogs ─────────────────────────────────────────────
@@ -825,11 +855,16 @@ class ScriptGenerator:
         data_file = data_file_override or self.data_file
 
         # Build all substitution blocks
-        subs = self._build_substitutions(template_name, cfg, data_file)
+        subs = self._build_substitutions(template_name, cfg, data_file, raw_params=params)
 
-        # Staircase expansion: npt_tg_step + T_END + T_STEP → full cooling loop
-        if (template_name == "npt_tg_step"
-                and "T_END" in params and "T_STEP" in params):
+        # Staircase expansion: npt_tg_step requires T_END + T_STEP → full cooling loop
+        if template_name == "npt_tg_step":
+            if not ("T_END" in params and "T_STEP" in params):
+                raise ValueError(
+                    "npt_tg_step requires both T_END and T_STEP for the cooling staircase. "
+                    "Use template 'npt' for a single-temperature NPT run, or pass "
+                    "T_END=<low_K>, T_STEP=<step_K> alongside T_START to generate the sweep."
+                )
             script = self._generate_tg_staircase(cfg, subs, output_path)
             return script
 
@@ -956,7 +991,8 @@ write_data tg_step_out.data
 
         return script
 
-    def _build_substitutions(self, template_name: str, cfg: dict, data_file: str) -> dict:
+    def _build_substitutions(self, template_name: str, cfg: dict, data_file: str,
+                              raw_params: dict = None) -> dict:
         """Build the full substitution dictionary for the given template and config."""
         subs = {}
 
@@ -969,9 +1005,34 @@ write_data tg_step_out.data
         subs["WRITE_DATA_FILE"]  = cfg.get("WRITE_DATA_FILE", f"{template_name}_out.data")
 
         # ── Force field styles ────────────────────────────────────────────
-        use_pcff = cfg.get("use_pcff", False)
+        use_pcff   = cfg.get("use_pcff",   False)
         use_opls   = cfg.get("use_opls",   False)
         use_trappe = cfg.get("use_trappe", False)
+
+        if data_file and os.path.exists(data_file):
+            detected = _detect_ff_from_data_file(data_file)
+            if detected:
+                # Explicit caller flag contradicts the data file → raise before emitting a broken deck
+                if raw_params is not None:
+                    for flag in ("use_pcff", "use_opls", "use_trappe"):
+                        if flag in raw_params and raw_params[flag] != detected.get(flag, False):
+                            raise ValueError(
+                                f"FF flag mismatch: caller set {flag}={raw_params[flag]} but "
+                                f"{os.path.basename(data_file)!r} requires "
+                                f"{flag}={detected.get(flag, False)}. "
+                                f"Pass the matching FF flag or remove the override."
+                            )
+                # Auto-set when caller omitted all three flags
+                if not (use_pcff or use_opls or use_trappe):
+                    use_pcff   = detected.get("use_pcff",   False)
+                    use_opls   = detected.get("use_opls",   False)
+                    use_trappe = detected.get("use_trappe", False)
+                    warnings.warn(
+                        "FF auto-detected from data file: "
+                        f"use_pcff={use_pcff}, use_opls={use_opls}, use_trappe={use_trappe}",
+                        stacklevel=3,
+                    )
+
         if use_pcff:
             ff_styles = PCFF_STYLES
         elif use_opls:
