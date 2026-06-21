@@ -65,7 +65,8 @@ import textwrap
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hw_common import load_rules, resolve_ff_family   # shared rules/FF-family access
+from hw_common import (load_rules, resolve_ff_family,  # shared rules/FF-family access
+                       host_matches, live_host)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
@@ -170,6 +171,21 @@ def resolve_hardware(args, cls: dict, rules: dict) -> None:
     hp = rules.get("hardware_policy")
     if not hp:
         return
+    # Fresh-clone nudge: the per-FF engine defaults below were benchmarked on hp.host and
+    # the crossover is hardware-dependent (KOKKOS wins PPPM but loses small UA cells on this
+    # GPU; another GPU/core-count can flip it). If this box isn't the benchmarked one — or no
+    # clean sweep has run here — the defaults are directional, not measured-for-you. Advisory
+    # only: resolution proceeds unchanged (defaults still apply at D-08 confidence:low).
+    if not hp.get("values_are_benchmarked") or not host_matches(rules):
+        saved = hp.get("host") or {}
+        saved_desc = (f"{saved.get('gpus','?')}x {saved.get('gpu_model','?')} / "
+                      f"{saved.get('phys_cores','?')} cores" if saved else "(never calibrated)")
+        live = live_host()
+        live_desc = f"{live['gpus']}x {live['gpu_model']} / {live['phys_cores']} cores"
+        print(f"INFO: hardware_policy was benchmarked on {saved_desc}; you are on {live_desc} "
+              f"(values_are_benchmarked={hp.get('values_are_benchmarked', False)}). Run "
+              f"/calibrate-hardware once to host-match the per-FF engine defaults.",
+              file=sys.stderr)
     ff_raw = cls.get("preferred_ff") or cls.get("forcefield") or ""
     fam = resolve_ff_family(ff_raw, hp)
     pol = hp.get("by_forcefield", {}).get(fam, {})

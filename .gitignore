@@ -19,10 +19,13 @@ mcp-lammps-engine/run_state.json
 mcp-radonpy-server/src/timer.dat
 
 # ── Simulation data and experiment database (local only) ──────────────────────
-# Calibration benchmark cells (data/CALIB_*) are local throwaways — kept for
-# re-calibration / directional_probe provenance, never committed (covered by data/*).
+# Calibration cells (data/CALIB_<FAM>/) ship the small emc_build.{data,params} per FF so a
+# fresh clone can host-match engine defaults via /calibrate-hardware without an EMC build.
+# Only those two files per cell are committed; every other artifact in the dir stays local.
 data/*
 !data/TEMPLATE/
+!data/CALIB_*/
+data/CALIB_*/*
 db/
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
@@ -43,3 +46,8 @@ guides/TODO_OWNER.md
 guides/ROADMAP.md
 guides/REVISION_PARAMS.md
 data/Polymer_Handbook/
+
+# ── Committed calibration-cell payload (must come last to win over *.data/*.log above) ──
+# Only emc_build.{data,params} per CALIB_<FAM> cell are tracked; see /calibrate-hardware.
+!data/CALIB_*/emc_build.data
+!data/CALIB_*/emc_build.params

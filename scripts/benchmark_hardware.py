@@ -166,6 +166,21 @@ def busy_cores(phys: int) -> int:
         return 0
 
 
+def kokkos_binary_ok(lmp_path: str) -> bool:
+    """True iff `lmp_path` exists and is a KOKKOS-enabled LAMMPS build. A fresh clone
+    often has only the base binary, so the kokkos engine (arm A3 / engine=kokkos) must
+    degrade gracefully rather than crash. Smoke test: the binary's `-h` package list
+    names KOKKOS (cheap, no GPU needed)."""
+    if not lmp_path or not Path(lmp_path).exists():
+        return False
+    try:
+        out = subprocess.run([lmp_path, "-h"], capture_output=True, text=True,
+                             timeout=30).stdout
+        return "KOKKOS" in out.upper()
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def live_lmp_ranks(lmp_path: str = "lmp") -> int:
     """Count currently-running lmp processes (≈ MPI ranks in flight). Matches the
     exact process name `lmp` so the parent `mpirun` launchers are not counted."""
@@ -207,7 +222,8 @@ def make_input_generate(data_file: str, ff: str, pppm: bool, steps: int,
         "TIMESTEP": timestep,
         "T_START": 400.0, "T_FINAL": 400.0, "T_DAMP": 100.0,
         "THERMO_FREQ": max(steps // 5, 100),
-        "DUMP_FREQ": steps * 10,      # effectively no trajectory I/O during the run
+        "DUMP_FREQ": max(steps * 10, 1),  # >> run length = effectively no traj I/O; >=1 so a
+                                          # run-0 parity deck (steps=0) is valid (dump freq 0 errors)
         "init_velocity": 400.0,
         "LOG_FILE": str(out_in.with_suffix(".log").name),
     }
@@ -370,6 +386,11 @@ def main() -> int:
 
     arm = ARMS[args.arm]
     lmp = args.lmp_kokkos if arm["engine"] == "kokkos" else args.lmp
+    if arm["engine"] == "kokkos" and not kokkos_binary_ok(lmp):
+        print(f"ERROR: arm {args.arm} needs a KOKKOS-enabled lmp but none usable at {lmp}. "
+              f"Set LAMBDA_LAMMPS_KOKKOS to a KOKKOS build, or pick a GPU-package arm "
+              f"(A0/A1/A2).", file=sys.stderr)
+        return 2
     base_label = args.label or Path(data).parent.name or "cell"
     label = f"{base_label}__{args.arm}"
     pppm = args.pppm
