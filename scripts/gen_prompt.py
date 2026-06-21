@@ -466,7 +466,7 @@ def born_prompt(args, cls: dict, cross_track_rules: str) -> str:
     work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
     is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
     dt_fs = _pick(args.dt_fs, cls, "dt_fs", 1.0)
-    born_run_ns = args.born_run_ns if args.born_run_ns is not None else 4.0
+    born_run_ns = args.born_run_ns if args.born_run_ns is not None else 0.5
     n_steps = int(born_run_ns * 1e6 / dt_fs)
     guide = load_worker_guide("born")
     return f"""\

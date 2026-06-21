@@ -1774,10 +1774,12 @@
         "PEKK": 433,
         "notes": "PEEK: ~145°C (418 K); PEK: ~167°C (440 K); PEKK: ~160°C (433 K). Consensus from MD simulations and DSC."
       },
+      "experimental_density_gcm3": 1.263,
+      "exp_density_note": "AMORPHOUS PEEK = 1.263 g/cm³ (fully amorphous MD cell comparator). Semicrystalline PEEK = 1.30–1.32 g/cm³ — NOT valid for amorphous MD cells. Planner must use 1.263, not 1.32 (PEEK1 R-01: used 1.32 → false −9% error, corrected to −5.5% vs 1.263). Source: Brandrup & Immergut / Marand et al.",
       "exp_E_GPa": {
         "PEEK": 3.6,
         "source": "Mark2007_Table24.4",
-        "notes": "amorphous PEEK at RT; density=1.32 g/cm³"
+        "notes": "amorphous PEEK at RT; Mark2007 lists 1.32 g/cm³ specimen which is semicrystalline — apply E as order-of-magnitude reference only for fully amorphous cells"
       },
       "confidence": "high",
       "citations": [
@@ -1793,8 +1795,8 @@
         "MD Tg for PEEK expected ~500-540 K after overestimation. Sweep to 750 K safely brackets this.",
         "Very rigid aromatic backbone: slow chain relaxation → 8 annealing cycles and 15 ns required.",
         "SCREENING dp/nchain: dp_typical=15 nchain=8 for 48h-budget Tg sweep (4,800 atoms, ~40h/4GPU). τ_Rouse at dp=15 T_equil=770K ≈ 2.2 ns; tg_steps_per_t=2M = 2ns ≈ 0.91×τ_Rouse — borderline adequate for screening. Tg may be overestimated by ~5-15% beyond standard MD bias. Original nchain=10 dp=32 MW ~9,216 g/mol crossed Klajmon2023 density convergence threshold (~9,000 g/mol); dp=15 nchain=8 MW ~3,456 g/mol is below threshold but acceptable for Tg screening.",
-        "Exp. RT density: PEEK=1.32 g/cm³. Initial 0.66 g/cm³ = ~0.5x PEEK density.",
-        "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. Verify density ~1.30 g/cm³ at 298 K before Tg sweep."
+        "Exp. RT density: amorphous PEEK=1.263 g/cm³; semicrystalline=1.30–1.32 g/cm³ (NOT the comparator for MD amorphous cells). Initial packing 0.66 g/cm³ = ~0.5x amorphous density.",
+        "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. Verify density ~1.26 g/cm³ at 298 K (amorphous ref) before Tg sweep; 1.30–1.32 indicates partial crystallinity."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",

@@ -47,6 +47,14 @@ Do not increase THERMO_FREQ beyond 1000.
 
 Use `nvt_born` template. Call `get_template_defaults("nvt_born")` for the full parameter list.
 
+### Rule G: Run Length Cap — born_run_ns ≤ 0.5
+
+The `compute born/matrix numdiff` trigger runs 6 full force evaluations every `BORN_EVERY=10` steps,
+reducing effective throughput to ~8–20 steps/s even on a fast CPU. Affine Born terms converge in
+~100–200 blocks (= 0.1–0.2 ns at BORN_EVERY=10, BORN_REPEAT=100, dt=1 fs). The gen_prompt.py
+default is **0.5 ns**; do not exceed it without explicit orchestrator approval. (PEEK1 ran 4 ns →
+projected 130 h; affine terms were converged at 87 blocks / ~0.09 ns.)
+
 ---
 
 ## Born Matrix Workflow
