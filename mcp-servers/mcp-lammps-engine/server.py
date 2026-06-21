@@ -290,6 +290,11 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
         f"export CUDA_VISIBLE_DEVICES={cuda_devices}",
         "# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).",
         'echo $$ > "$PIDFILE"',
+        # mpirun -np 1 does not propagate CUDA_VISIBLE_DEVICES to the child process on OpenMPI.
+        # For single-rank runs, skip mpirun and pin the GPU inline on the lmp command line.
+        ('LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"'
+         if mpi == 1 else
+         'LAMMPS_LAUNCH="mpirun -np $MPI $LMP $OFFLOAD_FLAGS"'),
         "",
     ]
 
@@ -304,7 +309,7 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
             f"mkdir -p {wdir}",
             f"cd {wdir}",  # FIX: cd into stage workdir so relative paths in .in files resolve correctly
             f"log_start {name}",
-            f"mpirun -np $MPI $LMP $OFFLOAD_FLAGS "
+            f"$LAMMPS_LAUNCH "
             f"-in {script} >> {wdir}/{log} 2>&1 \\",
             f"  && log_done {name} \\",
             f"  || {{ log_fail {name}; sentinel_fail {name}; "
@@ -362,10 +367,17 @@ def _lammps_run_background(
         else:
             cuda_line = f"export CUDA_VISIBLE_DEVICES={gpu_ids}\n"
         flags = f"{offload_flags} " if offload_flags else ""
-        lammps_cmd = (
-            f"mpirun -np {mpi} {lmp_bin} {flags}"
-            f"-in {script} >> {wrapper_stdout} 2>&1\n"
-        )
+        # mpirun -np 1 does not propagate CUDA_VISIBLE_DEVICES on OpenMPI; skip it for mpi=1.
+        if mpi == 1:
+            lammps_cmd = (
+                f"env CUDA_VISIBLE_DEVICES={gpu_ids} {lmp_bin} {flags}"
+                f"-in {script} >> {wrapper_stdout} 2>&1\n"
+            )
+        else:
+            lammps_cmd = (
+                f"mpirun -np {mpi} {lmp_bin} {flags}"
+                f"-in {script} >> {wrapper_stdout} 2>&1\n"
+            )
         wrapper = (
             f"#!/bin/bash\n"
             f"{cuda_line}"
@@ -2763,6 +2775,9 @@ def run_bulk_modulus_series(
     dt_fs: float = 1.0,
     thermo_freq: int = 100,
     output_dir: Optional[str] = None,
+    use_trappe: bool = False,
+    use_pcff: bool = False,
+    use_opls: bool = False,
 ) -> dict:
     """
     Run a series of constant-pressure NPT simulations to support Murnaghan
@@ -2791,6 +2806,11 @@ def run_bulk_modulus_series(
         mpi:            MPI processes. Required — no default.
         output_dir:     Where to store the list of log file paths (JSON).
                         Defaults to work_dir.
+        use_trappe:     Set True for TraPPE-UA systems (PHYC, PDIE). Emits lj/cut +
+                        neigh yes instead of PPPM/CHARMM defaults. Mirrors the same
+                        flag in generate_equilibration_workflow and generate_script.
+        use_pcff:       Set True for PCFF (Class II) systems. Emits pppm + class2 pair.
+        use_opls:       Set True for OPLS-AA systems. Emits pppm + lj/cut/coul/long.
 
     Returns:
         dict with chain_id, monitor_command, log_files (list of expected log paths),
@@ -2831,6 +2851,9 @@ def run_bulk_modulus_series(
                     "THERMO_FREQ": thermo_freq,
                     "LOG_FILE":    log_path,
                     "use_gpu":     True,
+                    "use_trappe":  use_trappe,
+                    "use_pcff":    use_pcff,
+                    "use_opls":    use_opls,
                     "DUMP_FILE":   f"{stage_dir}/{tag}.dump",
                     "LAST_DUMP_FILE":  f"{stage_dir}/{tag}_last.dump",
                     "WRITE_DATA_FILE": f"{stage_dir}/{tag}_out.data",

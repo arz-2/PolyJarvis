@@ -6,16 +6,16 @@ Box: 4× Quadro RTX 6000 (ids 0–3) + i9-10980XE (18 physical cores).
 ## Limits
 - Σ mpi over concurrent runs ≤ 18.
 - ≤ 1 GPU-heavy run per GPU.
-- PPPM (PCFF/OPLS): mpi ≥ 4, never mpi=1.
+- PPPM (GPU-package fallback / GAFF2): mpi ≥ 4, never mpi=1. KOKKOS PCFF/OPLS run mpi=1 (kspace on GPU, not CPU-serial).
 - <10k-atom cell: 1 GPU, never >1.
 
 ## Standard MD (equil, tg sweep, production)
 
 | FF family | Classes | engine | gpu_ids | gpus | mpi | mpi solo |
 |-----------|---------|--------|---------|------|-----|----------|
-| PCFF | PACR PEST PVNL PSFO PKTN PCBN PAMD PIMD POXI PSUL PURT PANH PPHS PIMN PPNL | gpu | one id | 1 | 4 | 8 |
-| OPLS-AA | PHAL PSIL | gpu | one id | 1 | 4 | 8 |
-| TraPPE-UA | PHYC PDIE | cpu | "" | 0 | 4 | 8 |
+| PCFF | PACR PEST PVNL PSFO PKTN PCBN PAMD PIMD POXI PSUL PURT PANH PPHS PIMN PPNL | **kokkos** | one id | 1 | **1** | 1 |
+| OPLS-AA | PHAL PSIL | **kokkos** | one id | 1 | **1** | 1 |
+| TraPPE-UA | PHYC PDIE | gpu (neigh yes) | one id | 1 | 1 | 1 |
 | GAFF2 | PURA / off-table | gpu | one id | 1 | 4 | 8 |
 
 ## Special templates (mechanical track)
