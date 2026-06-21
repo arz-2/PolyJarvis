@@ -25,7 +25,15 @@ Returns `overall_pass` verdict and a ready-to-paste D-05 markdown block. Copy `r
 
 `backbone_types` is **REQUIRED** — from `inspect_data_file()`; do not guess.
 
-**`ct_min_decay` usage:** Pass the value from the worker prompt (`ct_min_decay_melt`). Pass `None` for the NPT 300 K log (`npt_prod300`) and all rubbery polymer checks.
+**Thermo and structural checks read different files — this is deliberate.** The tool decouples Section A (thermo, from `log_file`) from Sections B/C (chain conformation +
+spatial, from `dump_file`):
+- `log_file` = `npt_prod_log_path` — the production NPT log (`npt_prod300` glassy / `npt_production` rubbery), where density/energy convergence is meaningful.
+- `dump_file` = `melt_dump_path` — the **melt** `nvt_production.dump` (T_workflow, chains mobile), where C(t)/MSD/Rg/R_ee actually report chain relaxation. Do **not**
+point this at the production NPT dump: for a glassy polymer the production state is below Tg, so C(t) never decays and MSD shows a kinetic trap *by construction* — the
+structural check would be meaningless. `gen_prompt.py` already resolves all three paths; use them verbatim, do not construct them.
+
+**`ct_min_decay` usage:** Pass `ct_min_decay_melt` from the prompt **in both phases** — the structural dump is always the melt, so the C(t) decay gate is always physically
+valid (rubbery T_workflow is ≥ its Tg, so its melt also relaxes).
 
 **Call signature:**
 ```python
@@ -37,7 +45,7 @@ check_equilibration_comprehensive(
                                   # Do NOT use npt_prod300.dump — chains are frozen below Tg
     data_file=equil_data_path,
     backbone_types=backbone_types,
-    ct_min_decay=ct_min_decay_melt,  # from prompt; pass None for rubbery
+    ct_min_decay=ct_min_decay_melt,  # from prompt; the dump is the melt, so always pass it
     output_dir=output_dir,
     graphs_dir=graphs_dir,
 )
@@ -56,7 +64,7 @@ check_equilibration_comprehensive(
 - `result["chain"]["ree"]["std_R_ee_A"]`             → `end_to_end_r_std_A`
 - `result["chain"]["ree"]["n_chains"]`               → `end_to_end_n_chains`
 - Histogram PNG auto-saved to `graphs_dir/end_to_end_distribution.png`
-- For rubbery classes (`ct_min_decay=None`): set `ct_decay_fraction` and `ct_tau_relax_ps` to N/A; R_ee is still available
+- C(t)/MSD/R_ee are computed on the melt dump in both phases, so `ct_decay_fraction` and `ct_tau_relax_ps` are always populated (no N/A rubbery branch)
 
 For PHYC class (PE): `ct_decayed=True` plus `tau_relax_ps` is the chain relaxation evidence R1M10 requires. Include both in the RESULT block even for passes.
 
@@ -70,8 +78,8 @@ extract_equilibrated_density(
     log_file=npt_prod_log_path,
     output_dir=output_dir,
     graphs_dir=graphs_dir,
-    eq_fraction=0.5,       # discard first 50% as burn-in (default)
-    target_temp=300.0,     # filter to 300 K rows if log is multi-T
+    eq_fraction=0.5,                 # discard first 50% as burn-in (default)
+    target_temp=npt_prod_temp_K,     # production temperature from prompt — filter to those rows if log is multi-T
 )
 ```
 
