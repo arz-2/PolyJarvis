@@ -901,7 +901,7 @@
       "notes": [
         "Purely apolar hydrocarbon backbone with C=C double bonds — lj_cut sufficient.",
         "Very low experimental Tg (180-200 K): sweep must go down to 80 K to sample deep glassy state.",
-        "MD Tg expected 260-320 K (overestimation). Upper sweep bound 400 K safely brackets this.",
+        "MD Tg offset for PDIE: SMALL for flexible low-fragility rubbers. cis-PBD1 pilot at 40 K/ns got Tg_MD=172.5 K vs exp 181 K (−8.5 K, BELOW exp). Prior note '260-320 K overestimate' was based on rigid polymers; does NOT apply here. The 400 K upper sweep bound is still safe to bracket the 180-200 K experimental Tg.",
         "DP=50-200 studied by polyisoprene MD: mechanical properties converge above DP=50 (PMC9698502).",
         "Microstructure matters: cis vs trans gives different Tg. Encode the target microstructure in the SMILES passed to EMC.",
         "Timestep: 2.0 fs (use_shake=False). TraPPE-UA removes explicit H atoms and their fast C-H stretch modes, so 2 fs is stable without bond constraints. LAMMPS fix shake cannot constrain a continuous backbone (every backbone atom has 2 bonds; cluster-build requires terminal atoms). The C=C torsional barrier is enforced by PCFF-style dihedral terms in the .params file, not SHAKE. Same logic as PHYC.",
@@ -916,9 +916,12 @@
         600,
         1000
       ],
+      "experimental_density_gcm3": 0.90,
+      "exp_density_note": "PBD amorphous = 0.90 g/cm³; PI amorphous = 0.91 g/cm³ (Brandrup & Immergut). Use 0.90 as the default comparator for PBD SMILES; override to 0.91 for PI.",
       "exp_K_GPa": {
-        "min": 0.2,
-        "max": 0.6
+        "min": 1.38,
+        "max": 1.95,
+        "note": "Amorphous rubber bulk modulus: cis-1,4-PBD K_T=1.38 GPa, cis-1,4-PI K_T=1.94 GPa (Mark, Polymer Data Handbook 1999; polymer_db). Prior [0.2,0.6] was shear/Young's modulus (mis-scoped), corrected 2026-06-21 after cis-PBD1 pilot (D-07). Measured 1.565 GPa at ~40 K/ns cooling, +13% above 1.38 GPa reference."
       }
     },
     "POXI": {
