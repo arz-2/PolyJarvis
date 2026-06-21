@@ -69,9 +69,11 @@
         "concurrency_note": "KOKKOS is GPU-bound at mpi=1, 1 GPU/run -> ~1 core/run (vs ~4 for gpu pkg) so up to 4 runs go concurrent (1 per GPU), relieving the CPU-core bottleneck",
         "parity_2026-06-20": "PASS. run-0 static eval on PEG1 npt_cool_out.data: class2/kk + pppm/kk vs GPU-package class2 agree to 0.000% on ALL energy terms (E_bond/E_angle/E_dihed/E_impro/E_vdwl/E_coul/E_long/PotEng) AND the full pressure tensor (Pxx/Pyy/Pzz) -> identical PES and forces, no KOKKOS bug. NOTE: an equilibrated-ensemble diff vs the ARCHIVED nvt_production.log spuriously FAILED on E_bond because that archived log was generated from a different npt_cool microstate than the current on-disk data (run-0 gives E_bond=995.77 for BOTH engines, not the archived 2320) -- a stale-baseline artifact, not physics.",
         "opls_parity_2026-06-20": "PASS. run-0 on decane-oplsaa (3200 atoms, OPLS-AA): lj/cut/coul/long/kk + harmonic bond/angle kk + dihedral opls/kk + pppm/kk vs GPU-package agree to 0.000% on E_bond/E_angle/E_dihed/E_vdwl/E_coul/E_long/PotEng and the pressure tensor. OPLS KOKKOS stack validated.",
-        "gate": "GREEN as of 2026-06-20. pcff + opls FLIPPED to engine=kokkos, mpi=1, gpu_per_run=1 (both run-0 parity-validated). gaff pending its own parity (no cell yet); trappe stays cpu.",
-        "binary": "/home/arz2/lammps-install-kokkos/bin/lmp (env LAMBDA_LAMMPS_KOKKOS)",
-        "cell_note": "cell used on A800 primary box; use a local PolyJarvis PCFF .data for this machine's parity test"
+        "gate": "GREEN as of 2026-06-20. pcff + opls FLIPPED to engine=kokkos, mpi=1, gpu_per_run=1 (both run-0 parity-validated). trappe FLIPPED to engine=gpu, mpi=1, gpu_per_run=1 with `neigh yes` (run-0 parity PASS, see trappe_neigh_yes_2026-06-20). gaff pending its own parity (no cell yet).",
+        "binary": "/home/alexzhao/lammps-install-kokkos/bin/lmp (env LAMBDA_LAMMPS_KOKKOS)",
+        "kokkos_deck_gotchas": "Three KOKKOS pitfalls (hit on the 2nd machine pre-merge; ALREADY correct on this hardware-optimization branch): (1) the KOKKOS package is loaded on the COMMAND LINE via `-pk kokkos` (in _engine_launch), NOT as an in-deck `package kokkos ...` line — script_generator renders only a comment for engine=kokkos. An in-deck `package kokkos gpu 1 comm no` is ILLEGAL (use `package kokkos neigh full comm no` if ever hand-writing one). (2) `-sf kk` rewrites STYLE commands (pair/bond/angle/dihedral/kspace/fix) to /kk, but NOT the `neighbor` command — decks keep plain `neighbor 2.0 bin`; `neighbor 2.0 bin/kk` is an invalid suffix. (3) run_lammps_script AND run_lammps_chain both take `engine=`, so no manual binary wrapper is needed — pass engine='kokkos' and the right binary+flags are selected. Our single-GPU mpi=1 `-pk kokkos` defaults passed parity; multi-GPU may need explicit `comm`/`neigh` tuning.",
+        "trappe_neigh_yes_2026-06-20": "TraPPE-UA is NOT a CPU job. CALIB_PHYC (1640 atoms), mpi=1/GPU, niced on idle GPU2 under identical contention (ratios robust, absolute ns/day suppressed uniformly): cpu_mpi4=136; A0 gpu-pkg neigh-on-CPU=136 (Neigh 71% stays on CPU -> no win, ties CPU); A1 gpu-pkg neigh-ON-GPU=501 (3.7x, now Bond 60% CPU-bound); A3 KOKKOS full-offload=397 (2.9x; Modify/Bond/Neigh, /kk launch+fix overhead loses on tiny UA cells). WINNER = GPU package + `neigh yes`, mpi=1, 1 GPU/run (A1). Implemented by gating `package gpu 1 neigh yes` on use_trappe in script_generator.py. Parity: run-0 static CPU lj/cut vs GPU lj/cut/gpu+neigh-yes on CALIB_PHYC = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl/density (only virial/pressure differs ~0.3% from FP summation order; advisory/non-gated). bench_accuracy_diff.py PASS. (Note: bench_accuracy_diff _pct_diff fixed to handle the no-kspace E_long=0/0 nan edge.) Open: mpi=2 may beat mpi=1 (Bond is CPU-bound at mpi=1) but costs a core -> defer to a drained box; 2/GPU MPS throughput for batches still to measure.",
+        "gpu_sharing_2026-06-20": "DO NOT pack >1 run/GPU for PPPM-heavy (PCFF/OPLS) KOKKOS runs. Measured on PEG1 7020 atoms, GPU2: solo=38.9 ns/day; 2 concurrent time-sliced (no MPS)=6.3 aggregate (0.16x, Kspace blows up 15x from GPU context-switching on PPPM sync points); 2 concurrent with CUDA MPS=39.0 aggregate (1.00x, clean 2x/section, 50% each) = ZERO gain. The GPU is already saturated by one PPPM job (pair kernel is tiny but the cuFFT pipeline keeps it busy). Optimal = 1 run/GPU, 4 concurrent across 4 GPUs (mpi=1, gpu_per_run=1)."
       }
     },
     "ff_aliases": {
@@ -107,11 +109,12 @@
         }
       },
       "trappe": {
-        "engine": "cpu",
-        "mpi": 4,
-        "mpi_single_run_hint": 8,
-        "gpu_per_run": 0,
-        "note": "lj/cut, no kspace; neigh-build dominated (~70%); CPU >> GPU mpi=1"
+        "engine": "gpu",
+        "mpi": 1,
+        "mpi_single_run_hint": 1,
+        "gpu_per_run": 1,
+        "note": "lj/cut, no kspace, neigh-build dominated (~71%). GPU package with `neigh yes` (neighbor build ON the GPU) = 3.7x vs CPU mpi=4 at 1 core/run (A1 501 vs 136 ns/day, CALIB_PHYC 1640 atoms, 2026-06-20, niced/contended ratio). BEATS KOKKOS here (397) — UA bonded is trivial and lj/cut/gpu is leaner than /kk per-kernel launch overhead on small cells (opposite of PCFF). The `neigh yes` line is rendered automatically by script_generator gating on use_trappe (engine=gpu only — PPPM classes keep neigh no). Parity run-0 vs CPU lj/cut = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl (2026-06-20). mpi=1 is the concurrency-optimal default (4 TraPPE runs on 4 GPUs = 4 cores). Fallback: engine=cpu, mpi=4.",
+        "_prev_cpu": {"engine": "cpu", "mpi": 4, "mpi_single_run_hint": 8, "gpu_per_run": 0}
       },
       "gaff": {
         "engine": "gpu",

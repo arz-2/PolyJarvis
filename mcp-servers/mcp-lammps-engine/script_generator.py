@@ -1000,6 +1000,9 @@ write_data tg_step_out.data
         # engine selects how the deck loads the accelerator. Absent → derive from use_gpu so
         # existing callers stay byte-identical (gpu ⇒ "package gpu 1 neigh no", else CPU).
         #   gpu    : GPU package — pairwise forces on GPU, bonded/kspace/neigh on CPU.
+        #            EXCEPT TraPPE-UA (lj/cut, no kspace): neighbor build is ~71% of the loop, so
+        #            it offloads to the GPU too (`neigh yes`, arm A1 → 3.7x vs CPU). PPPM classes
+        #            keep `neigh no` (the parity-validated A0 baseline; KOKKOS handles their offload).
         #   kokkos : NO `package gpu` line; the KOKKOS package is loaded by `-pk kokkos` on the
         #            command line and `-sf kk` rewrites pair/bonded/kspace/neigh to /kk. The deck
         #            keeps plain style names (e.g. `kspace_style pppm`) so the suffix machinery
@@ -1011,7 +1014,8 @@ write_data tg_step_out.data
         if engine == "kokkos":
             subs["GPU_PACKAGE"] = "# KOKKOS: package loaded via -pk kokkos on the command line"
         elif engine == "gpu":
-            subs["GPU_PACKAGE"] = "package gpu 1 neigh no"
+            neigh = "yes" if cfg.get("use_trappe", False) else "no"
+            subs["GPU_PACKAGE"] = f"package gpu 1 neigh {neigh}"
         else:
             subs["GPU_PACKAGE"] = "# GPU disabled (CPU run)"
 

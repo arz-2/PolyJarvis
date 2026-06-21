@@ -85,7 +85,11 @@ def summarize(log_path: str, tail_frac: float) -> dict:
 
 
 def _pct_diff(var: float, base: float) -> float:
-    return abs(var - base) / abs(base) * 100.0 if base else float("nan")
+    # base==0 needs care for forcefields lacking a term (e.g. TraPPE-UA has no kspace,
+    # so E_long=0): 0-vs-0 is identical (0%), 0-vs-nonzero is a true divergence (inf).
+    if base == 0:
+        return 0.0 if var == 0 else float("inf")
+    return abs(var - base) / abs(base) * 100.0
 
 
 def main() -> int:
