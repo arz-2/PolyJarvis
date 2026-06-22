@@ -1,0 +1,149 @@
+Dear Dr. Barati Farimani:
+
+Manuscript ID: ct-2026-00736q
+Title: "PolyJarvis: LLM Agent for Autonomous Polymer MD Simulations"
+Author(s): Zhao, Alexander; Chandrasekhar, Achuth; Barati Farimani, Amir
+
+Enclosed are the reviews for your paper.  The reviewers have found significant problems that render the paper unacceptable in its current form.  If you wish to resubmit, you need to make major revisions and respond well to the reviewers’ criticisms.
+
+We ask that you submit your revision no later than 19-Jun-2026.
+
+Please note that you may receive a follow-up message within 24 hours describing the non-scientific changes you should also make to your manuscript, in accordance with our author guidelines, before you submit the revision. It is important to address these changes in your revision so that processing your manuscript can proceed without further delay.
+
+Make sure that the manuscript you submit does not have any colored or highlighted text. Please also submit submit a separate file with highlighted text that reflects the changes of the revised manuscript. This marked manuscript should be uploaded electronically as "Supporting Information for Review Only".
+
+Please note that the Journal of Chemical Theory and Computation requires a Table of Contents Graphic that is 100% original and author-created, free of any AI art, clip art, logos, or previously used images that is 100% original and author-created, free of any AI art, clip art, logos, or previously used images. For guidelines on Table of Contents/Abstract Graphics, including instructions and specifications, please review the following document available at http://pubs.acs.org/paragonplus/submission/toc_abstract_graphics_guidelines.pdf.
+
+Funding Sources: Authors are required to report ALL funding sources and grant/award numbers relevant to this manuscript. Confirm all sources of funding for ALL authors relevant to this manuscript are included in BOTH the submission form and in the manuscript file to meet this requirement. See http://pubs.acs.org/page/4authors/funder_options.html for complete instructions.
+
+ORCID: Authors submitting manuscript revisions are required to provide their own validated ORCID iDs before completing the submission, if an ORCID iD is not already associated with their user profiles. This iD may be provided during original manuscript submission or when submitting the manuscript revision. You can provide only your own ORCID iD, a unique researcher identifier. If your ORCID iD is not already validated and associated with your  user profile, you may do so by following the ORCID-related links in the Email/Name section of your user account. All authors are encouraged to register for and associate their own ORCID iDs with their user profiles. The ORCID iD will be displayed in the published article for any author on a manuscript who has a validated ORCID iD associated with their user account when the manuscript is accepted. Learn more at http://www.orcid.org.
+
+To speed up the review process and avoid un-submission of your revised manuscript, please be sure that your revised manuscript adheres to ACS format, especially references.
+
+ACS Publications uses Crossref Similarity Check Powered by iThenticate to detect instances of similarity in submitted manuscripts. In publishing only original research, ACS is committed to deterring plagiarism, including self-plagiarism. Your manuscript may be screened for similarity to published material.
+
+Sincerely,
+
+Prof. Pratyush Tiwary
+Journal of Chemical Theory and Computation
+Associate Editor
+Email: tiwary-office@jctc.acs.org
+
+------------------------------------
+Go to the ACS Publishing Center at https://publish.acs.org to submit your revised manuscript.
+
+When submitting your revised manuscript, you will be able to respond to the comments made by the reviewer(s) by attaching a file containing your detailed responses to all of the points raised by the reviewers.
+
+------------------------------------
+Reviewer(s)' Comments to Author:
+Reviewer: 1
+
+Recommendation: Publish after major revisions noted.
+
+Comments:
+This manuscript presents PolyJarvis, an LLM-driven agent that connects Claude, RadonPy, and LAMMPS through MCP servers to automate all-atom molecular dynamics workflows for polymer property prediction. The study is timely and potentially valuable, because polymer MD remains labor-intensive and difficult to standardize. The work demonstrates a useful proof of concept, including autonomous construction, force-field assignment, equilibration, property extraction, error handling, and benchmarking on PE, aPS, PMMA, and PEG. However, the current validation is too limited to support several of the stronger claims about autonomy, robustness, and quantitative reliability. The manuscript would benefit from a clearer separation between what is contributed by the LLM agent and what is inherited from RadonPy/LAMMPS protocols, stronger statistical validation, more rigorous treatment of failed cases, and a more transparent analysis of whether the agent actually makes scientifically meaningful decisions rather than executing scripted or semi-scripted workflows. My recommendation would be major revision.
+
+Major Comments
+
+1. The novelty of the LLM agent is not yet demonstrated with sufficient rigor. The manuscript repeatedly emphasizes “intelligent decision-making” by the agent, but many of the described choices appear to be standard workflow decisions already available from RadonPy practice, polymer MD heuristics, or human-authored tool descriptions. The authors should more clearly define what information is encoded in the tools, prompts, decision rules, and system instructions, and what is genuinely inferred by the LLM at runtime. Without this distinction, it is difficult to judge whether PolyJarvis is an autonomous scientific agent or a natural-language interface around an existing automated MD pipeline.
+
+2. The validation set is too small and too forgiving for the breadth of the claims. Four polymers, three of which are standard textbook systems, are insufficient to establish generality across polymer chemistry, polarity, side-chain complexity, tacticity, chain stiffness, hydrogen bonding, semicrystallinity, copolymers, or charged systems. The authors should either temper the claims substantially or expand the benchmark to include more chemically diverse and failure-prone polymers. In its current form, the study demonstrates feasibility rather than robust autonomous polymer MD.
+
+3. The acceptance criteria and pass/fail accounting are not fully convincing. The manuscript reports 5 of 8 successful property–polymer combinations after excluding cases without directly comparable experimental references, but this framing may make the results appear stronger than they are. PE density fails badly, aPS and PEG Tg fail, PEG density and bulk modulus rely on MD literature rather than strict experimental validation, and PE Tg is excluded because the experimental reference is ambiguous. The authors should present both strict and inclusive scorecards, and they should avoid implying broad quantitative accuracy when several central predictions either fail or are excluded.
+
+4. The PE density failure is serious and should not be treated as a peripheral limitation. The PE density is overestimated by about 25%, which is far outside acceptable error and indicates a major equilibration or protocol failure for one of the simplest benchmark polymers. Since PE is often a baseline case for polymer simulation, this undermines confidence in the agent’s ability to diagnose packing, crystallization, chain relaxation, and density equilibration problems. The authors should provide a detailed post-mortem, rerun PE with a corrected protocol, and show whether the agent can autonomously detect and repair over-densification rather than merely explain it after the fact.
+
+5. The Tg analysis is vulnerable to cooling-rate and fitting artifacts. The Tg values are extracted from bilinear density–temperature fits, but the manuscript does not sufficiently demonstrate that the chosen temperature ranges, step sizes, equilibration lengths, and fit breakpoints produce stable and physically meaningful Tg estimates. The very large run-to-run variability for aPS and PMMA suggests that the reported “best replicate” approach may be selectively optimistic. The authors should report replicate means and uncertainties, not only best replicates, and should test sensitivity to fitting method, cooling schedule, temperature grid, and equilibration duration.
+
+6. The use of “best replicate” risks biasing the validation. Selecting the best replicate for Tg comparison can obscure the actual reliability of the workflow. For example, PMMA has one excellent Tg value but other runs are much higher, and aPS spans a wide range. A practical autonomous agent should be judged by expected performance over independent runs, not by post hoc selection of the most favorable trajectory. The authors should make the primary validation based on ensemble statistics and reserve best-replicate values for secondary discussion.
+
+7. The manuscript needs a stronger baseline comparison. To establish the value of PolyJarvis, the authors should compare its outcomes against standard RadonPy runs with default settings, expert-curated RadonPy protocols, and perhaps a non-agent scripted workflow. Without such baselines, it is unclear whether the LLM improves accuracy, robustness, speed, user effort, or error recovery. The strongest claim the paper can currently support is that an LLM can orchestrate an existing workflow, not that it improves polymer MD.
+
+8. The force-field and charge-selection logic requires deeper scientific justification. The agent’s selections, including GAFF2 and Gasteiger charges in some cases, are presented as correct, but the manuscript does not provide enough evidence that these choices are optimal for each polymer and property. Polymer thermomechanical properties are highly sensitive to bonded parameters, torsions, nonbonded interactions, partial charges, and density equilibration. The authors should include sensitivity tests comparing alternative force fields or charge models for at least one or two systems, especially where predictions fail.
+
+9. The bulk modulus calculation may be statistically fragile. Bulk modulus from NPT volume fluctuations is sensitive to barostat parameters, sampling length, finite-size effects, equilibration quality, and volume autocorrelation. The manuscript reports favorable agreement, but the production lengths and statistical inefficiencies are not sufficiently discussed in the main text. The authors should report autocorrelation times, effective sample sizes, block-averaged uncertainties, and sensitivity to barostat settings; otherwise, the bulk modulus values may appear more reliable than they are.
+
+10. The structural validation is too qualitative. RDFs that decay to unity and end-to-end distances are useful sanity checks, but they do not establish adequate equilibration of polymer conformations, especially below Tg or for long-chain systems. The authors should include additional diagnostics such as radius of gyration distributions, characteristic ratio or persistence-related measures, mean-squared displacement, chain relaxation indicators, density homogeneity, and checks for residual orientation or artificial packing. This is particularly important because the PE case appears kinetically trapped.
+
+11. The claim of autonomous error recovery needs clearer evaluation. The manuscript states that the agent resolved 13 simulation errors, but it is not clear how many attempts failed, how much human guidance was involved, whether recovery decisions were pre-programmed, or whether the same recovery would work on unseen systems. The authors should provide a reproducible error-recovery benchmark with predefined tasks, success rates, failure modes, and logs sufficient to assess whether the agent is robust or simply able to iterate within a narrow environment.
+
+12. Reproducibility and data availability are not yet adequate for this type of study. The manuscript says trajectories and output files are available upon request, but the central contribution depends on workflow traces, prompts, tool calls, decision logs, input scripts, final structures, seeds, and analysis notebooks. These should be openly available, at least for the benchmark systems, otherwise readers cannot independently verify the agent’s decisions or reproduce the simulations. For an automation paper, provenance is not supplementary; it is part of the core scientific result.
+
+Minor Comments
+
+1. The title should be made more precise. “Autonomous” and “all-atom molecular dynamics simulation of polymers” are broad claims, while the study actually validates a small set of amorphous homopolymers and a limited number of properties. A more specific title would better match the demonstrated scope.
+
+2. The abstract should better distinguish successful, failed, and excluded validation cases. The current abstract emphasizes density and modulus successes while also noting Tg failures, but the balance could be clearer. Readers should immediately understand that only PMMA passes the strict Tg criterion and that PE density fails substantially.
+
+3. The manuscript should avoid overusing terms such as “intelligent decision-making.” These phrases can sound promotional unless supported by controlled tests. More precise language, such as “tool-mediated workflow selection” or “LLM-orchestrated protocol adaptation,” would be more scientifically defensible.
+
+4. The role of MCP should be clarified for readers outside the LLM-agent field. The architecture figure is helpful, but the manuscript should explain what MCP contributes technically beyond ordinary API calls, wrappers, or workflow managers. This would make the infrastructure contribution easier to assess.
+
+5. The representative conversation figure feels somewhat generic. Because it uses placeholders rather than a real trace, it does not strongly support the claim of autonomy. A real shortened transcript, including an actual decision and error recovery event, would be more compelling.
+
+6. The benchmark table mixes experimental and MD literature references in a way that can be confusing. The authors should visually separate strict experimental benchmarks from contextual MD comparisons. This is especially important for PEG and PE, where some properties are not directly validated against experiment.
+
+7. The density plot should make the PE failure more visually prominent. Since PE is the largest density error and is central to assessing robustness, the discussion should not let this point be diluted by the successes for aPS, PMMA, and PEG.
+
+8. The Tg figure should include replicate variability more directly. Showing only the best replicate for each polymer may underrepresent uncertainty. A supplemental figure is helpful, but the main text should include either all replicate Tg values graphically or a compact uncertainty visualization.
+
+9. The authors should explain why 10 chains are sufficient for every system. The manuscript states that this is consistent with prior RadonPy validation, but chain stiffness, entanglement, side-chain bulk, and Tg estimation may require system-specific finite-size analysis. A short justification or sensitivity test would strengthen confidence.
+
+10. The treatment of tacticity should be expanded. aPS and PMMA are tacticity-sensitive systems, and the manuscript should describe how tacticity was generated, verified, and varied across chains or replicates. This is important for both Tg and density.
+
+11. The statement that Tg failures are primarily due to cooling-rate bias should be softened. Cooling rate is certainly important, but force-field choice, chain length, equilibration, fitting procedure, density relaxation, and tacticity can also contribute. The current wording risks attributing failures to a generic MD limitation without fully ruling out agent or protocol errors.
+
+12. The data and software availability statement should be strengthened. A GitHub link alone is not enough unless it includes the exact version, scripts, prompts, tool schemas, input files, seeds, and analysis outputs used in the manuscript. The authors should provide an archived release for review and reproducibility.
+
+13. The paper would benefit from clearer reporting of computational cost. Since automation is partly motivated by practical usability, the main text should summarize wall time, GPU hours, approximate cost, and failure/retry overhead for each polymer. This would help readers judge whether the autonomous workflow is efficient.
+
+14. Some wording implies that agreement with prior MD validates the agent. Agreement with previous MD can be useful context, but if previous MD shares similar cooling-rate or force-field biases, it does not establish experimental accuracy. The authors should phrase these comparisons more cautiously.
+
+15. The conclusion should be more restrained. The work convincingly shows a promising prototype, but it does not yet demonstrate a generally reliable autonomous polymer MD platform. The conclusion should emphasize proof of concept, identified failure modes, and the need for broader validation.
+
+Additional Questions:
+Please rate the quality of the science reported in this paper (10 - High Quality / 1 - Low Quality).: 7
+
+Please rate the overall importance of this paper to the field of chemical theory or computation (10 - High Importance / 1 - Low Importance).: 8
+
+
+Reviewer: 2
+
+Recommendation: Publish after minor revisions noted.
+
+Comments:
+Here, the authors present an agent, PolyJarvis, which integrates an LLM with the RadonPy platform to predict polymer properties from their SMILES strings or names. PolyJarvis autonomously constructs monomers, assigns charges, performs polymerization simulations, parameterizes molecular simulations, and computes polymer properties. Different polymers (PE, aPS, PMMA, and PEG) were used for validation, where density, glass transition temperature, and bulk modulus were evaluated against experimental values. Five out of eight polymer–property combinations show good agreement with experimental values based on the defined acceptance criteria. In general, performing these tasks conventionally may take several months, which highlights the value of this work for polymer-related MD simulations. I therefore recommend publication of the manuscript after the following comments have been addressed.
+
+-The authors did a great job reviewing previous frameworks, as summarized in Table 1. However, it is not clear how the developed method compares with these previous models. It would be beneficial to include a discussion of this in the manuscript.
+
+-The density is systematically overestimated by more than 25%. The authors attribute this to the failure of the agent’s equilibration protocol. Have the authors tried to modify the protocol to improve the density predictions? It would also be helpful to discuss how such equilibration failures can be detected autonomously within the workflow.
+
+-It is unclear whether the observed discrepancies arise from the autonomous workflow, the equilibration procedure, force-field limitations, or sampling effects. So the origin of the errors should be also be discussed.
+
+
+
+
+Additional Questions:
+Please rate the quality of the science reported in this paper (10 - High Quality / 1 - Low Quality).: 8
+
+Please rate the overall importance of this paper to the field of chemical theory or computation (10 - High Importance / 1 - Low Importance).: 8
+
+-----------------------------------------------------------------------
+
+If the Editor has suggested that your manuscript may benefit from language editing, you are encouraged to have it reviewed by a fluent English speaker before resubmitting. ACS Authoring Services can assist you by matching your manuscript with trained chemists who will edit your work for accurate terminology and phrasing. For pricing and information, visit https://authoringservices.acs.org/. Please note that using this (or any) service does not guarantee that your manuscript will be accepted for publication.
+
+------------------------------------------------------------------------
+
+FOR ASSISTANCE WITH YOUR MANUSCRIPT SUBMISSION PLEASE CONTACT:
+ACS Publications Customer Services & Information (CSI)
+Email: support@services.acs.org
+Phone: 202-872-4357
+Toll Free Phone: 800-227-9919 (USA/Canada only)
+
+
+------------
+PLEASE NOTE: This email message, including any attachments, contains confidential information related to peer review and is intended solely for the personal use of the recipient(s) named above. No part of this communication or any related attachments may be shared with or disclosed to any third party or organization without the explicit prior written consent of the journal Editor and ACS. If the reader of this message is not the intended recipient or is not responsible for delivering it to the intended recipient, you have received this communication in error. Please notify the sender immediately by e-mail, and delete the original message.
+ 
+As an author or reviewer for ACS Publications, we may send you communications about related journals, topics or products and services from the American Chemical Society. Please email us at pubs-comms-unsub@acs.org if you do not want to receive these. Note, you will still receive updates about your manuscripts, reviews, or future invitations to review.   
+
+Thank you.

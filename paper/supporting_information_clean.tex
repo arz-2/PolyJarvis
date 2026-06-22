@@ -1,0 +1,686 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Supporting Information for:
+%% PolyJarvis: Autonomous LLM Agent for All-Atom MD Simulation of Polymers
+%% Authors: Alexander Zhao, Achuth Chandrasekhar, Amir Barati Farimani
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[journal=acsami,manuscript=suppinfo]{achemso}
+
+
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{longtable}
+\usepackage{adjustbox}
+
+%% Placeholder command for deferred (simulation-pending) values.
+\newcommand{\placeholder}[1]{\textcolor{red}{\textbf{[PLACEHOLDER: #1]}}}
+%% Revision-change marker. CLEAN version: no-op (no colored text per ACS requirement).
+%% The marked version (supporting_information_marked.tex) redefines this to \textcolor{blue}{#1}.
+\newcommand{\marked}[1]{#1}
+%% Scaffold block: labeled, boxed bullet-note marking a planned revision change.
+\newcommand{\scaffold}[2]{\par\smallskip\noindent\marked{\fbox{\parbox{0.95\linewidth}{%
+\footnotesize\textbf{[SCAFFOLD --- #1]}\par #2}}}\par\smallskip}
+
+\author{Alexander Zhao}
+\affiliation{Department of Materials Science and Engineering, Carnegie Mellon University, 5000 Forbes Avenue, Pittsburgh, PA 15213, USA}
+\author{Achuth Chandrasekhar}
+\affiliation{Department of Mechanical Engineering, Carnegie Mellon University, 5000 Forbes Avenue, Pittsburgh, PA 15213, USA}
+\author{Amir Barati Farimani}
+\email{barati@cmu.edu}
+\affiliation{Department of Mechanical Engineering, Carnegie Mellon University, 5000 Forbes Avenue, Pittsburgh, PA 15213, USA}
+
+\title{Supporting Information: PolyJarvis: Autonomous Large Language Model Agent for All-Atom Molecular Dynamics Simulation of Polymers}
+\SectionNumbersOn
+\begin{document}
+\tableofcontents
+\clearpage
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{MCP Tool Inventory and Server Architecture}
+\label{sec:si_tools}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+PolyJarvis communicates with two independent MCP servers, each wrapping a distinct computational backend (Table~\ref{tab:si_servers}).
+The \textbf{RadonPy server} runs on the user's workstation and exposes molecular construction, force field assignment, and analysis tools.
+It wraps the RadonPy library\cite{hayashi2022radonpy} (v0.2.10, Python 3.10.12, RDKit 2025.09.1, Psi4 1.9.1\cite{smith2020psi4}) and handles monomer building, conformer search, RESP charge fitting, polymerization, and cell packing.
+The \textbf{LAMMPS engine server} manages GPU-accelerated LAMMPS\cite{thompson2022lammps} simulations on Lambda Labs cloud infrastructure (4$\times$ NVIDIA Quadro RTX 6000, 24~GB VRAM each) over an SSH tunnel.
+File transfer between the two servers is mediated by the agent: LAMMPS data files produced by RadonPy are uploaded to Lambda, and simulation logs are downloaded for analysis.
+
+\begin{table}[H]
+\centering
+\caption{MCP server components.}
+\label{tab:si_servers}
+\small
+\begin{tabular}{lllll}
+\toprule
+\textbf{Server} & \textbf{Backend} & \textbf{Location} & \textbf{Connection} & \textbf{Tools} \\
+\midrule
+RadonPy server & RadonPy 0.2.10 & Local workstation & stdio (local) & 18 \\
+LAMMPS engine  & LAMMPS (GPU) & Lambda Labs & SSH tunnel & 28 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The MCP framework\cite{anthropic2024mcp} provides a standardized interface through which the LLM discovers and invokes tools, receives structured results, and maintains context across multi-step workflows.
+Each tool exposes a typed function signature with parameter descriptions, enabling the LLM to reason about appropriate inputs.
+Asynchronous job management allows long-running operations to execute without blocking the agent's reasoning loop.
+\scaffold{R1 Minor 4 --- MCP vs.\ API wrappers / workflow managers}{%
+Expand S1 with the technical distinction (mirrors the main-text addition):
+\begin{itemize}
+\item Typed tool schemas $\to$ runtime reasoning over valid inputs; structured (not string) returns.
+\item Multi-turn invocation with persisted context; standardized error propagation enabling recovery.
+\item Server lifecycle / async job management.
+\item Unlike a DAG-based workflow manager, the LLM determines execution order at runtime --- no pre-defined pipeline graph.
+\end{itemize}}
+
+Table~\ref{tab:si_tool} lists representative MCP tools organized by workflow stage; the complete inventory of 46 tools (18 RadonPy, 28 LAMMPS engine) is available at the project repository.
+
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{llll}
+\toprule
+\textbf{Stage} & \textbf{Tool} & \textbf{Type} & \textbf{Server} \\
+\midrule
+\multirow{8}{*}{Construction}
+& \texttt{classify\_polymer} & sync & RadonPy \\
+& \texttt{build\_molecule\_from\_smiles} & sync & RadonPy \\
+& \texttt{assign\_forcefield} & sync & RadonPy \\
+& \texttt{submit\_conformer\_search\_job} & async & RadonPy \\
+& \texttt{submit\_assign\_charges\_job} & async & RadonPy \\
+& \texttt{submit\_polymerize\_job} & async & RadonPy \\
+& \texttt{submit\_generate\_cell\_job} & async & RadonPy \\
+& \texttt{save\_lammps\_data} & sync & RadonPy \\
+\midrule
+\multirow{3}{*}{Simulation}
+& \texttt{generate\_script} & sync & LAMMPS engine \\
+& \texttt{run\_lammps\_chain} & async & LAMMPS engine \\
+& \texttt{generate\_equilibration\_workflow} & async & LAMMPS engine \\
+\midrule
+\multirow{6}{*}{Analysis}
+& \texttt{check\_equilibration} & async & LAMMPS engine \\
+& \texttt{extract\_equilibrated\_density} & async & LAMMPS engine \\
+& \texttt{extract\_tg} & async & LAMMPS engine \\
+& \texttt{extract\_bulk\_modulus} & async & LAMMPS engine \\
+& \texttt{extract\_end\_to\_end\_vectors} & async & LAMMPS engine \\
+& \texttt{calculate\_rdf} & async & LAMMPS engine \\
+\midrule
+\multirow{4}{*}{Monitoring}
+& \texttt{get\_job\_status} & sync & RadonPy \\
+& \texttt{get\_job\_output} & sync & RadonPy \\
+& \texttt{get\_run\_status} & sync & LAMMPS engine \\
+& \texttt{get\_run\_output} & sync & LAMMPS engine \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\captionof{table}{Representative MCP tools available to the PolyJarvis agent, organized by workflow stage.
+``Sync'' tools return results immediately; ``async'' tools submit background jobs whose status is polled via monitoring tools.
+The complete tool inventory (46 tools: 18 RadonPy, 28 LAMMPS engine) is available at \texttt{https://github.com/arz-2/PolyJarvis}.}\label{tab:si_tool}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Detailed Agent Decision-Making Protocol}
+\label{sec:si_decision_protocol}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+This section expands on the agent's decision-making process summarized in the main text.
+
+\subsection{Polymer Classification and Force Field Selection}
+
+Upon receiving a polymer specification, the agent invokes \texttt{classify\_polymer}, which analyzes the SMILES representation against 21 polymer backbone classes defined in the PoLyInfo classification scheme.\cite{otsuka2011polyinfo}
+The tool returns a structural classification but does not prescribe simulation parameters.
+The agent then selects force field, charge method, and electrostatics handling based on the polymer class and its domain knowledge, reasoning through: (1)~whether the backbone or pendant group contains aromatic rings or polar moieties requiring corrected torsional parameters (GAFF2\_mod\cite{trag2019gaff2mod} vs.\ GAFF2\cite{wang2004gaff}); (2)~whether partial charges are significant enough to warrant quantum-mechanical fitting (RESP vs.\ Gasteiger); and (3)~whether long-range electrostatics (PPPM) are necessary given the polymer's polarity and the simulation stage.
+
+\subsection{Charge Assignment}
+
+For polar polymers, the agent employs the Restrained Electrostatic Potential (RESP) method\cite{bayly1993resp} at the HF/6-31G(d) level using Psi4,\cite{smith2020psi4} following the standard two-stage fitting procedure with hyperbolic restraints ($a_1 = 0.0005$, $a_2 = 0.001$).
+For nonpolar systems, Gasteiger charges are used where partial charges are negligible ($\sim\pm 0.05e$).
+
+% [R1 Minor 10] Tacticity generation/verification — new subsection.
+\subsection{Tacticity}
+\scaffold{R1 Minor 10 --- Tacticity reporting}{%
+aPS and PMMA are tacticity-sensitive; the manuscript must describe how tacticity was handled:
+\begin{itemize}
+\item State the generation method (RadonPy stereochemistry: random/atactic placement of side groups during polymerization) --- verify the actual mechanism in the builder before asserting.
+\item Report whether chains within a run carry a true atactic distribution or a uniform tacticity, and the meso/racemo fraction if available.
+\item Sensitivity (deferred run): pure atactic vs.\ pure syndiotactic PMMA $T_g$ to bound the tacticity effect. \placeholder{values pending}.
+\end{itemize}}
+
+\subsection{System Size and Chain Length}
+
+The agent targets 10 polymer chains per system, consistent with the RadonPy-validated minimum for statistical sampling.\cite{hayashi2022radonpy}
+Chain length $n$ is selected to satisfy two simultaneous criteria: (1) a target total atom count of roughly 6{,}000--15{,}000 atoms, sufficient for reliable property averaging;\cite{hayashi2022radonpy} and (2) chains long enough that backbone conformational statistics approach the infinite-chain limit (i.e., the characteristic ratio $C_\infty$ is reasonably converged).
+
+The primary driver is atoms per repeat unit.
+For monomers with small repeat units (PE: 2 carbons, $\sim$6 atoms; PEG: 3 carbons plus one ether oxygen, $\sim$7 atoms), longer chains are required to reach the target total atom count and to sample realistic backbone conformations, so $n = 100$--150 was used.
+For monomers with bulkier pendant groups (aPS: 8-heavy-atom repeat unit including a phenyl ring, $\sim$16 atoms per repeat; PMMA: 9-heavy-atom repeat unit with an ester side chain, $\sim$15 atoms per repeat), a shorter $n$ already produces a large total system, so $n = 62$ (aPS) and $n = 100$ (PMMA) were assigned.
+
+Chain lengths were further refined across replicate runs based on observed simulation behavior.
+For PE, end-to-end distance statistics from Run~1 ($n = 100$, $\langle R \rangle = 35.5$~\AA{}) indicated that chains were too short to sample realistic random-coil conformations relative to the known characteristic ratio of polyethylene; the agent increased $n$ to 150 for Runs~2--3, raising $\langle R \rangle$ to 68--75~\AA{}.
+Final system sizes ranged from 6{,}020 atoms (PE Run~1) to 15{,}020 atoms (PMMA); full details are in Section~\ref{sec:si_chain_verification}.
+\scaffold{R1 Minor 9 --- Why 10 chains is sufficient}{%
+Justify the 10-chain choice rather than asserting it:
+\begin{itemize}
+\item Cite RadonPy and prior amorphous-homopolymer GAFF2 studies demonstrating density/$T_g$ convergence at $\sim$10 chains for the target atom count.
+\item Acknowledge chain stiffness / side-chain bulk / entanglement may need system-specific finite-size checks.
+\item Alternative if reviewer insists: a small sensitivity test (5 / 10 / 20 chains for one polymer) showing density and $T_g$ stable. \placeholder{values pending if run}.
+\end{itemize}}
+
+\subsection{Equilibration Protocol Design}
+
+The staged equilibration protocol follows the compression/decompression approach of Larsen et al.\cite{larsen2011molecular} and typically consists of: (1)~energy minimization, (2)~NVT heating to 600~K, (3)~NPT compression at elevated temperature, (4)~NPT decompression to 1~atm with full electrostatics, (5)~NPT cooling to the target temperature, and (6)~NVT production.
+The agent adapts the number of stages, annealing cycles, compression method, and electrostatics handling based on polymer chemistry and observed simulation behavior.
+
+All simulations use a 1.0~fs timestep with the velocity-Verlet integrator (2.0~fs when SHAKE constraints are applied to hydrogen bonds).
+Nos\'{e}--Hoover thermostat and barostat damping parameters are set to 100 and 1000 timesteps, respectively.
+Long-range electrostatics are computed using PPPM with relative force accuracy $10^{-6}$, except during compression stages where cutoff-based Coulombic summation may be used to avoid PPPM instabilities.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Property Calculation Methods}
+\label{sec:si_property_methods}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Glass Transition Temperature ($T_g$)}
+
+$T_g$ is determined using a stepwise cooling protocol.\cite{trag2019gaff2mod,strobl2007physics}
+Starting from an equilibrated high-temperature configuration, the system is cooled in discrete temperature steps with NPT simulations at each step.
+The time-averaged density is computed from the last 50\% of each trajectory.
+Cooling ranges and step sizes are adapted by the agent based on each polymer's expected $T_g$.
+Thermal history is preserved by inheriting atomic momenta between temperature steps, avoiding \texttt{velocity create} commands that would destroy relaxation continuity.
+
+$T_g$ is extracted from bilinear fitting of the density--temperature data using the \texttt{extract\_tg} MCP tool (Section~\ref{sec:si_tg_method}).
+
+\subsection{Density}
+
+Density is the time-averaged mass-to-volume ratio during NPT production at 300~K and 1~atm.
+The final 50\% of each trajectory is used for averaging, after confirming equilibration through the \texttt{check\_equilibration} tool.
+All 12 runs used the dedicated NPT production stage (500{,}000 steps at $T = 300$~K, $P = 1$~atm) as the density source.
+
+\subsection{Bulk Modulus}
+
+The isothermal bulk modulus is calculated from volume fluctuations\cite{allen2017computer} during the same NPT production runs used for density:
+\begin{equation}
+K = \frac{k_B T \langle V \rangle}{\langle (\delta V)^2 \rangle}
+\end{equation}
+The first 50\% of each NPT trajectory is discarded as equilibration burn-in.
+Statistical uncertainty is estimated via 5-block averaging.
+
+\subsection{Structural Characterization}
+
+\emph{Radial distribution functions:} Pair correlation functions $g(r)$ are computed using MDAnalysis 2.10.0 on 101-frame NVT trajectories at 300~K with $r_{\max} = 15$~\AA{} and 150 bins.
+
+\emph{End-to-end distance:} The root-mean-square end-to-end distance $\langle R^2 \rangle^{1/2}$ is calculated for each chain after coordinate unwrapping, averaged over 101 NVT frames at 300~K.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{$T_g$ Extraction Methodology}
+\label{sec:si_tg_method}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The \texttt{extract\_tg} MCP tool implements the following procedure:
+
+\begin{enumerate}
+    \item \textbf{Log parsing:} The LAMMPS thermo log is parsed to extract temperature and density columns.
+    \item \textbf{Plateau detection:} Temperature bins exhibiting density drift are identified and excluded from the fit.
+    \item \textbf{Temperature binning:} Thermo rows are grouped by temperature set-point, and only the last 50\% of data points per bin are retained.
+    \item \textbf{F-statistic exhaustive split:} Every possible split point between the 3rd and $(N-3)$th temperature bins is evaluated.
+    For each candidate, separate linear regressions are fitted to the low-$T$ and high-$T$ subsets, and an F-statistic is computed comparing the two-line model to a single-line null.
+    The split yielding the maximum F-statistic is selected as $T_g$.
+    \item \textbf{Physics constraint:} The glassy-regime slope must have smaller magnitude than the rubbery-regime slope ($|b_1| < |b_2|$); splits violating this are rejected.
+    \item \textbf{Quality classification:} EXCELLENT ($R^2 \geq 0.995$ and $F > 50$), GOOD ($R^2 \geq 0.98$ or $F > 20$), ACCEPTABLE ($R^2 \geq 0.95$ or $F > 10$), POOR (otherwise).
+\end{enumerate}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Run-by-Run $T_g$ Summary}
+\label{sec:si_tg_summary}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Table~\ref{tab:si_tg} presents the $T_g$ values from the \texttt{extract\_tg} tool for all 12 production runs.
+These are the definitive values reported in the main text.
+\scaffold{R1 Major 5 / Major 6 --- Expand $T_g$ summary to replicate statistics (deferred)}{%
+\placeholder{Table to be replaced by 9 systems $\times$ 5 replicates}:
+\begin{itemize}
+\item Report per-system mean\,$\pm$\,std across 5 seeds (1001--5005); mark best replicate but do not headline it.
+\item Add a fit-method / cooling-schedule / grid / equilibration-duration sensitivity sub-table (R1M5).
+\item Existing PE/aPS/PMMA/PEG single-replicate rows are interim and will be superseded.
+\end{itemize}}
+
+\begin{table}[H]
+\centering
+\caption{$T_g$ results for all replicate runs from the \texttt{extract\_tg} tool with F-statistic bilinear split and plateau detection.
+$N_{\text{bins}}$ is the number of clean temperature bins; $N_{\text{skip}}$ is the number of drifting bins excluded.
+Bold entries mark the best replicate per polymer.}
+\label{tab:si_tg}
+\small
+\begin{tabular}{llrrrrrl}
+\toprule
+\textbf{System} & \textbf{Run} & $T_g$ (K) & $R^2$ & $F$ & $N_{\text{bins}}$ & $N_{\text{skip}}$ & \textbf{Quality} \\
+\midrule
+\multirow{3}{*}{PE}
+  & 1         & 291 & 0.998 & 79.0 & 38 & 24 & EXCELLENT \\
+  & \textbf{2} & \textbf{281} & \textbf{0.999} & \textbf{95.7} & \textbf{11} & \textbf{1} & \textbf{EXCELLENT} \\
+  & 3         & 304 & 0.997 & 46.8 & 30 & 17 & GOOD \\
+\midrule
+\multirow{3}{*}{aPS}
+  & 1         & 498 & 0.988 & 22.5 & 23 & 22 & GOOD \\
+  & \textbf{2} & \textbf{416} & \textbf{0.996} & \textbf{12.8} & \textbf{15} & \textbf{4} & \textbf{ACCEPTABLE} \\
+  & 3         & 466 & 0.990 & 43.8 & 25 & 12 & GOOD \\
+\midrule
+\multirow{3}{*}{PMMA}
+  & \textbf{1} & \textbf{395} & \textbf{0.998} & \textbf{58.1} & \textbf{16} & \textbf{1} & \textbf{GOOD} \\
+  & 2         & 489 & 0.996 & 2.9  & 9  & 0 & POOR \\
+  & 3         & 473 & 0.988 & 2.3  & 10 & 0 & POOR \\
+\midrule
+\multirow{3}{*}{PEG}
+  & 1         & 273 & 0.998 & 45.3 & 16 & 12 & GOOD \\
+  & 2         & 275 & 1.000 & 15.0 & 9  & 1 & ACCEPTABLE \\
+  & \textbf{3} & \textbf{260} & \textbf{1.000} & \textbf{43.8} & \textbf{17} & \textbf{10} & \textbf{GOOD} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Figures~\ref{fig:si_pe_tg}--\ref{fig:si_peg_tg} show density versus temperature curves with bilinear fits for all replicate runs.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.05\columnwidth]{{figures/PE_all_runs_v3}.png}
+\caption{Density vs.\ temperature with bilinear fits for all three PE runs.}
+\label{fig:si_pe_tg}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.05\columnwidth]{{figures/aPS_all_runs_v3}.png}
+\caption{Density vs.\ temperature with bilinear fits for all three aPS runs.}
+\label{fig:si_aps_tg}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.05\columnwidth]{{figures/PMMA_all_runs_v3}.png}
+\caption{Density vs.\ temperature with bilinear fits for all three PMMA runs.}
+\label{fig:si_pmma_tg}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.05\columnwidth]{{figures/PEG_all_runs_v3}.png}
+\caption{Density vs.\ temperature with bilinear fits for all three PEG runs.}
+\label{fig:si_peg_tg}
+\end{figure}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{System Size and Chain Verification}
+\label{sec:si_chain_verification}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{table}[H]
+\centering
+\caption{System size details for all benchmark polymers, verified against LAMMPS data files.}
+\label{tab:si_system_sizes}
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Polymer (Runs)} & \textbf{$n$} & \textbf{Chains} & \textbf{Atoms/chain} & \textbf{Total atoms} \\
+\midrule
+PE (Run 1)      & 100 & 10 & 602   & 6{,}020  \\
+PE (Runs 2--3)  & 150 & 10 & 902   & 9{,}020  \\
+aPS (all runs)  & 62  & 10 & 994   & 9{,}940  \\
+PMMA (all runs) & 100 & 10 & 1{,}502 & 15{,}020 \\
+PEG (all runs)  & 100 & 10 & 702   & 7{,}020  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Bulk Modulus Calculation Details}
+\label{sec:si_bulk_modulus}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Table~\ref{tab:si_bulk_mod_detail} provides the volume statistics underlying the bulk modulus calculations.
+All values are computed from the last 50\% of the NPT production stage ($T = 300$~K, $P = 1$~atm).
+\scaffold{R1 Major 9 --- Bulk-modulus statistical robustness (SI detail)}{%
+Strengthen S7 (tooling now emits these fields; \placeholder{values pending revision runs}):
+\begin{itemize}
+\item Add columns: volume autocorrelation time $\tau_\text{eff}$, effective sample size $N_\text{eff}$, block-averaged SEM $K_\text{SEM}$.
+\item Add a $\tau_P$ barostat-sensitivity table (PMMA replicate~1, three standalone 5~ns NPT runs): $\tau_P =$ 250 / 1000 / 4000~fs, each row \texttt{$\tau_P$ | $K_\text{fluc}\pm$sem | $\tau_\text{eff}$\% | $K_\text{Born}\pm$sem}.
+\item Expected: $K_\text{Born}$ (NVT) insensitive to $\tau_P$; $K_\text{fluc}$ more sensitive --- report honestly either way.
+\item Note adiabatic ($K_S$, ultrasonic) vs.\ isothermal ($K_T$, PVT/Born) reference distinction and the $C_V/C_P$ conversion.
+\end{itemize}}
+
+\begin{table}[H]
+\centering
+\caption{Bulk modulus from NPT volume fluctuations.
+$K_{\text{SEM}}$ is the standard error across 5 trajectory blocks.}
+\label{tab:si_bulk_mod_detail}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{System} & $K$ (GPa) & $K_{\text{SEM}}$ (GPa) & $\langle V \rangle$ (\AA$^3$) & $\sigma_V$ (\AA$^3$) \\
+\midrule
+PE Run 1   & 2.56 & 0.28 & 56{,}588  & 303 \\
+PE Run 2   & 2.89 & 0.40 & 83{,}825  & 347 \\
+PE Run 3   & 3.17 & 0.08 & 83{,}863  & 331 \\
+\midrule
+aPS Run 1  & 2.18 & 0.12 & 107{,}538 & 452 \\
+aPS Run 2  & 2.84 & 0.27 & 107{,}855 & 397 \\
+aPS Run 3  & 3.12 & 0.09 & 107{,}769 & 378 \\
+\midrule
+PMMA Run 1 & 3.44 & 0.17 & 163{,}382 & 443 \\
+PMMA Run 2 & 3.79 & 0.22 & 161{,}034 & 419 \\
+PMMA Run 3 & 3.04 & 0.47 & 164{,}171 & 473 \\
+\midrule
+PEG Run 1  & 2.88 & 0.46 & 66{,}687  & 310 \\
+PEG Run 2  & 2.60 & 0.37 & 66{,}529  & 325 \\
+PEG Run 3  & 2.99 & 0.47 & 67{,}024  & 305 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Structural Characterization}
+\label{sec:si_structural}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Radial Distribution Functions}
+
+All computed RDFs satisfy two criteria for amorphous equilibration quality: (1) first-neighbor bond peaks match GAFF2/GAFF2\_mod equilibrium bond lengths within 0.02~\AA{}; (2) $g(r) \to 1.0$ within 0.5\% at $r = 15$~\AA{}.
+Figures~\ref{fig:si_rdf_pe}--\ref{fig:si_rdf_peg} show per-system RDFs with all three replicate runs overlaid, demonstrating structural reproducibility across independent simulations.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\columnwidth]{figures/rdf_PE_all_runs.png}
+\caption{PE radial distribution functions: backbone c$_3$--c$_3$ pair for all three runs.}
+\label{fig:si_rdf_pe}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/rdf_aPS_all_runs.png}
+\caption{aPS radial distribution functions: backbone c$_3$--c$_3$ (left) and aromatic c$_a$--c$_a$ (right) pairs for all three runs.}
+\label{fig:si_rdf_aps}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/rdf_PMMA_all_runs.png}
+\caption{PMMA radial distribution functions: backbone c$_3$--c$_3$ (left) and backbone--carbonyl c$_3$--c (right) pairs for all three runs.}
+\label{fig:si_rdf_pmma}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/rdf_PEG_all_runs.png}
+\caption{PEG radial distribution functions: backbone c$_3$--c$_3$ (left) and ether c$_3$--o$_s$ (right) pairs for all three runs.}
+\label{fig:si_rdf_peg}
+\end{figure}
+
+Full per-pair RDF data are available as CSV files in the data repository.
+
+\subsection{End-to-End Distance}
+
+For aPS and PE, 300~K falls below the simulated $T_g$ (glassy state), meaning chains are conformationally frozen.
+The $\langle R \rangle$ values reported in the main text reflect quenched configurations rather than equilibrium chain statistics.
+Reliable equilibrium $C_\infty$ values would require above-$T_g$ simulations with multi-nanosecond trajectories.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Per-Run Simulation Parameters}
+\label{sec:si_per_run_params}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Tables~\ref{tab:si_pe_params}--\ref{tab:si_peg_params} document the complete simulation parameters for each production run.
+All property values are from the Lambda server \texttt{properties.log} files.
+\scaffold{R1 Major 2 / Major 5 --- Expand per-run parameters to 9 systems (deferred)}{%
+\placeholder{Add per-run parameter tables for PLA, PVC, PSU, cis-PBD, PEEK and the PE/aPS/PMMA/PEG replicate re-runs (seeds 1001--5005)}. Record force field, charges, seed, $T_g$ range/step, and resulting $T_g$/$\rho$/$K$ per replicate.}
+
+\begin{table}[H]
+\centering
+\caption{Per-run parameters for polyethylene (PE).}
+\label{tab:si_pe_params}
+\small
+\begin{tabular}{llll}
+\toprule
+\textbf{Parameter} & \textbf{Run 1} & \textbf{Run 2} & \textbf{Run 3} \\
+\midrule
+Force field & GAFF2 & GAFF2 & GAFF2 \\
+Charges & Gasteiger & Gasteiger & Gasteiger \\
+Pair style & lj/cut 12.0 & lj/cut 12.0 + tail & lj/cut 12.0 \\
+$n$ / chains / atoms & 100 / 10 / 6{,}020 & 150 / 10 / 9{,}020 & 150 / 10 / 9{,}020 \\
+Timestep (fs) & 1.0 (SHAKE) & 2.0 (SHAKE) & 1.0 (SHAKE) \\
+Eq.\ stages & 8 & 8 & 9 \\
+$T_g$ range (K) & 600$\to$160 & 500$\to$80 & 500$\to$80 \\
+$T_g$ step / time & 20~K / 0.5~ns & 30~K / 0.2--1~ns & 10~K / 1--2~ns \\
+\midrule
+$T_g$ (K) & 291 & \textbf{281} & 304 \\
+$\rho_{300\text{K}}$ (g/cm$^3$) & 1.0607 & 1.0735 & 1.0730 \\
+$K$ (GPa) & 2.56 & 2.89 & 3.17 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Per-run parameters for atactic polystyrene (aPS).}
+\label{tab:si_aps_params}
+\small
+\begin{tabular}{llll}
+\toprule
+\textbf{Parameter} & \textbf{Run 1} & \textbf{Run 2} & \textbf{Run 3} \\
+\midrule
+Force field & GAFF2\_mod & GAFF2\_mod & GAFF2\_mod \\
+Charges & RESP (HF/6-31G*) & RESP (HF/6-31G*) & RESP (HF/6-31G*) \\
+Pair style (eq.) & coul/charmm $\to$ PPPM & coul/charmm $\to$ PPPM & lj/cut $\to$ PPPM \\
+Pair style ($T_g$) & coul/long + PPPM & coul/charmm & coul/long + PPPM \\
+$n$ / chains / atoms & 62 / 10 / 9{,}940 & 62 / 10 / 9{,}940 & 62 / 10 / 9{,}940 \\
+Timestep (fs) & 1.0 & 1.0 & 1.0 \\
+Eq.\ stages & 6 & 12 & 8 \\
+$T_g$ range (K) & 600$\to$200 & 550$\to$250 & 600$\to$250 \\
+$T_g$ step / time & 25~K / 0.5--1~ns & 25~K / 0.5--1~ns & 25~K / 0.5~ns \\
+\midrule
+$T_g$ (K) & 498 & \textbf{416} & 466 \\
+$\rho_{300\text{K}}$ (g/cm$^3$) & 1.0557 & 1.0526 & 1.0535 \\
+$K$ (GPa) & 2.18 & 2.84 & 3.12 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Per-run parameters for poly(methyl methacrylate) (PMMA).}
+\label{tab:si_pmma_params}
+\small
+\begin{tabular}{llll}
+\toprule
+\textbf{Parameter} & \textbf{Run 1} & \textbf{Run 2} & \textbf{Run 3} \\
+\midrule
+Force field & GAFF2\_mod & GAFF2\_mod & GAFF2\_mod \\
+Charges & RESP (HF/6-31G*) & RESP (HF/6-31G*) & RESP (HF/6-31G*) \\
+Pair style (eq.) & PPPM (fix deform) & lj/cut $\to$ PPPM & PPPM \\
+Pair style ($T_g$) & PPPM & PPPM & PPPM \\
+$n$ / chains / atoms & 100 / 10 / 15{,}020 & 100 / 10 / 15{,}020 & 100 / 10 / 15{,}020 \\
+Timestep (fs) & 1.0 & 1.0 & 1.0 \\
+Eq.\ stages & 6 & 4 & 4 \\
+$T_g$ range (K) & 550$\to$250 & 550$\to$270 & 540$\to$270 \\
+$T_g$ step / time & 20~K / 0.5~ns & 30~K / 0.5~ns & 30~K / 0.5~ns \\
+\midrule
+$T_g$ (K) & \textbf{395} & 489 & 473 \\
+$\rho_{300\text{K}}$ (g/cm$^3$) & 1.1202 & 1.1365 & 1.1148 \\
+$K$ (GPa) & 3.44 & 3.79 & 3.04 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Per-run parameters for poly(ethylene glycol) (PEG).}
+\label{tab:si_peg_params}
+\small
+\begin{tabular}{llll}
+\toprule
+\textbf{Parameter} & \textbf{Run 1} & \textbf{Run 2} & \textbf{Run 3} \\
+\midrule
+Force field & GAFF2 & GAFF2\_mod & GAFF2 \\
+Charges & RESP (HF/6-31G*) & RESP (HF/6-31G*) & RESP (HF/6-31G*) \\
+Pair style & coul/long + PPPM & coul/long + PPPM & coul/long + PPPM \\
+$n$ / chains / atoms & 100 / 10 / 7{,}020 & 100 / 10 / 7{,}020 & 100 / 10 / 7{,}020 \\
+Timestep (fs) & 2.0 (SHAKE) & 2.0 (SHAKE) & 2.0 (SHAKE) \\
+Eq.\ stages & 6 & 6 & 6 \\
+$T_g$ range (K) & 420$\to$180 & 400$\to$240 & 440$\to$200 \\
+$T_g$ step / time & 20~K / 1~ns & 20~K / 2~ns & 20~K / 2~ns \\
+\midrule
+$T_g$ (K) & 273 & 275 & \textbf{260} \\
+$\rho_{300\text{K}}$ (g/cm$^3$) & 1.0995 & 1.1021 & 1.0939 \\
+$K$ (GPa) & 2.88 & 2.60 & 2.99 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Agent Decision Logs}
+\label{sec:si_decision_logs}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Table~\ref{tab:si_decisions} summarizes the key decisions made by the agent for each polymer system.
+Complete agent conversation logs are available in the data repository.
+
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lll}
+\toprule
+\textbf{Polymer} & \textbf{Decision} & \textbf{Rationale} \\
+\midrule
+\multirow{3}{*}{PE}
+& GAFF2 + Gasteiger charges & CH$_2$ partial charges negligible ($\sim\pm 0.05e$) \\
+& lj/cut (no electrostatics) & Nonpolar; Coulombics unnecessary \\
+& $n$: 100 $\to$ 150 after Run~1 & Improve chain statistics \\
+\midrule
+\multirow{3}{*}{aPS}
+& GAFF2\_mod + RESP charges & Aromatic pendant requires torsional corrections \\
+& 6 $\to$ 12 eq.\ stages after Run~1 & Run~1 poor $T_g$ fit; added triple annealing \\
+& Removed PPPM in Run~2 $T_g$ sweep & Cutoff Coulombics adequate; $\sim$40\% speedup; reverted in Run~3 \\
+\midrule
+\multirow{3}{*}{PMMA}
+& GAFF2\_mod + RESP charges & Ester side chain requires torsional corrections \\
+& fix deform for compression & PPPM out-of-range atom errors with NPT barostat \\
+& Fixed velocity re-init bug & velocity create at each $T$ step destroyed thermal history \\
+\midrule
+\multirow{2}{*}{PEG}
+& GAFF2 + RESP charges & GAFF2\_mod rejected after Run~2 (density error) \\
+& Doubled sampling to 2~ns/step & Improve density convergence per temperature \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\captionof{table}{Key agent decisions per polymer system.}\label{tab:si_decisions}
+
+Table~\ref{tab:si_errors} categorizes the errors encountered and autonomously resolved by the agent.
+\scaffold{R1 Major 11 --- Reproducible error-recovery benchmark (FULLY PENDING)}{%
+\textbf{Do not populate from prior exploratory runs.} Assemble \emph{after} the 9-system revision runs complete:
+\begin{itemize}
+\item Reframe as a per-incident benchmark table --- columns: polymer, stage, error class, recovery action, \textbf{pre-scripted vs.\ Tier-3 (LLM-inferred)}, \#retries (including failed attempts), outcome.
+\item Record how much human guidance each recovery needed; report an overall success rate.
+\item Distinguish hard-coded recovery paths from LLM-composed ones explicitly.
+\item \placeholder{Full table + final error count pending revision-run logs}.
+\end{itemize}}
+
+\begin{table}[H]
+\centering
+\caption{Error categories and autonomous resolutions.}
+\label{tab:si_errors}
+\small
+\begin{tabular}{lcl}
+\toprule
+\textbf{Error Category} & \textbf{Count} & \textbf{Resolution} \\
+\midrule
+PPPM out-of-range atoms & 4 & Switch to cutoff Coulomb or fix deform \\
+Pair style mismatch & 3 & Regenerate scripts with correct coefficients \\
+Velocity re-initialization & 2 & Remove velocity create from non-first scripts \\
+Poor $T_g$ fit & 4 & Adjust bin width; rerun with plateau detection \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Equilibration Convergence Metrics}
+\label{sec:si_convergence}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Equilibration quality was assessed for all 12 runs using the NPT production stage at 300~K and 1~atm.
+Four metrics were computed from the last 50\% of each trajectory: (1)~density drift, (2)~density block-averaged SEM, (3)~energy drift, and (4)~energy block-averaged SEM.
+Table~\ref{tab:si_convergence} summarizes the results; 11/12 runs pass convergence thresholds.
+
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrrrrrrrrl}
+\toprule
+\textbf{System} & $N_{\text{prod}}$ & $\langle \rho \rangle$ (g/cm$^3$) & $\rho$ drift (\%) & $\rho$ SEM (\%) & $\langle E \rangle$ (kcal/mol) & $E$ drift (\%) & $E$ SEM (\%) & \textbf{Status} \\
+\midrule
+PE Run 1   & 501  & 1.0607 & 0.45 & 0.13 & 8{,}881   & 0.72 & 0.13 & Pass \\
+PE Run 2   & 501  & 1.0735 & 0.53 & 0.10 & 13{,}209  & 0.02 & 0.03 & Pass \\
+PE Run 3   & 501  & 1.0730 & 0.29 & 0.08 & 12{,}973  & 0.10 & 0.05 & Pass \\
+\midrule
+aPS Run 1  & 501  & 1.0557 & 0.51 & 0.10 & 29{,}144  & 0.004 & 0.02 & Pass \\
+aPS Run 2  & 501  & 1.0526 & 0.29 & 0.04 & 16{,}137  & 0.06 & 0.02 & Pass \\
+aPS Run 3  & 501  & 1.0535 & 0.06 & 0.04 & 16{,}096  & 0.01 & 0.03 & Pass \\
+\midrule
+PMMA Run 1 & 501  & 1.1202 & 0.04 & 0.01 & 76{,}325  & 0.05 & 0.009 & Pass \\
+PMMA Run 2 & 501  & 1.1365 & 0.12 & 0.02 & 76{,}369  & 0.01 & 0.005 & Pass \\
+PMMA Run 3 & 502 & 1.1148 & 0.14 & 0.04 & 77{,}131  & 0.05 & 0.012 & Pass \\
+\midrule
+PEG Run 1  & 501  & 1.0995 & 0.25 & 0.05 & 23{,}281  & 0.25 & 0.04 & Pass \\
+PEG Run 2  & 501  & 1.1021 & 0.48 & 0.12 & 24{,}234  & 0.18 & 0.03 & Pass \\
+PEG Run 3  & 501  & 1.0939 & 0.68 & 0.10 & 23{,}361  & 0.24 & 0.04 & Pass \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\captionof{table}{Convergence metrics for all 12 runs, computed from the bulk modulus NPT production stage (300~K, 1~atm).
+$N_{\text{prod}}$ is the number of production frames (last 50\% of trajectory).
+Drift is expressed as a percentage of the mean; SEM is the block-averaged standard error (5 blocks) as a percentage of the mean.}\label{tab:si_convergence}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Computational Resources and Cost Summary}
+\label{sec:si_cost}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Molecular construction was performed locally (Ubuntu 22.04, RadonPy 0.2.10).
+GPU-accelerated LAMMPS simulations ran on Lambda Labs infrastructure (4$\times$ NVIDIA Quadro RTX 6000, 24~GB each).
+\scaffold{R1 Minor 13 --- Computational cost detail}{%
+Extend the wall-time table and add cost accounting (\placeholder{values pending revision runs}):
+\begin{itemize}
+\item Columns: GPU-hours per polymer, LLM API-call count, approximate API cost, failure/retry overhead.
+\item Campaign total GPU-hours across all 9 systems $\times$ 5 replicates.
+\item Tie back to the practical-usability argument in the main text (R1 Minor 13 main-text summary).
+\end{itemize}}
+
+\begin{table}[H]
+\centering
+\caption{Approximate wall-clock times per polymer.}
+\label{tab:si_walltimes}
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Polymer} & \textbf{Equilibration} & $T_g$ \textbf{Sweep} & \textbf{Total (3 runs)} \\
+\midrule
+PE & 2--5 h & 7--12 h & $\sim$50 h \\
+aPS & 5--20 h & 12--18 h & $\sim$100 h \\
+PMMA & 8--15 h & 10--24 h & $\sim$110 h \\
+PEG & 3--8 h & 8--15 h & $\sim$65 h \\
+\midrule
+\textbf{Total} & & & $\sim$325 GPU-h \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\bibliography{reference}
+
+\end{document}

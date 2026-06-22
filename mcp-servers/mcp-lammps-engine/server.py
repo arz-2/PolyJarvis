@@ -1147,6 +1147,7 @@ def generate_equilibration_workflow(
     melt_npt_steps: Optional[int] = None,
     add_300k_production: bool = True,
     engine: str = "gpu",
+    velocity_seed: Optional[int] = None,
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
@@ -1327,6 +1328,7 @@ def generate_equilibration_workflow(
                 output_path=script,
                 params=p,
                 data_file_override=prev_data,
+                velocity_seed=velocity_seed,
             )
             return {
                 "name":            name,
@@ -2797,6 +2799,7 @@ def run_bulk_modulus_series(
     use_trappe: bool = False,
     use_pcff: bool = False,
     use_opls: bool = False,
+    engine: str = "gpu",
 ) -> dict:
     """
     Run a series of constant-pressure NPT simulations to support Murnaghan
@@ -2830,6 +2833,11 @@ def run_bulk_modulus_series(
                         flag in generate_equilibration_workflow and generate_script.
         use_pcff:       Set True for PCFF (Class II) systems. Emits pppm + class2 pair.
         use_opls:       Set True for OPLS-AA systems. Emits pppm + lj/cut/coul/long.
+        engine:         Launch engine forwarded to run_lammps_chain: "kokkos"
+                        (full-offload; canonical for PCFF/OPLS PPPM cells, mpi=1),
+                        "gpu" (GPU package; default), or "cpu". Must match the
+                        per-FF hardware_policy default or the chain runs the wrong
+                        binary (PCFF on the GPU package is CPU-bound).
 
     Returns:
         dict with chain_id, monitor_command, log_files (list of expected log paths),
@@ -2870,6 +2878,7 @@ def run_bulk_modulus_series(
                     "THERMO_FREQ": thermo_freq,
                     "LOG_FILE":    log_path,
                     "use_gpu":     True,
+                    "engine":      engine,
                     "use_trappe":  use_trappe,
                     "use_pcff":    use_pcff,
                     "use_opls":    use_opls,
@@ -2888,7 +2897,7 @@ def run_bulk_modulus_series(
                 "name":     tag,
                 "script":   script_path,
                 "work_dir": stage_dir,
-                "log_file": log_path,
+                "log_file": f"{tag}_stdout.log",  # basename only; chain prepends work_dir. LAMMPS writes thermo to log_path via the 'log' directive in the .in file.
             })
 
         # Save log file manifest alongside output
@@ -2902,6 +2911,7 @@ def run_bulk_modulus_series(
             mpi=mpi,
             gpu_ids=gpu_ids,
             data_file=data_file,
+            engine=engine,
         )
         if chain_result.get("status") == "error":
             return chain_result

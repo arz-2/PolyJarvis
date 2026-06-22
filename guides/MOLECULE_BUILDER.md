@@ -26,7 +26,10 @@ EMC builds the amorphous cell and assigns all FF parameters in one step — no c
 
 ```python
 import random
-emc_seed = random.randint(1, 999999)   # never use seed=-1; EMC doesn't return the used seed
+# Use the pinned seed from the prompt (`emc_seed:`) when given — that is how replication
+# studies (guides/REVISION_PARAMS.md) reproduce the exact cell. Only draw a random seed
+# when the prompt's emc_seed is null. NEVER use seed=-1 (EMC doesn't return the used seed).
+emc_seed = emc_seed_from_prompt if emc_seed_from_prompt is not None else random.randint(1, 999999)
 job = submit_emc_cell_job(
     smiles="...",
     polymer_class="PCBN",
@@ -146,4 +149,4 @@ save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="
 
 ---
 
-**→ When `cell.data` is saved, return the RESULT block. The orchestrator decides next steps.**
+**→ When `cell.data` is saved, return the RESULT block.**

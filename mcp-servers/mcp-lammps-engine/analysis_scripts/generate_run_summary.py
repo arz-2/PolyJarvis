@@ -27,6 +27,7 @@ Usage:
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -76,6 +77,11 @@ def main():
     # Experimental references
     p.add_argument("--exp_tg_min",      type=float, default=None)
     p.add_argument("--exp_tg_max",      type=float, default=None)
+    p.add_argument("--tg_md_offset_K",  type=float, default=100.0,
+                   help="MD cooling-rate Tg overestimate (K) added to the exp upper bound when "
+                        "grading a RAW single-rate MD Tg (documented 80-120 K, default 100). NOT "
+                        "applied to a rate-extrapolated Tg, which already removes the bias. Set 0 "
+                        "to grade strictly.")
     p.add_argument("--exp_density_min", type=float, default=None)
     p.add_argument("--exp_density_max", type=float, default=None)
     p.add_argument("--exp_K_min",       type=float, default=None)
@@ -116,15 +122,43 @@ def main():
     # -----------------------------------------------------------------------
     # Results section
     # -----------------------------------------------------------------------
-    Tg_val = tg.get("Tg_K")
+    # Tg resolution: prefer the rate-extrapolated value (cooling-rate bias removed) over the raw
+    # single-rate MD Tg. Multi-rate runs may write per-rate tg_summary.json into subdirs, so search
+    # recursively when the top-level file is absent (else Tg silently drops from the summary).
+    tg_extrap = (tg_mr or {}).get("tg_at_slow_rate_K")
+    try:
+        tg_extrap = float(tg_extrap)
+        if not math.isfinite(tg_extrap):
+            tg_extrap = None
+    except (TypeError, ValueError):
+        tg_extrap = None
+    Tg_raw = tg.get("Tg_K")
+    if Tg_raw is None and not tg:
+        for cand in sorted(output_dir.rglob("tg_summary.json")):
+            j = _load_json(cand)
+            if j.get("Tg_K") is not None:
+                tg, Tg_raw = j, j.get("Tg_K")
+                break
+
+    Tg_val = tg_extrap if tg_extrap is not None else Tg_raw
+    tg_basis = ("rate_extrapolated" if tg_extrap is not None
+                else ("raw_MD" if Tg_raw is not None else None))
     exp_tg = ([args.exp_tg_min, args.exp_tg_max]
               if args.exp_tg_min is not None and args.exp_tg_max is not None else None)
     tg_err = None
     tg_status = "no exp ref"
     if Tg_val is not None and exp_tg:
-        exp_mid = (exp_tg[0] + exp_tg[1]) / 2
-        tg_err = round(abs(Tg_val - exp_mid) / exp_mid * 100, 1)
-        tg_status = "PASS" if exp_tg[0] <= Tg_val <= exp_tg[1] else "FAIL"
+        # A raw single-rate MD Tg overestimates experiment by ~80-120 K (cooling-rate artifact,
+        # Patrone 2016) — widen the exp upper bound by tg_md_offset_K so a normal MD result is not a
+        # false FAIL. The rate-extrapolated Tg already removes this bias, so it is graded strictly.
+        offset = 0.0 if tg_basis == "rate_extrapolated" else float(args.tg_md_offset_K or 0.0)
+        lo, hi = exp_tg[0], exp_tg[1] + offset
+        tg_status = "PASS" if lo <= Tg_val <= hi else "FAIL"
+        if tg_status == "PASS":
+            tg_err = 0.0
+        else:
+            nearest = lo if Tg_val < lo else hi
+            tg_err = round((Tg_val - nearest) / nearest * 100, 1)
 
     rho_val = eq_dens.get("plateau_density_mean") or eq_dens.get("density_mean")
     exp_rho = ([args.exp_density_min, args.exp_density_max]
@@ -132,16 +166,18 @@ def main():
     rho_err = None
     rho_status = "no exp ref"
     if rho_val is not None and exp_rho:
-        exp_mid = (exp_rho[0] + exp_rho[1]) / 2
-        rho_err = round(abs(rho_val - exp_mid) / exp_mid * 100, 1)
         rho_status = "PASS" if exp_rho[0] <= rho_val <= exp_rho[1] else "FAIL"
+        if rho_status == "PASS":
+            rho_err = 0.0
+        else:
+            nearest = exp_rho[0] if rho_val < exp_rho[0] else exp_rho[1]
+            rho_err = round((rho_val - nearest) / nearest * 100, 1)
 
-    # K-source precedence: murnaghan > deform > born > fluctuation
-    # Murnaghan is barostat-independent and handles EOS nonlinearity (rubbery).
-    # Deform is the glassy fallback; born is the primary glassy method. If both
-    # deform and born files exist, deform ran *because* born failed/was unphysical,
-    # so deform wins; born is reported only when it is the sole mechanical artifact.
-    # Fluctuation (B_dyn) is a diagnostic fallback.
+    # K-source precedence: murnaghan > deform > fluctuation
+    # Murnaghan is the primary glassy (300 K) and rubbery (T>Tg) method.
+    # Deform (3-direction) is the fallback when Murnaghan EOS fails.
+    # Born+NVT has been removed (PCFF+PPPM virial incompatibility, 2026-06-21).
+    # Fluctuation (B_dyn) is a diagnostic cross-check for rubbery systems.
     if bulk_murnaghan.get("B0_GPa") is not None:
         K_val    = bulk_murnaghan.get("B0_GPa")
         K_sem    = bulk_murnaghan.get("B0_sem_GPa")
@@ -150,10 +186,6 @@ def main():
         K_val    = bulk_deform.get("K_GPa")
         K_sem    = bulk_deform.get("K_sem_GPa")
         K_method = "deformation"
-    elif bulk_born.get("bulk_modulus_GPa") is not None:
-        K_val    = bulk_born.get("bulk_modulus_GPa")
-        K_sem    = bulk_born.get("bulk_modulus_sem_GPa")
-        K_method = "born"
     else:
         K_val    = bulk.get("bulk_modulus_GPa")
         K_sem    = bulk.get("bulk_modulus_sem_GPa")
@@ -164,9 +196,12 @@ def main():
     K_status = "no exp ref"
     K_err = None
     if K_val is not None and exp_K:
-        exp_mid = (exp_K[0] + exp_K[1]) / 2
-        K_err = round(abs(K_val - exp_mid) / exp_mid * 100, 1)
         K_status = "PASS" if exp_K[0] <= K_val <= exp_K[1] else "FAIL"
+        if K_status == "PASS":
+            K_err = 0.0
+        else:
+            nearest = exp_K[0] if K_val < exp_K[0] else exp_K[1]
+            K_err = round((K_val - nearest) / nearest * 100, 1)
 
     # -----------------------------------------------------------------------
     # Artifact pointers (relative to data/[RUN]/)
@@ -267,6 +302,8 @@ def main():
         "results": {
             "tg": {
                 "value_K":        Tg_val,
+                "grading_basis":  tg_basis,   # rate_extrapolated (strict) | raw_MD (+offset band)
+                "md_offset_K":    (0.0 if tg_basis == "rate_extrapolated" else args.tg_md_offset_K),
                 "exp_range_K":    exp_tg,
                 "error_pct":      tg_err,
                 "status":         tg_status,

@@ -44,6 +44,8 @@ workflow = generate_equilibration_workflow(
     use_trappe=lammps_flags["use_trappe"],
     params_file="{work_dir}/emc_build.params",  # EMC only — omit for RadonPy
     npt_prod_steps=npt_prod_steps,               # from prompt
+    engine=engine,                               # from prompt — selects deck (kokkos: no `package gpu` line)
+    velocity_seed=velocity_seed,                 # from prompt — pin `velocity all create` RNG (null = random)
 )
 ```
 
@@ -62,6 +64,7 @@ result = run_lammps_chain(
     mpi=mpi,
     data_file="{work_dir}/cell.data",
     params_file="{work_dir}/emc_build.params",  # EMC only
+    engine=engine,                              # from prompt — MUST match the workflow's engine
 )
 w = watch_run(result["chain_id"])
 # Return chain_id and w["monitor_command"] to orchestrator — do not call Monitor.

@@ -10,12 +10,17 @@ Inspect which inputs are non-null in your prompt:
 
 | Condition | Tool | Method | JSON written |
 |-----------|------|--------|-------------|
-| `born_matrix_file` non-null | `extract_bulk_modulus_born` | `born_nvt` | `bulk_modulus_born.json` |
-| `deform_log_path` non-null | `extract_bulk_modulus_deform` | `deformation` | `deform_analysis.json` |
 | `murnaghan_log_files` non-null | `extract_bulk_modulus_murnaghan` + `extract_bulk_modulus` (diagnostic) | `murnaghan` | `bulk_modulus_murnaghan.json` |
+| `deform_log_path` non-null | `extract_bulk_modulus_deform` | `deformation` | `bulk_modulus_deform.json` |
 | all null | `extract_bulk_modulus` | `fluctuation` | `bulk_modulus.json` |
 
+**Born+NVT has been removed from the pipeline.** `born_matrix_file` and `born_log_path` are always null in standard runs. Do not call `extract_bulk_modulus_born`. See `guides/BORN_MATRIX.md` for the removal rationale (PCFF+PPPM virial incompatibility, failed 3/3 pipeline runs).
+
 Only one path runs per invocation. The `murnaghan` path additionally calls `extract_bulk_modulus(npt_prod_log)` in parallel for a diagnostic B_dyn cross-check (write to same `output_dir`; not the reported K).
+
+**Glassy (is_glassy=True) path:** Murnaghan at 300 K is primary (murnaghan_log_files non-null). 3-direction deform is fallback when Murnaghan fails (`fit_converged=False` or `B0_prime` outside [4, 20]).
+
+**Rubbery (is_glassy=False) path:** Murnaghan at T>Tg (bm_pressures_atm set) or volume fluctuation (no pressures). Unchanged.
 
 ---
 
@@ -29,7 +34,6 @@ graphs_dir = "/home/arz2/PolyJarvis/data/<run_name>/graphs/"
 ```
 
 Tools that produce PNG figures:
-- `extract_bulk_modulus_born` → `born_timeseries.png` (Born element convergence)
 - `extract_bulk_modulus_deform` → `stress_strain.png`
 - `extract_bulk_modulus_murnaghan` → `murnaghan_eos.png`
 - `extract_bulk_modulus` → `volume_fluctuations.png`
@@ -38,47 +42,9 @@ Omitting `output_dir` means JSON files land next to the input log — `generate_
 
 ---
 
-## Tool: `extract_bulk_modulus_born`
-
-Use for glassy polymers — Born + NVT stress-fluctuation method.
-
-**Call signature:**
-```python
-extract_bulk_modulus_born(
-    born_matrix_file=born_matrix_file,   # fix ave/time output from nvt_born
-    log_file=born_log_path,              # NVT thermo log (pxx, pyy, pzz, vol, temp)
-    n_atoms=born_n_atoms,                # from born-worker RESULT
-    eq_fraction=0.5,                     # discard first 50% as burn-in
-    output_dir=output_dir,
-    graphs_dir=graphs_dir,
-)
-```
-
-**Result fields:**
-- `bulk_modulus_GPa` — K_T (the reported value)
-- `K_Born_GPa` — Born elastic contribution
-- `kinetic_term_GPa` — NkT/V correction
-- `fluctuation_correction_GPa` — (V/kT)·Var(P) correction (subtracted)
-- `bulk_modulus_sem_GPa` — uncertainty via block averaging (None if insufficient data)
-- `V_mean_A3`, `T_mean_K` — thermodynamic state
-- `Var_P_atm2` — pressure variance
-- `n_effective_samples`, `warnings`, `diagnostics`
-
-**Acceptance:**
-- `K_T > 0` — negative K_T means the fluctuation correction dominates; run is too short or system is not glassy
-- `K_Born_GPa > 0.5` — very low Born term is unusual for a glassy polymer; check log convergence
-- `fluctuation_correction_GPa < 0.5 × K_Born_GPa` — if fluctuation dominates, K_T is unreliable
-
-**Reporting (R1M9 — include in RESULT block):**
-- `bulk_modulus_sem_GPa`, `n_effective_samples`
-- Derived: `tau_ac_ps = (born_run_ns × 1e3 × (1 − eq_fraction)) / (2 × n_effective_samples)`
-- Gate: N_eff < 20 → add WARNING "born run too short for reliable block averaging; consider extending"
-
----
-
 ## Tool: `extract_bulk_modulus_deform`
 
-Use for glassy polymers (recovery fallback after born-worker failure) — stress-strain fit from `npt_deform` log.
+Use for glassy polymers (fallback when Murnaghan fails) — stress-strain fit from `npt_deform` log.
 
 **Call signature:**
 ```python
@@ -96,14 +62,15 @@ extract_bulk_modulus_deform(
 **Acceptance criteria:**
 - Both `fit_r2_C11` and `fit_r2_C12_yy` ≥ 0.90
 - K > 0 and G > 0
-- `isotropy_delta_pct` < 20%
+- `isotropy_delta_pct` < 20% — **hard gate**. If ≥ 20%, flag K as BORDERLINE (lower confidence). This is not advisory; a 24% anisotropy (PVC1) means C12_yy and C12_zz disagree by ~25%, so K = (C11 + C12_yy + C12_zz)/3... ± 12%, which is unreliable. For 3-direction deform runs, check K_std/K_mean < 20% instead.
 
 **Result fields:**
 - `C11_GPa`, `C12_GPa`, `K_GPa`, `G_GPa`, `E_GPa`, `nu_Poisson`
 - `fit_r2_C11`, `fit_r2_C12_yy`, `isotropy_delta_pct`
+- `avg_window_frames` — rolling-average window applied to stress before fitting (default 2000 frames). The R² values are on the smoothed series, which is correct: raw thermal noise (~0.2 GPa at THERMO_FREQ=100) swamps the elastic signal (~0.09 GPa at 3% strain). High R² on smoothed data is meaningful; raw R² is not. The real quality indicators are `isotropy_delta_pct` and the physical plausibility of K, G, E (PVC1: K=1.68 GPa is low; PEEK1: K=3.53 GPa is plausible).
 - `stress_strain_csv`, `summary_json`
 
-**Reporting (R1M9):** Deterministic stress-strain fit — no autocorrelation concern. Report `fit_r2_C11` and `fit_r2_C12_yy` as the reliability indicators.
+**Reporting (R1M9):** Report `fit_r2_C11`, `fit_r2_C12_yy`, `isotropy_delta_pct`, and `avg_window_frames`. If `isotropy_delta_pct` ≥ 20%, include WARNING "K estimate is BORDERLINE — anisotropy exceeds 20%; Murnaghan path should have been primary".
 
 ---
 
@@ -137,7 +104,7 @@ extract_bulk_modulus_murnaghan(
 - B0' in [4, 20] — outside this range is unphysical for polymers
 - `r_squared ≥ 0.999` for a 5-point series; lower suggests poor equilibration at one or more pressures
 
-**Reporting (R1M9 — include in RESULT block):** `bulk_modulus_sem_GPa`, `r_squared`, `B0_prime`
+**Reporting (include in RESULT block):** `bulk_modulus_sem_GPa`, `r_squared`, `B0_prime`
 
 ---
 
@@ -167,7 +134,7 @@ extract_bulk_modulus(
 - `tau_eff_frames`, `tau_eff_fraction`, `n_effective_samples`
 - `diagnostics` — T, P, density means + volume drift check
 
-**Reporting (R1M9 — include in RESULT block):** `bulk_modulus_sem_GPa`, `n_effective_samples`, `tau_eff_frames`, `tau_eff_fraction`
+**Reporting (include in RESULT block):** `bulk_modulus_sem_GPa`, `n_effective_samples`, `tau_eff_frames`, `tau_eff_fraction`
 
 ---
 
@@ -175,8 +142,10 @@ extract_bulk_modulus(
 
 **`extract_bulk_modulus` gives unreasonable K (< 0.1 GPa or > 20 GPa):** Not fully equilibrated — `diagnostics.drift_check` will warn. Increase `eq_fraction` to 0.7.
 
-**`extract_bulk_modulus_born` returns K_T < 0:** Fluctuation correction dominates K_Born — run is too short or system is partially glassy (T too close to Tg). Check `n_effective_samples`; if low, the Born NVT run needs extending.
+**`extract_bulk_modulus_murnaghan` returns K < 0 or `fit_converged=False`:** EOS not resolved — volume may not be equilibrated at one or more pressure points. Check `volume_equilibrated` per pressure point. For glassy polymers, narrow the pressure range (±500 atm) if ±1000 atm causes creep. `method = "linear_fallback"` means EOS curvature not resolved — add more pressure points. The linear fallback underestimates K for soft rubbery systems; for glassy systems it is particularly unreliable.
 
-**`extract_bulk_modulus_murnaghan` method = "linear_fallback":** EOS nonlinearity not resolved — add more pressure points or increase `npt_steps` per point so each V_i is better converged. The linear fallback underestimates K for soft rubbery systems.
+**`extract_bulk_modulus_murnaghan` gives B0_prime outside [4, 20]:** Pressure range is too wide (glass yielding at high compression) or too narrow (EOS curvature not captured). Typical glassy polymer at ±1000 atm: B0_prime ~7–12. Route to deform-worker fallback.
 
 **`extract_bulk_modulus_deform` fit_r2 < 0.90:** Stress-strain data is noisy. Check THERMO_FREQ in the deform log (should be ≤ 100 for dense output). May also indicate strain rate too high — try the slow-rate comparison if `K_deform_rate_slow_inv_s` is non-null in prompt.
+
+**`extract_bulk_modulus_deform` isotropy_delta_pct ≥ 20%:** System is too small or not isotropic. For 3-direction deform (x+y+z), this is acceptable if K_std/K_mean < 20% across directions. For single-direction (x-only), flag as BORDERLINE — the Murnaghan path should have been primary.

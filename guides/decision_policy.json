@@ -102,8 +102,12 @@
       "decision_id": "D-07_property_method",
       "evidence_required": true,
       "evaluate": ["phase_glassy_vs_rubbery", "method_physics_validity", "gpu_vs_cpu", "rate_artifact"],
-      "require": ["glassy bulk_modulus via Born+NVT (rate-free, full elastic tensor); rubbery via Murnaghan EOS sweep; volume fluctuation is cross-check only; deform is fallback only", "is_glassy from measured Tg>300K when tg requested, else from experimental_tg_K glassy_hint"],
-      "rationale": "Method must match phase. Born is glassy-only/CPU-only and cannot be the unified path; Murnaghan is the GPU-compatible both-phase candidate (ROADMAP I2). Deform overestimates K 20-50% and is a tertiary fallback.",
+      "require": [
+        "glassy bulk_modulus via Murnaghan NPT compression at 300 K (primary — symmetric, cell-size independent; Wu 2019 Comput. Mater. Sci. validated); 3-direction uniaxial deformation fallback if Murnaghan fails (fit_converged=False or B0_prime outside [4, 20]); Born+NVT REMOVED (PCFF+PPPM virial incompatibility — K_Born 8-15x too high, Var(P) ~10^7x too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1 2026-06-21; see BORN_MATRIX.md)",
+        "rubbery bulk_modulus via Murnaghan EOS sweep at T>Tg (unchanged); volume fluctuation is cross-check only",
+        "is_glassy from measured Tg>300K when tg requested, else from experimental_tg_K glassy_hint"
+      ],
+      "rationale": "Born+NVT PCFF virial incompatibility confirmed 2026-06-21 across PMMA4, PVC1, PEEK1. Even a 4-ns run (PEEK1) gave K_T=-49.6 GPa. Wu (2019) Comput. Mater. Sci. validates NPT compression as faster and more reliable than volume-fluctuation for polymer K. Murnaghan reuses existing run_bulk_modulus_series tooling; glassy path uses npt_prod300_out.data at 300 K with ±1000 atm symmetric pressure range.",
       "default_source": "polymer_rules.json:classes.<CLASS>.{bm_pressures_atm,exp_K_GPa}"
     }
   },
@@ -118,9 +122,8 @@
       "equil-check":  "foundation",
       "tg":           "thermal",
       "analyze-tg":   "thermal",
-      "born":         "mechanical",
-      "deform":       "mechanical",
       "murnaghan":    "mechanical",
+      "deform":       "mechanical",
       "analyze-bm":   "mechanical",
       "run-summary":  "summary"
     }

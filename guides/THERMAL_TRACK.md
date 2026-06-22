@@ -53,7 +53,7 @@ On session restart mid-thermal-track: re-read this file before resuming.
 
   [is_glassy determination]
   if "tg" in properties_requested:
-    Tg_for_glassy = Tg_K at the HIGHEST screening rate (400 K/ns)  # directly-measured, most-converged
+    Tg_for_glassy = Tg_K at the HIGHEST screening rate (400 K/ns)  # protocol-fixed, reproducible (NOT most-equilibrated — that's the slowest rate; this is a stable is_glassy gate, see below)
     is_glassy = (Tg_for_glassy > 300)   # safe default: True if None or fit ABORT
     # Drive is_glassy off the highest-rate MD Tg, NOT tg_dsc_equiv_K: the extrapolated value
     # shifts as replicates accumulate and could flip the mechanical-track branch mid-campaign.

@@ -388,6 +388,9 @@ TEMPLATE_DEFAULTS = {
         # STRAIN_RATE in 1/fs (LAMMPS real units).
         # K_deform_rate_inv_s = 1e8 s^-1 → 1e-7 /fs.
         "STRAIN_RATE":      1e-7,
+        # DEFORM_DIR: deformation direction — x (default), y, or z.
+        # Run all 3 sequentially and average K for reliable isotropic estimate.
+        "DEFORM_DIR":       "x",
         # N_STEPS = STRAIN_MAX / (STRAIN_RATE * TIMESTEP)
         # = 0.03 / (1e-7 * 1.0) = 300000 steps for 3% strain at 1e8 s^-1, 1 fs dt
         "N_STEPS":          300000,
@@ -826,6 +829,7 @@ class ScriptGenerator:
         output_path: str,
         params: dict,
         data_file_override: Optional[str] = None,
+        velocity_seed: Optional[int] = None,
     ) -> str:
         """
         Generate a filled LAMMPS .in script from a template.
@@ -838,6 +842,10 @@ class ScriptGenerator:
             params:             Dict of parameter overrides (merged with defaults).
             data_file_override: If provided, use this path in the DATA_FILE field
                                 instead of self.data_file (useful for remote paths).
+            velocity_seed:      If set, pin the `velocity all create` RNG seed for
+                                reproducible runs (used by the autonomy-evidence
+                                benchmark). Default None ⇒ randomized per call,
+                                preserving existing behavior.
 
         Returns:
             The rendered script as a string.
@@ -850,6 +858,10 @@ class ScriptGenerator:
 
         # Merge defaults with caller overrides
         cfg = {**TEMPLATE_DEFAULTS[template_name], **params}
+
+        # Pin the velocity-init seed when requested (benchmark reproducibility).
+        if velocity_seed is not None:
+            cfg["_velocity_seed"] = int(velocity_seed)
 
         # Data file path
         data_file = data_file_override or self.data_file
@@ -914,7 +926,8 @@ class ScriptGenerator:
 
         temp_list_str = " ".join(str(int(t) if t == int(t) else t) for t in temps)
 
-        seed = random.randint(10000, 999999)
+        seed = (int(cfg["_velocity_seed"]) if cfg.get("_velocity_seed") is not None
+                else random.randint(10000, 999999))
 
         if write_per_t_dump:
             per_t_dump_block = (
@@ -1127,7 +1140,8 @@ write_data tg_step_out.data
         # ── Initial velocity ──────────────────────────────────────────────
         init_v = cfg.get("init_velocity", None)
         if init_v is not None:
-            seed = random.randint(10000, 999999)
+            seed = (int(cfg["_velocity_seed"]) if cfg.get("_velocity_seed") is not None
+                    else random.randint(10000, 999999))
             subs["INIT_VELOCITY_BLOCK"] = (
                 f"velocity all create {init_v} {seed} mom yes rot yes dist gaussian"
             )
@@ -1233,8 +1247,9 @@ write_data tg_step_out.data
         subs["BORN_MATRIX_FILE"]   = cfg.get("BORN_MATRIX_FILE",   "born_matrix.dat")
 
         # ── Uniaxial deformation specifics (npt_deform) ──────────────────────
-        subs["STRAIN_RATE"]  = cfg.get("STRAIN_RATE", 1e-7)
-        subs["N_EQ_STEPS"]   = cfg.get("N_EQ_STEPS",  200000)
+        subs["STRAIN_RATE"]  = cfg.get("STRAIN_RATE",  1e-7)
+        subs["N_EQ_STEPS"]   = cfg.get("N_EQ_STEPS",   200000)
+        subs["DEFORM_DIR"]   = cfg.get("DEFORM_DIR",   "x")
 
         # ── SLLOD shear viscosity specifics ──────────────────────────────────
         subs["SHEAR_RATE"]    = cfg.get("SHEAR_RATE",   1e-5)

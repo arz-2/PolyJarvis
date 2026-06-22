@@ -54,57 +54,44 @@ params_deform = {
 }
 ```
 
-Without these, `generate_script` defaults to AMBER/CHARMM styles, which **crash on PCFF/TraPPE-UA
-.data files** with a `bond style harmonic mismatch` error (PMMA1 R-05: both deform runs died at
-read_data before taking a single step). Do not omit or guess the FF.
+Without these, `generate_script` defaults to AMBER/CHARMM styles, which **crash on PCFF/TraPPE-UA .data files**. Do not omit or guess the FF.
 
 ---
 
-## Uniaxial Deformation Workflow (glassy only)
+## 3-Direction Deformation Workflow (glassy fallback)
+
+Run x, y, z deformations sequentially. Average K across all three directions for a reliable isotropic estimate. Total cost: ~3× a single-direction run (~1 ns at standard strain rates), comparable to Murnaghan.
 
 ```python
-lammps_flags = <parse from prompt header>   # {"use_pcff": True/False, "use_trappe": ..., "use_opls": ...}
-strain_rate_per_fs = K_deform_rate_inv_s * 1e-15
-n_steps_deform = int(K_strain_max / (strain_rate_per_fs * dt_fs))
-
-params_deform = {
-    "LOG_FILE":         "05_deform.log",
-    "WRITE_DATA_FILE":  "05_deform_out.data",
-    "DUMP_FILE":        "",               # no dump — log only
-    "T_TARGET":         T_prop_K,         # 300
-    "T_DAMP":           100.0,
-    "STRAIN_RATE":      strain_rate_per_fs,
-    "N_STEPS":          n_steps_deform,
-    "N_EQ_STEPS":       200000,           # 0.2 ns NVT pre-equilibration
-    "TIMESTEP":         dt_fs,
-    "THERMO_FREQ":      100,              # dense output for stress-strain fit
-    "use_gpu":          True,
-    "use_pcff":         lammps_flags["use_pcff"],    # Rule F — explicit FF selector
-    "use_trappe":       lammps_flags["use_trappe"],  # Rule F — explicit FF selector
-    "use_opls":         lammps_flags["use_opls"],    # Rule F — explicit FF selector
-}
-# data_file = npt_prod300_out.data (passed as equil_data_path)
-generate_script(template_name="npt_deform",
-                data_file=equil_data_path,
-                output_script=f"{work_dir}/mechanical/deform/deform.in",
-                params=params_deform)
+run_ids = {}
+for deform_dir in ["x", "y", "z"]:
+    generate_script("npt_deform", data_file=equil_data_path,
+        output_script=f"{work_dir}/mechanical/deform/deform_{deform_dir}.in",
+        params={
+            "DEFORM_DIR":  deform_dir,                 # x, y, or z
+            "STRAIN_RATE": strain_rate_per_fs,         # Rule C
+            "N_STEPS":     n_steps_deform,             # Rule D
+            "N_EQ_STEPS":  200000,
+            "THERMO_FREQ": 100,
+            "DUMP_FILE":   "",
+            "engine":      engine,                     # from prompt — kokkos omits `package gpu`
+            "use_pcff":    lammps_flags["use_pcff"],   # Rule F
+            "use_trappe":  lammps_flags["use_trappe"],
+            "use_opls":    lammps_flags["use_opls"],
+        })
+    run_ids[deform_dir] = run_lammps_script(
+        script=f"{work_dir}/mechanical/deform/deform_{deform_dir}.in",
+        work_dir=f"{work_dir}/mechanical/deform_{deform_dir}",
+        gpu_ids=gpu_ids, mpi=mpi_ranks, engine=engine)  # engine MUST match generate_script
+# Submit all 3 runs; return run_ids dict and a combined monitor_command to the orchestrator.
+# Use watch_run on the last run_id to get a monitor_command that fires after all finish
+# (or run sequentially: submit x → Monitor → submit y → Monitor → submit z → Monitor).
+w = watch_run(run_ids["z"])  # return run_ids and w["monitor_command"] to orchestrator
 ```
 
----
+**Acceptance (3-direction):** Run `extract_bulk_modulus_deform` separately on each log. Report K_x, K_y, K_z, and K_mean = (K_x + K_y + K_z)/3 in the RESULT block. Gate: if K_std/K_mean > 20% across directions, flag BORDERLINE (isotropy still poor despite averaging — system too small or poorly equilibrated).
 
-## Script Submission
-
-```python
-run_id = run_lammps_script(
-    script=f"{work_dir}/mechanical/deform/deform.in",
-    work_dir=f"{work_dir}/mechanical/deform",
-    log_file="deform_run.log",
-    gpu_ids=gpu_ids,
-    mpi=mpi_ranks,
-)
-w = watch_run(run_id)
-# Return run_id and w["monitor_command"] to the orchestrator — do not call Monitor.
-```
+**Acceptance (single-direction, x-only):** If running x-only as a quick check, `isotropy_delta_pct ≥ 20%` → FAIL; this run is informational only. The Murnaghan path should have been primary and should be the reported value.
 
 ---
 
