@@ -1,5 +1,6 @@
 # Bulk Modulus Extractor — Memory Index
 
-- [PHYC PE exp_K_range anomaly](project_phyc_exp_k_range.md) — exp_K_range=[0.3,0.8] GPa in polymer_rules is likely wrong for polyhydrocarbon bulk modulus; PE1 Murnaghan B0=1.46 GPa, fluctuation B_dyn=1.59 GPa, both well above range [ingested 2026-06-20]
+- [PHYC PE exp_K_range corrected](project_phyc_exp_k_range.md) — polymer_rules PHYC exp_K_GPa corrected to [1.5,2.0]; PE1 B0=1.46, PE2 B0=1.64 both within range; old [0.3,0.8] conflated shear/bulk modulus [updated 2026-06-22]
 - [PHYC rubbery B0_prime high](project_phyc_murnaghan_b0prime.md) — TraPPE-UA PE at 300 K gives B0'~13.5, nonlinear EOS; B_def cross-check unreliable (R²<0.05); use Murnaghan EOS path only for PHYC [ingested 2026-06-20]
 - [Deform script graphs_dir bug](feedback_deform_graphs_dir.md) — extract_bulk_modulus_deform.py rejects --graphs_dir; MCP tool silently fails (completed sentinel but no output files); fix: re-run script directly without --graphs_dir [ingested 2026-06-20]
+- [PEST/PLA Murnaghan B0' collapse at narrow pressure span](project_pest_murnaghan_b0prime_narrow.md) — ±1000 atm (±0.1 GPa) gives B0'=1.0 (degenerate fit); K=4.58 GPa corroborated by fluctuation B_dyn=4.54 GPa; recommend wider pressure span for future PEST murnaghan runs [ingested 2026-06-22]

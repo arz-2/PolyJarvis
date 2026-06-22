@@ -21,6 +21,8 @@ On session restart mid-mechanical-track: re-read this file before resuming.
                   --data_path npt_prod300_data_path   # glassy: 300 K cell
                               # OR equil_data_path     # rubbery: melt cell
                   --gpu_ids <claimed>>)
+    # TraPPE-UA (PHYC/PDIE): SHAKE is automatically disabled in generated BM scripts.
+    # Do not pass use_shake=True for these classes — the script_generator enforces it.
       → parse RESULT → extract chain_id_murnaghan, log_files (murnaghan_log_files), monitor_command_murnaghan
     Write SIMULATION STATE (status=monitoring)
     Monitor(command=monitor_command_murnaghan, timeout_ms=3600000)

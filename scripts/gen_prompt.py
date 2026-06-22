@@ -633,6 +633,11 @@ def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
     npt_data = args.data_path or f"{lammps_base}/equil/{prod}/{prod}_out.data"
     melt_dump = args.npt_prod_dump or f"{lammps_base}/equil/nvt_production/nvt_production.dump"
 
+    # is_glassy and dp enable the require_glassy carve-out in the checker:
+    # when is_glassy=True AND dp>=30, chain C(t)/end-to-end diffusion gates are advisory only
+    # (gate on density SEM/CV/P2 exclusively). Derived from T_workflow so no explicit CLI flag needed.
+    is_glassy_equil = T_workflow > 300
+    dp_val = getattr(args, 'dp', None) or cls.get('dp_typical')
     guide = load_worker_guide("equil-check")
     return f"""\
 npt_prod_log_path: {npt_log}
@@ -643,6 +648,8 @@ run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 backbone_types:    {args.backbone_types or '<FILL from inspect_data_file>'}
 ct_min_decay_melt: {ct_decay if ct_decay is not None else 'null'}   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
+is_glassy:         {str(is_glassy_equil).lower()}   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
+dp:                {dp_val if dp_val is not None else 'null'}   # DP≥30 required for require_glassy carve-out to apply
 exp_density_range: {exp_density}
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
@@ -773,6 +780,7 @@ exp_tg_range:      {exp_tg}
 exp_density_range: {exp_density}
 exp_K_range:       {exp_K}
 n_replicates:      {_v(getattr(args, 'n_replicates', None), 'N/A')}   # distinct replicates in the multi-rate Tg registry; pass to generate_run_summary --n_replicates
+tg_path:           {_v(getattr(args, 'tg_path', None), 'null')}   # explicit canonical tg_summary.json path (slowest-rate folder); pass to generate_run_summary --tg_path
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
 """
@@ -913,6 +921,10 @@ def main():
                    help="Canonical DB name for experimental lookup (e.g. 'Poly(methyl methacrylate)'). "
                         "Enables polymer-specific exp ranges from polymer_db.sqlite. "
                         "When omitted, falls back to the class-representative canonical pattern.")
+    p.add_argument("--tg_path", default=None,
+                   help="Explicit path to the canonical tg_summary.json for run-summary (e.g. "
+                        "data/PLA1/raw/tg_r40/tg_summary.json — the slowest-rate folder). "
+                        "Prevents alphabetical rglob picking tg_r160 before tg_r40.")
 
     args = p.parse_args()
 

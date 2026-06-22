@@ -150,3 +150,18 @@ save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="
 ---
 
 **→ When `cell.data` is saved, return the RESULT block.**
+
+The RESULT block MUST include `emc_seed` — the orchestrator logs it to the run_log header immediately after parsing RESULT so the cell is reproducible for revision studies:
+
+```
+RESULT
+data_path:      /home/arz2/PolyJarvis/data/<RUN>/lammps/cell/cell.data
+emc_params_path: /home/arz2/PolyJarvis/data/<RUN>/lammps/cell/emc_build.params
+lammps_flags:   {"use_pcff": true, "use_trappe": false, "use_opls": false}
+emc_seed:       <integer you passed to submit_emc_cell_job seed= / saved on mol-builder for RadonPy>
+n_atoms:        <atom count from inspect_data_file or EMC output>
+```
+
+For EMC path: `emc_seed` = the integer you generated/pinned at the top of the build.
+For RadonPy path: no EMC seed — set `emc_seed: null`.
+NEVER set `emc_seed: -1` — that was the old placeholder for "uncaptured" and means the cell is irreproducible.

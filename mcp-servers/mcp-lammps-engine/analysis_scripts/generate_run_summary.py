@@ -95,6 +95,10 @@ def main():
     p.add_argument("--n_replicates",    type=int, default=None,
                    help="Number of replicates contributing to the multi-rate Tg registry "
                         "(distinct replicate rows). Reported in results.tg for the DSC extrapolation.")
+    p.add_argument("--tg_path",         default=None,
+                   help="Explicit path to the canonical tg_summary.json (e.g. the slowest-rate "
+                        "folder). When supplied, skips rglob discovery and uses this file directly. "
+                        "Prevents alphabetical-order bugs when multiple rate folders coexist.")
     args = p.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -134,11 +138,18 @@ def main():
         tg_extrap = None
     Tg_raw = tg.get("Tg_K")
     if Tg_raw is None and not tg:
-        for cand in sorted(output_dir.rglob("tg_summary.json")):
-            j = _load_json(cand)
+        # Explicit canonical path wins over rglob to avoid alphabetical-order bugs
+        # (tg_r160/ sorts before tg_r40/, picking the wrong faster-rate Tg as headline).
+        if getattr(args, "tg_path", None) and Path(args.tg_path).exists():
+            j = _load_json(Path(args.tg_path))
             if j.get("Tg_K") is not None:
                 tg, Tg_raw = j, j.get("Tg_K")
-                break
+        else:
+            for cand in sorted(output_dir.rglob("tg_summary.json")):
+                j = _load_json(cand)
+                if j.get("Tg_K") is not None:
+                    tg, Tg_raw = j, j.get("Tg_K")
+                    break
 
     Tg_val = tg_extrap if tg_extrap is not None else Tg_raw
     tg_basis = ("rate_extrapolated" if tg_extrap is not None

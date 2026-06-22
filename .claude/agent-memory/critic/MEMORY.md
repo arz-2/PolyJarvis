@@ -1,3 +1,3 @@
 # Critic Memory Index
 
-- [Glassy equil gate conflict](project_glassy_equil_gate_conflict.md) — glassy DP>=30 can't satisfy equilibration.require (overall_pass=True); demoting to advisory is a fixed-framework violation -> escalate, not approve/revise [ingested 2026-06-20]
+- [Glassy/rubbery equil gate](project_glassy_equil_gate_conflict.md) — DP>=30 glassy C(t)/MSD demotion=APPROVE (require_glassy); rubbery melt (PE) demotion=ESCALATE (no require_rubbery); DP<30 class-field demotion=REVISE (raise DP) [upd 2026-06-22]

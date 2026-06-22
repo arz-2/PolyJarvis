@@ -1111,6 +1111,7 @@
     },
     "PEST": {
       "name": "Polyester",
+      "_tg_rate_note": "PCFF/PPPM at <6000 atoms: steps_per_T = tg_t_step_K / (rate × dt_fs × 1e-6). At T_STEP=20K, dt=1fs: rate=40→500k steps, rate=160→125k, rate=400→50k. Only r40 clears tg_min_steps_per_T=200k; the slope gate in extract_tg_multirate is the primary protection. Planner should not use rates above 100 K/ns for PCFF PEST cells <6000 atoms.",
       "examples": [
         "PET",
         "PLA",
@@ -1143,6 +1144,7 @@
       "tg_t_low_K": 100,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
+      "tg_min_steps_per_T": 200000,
       "tg_rates_K_per_ns": [
         40,
         160,

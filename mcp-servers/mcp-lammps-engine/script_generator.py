@@ -1123,12 +1123,11 @@ write_data tg_step_out.data
             subs["RESTART_FREQ"]   = 0
 
         # ── SHAKE block ───────────────────────────────────────────────────
-        if cfg.get("use_trappe") and cfg.get("use_shake"):
-            # TraPPE-UA has no explicit H atoms; constrain C-C bond types by ID
-            bond_ids = cfg.get("shake_bond_type_ids", [cfg.get("shake_bond_type_id", 1)])
-            b_args = " ".join(f"b {bid}" for bid in bond_ids)
-            subs["SHAKE_BLOCK"]   = f"fix shake_fix all shake 1e-4 1000 0 {b_args}"
-            subs["UNSHAKE_BLOCK"] = "unfix shake_fix"
+        if cfg.get("use_trappe"):
+            # TraPPE-UA is united-atom: no H bonds; C-C backbone SHAKE forbidden
+            # ("Shake clusters are connected" fatal error on polyhydrocarbon chains)
+            subs["SHAKE_BLOCK"]   = "# SHAKE disabled (TraPPE-UA united-atom)"
+            subs["UNSHAKE_BLOCK"] = ""
         elif cfg.get("use_shake", True):
             # SHAKE constrains H-X bonds (m 1.008 targets all hydrogen mass)
             subs["SHAKE_BLOCK"]   = "fix shake_fix all shake 1e-4 1000 0 m 1.008"

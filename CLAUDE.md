@@ -107,7 +107,8 @@ PHASE A — FOUNDATION (always)
   [Build]
   Agent(subagent_type="molecule-builder", description="🔵 Build {polymer_name} cell",
         prompt=<gen_prompt.py --stage build --plan PLAN_PATH>)
-    → parse RESULT → extract data_path, lammps_flags
+    → parse RESULT → extract data_path, lammps_flags, emc_seed (integer or null)
+    → immediately write emc_seed to run_log.md header Seeds line (never log -1; log null if RadonPy path)
 
   [Equilibration]
   Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polymer_name}",
@@ -139,10 +140,15 @@ PHASE B — TRACKS (property-conditional)
 
 PHASE C — SUMMARY (always)
 
+  # Before spawning run-summary-worker: verify the lammps-engine MCP server is live.
+  # In long sessions (>12 h) the MCP connection can drop silently. Do a minimal call
+  # (e.g. list_templates) — if it returns, proceed; if it hangs or errors, restart the
+  # MCP server before the Agent call.
   Agent(subagent_type="run-summary-worker", description="🟢 Run summary {polymer_name}",
         prompt=<gen_prompt.py --stage run-summary --plan PLAN_PATH
                --smiles ... --ff ... --tg_fit_quality ... --d05 equil_verdict
-               --n_replicates <distinct replicates in the multirate registry>>)  # multirate Tg
+               --n_replicates <distinct replicates in the multirate registry>
+               --tg_path <data/RUN/raw/tg_r{slowest_rate}/tg_summary.json>>)  # multirate Tg; slowest rate from plan tg_rates_K_per_ns[0]
     → parse RESULT → run_summary_path → write RESULTS to run_log.md
 ```
 
@@ -162,5 +168,7 @@ These rules are inlined into every worker prompt by `gen_prompt.py`. They apply 
 0. **GPU is used for ALL simulation runs** — always pass explicit `gpu_ids` and `mpi`; never leave them unset or default
 1. **Fill `run_log.md` in real time** — log each DECISION row when made, each RECOVERY block immediately after resolving an error; do not reconstruct at the end
 2. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, and SEED_COLD in the run_log header. For replication studies, use fixed seeds from `guides/REVISION_PARAMS.md`. For exploratory runs, read seeds back from job output and log them immediately after submission.
+3. **Check for existing writers before killing any process** — before killing and relaunching any LAMMPS run, run `lsof | grep <log_filename>` to check for existing writers. If another writer is present (concurrent orchestrator session), do NOT launch — coordinate via user first. A double-launch corrupts the shared log and requires a full restart from step 0.
+4. **Log the exact GPU claim label** — after any GPU claim (`pick_gpu.py claim --run <LABEL>`), copy the `run` field from the JSON response into the SIMULATION STATE table. Use that exact string verbatim at release (`pick_gpu.py release --run <LABEL>`). A label mismatch at release silently leaves the GPU stuck as claimed.
 <!-- CROSS_STAGE_RULES_END -->
 

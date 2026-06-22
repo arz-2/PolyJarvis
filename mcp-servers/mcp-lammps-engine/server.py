@@ -76,9 +76,16 @@ LAMBDA_LAMMPS   = os.environ.get("LAMBDA_LAMMPS",  f"/home/{LAMBDA_USER}/lammps-
 LAMBDA_LAMMPS_KOKKOS = os.environ.get("LAMBDA_LAMMPS_KOKKOS",
                                       f"/home/{LAMBDA_USER}/lammps-install-kokkos/bin/lmp")
 CONDA_ENV       = os.environ.get("CONDA_ENV",      "mol-builder")
-OPENMPI_BIN    = os.environ.get("OPENMPI_BIN",    f"/home/{LAMBDA_USER}/openmpi/bin")
-OPENMPI_LIB    = os.environ.get("OPENMPI_LIB",    f"/home/{LAMBDA_USER}/openmpi/lib")
-OPENMPI_PREFIX = os.environ.get("OPENMPI_PREFIX",  f"/home/{LAMBDA_USER}/openmpi")
+_openmpi_home = f"/home/{LAMBDA_USER}/openmpi"
+_sys_openmpi_bin = "/usr/bin"
+_sys_openmpi_lib = "/usr/lib/x86_64-linux-gnu"
+_sys_openmpi_prefix = "/usr"
+OPENMPI_BIN    = os.environ.get("OPENMPI_BIN",
+                                _openmpi_home + "/bin" if os.path.isdir(_openmpi_home) else _sys_openmpi_bin)
+OPENMPI_LIB    = os.environ.get("OPENMPI_LIB",
+                                _openmpi_home + "/lib" if os.path.isdir(_openmpi_home) else _sys_openmpi_lib)
+OPENMPI_PREFIX = os.environ.get("OPENMPI_PREFIX",
+                                _openmpi_home if os.path.isdir(_openmpi_home) else _sys_openmpi_prefix)
 
 
 def _engine_launch(engine: str, n_gpu: int) -> tuple[str, str]:
@@ -293,7 +300,11 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
         f"export CUDA_VISIBLE_DEVICES={cuda_devices}",
         f"export PATH={OPENMPI_BIN}:$PATH",
         f"export LD_LIBRARY_PATH={OPENMPI_LIB}:${{LD_LIBRARY_PATH:-}}",
-        f"export OPAL_PREFIX={OPENMPI_PREFIX}",
+        # Clear any stale inherited OPAL_PREFIX when using system OpenMPI (/usr);
+        # only set it explicitly for a non-system installation.
+        ("unset OPAL_PREFIX"
+         if OPENMPI_PREFIX == _sys_openmpi_prefix
+         else f"export OPAL_PREFIX={OPENMPI_PREFIX}"),
         "# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).",
         'echo $$ > "$PIDFILE"',
         # mpirun -np 1 does not propagate CUDA_VISIBLE_DEVICES to the child process on OpenMPI.
@@ -389,10 +400,12 @@ def _lammps_run_background(
             f"{cuda_line}"
             f"export PATH={OPENMPI_BIN}:$PATH\n"
             f"export LD_LIBRARY_PATH={OPENMPI_LIB}:${{LD_LIBRARY_PATH:-}}\n"
-            f"export OPAL_PREFIX={OPENMPI_PREFIX}\n"
+            + ("unset OPAL_PREFIX\n"
+               if OPENMPI_PREFIX == _sys_openmpi_prefix
+               else f"export OPAL_PREFIX={OPENMPI_PREFIX}\n")
             # Record our own PID first so watch_run can check liveness. $$ is the
             # long-lived wrapper; $! at launch is the short-lived setsid parent.
-            f"mkdir -p {SENTINEL_DIR}\n"
+            + f"mkdir -p {SENTINEL_DIR}\n"
             f"echo $$ > {pidfile}\n"
             f"cd {work_dir}\n"
             f"{lammps_cmd}"
@@ -3084,6 +3097,7 @@ def _run_generate_run_summary(
     exp_K_max: Optional[float],
     graphs_dir: Optional[str] = None,
     n_replicates: Optional[int] = None,
+    tg_path: Optional[str] = None,
 ) -> dict:
     """Background worker — runs generate_run_summary.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/generate_run_summary.py"]
@@ -3113,10 +3127,11 @@ def _run_generate_run_summary(
     if exp_K_max is not None:       parts.append(f"--exp_K_max {exp_K_max}")
     if graphs_dir:                  parts.append(f"--graphs_dir {graphs_dir}")
     if n_replicates is not None:    parts.append(f"--n_replicates {n_replicates}")
+    if tg_path:                     parts.append(f"--tg_path {tg_path}")
 
     command = " ".join(parts)
     logger.info(f"Running generate_run_summary via CLI: {command}")
-    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=60)
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=300)
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
     return _parse_json_from_stdout(stdout, stderr)
@@ -3270,6 +3285,7 @@ def generate_run_summary(
     exp_K_min: Optional[float] = None,
     exp_K_max: Optional[float] = None,
     n_replicates: Optional[int] = None,
+    tg_path: Optional[str] = None,
 ) -> dict:
     """
     Aggregate all Stage 4 analysis outputs into a single run_summary.json.
@@ -3301,6 +3317,10 @@ def generate_run_summary(
         exp_K_min/max:    Experimental bulk modulus range (GPa).
         n_replicates:     Distinct replicates in the multi-rate Tg registry (for the
                           DSC-equivalent extrapolation reported in results.tg).
+        tg_path:          Explicit path to the canonical tg_summary.json (e.g.
+                          tg_r40/tg_summary.json — the slowest-rate folder). When
+                          supplied, skips rglob discovery; prevents alphabetical-order
+                          bugs when multiple rate folders coexist.
 
     Returns:
         dict with status and summary_json path on success.
@@ -3320,6 +3340,7 @@ def generate_run_summary(
             exp_density_min=exp_density_min, exp_density_max=exp_density_max,
             exp_K_min=exp_K_min, exp_K_max=exp_K_max,
             graphs_dir=graphs_dir, n_replicates=n_replicates,
+            tg_path=tg_path,
         )),
         daemon=True,
     )

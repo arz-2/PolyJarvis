@@ -50,6 +50,21 @@ On session restart mid-thermal-track: re-read this file before resuming.
       "theoretical DSC-equivalent experimental Tg".
   Validator gate: loglinear_r_squared >= plan success_criteria.loglinear_r_squared_min (0.90).
     Not met → /recover (re-run a noisy rate with more steps, or re-plan), max 2 attempts.
+    Exception: if result.is_flat_rate_regime == True, low R² is expected and the gate DOES NOT
+    apply. extract_tg_multirate already set tg_method="flat_rate_mean" and reported the mean
+    of per-rate values as tg_at_slow_rate_K. Accept that value directly.
+
+  Rubbery polymers (T_workflow > Tg_exp + 20 K, e.g. PE, PBD):
+    Rate-dependence of Tg is near-zero (|slope| < 1 K/decade) because the chain is already deep
+    in the rubbery regime at T_workflow. The code detects this via is_flat_rate_regime=True and
+    tg_method="flat_rate_mean". Report Tg_MD as the mean across rates with a note that this is a
+    rubbery-regime estimate, NOT a DSC-equivalent extrapolation. Registry rows are still written
+    — they are valid for cross-replicate averaging. Do NOT trigger /recover for low R² when
+    is_flat_rate_regime=True.
+
+  Slope gate (ALL polymers): if result.slope_gate_pass == False (slope ≤ 0), the per-rate data is
+    contaminated. Do NOT write registry rows for any rate from this sweep. Spawn /recover
+    immediately (re-run from equil cell with a different seed). Max 2 attempts, then UNRESOLVED.
 
   [is_glassy determination]
   if "tg" in properties_requested:

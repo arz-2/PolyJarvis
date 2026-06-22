@@ -130,6 +130,18 @@ def test_trappe_mismatch_raises(tmp_path):
         )
 
 
+def test_trappe_shake_disabled(tmp_path):
+    """TraPPE-UA script must never contain 'fix shake_fix' — C-C backbone SHAKE crashes."""
+    out = str(tmp_path / "npt.in")
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter("always")
+        script = ScriptGenerator(data_file=str(TRAPPE_DATA)).generate(
+            "npt", output_path=out, params={"use_trappe": True}
+        )
+    assert "fix shake_fix" not in script, "TraPPE-UA must not have SHAKE"
+    assert "SHAKE disabled" in script, "expected explicit SHAKE-disabled comment"
+
+
 def test_gaff2_no_autodetect_no_raise(tmp_path):
     """RadonPy GAFF2 file: auto-detect returns {}, no raise, GAFF2 styles used."""
     data_file = tmp_path / "gaff2.data"
