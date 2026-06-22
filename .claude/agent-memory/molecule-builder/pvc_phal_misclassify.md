@@ -3,6 +3,7 @@ name: pvc-phal-misclassify
 description: classify_polymer returns PHAL (OPLS-AA) for PVC *CC(Cl)*; correct route is PVNL/PCFF
 metadata:
   type: feedback
+  ingested_at: 2026-06-22
 ---
 
 `classify_polymer("*CC(Cl)*")` (PVC) returns **PHAL** (class 5, OPLS-AA,

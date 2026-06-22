@@ -3,6 +3,7 @@ name: pcff-sulfone-charges
 description: PCFF sulfone (PSFO) charges are small by design — do NOT apply OPLS/QM +1.3/-0.55 criterion
 metadata:
   type: feedback
+  ingested_at: 2026-06-22
 ---
 
 For PSFO (polysulfone, e.g. PSU/Udel) built via EMC/PCFF, the sulfone S and O
@@ -23,5 +24,5 @@ that is the real correctness signal. Do NOT fail on small charge magnitudes.
 The failure signature for a genuinely missing increment is a charge of exactly
 **0.0000** (fallback), not a specific small nonzero value. A specific value like
 -0.1143 means EMC found a real frc increment. Cross-check against
-`/home/alexzhao/emc/field/pcff/pcff.frc` bond_increments if in doubt.
+`/home/arz2/emc/field/pcff/pcff.frc` bond_increments if in doubt.
 See [[emc-output-naming]].

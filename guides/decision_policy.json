@@ -35,7 +35,7 @@
         "mpi>=4 for any PPPM/charged class2 system (mpi=1 starves kspace ~75x — never launch it)",
         "UA classes (TraPPE: PHYC/PDIE/PSTR) route to GPU package with `neigh yes`, mpi=1, 1 GPU/run (neighbor build is ~71% of the loop and offloads to the GPU; script_generator emits `neigh yes` automatically for use_trappe). This is 3.7x vs CPU mpi=4 and beats KOKKOS on small UA cells (run-0 parity PASS 2026-06-20). NOT pair-only GPU (neigh on CPU ties CPU) and NOT CPU mpi=4 (the old default).",
         "small (<10k-atom) cells use 1 GPU per run, not 4 (comm overhead, GPU underfill)",
-        "Sum of mpi across concurrent runs <= 32 physical cores (one GPU-heavy run per GPU)",
+        "Sum of mpi across concurrent runs <= 18 physical cores (one GPU-heavy run per GPU)",
         "a multi-GPU pin (gpu_per_run>=2) requires BOTH an estimated cell >~10k atoms AND benchmark support (directional_probe.recommended_by_ff[fam].gpu>=2 on a matching host); otherwise use 1 GPU",
         "when hardware_policy.values_are_benchmarked=false OR directional_probe.host != hardware_policy.host, any non-default D-08 pin MUST be accompanied by a planned hardware_benchmark probe and confidence:low — else keep the by_forcefield default"
       ],
@@ -84,8 +84,12 @@
       "decision_id": "D-05_convergence",
       "evidence_required": false,
       "evaluate": ["density_convergence", "energy_convergence", "chain_statistic_convergence"],
-      "require": ["check_equilibration_comprehensive overall_pass=True before ANY property extraction (cross-stage rule 2)"],
+      "require": ["check_equilibration_comprehensive overall_pass=True before ANY property extraction (cross-stage rule 2); EXCEPT glassy DP>=30 systems, which use require_glassy (see below); EXCEPT rubbery systems (T_workflow_K > Tg_K), which use require_rubbery (see below)"],
+      "require_glassy": ["for regime=glassy AND DP>=30: gate on density plateau within experimental range AND density homogeneity CV<0.25 AND P2 nematic<0.10 AND energy drift/SEM within bounds. The melt chain-self-diffusion metrics (C(t) decay, MSD diffusivity, MSID slope, Rg chain-chain CV) are ADVISORY (logged, non-blocking). overall_pass may be False on these advisory metrics without blocking property extraction."],
+      "require_rubbery": ["for regime=rubbery (T_workflow_K > Tg_K, e.g. PE/PP/PIB/PBD/PI at 300K): gate on density block-SEM < 2% AND density homogeneity CV < 25% AND energy drift/SEM within bounds. The terminal chain-reptation metrics (C(t) full decay, MSD diffusivity, tau_relax, MSID slope, Rg chain-chain CV) are ADVISORY (logged, non-blocking). overall_pass may be False on these reptation-limited metrics without blocking property extraction, provided the density/energy gating criteria pass."],
       "rationale": "This is the philosophy's 'convince me it is equilibrated' gate — already implemented as check_equilibration_comprehensive. The policy makes it a hard plan success_criterion, not an afterthought. The Validator enforces it after the equil stage.",
+      "rationale_glassy": "For glassy high-MW polymers (DP>=30) melt chain self-diffusion is unattainable on MD timescales (measured tau_relax ~3.6e9 ps for DP=60 PVC; a 1-2 ns extend moves C(t) only ~0.4%->0.5%), so overall_pass=True is unsatisfiable by construction. The 5-cycle high-T anneal substitutes for melt self-diffusion. The metrics that actually bound structural quality for density/Tg/glassy-K_T — density plateau, homogeneity CV, P2 — are gating; the diffusion-limited metrics are advisory. Authorized 2026-06-20 (PVC1 route-back, user-approved). Applies campaign-wide to glassy revision polymers.",
+      "rationale_rubbery": "For rubbery high-MW polymers at T_workflow_K > Tg_K, terminal chain reptation time >> accessible MD simulation time even at high melt temperature (measured tau_relax ~88 ns KWW for DP-120 PE at 550 K; MSD alpha=0.28 subdiffusive). The requested properties — density (packing/cohesion), Tg (segmental kinetics), rubbery-K (P-V EOS volumetric response) — are governed by local packing and cohesive energy, not terminal reptation; each property has its own downstream gate (density block-SEM, Tg bilinear R^2, Murnaghan volume convergence per pressure point). Authorized 2026-06-22 (user-approved, PE1 critic round-2 precedent). Applies campaign-wide to PHYC/PDIE rubbery replicates.",
       "default_source": "tool:check_equilibration_comprehensive"
     },
     "tg_protocol": {
@@ -100,8 +104,12 @@
       "decision_id": "D-07_property_method",
       "evidence_required": true,
       "evaluate": ["phase_glassy_vs_rubbery", "method_physics_validity", "gpu_vs_cpu", "rate_artifact"],
-      "require": ["glassy bulk_modulus via Born+NVT (rate-free, full elastic tensor); rubbery via Murnaghan EOS sweep; volume fluctuation is cross-check only; deform is fallback only", "is_glassy from measured Tg>300K when tg requested, else from experimental_tg_K glassy_hint"],
-      "rationale": "Method must match phase. Born is glassy-only/CPU-only and cannot be the unified path; Murnaghan is the GPU-compatible both-phase candidate (ROADMAP I2). Deform overestimates K 20-50% and is a tertiary fallback.",
+      "require": [
+        "glassy bulk_modulus via Murnaghan NPT compression at 300 K (primary — symmetric, cell-size independent; Wu 2019 Comput. Mater. Sci. validated); 3-direction uniaxial deformation fallback if Murnaghan fails (fit_converged=False or B0_prime outside [4, 20]); Born+NVT REMOVED (PCFF+PPPM virial incompatibility — K_Born 8-15x too high, Var(P) ~10^7x too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1 2026-06-21; see BORN_MATRIX.md)",
+        "rubbery bulk_modulus via Murnaghan EOS sweep at T>Tg (unchanged); volume fluctuation is cross-check only",
+        "is_glassy from measured Tg>300K when tg requested, else from experimental_tg_K glassy_hint"
+      ],
+      "rationale": "Born+NVT PCFF virial incompatibility confirmed 2026-06-21 across PMMA4, PVC1, PEEK1. Even a 4-ns run (PEEK1) gave K_T=-49.6 GPa. Wu (2019) Comput. Mater. Sci. validates NPT compression as faster and more reliable than volume-fluctuation for polymer K. Murnaghan reuses existing run_bulk_modulus_series tooling; glassy path uses npt_prod300_out.data at 300 K with ±1000 atm symmetric pressure range.",
       "default_source": "polymer_rules.json:classes.<CLASS>.{bm_pressures_atm,exp_K_GPa}"
     }
   },
@@ -116,9 +124,8 @@
       "equil-check":  "foundation",
       "tg":           "thermal",
       "analyze-tg":   "thermal",
-      "born":         "mechanical",
-      "deform":       "mechanical",
       "murnaghan":    "mechanical",
+      "deform":       "mechanical",
       "analyze-bm":   "mechanical",
       "run-summary":  "summary"
     }

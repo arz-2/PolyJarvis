@@ -42,6 +42,21 @@ Quick index of all available MCP tools.
 | `get_emc_job_output` | sync | Retrieve result; `data_path` = LAMMPS `.data` file; `lammps_flags` = `{use_pcff, use_opls}` |
 | `list_emc_jobs` | sync | List all EMC jobs with status |
 
+
+**`field` is NOT a parameter** — auto-selected from `polymer_class`. Do not pass it.
+
+**`lammps_flags` from `get_emc_job_output`** — pass directly to `generate_equilibration_workflow` as `**lammps_flags`.
+
+**SMILES conventions (critical):**
+- PCBN: full carbonate `-O-C(=O)-O-` in repeat unit; `*` on aromatic C
+- PAMD: amide N adjacent to C=O (not split across `*`)
+- PIMD: all imide ring atoms lowercase for sp2 `npc` type; uppercase N → crash
+- PDIE: cis/trans microstructure in SMILES; `*C/C=C\C*` for cis-PBD
+- PSTR (PCFF, all-atom): tacticity via `[C@@H]`/`[C@H]` is supported. PHYC/PDIE (TraPPE-UA): **not** supported (UA has no explicit H) → atactic only
+
+**params file:** After every EMC build, `smiles_to_emc.py` auto-strips style lines from `.params`. If using a pre-2026-05-30 build, strip manually: `sed -i '/^pair_style\b/d; /^bond_style\b/d; ...' emc_build.params`
+
+
 ---
 
 ## LAMMPS Engine Server

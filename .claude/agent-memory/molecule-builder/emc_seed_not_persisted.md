@@ -3,6 +3,7 @@ name: emc-seed-not-persisted
 description: EMC seed=-1 does not persist the resolved packing seed; no seed field in job output, esh/in carry only LAMMPS run seeds
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 When `submit_emc_cell_job(seed=-1)`, the resolved EMC cell-packing RNG seed is

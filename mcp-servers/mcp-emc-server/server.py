@@ -2,8 +2,8 @@
 """
 EMC MCP Server
 ==============
-Builds amorphous polymer cells via EMC for Track C (PCFF), PHAL+PSIL (OPLS-AA),
-and PHYC/PDIE/PSTR (TraPPE-UA) classes using EMC v9.4.4.
+Builds amorphous polymer cells via EMC for Track C (PCFF including PSTR), PHAL+PSIL (OPLS-AA),
+and PHYC/PDIE (TraPPE-UA) classes using EMC v9.4.4.
 
 Wraps mcp-servers/mcp-emc-server/smiles_to_emc.py's build_cell() pipeline:
     SMILES → .esh → emc_setup.pl → EMC binary → LAMMPS .data
@@ -21,8 +21,10 @@ get_emc_job_output    sync   Retrieve result (data_path + lammps_flags) when com
 list_emc_jobs         sync   Show all jobs with status
 """
 
+import json
 import logging
 import os
+import random
 import sys
 import threading
 import time
@@ -275,6 +277,11 @@ def _build_emc_cell(
     temperature: float,
     seed: int,
 ) -> dict:
+    # Resolve seed before calling EMC so the cell is reproducible.
+    if seed == -1:
+        seed = random.randint(1, 2**31 - 1)
+        logger.info("EMC seed resolved: %d", seed)
+
     data_path = build_cell(
         smiles=smiles,
         output_dir=output_dir,
@@ -288,6 +295,21 @@ def _build_emc_cell(
         seed=seed,
     )
     data_path = str(data_path)
+
+    # Write reproducibility metadata so the seed survives run_log.md references.
+    try:
+        meta = {
+            "resolved_seed": seed,
+            "field": field,
+            "dp": dp,
+            "density": density,
+            "smiles": smiles,
+        }
+        (Path(output_dir) / "emc_metadata.json").write_text(
+            json.dumps(meta, indent=2)
+        )
+    except Exception:
+        pass
 
     # Quick sanity: count atoms from the .data header
     natoms = None
@@ -309,6 +331,7 @@ def _build_emc_cell(
         "dp":            dp,
         "density":       density,
         "natoms":        natoms,
+        "resolved_seed": seed,
         "lammps_flags":  _lammps_flags(field),
         "message":       f"LAMMPS .data file written: {data_path}",
     }
@@ -402,8 +425,8 @@ def submit_emc_cell_job(
                          For polycarbonates include the full -O-C(=O)-O- carbonate
                          in the repeat unit and put * on aromatic carbons.
         polymer_class:   PolyInfo class name — determines force field; required.
-                         PCFF: PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL
-                         OPLS-AA: PHAL.  TraPPE-UA: PHYC/PDIE/PSTR.
+                         PCFF: PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL/PSTR
+                         OPLS-AA: PHAL/PSIL.  TraPPE-UA: PHYC/PDIE.
         dp:              Degree of polymerization (repeat units per chain). [20]
         nchains:         Exact number of polymer chains to build (EMC "number"
                          mode). When > 0 this sets the chain count precisely and

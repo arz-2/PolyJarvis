@@ -105,7 +105,23 @@ def fit_multirate(
     # ── 1. Log-linear fit (primary) ────────────────────────────────────────
     slope, intercept, r_val, _, _ = linregress(log_rates, tg_arr)
     r2_lin  = float(r_val ** 2)
-    tg_slow = float(intercept + slope * np.log(slow_rate_ref))
+
+    # Slope gates — applied before any extrapolation
+    slope_gate_pass  = bool(slope > 0)       # negative slope is physically impossible
+    flat_rate_regime = bool(abs(slope) < 1.0) # < 1 K/decade → rubbery, extrapolation meaningless
+
+    if not slope_gate_pass:
+        # Negative slope: extrapolation would give absurd result (PLA1-type incident).
+        # Fall back to the directly measured Tg at the slowest rate.
+        tg_slow   = float(tg_arr[int(np.argmin(rates_arr))])
+        tg_method = "single_rate_fallback"
+    elif flat_rate_regime:
+        # Rubbery regime: Tg barely changes with rate; mean is more stable than extrapolation.
+        tg_slow   = float(np.mean(tg_arr))
+        tg_method = "flat_rate_mean"
+    else:
+        tg_slow   = float(intercept + slope * np.log(slow_rate_ref))
+        tg_method = "loglinear_extrapolation"
 
     result = {
         "status":                  "success",
@@ -119,6 +135,9 @@ def fit_multirate(
         "loglinear_r_squared":     r2_lin,
         "tg_at_slow_rate_K":       tg_slow,
         "slow_rate_ref_K_per_ns":  slow_rate_ref,
+        "slope_gate_pass":         slope_gate_pass,
+        "is_flat_rate_regime":     flat_rate_regime,
+        "tg_method":               tg_method,
         # VF fields filled below
         "vf_fit_quality":          "NOT_ATTEMPTED",
     }

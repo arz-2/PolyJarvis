@@ -1,6 +1,7 @@
 ---
 name: phyc-cooling-rate-gap
 description: The melt->300 K cooling RATE is not expressible via decided_params or generate_equilibration_workflow; only partially slowable via add_melt_npt
+ingested_at: 2026-06-20
 metadata:
   type: project
 ---

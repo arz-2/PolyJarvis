@@ -28,6 +28,7 @@ Usage:
 import os
 import re
 import random
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -119,6 +120,35 @@ TRAPPE_UA_STYLES = {
 # TraPPE-UA: exclude all 1-2/1-3/1-4 LJ (bonded terms handle short-range); no Coulomb.
 TRAPPE_SPECIAL_BONDS = "special_bonds lj 0 0 0"
 TRAPPE_PAIR_MODIFY   = "mix arithmetic tail yes"
+
+
+def _detect_ff_from_data_file(data_file: str) -> dict:
+    """Detect FF type from .data file content.
+
+    Handles two data-file origins:
+      - RadonPy (GAFF2/GAFF2_mod): atom_style charge, inline Pair Coeffs → return {} (no override)
+      - EMC (PCFF/OPLS-AA/TraPPE-UA): atom_style full, coeffs in .params → detect by header
+
+    Returns a dict with one of use_pcff/use_trappe/use_opls = True and the others False,
+    or {} when detection is inconclusive so callers fall back to explicit flags or GAFF2 default.
+    """
+    try:
+        content = Path(data_file).read_text(errors="replace")
+    except OSError:
+        return {}
+    # RadonPy GAFF2: has inline Pair Coeffs section (EMC stores these in a .params file)
+    if re.search(r"^Pair Coeffs", content, re.MULTILINE):
+        return {}
+    # From here: EMC-generated file (no inline coeffs; atom_style full; coeffs via include)
+    # PCFF (class2): always has improper types — class2 requires them
+    m = re.search(r"(\d+)\s+improper types", content)
+    if m and int(m.group(1)) > 0:
+        return {"use_pcff": True, "use_trappe": False, "use_opls": False}
+    # TraPPE-UA: united-atom names in Masses section (e.g. "# c4h2", "# c4h3")
+    if re.search(r"#\s*c\d+h\d+", content):
+        return {"use_pcff": False, "use_trappe": True, "use_opls": False}
+    # OPLS-AA: remaining EMC case — no impropers, non-UA atom types (PHAL/PSIL)
+    return {"use_pcff": False, "use_trappe": False, "use_opls": True}
 
 
 # ─── Template parameter catalogs ─────────────────────────────────────────────
@@ -358,6 +388,9 @@ TEMPLATE_DEFAULTS = {
         # STRAIN_RATE in 1/fs (LAMMPS real units).
         # K_deform_rate_inv_s = 1e8 s^-1 → 1e-7 /fs.
         "STRAIN_RATE":      1e-7,
+        # DEFORM_DIR: deformation direction — x (default), y, or z.
+        # Run all 3 sequentially and average K for reliable isotropic estimate.
+        "DEFORM_DIR":       "x",
         # N_STEPS = STRAIN_MAX / (STRAIN_RATE * TIMESTEP)
         # = 0.03 / (1e-7 * 1.0) = 300000 steps for 3% strain at 1e8 s^-1, 1 fs dt
         "N_STEPS":          300000,
@@ -835,6 +868,7 @@ class ScriptGenerator:
         output_path: str,
         params: dict,
         data_file_override: Optional[str] = None,
+        velocity_seed: Optional[int] = None,
     ) -> str:
         """
         Generate a filled LAMMPS .in script from a template.
@@ -847,6 +881,10 @@ class ScriptGenerator:
             params:             Dict of parameter overrides (merged with defaults).
             data_file_override: If provided, use this path in the DATA_FILE field
                                 instead of self.data_file (useful for remote paths).
+            velocity_seed:      If set, pin the `velocity all create` RNG seed for
+                                reproducible runs (used by the autonomy-evidence
+                                benchmark). Default None ⇒ randomized per call,
+                                preserving existing behavior.
 
         Returns:
             The rendered script as a string.
@@ -860,11 +898,15 @@ class ScriptGenerator:
         # Merge defaults with caller overrides
         cfg = {**TEMPLATE_DEFAULTS[template_name], **params}
 
+        # Pin the velocity-init seed when requested (benchmark reproducibility).
+        if velocity_seed is not None:
+            cfg["_velocity_seed"] = int(velocity_seed)
+
         # Data file path
         data_file = data_file_override or self.data_file
 
         # Build all substitution blocks
-        subs = self._build_substitutions(template_name, cfg, data_file)
+        subs = self._build_substitutions(template_name, cfg, data_file, raw_params=params)
 
         # Staircase expansion: npt_tg_step + T_END + T_STEP → full cooling loop.
         # A Tg sweep MUST be a multi-temperature ramp. Guard against the silent failure where
@@ -926,7 +968,8 @@ class ScriptGenerator:
 
         temp_list_str = " ".join(str(int(t) if t == int(t) else t) for t in temps)
 
-        seed = random.randint(10000, 999999)
+        seed = (int(cfg["_velocity_seed"]) if cfg.get("_velocity_seed") is not None
+                else random.randint(10000, 999999))
 
         if write_per_t_dump:
             per_t_dump_block = (
@@ -937,6 +980,14 @@ class ScriptGenerator:
             )
         else:
             per_t_dump_block = ""
+
+        # Progress reporting: write a JSON event per temperature step if PROGRESS_FILE given.
+        pf = cfg.get("PROGRESS_FILE", "")
+        progress_line = (
+            '  shell echo \'{"stage":"T${temps}","status":"done"}\''
+            f' >> {pf}\n'
+            if pf else ""
+        )
 
         script = f"""\
 # ============================================================
@@ -982,7 +1033,7 @@ label TEMP_LOOP
   fix npt_tg all npt temp ${{temps}} ${{temps}} {t_damp} iso {p_target} {p_target} {p_damp}
   run {n_steps}
   unfix npt_tg
-{per_t_dump_block}  print "STAGE COMPLETE: Tg step T=${{temps}}K P={p_target}atm steps={n_steps}"
+{progress_line}{per_t_dump_block}  print "STAGE COMPLETE: Tg step T=${{temps}}K P={p_target}atm steps={n_steps}"
   next temps
   jump SELF TEMP_LOOP
 
@@ -995,7 +1046,8 @@ write_data tg_step_out.data
 
         return script
 
-    def _build_substitutions(self, template_name: str, cfg: dict, data_file: str) -> dict:
+    def _build_substitutions(self, template_name: str, cfg: dict, data_file: str,
+                              raw_params: dict = None) -> dict:
         """Build the full substitution dictionary for the given template and config."""
         subs = {}
 
@@ -1008,28 +1060,34 @@ write_data tg_step_out.data
         subs["WRITE_DATA_FILE"]  = cfg.get("WRITE_DATA_FILE", f"{template_name}_out.data")
 
         # ── Force field styles ────────────────────────────────────────────
-        use_pcff = cfg.get("use_pcff", False)
+        use_pcff   = cfg.get("use_pcff",   False)
         use_opls   = cfg.get("use_opls",   False)
         use_trappe = cfg.get("use_trappe", False)
 
-        # Guard against the silent failure mode where use_pcff defaults to False and a
-        # Class II (PCFF) cell gets harmonic/GAFF2 styles emitted onto it → LAMMPS aborts
-        # ("Bond style class2 in data file differs from currently defined bond style harmonic").
-        # Detect the FF family from the data file and auto-correct / hard-error on mismatch.
-        if not (use_opls or use_trappe):
-            is_class2 = self._detect_class2(data_file, cfg.get("params_file") or None)
-            requested_pcff = bool(cfg.get("use_pcff", False))
-            explicit = "use_pcff" in cfg
-            if is_class2 is True and not requested_pcff:
-                if explicit:
-                    raise ValueError(
-                        f"FF mismatch: data file '{data_file}' is Class II (PCFF) but "
-                        f"use_pcff=False was passed. Pass use_pcff=True (or omit it) for this cell.")
-                use_pcff = True  # auto-correct the default; never emit harmonic on a class2 cell
-            elif is_class2 is False and requested_pcff:
-                raise ValueError(
-                    f"FF mismatch: use_pcff=True but data file '{data_file}' has no Class II "
-                    f"cross-term sections (looks harmonic/GAFF2). Emitting class2 styles would abort LAMMPS.")
+        if data_file and os.path.exists(data_file):
+            detected = _detect_ff_from_data_file(data_file)
+            if detected:
+                # Explicit caller flag contradicts the data file → raise before emitting a broken deck
+                if raw_params is not None:
+                    for flag in ("use_pcff", "use_opls", "use_trappe"):
+                        if flag in raw_params and raw_params[flag] != detected.get(flag, False):
+                            raise ValueError(
+                                f"FF flag mismatch: caller set {flag}={raw_params[flag]} but "
+                                f"{os.path.basename(data_file)!r} requires "
+                                f"{flag}={detected.get(flag, False)}. "
+                                f"Pass the matching FF flag or remove the override."
+                            )
+                # Auto-set when caller omitted all three flags
+                if not (use_pcff or use_opls or use_trappe):
+                    use_pcff   = detected.get("use_pcff",   False)
+                    use_opls   = detected.get("use_opls",   False)
+                    use_trappe = detected.get("use_trappe", False)
+                    warnings.warn(
+                        "FF auto-detected from data file: "
+                        f"use_pcff={use_pcff}, use_opls={use_opls}, use_trappe={use_trappe}",
+                        stacklevel=3,
+                    )
+
         if use_pcff:
             ff_styles = PCFF_STYLES
         elif use_opls:
@@ -1107,12 +1165,11 @@ write_data tg_step_out.data
             subs["RESTART_FREQ"]   = 0
 
         # ── SHAKE block ───────────────────────────────────────────────────
-        if cfg.get("use_trappe") and cfg.get("use_shake"):
-            # TraPPE-UA has no explicit H atoms; constrain C-C bond types by ID
-            bond_ids = cfg.get("shake_bond_type_ids", [cfg.get("shake_bond_type_id", 1)])
-            b_args = " ".join(f"b {bid}" for bid in bond_ids)
-            subs["SHAKE_BLOCK"]   = f"fix shake_fix all shake 1e-4 1000 0 {b_args}"
-            subs["UNSHAKE_BLOCK"] = "unfix shake_fix"
+        if cfg.get("use_trappe"):
+            # TraPPE-UA is united-atom: no H bonds; C-C backbone SHAKE forbidden
+            # ("Shake clusters are connected" fatal error on polyhydrocarbon chains)
+            subs["SHAKE_BLOCK"]   = "# SHAKE disabled (TraPPE-UA united-atom)"
+            subs["UNSHAKE_BLOCK"] = ""
         elif cfg.get("use_shake", True):
             # SHAKE constrains H-X bonds (m 1.008 targets all hydrogen mass)
             subs["SHAKE_BLOCK"]   = "fix shake_fix all shake 1e-4 1000 0 m 1.008"
@@ -1124,7 +1181,8 @@ write_data tg_step_out.data
         # ── Initial velocity ──────────────────────────────────────────────
         init_v = cfg.get("init_velocity", None)
         if init_v is not None:
-            seed = random.randint(10000, 999999)
+            seed = (int(cfg["_velocity_seed"]) if cfg.get("_velocity_seed") is not None
+                    else random.randint(10000, 999999))
             subs["INIT_VELOCITY_BLOCK"] = (
                 f"velocity all create {init_v} {seed} mom yes rot yes dist gaussian"
             )
@@ -1230,8 +1288,9 @@ write_data tg_step_out.data
         subs["BORN_MATRIX_FILE"]   = cfg.get("BORN_MATRIX_FILE",   "born_matrix.dat")
 
         # ── Uniaxial deformation specifics (npt_deform) ──────────────────────
-        subs["STRAIN_RATE"]  = cfg.get("STRAIN_RATE", 1e-7)
-        subs["N_EQ_STEPS"]   = cfg.get("N_EQ_STEPS",  200000)
+        subs["STRAIN_RATE"]  = cfg.get("STRAIN_RATE",  1e-7)
+        subs["N_EQ_STEPS"]   = cfg.get("N_EQ_STEPS",   200000)
+        subs["DEFORM_DIR"]   = cfg.get("DEFORM_DIR",   "x")
 
         # ── SLLOD shear viscosity specifics ──────────────────────────────────
         subs["SHEAR_RATE"]    = cfg.get("SHEAR_RATE",   1e-5)

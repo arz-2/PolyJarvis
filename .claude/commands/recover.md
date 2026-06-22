@@ -7,7 +7,7 @@ Recovery procedure for a failed PolyJarvis simulation. Follow these steps exactl
 
 **1. Find the active run_log.md:**
 ```bash
-find /home/alexzhao/PolyJarvis/data -name "run_log.md" -newer /home/alexzhao/PolyJarvis/data/TEMPLATE/run_log.md | sort -t/ -k6 | tail -5
+find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/data/TEMPLATE/run_log.md | sort -t/ -k6 | tail -5
 ```
 
 **2. Read the SIMULATION STATE table** from that run_log.md. Identify the row with status `monitoring` or `failed` and note the `chain_id` / `run_id`.
@@ -20,7 +20,10 @@ find /home/alexzhao/PolyJarvis/data -name "run_log.md" -newer /home/alexzhao/Pol
 - `get_run_output(run_id)` — read the last 50 lines of the LAMMPS log
 - For RadonPy: `get_job_output(job_id)`
 
-**5. Diagnose using this taxonomy:**
+**5. Diagnose — consult the recovery playbook first, then the built-in taxonomy:**
+
+- **Read `guides/RECOVERY_PLAYBOOK.md`** (regenerated from past run_logs by `runlog_miner`). If a clustered signature matches this failure's symptom/error, prefer its **Recovery action** — those rows carry an empirical success rate (`k/n`) across past runs, so rank by it and skip low-`n` or low-success rows.
+- If no playbook row matches (or the playbook has no incidents yet), fall back to the built-in taxonomy below:
 
 | Error string / condition | Root cause | Recovery action |
 |---|---|---|

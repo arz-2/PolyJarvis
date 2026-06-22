@@ -1,6 +1,7 @@
 ---
 name: feedback_run_summary_born_gap
 description: generate_run_summary does not pick up bulk_modulus_born.json; only reads bulk_modulus.json (fluctuation method)
+ingested_at: 2026-06-20
 metadata:
   type: feedback
 ---

@@ -29,19 +29,24 @@ Returns `overall_pass` verdict and a ready-to-paste D-05 markdown block. Copy `r
 - `log_file` = `npt_prod_log_path` — the production NPT log (`npt_prod300` glassy / `npt_production` rubbery), where density/energy convergence is meaningful.
 - `dump_file` = `melt_dump_path` — the **melt** `nvt_production.dump` (T_workflow, chains mobile), where C(t)/MSD/Rg/R_ee actually report chain relaxation. Do **not** point this at the production NPT dump: for a glassy polymer the production state is below Tg, so C(t) never decays and MSD shows a kinetic trap *by construction* — the structural check would be meaningless. `gen_prompt.py` already resolves all three paths; use them verbatim, do not construct them.
 
-**`ct_min_decay` usage:** Pass `ct_min_decay_melt` from the prompt **in both phases** — the structural dump is always the melt, so the C(t) decay gate is always physically valid (rubbery T_workflow is ≥ its Tg, so its melt also relaxes).
+**`ct_min_decay_melt` may be `null`.** When the prompt gives a number, pass it as `ct_min_decay` (C(t) becomes a hard gate). When it is `null` (aromatic main-chain classes — PSU/PEEK/PC/Kapton/PPS/PPV — where the backbone path cannot be defined by atom-type selection, so C(t)/C∞ are meaningless), **omit `ct_min_decay` entirely**: C(t)/C∞ are then reported as advisory warnings and never block `overall_pass`. This is the property-aware default that prevents the spurious aromatic-backbone FAIL; do not hand-override it back on.
 
 **Call signature:**
 ```python
-check_equilibration_comprehensive(
-    log_file=npt_prod_log_path,      # production NPT log — thermo (density/energy) convergence
-    dump_file=melt_dump_path,        # melt nvt_production.dump — chain relaxation (C(t)/MSD/Rg/R_ee)
-    data_file=equil_data_path,       # topology
+kwargs = dict(
+    log_file=npt_prod_log_path,   # npt_prod300.log (glassy) or npt_production.log (rubbery)
+                                  # → thermo convergence: density/energy drift + block-SEM
+    dump_file=melt_dump_path,     # nvt_production.dump — always the MELT dump, both phases
+                                  # → structural checks: C(t)/MSD/Rg/R_ee on MOBILE chains
+                                  # Do NOT use npt_prod300.dump — chains are frozen below Tg
+    data_file=equil_data_path,
     backbone_types=backbone_types,
-    ct_min_decay=ct_min_decay_melt,  # from prompt; the dump is the melt, so always pass it
     output_dir=output_dir,
     graphs_dir=graphs_dir,
 )
+if ct_min_decay_melt is not None:        # null ⇒ aromatic main chain: leave C(t) advisory
+    kwargs["ct_min_decay"] = ct_min_decay_melt
+check_equilibration_comprehensive(**kwargs)
 ```
 
 **Key result fields:**
@@ -88,8 +93,10 @@ Density passes if `plateau_density_mean` is within ±5% of experimental; flag if
 ## Common Failures
 
 **`check_equilibration_comprehensive` returns `overall_pass=False`:**
-- Convergence failure (density drift, energy not plateaued) → return `EXTEND` — orchestrator extends chain 1–2 ns and re-Monitors
-- Hard structural failure (box collapse, charge imbalance, C(t)=0% for a rubbery class) → return `FAIL` — orchestrator writes UNRESOLVED
+- Convergence failure (density drift, energy not plateaued) → return `EXTEND`
+- Hard structural failure (box collapse, charge imbalance, C(t)=0% for a rubbery class) → return `FAIL`
 
 **`extract_equilibrated_density` returns implausibly low density (<0.5 g/cm³):**
 The NPT production log may contain the compression ramp rather than the production plateau. Verify `plateau_step_range` starts after the ramp ends. Increase `eq_fraction` to 0.7.
+
+**`overall_pass=False` on a glassy DP≥30 system blocked SOLELY by melt chain-self-diffusion (C(t) decay, MSD, MSID slope, Rg chain-chain CV):** This is NOT a FAIL. Rigid-aromatic (PKTN/PEEK) and high-DP glassy melts have τ_relax ~10⁹ ps — terminal relaxation is unreachable in MD and a 1–2 ns EXTEND cannot move C(t). Per `decision_policy.json:require_glassy`, gate on the STRUCTURAL set only (density plateau in range, density-homogeneity CV<0.25, P2<0.10, thermo drift/SEM); the four chain-diffusion metrics are ADVISORY (non-blocking). Do not loop EXTEND. Flag the dynamic-relaxation lower-bound caveat (Tg over-estimate, K low) in the run summary.

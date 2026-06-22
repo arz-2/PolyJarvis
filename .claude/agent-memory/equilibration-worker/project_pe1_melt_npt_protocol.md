@@ -1,6 +1,7 @@
 ---
 name: project_pe1_melt_npt_protocol
 description: PE1 density re-run corrected equilibration protocol — melt branch required to fix +25% over-density failure
+ingested_at: 2026-06-20
 metadata:
   type: project
 ---

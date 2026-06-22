@@ -143,6 +143,11 @@ def main():
                              "for rate-sensitivity comparison. Used with --strain_rate_2.")
     parser.add_argument("--strain_rate_2", type=float, default=None,
                         help="Strain rate (1/fs) for --log_file_2. Typically 10× slower than --strain_rate.")
+    parser.add_argument("--graphs_dir", default=None,
+                        help="Accepted for interface compatibility with the standardized analysis-script "
+                             "convention (the MCP wrapper passes it). This script emits no plots, so the "
+                             "argument is ignored — its presence prevents an argparse exit-2 that would "
+                             "leave the MCP tool reporting 'completed' with no JSON/CSV output.")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)

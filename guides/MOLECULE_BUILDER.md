@@ -25,6 +25,11 @@ EMC builds the amorphous cell and assigns all FF parameters in one step — no c
 ### `submit_emc_cell_job`
 
 ```python
+import random
+# Use the pinned seed from the prompt (`emc_seed:`) when given — that is how replication
+# studies (guides/REVISION_PARAMS.md) reproduce the exact cell. Only draw a random seed
+# when the prompt's emc_seed is null. NEVER use seed=-1 (EMC doesn't return the used seed).
+emc_seed = emc_seed_from_prompt if emc_seed_from_prompt is not None else random.randint(1, 999999)
 job = submit_emc_cell_job(
     smiles="...",
     polymer_class="PCBN",
@@ -32,7 +37,7 @@ job = submit_emc_cell_job(
     nchains=10,          # exact chain count — pass the `nchain` value from the prompt
     density_initial=0.6,
     temperature=300.0,
-    seed=-1,
+    seed=emc_seed,       # always a specific integer so the run is reproducible
     output_name="polymer",
 )
 ```
@@ -48,6 +53,7 @@ out = get_emc_job_output(job_id)
 data_path    = out["result"]["data_path"]
 params_path  = out["result"]["params_path"]   # may be None
 lammps_flags = out["result"]["lammps_flags"]  # e.g. {"use_pcff": True, "use_opls": False}
+# emc_seed is the value you generated above — include it in your RESULT block
 ```
 
 **Output placement:** After the job completes, copy outputs into `{work_dir}/cell/`:
@@ -65,7 +71,7 @@ Report `data_path = {work_dir}/cell/cell.data` and `emc_params_path = {work_dir}
 | ID | Decision | Value |
 |---|---|---|
 | D-01 | Force field | auto-selected from polymer_class (see `lammps_flags` in output) |
-| D-02 | Charge method | embedded in FF — no separate step |
+| D-02 | Charge method | bond-increment / library charges embedded in the EMC class-II FF (PCFF/OPLS/TraPPE) — no separate QM step |
 | D-03 | Electrostatics | pppm (all except PHYC/PDIE which use lj/cut) |
 | D-04 | System size | dp and nchain passed to submit_emc_cell_job |
 
@@ -141,6 +147,23 @@ save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="
 
 **EMC exits with "Missing force field parameters":** Check SMILES conventions for the class — most common cause is `*` placement error (PCBN: `*` on aromatic C; PIMD: ring atoms must be lowercase). Verify exactly two `*` atoms. If `dp=20` fails, retry with `dp=15`.
 
+**`classify_polymer` returns PHAL for PVC (`*CC(Cl)*`):** False flag — PVC is PVNL/PCFF (C–Cl is not PTFE-family). Build with the class specified in the approved plan; log the PHAL divergence in D-01.
+
 ---
 
-**→ When `cell.data` is saved, return the RESULT block. The orchestrator decides next steps.**
+**→ When `cell.data` is saved, return the RESULT block.**
+
+The RESULT block MUST include `emc_seed` — the orchestrator logs it to the run_log header immediately after parsing RESULT so the cell is reproducible for revision studies:
+
+```
+RESULT
+data_path:      /home/arz2/PolyJarvis/data/<RUN>/lammps/cell/cell.data
+emc_params_path: /home/arz2/PolyJarvis/data/<RUN>/lammps/cell/emc_build.params
+lammps_flags:   <as returned by get_emc_job_output result["lammps_flags"]>
+emc_seed:       <integer you passed to submit_emc_cell_job seed= / saved on mol-builder for RadonPy>
+n_atoms:        <atom count from inspect_data_file or EMC output>
+```
+
+For EMC path: `emc_seed` = the integer you generated/pinned at the top of the build.
+For RadonPy path: no EMC seed — set `emc_seed: null`.
+NEVER set `emc_seed: -1` — that was the old placeholder for "uncaptured" and means the cell is irreproducible.

@@ -1,0 +1,17 @@
+{
+  "arm": "script",
+  "system": "SMOKE",
+  "polymer_class": "PHYC",
+  "seed": 1001,
+  "interventions": 0,
+  "wall_clock_s": 0.0,
+  "terminal_state": "completed_foundation",
+  "recovery_events": [],
+  "stages_completed": [
+    "build",
+    "equil",
+    "equil-check"
+  ],
+  "smoke": true,
+  "notes": "; stage 'run-summary' not wired this pass (foundation-only)"
+}

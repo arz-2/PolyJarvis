@@ -3,6 +3,7 @@ name: project-psu1-equil-chain
 description: PSU1 Polysulfone equilibration: 9-stage glassy chain, PCFF, temp=700 K, chain_id=a3dd19a9
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 PSU1 Polysulfone (PSFO class) equilibration submitted 2026-06-18.
@@ -12,7 +13,7 @@ PSU1 Polysulfone (PSFO class) equilibration submitted 2026-06-18.
 **Key params:** use_pcff=True, max_temp=780 K, n_atoms=8656, gpu_ids=0,1,2,3, mpi=4, SEED_HOT=723979 (nvt_softheat velocity init only; no SEED_COLD — subsequent stages read from data/restart files).
 
 **chain_id:** a3dd19a9
-**work_dir:** /home/alexzhao/PolyJarvis/data/PSU1/lammps/
+**work_dir:** /home/arz2/PolyJarvis/data/PSU1/lammps/
 
 **Why:** PSFO uses PCFF (Class II); glassy polymer (exp Tg ~190 C); 9-stage chain mandatory so stage 09 produces 300 K density for mechanical track.
 

@@ -3,6 +3,7 @@ name: trappe-result-block
 description: PHYC/PDIE use trappe-ua; RESULT lammps_flags need use_trappe:true
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 PHYC (polyhydrocarbons: PE/PP/PIB) and PDIE (polydienes: PBD/PI) route to the

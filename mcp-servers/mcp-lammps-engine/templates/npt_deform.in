@@ -14,7 +14,7 @@
 # Design:
 #   Phase 1: NVT pre-equilibration (N_EQ_STEPS) at T_TARGET.
 #            Removes NPT thermostat state; brief re-thermalisation.
-#   Phase 2: Uniaxial deformation (N_STEPS) via fix deform x erate.
+#   Phase 2: Uniaxial deformation (N_STEPS) via fix deform {DEFORM_DIR} erate.
 #            NVT — no barostat so y/z dimensions stay fixed.
 #            pxx, pyy, pzz written every THERMO_FREQ steps for analysis.
 #            STRAIN_MAX / (STRAIN_RATE * TIMESTEP) = N_STEPS.
@@ -78,13 +78,14 @@ fix nvt_eq all nvt temp {T_TARGET} {T_TARGET} {T_DAMP}
 run {N_EQ_STEPS}
 unfix nvt_eq
 
-# ── Phase 2: Uniaxial deformation in x ─────────────────────────────────────
-# fix deform x erate: engineering strain rate in 1/fs (LAMMPS real units).
-# NVT thermostat — no barostat; y/z box dimensions stay fixed.
+# ── Phase 2: Uniaxial deformation ──────────────────────────────────────────
+# fix deform {DEFORM_DIR} erate: engineering strain rate in 1/fs (LAMMPS real units).
+# DEFORM_DIR: x (default), y, or z — run all 3 sequentially and average K for reliability.
+# NVT thermostat — no barostat; the other two box dimensions stay fixed.
 # "remap v" rescales velocities with the deforming cell (maintains
 # thermostat accuracy at large strains; required for SHAKE compatibility).
 fix nvt_def all nvt temp {T_TARGET} {T_TARGET} {T_DAMP}
-fix def all deform 1 x erate {STRAIN_RATE} remap v
+fix def all deform 1 {DEFORM_DIR} erate {STRAIN_RATE} remap v
 run {N_STEPS}
 unfix def
 unfix nvt_def

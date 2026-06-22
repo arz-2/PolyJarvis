@@ -76,6 +76,16 @@ LAMBDA_LAMMPS   = os.environ.get("LAMBDA_LAMMPS",  f"/home/{LAMBDA_USER}/lammps-
 LAMBDA_LAMMPS_KOKKOS = os.environ.get("LAMBDA_LAMMPS_KOKKOS",
                                       f"/home/{LAMBDA_USER}/lammps-install-kokkos/bin/lmp")
 CONDA_ENV       = os.environ.get("CONDA_ENV",      "mol-builder")
+_openmpi_home = f"/home/{LAMBDA_USER}/openmpi"
+_sys_openmpi_bin = "/usr/bin"
+_sys_openmpi_lib = "/usr/lib/x86_64-linux-gnu"
+_sys_openmpi_prefix = "/usr"
+OPENMPI_BIN    = os.environ.get("OPENMPI_BIN",
+                                _openmpi_home + "/bin" if os.path.isdir(_openmpi_home) else _sys_openmpi_bin)
+OPENMPI_LIB    = os.environ.get("OPENMPI_LIB",
+                                _openmpi_home + "/lib" if os.path.isdir(_openmpi_home) else _sys_openmpi_lib)
+OPENMPI_PREFIX = os.environ.get("OPENMPI_PREFIX",
+                                _openmpi_home if os.path.isdir(_openmpi_home) else _sys_openmpi_prefix)
 
 
 def _engine_launch(engine: str, n_gpu: int) -> tuple[str, str]:
@@ -288,8 +298,20 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
             " > \"$SENTINEL\"; }",
         "",
         f"export CUDA_VISIBLE_DEVICES={cuda_devices}",
+        f"export PATH={OPENMPI_BIN}:$PATH",
+        f"export LD_LIBRARY_PATH={OPENMPI_LIB}:${{LD_LIBRARY_PATH:-}}",
+        # Clear any stale inherited OPAL_PREFIX when using system OpenMPI (/usr);
+        # only set it explicitly for a non-system installation.
+        ("unset OPAL_PREFIX"
+         if OPENMPI_PREFIX == _sys_openmpi_prefix
+         else f"export OPAL_PREFIX={OPENMPI_PREFIX}"),
         "# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).",
         'echo $$ > "$PIDFILE"',
+        # mpirun -np 1 does not propagate CUDA_VISIBLE_DEVICES to the child process on OpenMPI.
+        # For single-rank runs, skip mpirun and pin the GPU inline on the lmp command line.
+        ('LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"'
+         if mpi == 1 else
+         'LAMMPS_LAUNCH="mpirun -np $MPI $LMP $OFFLOAD_FLAGS"'),
         "",
     ]
 
@@ -304,7 +326,7 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
             f"mkdir -p {wdir}",
             f"cd {wdir}",  # FIX: cd into stage workdir so relative paths in .in files resolve correctly
             f"log_start {name}",
-            f"mpirun -np $MPI $LMP $OFFLOAD_FLAGS "
+            f"$LAMMPS_LAUNCH "
             f"-in {script} >> {wdir}/{log} 2>&1 \\",
             f"  && log_done {name} \\",
             f"  || {{ log_fail {name}; sentinel_fail {name}; "
@@ -362,16 +384,28 @@ def _lammps_run_background(
         else:
             cuda_line = f"export CUDA_VISIBLE_DEVICES={gpu_ids}\n"
         flags = f"{offload_flags} " if offload_flags else ""
-        lammps_cmd = (
-            f"mpirun -np {mpi} {lmp_bin} {flags}"
-            f"-in {script} >> {wrapper_stdout} 2>&1\n"
-        )
+        # mpirun -np 1 does not propagate CUDA_VISIBLE_DEVICES on OpenMPI; skip it for mpi=1.
+        if mpi == 1:
+            lammps_cmd = (
+                f"env CUDA_VISIBLE_DEVICES={gpu_ids} {lmp_bin} {flags}"
+                f"-in {script} >> {wrapper_stdout} 2>&1\n"
+            )
+        else:
+            lammps_cmd = (
+                f"mpirun -np {mpi} {lmp_bin} {flags}"
+                f"-in {script} >> {wrapper_stdout} 2>&1\n"
+            )
         wrapper = (
             f"#!/bin/bash\n"
             f"{cuda_line}"
+            f"export PATH={OPENMPI_BIN}:$PATH\n"
+            f"export LD_LIBRARY_PATH={OPENMPI_LIB}:${{LD_LIBRARY_PATH:-}}\n"
+            + ("unset OPAL_PREFIX\n"
+               if OPENMPI_PREFIX == _sys_openmpi_prefix
+               else f"export OPAL_PREFIX={OPENMPI_PREFIX}\n")
             # Record our own PID first so watch_run can check liveness. $$ is the
             # long-lived wrapper; $! at launch is the short-lived setsid parent.
-            f"mkdir -p {SENTINEL_DIR}\n"
+            + f"mkdir -p {SENTINEL_DIR}\n"
             f"echo $$ > {pidfile}\n"
             f"cd {work_dir}\n"
             f"{lammps_cmd}"
@@ -598,12 +632,28 @@ def generate_script(
             data_file_override=data_file,
         )
 
+        # For Tg staircases, compute and return the number of temperature steps so workers
+        # can pass n_stages to run_lammps_script without re-implementing the list logic.
+        n_tg_stages = 0
+        if template_name == "npt_tg_step" and "T_END" in params and "T_STEP" in params:
+            merged = {**TEMPLATE_DEFAULTS["npt_tg_step"], **params}
+            _t = float(merged.get("T_START", 450.0))
+            _end = float(params["T_END"])
+            _step = float(params["T_STEP"])
+            _temps: list = []
+            while _t > _end + 1e-6:
+                _temps.append(_t); _t -= _step
+            if not _temps or abs(_temps[-1] - _end) > 1e-6:
+                _temps.append(_end)
+            n_tg_stages = len(_temps)
+
         return {
             "status":         "success",
             "template":       template_name,
             "output_script":  output_script,
             "params_used":    {**TEMPLATE_DEFAULTS[template_name], **params},
             "system_info":    gen.get_system_info(),
+            "n_tg_stages":    n_tg_stages,
             "script_preview": script[:1500] + "\n..." if len(script) > 1500 else script,
         }
 
@@ -621,6 +671,8 @@ def run_lammps_script(
     log_file: str = "lammps_run.log",
     use_gpu: bool = True,
     engine: str = "gpu",
+    progress_file: str = "",
+    n_stages: int = 0,
 ) -> dict:
     """
     Execute a LAMMPS .in script on the local GPU in the background.
@@ -653,13 +705,15 @@ def run_lammps_script(
         Path(work_dir).mkdir(parents=True, exist_ok=True)
 
         meta = {
-            "script":   script,
-            "work_dir": work_dir,
-            "log_file":        log_file,
-            "mpi":             mpi,
-            "gpu_ids":         gpu_ids,
-            "use_gpu":         use_gpu,
-            "engine":          engine,
+            "script":        script,
+            "work_dir":      work_dir,
+            "log_file":      log_file,
+            "mpi":           mpi,
+            "gpu_ids":       gpu_ids,
+            "use_gpu":       use_gpu,
+            "engine":        engine,
+            "progress_file": progress_file,
+            "n_stages":      n_stages,
         }
         run_id = run_manager.create("lammps_run", meta)
 
@@ -1070,10 +1124,9 @@ def watch_run(run_id: str) -> dict:
     """
     sentinel_path = SENTINEL_DIR / f"done_{run_id}.json"
     pidfile = pidfile_path(run_id, SENTINEL_DIR)
-    # Chains expose per-stage progress; single runs have none.
     run = run_manager.get(run_id) or {}
     meta = run.get("meta", {})
-    progress_file = meta.get("progress_file", "") if run.get("run_type") == "lammps_nohup_chain" else ""
+    progress_file = meta.get("progress_file", "")
     n_stages = meta.get("n_stages", 0) if progress_file else 0
     monitor_command = build_watch_command(str(sentinel_path), pidfile, progress_file, n_stages)
     return {
@@ -1116,6 +1169,7 @@ def generate_equilibration_workflow(
     melt_npt_steps: Optional[int] = None,
     add_300k_production: bool = True,
     engine: str = "gpu",
+    velocity_seed: Optional[int] = None,
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
@@ -1165,7 +1219,7 @@ def generate_equilibration_workflow(
                         PIMN, PVNL, PPNL). Switches all templates to class2
                         styles, sixthpower mixing, and full 1-4 interactions.
                         SHAKE is disabled (PCFF runs cleanly at 1 fs without it).
-        use_trappe:     Set True for EMC/TraPPE-UA systems (PHYC, PDIE, PSTR).
+        use_trappe:     Set True for EMC/TraPPE-UA systems (PHYC, PDIE).
                         Switches all templates to pair_style lj/cut 14.0 (no
                         kspace), multi/harmonic dihedrals, and SHAKE on all
                         C-C bond types (enables dt=2 fs for npt_pppm through npt_production).
@@ -1296,6 +1350,7 @@ def generate_equilibration_workflow(
                 output_path=script,
                 params=p,
                 data_file_override=prev_data,
+                velocity_seed=velocity_seed,
             )
             return {
                 "name":            name,
@@ -2763,6 +2818,10 @@ def run_bulk_modulus_series(
     dt_fs: float = 1.0,
     thermo_freq: int = 100,
     output_dir: Optional[str] = None,
+    use_trappe: bool = False,
+    use_pcff: bool = False,
+    use_opls: bool = False,
+    engine: str = "gpu",
 ) -> dict:
     """
     Run a series of constant-pressure NPT simulations to support Murnaghan
@@ -2791,6 +2850,16 @@ def run_bulk_modulus_series(
         mpi:            MPI processes. Required — no default.
         output_dir:     Where to store the list of log file paths (JSON).
                         Defaults to work_dir.
+        use_trappe:     Set True for TraPPE-UA systems (PHYC, PDIE). Emits lj/cut +
+                        neigh yes instead of PPPM/CHARMM defaults. Mirrors the same
+                        flag in generate_equilibration_workflow and generate_script.
+        use_pcff:       Set True for PCFF (Class II) systems. Emits pppm + class2 pair.
+        use_opls:       Set True for OPLS-AA systems. Emits pppm + lj/cut/coul/long.
+        engine:         Launch engine forwarded to run_lammps_chain: "kokkos"
+                        (full-offload; canonical for PCFF/OPLS PPPM cells, mpi=1),
+                        "gpu" (GPU package; default), or "cpu". Must match the
+                        per-FF hardware_policy default or the chain runs the wrong
+                        binary (PCFF on the GPU package is CPU-bound).
 
     Returns:
         dict with chain_id, monitor_command, log_files (list of expected log paths),
@@ -2831,6 +2900,10 @@ def run_bulk_modulus_series(
                     "THERMO_FREQ": thermo_freq,
                     "LOG_FILE":    log_path,
                     "use_gpu":     True,
+                    "engine":      engine,
+                    "use_trappe":  use_trappe,
+                    "use_pcff":    use_pcff,
+                    "use_opls":    use_opls,
                     "DUMP_FILE":   f"{stage_dir}/{tag}.dump",
                     "LAST_DUMP_FILE":  f"{stage_dir}/{tag}_last.dump",
                     "WRITE_DATA_FILE": f"{stage_dir}/{tag}_out.data",
@@ -2846,7 +2919,7 @@ def run_bulk_modulus_series(
                 "name":     tag,
                 "script":   script_path,
                 "work_dir": stage_dir,
-                "log_file": log_path,
+                "log_file": f"{tag}_stdout.log",  # basename only; chain prepends work_dir. LAMMPS writes thermo to log_path via the 'log' directive in the .in file.
             })
 
         # Save log file manifest alongside output
@@ -2860,6 +2933,7 @@ def run_bulk_modulus_series(
             mpi=mpi,
             gpu_ids=gpu_ids,
             data_file=data_file,
+            engine=engine,
         )
         if chain_result.get("status") == "error":
             return chain_result
@@ -3023,6 +3097,7 @@ def _run_generate_run_summary(
     exp_K_max: Optional[float],
     graphs_dir: Optional[str] = None,
     n_replicates: Optional[int] = None,
+    tg_path: Optional[str] = None,
 ) -> dict:
     """Background worker — runs generate_run_summary.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/generate_run_summary.py"]
@@ -3052,10 +3127,11 @@ def _run_generate_run_summary(
     if exp_K_max is not None:       parts.append(f"--exp_K_max {exp_K_max}")
     if graphs_dir:                  parts.append(f"--graphs_dir {graphs_dir}")
     if n_replicates is not None:    parts.append(f"--n_replicates {n_replicates}")
+    if tg_path:                     parts.append(f"--tg_path {tg_path}")
 
     command = " ".join(parts)
     logger.info(f"Running generate_run_summary via CLI: {command}")
-    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=60)
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=300)
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
     return _parse_json_from_stdout(stdout, stderr)
@@ -3209,6 +3285,7 @@ def generate_run_summary(
     exp_K_min: Optional[float] = None,
     exp_K_max: Optional[float] = None,
     n_replicates: Optional[int] = None,
+    tg_path: Optional[str] = None,
 ) -> dict:
     """
     Aggregate all Stage 4 analysis outputs into a single run_summary.json.
@@ -3240,6 +3317,10 @@ def generate_run_summary(
         exp_K_min/max:    Experimental bulk modulus range (GPa).
         n_replicates:     Distinct replicates in the multi-rate Tg registry (for the
                           DSC-equivalent extrapolation reported in results.tg).
+        tg_path:          Explicit path to the canonical tg_summary.json (e.g.
+                          tg_r40/tg_summary.json — the slowest-rate folder). When
+                          supplied, skips rglob discovery; prevents alphabetical-order
+                          bugs when multiple rate folders coexist.
 
     Returns:
         dict with status and summary_json path on success.
@@ -3259,6 +3340,7 @@ def generate_run_summary(
             exp_density_min=exp_density_min, exp_density_max=exp_density_max,
             exp_K_min=exp_K_min, exp_K_max=exp_K_max,
             graphs_dir=graphs_dir, n_replicates=n_replicates,
+            tg_path=tg_path,
         )),
         daemon=True,
     )

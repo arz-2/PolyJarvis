@@ -58,8 +58,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # shared host/GPU probes (re-exported here so calibrate_hardware.py keeps using bh.detect_phys_cores / bh.gpu_status)
 from hw_common import detect_phys_cores, gpu_status
 
-LMP_DEFAULT = "/home/alexzhao/lammps-install/bin/lmp"
-LMP_KOKKOS_DEFAULT = "/home/alexzhao/lammps-install-kokkos/bin/lmp"
+LMP_DEFAULT = "/home/arz2/lammps-install/bin/lmp"
+LMP_KOKKOS_DEFAULT = "/home/arz2/lammps-install-kokkos/bin/lmp"
 CONDA_ACTIVATE = "source ~/miniforge3/etc/profile.d/conda.sh; conda activate mol-builder"
 
 # Execution arms — how LAMMPS offloads work to the GPU. A0 is the current production

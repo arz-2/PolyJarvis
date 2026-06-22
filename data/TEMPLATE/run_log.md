@@ -1,6 +1,6 @@
 # [POLYMER_NAME] Run [N] · [START_DATE] → [END_DATE]
 SMILES: `[SMILES]`  |  FF: [FF]  |  Charges: [CHARGE_METHOD]  |  DP: [DP]  |  Chains: [N_CHAINS]  |  GPU: [IDs used]
-Requested: [PROPERTIES]  |  Replicate: [1 of 1 / N of 5]  |  Seeds: EMC=[N or "random"]  |  SEED_HOT=[N]  |  SEED_COLD=[N]
+Requested: [PROPERTIES]  |  Replicate: [1 of 1 / N of 5]  |  Seeds: EMC=[N]  |  SEED_HOT=[N]  |  SEED_COLD=[N]
 Plan: `[PLAN_PATH = data/[RUN]/raw/run_plan.json]`  |  mode: [deterministic / reasoned]  |  confidence: [high/medium/low]  |  critic: [approved / N rounds]  |  T_workflow_K: [N]
 
 ---
@@ -16,11 +16,20 @@ Plan: `[PLAN_PATH = data/[RUN]/raw/run_plan.json]`  |  mode: [deterministic / re
 | D-03 Electrostatics | [PPPM / lj/cut [CUTOFF] Å]                          | [heteroatoms → PPPM / pure C/H → lj/cut 12 Å] |
 | D-04 System size    | DP=[N], [N] chains, [N] atoms                        | [polymer_rules.json default / literature N chains / stiff chain] |
 | D-05 Convergence    | [PASS / EXTEND×N / ESCALATE]                         | [overall_pass=true / [N] extension(s) needed] |
-| D-06 Tg fit quality | [EXCELLENT / ACCEPTABLE / BORDERLINE / ABORT / N/A]  | [R²=[X], F-stat=[TIER], N=[N] bins; α_g=[X]×10⁻⁵ K⁻¹, α_r=[X]×10⁻⁵ K⁻¹, ΔCp=[X] J/(g·K) / N/A — tg not requested] |
+| D-06 Tg fit quality | [EXCELLENT / ACCEPTABLE / BORDERLINE / ABORT / N/A]  | [R²=[X], N=[N] bins, F-stat=[TIER]; is_glassy=[true/false] (Tg=[X] K > 300 K) / N/A — tg not requested] |
 | D-06b Multirate Tg  | [DSC-equiv=[X] K / N/A]                              | [log-linear Tg(Γ) b=[X] K/ln(K/ns), R²=[X], N_rates=[3] @ [40,160,400] K/ns, N_repl=[N]; extrapolated to 1.67e-10 K/ns (10 K/min DSC); VF=[quality] (diagnostic, <2 decades) / N/A — single-rate] |
 | D-07 Property method | [born (glassy) / deform fallback (glassy) / murnaghan (rubbery) / fluctuation (rubbery fallback) / N/A] | [Tg=[X] K → is_glassy=[true/false]; bm_pressures_atm=[Y/N] / N/A — bulk_modulus not requested] |
 
-<!-- Add rows for non-routine decisions (parameter overrides, custom protocols, etc.) -->
+<!-- Example — PS1 completed run:
+| D-01 | PCFF | classify_polymer returned PSTR → EMC PCFF auto-routed |
+| D-02 | bond-increment | PCFF: bond-increment charges embedded, no QM step |
+| D-03 | pppm 12 Å | Aromatic ring partial charges → long-range Coulomb |
+| D-04 | DP=40, 10 chains, ~6400 atoms | polymer_rules.json default |
+| D-05 | PASS | density drift 0.4% over last 500 ps; energy plateau confirmed |
+| D-06 | ACCEPTABLE | R²=0.93, F-stat GOOD, N=19 bins; range 550→250K in 20K steps |
+-->
+
+<!-- Add rows for any non-routine decisions (parameter overrides, custom protocols, etc.) -->
 
 ---
 
@@ -37,9 +46,11 @@ None
 
 <!-- Written before each Monitor call; updated to done/failed after Monitor returns. Used for session restart. -->
 
-| Stage | ID | Submitted | Status |
-|-------|----|-----------|--------|
-| [equil / tg-sweep / born / deform / murnaghan] | [chain_id / run_id] | [HH:MM] | [monitoring / done / failed] |
+| Stage | ID | Submitted | Completed | Wall | Status |
+|-------|----|-----------|-----------|------|--------|
+| [equil / tg-sweep / born / deform / murnaghan] | [chain_id / run_id] | [HH:MM] | [HH:MM / —] | [Xh Ym / —] | [monitoring / done / failed] |
+
+GPU inventory (`nvidia-smi` at run start): GPU [ID]: [model], [VRAM] GB, [free] GB free
 
 ---
 
@@ -57,21 +68,6 @@ None
 | C(t) decay (melt NVT) | [X%] at threshold [Y] / N/A — rubbery | [PASS / FAIL] |
 | τ_c chain relax (KWW) | [X] ps / N/A — rubbery | annotation only |
 | R_ee mean ± std | [X ± Y] Å (N=[N] chains) | end_to_end_summary.json |
-
----
-
-## TIMING
-
-| Worker | Submitted | Completed | Wall time | Throughput |
-|--------|-----------|-----------|-----------|------------|
-| Cell build | [HH:MM] | [HH:MM] | [Xh Ym] | — |
-| Equilibration | [HH:MM] | [HH:MM] | [Xh Ym] | [X ns/day] |
-| Tg sweep | [HH:MM] | [HH:MM] | [Xh Ym / — not requested] | [X ns/day] |
-| Born / Deform / Murnaghan | [HH:MM] | [HH:MM] | [Xh Ym / — not requested] | — |
-| **Total** | | | **[Xh Ym]** | |
-
-GPU inventory (`nvidia-smi` at run start):
-- GPU [ID]: [model], [VRAM] GB, [free] GB free
 
 ---
 
@@ -94,8 +90,6 @@ GPU inventory (`nvidia-smi` at run start):
 | α_g (CTE) | [X]×10⁻⁵ K⁻¹   | [X]–[X]×10⁻⁵ K⁻¹      | [X]% | −a_glassy / ρ_mean_glassy | [✓ / ⚠] |
 | α_r (CTE) | [X]×10⁻⁵ K⁻¹   | [X]–[X]×10⁻⁵ K⁻¹      | [X]% | −a_rubbery / ρ_mean_rubbery | [✓ / ⚠] |
 | ΔCp at Tg | [X] J/(g·K)     | [X]–[X] J/(g·K)        | [X]% | H(T) bilinear fit         | [✓ / ⚠ / N/A] |
-| cooling rates | [40,160,400] K/ns | ~10⁻⁷ K/ns (exp) | —    | extrapolated to 1.67×10⁻¹⁰ K/ns (10 K/min DSC) | annotation |
-| expected Tg offset | [80–120 K (screening) / 50–80 K (production); multirate extrapolation corrects toward exp] | — | — | — | annotation |
 
 ### C — Mechanical
 
@@ -106,16 +100,5 @@ GPU inventory (`nvidia-smi` at run start):
 | G   | [X] GPa | [X]–[X] GPa    | [X]% | deformation (glassy only)               | [✓ / ⚠ / N/A] |
 | E   | [X] GPa | [X]–[X] GPa    | [X]% | deformation (glassy only)               | [✓ / ⚠ / N/A] |
 
-### D — Chain Structure
-
-| Metric | Value | Status |
-|--------|-------|--------|
-| Rg mean ± std     | [X ± Y] Å | [sourced from D-05] |
-| MSD plateau       | [plateau / still diffusing] | [PASS / FAIL] |
-| Density homog (CV)| [X]% | [PASS / FAIL] |
-| C(t) decay (melt NVT) | [X%] / N/A — rubbery | [PASS / FAIL] |
-| τ_c chain relax (KWW) | [X] ps / N/A — rubbery | annotation only |
-| R_ee mean ± std   | [X ± Y] Å (N=[N] chains) | [sourced from D-05] |
-
-Simulation dir: `[PATH]`
-Outputs: `data/[RUN]/outputs/` — CSVs, JSONs, `figures/*.png`, `run_summary.json`
+Simulation dir: `data/[RUN]/lammps/`
+Outputs: `data/[RUN]/raw/` — JSONs; `data/[RUN]/graphs/` — PNGs; `data/[RUN]/raw/run_summary.json`

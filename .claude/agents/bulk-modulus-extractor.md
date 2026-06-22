@@ -1,6 +1,6 @@
 ---
 name: bulk-modulus-extractor
-description: Bulk modulus extraction worker — extracts K from Born matrix (glassy), deformation log (glassy fallback), Murnaghan pressure series (rubbery+pressures), or NPT volume fluctuations (rubbery no-pressures). Routes by which inputs are non-null in the prompt. No simulation submission, no Monitor calls, no generate_run_summary.
+description: Bulk modulus extraction worker — extracts K from Murnaghan pressure series (primary, glassy 300 K and rubbery T>Tg), deformation log (3-direction fallback), or NPT volume fluctuations (rubbery no-pressures). Born+NVT removed (PCFF+PPPM virial incompatibility). Routes by which inputs are non-null in the prompt. No simulation submission, no Monitor calls, no generate_run_summary.
 tools:
   - Read
   - Bash

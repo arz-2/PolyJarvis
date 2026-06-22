@@ -7,7 +7,7 @@ metadata:
 
 **Run ID:** e37452d5
 **Polymer:** PMMA4 (PACR, n_atoms=5264)
-**Script:** /home/alexzhao/PolyJarvis/data/PMMA4/lammps/prop/08_nvt_born/08_nvt_born.in
+**Script:** /home/arz2/PolyJarvis/data/PMMA4/lammps/prop/08_nvt_born/08_nvt_born.in
 **Status:** submitted 2026-06-16
 
 **Recovery context:**

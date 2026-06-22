@@ -809,6 +809,29 @@ def main():
                 f"transition_width_too_broad: c={c_width:.1f} K exceeds half the sweep "
                 f"span ({half_span:.0f} K) — transition poorly localised"
             )
+        # Too-narrow / degenerate transition: a near-zero crossover width is a fit artifact
+        # (a sharp kink fit to noise), not a physical Tg. It can score high R² yet return an
+        # outlier Tg — this is the PSU1 160 K/ns "width≈0 → Tg=565 K" failure that poisoned the
+        # multi-rate extrapolation. A real glass transition spans ≳5–10 K; below that the
+        # crossover is unresolved. Demote to POOR so the aggregation filter (>= ACCEPTABLE) drops it.
+        elif c_width < 5.0:
+            fit_quality = "POOR"
+            fit_warnings.append(
+                f"transition_width_degenerate: c={c_width:.2f} K (< 5 K) — unresolved kink "
+                "artifact, Tg unreliable; excluded from multi-rate aggregation"
+            )
+
+    # Endpoint-pinned Tg: a transition fit whose Tg sits within ~5% of the sweep span from either
+    # bound never captured a real crossover (the sweep didn't bracket Tg, or the fit ran to the
+    # boundary). Demote to POOR so it is filtered rather than extrapolated from.
+    _span = float(temps.max()) - float(temps.min())
+    if _span > 0 and (Tg_primary <= float(temps.min()) + 0.05 * _span
+                      or Tg_primary >= float(temps.max()) - 0.05 * _span):
+        fit_quality = "POOR"
+        fit_warnings.append(
+            f"tg_pinned_to_sweep_endpoint: Tg={Tg_primary:.1f} K within 5% of the sweep bounds "
+            f"[{float(temps.min()):.0f}, {float(temps.max()):.0f}] — sweep did not bracket Tg"
+        )
 
     # -------------------------------------------------------------------
     # 4c. CTE from bilinear density fit slopes

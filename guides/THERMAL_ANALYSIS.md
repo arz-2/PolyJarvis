@@ -22,8 +22,8 @@
 ## Rule B: Always Pass `output_dir` and `graphs_dir`
 
 ```python
-output_dir = "/home/alexzhao/PolyJarvis/data/<run_name>/raw/"
-graphs_dir = "/home/alexzhao/PolyJarvis/data/<run_name>/graphs/"
+output_dir = "/home/arz2/PolyJarvis/data/<run_name>/raw/"
+graphs_dir = "/home/arz2/PolyJarvis/data/<run_name>/graphs/"
 ```
 
 ---
@@ -45,14 +45,9 @@ Key params:
 
 If `dCp_status` contains "skipped (column 'Enthalpy' not in log)" — report N/A; do not re-run the sweep for this alone.
 
-**CTE expected ranges (PMMA reference):**
-- α_g ≈ 50–70 × 10⁻⁶ K⁻¹ (glassy branch)
-- α_r ≈ 150–300 × 10⁻⁶ K⁻¹ (rubbery branch)
-- Ratio α_r / α_g ≈ 2–3 (universal; flag if outside 1.5–5)
+**CTE sanity check:** α_r / α_g ≈ 2–3 (flag if outside 1.5–5).
 
-**ΔCp expected range (PMMA reference):**
-- ΔCp ≈ 0.27–0.50 J/(g·K)
-- Requires `tg_data_file` for system mass normalisation. Reports `dCp_status: "skipped"` if file absent or Enthalpy column missing from log.
+**ΔCp:** Requires `tg_data_file` for mass normalisation. Reports `dCp_status: "skipped"` if file absent or Enthalpy column missing from log.
 
 ---
 

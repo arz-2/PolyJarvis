@@ -3,6 +3,7 @@ name: pstr-reasoned-plan
 description: PSTR (polystyrenic, e.g. PS/aPS) is confidence=medium -> reasoned plan; key judgment calls and exp anchors
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 PSTR is confidence=medium in polymer_rules.json -> reasoned plan, NOT deterministic. It HAS class-specific temperatures, so skip group-contribution Tg estimation (that step is only for off-table/confidence=low).

@@ -3,6 +3,7 @@ name: reasoned-override-keeps-confidence-high
 description: A confidence=high class can still require a REASONED plan when the task hands a corrected/non-standard protocol; the override flips plan_mode, not the class confidence field
 metadata:
   type: feedback
+  ingested_at: 2026-06-22
 ---
 
 When the orchestrator/user hands an explicit corrected-protocol override for a `confidence=high` class (e.g. PE/PHYC density re-run), produce a **reasoned** plan, not a verbatim deterministic transcription.

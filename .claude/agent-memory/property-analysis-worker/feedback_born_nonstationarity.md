@@ -1,6 +1,7 @@
 ---
 name: feedback_born_nonstationarity
 description: Block-K values growing in magnitude over production window = non-stationary glass; fluctuation-dominated Born K diagnostic
+ingested_at: 2026-06-20
 metadata:
   type: feedback
 ---
