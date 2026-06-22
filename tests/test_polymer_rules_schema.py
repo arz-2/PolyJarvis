@@ -74,16 +74,17 @@ def test_routing_fields_are_known(cid):
     assert e["electrostatics"] in {"pppm", "lj_cut"}
 
 
-# The force-field label and charge handling are NOT independent facts — they are
-# determined by (preferred_builder, preferred_ff). Storing them as free fields let
-# them drift (10+ classes once read forcefield=GAFF2_mod / charge_method=RESP while
-# actually building EMC/PCFF). These invariants pin the derived fields to the route
-# so any future drift fails CI instead of surfacing as a wrong mid-run build.
-EMC_FF_LABEL = {
-    "pcff": "PCFF",
-    "opls-aa/2024": "OPLS-AA",
-    "trappe-ua": "TraPPE-UA",
-}
+# The build route (builder + force-field family + charge handling) must stay
+# internally consistent — drift here (e.g. forcefield=GAFF2_mod / charge_method=RESP
+# on a class that actually builds EMC/PCFF) surfaces as a wrong mid-run build rather
+# than an obvious data error. This is a *structural* invariant only: it pins each
+# class to one of the two routes and rejects a QM charge job on EMC. The exact
+# per-class force field and embedded-charge token (pcff→bond-increment,
+# opls→opls-library, trappe→none) are the authority of test_ff_routing.py, which is
+# sourced from the same JSON; duplicating those exact values here only invites the
+# two tests to contradict each other.
+EMC_FF_FAMILIES = ("pcff", "opls", "trappe")   # substring families (both opls spellings)
+QM_CHARGE_JOBS = {"resp", "am1-bcc", "am1bcc", "gasteiger"}
 
 
 @pytest.mark.parametrize("cid", sorted(CLASSES))
@@ -91,18 +92,15 @@ def test_build_route_consistency(cid):
     e = CLASSES[cid]
     builder, pref_ff = e["preferred_builder"], e["preferred_ff"]
     if builder == "emc":
-        # EMC cannot build GAFF2 — it needs one of its own all-atom/UA fields,
-        # and it embeds force-field charges directly (no separate charge job).
-        assert pref_ff in EMC_FF_LABEL, (
-            f"{cid}: EMC build requires an EMC field, got preferred_ff={pref_ff!r}"
+        # EMC builds with one of its own all-atom/UA fields and embeds the
+        # force field's charges directly — it never schedules a QM charge job.
+        assert any(fam in pref_ff.lower() for fam in EMC_FF_FAMILIES), (
+            f"{cid}: EMC build requires an EMC FF family {EMC_FF_FAMILIES}, "
+            f"got preferred_ff={pref_ff!r}"
         )
-        assert e["forcefield"] == EMC_FF_LABEL[pref_ff], (
-            f"{cid}: forcefield={e['forcefield']!r} inconsistent with "
-            f"preferred_ff={pref_ff!r} (expected {EMC_FF_LABEL[pref_ff]!r})"
-        )
-        assert e["charge_method"] == "none", (
-            f"{cid}: EMC embeds charges → charge_method must be 'none', "
-            f"got {e['charge_method']!r}"
+        assert e["charge_method"].lower() not in QM_CHARGE_JOBS, (
+            f"{cid}: EMC embeds force-field charges → must not run a QM charge job, "
+            f"got charge_method={e['charge_method']!r}"
         )
     else:  # radonpy — runs a real charge-assignment job with a GAFF2 field
         assert pref_ff in {"GAFF2", "GAFF2_mod"}, (
