@@ -3,6 +3,7 @@ name: kokkos_unavailable_lammps_binary
 description: KOKKOS binary at /home/arz2/lammps-install-kokkos/bin/lmp; pass engine="kokkos" to run_lammps_script
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 **KOKKOS binary:** `/home/arz2/lammps-install-kokkos/bin/lmp` — supports `-k on g N -sf kk -pk kokkos` flags.

@@ -3,6 +3,7 @@ name: psfo-dp-floor-resolution
 description: PSFO/polysulfone class default dp_typical=15 violates the DP>=20 Fox-Flory hard floor; medium-confidence -> reasoned -> policy floor governs, not the class default
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 PSFO (polysulfone) `polymer_rules.json` default is `dp_typical=15, dp_min=15, nchain=8`, but the class note itself says "Aim for DP=20 if budget allows" and DP=15 (per-chain MW ~5,304) is below the Fox-Flory plateau.

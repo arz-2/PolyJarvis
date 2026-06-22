@@ -3,6 +3,7 @@ name: tg_sweep_gpu_neigh_optimization
 description: GPU neighbor list optimization for small PCFF Tg-sweep cells — ~+30% speedup
 metadata:
   type: feedback
+  ingested_at: 2026-06-22
 ---
 
 After generate_script writes tg_sweep.in, the default `package gpu 1 neigh no` line must be manually edited to `package gpu 1 neigh yes` for small PCFF cells (<5k atoms).

@@ -3,6 +3,7 @@ name: emc-output-naming
 description: EMC cell job writes emc_build.data/.params regardless of output_name arg
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 The `output_name` argument to `submit_emc_cell_job` does NOT rename the output

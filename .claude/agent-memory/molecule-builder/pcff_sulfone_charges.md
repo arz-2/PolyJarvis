@@ -3,6 +3,7 @@ name: pcff-sulfone-charges
 description: PCFF sulfone (PSFO) charges are small by design — do NOT apply OPLS/QM +1.3/-0.55 criterion
 metadata:
   type: feedback
+  ingested_at: 2026-06-22
 ---
 
 For PSFO (polysulfone, e.g. PSU/Udel) built via EMC/PCFF, the sulfone S and O

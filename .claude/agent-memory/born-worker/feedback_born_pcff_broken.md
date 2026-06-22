@@ -3,6 +3,7 @@ name: born-pcff-broken
 description: Born+NVT is broken for PCFF+PPPM — K_Born 8-15x too high, Var(P) ~10^7x too high. Never submit Born for PCFF/OPLS/PPPM classes.
 metadata:
   type: feedback
+  ingested_at: 2026-06-22
 ---
 
 Born+NVT has been removed from the PolyJarvis pipeline as of 2026-06-21. Never spawn born-worker for a standard pipeline run.

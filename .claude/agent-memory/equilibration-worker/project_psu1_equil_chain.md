@@ -3,6 +3,7 @@ name: project-psu1-equil-chain
 description: PSU1 Polysulfone equilibration: 9-stage glassy chain, PCFF, temp=700 K, chain_id=a3dd19a9
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 PSU1 Polysulfone (PSFO class) equilibration submitted 2026-06-18.

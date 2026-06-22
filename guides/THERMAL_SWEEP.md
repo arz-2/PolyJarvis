@@ -81,6 +81,8 @@ result = generate_script(
 # result["n_tg_stages"] is the number of temperature steps (used by run_lammps_script)
 ```
 
+**GPU neighbor list optimization (small PCFF cells <5k atoms):** After `generate_script`, edit `package gpu 1 neigh no` → `package gpu 1 neigh yes` in the generated `.in` file for +30% speedup (NPT-stable; do not apply to kokkos engine — kokkos manages its own neighbor list).
+
 ### Step 2: Submit sweep
 
 `run_lammps_script` is async — returns `run_id` immediately.

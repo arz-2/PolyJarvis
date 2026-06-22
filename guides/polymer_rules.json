@@ -1863,7 +1863,7 @@
       "forcefield": "PCFF",
       "charge_method": "none",
       "dp_typical": 25,
-      "dp_min": 15,
+      "dp_min": 20,
       "nchain": 8,
       "density_initial_gcm3": 0.62,
       "electrostatics": "pppm",
@@ -1905,13 +1905,13 @@
         "Afzal2021"
       ],
       "notes": [
-        "Sulfone group (-SO2-) has very large partial charges on S (~+1.3 e) and O (~-0.55 e) — PPPM mandatory.",
+        "Sulfone S and O carry small PCFF bond-increment charges by design: S ≈ +0.08 e, sulfone O (o=) ≈ -0.11 e per S–O bond — these are native PCFF values, NOT OPLS/QM magnitudes (~+1.3/−0.55). PPPM mandatory despite small magnitudes (aromatic ring + ether charges accumulate). A charge of exactly 0.0000 on S or O indicates a missing frc increment, not a small value.",
         "PCFF covers aryl-SO2-aryl and aryl ether torsions via Class II cross terms. Verify sulfone S atom types (so2/o_2s) in EMC PCFF output before run.",
         "Ether linkages add additional polarity. Combined sulfone+ether: strong electrostatic interactions throughout chain.",
         "T_equil=700 K: PES Tg=493 K + 150 K = 643 K → 700 K conservative for slow-relaxing rigid backbone.",
         "MD Tg for PSU expected ~540-580 K after overestimation. Sweep to 750 K safely brackets this.",
         "Rigid aromatic backbone: 15 ns and 8 cycles essential for equilibration.",
-        "SCREENING dp/nchain: dp_typical=15 nchain=8 for 48h-budget Tg sweep (6,000 atoms, ~47h/4GPU). τ_Rouse at dp=15 T_equil=700K ≈ 2.5 ns; tg_steps_per_t=2M = 2ns ≈ 0.79×τ_Rouse — borderline adequate for screening. Tg may be overestimated by ~5-15% beyond standard MD bias. Original nchain=10 dp=25 MW ~11,050 g/mol above Klajmon2023 threshold; dp=15 nchain=8 MW ~5,304 g/mol is below threshold.",
+        "dp_typical=25, dp_min=20 (Fox-Flory hard floor: decision_policy.json requires DP≥20 for Tg/bulk_modulus targets). nchain=8 → ~11,000 atoms at ~442 g/mol repeat unit. At dp=25 MW~11,050 g/mol ≈ 1 M_e for PSU; adequate for Tg but short of entanglement plateau for K. Prior dp_min=15 (MW~5,304) was below the Fox-Flory floor for Tg — bumped to 20.",
         "Exp. RT density: PSF=1.24 g/cm³. Initial 0.62 g/cm³ = ~0.5x PSF density.",
         "WARNING: DP≥15 minimum; stiff backbone means very short chains behave differently. Aim for DP=20 if budget allows."
       ],

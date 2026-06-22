@@ -3,6 +3,7 @@ name: cispbd1-equil-chain
 description: cis-PBD1 PDIE/TraPPE-UA 7-stage rubbery equilibration chain, temp=300 K, max_temp=480 K, n_atoms=8040, chain_id=c2e7c43e
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 cis-PBD1 (standard cis-1,4-PBD, `*C/C=C\C*`, PDIE, TraPPE-UA) 7-stage rubbery equilibration chain submitted 2026-06-18.

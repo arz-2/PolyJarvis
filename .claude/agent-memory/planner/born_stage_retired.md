@@ -3,6 +3,7 @@ name: born-stage-retired
 description: born mechanical stage removed pipeline-wide 2026-06-21 (PCFF+PPPM virial incompatibility); glassy K path is now Murnaghan NPT
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 The `born` planned_stage was REMOVED from the PolyJarvis pipeline on 2026-06-21. `gen_prompt.py --stage born` now hard-errors.

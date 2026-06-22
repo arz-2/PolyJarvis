@@ -3,6 +3,7 @@ name: project-ps1-equil-chain
 description: PS1 atactic Polystyrene equilibration: 9-stage glassy chain, PCFF, temp=550 K; prior chain 76ded65d failed (mpirun not found), retry chain_id=6f8a5143
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 PS1 atactic Polystyrene (PSTR class) equilibration submitted 2026-06-20.

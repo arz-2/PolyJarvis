@@ -3,6 +3,7 @@ name: murnaghan_workflow_rules
 description: Murnaghan pressure-series rules for glassy vs rubbery polymers, pressure defaults, and workflow assumptions
 metadata:
   type: feedback
+  ingested_at: 2026-06-22
 ---
 
 ## Glassy vs Rubbery Routing (guides/MURNAGHAN.md Rule B)

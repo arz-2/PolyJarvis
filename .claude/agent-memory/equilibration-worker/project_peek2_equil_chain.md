@@ -3,6 +3,7 @@ name: peek2-equil-chain
 description: PEEK2 PKTN/PCFF 9-stage glassy equil chain, temp=770 K, max_temp=850 K, n_atoms=10900, chain_id=2a790dda
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 PEEK2 (Poly(ether ether ketone)) replicate 1 — glassy path (temp=770 K > 300 K).

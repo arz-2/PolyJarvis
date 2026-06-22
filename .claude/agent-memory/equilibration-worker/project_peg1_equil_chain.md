@@ -3,6 +3,7 @@ name: peg1-equil-chain
 description: PEG1 Polyethylene glycol (POXI/PCFF) 7-stage rubbery equil chain, temp=300 K, max_temp=580 K, n_atoms=7020, chain_id=ae9b7b4b
 metadata:
   type: project
+  ingested_at: 2026-06-22
 ---
 
 PEG1 (PEO/PEG, POXI class, PCFF force field) 7-stage rubbery equilibration chain submitted 2026-06-20.

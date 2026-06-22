@@ -3,6 +3,7 @@ name: murnaghan_submission_issues
 description: Known blocker bugs in run_bulk_modulus_series generator (chain log-path concatenation, missing kokkos engine support)
 metadata:
   type: feedback
+  ingested_at: 2026-06-22
 ---
 
 ## Issue 1: Log-path concatenation in chain script generator (BLOCKER)
