@@ -20,7 +20,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RULES = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
 CLASSES = sorted(RULES["classes"].keys())
-STAGES = ["build", "equil", "tg", "deform", "born", "murnaghan",
+# NB: "born" was removed from the pipeline (2026-06-21, PCFF+PPPM virial incompatibility);
+# gen_prompt now errors on --stage born by design, so it is intentionally absent here.
+STAGES = ["build", "equil", "tg", "deform", "murnaghan",
           "analyze-tg", "equil-check", "analyze-bm", "run-summary"]
 
 GEN_PROMPT = REPO_ROOT / "scripts" / "gen_prompt.py"
