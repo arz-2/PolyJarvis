@@ -1,0 +1,2 @@
+- [Born SEM Inflation](born_sem_inflation.md) — Born+NVT SEM >> K_Born when fluctuation correction ~= K_Born; K_Born-Kfluc cancellation; check V_std=0 and tau_eff diagnostic
+- [Born V_std=0 NVT Artefact](born_vstd_zero.md) — NVT volume is fixed (NVT ensemble), V_std=0 is expected; Born fluctuation correction uses P variance not V variance

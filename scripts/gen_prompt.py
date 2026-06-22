@@ -441,6 +441,13 @@ per_t_dump:
   file:            {tg_sweep_dir}/per_t_structs.dump   # one final frame per T step
   param_key:       WRITE_PER_T_DUMP=True, PER_T_DUMP_FILE=per_t_structs.dump
   note:            Pass these in generate_script params alongside T_START/T_END/etc.
+generate_script:
+  template_name:   npt_tg_step   # REQUIRED — the multi-temperature cooling staircase.
+  WARNING:         NEVER use template "npt" for a Tg sweep — it renders a single-temperature
+                   NPT (no cooling, no per-T dump) and is an invalid sweep.
+  required_params: T_START={_pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600)}, T_END={_pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200)}, T_STEP={_pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)} (map from tg_params above).
+                   generate_script RAISES if T_END/T_STEP are missing — verify the rendered .in
+                   has a `variable temps index ...` loop before submitting.
 
 --- Worker Guide (THERMAL_SWEEP) ---
 {guide}
@@ -717,9 +724,18 @@ graphs_dir:        {graphs_dir}
 
 
 def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
-    """Prompt for run-summary-worker (always-terminal, calls generate_run_summary)."""
+    """Prompt for run-summary-worker (always-terminal, calls generate_run_summary).
+
+    Threads run metadata and per-decision strings through to generate_run_summary so
+    run_summary.json is fully populated. Every field is derived from CLI flags + the
+    (plan-overlaid) class defaults + the deterministic output_dir convention — NOT from the
+    plan's decisions[] list or the --plan path — so a deterministic plan still produces
+    byte-identical output to the no-plan path (enforced by tests/test_plan_reproducibility.py).
+    The plan provenance is carried by reading raw/run_plan.json (the convention path below).
+    """
     output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
+    run_plan = f"{output_dir.rstrip('/')}/run_plan.json"
     exp_tg = _exp_tg_range(cls)
     exp_density = _exp_density_range(cls)
     _k_from_cls = _exp_K_range(cls)
@@ -727,19 +743,45 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
         args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0],
         args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1],
     ]
+
+    dp = args.dp if args.dp is not None else cls.get("dp_typical")
+    nchain = args.nchain if args.nchain is not None else cls.get("nchain")
+    charge_method = args.charge_method or cls.get("charge_method")
+    ff = args.ff or cls.get("preferred_ff", "pcff")
+    d01 = args.d01 or ff
+    d02 = args.d02 or charge_method
+    d03 = args.d03 or cls.get("electrostatics")
+    d04 = args.d04 or (f"DP={dp}, {nchain} chains" if dp and nchain else None)
+
     return f"""\
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 smiles:            {_v(args.smiles)}
-ff:                {args.ff or cls.get('preferred_ff', 'pcff')}
-d05_verdict:       {getattr(args, 'd05', None) or '<FILL from equil-checker RESULT>'}
+ff:                {ff}
+charge_method:     {_v(charge_method, 'null')}
+dp:                {_v(dp, 'null')}
+n_chains:          {_v(nchain, 'null')}
+n_atoms:           {_v(getattr(args, 'n_atoms', None), 'null')}
+date_start:        {_v(args.date_start, 'null')}
+date_end:          {_v(args.date_end, 'null')}
+d01_ff:            {_v(d01, 'null')}
+d02_charges:       {_v(d02, 'null')}
+d03_electrostatics: {_v(d03, 'null')}
+d04_system_size:   {_v(d04, 'null')}
+d05_verdict:       {args.d05 or '<FILL from equil-checker RESULT>'}
 d06_tg_fit_quality: {_v(args.tg_fit_quality, 'N/A (not requested)')}
+run_plan:          {run_plan}   # always pass to generate_run_summary --run_plan (skip if file absent)
 exp_tg_range:      {exp_tg}
 exp_density_range: {exp_density}
 exp_K_range:       {exp_K}
 n_replicates:      {_v(getattr(args, 'n_replicates', None), 'N/A')}   # distinct replicates in the multi-rate Tg registry; pass to generate_run_summary --n_replicates
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
+
+Forward every field above to generate_run_summary as its matching --flag (dp→--dp,
+n_chains→--n_chains, n_atoms→--n_atoms, charge_method→--charge_method, date_start→--date_start,
+date_end→--date_end, d01_ff→--d01, …, d05_verdict→--d05, d06_tg_fit_quality→--d06,
+run_plan→--run_plan). Skip any field whose value is `null`.
 """
 
 
@@ -794,6 +836,15 @@ def main():
                         "(kokkos = full-offload; anything else → gpu).")
     p.add_argument("--dp", type=int)
     p.add_argument("--nchain", type=int)
+    # run-summary metadata (else sourced from the plan; see run_summary_prompt)
+    p.add_argument("--n_atoms", type=int)
+    p.add_argument("--charge_method")
+    p.add_argument("--date_start")
+    p.add_argument("--date_end")
+    p.add_argument("--d01", help="run-summary: D-01 force-field choice")
+    p.add_argument("--d02", help="run-summary: D-02 charges choice")
+    p.add_argument("--d03", help="run-summary: D-03 electrostatics choice")
+    p.add_argument("--d04", help="run-summary: D-04 system-size choice")
     p.add_argument("--lammps_flags")
     p.add_argument("--is_glassy", default="true")
     p.add_argument("--tg_k", type=float)

@@ -1,0 +1,2 @@
+- [PEG1 r40 recovery — npt_tg_step template fix](peg1_r40_recovery_template_fix.md) — always use npt_tg_step for multi-T ramps, never single-T
+- [PCFF Class II styles reference](pcff_class2_styles.md) — class2 styles required; grep to verify after generation
