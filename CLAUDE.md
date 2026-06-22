@@ -134,6 +134,13 @@ PHASE B — TRACKS (property-conditional)
   Read("guides/THERMAL_TRACK.md") now for the full multirate sweep + registry + is_glassy procedure.
   On session restart mid-thermal-track: re-read guides/THERMAL_TRACK.md before resuming.
 
+  Slope-gate hard stop (after multirate analysis — read slope_gate_pass from tg_multirate_result.json):
+    if slope_gate_pass == False:
+      DO NOT proceed to mechanical track or run-summary.
+      Delete any registry rows written for this sweep (slope_gate_pass=False → data is contaminated).
+      Spawn recovery: re-run all 3 Tg sweeps from the same equil cell with a new velocity seed.
+      Max 2 recovery attempts total; if both fail → write UNRESOLVED to run_log.md and stop.
+
   [mechanical track — if "bulk_modulus" in properties_requested]
   Read("guides/MECHANICAL_TRACK.md") now for the Murnaghan + deform-fallback + BM extraction procedure.
   On session restart mid-mechanical-track: re-read guides/MECHANICAL_TRACK.md before resuming.
@@ -144,11 +151,24 @@ PHASE C — SUMMARY (always)
   # In long sessions (>12 h) the MCP connection can drop silently. Do a minimal call
   # (e.g. list_templates) — if it returns, proceed; if it hangs or errors, restart the
   # MCP server before the Agent call.
+  # Determine tg_path and slope_gate_pass before spawning run-summary-worker:
+  #   SLOPE_GATE=$(jq -r '.slope_gate_pass' data/RUN/raw/tg_multirate_result.json)
+  #   RATES_ARR=$(jq -r '.decided_params.tg_rates_K_per_ns' PLAN_PATH)   # e.g. [40,160,400]
+  #   if [ "$SLOPE_GATE" = "false" ]; then
+  #     TG_PATH="data/RUN/raw/tg_r$(jq '.[length-1]' <<<$RATES_ARR)/tg_summary.json"  # highest rate (fallback)
+  #   else
+  #     TG_PATH="data/RUN/raw/tg_r$(jq '.[0]' <<<$RATES_ARR)/tg_summary.json"         # slowest rate (convention)
+  #   fi
+  # Always pass --exp_K_min / --exp_K_max from polymer_rules to override single-point DB lookup:
+  #   EXP_K_MIN=$(jq -r '.exp_K_GPa.min' <(jq -r --arg c CLASS guides/polymer_rules.json '.classes[$c]' guides/polymer_rules.json))
+  #   EXP_K_MAX=$(jq -r '.exp_K_GPa.max' <same>)
   Agent(subagent_type="run-summary-worker", description="🟢 Run summary {polymer_name}",
         prompt=<gen_prompt.py --stage run-summary --plan PLAN_PATH
                --smiles ... --ff ... --tg_fit_quality ... --d05 equil_verdict
                --n_replicates <distinct replicates in the multirate registry>
-               --tg_path <data/RUN/raw/tg_r{slowest_rate}/tg_summary.json>>)  # multirate Tg; slowest rate from plan tg_rates_K_per_ns[0]
+               --tg_path <TG_PATH (see above — slowest rate if slope_gate=True, highest rate if False)>
+               --slope_gate_pass <true|false from tg_multirate_result.json>
+               --exp_K_min <from polymer_rules.json exp_K_GPa.min> --exp_K_max <exp_K_GPa.max>>)
     → parse RESULT → run_summary_path → write RESULTS to run_log.md
 ```
 

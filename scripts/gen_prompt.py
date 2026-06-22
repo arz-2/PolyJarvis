@@ -758,9 +758,13 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
     else:
         exp_density = _exp_density_range(cls)
 
-    # K: CLI override > DB range > polymer_rules.json range
+    # K: CLI override > DB range (if genuine range) > polymer_rules.json range
+    # A DB range of [x, x] (single-point measurement) is treated as missing — it must not
+    # override the polymer_rules class range, which covers all class members.
     _k_from_cls = _exp_K_range(cls)
     _k_from_db = _db.get("K_range_GPa")
+    if _k_from_db and (_k_from_db[1] - _k_from_db[0]) < 0.01:
+        _k_from_db = None  # degenerate single-point DB entry; fall through to polymer_rules
     exp_K = [
         args.exp_K_min if args.exp_K_min is not None else (
             _k_from_db[0] if _k_from_db else _k_from_cls[0]
@@ -769,6 +773,12 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
             _k_from_db[1] if _k_from_db else _k_from_cls[1]
         ),
     ]
+    _slope_gate = getattr(args, 'slope_gate_pass', None)
+    _tg_path_label = (
+        "single-rate fallback (slope_gate=False; highest-rate folder)"
+        if _slope_gate is False
+        else "slowest-rate folder (slope_gate=True or N/A)"
+    )
     return f"""\
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
@@ -780,7 +790,8 @@ exp_tg_range:      {exp_tg}
 exp_density_range: {exp_density}
 exp_K_range:       {exp_K}
 n_replicates:      {_v(getattr(args, 'n_replicates', None), 'N/A')}   # distinct replicates in the multi-rate Tg registry; pass to generate_run_summary --n_replicates
-tg_path:           {_v(getattr(args, 'tg_path', None), 'null')}   # explicit canonical tg_summary.json path (slowest-rate folder); pass to generate_run_summary --tg_path
+tg_path:           {_v(getattr(args, 'tg_path', None), 'null')}   # explicit canonical tg_summary.json path ({_tg_path_label}); pass to generate_run_summary --tg_path
+slope_gate_pass:   {_v(_slope_gate, 'null')}   # False → single-rate fallback Tg; pass --tg_k with the fallback value
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
 """
@@ -922,9 +933,14 @@ def main():
                         "Enables polymer-specific exp ranges from polymer_db.sqlite. "
                         "When omitted, falls back to the class-representative canonical pattern.")
     p.add_argument("--tg_path", default=None,
-                   help="Explicit path to the canonical tg_summary.json for run-summary (e.g. "
-                        "data/PLA1/raw/tg_r40/tg_summary.json — the slowest-rate folder). "
-                        "Prevents alphabetical rglob picking tg_r160 before tg_r40.")
+                   help="Explicit path to the canonical tg_summary.json for run-summary. "
+                        "Normally the slowest-rate folder (e.g. tg_r40/tg_summary.json). "
+                        "When slope_gate_pass=False, pass the highest-rate folder instead "
+                        "(e.g. tg_r400/tg_summary.json — the single-rate fallback).")
+    p.add_argument("--slope_gate_pass", type=lambda x: x.lower() == 'true', default=None,
+                   help="Multirate log-linear slope gate result (true/false). False means "
+                        "slope<=0 (contaminated sweep); tg_path should point to the highest-rate "
+                        "fallback folder, not the slowest-rate folder. Threaded to run-summary-worker.")
 
     args = p.parse_args()
 
