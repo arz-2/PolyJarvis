@@ -1219,7 +1219,7 @@ def generate_equilibration_workflow(
                         PIMN, PVNL, PPNL). Switches all templates to class2
                         styles, sixthpower mixing, and full 1-4 interactions.
                         SHAKE is disabled (PCFF runs cleanly at 1 fs without it).
-        use_trappe:     Set True for EMC/TraPPE-UA systems (PHYC, PDIE, PSTR).
+        use_trappe:     Set True for EMC/TraPPE-UA systems (PHYC, PDIE).
                         Switches all templates to pair_style lj/cut 14.0 (no
                         kspace), multi/harmonic dihedrals, and SHAKE on all
                         C-C bond types (enables dt=2 fs for npt_pppm through npt_production).

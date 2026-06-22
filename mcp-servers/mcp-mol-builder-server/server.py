@@ -899,66 +899,32 @@ def cancel_job(job_id: str) -> dict:
 
 # PoLyInfo class ID → name/description lookup
 def _get_preferred_ff(smiles: str, class_name: str) -> dict:
-    """Return preferred FF, builder, and justification based on SMILES chemistry and class.
+    """Authoritative FF/builder routing for a polymer class, from polymer_rules.json.
 
-    Decision rule (E1):
-      PCBN/PAMD/PKTN/PSFO/PIMD → pcff / emc  (Track C, already implemented)
-      All-aliphatic C/H only   → trappe-ua / emc  (Ramos 2015 PE benchmark)
-      Polar / halogen / aromatic → opls-aa/2024 / emc  (Afzal 2021, 315 polymers)
+    Single source of truth: the routing fields are looked up from
+    ``guides/polymer_rules.json`` (via the dependency-light ``ff_routing`` module)
+    rather than re-derived from SMILES chemistry, which previously produced advice that
+    diverged from the JSON the orchestrator actually builds with.
+
+    ``smiles`` is accepted for call-signature compatibility but is no longer used —
+    routing is a pure function of the polymer class.
     """
-    PCFF_CLASSES = {"PCBN", "PAMD", "PKTN", "PSFO", "PIMD"}
-    if class_name in PCFF_CLASSES:
+    try:
+        import os
+        import sys
+        _here = os.path.dirname(os.path.abspath(__file__))
+        if _here not in sys.path:
+            sys.path.insert(0, _here)
+        from ff_routing import get_preferred_ff
+        return get_preferred_ff(class_name)
+    except Exception as exc:  # never break classification on a routing-lookup failure
         return {
-            "preferred_ff": "pcff",
-            "preferred_builder": "emc",
-            "ff_confidence": "high",
-            "ff_justification": "Track C engineering thermoplastic — PCFF via EMC",
+            "preferred_ff": None,
+            "preferred_builder": None,
+            "ff_confidence": "low",
+            "ff_justification": f"routing lookup failed: {exc}",
             "ff_justification_doi": None,
         }
-
-    smiles_clean = smiles.replace("[*]", "[H]").replace("*", "[H]")
-    try:
-        from rdkit import Chem  # available in radonpy env
-        mol = Chem.MolFromSmiles(smiles_clean)
-        if mol is None:
-            raise ValueError("unparseable SMILES")
-        has_aromatic = any(a.GetIsAromatic() for a in mol.GetAtoms())
-        has_heteroatom = any(a.GetAtomicNum() not in (1, 6) for a in mol.GetAtoms())
-    except Exception:
-        import re
-        lc = set(re.findall(r'[a-z]', smiles_clean))
-        has_aromatic = bool(lc & {'c', 'n', 'o', 's', 'p'})
-        up = smiles_clean.upper()
-        has_heteroatom = any(x in up for x in ['O', 'N', 'S', 'F', 'CL', 'BR', 'I', 'P', 'SI'])
-
-    if not has_aromatic and not has_heteroatom:
-        return {
-            "preferred_ff": "trappe-ua",
-            "preferred_builder": "emc",
-            "ff_confidence": "high" if class_name == "PHYC" else "medium",
-            "ff_justification": (
-                "All-aliphatic C/H backbone — TraPPE-UA via EMC. "
-                "Ramos et al. Macromolecules 2015: PE Tg=187K vs exp 185-195K, density ±7%. "
-                "Branched types (PP, PIB): parameters exist but polymer-Tg validation pending."
-            ),
-            "ff_justification_doi": "10.1021/acs.macromol.5b00823",
-        }
-
-    caveat = (
-        " CAUTION: OPLS3e R²=0.40 for styrene-class polymers (Afzal 2021) — "
-        "rank-ordering within PS class unreliable; advisor input pending."
-        if class_name == "PSTR" else ""
-    )
-    return {
-        "preferred_ff": "opls-aa/2024",
-        "preferred_builder": "emc",
-        "ff_confidence": "medium" if class_name == "PSTR" else "high",
-        "ff_justification": (
-            "Polar/halogen/aromatic backbone — OPLS-AA 2024 via EMC. "
-            f"Afzal 2021 (OPLS3e, 315 polymers): density R²=0.95, MAE=3.5%.{caveat}"
-        ),
-        "ff_justification_doi": "10.1021/acsapm.0c00524",
-    }
 
 
 POLYINFO_CLASS_NAMES = {
@@ -998,8 +964,9 @@ def classify_polymer(smiles: str) -> dict:
       - Uses isotope-tagged [14C] for mainchain-aware patterns (styrene, acrylic)
       - Falls back to element counting for vinyl/diene/hydrocarbon/halogenated
 
-    Returns ONLY the polymer class — force field, charge method, and
-    electrostatics selections are handled downstream.
+    Returns the polymer class plus the authoritative force-field/builder routing
+    for that class, looked up from guides/polymer_rules.json (not re-derived here),
+    so the advice matches what the orchestrator actually builds with.
 
     Args:
         smiles: Polymer SMILES with * or [*] attachment points
@@ -1007,7 +974,9 @@ def classify_polymer(smiles: str) -> dict:
 
     Returns:
         dict with class_id, class_name, description, flags (all 21 groups),
-        co_occurring_groups, and any warnings
+        co_occurring_groups, any warnings, and the routing fields preferred_ff,
+        preferred_builder, ff_confidence, ff_justification, ff_justification_doi
+        (sourced from polymer_rules.json)
     """
     _libs_ready.wait()
     try:

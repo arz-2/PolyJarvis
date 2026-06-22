@@ -144,7 +144,7 @@
     }
   },
   "_metadata": {
-    "description": "PolyJarvis polymer class parameter rules for LAMMPS MD simulations. 20 of 21 classes route to EMC: TraPPE-UA (PHYC/PDIE/PSTR), OPLS-AA (PHAL/PSIL), PCFF (PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL). RadonPy only for PURA (GAFF2_mod + QM charges, EMC missing n_2/hn increment). preferred_builder in each class block is authoritative for routing. Drives force field selection, cell construction, equilibration, Tg sweep, and bulk modulus protocols per PoLyInfo 21-class taxonomy.",
+    "description": "PolyJarvis polymer class parameter rules for LAMMPS MD simulations. 20 of 21 classes route to EMC: TraPPE-UA (PHYC/PDIE), OPLS-AA (PHAL/PSIL), PCFF (PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL/PSTR). RadonPy only for PURA (GAFF2_mod + QM charges, EMC missing n_2/hn increment). preferred_builder in each class block is authoritative for routing. Drives force field selection, cell construction, equilibration, Tg sweep, and bulk modulus protocols per PoLyInfo 21-class taxonomy.",
     "version": "2.1.0",
     "created": "2026-05-23",
     "units": {
@@ -180,7 +180,7 @@
       "lj/cut is acceptable only for purely apolar backbones (PE, PIB, PBD, PI) where charge magnitudes on backbone atoms are < 0.1 e (Afzal et al. ACS Appl. Polym. Mater. 2021 DOI:10.1021/acsapm.0c00524).",
       "Annealing: 10 heat-cool cycles (300→600 K, 3 ns each) are used in PolyPal (Roos et al. PMC12249339 2025); RadonPy uses a single rapid 1 ns anneal at 700 K then stepwise cooling.",
       "For halogenated polymers (PHAL), OPLS-AA via EMC uses native Watkins2001 F LJ parameters (opls_965: σ=2.95 Å, ε=0.053 kcal/mol) for CF2/CF3 backbones. Key sources: Damm et al. J. Comput. Chem. 1997, 18, 1955 (OPLS-AA F params); Byutner & Smith Macromolecules 2000, 33, 4264 (PVDF-specific QM FF); Kamath & Potoff Fluid Phase Equilib. 2006, 246, 218 (PTFE/perfluorocarbon).",
-      "Builder routing (updated 2026-06-05): 20 of 21 classes use EMC. PCFF (Class II, 15 classes): PCBN PAMD PKTN PSFO PIMD POXI PEST PSUL PURT PANH PPHS PACR PIMN PVNL PPNL. OPLS-AA (2 classes): PHAL PSIL. TraPPE-UA (3 classes): PHYC PDIE PSTR. RadonPy only (1 class): PURA (n_2/hn increment missing). PURT warning: aliphatic urethanes only — aromatic MDI fails. preferred_builder field in each class block is authoritative.",
+      "Builder routing (updated 2026-06-11): 20 of 21 classes use EMC. PCFF (Class II, 16 classes): PCBN PAMD PKTN PSFO PIMD POXI PEST PSUL PURT PANH PPHS PACR PIMN PVNL PPNL PSTR. OPLS-AA (2 classes): PHAL PSIL. TraPPE-UA (2 classes): PHYC PDIE. RadonPy only (1 class): PURA (n_2/hn increment missing). PURT warning: aliphatic urethanes only — aromatic MDI fails. preferred_builder field in each class block is authoritative.",
       "Primary Tg observable: density (or specific volume) is the most reliable and consistent observable for Tg extraction across all polymer classes and FFs (Wu2011; Klajmon2023; NkepsuMbitou2025). Tg from Coulombic energy is systematically 20–40 K lower than density-based Tg (Wu2011 PEO); do not use electrostatic energy slope-change as primary Tg signal. Tg from E_vdW tracks density Tg closely and is an acceptable secondary check.",
       "Asymptote convergence is required before reporting Tg (Patrone2016): temperature sweep must extend far enough beyond the transition region to achieve ≥90% convergence to both glassy and rubbery asymptotes. Inadequate sweep range is a leading source of Tg bias in high-throughput MD (Klajmon2023).",
       "SIZE CONVERGENCE — Density: Converged at ~2,000 atoms (Rigby/Afzal2021; Kashmari2024). Current defaults exceed this for all classes. Density is a force-field and equilibration question, not a size question.",
@@ -264,7 +264,7 @@
         "id": "Martin1998",
         "citation": "Martin, M. G.; Siepmann, J. I. Transferable Potentials for Phase Equilibria. 1. United-Atom Description of n-Alkanes. J. Phys. Chem. B 1998, 102, 2569–2577.",
         "doi": null,
-        "relevance": "Original TraPPE-UA force field for n-alkanes (CH3/CH2 united atoms): LJ parameters fitted to vapor–liquid coexistence of C1–C12 alkanes. Foundation for all TraPPE-UA-routed classes (PHYC, PDIE, PSTR) via EMC."
+        "relevance": "Original TraPPE-UA force field for n-alkanes (CH3/CH2 united atoms): LJ parameters fitted to vapor–liquid coexistence of C1–C12 alkanes. Foundation for all TraPPE-UA-routed classes (PHYC, PDIE) via EMC."
       },
       {
         "id": "Keasler2012",
@@ -442,7 +442,7 @@
       "ff_justification_doi": "10.1021/acs.macromol.5b00823",
       "ff_note": "Ramos 2015: TraPPE-UA PE Tg=187K vs exp 185-195K, density ±7%. Branched types (PP, PIB): UA types exist but no polymer-Tg validation — use with medium confidence.",
       "forcefield": "TraPPE-UA",
-      "charge_method": "trappe-ua-fixed",
+      "charge_method": "none",
       "dp_typical": 120,
       "dp_min": 60,
       "nchain": 20,
@@ -505,7 +505,7 @@
         "Purely apolar backbone — no significant partial charges on C or H; lj_cut is sufficient (Afzal2021). Backbone charges < 0.1 e.",
         "TraPPE-UA PE MD Tg=187 K (Ramos2015), consistent with experimental amorphous Tg(U)~195 K (Boyer1973). Sweep 100–450 K brackets all PHYC values including PP (MD Tg ~340–380 K) and PIB (MD Tg ~285–325 K).",
         "PE Tm ~400 K (semicrystalline): T_equil=550 K exceeds Tm, ensuring melt equilibration. PP/PIB are amorphous; 550 K safely above all PHYC Tg+150 K.",
-        "Apolar hydrocarbon: Gasteiger charges acceptable; RESP not required (Afzal2021). lj_cut sufficient (Afzal2021; backbone charges < 0.1 e).",
+        "Apolar hydrocarbon: TraPPE-UA backbone charge is negligible (<0.1 e), embedded by EMC (charge_method=none; no separate Gasteiger/RESP step). lj_cut sufficient (Afzal2021).",
         "dp_min=60 to exceed Fox-Flory plateau for flexible backbone (Patrone 2016). dp_typical=120 for PE-like flexibility (large chains needed for reliable Tg).",
         "Timestep: 2.0 fs (use_shake=False). TraPPE-UA removes explicit H atoms and their fast C-H stretch modes (period ~10 fs), so 2 fs is stable WITHOUT bond constraints. LAMMPS fix shake builds bond clusters requiring terminal atoms; interior CH2 atoms each have 2 bonds so cluster-build fails on a continuous backbone. The 2× throughput gain comes from the timestep increase alone and offsets the nchain=20 cost increase.",
         "Exp. RT density: PE=0.95 g/cm³, PP=0.91 g/cm³, PIB=0.92 g/cm³. Initial density 0.65 g/cm³ = ~94% of ρ_melt(550K)=0.691 g/cm³ (Ramos2015 Table 3); previous 0.48 required heavy compression. Validation target (TraPPE-UA): volumetric thermal expansion α=8.57×10⁻⁴ K⁻¹ vs experimental HDPE ~7.7–7.9×10⁻⁴ K⁻¹ (+7%; Ramos2015 Table 2). Characteristic ratio C∞=8.2 at 500 K vs experimental 7.4–8.1 (Ramos2015).",
@@ -595,11 +595,11 @@
       },
       "confidence": "medium",
       "citations": [
-        "Hayashi2022",
-        "Afzal2021",
         "Srivastava2026",
         "Tang2022",
-        "Soldera2006"
+        "Soldera2006",
+        "NkepsuMbitou2025",
+        "Klajmon2023"
       ],
       "notes": [
         "PCFF via EMC is the preferred path for polystyrenic systems; pppm required for PSTR (aromatic ring pi-system partial charges from PCFF). lj/cut is acceptable only for purely apolar PHYC/PDIE.",
@@ -628,7 +628,7 @@
         "PVF"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 60,
       "dp_min": 30,
       "nchain": 10,
@@ -680,7 +680,7 @@
         "PVA has hydroxyl groups capable of strong hydrogen bonding — PPPM required for proper electrostatics.",
         "PVAc ester side chain carries carbonyl dipole — PPPM recommended.",
         "PVC chloride gives significant partial charges on backbone carbons — PPPM required.",
-        "AM1-BCC adequate for polar vinyl side chains without aromatic conjugation; RESP not required.",
+        "Charges are embedded by EMC/PCFF (charge_method=none); no separate charge job. On the retired RadonPy route, AM1-BCC was adequate for polar vinyl side chains without aromatic conjugation (RESP not required).",
         "MD Tg expected 380-470 K for PVA/PVC after 80-120 K overestimation. Sweep to 550 K is safe.",
         "Strong H-bonding in PVA can trap chain conformations; extra annealing cycles recommended (5 minimum).",
         "Exp. RT density: PVC=1.38 g/cm³, PVA=1.26 g/cm³, PVAc=1.19 g/cm³. Initial 0.55 g/cm³ is conservative (avoids overlaps for full class range)."
@@ -705,8 +705,8 @@
         "PEA"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
-      "dp_typical": 40,
+      "charge_method": "none",
+      "dp_typical": 50,
       "dp_min": 30,
       "nchain": 10,
       "tacticity": {
@@ -800,7 +800,7 @@
       "ff_justification_doi": "10.1021/ma9918295",
       "ff_note": "Halogen → OPLS-AA path. Afzal 2021 halogen-class R²=0.87, MAE=20.8K. Note: Watkins & Jorgensen 2001 covers perfluoroalkanes (PTFE-like all-CF2); PVDF mixed CF2-CH2 dihedrals use general OPLS-AA CT/HC types. PVDF2 run in progress for validation.",
       "forcefield": "OPLS-AA",
-      "charge_method": "opls-library",
+      "charge_method": "none",
       "dp_typical": 60,
       "dp_min": 30,
       "nchain": 10,
@@ -877,7 +877,7 @@
       "ff_justification_doi": "10.1021/jp001044x",
       "ff_note": "TraPPE-UA via EMC. Wick 2000 TraPPE-4 (J. Phys. Chem. B 104:8008) defines cis/trans-CH=CH- and CH2=CH- UA types for 1,3-butadiene and isoprene. Previous ff_justification_doi (Ramos2015) was for PE (PHYC), not dienes — corrected. Sharma2016 (JPCB) validates multiple UA FFs for PBD/PI Tg at microsecond timescales with excellent agreement. Afzal2021 butadiene-class OPLS3e R2=0.87, MAE=13.1 K also acceptable. TraPPE-UA includes alkene types; cis/trans microstructure must be encoded in SMILES.",
       "forcefield": "TraPPE-UA",
-      "charge_method": "trappe-ua-fixed",
+      "charge_method": "none",
       "dp_typical": 100,
       "dp_min": 50,
       "nchain": 20,
@@ -941,7 +941,7 @@
         600,
         1000
       ],
-      "experimental_density_gcm3": 0.90,
+      "experimental_density_gcm3": 0.9,
       "exp_density_note": "PBD amorphous = 0.90 g/cm³; PI amorphous = 0.91 g/cm³ (Brandrup & Immergut). Use 0.90 as the default comparator for PBD SMILES; override to 0.91 for PI.",
       "exp_K_GPa": {
         "min": 1.38,
@@ -959,7 +959,7 @@
         "poly(tetrahydrofuran)"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 100,
       "dp_min": 50,
       "nchain": 10,
@@ -1044,7 +1044,7 @@
         "PPSO2"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 40,
       "dp_min": 20,
       "nchain": 10,
@@ -1075,7 +1075,8 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
-      "ct_gate_reliable": false,   "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
+      "ct_gate_reliable": false,
+      "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
       "experimental_tg_K": {
         "PPS": 358,
         "notes": "PPS (polyphenylene sulfide): ~85°C (358 K). Polythioethers generally 250-360 K."
@@ -1121,7 +1122,7 @@
         "PHB"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 50,
       "dp_min": 25,
       "nchain": 10,
@@ -1203,7 +1204,7 @@
         "aramid"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 50,
       "dp_min": 25,
       "nchain": 10,
@@ -1281,7 +1282,7 @@
         "segmented polyurethane"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 40,
       "dp_min": 20,
       "nchain": 10,
@@ -1399,8 +1400,8 @@
         "BPDA-ODA"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
-      "dp_typical": 15,
+      "charge_method": "none",
+      "dp_typical": 24,
       "dp_min": 15,
       "nchain": 6,
       "density_initial_gcm3": 0.71,
@@ -1424,7 +1425,8 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
-      "ct_gate_reliable": false,   "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
+      "ct_gate_reliable": false,
+      "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
       "experimental_tg_K": {
         "PMDA_ODA": 633,
         "BPDA_PDA": 633,
@@ -1468,7 +1470,7 @@
         "PLGA-like anhydrides"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 40,
       "dp_min": 20,
       "nchain": 10,
@@ -1527,7 +1529,7 @@
         "PC-PDMS"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 40,
       "dp_min": 20,
       "nchain": 10,
@@ -1552,7 +1554,8 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
-      "ct_gate_reliable": false,   "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
+      "ct_gate_reliable": false,
+      "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
       "experimental_tg_K": {
         "BPA_PC": 422,
         "notes": "Bisphenol-A polycarbonate: ~149°C (422 K). Literature DSC consensus."
@@ -1595,7 +1598,7 @@
         "DGEBA-amine epoxy"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 20,
       "dp_min": 10,
       "nchain": 10,
@@ -1722,7 +1725,7 @@
         "poly(ethoxyphosphazene)"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 30,
       "dp_min": 15,
       "nchain": 10,
@@ -1781,8 +1784,8 @@
         "poly(ether ketone)"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
-      "dp_typical": 15,
+      "charge_method": "none",
+      "dp_typical": 32,
       "dp_min": 15,
       "nchain": 8,
       "density_initial_gcm3": 0.66,
@@ -1806,7 +1809,8 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
-      "ct_gate_reliable": false,   "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
+      "ct_gate_reliable": false,
+      "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
       "experimental_tg_K": {
         "PEEK": 418,
         "PEK": 440,
@@ -1857,8 +1861,8 @@
         "poly(aryl ether sulfone)"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
-      "dp_typical": 15,
+      "charge_method": "none",
+      "dp_typical": 25,
       "dp_min": 15,
       "nchain": 8,
       "density_initial_gcm3": 0.62,
@@ -1882,7 +1886,8 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
-      "ct_gate_reliable": false,   "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
+      "ct_gate_reliable": false,
+      "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
       "experimental_tg_K": {
         "PSU": 463,
         "PES": 493,
@@ -1931,7 +1936,7 @@
         "P3HT-like"
       ],
       "forcefield": "PCFF",
-      "charge_method": "bond-increment",
+      "charge_method": "none",
       "dp_typical": 25,
       "dp_min": 20,
       "nchain": 10,
@@ -1956,7 +1961,8 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
-      "ct_gate_reliable": false,   "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
+      "ct_gate_reliable": false,
+      "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
       "experimental_tg_K": {
         "PPV": 416,
         "MEH_PPV": 358,

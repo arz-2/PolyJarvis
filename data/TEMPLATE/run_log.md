@@ -20,7 +20,16 @@ Plan: `[PLAN_PATH = data/[RUN]/raw/run_plan.json]`  |  mode: [deterministic / re
 | D-06b Multirate Tg  | [DSC-equiv=[X] K / N/A]                              | [log-linear Tg(Γ) b=[X] K/ln(K/ns), R²=[X], N_rates=[3] @ [40,160,400] K/ns, N_repl=[N]; extrapolated to 1.67e-10 K/ns (10 K/min DSC); VF=[quality] (diagnostic, <2 decades) / N/A — single-rate] |
 | D-07 Property method | [born (glassy) / deform fallback (glassy) / murnaghan (rubbery) / fluctuation (rubbery fallback) / N/A] | [Tg=[X] K → is_glassy=[true/false]; bm_pressures_atm=[Y/N] / N/A — bulk_modulus not requested] |
 
-<!-- Add rows for non-routine decisions (parameter overrides, custom protocols, etc.) -->
+<!-- Example — PS1 completed run:
+| D-01 | PCFF | classify_polymer returned PSTR → EMC PCFF auto-routed |
+| D-02 | bond-increment | PCFF: bond-increment charges embedded, no QM step |
+| D-03 | pppm 12 Å | Aromatic ring partial charges → long-range Coulomb |
+| D-04 | DP=40, 10 chains, ~6400 atoms | polymer_rules.json default |
+| D-05 | PASS | density drift 0.4% over last 500 ps; energy plateau confirmed |
+| D-06 | ACCEPTABLE | R²=0.93, F-stat GOOD, N=19 bins; range 550→250K in 20K steps |
+-->
+
+<!-- Add rows for any non-routine decisions (parameter overrides, custom protocols, etc.) -->
 
 ---
 

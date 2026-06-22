@@ -2,8 +2,8 @@
 """
 EMC MCP Server
 ==============
-Builds amorphous polymer cells via EMC for Track C (PCFF), PHAL+PSIL (OPLS-AA),
-and PHYC/PDIE/PSTR (TraPPE-UA) classes using EMC v9.4.4.
+Builds amorphous polymer cells via EMC for Track C (PCFF including PSTR), PHAL+PSIL (OPLS-AA),
+and PHYC/PDIE (TraPPE-UA) classes using EMC v9.4.4.
 
 Wraps mcp-servers/mcp-emc-server/smiles_to_emc.py's build_cell() pipeline:
     SMILES → .esh → emc_setup.pl → EMC binary → LAMMPS .data
@@ -425,8 +425,8 @@ def submit_emc_cell_job(
                          For polycarbonates include the full -O-C(=O)-O- carbonate
                          in the repeat unit and put * on aromatic carbons.
         polymer_class:   PolyInfo class name — determines force field; required.
-                         PCFF: PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL
-                         OPLS-AA: PHAL.  TraPPE-UA: PHYC/PDIE/PSTR.
+                         PCFF: PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL/PSTR
+                         OPLS-AA: PHAL/PSIL.  TraPPE-UA: PHYC/PDIE.
         dp:              Degree of polymerization (repeat units per chain). [20]
         nchains:         Exact number of polymer chains to build (EMC "number"
                          mode). When > 0 this sets the chain count precisely and
