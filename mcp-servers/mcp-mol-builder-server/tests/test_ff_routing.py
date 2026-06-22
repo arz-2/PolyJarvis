@@ -39,16 +39,17 @@ def test_previously_divergent_classes_now_authoritative(cid, expected_ff):
     assert got["preferred_ff"] != "opls-aa/2024"
 
 
-def test_pstr_routes_opls_aa():
-    """PSTR (polystyrenics) is deliberately OPLS-AA + EMC: OPLS-AA reproduces aPS
-    density to ~0.4% (Al Otmi 2023). It rides the same use_opls/pppm path as PHAL
-    (not TraPPE-UA). confidence is medium because OPLS over-predicts aPS Tg (~+79 K)."""
+def test_pstr_routes_pcff():
+    """PSTR (polystyrenics) uses PCFF via EMC: Class II explicitly parameterizes aromatic
+    C-H charges and pi-dihedral cross-terms governing PS Tg (~373 K). OPLS-AA over-predicts
+    aPS Tg by ~+79 K (Afzal 2021) so PCFF is preferred for thermomechanical accuracy.
+    confidence=medium until a direct PCFF PS Tg paper is found."""
     got = ff_routing.get_preferred_ff("PSTR")
-    assert got["preferred_ff"] == "opls-aa/2024"
+    assert got["preferred_ff"] == "pcff"
     assert got["preferred_builder"] == "emc"
     assert got["ff_confidence"] == "medium"
-    assert CLASSES["PSTR"]["forcefield"] == "OPLS-AA"
-    assert CLASSES["PSTR"]["charge_method"] == "none"
+    assert CLASSES["PSTR"]["forcefield"] == "PCFF"
+    assert CLASSES["PSTR"]["charge_method"] == "bond-increment"
     assert CLASSES["PSTR"]["electrostatics"] == "pppm"
 
 
