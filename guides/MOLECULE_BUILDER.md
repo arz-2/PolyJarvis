@@ -149,10 +149,6 @@ save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="
 
 **`classify_polymer` returns PHAL for PVC (`*CC(Cl)*`):** False flag — PVC is PVNL/PCFF (C–Cl is not PTFE-family). Build with the class specified in the approved plan; log the PHAL divergence in D-01.
 
-**EMC `output_name` does not rename output files:** The server always writes `emc_build.data` and `emc_build.params` into the job output dir regardless of the `output_name` arg. Always use `data_path` / `params_path` from `get_emc_job_output()` — do not reconstruct filenames from `output_name`.
-
-**TraPPE-UA `lammps_flags` for PHYC/PDIE:** EMC returns `{"use_pcff": false, "use_trappe": true, "use_opls": false}`. Report this exactly in RESULT — do not default to `use_pcff: true`.
-
 ---
 
 **→ When `cell.data` is saved, return the RESULT block.**
@@ -163,7 +159,7 @@ The RESULT block MUST include `emc_seed` — the orchestrator logs it to the run
 RESULT
 data_path:      /home/arz2/PolyJarvis/data/<RUN>/lammps/cell/cell.data
 emc_params_path: /home/arz2/PolyJarvis/data/<RUN>/lammps/cell/emc_build.params
-lammps_flags:   {"use_pcff": true, "use_trappe": false, "use_opls": false}
+lammps_flags:   <as returned by get_emc_job_output result["lammps_flags"]>
 emc_seed:       <integer you passed to submit_emc_cell_job seed= / saved on mol-builder for RadonPy>
 n_atoms:        <atom count from inspect_data_file or EMC output>
 ```
