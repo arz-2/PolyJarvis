@@ -21,8 +21,10 @@ get_emc_job_output    sync   Retrieve result (data_path + lammps_flags) when com
 list_emc_jobs         sync   Show all jobs with status
 """
 
+import json
 import logging
 import os
+import random
 import sys
 import threading
 import time
@@ -275,6 +277,11 @@ def _build_emc_cell(
     temperature: float,
     seed: int,
 ) -> dict:
+    # Resolve seed before calling EMC so the cell is reproducible.
+    if seed == -1:
+        seed = random.randint(1, 2**31 - 1)
+        logger.info("EMC seed resolved: %d", seed)
+
     data_path = build_cell(
         smiles=smiles,
         output_dir=output_dir,
@@ -288,6 +295,21 @@ def _build_emc_cell(
         seed=seed,
     )
     data_path = str(data_path)
+
+    # Write reproducibility metadata so the seed survives run_log.md references.
+    try:
+        meta = {
+            "resolved_seed": seed,
+            "field": field,
+            "dp": dp,
+            "density": density,
+            "smiles": smiles,
+        }
+        (Path(output_dir) / "emc_metadata.json").write_text(
+            json.dumps(meta, indent=2)
+        )
+    except Exception:
+        pass
 
     # Quick sanity: count atoms from the .data header
     natoms = None
@@ -309,6 +331,7 @@ def _build_emc_cell(
         "dp":            dp,
         "density":       density,
         "natoms":        natoms,
+        "resolved_seed": seed,
         "lammps_flags":  _lammps_flags(field),
         "message":       f"LAMMPS .data file written: {data_path}",
     }

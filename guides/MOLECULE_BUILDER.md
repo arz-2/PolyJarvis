@@ -71,7 +71,7 @@ Report `data_path = {work_dir}/cell/cell.data` and `emc_params_path = {work_dir}
 | ID | Decision | Value |
 |---|---|---|
 | D-01 | Force field | auto-selected from polymer_class (see `lammps_flags` in output) |
-| D-02 | Charge method | embedded in FF — no separate step |
+| D-02 | Charge method | bond-increment / library charges embedded in the EMC class-II FF (PCFF/OPLS/TraPPE) — no separate QM step |
 | D-03 | Electrostatics | pppm (all except PHYC/PDIE which use lj/cut) |
 | D-04 | System size | dp and nchain passed to submit_emc_cell_job |
 

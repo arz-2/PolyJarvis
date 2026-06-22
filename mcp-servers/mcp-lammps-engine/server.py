@@ -76,6 +76,9 @@ LAMBDA_LAMMPS   = os.environ.get("LAMBDA_LAMMPS",  f"/home/{LAMBDA_USER}/lammps-
 LAMBDA_LAMMPS_KOKKOS = os.environ.get("LAMBDA_LAMMPS_KOKKOS",
                                       f"/home/{LAMBDA_USER}/lammps-install-kokkos/bin/lmp")
 CONDA_ENV       = os.environ.get("CONDA_ENV",      "mol-builder")
+OPENMPI_BIN    = os.environ.get("OPENMPI_BIN",    f"/home/{LAMBDA_USER}/openmpi/bin")
+OPENMPI_LIB    = os.environ.get("OPENMPI_LIB",    f"/home/{LAMBDA_USER}/openmpi/lib")
+OPENMPI_PREFIX = os.environ.get("OPENMPI_PREFIX",  f"/home/{LAMBDA_USER}/openmpi")
 
 
 def _engine_launch(engine: str, n_gpu: int) -> tuple[str, str]:
@@ -288,6 +291,9 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
             " > \"$SENTINEL\"; }",
         "",
         f"export CUDA_VISIBLE_DEVICES={cuda_devices}",
+        f"export PATH={OPENMPI_BIN}:$PATH",
+        f"export LD_LIBRARY_PATH={OPENMPI_LIB}:${{LD_LIBRARY_PATH:-}}",
+        f"export OPAL_PREFIX={OPENMPI_PREFIX}",
         "# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).",
         'echo $$ > "$PIDFILE"',
         # mpirun -np 1 does not propagate CUDA_VISIBLE_DEVICES to the child process on OpenMPI.
@@ -381,6 +387,9 @@ def _lammps_run_background(
         wrapper = (
             f"#!/bin/bash\n"
             f"{cuda_line}"
+            f"export PATH={OPENMPI_BIN}:$PATH\n"
+            f"export LD_LIBRARY_PATH={OPENMPI_LIB}:${{LD_LIBRARY_PATH:-}}\n"
+            f"export OPAL_PREFIX={OPENMPI_PREFIX}\n"
             # Record our own PID first so watch_run can check liveness. $$ is the
             # long-lived wrapper; $! at launch is the short-lived setsid parent.
             f"mkdir -p {SENTINEL_DIR}\n"

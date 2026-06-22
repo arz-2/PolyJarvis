@@ -10,6 +10,10 @@ On session restart mid-mechanical-track: re-read this file before resuming.
   # Born+NVT is REMOVED — do not spawn born-worker. Never use --stage born.
   # Glassy primary: Murnaghan NPT compression at 300 K (npt_prod300_out.data)
   # Rubbery primary: Murnaghan EOS at T>Tg (npt_production_out.data, bm_pressures_atm set)
+  # GATE: Do not spawn murnaghan-worker (or deform-worker) until thermal track confirms
+  # is_glassy=True (or glassy_hint=True when tg is skipped). Murnaghan at 300 K is the
+  # glassy primary path only — launching before is_glassy is known wastes ~2–5 h if the
+  # polymer is rubbery at 300 K (K_rubbery requires a different T and pressure range).
   if is_glassy or bm_pressures_atm is non-null in plan.decided_params:
     Claim GPU: scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
     Agent(subagent_type="murnaghan-worker", description="🟠 Murnaghan BM {polymer_name}",
