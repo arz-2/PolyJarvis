@@ -47,6 +47,87 @@ Atoms
 """
 
 
+# Inline-coeff fixtures mirroring LAMMPS `write_data` output (post-equilibration).
+# Every section is inlined and the `Pair Coeffs # <style>` comment carries the
+# pair_style — this is what the tracks actually feed to generate_script, and what the
+# old detector mis-handled (it bailed to {} on ANY inline Pair Coeffs → silent GAFF2).
+TRAPPE_EQUIL_CONTENT = """\
+# LAMMPS data file written by write_data (TraPPE-UA, post-equil)
+3 atoms
+2 bonds
+3 atom types
+0 improper types
+
+0.0 20.0 xlo xhi
+0.0 20.0 ylo yhi
+0.0 20.0 zlo zhi
+
+Masses
+
+1 13.0189
+2 14.0268
+3 15.0347
+
+Pair Coeffs # lj/cut/gpu
+
+1 0.0934 3.71
+2 0.09141 3.95
+3 0.19475 3.75
+
+Dihedral Coeffs # multi/harmonic
+
+1 1.91086 1.85422 0.43627 -2.24348 0
+
+Atoms
+
+1 1 1 0.0 1.0 1.0 1.0 0 0 0
+2 1 2 0.0 2.0 1.0 1.0 0 0 0
+3 1 3 0.0 3.0 1.0 1.0 0 0 0
+"""
+
+PCFF_EQUIL_CONTENT = """\
+# LAMMPS data file written by write_data (PCFF class2, post-equil)
+3 atoms
+2 bonds
+3 atom types
+5 improper types
+
+0.0 20.0 xlo xhi
+0.0 20.0 ylo yhi
+0.0 20.0 zlo zhi
+
+Masses
+
+1 12.011
+2 1.008
+3 15.999
+
+Pair Coeffs # lj/class2/coul/long/gpu
+
+1 0.054 4.01
+2 0.020 2.995
+3 0.240 3.535
+
+Atoms
+
+1 1 1 -0.1 1.0 1.0 1.0 0 0 0
+2 1 2  0.1 2.0 1.0 1.0 0 0 0
+3 1 3 -0.2 3.0 1.0 1.0 0 0 0
+"""
+
+# OPLS-AA write_data: lj/cut/coul/long → ambiguous vs GAFF2 → conservatively returns {}.
+OPLS_EQUIL_CONTENT = TRAPPE_EQUIL_CONTENT.replace(
+    "Pair Coeffs # lj/cut/gpu", "Pair Coeffs # lj/cut/coul/long/gpu"
+)
+
+# RadonPy GAFF2 write_data: lj/charmm/coul/long + cvff impropers → returns {} (leave
+# GAFF2 default alone). The nonzero improper count is the faithful part — GAFF2 carries
+# cvff impropers, so this exercises the "don't mistake impropers for PCFF" guard.
+RADONPY_CHARMM_CONTENT = TRAPPE_EQUIL_CONTENT.replace(
+    "Pair Coeffs # lj/cut/gpu", "Pair Coeffs # lj/charmm/coul/long"
+).replace("0 improper types", "5 improper types")
+
+
 # ── _detect_ff_from_data_file ─────────────────────────────────────────────────
 
 def test_detect_pcff_from_calib():
@@ -72,6 +153,96 @@ def test_detect_gaff2_returns_empty(tmp_path):
 
 def test_detect_missing_file_returns_empty():
     assert _detect_ff_from_data_file("/nonexistent/path.data") == {}
+
+
+# ── Inline-coeff (post-equilibration write_data) detection — the reported bug ──
+# Equilibrated EMC files inline all coeffs, so the old detector returned {} and the
+# deck silently fell back to GAFF2 styles on a TraPPE/PCFF cell.
+
+def test_detect_trappe_from_equil_writedata(tmp_path):
+    f = tmp_path / "npt_production_out.data"
+    f.write_text(TRAPPE_EQUIL_CONTENT)
+    assert _detect_ff_from_data_file(str(f)) == {
+        "use_pcff": False, "use_trappe": True, "use_opls": False}
+
+
+def test_detect_pcff_from_equil_writedata(tmp_path):
+    f = tmp_path / "npt_production_out.data"
+    f.write_text(PCFF_EQUIL_CONTENT)
+    assert _detect_ff_from_data_file(str(f)) == {
+        "use_pcff": True, "use_trappe": False, "use_opls": False}
+
+
+def test_detect_opls_equil_returns_empty(tmp_path):
+    """lj/cut/coul/long is ambiguous vs GAFF2 → conservative {} (don't misread as TraPPE)."""
+    f = tmp_path / "opls_out.data"
+    f.write_text(OPLS_EQUIL_CONTENT)
+    assert _detect_ff_from_data_file(str(f)) == {}
+
+
+def test_detect_radonpy_charmm_equil_returns_empty(tmp_path):
+    f = tmp_path / "gaff2_out.data"
+    f.write_text(RADONPY_CHARMM_CONTENT)
+    assert _detect_ff_from_data_file(str(f)) == {}
+
+
+# ── Inline-coeff end-to-end: npt_tg_step deck gets the right FF without any flag ──
+
+def test_trappe_equil_tg_sweep_no_flag(tmp_path):
+    """The exact reported failure: TraPPE equil file + no FF flag → lj/cut deck, no pppm."""
+    data_file = tmp_path / "npt_production_out.data"
+    data_file.write_text(TRAPPE_EQUIL_CONTENT)
+    out = str(tmp_path / "tg_sweep.in")
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter("always")
+        script = ScriptGenerator(data_file=str(data_file)).generate(
+            "npt_tg_step", output_path=out,
+            params={"T_START": 400.0, "T_END": 100.0, "T_STEP": 20.0, "N_STEPS_PER_T": 100},
+        )
+    assert "pair_style lj/cut" in script
+    assert "dihedral_style multi/harmonic" in script
+    assert "pppm" not in script.lower()
+
+
+def test_pcff_equil_tg_sweep_no_flag(tmp_path):
+    """PCFF equil file + no FF flag → class2 deck with pppm."""
+    data_file = tmp_path / "npt_production_out.data"
+    data_file.write_text(PCFF_EQUIL_CONTENT)
+    out = str(tmp_path / "tg_sweep.in")
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter("always")
+        script = ScriptGenerator(data_file=str(data_file)).generate(
+            "npt_tg_step", output_path=out,
+            params={"T_START": 600.0, "T_END": 300.0, "T_STEP": 20.0, "N_STEPS_PER_T": 100},
+        )
+    assert "dihedral_style class2" in script
+    assert "pppm" in script.lower()
+
+
+def test_trappe_equil_matching_flag_no_raise(tmp_path):
+    """Passing use_trappe=True on a TraPPE equil file must not trip the mismatch guard."""
+    data_file = tmp_path / "npt_production_out.data"
+    data_file.write_text(TRAPPE_EQUIL_CONTENT)
+    out = str(tmp_path / "tg_sweep.in")
+    script = ScriptGenerator(data_file=str(data_file)).generate(
+        "npt_tg_step", output_path=out,
+        params={"use_trappe": True, "T_START": 400.0, "T_END": 100.0,
+                "T_STEP": 20.0, "N_STEPS_PER_T": 100},
+    )
+    assert "pair_style lj/cut" in script
+
+
+def test_pcff_flag_on_trappe_equil_raises(tmp_path):
+    """Contradicting flag on an equil file now fires the guard (was silent GAFF2 before)."""
+    data_file = tmp_path / "npt_production_out.data"
+    data_file.write_text(TRAPPE_EQUIL_CONTENT)
+    out = str(tmp_path / "tg_sweep.in")
+    with pytest.raises(ValueError, match="FF flag mismatch"):
+        ScriptGenerator(data_file=str(data_file)).generate(
+            "npt_tg_step", output_path=out,
+            params={"use_pcff": True, "T_START": 400.0, "T_END": 100.0,
+                    "T_STEP": 20.0, "N_STEPS_PER_T": 100},
+        )
 
 
 # ── B1: FF auto-detect in generate() ─────────────────────────────────────────

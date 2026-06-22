@@ -125,9 +125,17 @@ TRAPPE_PAIR_MODIFY   = "mix arithmetic tail yes"
 def _detect_ff_from_data_file(data_file: str) -> dict:
     """Detect FF type from .data file content.
 
-    Handles two data-file origins:
-      - RadonPy (GAFF2/GAFF2_mod): atom_style charge, inline Pair Coeffs → return {} (no override)
-      - EMC (PCFF/OPLS-AA/TraPPE-UA): atom_style full, coeffs in .params → detect by header
+    Handles both data-file origins and both lifecycle stages:
+      - EMC build cell.data: coeffs live in a .params file (no inline ``Pair Coeffs``);
+        detect by the united-atom Masses comments + improper-type count.
+      - LAMMPS write_data output (post-equilibration): every section is inlined, so the
+        ``Pair Coeffs # <style>`` comment carries the exact pair_style — use that.
+      - RadonPy (GAFF2/GAFF2_mod): inline coeffs with a ``coul`` charmm/long style →
+        left alone (return {}) so callers fall back to the GAFF2 default.
+
+    Detection is intentionally *conservative*: only the two unambiguous EMC signatures
+    (TraPPE-UA, PCFF) are classified. Anything carrying electrostatics that isn't class2
+    (OPLS-AA, RadonPy GAFF2) returns {} so those existing paths stay untouched.
 
     Returns a dict with one of use_pcff/use_trappe/use_opls = True and the others False,
     or {} when detection is inconclusive so callers fall back to explicit flags or GAFF2 default.
@@ -136,18 +144,48 @@ def _detect_ff_from_data_file(data_file: str) -> dict:
         content = Path(data_file).read_text(errors="replace")
     except OSError:
         return {}
-    # RadonPy GAFF2: has inline Pair Coeffs section (EMC stores these in a .params file)
-    if re.search(r"^Pair Coeffs", content, re.MULTILINE):
-        return {}
-    # From here: EMC-generated file (no inline coeffs; atom_style full; coeffs via include)
-    # PCFF (class2): always has improper types — class2 requires them
+
+    n_improper = 0
     m = re.search(r"(\d+)\s+improper types", content)
-    if m and int(m.group(1)) > 0:
+    if m:
+        n_improper = int(m.group(1))
+
+    # ── Inline-coeff files (LAMMPS write_data output, also RadonPy builds) ──────────
+    # EMC build files keep coeffs in a separate .params file (no inline section); any
+    # inline ``Pair Coeffs`` means either a write_data round-trip or a RadonPy build.
+    if re.search(r"^Pair Coeffs", content, re.MULTILINE):
+        # write_data records the pair_style in the section comment, e.g.
+        # "Pair Coeffs # lj/cut/gpu", "Pair Coeffs # lj/class2/coul/long/kk".
+        # Strip any engine accelerator suffix before matching.
+        pc = re.search(r"^Pair Coeffs\s*#\s*(\S+)", content, re.MULTILINE)
+        if pc:
+            style = pc.group(1).lower()
+            for sfx in ("/gpu", "/kk", "/omp", "/intel", "/opt"):
+                style = style.replace(sfx, "")
+            has_coul = "coul" in style
+            is_class2 = "class2" in style
+            # PCFF: the class2 pair style is the clean signal. Do NOT also key off
+            # improper count here — GAFF2 uses cvff impropers too, so an equilibrated
+            # RadonPy file (lj/charmm/coul/long + impropers) would be mis-read as PCFF.
+            if is_class2:
+                return {"use_pcff": True, "use_trappe": False, "use_opls": False}
+            # TraPPE-UA: lj/cut with no electrostatics and no impropers (united atom).
+            # The no-coul guard is essential — "lj/cut/coul/long" contains "lj/cut".
+            if "lj/cut" in style and not has_coul and n_improper == 0:
+                return {"use_pcff": False, "use_trappe": True, "use_opls": False}
+        # Bare inline coeffs (RadonPy build) or an ambiguous style (OPLS-AA
+        # lj/cut/coul/long, RadonPy lj/charmm/coul/long, …) → leave alone so callers
+        # fall back to explicit flags / GAFF2 default. Preserves prior RadonPy behavior.
+        return {}
+
+    # ── Pre-equil EMC build files (no inline coeffs; coeffs via .params include) ────
+    # PCFF (class2): always has improper types — class2 requires them.
+    if n_improper > 0:
         return {"use_pcff": True, "use_trappe": False, "use_opls": False}
-    # TraPPE-UA: united-atom names in Masses section (e.g. "# c4h2", "# c4h3")
+    # TraPPE-UA: united-atom names in Masses section (e.g. "# c4h2", "# c4h3").
     if re.search(r"#\s*c\d+h\d+", content):
         return {"use_pcff": False, "use_trappe": True, "use_opls": False}
-    # OPLS-AA: remaining EMC case — no impropers, non-UA atom types (PHAL/PSIL)
+    # OPLS-AA: remaining EMC case — no impropers, non-UA atom types (PHAL/PSIL).
     return {"use_pcff": False, "use_trappe": False, "use_opls": True}
 
 

@@ -70,8 +70,14 @@ result = generate_script(
         "use_pppm":            <True unless TraPPE-UA>,
         "use_gpu":             True,
         "engine":              <engine from prompt>,  # kokkos for PCFF/OPLS → deck omits `package gpu`
-        "use_pcff":            <from lammps_flags>,
-        "use_trappe":          <from lammps_flags>,
+        "use_pcff":            <copy lammps_flags["use_pcff"] verbatim>,
+        "use_opls":            <copy lammps_flags["use_opls"] verbatim>,
+        "use_trappe":          <copy lammps_flags["use_trappe"] verbatim>,
+        # ↑ ALWAYS pass all three FF booleans, copied literally from the lammps_flags
+        # dict in your prompt. Do NOT omit them: on an equilibrated .data the engine
+        # cannot always re-derive the FF and will silently emit a GAFF2 deck (wrong
+        # pair_style/dihedral_style → corrupt Tg). Passing the wrong flag now hard-fails
+        # with "FF flag mismatch" rather than running a bad deck — also do not guess.
         "use_shake":           False,    # False for TraPPE-UA and PCFF; True for GAFF2
         "shake_bond_type_ids": <omit for TraPPE-UA and PCFF; only relevant for GAFF2>,
         "params_file":         "<work_dir>/emc_build.params",  # EMC only; omit for RadonPy
@@ -79,6 +85,16 @@ result = generate_script(
     }
 )
 # result["n_tg_stages"] is the number of temperature steps (used by run_lammps_script)
+```
+
+**Verify the FF before submitting.** After `generate_script`, `grep` the generated `.in`
+for `pair_style` and confirm it matches the planned force field — abort and re-check the
+FF flags if it shows a GAFF2 deck:
+```bash
+grep -E 'pair_style|dihedral_style|kspace' "<tg_sweep_dir>/tg_sweep.in"
+# TraPPE-UA → "pair_style lj/cut ..." + "dihedral_style multi/harmonic", NO kspace/pppm
+# PCFF      → "pair_style lj/class2/coul/long ..." + "kspace_style pppm ..."
+# GAFF2 leak (pair_style lj/charmm... / dihedral_style fourier) = wrong → do NOT submit
 ```
 
 **GPU neighbor list optimization (small PCFF cells <5k atoms):** After `generate_script`, edit `package gpu 1 neigh no` → `package gpu 1 neigh yes` in the generated `.in` file for +30% speedup (NPT-stable; do not apply to kokkos engine — kokkos manages its own neighbor list).
