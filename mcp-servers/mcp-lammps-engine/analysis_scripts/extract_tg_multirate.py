@@ -86,6 +86,7 @@ def fit_multirate(
     rates: list,
     tg_values: list,
     slow_rate_ref: float = 5.0,
+    regime: str = "glassy",
 ) -> dict:
     """
     Fit log-linear and VF models to (rate, Tg) pairs.
@@ -107,16 +108,28 @@ def fit_multirate(
     r2_lin  = float(r_val ** 2)
 
     # Slope gates — applied before any extrapolation
-    slope_gate_pass  = bool(slope > 0)       # negative slope is physically impossible
+    slope_gate_pass  = bool(slope > 0)       # negative slope is physically impossible (glassy)
     flat_rate_regime = bool(abs(slope) < 1.0) # < 1 K/decade → rubbery, extrapolation meaningless
+    rubbery_regime   = (str(regime).lower() == "rubbery")
 
-    if not slope_gate_pass:
-        # Negative slope: extrapolation would give absurd result (PLA1-type incident).
+    if rubbery_regime:
+        # Rubbery regime (T_workflow >> Tg): the per-rate "Tg" is an extrapolation artefact, so the
+        # SIGN of its rate-dependence is meaningless scatter — a negative slope (e.g. −9 K/decade)
+        # is NOT contamination and must not trigger a reroll. Report the mean across rates as a
+        # rubbery-regime estimate. The proper guard for rubbery quality (equilibration: density
+        # SEM/CV) is enforced upstream at equil-check; the slope-gate only guards GLASSY-Tg
+        # extrapolation, which the rubbery path never performs. (PS2/PEG2: false-positive ~5 h reroll.)
+        tg_slow         = float(np.mean(tg_arr))
+        tg_method       = "rubbery_flat_mean"
+        slope_gate_pass = True              # not a contamination signal in the rubbery regime
+        flat_rate_regime = True             # extrapolation meaningless; treat as flat
+    elif not slope_gate_pass:
+        # Negative slope (glassy): extrapolation would give absurd result (PLA1-type incident).
         # Fall back to the directly measured Tg at the slowest rate.
         tg_slow   = float(tg_arr[int(np.argmin(rates_arr))])
         tg_method = "single_rate_fallback"
     elif flat_rate_regime:
-        # Rubbery regime: Tg barely changes with rate; mean is more stable than extrapolation.
+        # Near-zero slope: Tg barely changes with rate; mean is more stable than extrapolation.
         tg_slow   = float(np.mean(tg_arr))
         tg_method = "flat_rate_mean"
     else:
@@ -137,6 +150,8 @@ def fit_multirate(
         "slow_rate_ref_K_per_ns":  slow_rate_ref,
         "slope_gate_pass":         slope_gate_pass,
         "is_flat_rate_regime":     flat_rate_regime,
+        "regime":                  str(regime).lower(),
+        "rubbery_regime_exemption": rubbery_regime,
         "tg_method":               tg_method,
         # VF fields filled below
         "vf_fit_quality":          "NOT_ATTEMPTED",
@@ -213,6 +228,9 @@ def main():
                    help="Cooling rates in K/ns")
     p.add_argument("--tg_values", nargs="+", type=float, required=True,
                    help="Tg_MD values in K (same order as --rates)")
+    p.add_argument("--regime", choices=["glassy", "rubbery"], default="glassy",
+                   help="Thermal regime. 'rubbery' (T_workflow >> Tg) exempts the slope-sign gate "
+                        "(negative slope is scatter, not contamination) and reports the rubbery mean.")
     p.add_argument("--slow_rate_ref", type=float, default=5.0,
                    help="Reference rate for log-linear Tg extrapolation (K/ns, default 5.0)")
     p.add_argument("--output_dir", default=".", help="Directory for output files")
@@ -235,7 +253,8 @@ def main():
     is_dsc = args.slow_rate_ref < 1e-6
     ref_label = "DSC-equivalent, 10 K/min" if is_dsc else "slow MD"
 
-    result = fit_multirate(args.rates, args.tg_values, slow_rate_ref=args.slow_rate_ref)
+    result = fit_multirate(args.rates, args.tg_values, slow_rate_ref=args.slow_rate_ref,
+                           regime=args.regime)
     result["polymer_name"] = args.polymer_name
     result["is_dsc_extrapolation"] = is_dsc
 

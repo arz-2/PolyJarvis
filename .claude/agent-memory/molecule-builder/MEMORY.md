@@ -1,5 +1,5 @@
-- [EMC output file naming](emc_output_naming.md) — EMC job output_name is ignored for the .data filename; files are always emc_build.data / emc_build.params regardless of output_name arg [ingested 2026-06-22]
-- [PHYC/PDIE TraPPE-UA RESULT block](trappe_result_block.md) — PHYC/PDIE route to trappe-ua; lammps_flags must include use_trappe:true (use_pcff:false, use_opls:false) [ingested 2026-06-22]
-- [PVC PHAL misclassification](pvc_phal_misclassify.md) — classify_polymer returns PHAL/OPLS-AA for PVC *CC(Cl)*; correct route is PVNL/PCFF per plan + polymer_rules.json [ingested 2026-06-22]
-- [PCFF sulfone charges](pcff_sulfone_charges.md) — PSFO PCFF sulfone S≈+0.08/O≈-0.11 are native bond-increment values; do NOT apply OPLS/QM +1.3/-0.55 criterion; 0.0000=real fallback failure [ingested 2026-06-22]
-- [EMC seed=-1 not persisted](emc_seed_not_persisted.md) — resolved EMC packing seed is never saved; output/esh/emc files keep seed=-1; .in lseed/vseed are LAMMPS run seeds, not emc_seed [ingested 2026-06-22]
+# Molecule Builder Memory Index
+
+- [EMC output naming](emc_output_naming.md) — EMC always writes emc_build.data (not polymer.data); take data_path from get_emc_job_output verbatim
+- [EMC seed not persisted](emc_seed_not_persisted.md) — read resolved_seed from job output; never report -1; record seed before submit
+- [PSFO routing](psfo_routing.md) — PSFO→EMC/PCFF, charge none, pppm; co-occurs POXI+PPNL (expected); use_pcff:true

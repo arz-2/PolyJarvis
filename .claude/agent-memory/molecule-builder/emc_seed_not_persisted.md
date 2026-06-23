@@ -1,22 +1,12 @@
 ---
 name: emc-seed-not-persisted
-description: EMC seed=-1 does not persist the resolved packing seed; no seed field in job output, esh/in carry only LAMMPS run seeds
+description: EMC seed must be logged from the prompt/resolved_seed; get_emc_job_output echoes resolved_seed — never report -1
 metadata:
-  type: project
-  ingested_at: 2026-06-22
+  type: feedback
 ---
 
-When `submit_emc_cell_job(seed=-1)`, the resolved EMC cell-packing RNG seed is
-NOT persisted anywhere recoverable:
+The EMC seed passed to `submit_emc_cell_job(seed=...)` is echoed back as `result["resolved_seed"]` in `get_emc_job_output`. Use that to confirm the seed actually used, and report it in the RESULT block.
 
-- `get_emc_job_output` has no `seed` field.
-- `emc_build.esh` carries no seed line.
-- `build.emc` and `emc_build.emc.gz` only show `seed -> -1` (the literal unresolved value).
-- `emc_build.in` contains `lseed`/`vseed` (e.g. 723853 / 486234) — these are
-  LAMMPS *run-script* seeds (Langevin thermostat + velocity init) for an
-  equilibration step the builder does NOT run. Do NOT report these as `emc_seed`.
+**Why:** Reproducibility depends on the exact seed. For revision baselines the seed is FIXED in the prompt (from guides/REVISION_PARAMS.md) — e.g. PSU2/PSFO used emc_seed=820419, confirmed by resolved_seed=820419 in job output. Never report `-1` (that's the "pick random" sentinel, not a usable seed); if seed=-1 was passed, read resolved_seed back and log that integer.
 
-**How to apply:** When `seed=-1`, report `emc_seed: random (-1), resolved packing
-seed not persisted by EMC server`. Do not substitute the LAMMPS run seeds. For
-reproducibility-critical runs, pass an explicit positive `seed` so the value is
-known up front. See [[emc-output-naming]].
+**How to apply:** Record the seed in run_log.md BEFORE submitting (cross-track rule 2). After completion, cross-check `result["resolved_seed"]` matches what you passed and put that integer in the RESULT `emc_seed` field. See [[emc-output-naming]].

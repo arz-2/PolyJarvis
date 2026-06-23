@@ -20,7 +20,7 @@ Only one path runs per invocation. The `murnaghan` path additionally calls `extr
 
 **Glassy (is_glassy=True) path:** Murnaghan at 300 K is primary (murnaghan_log_files non-null). 3-direction deform is fallback when Murnaghan fails (`fit_converged=False` or `B0_prime` outside [4, 20]).
 
-**Rubbery (is_glassy=False) path:** Murnaghan at T>Tg (bm_pressures_atm set) or volume fluctuation (no pressures). Unchanged.
+**Rubbery (is_glassy=False) path:** Murnaghan at T>Tg is now the **primary** rubbery K method — the rubbery classes (PHYC/PDIE/POXI/PSIL) all ship `bm_pressures_atm` in polymer_rules.json, so the plan emits a murnaghan stage. Volume fluctuation overestimates rubbery K (~+70%, PEG2 2026-06-23) and is kept ONLY as the diagnostic B_dyn cross-check (`extract_bulk_modulus`), never the reported K when Murnaghan is present. The pure-fluctuation path (all-null) now applies only to a rubbery class with no `bm_pressures_atm` defined — add one to polymer_rules.json rather than relying on fluctuation.
 
 ---
 

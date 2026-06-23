@@ -768,6 +768,50 @@ def main():
                            "error": f"{fit_method_used} failed — check temperature range and data quality"}))
         sys.exit(0)
 
+    # -------------------------------------------------------------------
+    # 3b. Hard physics-validity gate on the PRIMARY fit.
+    # A fit that violates a hard constraint (slope signs not both negative, a degenerate
+    # near-zero crossover width, or a Tg pinned to the sweep endpoints) is physically invalid
+    # and must NOT headline tg_summary.json as Tg_K — it poisons the multi-rate extrapolation
+    # and the run-summary (PSU1/PVC2: a 578 K endpoint-pinned hyperbola masked a valid ~437 K
+    # bilinear). If the primary is invalid but the alternative fit is valid, swap it in.
+    # If neither is valid, keep the primary but flag primary_fit_invalid so downstream guards.
+    _span = float(temps.max()) - float(temps.min())
+
+    def _hard_violations(cf):
+        if not cf:
+            return ["fit_missing"]
+        v = []
+        ag, ar = cf.get("a_glassy"), cf.get("a_rubbery")
+        if not (isinstance(ag, (int, float)) and isinstance(ar, (int, float)) and ag < 0 and ar < 0):
+            v.append("slope_sign_invalid")
+        cw = cf.get("transition_width_c_K")
+        if cw is not None and cw < 5.0:
+            v.append("transition_width_degenerate")
+        tgk = cf.get("Tg_K")
+        if _span > 0 and isinstance(tgk, (int, float)) and (
+                tgk <= float(temps.min()) + 0.05 * _span
+                or tgk >= float(temps.max()) - 0.05 * _span):
+            v.append("tg_pinned_to_sweep_endpoint")
+        return v
+
+    primary_violations = _hard_violations(cf_result)
+    fit_swap_note = None
+    if primary_violations and alt_result is not None and not _hard_violations(alt_result):
+        invalid_method = fit_method_used
+        invalid_tg = Tg_primary
+        invalid_reasons = ",".join(primary_violations)
+        cf_result, alt_result = alt_result, cf_result
+        fit_method_used = "bilinear_curvefit"
+        Tg_primary = cf_result["Tg_K"]
+        r2_primary = cf_result["r_squared"]
+        primary_violations = _hard_violations(cf_result)
+        fit_swap_note = (
+            f"primary_fit_swapped: {invalid_method} (Tg={invalid_tg:.1f} K) was physically "
+            f"invalid [{invalid_reasons}]; swapped to bilinear_curvefit (Tg={Tg_primary:.1f} K)"
+        )
+    primary_fit_invalid = bool(primary_violations)
+
     # Quality rating based on bilinear R²
     fit_quality = (
         "EXCELLENT"  if r2_primary >= 0.995 else
@@ -782,6 +826,8 @@ def main():
     slope_signs_valid    = (a_g < 0 and a_r < 0)
     slope_ordering_valid = (a_r < a_g)   # rubbery must be steeper (more negative)
     fit_warnings = []
+    if fit_swap_note:
+        fit_warnings.append(fit_swap_note)
     if not slope_signs_valid:
         fit_quality = "POOR"
         fit_warnings.append(
@@ -998,6 +1044,11 @@ def main():
         "density_col":               density_col,
         "slope_signs_valid":         slope_signs_valid,
         "slope_ordering_valid":      slope_ordering_valid,
+        # primary_fit_invalid: the headline Tg_K still violates a hard physics constraint (no valid
+        # alternative existed to swap in). Downstream (generate_run_summary, is_glassy) must NOT
+        # silently headline it. fit_swapped: a physically-invalid primary was replaced by the alt fit.
+        "primary_fit_invalid":       primary_fit_invalid,
+        "fit_swapped":               fit_swap_note is not None,
         "fit_warnings":              fit_warnings,
         "relaxation_metrics":        relaxation_metrics,
         # CTE (always present when bilinear fit succeeds and slopes are physical)
