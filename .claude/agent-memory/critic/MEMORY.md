@@ -1,3 +1,3 @@
 # Critic Memory Index
 
-- [Glassy/rubbery equil gate](project_glassy_equil_gate_conflict.md) — DP>=30 glassy C(t)/MSD demotion=APPROVE (require_glassy); rubbery melt (PE) demotion=ESCALATE (no require_rubbery); DP<30 class-field demotion=REVISE (raise DP) [upd 2026-06-22]
+- [analyze-tg-multirate track_map gap](feedback_multirate_track_map_gap.md) — stage missing from policy track_map; non-blocking stale-policy artifact, never revise/escalate over it (track=thermal is valid)
