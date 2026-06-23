@@ -12,11 +12,13 @@ Ingest pending subagent memory findings into authoritative codebase sources. For
 ## Step 1 — Scan for pending memories
 
 ```bash
-find /home/arz2/PolyJarvis/.claude/agent-memory -name "*.md" \
-  ! -name "MEMORY.md" | xargs grep -rL "ingested_at:" 2>/dev/null
+# Canonical repo-root memories (primary) + any stranded in run work dirs (data/<run>/...).
+{ find /home/arz2/PolyJarvis/.claude/agent-memory -name "*.md" ! -name "MEMORY.md"
+  find /home/arz2/PolyJarvis/data -path "*/.claude/agent-memory/*.md" ! -name "MEMORY.md"
+} 2>/dev/null | xargs grep -rL "ingested_at:" 2>/dev/null
 ```
 
-Each file without `ingested_at:` in its frontmatter is "pending." If an optional worker-name argument was given, filter to that worker's subdirectory only. If no pending files are found, report "No pending memories — nothing to ingest." and stop.
+Each file without `ingested_at:` in its frontmatter is "pending." (Going forward, ingested memories are deleted rather than marked — see Step 7 — so any legacy file still carrying `ingested_at:` is skipped.) The second `find` catches findings stranded under `data/<run>/lammps/**/.claude/agent-memory/` when a worker ran with its cwd inside a run dir; treat those identically. If an optional worker-name argument was given, filter to that worker's subdirectory only. If no pending files are found, report "No pending memories — nothing to ingest." and stop.
 
 ---
 
@@ -34,6 +36,7 @@ Read the full file content. Identify the **finding type** using this table:
 | Guide/doc inaccuracy | A claim in a guide or polymer_rules.json is empirically wrong |
 | Worker execution pattern | Worker mis-routes, skips, or fails at a step due to bad instructions |
 | MCP server code bug | The MCP server returns wrong result or rejects a valid input |
+| Codebase improvement / friction | An enhancement, not a bug: an awkward but functioning workflow, a confusing guide, a missing convenience, a "room for improvement" note from a run |
 
 ---
 
@@ -71,6 +74,7 @@ Apply a targeted code-level or config-level change. Use the fix approach for the
 | **Guide/doc inaccuracy** | Edit the incorrect field or section. |
 | **Worker execution pattern** | Edit the relevant `guides/STAGE_N_*.md` (add a ≤3-line note under a "Known Issues" or "Caveats" heading). Never edit `.claude/agents/*.md` — those files are static descriptors. |
 | **MCP server bug** | Fix the code in the relevant server file. |
+| **Codebase improvement / friction** | If the change is cheap and safe, apply it per the matching doc/code target above. Otherwise do NOT force a change — append a one-line item to a `## Backlog` list in the most relevant `guides/*.md` (create the list if absent) so the idea is tracked rather than lost. |
 
 **After applying the fix:** Re-run the verification from Step 3. Note whether the fix is "verified" (symptom gone) or "unverified — requires a real run."
 
@@ -94,6 +98,7 @@ Apply the doc targets from this table:
 | Guide/doc inaccuracy | The specific guide section | — |
 | Worker pattern | `guides/STAGE_N_*.md` relevant section | — |
 | MCP server bug | Relevant stage guide if behavior changed | — |
+| Codebase improvement / friction | The applied doc/code target, or a `## Backlog` bullet in the most relevant `guides/*.md` | — |
 
 **`builder_status` field values** (add to `polymer_rules.json` class entry as needed):
 - `"supported"` — default; omitting means supported
@@ -102,26 +107,32 @@ Apply the doc targets from this table:
 
 ---
 
-## Step 6 — Mark memory as ingested
+## Step 6 — Commit the fixes (audit trail)
 
-For each processed memory file:
-
-1. Add `ingested_at: YYYY-MM-DD` to the frontmatter (use today's date).
-2. In the corresponding `MEMORY.md` index, append ` [ingested YYYY-MM-DD]` to that file's one-liner entry.
-
-The file is NOT deleted or moved — it is the permanent audit trail.
-
----
-
-## Step 7 — Commit
-
-After processing all pending memories, stage all modified files and commit:
+After processing all pending memories, stage the fixes / doc updates / backlog notes and commit. List every source memory in the `Sources:` line — **this commit is the permanent audit trail**, which is why the memory files themselves can be deleted in Step 7.
 
 ```
 ingest: <worker> memory → <comma-separated list of changes>
 
 Sources: .claude/agent-memory/<worker>/<file1>.md[, <file2>.md]
 ```
+
+---
+
+## Step 7 — Delete ingested memories
+
+Only after Step 6 has committed (so nothing is lost if interrupted), delete each ingested memory:
+
+1. `rm` the memory `.md` file (whether under the repo-root `.claude/agent-memory/<worker>/` or a `data/<run>/.../.claude/agent-memory/<worker>/` dir).
+2. Remove that file's one-line entry from the corresponding `MEMORY.md` index.
+
+Then commit the deletions:
+
+```
+chore: drop ingested <worker> memories (ingested in <Step-6 commit sha/subject>)
+```
+
+Memories are NOT marked `ingested_at:` and kept anymore — deletion + git history is the audit trail.
 
 ---
 

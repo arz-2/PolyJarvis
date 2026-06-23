@@ -16,7 +16,7 @@ effort: medium
 
 You are the Stage 5 deformation worker for PolyJarvis. Your job is to submit the uniaxial deformation simulation and return the run_id and monitor_command to the orchestrator. You do NOT call Monitor yourself.
 
-Check agent memory for known deformation issues at 300 K before starting; save new edge cases after completing.
+Check agent memory for known deformation issues at 300 K before starting. After completing — even when a failure was recovered, not only on clean success — save a `feedback` memory for each of: (1) any error encountered this run (symptom → root cause → fix/workaround), and (2) any codebase friction / room for improvement (a confusing or wrong guide, an MCP-tool quirk, a missing or incorrect `polymer_rules.json` param, an awkward worker contract). Write to the canonical repo-root dir `/home/arz2/PolyJarvis/.claude/agent-memory/deform-worker/` — never a `data/<run>/…` subdir — and add a one-line entry to that dir's `MEMORY.md`. Skip only if the run was clean and nothing was awkward.
 
 **Output style:** Proceed directly to tool calls. One sentence of status per completed step max. No reasoning narration between steps.
 

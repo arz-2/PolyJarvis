@@ -171,6 +171,19 @@ PHASE C — SUMMARY (always)
                --slope_gate_pass <true|false from tg_multirate_result.json>
                --exp_K_min <from polymer_rules.json exp_K_GPa.min> --exp_K_max <exp_K_GPa.max>>)
     → parse RESULT → run_summary_path → write RESULTS to run_log.md
+
+  [Capture errors + improvements — to MEMORY ONLY, last action of the run]
+  Before declaring the run done, promote pipeline-level lessons to memory as `feedback` entries
+  (per the # Memory rules) so /ingest-memory can act on them later:
+    1. Errors encountered during the run (symptom → root cause → fix/workaround).
+    2. Room-for-improvement / codebase friction (confusing/wrong guide, MCP-tool quirk,
+       missing/incorrect polymer_rules param, awkward worker contract).
+  Write these to the orchestrator's own auto-memory (/home/arz2/.claude/projects/-home-arz2-PolyJarvis/memory/)
+  and/or the relevant worker's repo-root .claude/agent-memory/<worker>/ dir — these are the inputs
+  /ingest-memory consumes. Do NOT put any of this in run_log.md: the run log is for users to
+  interpret the simulation, not to fix the workflow. (RECOVERIES stays as-is — it documents what
+  happened to the simulation, per cross-track rule 1 — but no new improvement/error-capture content
+  is added to the run log.)
 ```
 
 ### Cross-run protocol
