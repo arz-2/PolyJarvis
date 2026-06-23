@@ -8,11 +8,11 @@ On session restart mid-thermal-track: re-read this file before resuming.
 ```
   [thermal track — if "tg" in properties_requested]  # MULTIRATE: one sweep PER cooling rate
   Read multirate config from the plan:
-    TG_RATES=$(jq -r '.decided_params.tg_rates_K_per_ns | @csv' PLAN_PATH)     # e.g. 40,160,400
+    TG_RATES=$(jq -r '.decided_params.tg_rates_K_per_ns | @csv' PLAN_PATH)     # e.g. 25,50,100
     DSC_RATE=$(jq -r '.decided_params.dsc_equiv_rate_K_per_ns // 1.6667e-10' PLAN_PATH)
   Read replicate N from run_log.md header ("Replicate: N of M").
 
-  For idx, rate in enumerate(TG_RATES):                # idx = 0,1,2 → rates 40,160,400 K/ns
+  For idx, rate in enumerate(TG_RATES):                # idx = 0,1,2 → rates 25,50,100 K/ns
     [Tg sweep @ rate]
     Claim GPU(s): scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
       → on shortfall (exit 1) defer/retry; NEVER --allow-busy on the shared box.

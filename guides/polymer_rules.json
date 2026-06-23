@@ -477,10 +477,11 @@
       "tg_t_low_K": 100,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 250000,
+      "tg_min_steps_per_T": 100000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -581,9 +582,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 10000000.0,
       "K_strain_max": 0.03,
@@ -656,9 +657,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -743,9 +744,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -829,9 +830,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -904,10 +905,11 @@
       "tg_t_low_K": 80,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 250000,
+      "tg_min_steps_per_T": 100000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -996,9 +998,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 2000000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1078,9 +1080,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1122,7 +1124,7 @@
     },
     "PEST": {
       "name": "Polyester",
-      "_tg_rate_note": "PCFF/PPPM at <6000 atoms: steps_per_T = tg_t_step_K / (rate × dt_fs × 1e-6). At T_STEP=20K, dt=1fs: rate=40→500k steps, rate=160→125k, rate=400→50k. Only r40 clears tg_min_steps_per_T=200k; the slope gate in extract_tg_multirate is the primary protection. Planner should not use rates above 100 K/ns for PCFF PEST cells <6000 atoms.",
+      "_tg_rate_note": "steps_per_T = tg_t_step_K / (rate * dt_fs * 1e-6). Floor = tg_min_steps_per_T (200000 steps = 200 ps at dt=1fs). Feasible default [25,50,100] K/ns -> 800k/400k/200k steps, all clear the floor. The retired [40,160,400] gave 500k/125k/50k (125/50 ps degenerate). Plan-time feasibility filter (make_deterministic_plan._feasible_tg_rates) + gen_prompt warning enforce this.",
       "examples": [
         "PET",
         "PLA",
@@ -1157,9 +1159,9 @@
       "tg_steps_per_t": 500000,
       "tg_min_steps_per_T": 200000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1239,9 +1241,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 1000000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1311,9 +1313,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 1000000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1371,9 +1373,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1430,9 +1432,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 2000000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1500,9 +1502,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1559,9 +1561,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 1000000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1628,9 +1630,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1694,9 +1696,9 @@
       "tg_t_step_K": 10,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        10,
+        25,
+        50
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1763,9 +1765,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1822,10 +1824,11 @@
       "tg_t_low_K": 250,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 2000000,
+      "tg_min_steps_per_T": 200000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1860,7 +1863,8 @@
         "Very rigid aromatic backbone: slow chain relaxation → 8 annealing cycles and 15 ns required.",
         "SCREENING dp/nchain: dp_typical=15 nchain=8 for 48h-budget Tg sweep (4,800 atoms, ~40h/4GPU). τ_Rouse at dp=15 T_equil=770K ≈ 2.2 ns; tg_steps_per_t=2M = 2ns ≈ 0.91×τ_Rouse — borderline adequate for screening. Tg may be overestimated by ~5-15% beyond standard MD bias. Original nchain=10 dp=32 MW ~9,216 g/mol crossed Klajmon2023 density convergence threshold (~9,000 g/mol); dp=15 nchain=8 MW ~3,456 g/mol is below threshold but acceptable for Tg screening.",
         "Exp. RT density: amorphous PEEK=1.263 g/cm³; semicrystalline=1.30–1.32 g/cm³ (NOT the comparator for MD amorphous cells). Initial packing 0.66 g/cm³ = ~0.5x amorphous density.",
-        "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. Verify density ~1.26 g/cm³ at 298 K (amorphous ref) before Tg sweep; 1.30–1.32 indicates partial crystallinity."
+        "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. Verify density ~1.26 g/cm³ at 298 K (amorphous ref) before Tg sweep; 1.30–1.32 indicates partial crystallinity.",
+        "DENSITY SYSTEMATIC: PCFF MD systematically underestimates amorphous PEEK density by ~5% (rho_sim ~= 1.194 vs amorphous-ref 1.263 g/cm^3, band [1.199,1.326]). The run-summary density warning is ANTICIPATED, not a failure - accept rho_sim near the lower bound as a valid amorphous baseline. No band widening (1.263 stays the amorphous comparator; widening would mask a real FF systematic)."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
@@ -1900,9 +1904,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 2000000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -1975,9 +1979,9 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_rates_K_per_ns": [
-        40,
-        160,
-        400
+        25,
+        50,
+        100
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -2039,10 +2043,11 @@
     "tg_t_low_K": 150,
     "tg_t_step_K": 20,
     "tg_steps_per_t": 500000,
+    "tg_min_steps_per_T": 200000,
     "tg_rates_K_per_ns": [
-      40,
-      160,
-      400
+      25,
+      50,
+      100
     ],
     "dsc_equiv_rate_K_per_ns": 1.6667e-10,
     "K_deform_rate_inv_s": 100000000.0,
@@ -2112,11 +2117,11 @@
     "description": "Recommended stepwise-cooling Tg protocol based on Webb et al. JPCB 2024.",
     "method": "stepwise_cooling_npt",
     "step_size_K": 20,
-    "steps_per_point": 500000,
+    "steps_per_point": 800000,
     "dt_fs": 1.0,
-    "time_per_point_ns": 0.5,
-    "cooling_rate_K_per_ns_equivalent": 40,
-    "note_on_steps": "500,000 steps at 1 fs = 500 ps per temperature point (= 40 K/ns screening rate). For TraPPE-UA PHYC/PDIE classes with dt=2 fs, 250,000 steps also = 500 ps per point (same 40 K/ns). Webb2024 recommends 4 ns/point (2+2 ns eq+prod). Multi-rate Tg (screening-robust): run tg_rates_K_per_ns list [40, 160, 400] in parallel on 3 GPUs; each rate is ≤24h wall time for all classes. Fit log-linear Tg(Γ) = a + b·ln(Γ) and extrapolate to dsc_equiv_rate_K_per_ns=1.6667e-10 K/ns (10 K/min) as the reported theoretical DSC-equivalent experimental Tg; VF extrapolation Tg(Γ) = Tg0 + A/ln(B·Γ) as secondary diagnostic (poorly constrained at <2 decades). Validation only (PHYC): add 10 K/ns rate [10, 40, 160, 640] from tg_rates_validation_K_per_ns to compare with Ramos 2015 Fig. 3 (increases PHYC budget to ~14h at 2 fs).",
+    "time_per_point_ns": 0.8,
+    "cooling_rate_K_per_ns_equivalent": 25,
+    "note_on_steps": "Per-T simulation TIME (not step count) sets fit quality: too few ps at each temperature collapses the bilinear Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400 degenerate). Uniform floor = 200 ps/T = tg_min_steps_per_T (PCFF/OPLS dt=1fs -> 200000 steps; TraPPE-UA dt=2fs -> 100000 steps). Feasible multirate set [25,50,100] K/ns clears the floor at every rate (PCFF: 800k/400k/200k steps = 800/400/200 ps; TraPPE: 400k/200k/100k steps = 800/400/200 ps). The old [40,160,400] set is RETIRED: at T_STEP=20K it gave 500/125/50 ps, and rate is the same knob as per-T sampling (run n_steps), so the two fast rates were degenerate by construction. PSIL (T_STEP=10K) uses [10,25,50]. Fit log-linear Tg(G)=a+b*ln(G) and extrapolate to dsc_equiv_rate_K_per_ns=1.6667e-10 K/ns (10 K/min); VF Tg(G)=Tg0+A/ln(B*G) secondary diagnostic. Webb2024 recommends up to 4 ns/point where budget allows. Validation only (PHYC): tg_rates_validation_K_per_ns is a separate manual path and is not feasibility-filtered. RESIDUAL: [25,50,100] spans only 0.6 decades — DSC-equiv extrapolation has wide slope uncertainty. If a polymer still shows Tg FAIL after this fix, the knob is WIDENING the slowest rate (e.g. [10,32,100] = 1.0 decade, all clear the floor) at ~4x slowest-rate budget — NOT lowering the floor.",
     "analysis": "Bilinear fit of density vs T; Tg at breakpoint. Recommended: slope-temperature method (rolling 50 K window) to reduce fitting bias (Webb2024).",
     "pre_sweep_equilibration": [
       "1. Energy minimization (CG, FTOL=1e-6)",
@@ -2136,6 +2141,13 @@
     "additional_notes": [
       "Patrone2016 screening criterion: verify ≥90% convergence to both asymptotes on BOTH sides of Tg before accepting a Tg estimate. Transition half-width ΔT = e^(c/2)(2P̂−1)/√(P̂(1−P̂)) where P̂=0.90. Practical rule: sweep must extend ≥100 K below T_low and ≥150 K above T_high relative to expected Tg. If transition region spans >50% of the sweep window, widen range and re-run. Datasets failing this test should be held for review, not reported.",
       "Hyperbola fit (Patrone2016 Eq. 1): ρ(T) = ρ₀ − a(T−T₀) − b·H₀(T,T₀,c) is preferred over piecewise bilinear fit. Fits all data simultaneously; Tg = T₀ (hyperbola center). Slope in glassy state = −a; slope in rubbery state = −(a+b). As c→−∞, hyperbola converges to piecewise linear (bilinear is a special case)."
-    ]
+    ],
+    "tg_rates_K_per_ns": [
+      25,
+      50,
+      100
+    ],
+    "tg_min_steps_per_T_pcff": 200000,
+    "tg_min_steps_per_T_trappe": 100000
   }
 }
