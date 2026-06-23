@@ -12,7 +12,14 @@ Only initialize velocities once at the very first temperature step. Every subseq
 
 ### Rule B: No Dump Files During Tg Sweep
 
-Set `"DUMP_FILE": ""` in the `generate_script` params.
+Set `"DUMP_FILE": ""` in the `generate_script` params — no full trajectory during the sweep (large I/O).
+
+**Opt-in per-T structural snapshot:** keep `DUMP_FILE=""`, but if per-T Rg/P2/nematic order is wanted,
+additionally pass `"WRITE_PER_T_DUMP": True` (optionally `"PER_T_DUMP_FILE": "per_t_structs.dump"`).
+This writes ONE single-frame snapshot per temperature step (a `dump … 1 … ; run 0 ; undump` block),
+not a trajectory, so the I/O cost is negligible while still enabling per-T structural analysis. Default
+off; only enable when the run explicitly requests per-T structural metrics. (Previously these metrics
+silently failed because the flag was never set — PVC2 2026-06-23.)
 
 ### Rule C: Simulation Time Per T is System-Dependent
 

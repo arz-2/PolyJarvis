@@ -39,6 +39,15 @@ def build_watch_command(
     line per newly-completed stage — a discrete terminal notification with a
     small ASCII bar. Monitor is line-based, so this is per-stage, not an animated
     bar; one event per stage keeps it well under the too-many-events limit.
+
+    Persistence: this command already loops to completion (``while [ ! -f
+    "$SENTINEL" ]``) and the per-stage ``SEEN`` counter is persisted to
+    ``$SENTINEL.seen`` so it survives re-arms without replaying already-seen
+    stages. A multi-hour chain therefore needs no special "persistent monitor" —
+    the ONLY reason the orchestrator re-arms (~hourly) is the Monitor *tool's*
+    fixed ``timeout_ms`` cap (3.6e6 ms = 1 h), a harness limit, not a property of
+    this command. Re-arming by calling ``watch_run`` again on a bare timeout is
+    expected, cheap, and lossless — treat it as routine, not a sign of failure.
     """
     pidfile = pidfile or ""
     progress_file = progress_file or ""

@@ -1003,6 +1003,14 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.2,
+      "bm_pressures_atm": [
+        1,
+        100,
+        300,
+        600,
+        1000
+      ],
+      "bm_pressures_note": "Rubbery class (all members Tg<300, produced above Tg). Murnaghan EOS pressure series at T>Tg is the primary K method; the volume-fluctuation estimate overestimates rubbery K (~+70%, PEG2 2026-06-23), so it is kept only as a diagnostic cross-check. Series matches the proven PHYC/PDIE rubbery series.",
       "experimental_tg_K": {
         "PEO": 206,
         "PPO": 198,
@@ -1693,6 +1701,14 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.25,
+      "bm_pressures_atm": [
+        1,
+        100,
+        300,
+        600,
+        1000
+      ],
+      "bm_pressures_note": "Rubbery class (PDMS/PMHS Tg<160, produced above Tg). Murnaghan EOS pressure series at T>Tg is the primary K method; the volume-fluctuation estimate overestimates rubbery K, so it is kept only as a diagnostic cross-check. Series matches the proven PHYC/PDIE rubbery series.",
       "experimental_tg_K": {
         "PDMS": 148,
         "PMHS": 158,

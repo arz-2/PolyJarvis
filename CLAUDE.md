@@ -117,6 +117,11 @@ PHASE A — FOUNDATION (always)
       npt_tg_prep_data is non-null for rubbery polymers (npt_melt at T_equil_K); null for glassy.
   Write SIMULATION STATE to run_log.md (status=monitoring)
   Monitor(command=monitor_command, timeout_ms=3600000)
+  # The monitor_command loops to completion and persists per-stage progress (SEEN checkpoint), so a
+  # bare timeout on a still-running chain is ROUTINE: re-issue the SAME Monitor command (re-arm) —
+  # it is lossless, replays nothing, and is NOT a failure. The hourly cadence is the Monitor tool's
+  # fixed 1 h timeout_ms cap, not a problem with the run. Only investigate on RUN_COMPLETE / failure
+  # / PROCESS_DEAD_NO_SENTINEL.
   get_run_status(chain_id) → check success/failure
 
   [Equil-check gate]
@@ -126,7 +131,12 @@ PHASE A — FOUNDATION (always)
         ct_decay_fraction, ct_tau_relax_ps,
         end_to_end_r_mean_A, end_to_end_r_std_A, end_to_end_n_chains
       → write D-05 to run_log.md (populate Chain Structure Summary rows from these fields)
-  If equil_verdict=EXTEND: extend chain by 1–2 ns and re-Monitor (max 2 extensions)
+  If equil_verdict=EXTEND: re-spawn equilibration-worker in extend mode (prompt: mode=extend,
+    extend_from_data=<npt_prod_data_path>, extend_ns=1–2, press/engine same, temp=npt_prod_temp_K
+    (300 K — the production temperature of the cell, NOT the melt T_equil/T_workflow; passing the
+    melt T would re-melt a cooled glassy cell)). It generates a single deterministic npt_extend stage
+    via generate_equilibration_workflow(extend_only=True) and submits it. Do NOT hand-write a
+    continuation .in. Re-Monitor, then re-run equil-check on npt_extend_out.data (max 2 extensions).
   If equil_verdict=FAIL: write UNRESOLVED and stop
 
 PHASE B — TRACKS (property-conditional)
@@ -136,9 +146,13 @@ PHASE B — TRACKS (property-conditional)
   On session restart mid-thermal-track: re-read guides/THERMAL_TRACK.md before resuming.
 
   Slope-gate hard stop (after multirate analysis — read slope_gate_pass from tg_multirate_result.json):
-    if slope_gate_pass == False:
+    Registry rows for this sweep are STAGED (not yet committed) until this gate — see
+    guides/THERMAL_TRACK.md "Multirate Tg registry" (deferred write). Rubbery sweeps run with
+    --regime rubbery, so slope_gate_pass is True by exemption (rubbery_regime_exemption=True) and
+    this hard stop does NOT fire for them — commit the staged rows and proceed.
+    if slope_gate_pass == False:   # glassy contamination only
       DO NOT proceed to mechanical track or run-summary.
-      Delete any registry rows written for this sweep (slope_gate_pass=False → data is contaminated).
+      Discard the staged registry rows for this sweep (nothing was committed → no churn).
       Spawn recovery: re-run all 3 Tg sweeps from the same equil cell with a new velocity seed.
       Max 2 recovery attempts total; if both fail → write UNRESOLVED to run_log.md and stop.
 
@@ -147,6 +161,17 @@ PHASE B — TRACKS (property-conditional)
   On session restart mid-mechanical-track: re-read guides/MECHANICAL_TRACK.md before resuming.
 
 PHASE C — SUMMARY (always)
+
+  [Experimental lookup — run BEFORE run-summary so grading uses condition-matched DB ranges]
+  Agent(subagent_type="exp-lookup-worker", description="🟢 Exp lookup {polymer_name}",
+        prompt="polymer_name: <canonical name>\npolymer_class: <CLASS>\nT_sim_K: <300 or T_workflow>\n"
+               "is_glassy: <from thermal track>\nproperties: <comma-joined>\n"
+               "output_path: data/<RUN>/raw/exp_lookup.json")
+    → parse RESULT → exp_lookup_path, match_confidence, exp_{tg,density,K}_{min,max}.
+  # Thread these ranges into run-summary via the CLI overrides below. Do NOT hand-enter a tight
+  # single floor (a too-tight 1.35 density floor caused a 0.07% false FAIL, PVC2). When
+  # match_confidence=none or a field is null, OMIT that override — gen_prompt then falls back to
+  # its DB lookup / polymer_rules median ±5% band, which is correctly wide.
 
   # Before spawning run-summary-worker: verify the lammps-engine MCP server is live.
   # In long sessions (>12 h) the MCP connection can drop silently. Do a minimal call
@@ -160,17 +185,23 @@ PHASE C — SUMMARY (always)
   #   else
   #     TG_PATH="data/RUN/raw/tg_r$(jq '.[0]' <<<$RATES_ARR)/tg_summary.json"         # slowest rate (convention)
   #   fi
-  # Always pass --exp_K_min / --exp_K_max from polymer_rules to override single-point DB lookup:
-  #   EXP_K_MIN=$(jq -r '.exp_K_GPa.min' <(jq -r --arg c CLASS guides/polymer_rules.json '.classes[$c]' guides/polymer_rules.json))
-  #   EXP_K_MAX=$(jq -r '.exp_K_GPa.max' <same>)
+  # Exp ranges: prefer the exp-lookup-worker RESULT (condition-matched). Thread each non-null field
+  # as a CLI override; omit nulls so gen_prompt falls back to its DB/polymer_rules ±5% band.
+  #   --exp_tg_min/--exp_tg_max        (from exp_tg_min_K / exp_tg_max_K)
+  #   --exp_density_min/--exp_density_max  (from exp_density_min_gcm3 / exp_density_max_gcm3)
+  #   --exp_K_min/--exp_K_max          (from exp_K_min_GPa / exp_K_max_GPa; else polymer_rules exp_K_GPa)
+  # NEVER hand-enter a single tight floor — that is what caused the PVC2 density false FAIL.
   Agent(subagent_type="run-summary-worker", description="🟢 Run summary {polymer_name}",
         prompt=<gen_prompt.py --stage run-summary --plan PLAN_PATH
                --smiles ... --ff ... --tg_fit_quality ... --d05 equil_verdict
                --n_replicates <distinct replicates in the multirate registry>
                --tg_path <TG_PATH (see above — slowest rate if slope_gate=True, highest rate if False)>
                --slope_gate_pass <true|false from tg_multirate_result.json>
-               --exp_K_min <from polymer_rules.json exp_K_GPa.min> --exp_K_max <exp_K_GPa.max>>)
+               [--exp_tg_min ... --exp_tg_max ...] [--exp_density_min ... --exp_density_max ...]
+               --exp_K_min <exp-lookup or polymer_rules exp_K_GPa.min> --exp_K_max <exp_K_GPa.max>>)
     → parse RESULT → run_summary_path → write RESULTS to run_log.md
+    → if run_summary tg.primary_fit_invalid==True, flag the headline Tg as unreliable in run_log.md
+      (the fit violated a hard physics constraint and no valid alternative existed).
 
   [Capture errors + improvements — to MEMORY ONLY, last action of the run]
   Before declaring the run done, promote pipeline-level lessons to memory as `feedback` entries

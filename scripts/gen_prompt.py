@@ -370,6 +370,19 @@ def _resolve_t_workflow(args, cls: dict) -> float:
     return 300.0 if isinstance(exp_tg, (int, float)) and exp_tg < 300 else T_equil
 
 
+def _regime(args, cls: dict) -> str:
+    """Single regime oracle: 'rubbery' if the workflow produces above Tg, else 'glassy'.
+
+    Defined as T_workflow ≤ 300 K (⇔ exp_Tg < 300, via _resolve_t_workflow) so it agrees by
+    construction with which equilibration chain was built (rubbery = 7-run ending at
+    npt_production; glassy = 9-run with npt_prod300) and with the property-track routing.
+    Consumed by the equil-check carve-out (require_rubbery), the analyze-tg data path, the
+    multirate slope-gate exemption, and rubbery-K routing — one definition, fed everywhere.
+    NOTE: do NOT redefine as `T_workflow > exp_Tg + margin`; for a glassy polymer T_workflow is
+    the melt-equilibration temperature (~T_equil), which would mis-label glassy melts as rubbery."""
+    return "rubbery" if _resolve_t_workflow(args, cls) <= 300.0 else "glassy"
+
+
 def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
     work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/equil"
@@ -546,8 +559,15 @@ def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
     lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
     tg_log = args.data_path or f"{lammps_base}/thermal/tg_sweep{rate_suffix}/tg_sweep.log"
-    # equil_data_path: NPT 300 K production output — passed to extract_thermal as tg_data_file for ΔCp mass normalisation
-    equil_data = args.equil_data_path or f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
+    # equil_data_path: production NPT output — passed to extract_thermal as tg_data_file for ΔCp mass
+    # normalisation. Phase-aware: glassy chains end at npt_prod300 (cooled to 300 K); rubbery chains
+    # (7-run, since commit 5b640ff) have NO npt_prod300 stage — they end at npt_production at
+    # T_equil_K. Defaulting to npt_prod300 on a rubbery chain points at a nonexistent file.
+    if _regime(args, cls) == "rubbery":
+        default_equil_data = f"{lammps_base}/equil/npt_production/npt_production_out.data"
+    else:
+        default_equil_data = f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
+    equil_data = args.equil_data_path or default_equil_data
     enthalpy_col = getattr(args, "enthalpy_col", None) or "Enthalpy"
     guide = load_worker_guide("analyze-tg")
     rate_line = (f"cooling_rate_K_per_ns: {selected_rate}  # tg_rate_index={args.tg_rate_index}; "
@@ -583,11 +603,15 @@ def analyze_tg_multirate_prompt(args, cls: dict, cross_track_rules: str) -> str:
     rates = (args.mr_rates or "").replace(",", " ").strip()
     tg_vals = (args.mr_tg_values or "").replace(",", " ").strip()
     polymer_name = args.run_name
+    # regime exempts the slope-sign gate for rubbery polymers (T_workflow >> Tg): a negative
+    # rate-dependence slope is scatter, not contamination, so no false-positive reroll.
+    regime = _regime(args, cls)
     command = (
         f"python3 {script} \\\n"
         f"  --rates {rates or '<FILL: space-separated rates from registry, e.g. 40 160 400>'} \\\n"
         f"  --tg_values {tg_vals or '<FILL: matching Tg_MD values from registry>'} \\\n"
         f"  --slow_rate_ref {dsc_rate} \\\n"
+        f"  --regime {regime} \\\n"
         f"  --polymer_name {polymer_name} \\\n"
         f"  --output_dir {output_dir}"
     )
@@ -642,6 +666,12 @@ def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
     # when is_glassy=True AND dp>=30, chain C(t)/end-to-end diffusion gates are advisory only
     # (gate on density SEM/CV/P2 exclusively). Derived from T_workflow so no explicit CLI flag needed.
     is_glassy_equil = T_workflow > 300
+    # regime oracle drives the require_rubbery carve-out (decision_policy.json): a rubbery polymer
+    # (produced above Tg) has is_glassy=False, so require_glassy does NOT apply — but its terminal
+    # chain-reptation metrics are unreachable at finite DP, so C(t)/MSD/Rg/τ_relax must be advisory
+    # and the gate keys on density block-SEM + homogeneity + energy only. Without this line the
+    # checker hard-gates reptation metrics on rubbery melts → unfixable EXTEND (PE/PBD/PEG).
+    regime = _regime(args, cls)
     dp_val = getattr(args, 'dp', None) or cls.get('dp_typical')
     guide = load_worker_guide("equil-check")
     return f"""\
@@ -654,6 +684,7 @@ polymer_class:     {args.polymer_class.upper()}
 backbone_types:    {args.backbone_types or '<FILL from inspect_data_file>'}
 ct_min_decay_melt: {ct_decay if ct_decay is not None else 'null'}   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
 is_glassy:         {str(is_glassy_equil).lower()}   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
+regime:            {regime}   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<2% AND density-homogeneity CV<25% AND energy drift/SEM; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
 dp:                {dp_val if dp_val is not None else 'null'}   # DP≥30 required for require_glassy carve-out to apply
 exp_density_range: {exp_density}
 output_dir:        {output_dir}
@@ -746,18 +777,27 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
     output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
 
-    # Three-tier priority: --exp_tg_K CLI > DB query > polymer_rules.json median
+    # Priority: explicit CLI min/max (thread from exp-lookup-worker) > --exp_tg_K CLI > DB query
+    #           > polymer_rules.json median. The explicit min/max path lets the orchestrator pass
+    #           condition-matched experimental ranges from exp-lookup-worker instead of hand-entering
+    #           a tight floor (which caused a 0.07% density false FAIL, PVC2).
     _db = _db_exp_lookup(args.polymer_class, getattr(args, 'polymer_name', None))
+    _tg_min, _tg_max = getattr(args, 'exp_tg_min', None), getattr(args, 'exp_tg_max', None)
     _tg_override = getattr(args, 'exp_tg_K', None)
-    if _tg_override is not None:
+    if _tg_min is not None and _tg_max is not None:
+        exp_tg = [_tg_min, _tg_max]
+    elif _tg_override is not None:
         exp_tg = [round(_tg_override - 20), round(_tg_override + 20)]
     elif _db.get("tg_median_K") is not None:
         exp_tg = [round(_db["tg_median_K"] - 20), round(_db["tg_median_K"] + 20)]
     else:
         exp_tg = _exp_tg_range(cls, run_name=args.run_name)
 
-    # Density: DB value ±5% > polymer_rules.json median ±5%
-    if _db.get("density_gcm3") is not None:
+    # Density: explicit CLI min/max > DB value ±5% > polymer_rules.json median ±5%
+    _dens_min, _dens_max = getattr(args, 'exp_density_min', None), getattr(args, 'exp_density_max', None)
+    if _dens_min is not None and _dens_max is not None:
+        exp_density = [_dens_min, _dens_max]
+    elif _db.get("density_gcm3") is not None:
         _d = _db["density_gcm3"]
         exp_density = [round(_d * 0.95, 3), round(_d * 1.05, 3)]
     else:
@@ -937,6 +977,17 @@ def main():
     p.add_argument("--exp_tg_K", type=float,
                    help="Experimental Tg override (K) for T_workflow_K decision; use for specific polymer "
                         "within a multi-polymer class (e.g. --exp_tg_K 213 for PCL within PEST)")
+    p.add_argument("--exp_tg_min", type=float,
+                   help="Experimental Tg lower bound (K) for run-summary grading; overrides DB/rules. "
+                        "Thread from exp-lookup-worker. Pass with --exp_tg_max.")
+    p.add_argument("--exp_tg_max", type=float,
+                   help="Experimental Tg upper bound (K) for run-summary grading; overrides DB/rules.")
+    p.add_argument("--exp_density_min", type=float,
+                   help="Experimental density lower bound (g/cm³) for run-summary grading; overrides "
+                        "DB/rules. Thread from exp-lookup-worker rather than hand-entering a tight floor "
+                        "(a too-tight floor caused a 0.07%% false FAIL, PVC2 2026-06-23). With --exp_density_max.")
+    p.add_argument("--exp_density_max", type=float,
+                   help="Experimental density upper bound (g/cm³) for run-summary grading; overrides DB/rules.")
     p.add_argument("--polymer_name", default=None,
                    help="Canonical DB name for experimental lookup (e.g. 'Poly(methyl methacrylate)'). "
                         "Enables polymer-specific exp ranges from polymer_db.sqlite. "

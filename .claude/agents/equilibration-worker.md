@@ -48,6 +48,25 @@ Always `max_temp = T_anneal_high_K` regardless of class.
 
 **Stop after step 5. Do NOT call Monitor.** Return chain_id and monitor_command to the orchestrator.
 
+### Extend mode (equil-check returned EXTEND)
+
+When the prompt sets `mode: extend` (with `extend_from_data: <last NPT _out.data>` and optional
+`extend_ns: <1-2>`), do NOT hand-write a continuation `.in`. Instead generate the extension
+deterministically with the same tool:
+
+1. `inspect_data_file(data_file=extend_from_data)` — sanity-check the equilibrated cell.
+2. `generate_equilibration_workflow(data_file=extend_from_data, work_dir_base=work_dir, use_pcff=..., use_opls=..., use_trappe=..., temp=<PRODUCTION temperature of the cell being extended = npt_prod_temp_K = 300 K>, press=<same>, engine=<same>, extend_only=True, extend_steps=int(extend_ns*1e6/dt_fs))` → a single `npt_extend` stage.
+   ⚠ **`temp` MUST be the production temperature of `extend_from_data` (300 K — the `npt_prod_temp_K`
+   from equil-check), NOT `T_equil_K`/`T_workflow_K`.** Both regimes produce at 300 K (glassy cooled to
+   300; rubbery produced at 300). Passing the glassy melt temperature (~600 K) here would re-melt the
+   cooled cell and corrupt the equilibration.
+3. `run_lammps_chain(stages=workflow["stages"], gpu_ids=gpu_ids, mpi=mpi_ranks, engine=<same>)` — submit.
+4. `watch_run(chain_id)` → monitor_command.
+
+Return the same RESULT block; `npt_prod_data_path` = `workflow["npt_production_dir"]/npt_extend_out.data`
+(re-run equil-check on it). Keep `press`/`engine` identical to the original run; set `temp` to the cell's
+300 K production temperature (above) so the extension continues the SAME ensemble, not the melt.
+
 ## Required output format
 
 Substitute the actual `work_dir` value for every `{work_dir}` placeholder — the RESULT block must contain real absolute paths, not literal `{work_dir}` text.

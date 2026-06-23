@@ -66,16 +66,35 @@ On session restart mid-thermal-track: re-read this file before resuming.
     — they are valid for cross-replicate averaging. Do NOT trigger /recover for low R² when
     is_flat_rate_regime=True.
 
-  Slope gate (ALL polymers): if result.slope_gate_pass == False (slope ≤ 0), the per-rate data is
-    contaminated. Do NOT write registry rows for any rate from this sweep. Spawn /recover
-    immediately (re-run from equil cell with a different seed). Max 2 attempts, then UNRESOLVED.
+  Slope gate (GLASSY only): for glassy polymers, if result.slope_gate_pass == False (slope ≤ 0)
+    the per-rate data is contaminated. Do NOT write registry rows for any rate from this sweep.
+    Spawn /recover immediately (re-run from equil cell with a different seed). Max 2 attempts,
+    then UNRESOLVED.
+  Rubbery exemption: gen_prompt passes `--regime rubbery` to extract_tg_multirate for rubbery
+    polymers (T_workflow >> Tg). In that regime a negative slope is meaningless scatter (the
+    per-rate "Tg" is an extrapolation artefact), NOT contamination — the tool returns
+    slope_gate_pass=True, tg_method="rubbery_flat_mean", rubbery_regime_exemption=True, and you
+    KEEP the registry rows. Do NOT /recover on slope sign for rubbery. Equilibration quality is
+    already guarded upstream by the equil-check require_rubbery carve-out (density SEM/CV); the
+    slope-gate only guards glassy-Tg extrapolation, which the rubbery path never performs.
 
   [is_glassy determination]
   if "tg" in properties_requested:
     Tg_for_glassy = Tg_K at the HIGHEST screening rate (400 K/ns)  # protocol-fixed, reproducible (NOT most-equilibrated — that's the slowest rate; this is a stable is_glassy gate, see below)
-    is_glassy = (Tg_for_glassy > 300)   # safe default: True if None or fit ABORT
-    # Drive is_glassy off the highest-rate MD Tg, NOT tg_dsc_equiv_K: the extrapolated value
-    # shifts as replicates accumulate and could flip the mechanical-track branch mid-campaign.
+    # Default: drive is_glassy off the highest-rate MD Tg, NOT tg_dsc_equiv_K — the extrapolated
+    # value shifts as replicates accumulate and could flip the mechanical-track branch mid-campaign.
+    # Exp-Tg fallback (degenerate fit): if the highest-rate fit is unreliable — fit_quality==POOR,
+    # primary_fit_invalid==True (extract_thermal hard-constraint flag), the fit ABORTed, or the
+    # multirate slope-gate failed (glassy) — an artefactual MD Tg must NOT decide routing. In that
+    # case decide is_glassy from the plan's experimental Tg instead:
+    #   is_glassy = (experimental_tg_K > 300)   # plan decided_params.experimental_tg_K
+    # Otherwise:
+    #   is_glassy = (Tg_for_glassy > 300)       # safe default: True if None
+    if highest_rate_fit_degenerate:   # POOR / primary_fit_invalid / ABORT / glassy slope-gate fail
+      is_glassy = (experimental_tg_K > 300)
+      # Record D-06 note: "is_glassy from plan exp-Tg (MD fit degenerate)".
+    else:
+      is_glassy = (Tg_for_glassy > 300)
   else:
     is_glassy = glassy_hint      # from plan; write D-06 = "N/A — tg not requested"
     Tg_K = None; Tg_fit_quality = "N/A (not requested)"; tg_dsc_equiv_K = None
@@ -87,5 +106,15 @@ On session restart mid-thermal-track: re-read this file before resuming.
 
 - **File:** `data/_tg_registry/<CLASS_ID>__<polymer_slug>.csv` (append-only; survives across runs). `<polymer_slug>` = filesystem-safe SMILES slug.
 - **Header:** `replicate,rate_K_per_ns,Tg_MD_K,r_squared,fit_quality,run_name,timestamp_utc`
-- **Write:** append one row after each per-rate `analyze-tg` (3 rows/replicate).
-- **Read:** pass ALL rows for this polymer (filtered to `fit_quality >= ACCEPTABLE`) as `--mr_rates`/`--mr_tg_values` to `analyze-tg-multirate`. If < 2 rows survive, fall back to the single highest-rate Tg.
+- **Write (deferred — commit only after the gate passes):** stage this replicate's 3 per-rate
+  rows (hold them in the orchestrator, do NOT append to the CSV yet). Run `analyze-tg-multirate`
+  over the committed rows + this replicate's staged rows, then:
+  - glassy + `slope_gate_pass==True` → **commit** the 3 staged rows (append to the CSV).
+  - glassy + `slope_gate_pass==False` → **discard** the staged rows (contaminated; reroll). Nothing
+    was appended, so there is no write-then-delete churn.
+  - rubbery (`rubbery_regime_exemption==True`) → **commit** the 3 staged rows (slope sign is not a
+    contamination signal in this regime).
+  This deferral replaces the old "append immediately, then delete on gate failure" flow.
+- **Read:** pass ALL committed rows for this polymer (filtered to `fit_quality >= ACCEPTABLE`) plus
+  this replicate's staged rows as `--mr_rates`/`--mr_tg_values` to `analyze-tg-multirate`. If < 2
+  rows survive, fall back to the single highest-rate Tg.
