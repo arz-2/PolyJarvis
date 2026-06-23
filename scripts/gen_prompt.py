@@ -387,7 +387,7 @@ def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
     else:
         npt_prod_line = "t_npt_prod_ns:     null  # auto-sized by atom count"
     T_workflow = _resolve_t_workflow(args, cls)
-    add_melt_npt = getattr(args, 'add_melt_npt', False) or False
+    add_melt_npt = getattr(args, 'add_melt_npt', False) or (T_workflow <= 300.0)
     melt_npt_ns_val = _pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None
     if add_melt_npt and melt_npt_ns_val is not None:
         melt_npt_steps = int(melt_npt_ns_val * 1e6 / dt)
@@ -471,8 +471,12 @@ def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     # Per-rate output dir so concurrent/sequential multi-rate sweeps don't collide on
     # one tg_sweep/tg_sweep.log. Single-rate path keeps the legacy "tg_sweep" dir.
     tg_sweep_dir = f"{work_dir}/tg_sweep{rate_suffix}"
+    # Rubbery: equil_data_path = npt_tg_prep_data (npt_melt at T_equil_K)
+    # Glassy:  equil_data_path = npt_prod300_out.data
+    # Orchestrator passes the correct cell via --tg_start_data (rubbery) or --data_path (glassy)
+    _tg_cell = getattr(args, 'tg_start_data', None) or args.data_path
     return f"""\
-equil_data_path:   {_v(args.data_path)}
+equil_data_path:   {_v(_tg_cell)}
 lammps_flags:      {json.dumps(flags)}
 polymer_class:     {args.polymer_class.upper()}
 run_name:          {args.run_name}
@@ -488,6 +492,7 @@ dt_fs:             {dt}
 gpu_ids:           "{args.gpu_ids}"
 mpi_ranks:         {args.mpi_ranks}
 engine:            "{args.engine}"
+velocity_seed:     {args.velocity_seed if getattr(args, 'velocity_seed', None) is not None else 'null'}   # null = random; pin for reproducible/recovery trajectory
 
 --- Worker Guide (THERMAL_SWEEP) ---
 {guide}
@@ -832,6 +837,10 @@ def main():
                         "produce byte-identical output to the no-plan path.")
     p.add_argument("--smiles")
     p.add_argument("--data_path")
+    p.add_argument("--tg_start_data",
+                   help="Tg sweep starting .data file (rubbery: npt_tg_prep_data = npt_melt at "
+                        "T_equil_K). Overrides --data_path for the tg stage only. Glassy polymers "
+                        "omit this flag and pass --data_path instead.")
     p.add_argument("--work_dir")
     p.add_argument("--gpu_ids", required=False, default=None,
                    help='Comma-separated GPU IDs, e.g. "0" or "0,1". '

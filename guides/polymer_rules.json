@@ -785,7 +785,8 @@
         "max": 4.2,
         "note": "K_T (isothermal, PVT/dilatometry) for glassy PMMA at 25°C. Mark 2007 Table 7.6 Tait params for glassy PMMA (b0≈3560–3770 bar, b1≈0.0032–0.0047, Tg≈100–105°C, refs [7,18,48]) give K_T≈3.5–3.8 GPa at 25°C. Prior upper 5.0 GPa was ultrasonic K_S not converted. revision.md [4.3,5.4] uses K_S→K_T which overestimates vs direct PVT; K_T priority rule applies. Source: Zoller/McKinney/Rogers via Mark 2007 Table 7.6."
       },
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "melt_npt_ns": 1.0
     },
     "PHAL": {
       "name": "Polyhalogenated",
@@ -860,7 +861,8 @@
         "WARNING: PTFE atom type (CF2 backbone) — verify opls_f / opls_935 types are assigned by EMC before run.",
         "Amorphous PVDF density validation target: 1.75–1.78 g/cm³ at 283 K (Byutner2000 Fig 5; experimental Kynar amorphous PVDF). Simulation density at 283 K below 1.70 g/cm³ indicates incorrect charge scaling or wrong nonbonded parameters."
       ],
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "melt_npt_ns": 1.0
     },
     "PDIE": {
       "name": "Polydiene",
@@ -1192,7 +1194,8 @@
         "min": 3.0,
         "max": 4.5
       },
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "melt_npt_ns": 1.0
     },
     "PAMD": {
       "name": "Polyamide",
@@ -1332,7 +1335,8 @@
       "preferred_builder": "emc",
       "ff_justification_doi": "10.3390/polym18060679",
       "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: aliphatic TPU PASS). WARNING: aromatic MDI-type urethane SMILES fail with {o,c_2} increment error — test build before submitting aromatic TPU.",
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "melt_npt_ns": 1.0
     },
     "PURA": {
       "name": "Polyurea",
@@ -1773,7 +1777,8 @@
       "preferred_builder": "emc",
       "ff_justification_doi": "10.3390/polym14071451",
       "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(ethoxyphosphazene) PASS; pcff.frc explicitly added polyphosphazene types). WARNING: Cl-substituted PDCP not tested.",
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "melt_npt_ns": 1.0
     },
     "PKTN": {
       "name": "Polyketone / Polyetherketone",

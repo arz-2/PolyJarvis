@@ -16,8 +16,12 @@ On session restart mid-thermal-track: re-read this file before resuming.
     [Tg sweep @ rate]
     Claim GPU(s): scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
       → on shortfall (exit 1) defer/retry; NEVER --allow-busy on the shared box.
+    # Starting cell routing (Option C):
+    #   Rubbery (npt_tg_prep_data non-null from equil RESULT): --tg_start_data $npt_tg_prep_data
+    #   Glassy  (npt_tg_prep_data null):                        --data_path $npt_prod300_out_data
     Agent(subagent_type="tg-sweep-worker", description="🟣 Tg sweep r{rate} {polymer_name}",
-          prompt=<gen_prompt.py --stage tg --plan PLAN_PATH --data_path equil_data_path
+          prompt=<gen_prompt.py --stage tg --plan PLAN_PATH
+                  [--tg_start_data $npt_tg_prep_data | --data_path $npt_prod300_out_data]
                   --tg_rate_index {idx} --gpu_ids <claimed>>)
       → parse RESULT → run_id, tg_log_path (now .../thermal/tg_sweep_r{rate}/tg_sweep.log), monitor_command
     Write SIMULATION STATE (status=monitoring) to run_log.md

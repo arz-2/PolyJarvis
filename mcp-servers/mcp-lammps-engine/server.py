@@ -1561,6 +1561,16 @@ def generate_equilibration_workflow(
 
         # npt_production_log/dir point to npt_prod300 (glassy) or npt_production (rubbery)
         _npt_final = s9 if _add_300k else s7
+
+        # Tg sweep starting cell (Option C): rubbery polymers start from npt_melt (at T_equil_K),
+        # not npt_production (300 K). Glassy polymers use npt_prod300 (existing path, unchanged).
+        if _use_melt_npt:
+            _npt_tg_prep = s5b["output_data"]     # npt_melt at t_equil_K — well-relaxed melt
+        elif temp <= 300.0:
+            _npt_tg_prep = s4["output_data"]       # fallback: npt_pppm at max_temp
+        else:
+            _npt_tg_prep = None                    # glassy: use npt_prod300 (separate key)
+
         ret = {
             "status":     "success",
             "polymer":    polymer_name,
@@ -1573,6 +1583,7 @@ def generate_equilibration_workflow(
             "run_order":  [s["name"] for s in stages],
             "npt_production_log": f"{_npt_final['work_dir']}/{_npt_final['params']['LOG_FILE']}",
             "npt_production_dir": _npt_final["work_dir"],
+            "npt_tg_prep_data":   _npt_tg_prep,
             "preflight_warnings": vr["warnings"],
             "preflight_stats":    vr["stats"],
             "instructions": (
@@ -1584,6 +1595,7 @@ def generate_equilibration_workflow(
                     "npt_cool300 + npt_prod300 cool to 300 K and produce at 300 K — use npt_prod300 for density and deformation.\n"
                     if _add_300k else
                     "npt_production is a constant-T/P NPT run for bulk modulus (volume fluctuation method).\n"
+                    "npt_tg_prep_data points to the npt_melt output at T_equil_K — pass as the Tg sweep starting cell.\n"
                 )
                 + "Submit stages as a chain using run_lammps_chain()."
             ),

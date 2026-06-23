@@ -113,7 +113,8 @@ PHASE A — FOUNDATION (always)
   [Equilibration]
   Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polymer_name}",
         prompt=<gen_prompt.py --stage equil --plan PLAN_PATH --data_path ...>)
-    → parse RESULT → extract chain_id, monitor_command, expected_equil_data
+    → parse RESULT → extract chain_id, monitor_command, expected_equil_data, npt_tg_prep_data
+      npt_tg_prep_data is non-null for rubbery polymers (npt_melt at T_equil_K); null for glassy.
   Write SIMULATION STATE to run_log.md (status=monitoring)
   Monitor(command=monitor_command, timeout_ms=3600000)
   get_run_status(chain_id) → check success/failure

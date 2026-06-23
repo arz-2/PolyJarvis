@@ -30,6 +30,17 @@ Rule of thumb: start ~1.5× Tg, end ~0.75× Tg, span ≥300 K, step 10–20 K.
 
 ---
 
+## Starting Cell
+
+The `equil_data_path` in the prompt differs by polymer regime — never substitute one for the other:
+
+- **Rubbery** (Tg_exp < 300 K, T_workflow_K = 300): use `npt_tg_prep_data` from the equil RESULT — the `npt_melt` output at `T_equil_K` (e.g., 400 K for PDIE). The 300 K production cell is only ~Tg_exp + 20 K; the chains are poorly relaxed at that temperature and bias the rubbery density slope in the sweep.
+- **Glassy** (Tg_exp > 300 K): use `npt_prod300_out.data` (300 K cell, well-quenched from T_equil_K). This is below Tg so the sweep re-melts it cleanly before detecting the transition.
+
+The orchestrator passes the correct path as `equil_data_path` via `--tg_start_data` (rubbery) or `--data_path` (glassy).
+
+---
+
 ## Workflow
 
 ### Step 1: Generate Tg sweep script
@@ -56,6 +67,7 @@ result = generate_script(
     template_name="npt_tg_step",
     output_script=f"{tg_sweep_dir}/tg_sweep.in",
     data_file=equil_data_path,
+    velocity_seed=<velocity_seed from prompt, or None for random>,   # pin for recovery/replication
     params={
         "LOG_FILE":            "tg_sweep.log",
         "DUMP_FILE":           "",
