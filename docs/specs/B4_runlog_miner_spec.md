@@ -1,7 +1,7 @@
 # Spec — B.4: run_log Mining → Learning Loop
 
-**Status:** Draft for review · **Parent:** `docs/LLM_CONTRIBUTION_PLAN.md` (Part B, lever B.4, P0)
-· **Date:** 2026-06-14
+**Status:** Draft for review · **Parent:** the LLM-contribution plan (Part B, lever B.4, P0 —
+internal planning doc, not in the public repo) · **Date:** 2026-06-14
 
 > **One-line purpose:** mine the corpus of `data/*/run_log.md` so the LLM's past judgment
 > *compounds* — every completed run improves the defaults and the recovery playbook the next run

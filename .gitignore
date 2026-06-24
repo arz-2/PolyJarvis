@@ -16,7 +16,7 @@ __pycache__/
 
 # ── Runtime state (not source) ────────────────────────────────────────────────
 mcp-lammps-engine/run_state.json
-mcp-radonpy-server/src/timer.dat
+timer.dat
 
 # ── Simulation data and experiment database (local only) ──────────────────────
 # Calibration cells (data/CALIB_<FAM>/) ship the small emc_build.{data,params} per FF so a
@@ -39,9 +39,13 @@ db/
 *.dcd
 *.log
 
-# ── Manuscript & private notes (not for public repo) ──────────────────────────
+# ── Manuscript, benchmark scaffold & internal planning docs (not for public repo) ─
 revision.md
 literature/
+paper/
+benchmarks/
+docs/LLM_CONTRIBUTION_PLAN.md
+docs/UI_PLAN.md
 guides/TODO_OWNER.md
 guides/ROADMAP.md
 guides/REVISION_PARAMS.md
