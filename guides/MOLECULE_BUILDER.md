@@ -28,7 +28,9 @@ EMC builds the amorphous cell and assigns all FF parameters in one step — no c
 import random
 # Use the pinned seed from the prompt (`emc_seed:`) when given — that is how replication
 # studies (guides/REVISION_PARAMS.md) reproduce the exact cell. Only draw a random seed
-# when the prompt's emc_seed is null. NEVER use seed=-1 (EMC doesn't return the used seed).
+# when the prompt's emc_seed is null. Prefer a specific integer (don't pass seed=-1, the
+# "pick random" sentinel); if -1 was used, read out["result"]["resolved_seed"] back and report
+# THAT integer — get_emc_job_output echoes the seed actually used. Never report -1.
 emc_seed = emc_seed_from_prompt if emc_seed_from_prompt is not None else random.randint(1, 999999)
 job = submit_emc_cell_job(
     smiles="...",
@@ -50,7 +52,9 @@ Poll with `get_emc_job_status(job_id)` until `status == "completed"`, then:
 
 ```python
 out = get_emc_job_output(job_id)
-data_path    = out["result"]["data_path"]
+data_path    = out["result"]["data_path"]      # EMC always writes emc_build.data (NOT polymer.data
+                                               # / <output_name>.data) — take this path verbatim;
+                                               # never watch a hardcoded polymer.data (it never fires)
 params_path  = out["result"]["params_path"]   # may be None
 lammps_flags = out["result"]["lammps_flags"]  # e.g. {"use_pcff": True, "use_opls": False}
 # emc_seed is the value you generated above — include it in your RESULT block

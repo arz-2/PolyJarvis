@@ -95,8 +95,8 @@
     "tg_protocol": {
       "decision_id": "D-06_tg_fit_quality",
       "evidence_required": false,
-      "evaluate": ["t_range_brackets_experimental_tg", "n_temperature_bins", "bilinear_fit_r_squared", "cooling_rate_artifact"],
-      "require": ["never report Tg without verifying bilinear fit R^2 (cross-stage rule 3)", "T sweep range must bracket experimental_tg_K with margin"],
+      "evaluate": ["t_range_brackets_experimental_tg", "n_temperature_bins", "bilinear_fit_r_squared", "cooling_rate_artifact", "tg_rates_clear_steps_floor"],
+      "require": ["never report Tg without verifying bilinear fit R^2 (cross-stage rule 3)", "T sweep range must bracket experimental_tg_K with margin", "every tg_rates_K_per_ns entry must clear tg_min_steps_per_T: N=tg_t_step_K/(rate*dt_fs*1e-6) >= floor (default 200000 steps=200ps@dt=1fs; TraPPE-UA dt=2fs floor=100000). Retired [40,160,400] gave 50/125ps degenerate fits (cis-PBD2, PEEK2)"],
       "rationale": "A too-narrow T range gives R^2<0.80 / <4 bins (known /recover failure mode). Planning the range from experimental_tg_K +/- margin catches this before the sweep runs.",
       "default_source": "polymer_rules.json:tg_protocol_reference"
     },
@@ -124,6 +124,7 @@
       "equil-check":  "foundation",
       "tg":           "thermal",
       "analyze-tg":   "thermal",
+      "analyze-tg-multirate": "thermal",
       "murnaghan":    "mechanical",
       "deform":       "mechanical",
       "analyze-bm":   "mechanical",

@@ -466,6 +466,7 @@ def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     tg_rates = cls.get('tg_rates_K_per_ns', [])
     rate_idx = getattr(args, 'tg_rate_index', None)
     selected_rate, rate_suffix = _resolve_tg_rate(args, cls)
+    tg_floor_warning = ""
     if selected_rate is not None:
         # Compute n_steps_per_t for this rate: rate = T_step / (n_steps * dt * 1e-6)
         t_step = _pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)
@@ -475,6 +476,19 @@ def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
             f"tg_rate_index:     {rate_idx}  # rate {selected_rate} K/ns\n"
             f"  cooling_rate:    {selected_rate}"
         )
+        # Backstop only — the plan-time feasibility filter should have rejected an infeasible
+        # rate. Warn (never block) if this multirate point undershoots the per-T steps floor:
+        # too few ps/T collapses the bilinear Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400).
+        floor = cls.get('tg_min_steps_per_T', 200000)
+        if n_steps_per_t < floor:
+            ps = n_steps_per_t * dt * 1e-3
+            tg_floor_warning = (
+                f"⚠ WARNING: rate {selected_rate} K/ns → {n_steps_per_t} steps/T = {ps:.0f} ps/T, "
+                f"BELOW tg_min_steps_per_T={floor} ({floor * dt * 1e-3:.0f} ps). Bilinear Tg fit "
+                f"likely DEGENERATE (cis-PBD2/PEEK2 failure mode). This rate is infeasible for "
+                f"tg_t_step_K={t_step}, dt={dt}fs — the slope gate is the backstop; do NOT report "
+                f"this rate's Tg as primary.\n\n"
+            )
     else:
         n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
         rate_line = f"tg_rate_index:     null  # standard single-rate run"
@@ -489,7 +503,7 @@ def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     # Orchestrator passes the correct cell via --tg_start_data (rubbery) or --data_path (glassy)
     _tg_cell = getattr(args, 'tg_start_data', None) or args.data_path
     return f"""\
-equil_data_path:   {_v(_tg_cell)}
+{tg_floor_warning}equil_data_path:   {_v(_tg_cell)}
 lammps_flags:      {json.dumps(flags)}
 polymer_class:     {args.polymer_class.upper()}
 run_name:          {args.run_name}
@@ -693,6 +707,12 @@ tasks:
   - check_equilibration_comprehensive
   - extract_equilibrated_density
 
+### D-05 REQUIREMENT (PEEK2 I-04): paste result["d05_markdown"] (also written to
+### {output_dir}d05_block.md) VERBATIM into the run_log.md D-05 CONVERGENCE DETAIL section.
+### It contains the real Rg/MSD/density/C(t)/R_ee values. Leaving any [X ± Y] / [X]% /
+### [PASS / FAIL] placeholder in run_log.md is a FAILURE of this equil-check step — the tool
+### already fills every field, so there is no reason to leave a placeholder.
+
 --- Worker Guide (EQUIL_CHECK) ---
 {guide}
 --- Cross-Track Rules ---
@@ -710,8 +730,17 @@ def murnaghan_prompt(args, cls: dict, cross_track_rules: str) -> str:
     lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
     equil_data = args.data_path or f"{lammps_base}/equil/npt_production/npt_production_out.data"
     guide = load_worker_guide("murnaghan")
+    # Glassy polymers ALWAYS submit. The guide's Rule B rubbery null-return guard has been
+    # mis-applied to glassy cells when Tg metadata was degraded (POOR fits / single-rate
+    # fallback) → worker returned null instead of submitting (PEEK2 I-02). Assert imperatively,
+    # above the guide, so this overrides Rule B at prompt-assembly time.
+    glassy_assertion = (
+        "### ASSERTION (overrides guide Rule B): is_glassy=true → SUBMIT the Murnaghan series "
+        "NOW, regardless of bm_pressures_atm being null. The rubbery null-return guard does NOT "
+        "apply to glassy cells. Do not return an all-null RESULT.\n\n"
+    ) if is_glassy else ""
     return f"""\
-equil_data_path:   {equil_data}
+{glassy_assertion}equil_data_path:   {equil_data}
 lammps_flags:      {flags}
 polymer_class:     {args.polymer_class.upper()}
 run_name:          {args.run_name}

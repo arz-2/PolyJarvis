@@ -40,6 +40,13 @@ Tools that produce PNG figures:
 
 Omitting `output_dir` means JSON files land next to the input log — `generate_run_summary` won't find them.
 
+**Distinct `output_dir` per parallel deform call** (each direction x/y/z or rate): two calls sharing one `output_dir` silently overwrite `bulk_modulus_deform.json` + `stress_strain.csv` — use `.../raw/deform_x/`, `.../deform_y/`, … (match `graphs_dir`).
+
+## Interpretation notes
+
+- **PDIE / rubbery Murnaghan:** `B0′` of 7–10 is normal for polydienes; `B_def` R²≈0 is expected for soft rubbery polymers (P vs ln V is nonlinear at this scale) — not an anomaly. `warning_bdef_unreliable` is standard for rubbery.
+- **Deform inverted rate ordering** (fast-rate K < slow-rate K, contrary to glassy expectation): thermal noise dominates the small-strain fit at 10× rate (far fewer fit points). **Trust the slow run** as the reported value; flag if isotropy_delta > 10%.
+
 ---
 
 ## Tool: `extract_bulk_modulus_deform`

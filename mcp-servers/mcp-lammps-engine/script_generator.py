@@ -953,6 +953,18 @@ class ScriptGenerator:
         write_per_t_dump = bool(cfg.get("WRITE_PER_T_DUMP", False))
         per_t_dump_file  = str(cfg.get("PER_T_DUMP_FILE", "per_t_structs.dump"))
 
+        # Defense-in-depth (never raises): too few ps per temperature collapses the bilinear
+        # Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400). Feasibility is enforced upstream at
+        # plan time; this only annotates the deck if a low N_STEPS_PER_T slips through.
+        ps_per_t  = n_steps * timestep * 1e-3
+        floor_ps  = float(cfg.get("TG_MIN_PS_PER_T", 200.0))
+        floor_comment = ""
+        if ps_per_t < floor_ps:
+            msg = (f"Tg staircase: {n_steps} steps x {timestep} fs = {ps_per_t:.0f} ps/T, "
+                   f"below the {floor_ps:.0f} ps/T floor — bilinear Tg fit may be degenerate.")
+            warnings.warn(msg)
+            floor_comment = f"# WARNING: {msg}\n"
+
         # Build temperature list: T_START down to T_END, always include T_END
         temps: list[float] = []
         t = t_start
@@ -991,7 +1003,7 @@ class ScriptGenerator:
 # T_START={t_start} → T_END={t_end} K, step={t_step} K
 # {len(temps)} temperature points × {n_steps} steps/T
 # ============================================================
-
+{floor_comment}
 log {log_file} append
 units real
 atom_style full

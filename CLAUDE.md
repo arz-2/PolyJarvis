@@ -179,7 +179,7 @@ PHASE C — SUMMARY (always)
   # MCP server before the Agent call.
   # Determine tg_path and slope_gate_pass before spawning run-summary-worker:
   #   SLOPE_GATE=$(jq -r '.slope_gate_pass' data/RUN/raw/tg_multirate_result.json)
-  #   RATES_ARR=$(jq -r '.decided_params.tg_rates_K_per_ns' PLAN_PATH)   # e.g. [40,160,400]
+  #   RATES_ARR=$(jq -r '.decided_params.tg_rates_K_per_ns' PLAN_PATH)   # e.g. [25,50,100]
   #   if [ "$SLOPE_GATE" = "false" ]; then
   #     TG_PATH="data/RUN/raw/tg_r$(jq '.[length-1]' <<<$RATES_ARR)/tg_summary.json"  # highest rate (fallback)
   #   else
