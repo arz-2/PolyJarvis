@@ -12,9 +12,9 @@ Traditional polymer MD workflows require manual intervention across several soft
 
 ### Properties computed
 
-- Glass transition temperature (T<sub>g</sub>) via density–temperature sweep with bilinear fit
+- Glass transition temperature (T<sub>g</sub>) via a multirate density–temperature sweep extrapolated to the experimental (DSC-equivalent) cooling rate
 - Equilibrated density at target T and P
-- Isothermal bulk modulus via volume fluctuation method
+- Isothermal bulk modulus via the Murnaghan equation-of-state pressure series (volume-fluctuation cross-check)
 - Radial distribution functions (RDF) for structural analysis
 - End-to-end vector distributions for chain conformation analysis
 
@@ -129,6 +129,20 @@ Wraps [EMC](http://montecarlo.sourceforge.net/emc/) for PCFF amorphous cell cons
 
 Script generation, simulation execution, and analysis on the local GPU server. Simulation chains run as `nohup` processes and survive MCP server disconnections. Bundles all MDAnalysis analysis scripts in `analysis_scripts/`.
 
+
+---
+
+## Quick Start
+
+New to the repo? The fastest path to a first run:
+
+1. **Read [`guides/STAGE_INDEX.md`](guides/STAGE_INDEX.md)** — the navigation hub for the whole pipeline.
+2. **Complete [Setup](#setup) below** — build LAMMPS (GPU), create the conda envs, install EMC, configure `.mcp.json`.
+3. **Start the three MCP servers** (see [Starting the MCP Servers](#starting-the-mcp-servers)).
+4. **Calibrate once on a new machine:** run `/calibrate-hardware` (see [Hardware Calibration](#hardware-calibration-first-run-on-a-new-machine)).
+5. **Ask the agent in natural language** (see [Usage](#usage)) — copy `Task_TEMPLATE.txt`, fill in a polymer name + SMILES, and describe what you want.
+
+What gets reported, and how each property is computed, is documented in [`docs/PROPERTIES.md`](docs/PROPERTIES.md).
 
 ---
 
