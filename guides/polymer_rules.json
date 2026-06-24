@@ -13,7 +13,7 @@
       "kokkos_offload_study": {
         "date": "2026-06-20",
         "what": "KOKKOS full-offload arm (pair+class2 bonded+pppm+neigh on GPU via -sf kk -pk kokkos) vs the GPU-package baseline. Engine is wired as a selectable engine=\"kokkos\" end-to-end (server.py run tools, script_generator deck, gen_prompt). by_forcefield defaults intentionally UNCHANGED until the 40k-step accuracy parity passes.",
-        "cell": "/home/arz2/PolyJarvis/data/CALIB_PCFF/emc_build.data",
+        "cell": "data/CALIB_PCFF/emc_build.data",
         "cell_atoms": 3020,
         "pcff_ns_per_day_mpi1_contended": {
           "A0_gpu_pkg_pppm_cpu_neigh_no": 5.82,
@@ -37,9 +37,9 @@
       "date": "2026-06-21",
       "mode": "revalidate — ran the shipped by_forcefield default per FF (no engine re-search) + run-0 parity vs CPU; records host-matched ns/day. Use --full for a fresh engine×config sweep on a drained box.",
       "cells": {
-        "pcff": "/home/arz2/PolyJarvis/data/CALIB_PCFF/emc_build.data",
-        "opls": "/home/arz2/PolyJarvis/data/CALIB_OPLS/emc_build.data",
-        "trappe": "/home/arz2/PolyJarvis/data/CALIB_TRAPPE/emc_build.data"
+        "pcff": "data/CALIB_PCFF/emc_build.data",
+        "opls": "data/CALIB_OPLS/emc_build.data",
+        "trappe": "data/CALIB_TRAPPE/emc_build.data"
       },
       "cells_atoms": {
         "pcff": 3020,

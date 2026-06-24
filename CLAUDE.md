@@ -12,6 +12,7 @@ AI agent for autonomous polymer MD simulation. Given a SMILES string, runs the f
 | `guides/polymer_rules.json` | Per-class Tg ranges, density targets, DP defaults, annealing cycles |
 | `data/TEMPLATE/run_log.md` | Run log template — copy to `data/[RUN]/run_log.md` at task start |
 | `data/[RUN]/` | All run files: `run_log.md`, `lammps/`, `raw/`, `graphs/` (git-excluded) |
+| `guides/MULTI_MACHINE_WORKFLOW.md` | Two-machine revision integrator protocol (`scripts/integrate.py`) — how findings/fixes from both machines land in `main` |
 
 ---
 
@@ -19,7 +20,7 @@ AI agent for autonomous polymer MD simulation. Given a SMILES string, runs the f
 
 All run files live under `data/<run_name>/` (repo-relative, git-excluded). Use absolute paths in all tool calls.
 
-`<lammps_base>` = `/home/arz2/PolyJarvis/data/<run_name>/lammps/`
+`<lammps_base>` = `<repo_root>/data/<run_name>/lammps/` — `<repo_root>` is your PolyJarvis checkout dir (gen_prompt.py derives it from its own location; never hard-code `/home/<user>/...`).
 
 Equilibration paths are tool-defined — use worker RESULT dict keys (`npt_production_dir`, `npt_prod300_data`, etc.); do not construct them manually.
 
@@ -209,7 +210,7 @@ PHASE C — SUMMARY (always)
     1. Errors encountered during the run (symptom → root cause → fix/workaround).
     2. Room-for-improvement / codebase friction (confusing/wrong guide, MCP-tool quirk,
        missing/incorrect polymer_rules param, awkward worker contract).
-  Write these to the orchestrator's own auto-memory (/home/arz2/.claude/projects/-home-arz2-PolyJarvis/memory/)
+  Write these to the orchestrator's own auto-memory (`~/.claude/projects/<project-slug>/memory/` — the dir named in the # Memory system reminder)
   and/or the relevant worker's repo-root .claude/agent-memory/<worker>/ dir — these are the inputs
   /ingest-memory consumes. Do NOT put any of this in run_log.md: the run log is for users to
   interpret the simulation, not to fix the workflow. (RECOVERIES stays as-is — it documents what
@@ -235,5 +236,6 @@ These rules are inlined into every worker prompt by `gen_prompt.py`. They apply 
 2. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, and SEED_COLD in the run_log header. For replication studies, use fixed seeds from `guides/REVISION_PARAMS.md`. For exploratory runs, read seeds back from job output and log them immediately after submission.
 3. **Check for existing writers before killing any process** — before killing and relaunching any LAMMPS run, run `lsof | grep <log_filename>` to check for existing writers. If another writer is present (concurrent orchestrator session), do NOT launch — coordinate via user first. A double-launch corrupts the shared log and requires a full restart from step 0.
 4. **Log the exact GPU claim label** — after any GPU claim (`pick_gpu.py claim --run <LABEL>`), copy the `run` field from the JSON response into the SIMULATION STATE table. Use that exact string verbatim at release (`pick_gpu.py release --run <LABEL>`). A label mismatch at release silently leaves the GPU stuck as claimed.
+5. **Log repo-relative run paths in memory** — when recording run artifacts or paths in any `.claude/agent-memory/**` file, write them repo-relative (`data/<run>/...`), never machine-absolute (`/home/<user>/...`). Keeps captures portable across the revision machines so integration needs no path sanitization.
 <!-- CROSS_STAGE_RULES_END -->
 

@@ -161,8 +161,8 @@ The RESULT block MUST include `emc_seed` — the orchestrator logs it to the run
 
 ```
 RESULT
-data_path:      /home/arz2/PolyJarvis/data/<RUN>/lammps/cell/cell.data
-emc_params_path: /home/arz2/PolyJarvis/data/<RUN>/lammps/cell/emc_build.params
+data_path:      data/<RUN>/lammps/cell/cell.data
+emc_params_path: data/<RUN>/lammps/cell/emc_build.params
 lammps_flags:   <as returned by get_emc_job_output result["lammps_flags"]>
 emc_seed:       <integer you passed to submit_emc_cell_job seed= / saved on mol-builder for RadonPy>
 n_atoms:        <atom count from inspect_data_file or EMC output>
