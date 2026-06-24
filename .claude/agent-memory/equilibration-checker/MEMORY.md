@@ -1,0 +1,1 @@
+- [PS glassy C(t) advisory](ps-ct-advisory.md) — C(t) slowness in glassy PS is ADVISORY-only; gate on structural convergence instead

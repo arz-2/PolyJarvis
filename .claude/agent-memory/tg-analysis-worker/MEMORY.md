@@ -1,0 +1,1 @@
+- [PVC2 degenerate multirate (all rates fail)](project_pvc2_degenerate_multirate.md) — r40, r160, r400 all exhibit density drift > 1% + undersampling (n_eff < 5); NPT production undersized
