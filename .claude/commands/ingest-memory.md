@@ -107,6 +107,25 @@ Apply the doc targets from this table:
 
 ---
 
+## Step 5b — Refresh the recovery playbook
+
+Regenerate `guides/RECOVERY_PLAYBOOK.md` from the accumulated `data/*/run_log.md`
+corpus. `runlog_miner` clusters past RECOVERIES into a signature → diagnosis → fix
+table ranked by empirical success rate; the `recover` skill consults this **before**
+its built-in taxonomy, so a fresh distillation here closes the learning loop each
+time memories are ingested.
+
+```bash
+python -m tools.runlog_miner --playbook -o guides/RECOVERY_PLAYBOOK.md
+```
+
+The file carries a `do not edit by hand` header — it is fully generated, so the
+overwrite is safe. Stage it so it rides along in the Step 6 commit. (This is
+playbook-only; the miner's `--suggest`/`--diff` polymer_rules.json deltas are
+intentionally **not** auto-applied here — keep those a separate, reviewed step.)
+
+---
+
 ## Step 6 — Commit the fixes (audit trail)
 
 After processing all pending memories, stage the fixes / doc updates / backlog notes and commit. List every source memory in the `Sources:` line — **this commit is the permanent audit trail**, which is why the memory files themselves can be deleted in Step 7.
