@@ -44,6 +44,7 @@ SNAPSHOT_KEYS = [
     "T_equil_K", "annealing_T_high_K", "eq_annealing_cycles", "P_equil_atm",
     "t_equil_ns", "npt_prod_ns", "melt_npt_ns",
     "tg_t_high_K", "tg_t_low_K", "tg_t_step_K", "tg_steps_per_t", "tg_rates_K_per_ns",
+    "tg_min_steps_per_T",
     "K_deform_rate_inv_s", "K_deform_rate_slow_inv_s", "K_strain_max",
     "bm_pressures_atm", "ct_min_decay_melt",
 ]
@@ -157,9 +158,37 @@ def build_planned_stages(cls: dict, properties: set) -> list:
     return stages
 
 
+def _assert_tg_rates_feasible(cls: dict, polymer_class: str) -> None:
+    """Reject a multirate Tg set where any rate gives too few steps per temperature.
+
+    Per-T simulation TIME (not step count) sets bilinear-fit quality: too few ps at each
+    temperature collapses the Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400 degenerate).
+    Rate IS the per-T step knob (N = tg_t_step_K/(rate*dt*1e-6)), so an infeasible rate
+    cannot be salvaged at run time — fail at plan time. Floor = tg_min_steps_per_T
+    (default 200000 steps = 200 ps at dt=1fs; TraPPE dt=2fs classes set 100000 = 200 ps).
+    """
+    rates = cls.get("tg_rates_K_per_ns")
+    t_step = cls.get("tg_t_step_K")
+    if not rates or t_step is None:
+        return
+    dt = cls.get("dt_fs", 1.0)
+    floor = cls.get("tg_min_steps_per_T", 200000)
+    bad = [(r, int(t_step / (r * dt * 1e-6)))
+           for r in rates if t_step / (r * dt * 1e-6) < floor - 1]
+    if bad:
+        max_rate = t_step / (floor * dt * 1e-6)
+        raise ValueError(
+            f"{polymer_class}: infeasible tg_rates_K_per_ns {rates} — "
+            f"rate(s) {[b[0] for b in bad]} give {[b[1] for b in bad]} steps/T, below "
+            f"tg_min_steps_per_T={floor} (tg_t_step_K={t_step}, dt_fs={dt}). Lower the rates "
+            f"so N = tg_t_step_K/(rate*dt*1e-6) >= floor (max feasible rate = {max_rate:.0f} K/ns)."
+        )
+
+
 def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dict:
     rules = load_rules()
     cls = get_class_entry(rules, polymer_class)
+    _assert_tg_rates_feasible(cls, polymer_class.upper())
     decided_params = {k: cls[k] for k in SNAPSHOT_KEYS if k in cls}
     exp_tg = _exp_tg_scalar(cls)
     T_equil = decided_params.get("T_equil_K", 600.0)

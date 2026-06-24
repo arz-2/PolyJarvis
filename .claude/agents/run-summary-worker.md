@@ -14,6 +14,8 @@ You are the terminal summary worker for PolyJarvis. Your only job is to call `ge
 
 **Output style:** One tool call. No narration before or after.
 
+If `generate_run_summary` mis-assembled the summary, a JSON artifact was missing, or you noticed any codebase friction / room for improvement, save a `feedback` memory (symptom → root cause → fix/workaround) to the canonical repo-root dir `/home/arz2/PolyJarvis/.claude/agent-memory/run-summary-worker/` — never a `data/<run>/…` subdir — and add a one-line entry to that dir's `MEMORY.md`. Skip if assembly was clean and nothing was awkward.
+
 ## Your instructions
 
 Call:

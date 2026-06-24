@@ -996,11 +996,25 @@ def get_run_status(run_id: str) -> dict:
         stage_names = run["meta"].get("stage_names", [])
         n_stages    = run["meta"].get("n_stages", 0)
 
+        # Completion sentinel fallback: the live `cat` of the progress file can fail silently
+        # (file rotated/removed/unreadable) → events=[] → a false 'pending' on a chain that has
+        # actually completed. The sentinel (done_<run_id>.json) is written by the nohup wrapper on
+        # exit and is authoritative for terminal status, so consult it before concluding 'pending'.
+        sentinel_status = None
+        try:
+            sentinel_file = SENTINEL_DIR / f"done_{run_id}.json"
+            if sentinel_file.exists():
+                sentinel_status = json.loads(sentinel_file.read_text()).get("status")
+        except Exception:
+            sentinel_status = None
+
         if chain_end:
             if chain_end["status"] == "completed":
                 status = "completed"
             else:
                 status = "failed"
+        elif sentinel_status in ("completed", "failed"):
+            status = sentinel_status
         elif not events:
             status = "pending"
         else:
@@ -1022,12 +1036,34 @@ def get_run_status(run_id: str) -> dict:
             "next_stage":       next_stage if status == "running" else None,
             "failed_stages":    [f["stage"] for f in failed],
             "chain_end_event":  chain_end,
+            "sentinel_status":  sentinel_status,
             "progress_file":    progress_file,
             "pid":              run["meta"].get("pid"),
-            "note":             "Status read live from progress file — survives MCP restarts.",
+            "note":             "Status read live from progress file (sentinel fallback) — survives MCP restarts.",
         }
 
-    return run
+    # Non-chain (single-script / analysis) run: return a COMPACT view. The full result dict for
+    # analysis tools (extract_thermal etc.) can carry large per-frame lists
+    # (structural_metrics_per_T, relaxation_metrics) that overflow the client (~73k chars). Keep
+    # scalar result fields; replace big collections with a pointer — callers read the written JSON
+    # artifact (e.g. tg_summary.json) for full detail.
+    result = run.get("result")
+    if not isinstance(result, dict):
+        return run
+    compact = {k: v for k, v in run.items() if k != "result"}
+    _BIG_KEYS = {"structural_metrics_per_T", "relaxation_metrics", "structural_metrics",
+                 "per_frame", "raw_data", "timeseries", "structural_analysis"}
+    slim = {}
+    for k, v in result.items():
+        if k in _BIG_KEYS or (isinstance(v, (list, dict)) and len(v) > 50):
+            _n = len(v) if isinstance(v, (list, dict)) else "?"
+            slim[k] = f"<omitted: {type(v).__name__} len={_n}; read the JSON artifact for detail>"
+        else:
+            slim[k] = v
+    compact["result"] = slim
+    if isinstance(result.get("output_dir"), str):
+        compact["result_artifact_dir"] = result["output_dir"]
+    return compact
 
 
 @mcp.tool()
@@ -1170,6 +1206,8 @@ def generate_equilibration_workflow(
     add_300k_production: bool = True,
     engine: str = "gpu",
     velocity_seed: Optional[int] = None,
+    extend_only: bool = False,
+    extend_steps: Optional[int] = None,
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
@@ -1360,6 +1398,44 @@ def generate_equilibration_workflow(
                 "input_data":      prev_data,
                 "output_data":     out_data,
                 "params":          p,
+            }
+
+        # --- Extend-only mode (deterministic equilibration extension) -----------------------------
+        # When equil-check returns EXTEND, add a SINGLE NPT continuation stage from an
+        # already-equilibrated cell. Deterministic: reuses the npt template via _stage (no
+        # hand-written .in), and returns the same shape as a full workflow so run_lammps_chain and
+        # the equil-check gate consume it identically. Submit with engine= matching this call.
+        if extend_only:
+            ext_steps = int(extend_steps) if extend_steps else int(1.0e6 / dt_prod)  # ~1 ns default
+            sx = _stage("npt_extend", "npt", {
+                "T_START": temp, "T_FINAL": temp, "T_DAMP": 100.0,
+                "P_START": press, "P_FINAL": press, "P_DAMP": 1000.0,
+                "TIMESTEP": dt_prod, "N_STEPS": ext_steps,
+                "use_pppm": not use_trappe, "use_gpu": True, "write_restart": False,
+            }, data_file)
+            stages.append(sx)
+            return {
+                "status":             "success",
+                "polymer":            polymer_name,
+                "n_atoms":            n_atoms,
+                "temp":               temp,
+                "max_temp":           max_temp,
+                "n_stages":           1,
+                "engine":             engine,
+                "extend_only":        True,
+                "stages":             stages,
+                "run_order":          [sx["name"]],
+                "npt_production_log":  f"{sx['work_dir']}/{sx['params']['LOG_FILE']}",
+                "npt_production_dir":  sx["work_dir"],
+                "npt_tg_prep_data":    None,
+                "preflight_warnings":  vr["warnings"],
+                "preflight_stats":     vr["stats"],
+                "instructions": (
+                    f"Extend-only: 1 NPT continuation stage (npt_extend, {ext_steps} steps) from "
+                    f"{data_file} at {temp} K / {press} atm (engine={engine}). Submit with "
+                    f"run_lammps_chain(engine='{engine}'); then re-run equil-check on "
+                    f"{sx['output_data']}."
+                ),
             }
 
         # minimize
@@ -1561,6 +1637,16 @@ def generate_equilibration_workflow(
 
         # npt_production_log/dir point to npt_prod300 (glassy) or npt_production (rubbery)
         _npt_final = s9 if _add_300k else s7
+
+        # Tg sweep starting cell (Option C): rubbery polymers start from npt_melt (at T_equil_K),
+        # not npt_production (300 K). Glassy polymers use npt_prod300 (existing path, unchanged).
+        if _use_melt_npt:
+            _npt_tg_prep = s5b["output_data"]     # npt_melt at t_equil_K — well-relaxed melt
+        elif temp <= 300.0:
+            _npt_tg_prep = s4["output_data"]       # fallback: npt_pppm at max_temp
+        else:
+            _npt_tg_prep = None                    # glassy: use npt_prod300 (separate key)
+
         ret = {
             "status":     "success",
             "polymer":    polymer_name,
@@ -1573,6 +1659,7 @@ def generate_equilibration_workflow(
             "run_order":  [s["name"] for s in stages],
             "npt_production_log": f"{_npt_final['work_dir']}/{_npt_final['params']['LOG_FILE']}",
             "npt_production_dir": _npt_final["work_dir"],
+            "npt_tg_prep_data":   _npt_tg_prep,
             "preflight_warnings": vr["warnings"],
             "preflight_stats":    vr["stats"],
             "instructions": (
@@ -1584,6 +1671,7 @@ def generate_equilibration_workflow(
                     "npt_cool300 + npt_prod300 cool to 300 K and produce at 300 K — use npt_prod300 for density and deformation.\n"
                     if _add_300k else
                     "npt_production is a constant-T/P NPT run for bulk modulus (volume fluctuation method).\n"
+                    "npt_tg_prep_data points to the npt_melt output at T_equil_K — pass as the Tg sweep starting cell.\n"
                 )
                 + "Submit stages as a chain using run_lammps_chain()."
             ),

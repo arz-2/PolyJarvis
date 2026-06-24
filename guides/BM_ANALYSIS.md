@@ -20,7 +20,7 @@ Only one path runs per invocation. The `murnaghan` path additionally calls `extr
 
 **Glassy (is_glassy=True) path:** Murnaghan at 300 K is primary (murnaghan_log_files non-null). 3-direction deform is fallback when Murnaghan fails (`fit_converged=False` or `B0_prime` outside [4, 20]).
 
-**Rubbery (is_glassy=False) path:** Murnaghan at T>Tg (bm_pressures_atm set) or volume fluctuation (no pressures). Unchanged.
+**Rubbery (is_glassy=False) path:** Murnaghan at T>Tg is now the **primary** rubbery K method — the rubbery classes (PHYC/PDIE/POXI/PSIL) all ship `bm_pressures_atm` in polymer_rules.json, so the plan emits a murnaghan stage. Volume fluctuation overestimates rubbery K (~+70%, PEG2 2026-06-23) and is kept ONLY as the diagnostic B_dyn cross-check (`extract_bulk_modulus`), never the reported K when Murnaghan is present. The pure-fluctuation path (all-null) now applies only to a rubbery class with no `bm_pressures_atm` defined — add one to polymer_rules.json rather than relying on fluctuation.
 
 ---
 
@@ -39,6 +39,13 @@ Tools that produce PNG figures:
 - `extract_bulk_modulus` → `volume_fluctuations.png`
 
 Omitting `output_dir` means JSON files land next to the input log — `generate_run_summary` won't find them.
+
+**Distinct `output_dir` per parallel deform call** (each direction x/y/z or rate): two calls sharing one `output_dir` silently overwrite `bulk_modulus_deform.json` + `stress_strain.csv` — use `.../raw/deform_x/`, `.../deform_y/`, … (match `graphs_dir`).
+
+## Interpretation notes
+
+- **PDIE / rubbery Murnaghan:** `B0′` of 7–10 is normal for polydienes; `B_def` R²≈0 is expected for soft rubbery polymers (P vs ln V is nonlinear at this scale) — not an anomaly. `warning_bdef_unreliable` is standard for rubbery.
+- **Deform inverted rate ordering** (fast-rate K < slow-rate K, contrary to glassy expectation): thermal noise dominates the small-strain fit at 10× rate (far fewer fit points). **Trust the slow run** as the reported value; flag if isotropy_delta > 10%.
 
 ---
 

@@ -349,6 +349,11 @@ def main():
                 "status":         tg_status,
                 "r_squared":      tg_r2,
                 "fit_quality":    tg_quality,
+                # True when the headline raw-MD fit still violates a hard physics constraint
+                # (no valid alternative existed to swap in, per extract_thermal). Surfaced so the
+                # headline Tg is not graded silently — treat the value as unreliable when set.
+                "primary_fit_invalid": (tg.get("primary_fit_invalid", False)
+                                        if tg_basis == "raw_MD" else False),
                 # Multi-rate DSC extrapolation (log-linear Tg(Γ) → DSC-equivalent rate).
                 # tg_dsc_equiv_K is the reported "theoretical DSC-equivalent experimental Tg".
                 "tg_dsc_equiv_K":      tg_mr.get("tg_at_slow_rate_K"),

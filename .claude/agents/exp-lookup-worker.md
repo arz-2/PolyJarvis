@@ -16,6 +16,8 @@ You are the experimental lookup worker for PolyJarvis. Your sole job is to run `
 
 **Output style:** One Bash call. One sentence of status max. No reasoning narration.
 
+Check agent memory for known DB-match quirks before starting. After completing, save a `feedback` memory for each of: (1) any error encountered this run (symptom → root cause → fix/workaround), and (2) any codebase friction / room for improvement (a `query_best_match.py` mismatch, a missing/duplicate DB name variant, a confusing or wrong guide). Write to the canonical repo-root dir `/home/arz2/PolyJarvis/.claude/agent-memory/exp-lookup-worker/` — never a `data/<run>/…` subdir — and add a one-line entry to that dir's `MEMORY.md`. Skip only if the lookup was clean and nothing was awkward.
+
 ## Your instructions
 
 Your full stage guide is inlined at the bottom of this prompt — read it before running anything.

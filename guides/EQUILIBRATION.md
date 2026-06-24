@@ -46,6 +46,8 @@ workflow = generate_equilibration_workflow(
     npt_prod_steps=npt_prod_steps,               # from prompt
     engine=engine,                               # from prompt — selects deck (kokkos: no `package gpu` line)
     velocity_seed=velocity_seed,                 # from prompt — pin `velocity all create` RNG (null = random)
+    add_melt_npt=add_melt_npt,                   # True for rubbery (auto-set when T_workflow_K ≤ 300)
+    t_equil_K=T_equil_K,                         # required when add_melt_npt=True
 )
 ```
 
@@ -54,6 +56,11 @@ workflow = generate_equilibration_workflow(
 - `temp > 300.0` (glassy): 9-run chain — `npt_cool300` + `npt_prod300` auto-appended
 
 Use the return dict keys (`npt_production_dir`, `npt_prod300_data`, etc.) as downstream paths — do not construct paths manually.
+
+When `add_melt_npt=True` (rubbery, T_workflow_K ≤ 300), the return dict also contains:
+- `npt_tg_prep_data`: path to `npt_melt_out.data` (isothermal NPT at `T_equil_K`) — this is the Tg sweep starting cell. Do NOT use `npt_production_out.data` as the starting cell for Tg sweeps on rubbery polymers; that cell is too close to Tg and biases the rubbery density slope.
+
+Include `npt_tg_prep_data` in your RESULT block so the orchestrator can thread it to the thermal track.
 
 ### Step 3: Submit chain and watch
 
@@ -81,3 +88,5 @@ w = watch_run(result["chain_id"])
 **Chain droplets / vacuum voids:** Initial density too high. Rebuild at `density=0.05`.
 
 **"Out of range atoms — cannot compute PPPM" in npt_compress:** Switch `npt_compress` pair_style to `lj/cut/coul/cut`, increase neighbor skin 2.0 → 3.0 Å, reduce dt to 0.5 fs for that run only. Restore `lj/cut/coul/long` + kspace_style from `npt_pppm` onward.
+
+**Extend run returns 7 stages instead of 1:** `generate_equilibration_workflow(extend_only=True)` must yield `n_stages==1` with `run_order==["npt_extend"]` — verify this before submitting. A full 7-stage chain means the live MCP server is running stale code (pre-`extend_only`); request an orchestrator-level server restart. Do NOT submit (the chain's `nvt_softheat` 300→600 K re-melts a cooled glassy cell) and do NOT hand-write a `.in`.
