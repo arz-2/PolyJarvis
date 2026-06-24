@@ -314,7 +314,7 @@ def _exp_density_range(cls: dict) -> list:
 
 def build_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
+    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
     guide = load_worker_guide("build")
     return f"""\
 smiles:            {_v(args.smiles)}
@@ -385,7 +385,7 @@ def _regime(args, cls: dict) -> str:
 
 def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/equil"
+    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/equil"
     guide = load_worker_guide("equil")
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
     T_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
@@ -458,7 +458,7 @@ def _resolve_tg_rate(args, cls: dict):
 
 def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/thermal"
+    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/thermal"
     guide = load_worker_guide("tg")
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
 
@@ -542,7 +542,7 @@ generate_script:
 
 def deform_prompt(args, cls: dict, cross_track_rules: str) -> str:
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/mechanical"
+    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
     is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
     guide = load_worker_guide("deform")
     return f"""\
@@ -581,9 +581,9 @@ def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     # Per-rate analysis dir so the three tg_summary.json files don't overwrite each other.
     # Single-rate (no --tg_rate_index) keeps the legacy raw/ output → reproducibility preserved.
     raw_suffix = f"tg_r{int(selected_rate)}/" if selected_rate is not None else ""
-    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/{raw_suffix}"
+    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/{raw_suffix}"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    lammps_base = f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
+    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
     tg_log = args.data_path or f"{lammps_base}/thermal/tg_sweep{rate_suffix}/tg_sweep.log"
     # equil_data_path: production NPT output — passed to extract_thermal as tg_data_file for ΔCp mass
     # normalisation. Phase-aware: glassy chains end at npt_prod300 (cooled to 300 K); rubbery chains
@@ -621,8 +621,8 @@ def analyze_tg_multirate_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Aggregate per-rate (rate, Tg_MD) pairs: log-linear + VF fit, extrapolated to the
     DSC-equivalent rate. The orchestrator supplies --mr_rates / --mr_tg_values from the
     cross-replicate registry; the worker runs the emitted command verbatim."""
-    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
-    script = ("/home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/"
+    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
+    script = ("/home/arz2/PolyJarvis/mcp-servers/mcp-lammps-engine/"
               "analysis_scripts/extract_tg_multirate.py")
     dsc_rate = cls.get("dsc_equiv_rate_K_per_ns", 1.6667e-10)
     guide = load_worker_guide("analyze-tg-multirate")
@@ -661,14 +661,14 @@ command: |
 
 def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for equilibration-checker (equil-check gate — equil check + density)."""
-    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
+    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
     exp_density = _exp_density_range(cls)
     # Aromatic main-chain classes (ct_gate_reliable=false) cannot have their backbone path defined
     # by atom-type selection, so C(t)/C∞ are unreliable — do NOT arm the hard gate (null = advisory).
     ct_decay = cls.get("ct_min_decay_melt", 0.10) if cls.get("ct_gate_reliable", True) else None
 
-    lammps_base = f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
+    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
     # Phase-aware NPT production files: rubbery (T_workflow ≤ 300) ends at npt_production (7-run
     # chain — no npt_prod300 exists); glassy (T_workflow > 300) appends npt_prod300. The melt-NVT
     # log (nvt_production.log) is present in both. CLI --npt_prod_log/--npt_prod_dump/--data_path
@@ -735,11 +735,11 @@ tasks:
 def murnaghan_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for murnaghan-worker (rubbery BM pressure series submission)."""
     flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps/mechanical"
+    work_dir = args.work_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps/mechanical"
     is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else False
     bm_pressures_atm = cls.get("bm_pressures_atm", None)
     dt = _pick(args.dt_fs, cls, "dt_fs", 1.0)
-    lammps_base = f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
+    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
     equil_data = args.data_path or f"{lammps_base}/equil/npt_production/npt_production_out.data"
     guide = load_worker_guide("murnaghan")
     # Glassy polymers ALWAYS submit. The guide's Rule B rubbery null-return guard has been
@@ -775,9 +775,9 @@ engine:            "{args.engine}"
 
 def analyze_bm_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for bulk-modulus-extractor (BM extraction, all four routing paths)."""
-    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
+    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    lammps_base = f"/home/alexzhao/PolyJarvis/data/{args.run_name}/lammps"
+    lammps_base = f"/home/arz2/PolyJarvis/data/{args.run_name}/lammps"
     npt_log = args.npt_prod_log or f"{lammps_base}/equil/npt_prod300/npt_prod300.log"
     _k_from_cls = _exp_K_range(cls)
     exp_K = [
@@ -823,7 +823,7 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
     byte-identical output to the no-plan path (enforced by tests/test_plan_reproducibility.py).
     The plan provenance is carried by reading raw/run_plan.json (the convention path below).
     """
-    output_dir = args.output_dir or f"/home/alexzhao/PolyJarvis/data/{args.run_name}/raw/"
+    output_dir = args.output_dir or f"/home/arz2/PolyJarvis/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
     run_plan = f"{output_dir.rstrip('/')}/run_plan.json"
 

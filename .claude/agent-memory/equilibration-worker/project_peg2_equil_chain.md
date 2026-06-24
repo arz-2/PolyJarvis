@@ -16,7 +16,7 @@ PEG2 (PEO/PEG, POXI class, PCFF force field) 7-stage rubbery equilibration chain
 - gpu_ids: "0", mpi: 1, engine: kokkos
 - SEED_HOT: random (velocity_seed=null; read from nvt_softheat output after completion)
 - SEED_COLD: N/A (nvt_production inherits velocities from data file)
-- params_file: /home/alexzhao/PolyJarvis/data/PEG2/lammps/equil/emc_build.params
+- params_file: /home/arz2/PolyJarvis/data/PEG2/lammps/equil/emc_build.params
 
 **Why:** POXI/PCFF EMC build — Coeffs live in params file, not .data; passed params_file to inspect_data_file and run_lammps_chain to suppress false Coeffs errors. engine=kokkos per plan hardware override.
 

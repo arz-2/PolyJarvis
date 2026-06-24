@@ -13,7 +13,7 @@ PS3 atactic Polystyrene (PSTR class) equilibration submitted 2026-06-23.
 **Key params:** use_pcff=True, max_temp=630 K, n_atoms=6420, gpu_ids=1, mpi=1, engine=kokkos, velocity_seed=null (random; read back from nvt_softheat.log). params_file required for EMC PCFF Coeffs.
 
 **chain_id:** c2a94ebb
-**work_dir:** /home/alexzhao/PolyJarvis/data/PS3/lammps/equil/
+**work_dir:** /home/arz2/PolyJarvis/data/PS3/lammps/equil/
 
 **Why:** PSTR uses PCFF (Class II); glassy polymer (exp Tg ~370 K); 9-stage chain mandatory so stage 09 (npt_prod300) produces 300 K density and serves as deformation source. temp=550 K chosen as T_workflow_K above MD Tg.
 

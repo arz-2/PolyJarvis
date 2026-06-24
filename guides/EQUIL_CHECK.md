@@ -9,8 +9,8 @@
 Default `output_dir` scatters files into subdirectories next to the input log. Always pass both:
 
 ```python
-output_dir = "/home/alexzhao/PolyJarvis/data/<run_name>/raw/"
-graphs_dir = "/home/alexzhao/PolyJarvis/data/<run_name>/graphs/"
+output_dir = "/home/arz2/PolyJarvis/data/<run_name>/raw/"
+graphs_dir = "/home/arz2/PolyJarvis/data/<run_name>/graphs/"
 ```
 
 Tools that produce PNG figures (always pass `graphs_dir`):

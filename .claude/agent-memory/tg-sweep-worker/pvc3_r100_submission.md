@@ -15,8 +15,8 @@ PVC3 r100 (fastest rate, rate index 2) submitted cleanly 2026-06-24.
 - Velocity seed: 730559 (random draw from template, captured for reproducibility — cross-track rule 2)
 
 **Run ID:** 65168f97
-**Working dir:** /home/alexzhao/PolyJarvis/data/PVC3/lammps/thermal/tg_sweep_r100
-**Log path:** /home/alexzhao/PolyJarvis/data/PVC3/lammps/thermal/tg_sweep_r100/tg_sweep.log
+**Working dir:** /home/arz2/PolyJarvis/data/PVC3/lammps/thermal/tg_sweep_r100
+**Log path:** /home/arz2/PolyJarvis/data/PVC3/lammps/thermal/tg_sweep_r100/tg_sweep.log
 
 **FF verified:** pair_style lj/class2/coul/long + dihedral_style class2 + kspace_style pppm (correct PCFF Class II for KOKKOS engine).
 

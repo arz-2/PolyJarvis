@@ -15,7 +15,7 @@ PVC2 (PVNL/PCFF) 9-stage glassy equilibration chain submitted 2026-06-22.
 - velocity_seed: null (random; read SEED_HOT back from nvt_softheat.log)
 - stages: minimize, nvt_softheat, npt_compress, npt_pppm, npt_cool, nvt_production, npt_production, npt_cool300, npt_prod300
 - npt_prod300 is density/deformation source (stage 09, 300 K)
-- equil dir: /home/alexzhao/PolyJarvis/data/PVC2/lammps/equil/
+- equil dir: /home/arz2/PolyJarvis/data/PVC2/lammps/equil/
 
 **Why:** Glassy polymer (exp_Tg ~355 K); temp>300 forces 9-stage path with 300 K cool-down.
 **How to apply:** For any PVNL/PCFF run, params_file is required and kokkos engine is confirmed working on GPU 2.

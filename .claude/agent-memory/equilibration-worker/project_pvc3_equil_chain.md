@@ -15,7 +15,7 @@ PVC3 (PVNL/PCFF) 9-stage glassy equilibration chain submitted 2026-06-23.
 - velocity_seed: null (random; read SEED_HOT back from nvt_softheat.log)
 - stages: minimize, nvt_softheat, npt_compress, npt_pppm, npt_cool, nvt_production, npt_production, npt_cool300, npt_prod300
 - npt_prod300 is density/deformation source (stage 09, 300 K)
-- equil dir: /home/alexzhao/PolyJarvis/data/PVC3/lammps/equil/
+- equil dir: /home/arz2/PolyJarvis/data/PVC3/lammps/equil/
 - revision motivation: PVC2 had degenerate Tg fits at DP60; PVC3 uses longer melt equil (8 ns, 7 annealing cycles)
 
 **Why:** Glassy polymer (exp_Tg ~355 K); temp>300 forces 9-stage path with 300 K cool-down. PVC2 had degenerate Tg fits so PVC3 extends melt equilibration time per [[project-pvc2-equil-chain]].
