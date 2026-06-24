@@ -53,6 +53,21 @@ def _load_json(path):
         return {}
 
 
+def _dig(d, *keys, default=None):
+    """Walk a nested dict by keys, returning default if any level is missing."""
+    cur = d
+    for k in keys:
+        if not isinstance(cur, dict) or k not in cur:
+            return default
+        cur = cur[k]
+    return cur
+
+
+def _not(v):
+    """Boolean negation that preserves None (unknown stays unknown)."""
+    return (not v) if v is not None else None
+
+
 def main():
     p = argparse.ArgumentParser(description="Aggregate Stage 4 outputs into run_summary.json")
     p.add_argument("--output_dir",      required=True)
@@ -112,6 +127,9 @@ def main():
     tg_mr        = _load_json(output_dir / "tg_multirate_result.json")
     eq_dens      = _load_json(output_dir / "equilibrated_density.json")
     eq_chk       = _load_json(output_dir / "equilibration_check.json")
+    # check_equilibration_comprehensive actually writes equilibration_comprehensive.json
+    # with a nested schema (thermo.*/chain.*/spatial.*); prefer it when present.
+    eq_comp      = _load_json(output_dir / "equilibration_comprehensive.json")
     bulk         = _load_json(output_dir / "bulk_modulus.json")
     bulk_deform  = _load_json(output_dir / "bulk_modulus_deform.json")
     bulk_born    = _load_json(output_dir / "bulk_modulus_born.json")
@@ -154,6 +172,16 @@ def main():
     Tg_val = tg_extrap if tg_extrap is not None else Tg_raw
     tg_basis = ("rate_extrapolated" if tg_extrap is not None
                 else ("raw_MD" if Tg_raw is not None else None))
+    # Fit-quality fields for the results dict: per-rate bilinear r²/quality for a raw single-rate
+    # headline, or the multirate log-linear r² when the rate-extrapolated value is reported.
+    tg_r2 = tg.get("r_squared")
+    tg_quality = tg.get("fit_quality")
+    if tg_extrap is not None:
+        tg_r2 = tg_mr.get("loglinear_r_squared")
+        # Per-rate bilinear fit quality (the D-06 metric) lives in any tg_r*/tg_summary.json.
+        for sub in sorted(output_dir.glob("tg_r*/tg_summary.json")):
+            tg_quality = _load_json(sub).get("fit_quality")
+            break
     exp_tg = ([args.exp_tg_min, args.exp_tg_max]
               if args.exp_tg_min is not None and args.exp_tg_max is not None else None)
     tg_err = None
@@ -235,6 +263,7 @@ def main():
         "tg_multirate_fig":        rel("tg_multirate.png"),
         "equilibrated_density":    rel("equilibrated_density.json"),
         "equilibration_check":     rel("equilibration_check.json"),
+        "equilibration_comprehensive": rel("equilibration_comprehensive.json"),
         "equilibration_fig":       rel_fig("equilibration_convergence.png"),
         "bulk_modulus":            rel("bulk_modulus.json"),
         "bulk_modulus_deform":     rel("bulk_modulus_deform.json"),
@@ -318,8 +347,8 @@ def main():
                 "exp_range_K":    exp_tg,
                 "error_pct":      tg_err,
                 "status":         tg_status,
-                "r_squared":      tg.get("r_squared"),
-                "fit_quality":    tg.get("fit_quality"),
+                "r_squared":      tg_r2,
+                "fit_quality":    tg_quality,
                 # True when the headline raw-MD fit still violates a hard physics constraint
                 # (no valid alternative existed to swap in, per extract_thermal). Surfaced so the
                 # headline Tg is not graded silently — treat the value as unreliable when set.
@@ -352,21 +381,33 @@ def main():
             },
         },
         "convergence": {
-            "verdict":            args.d05,
-            "density_equilibrated": eq_chk.get("density_equilibrated"),
-            "energy_equilibrated":  eq_chk.get("energy_equilibrated"),
-            "density_drift_pct":    (eq_chk.get("density", {}) or {})
-                                    .get("drift", {}).get("drift_pct"),
+            "verdict":            args.d05 or (("PASS" if eq_comp.get("overall_pass") else "FAIL")
+                                              if eq_comp else None),
+            # Prefer the comprehensive nested schema; fall back to the legacy flat keys.
+            "density_equilibrated": _dig(eq_comp, "thermo", "density_drift", "pass",
+                                         default=eq_chk.get("density_equilibrated")),
+            "energy_equilibrated":  _dig(eq_comp, "thermo", "energy_drift", "pass",
+                                         default=eq_chk.get("energy_equilibrated")),
+            "density_drift_pct":    _dig(eq_comp, "thermo", "density_drift", "drift_pct",
+                                         default=_dig(eq_chk, "density", "drift", "drift_pct")),
         },
         "structural_checks": {
-            "rg_cv":              rg.get("rg_cv_across_chains"),
-            "rg_spread_flag":     rg.get("rg_spread_flag"),
-            "kinetic_trap_flag":  msd.get("kinetic_trap_flag"),
-            "diffusion_regime":   msd.get("diffusion_regime"),
-            "ordered_flag":       orient.get("ordered_flag"),
-            "p2_mean":            orient.get("p2_mean"),
-            "heterogeneous_flag": dh.get("heterogeneous_flag"),
-            "density_cv_mean":    dh.get("cv_mean"),
+            "rg_cv":              _dig(eq_comp, "chain", "rg", "cv",
+                                       default=rg.get("rg_cv_across_chains")),
+            "rg_spread_flag":     (_not(_dig(eq_comp, "chain", "rg", "pass"))
+                                   if eq_comp else rg.get("rg_spread_flag")),
+            "kinetic_trap_flag":  _dig(eq_comp, "chain", "msd", "kinetic_trap_flag",
+                                       default=msd.get("kinetic_trap_flag")),
+            "diffusion_regime":   _dig(eq_comp, "chain", "msd", "diffusion_regime",
+                                       default=msd.get("diffusion_regime")),
+            "ordered_flag":       (_not(_dig(eq_comp, "spatial", "p2", "pass"))
+                                   if eq_comp else orient.get("ordered_flag")),
+            "p2_mean":            _dig(eq_comp, "spatial", "p2", "p2_mean",
+                                       default=orient.get("p2_mean")),
+            "heterogeneous_flag": (_not(_dig(eq_comp, "spatial", "density_homogeneity", "pass"))
+                                   if eq_comp else dh.get("heterogeneous_flag")),
+            "density_cv_mean":    _dig(eq_comp, "spatial", "density_homogeneity", "cv_mean",
+                                       default=dh.get("cv_mean")),
         },
         "artifacts":    artifacts,
         "provenance": {

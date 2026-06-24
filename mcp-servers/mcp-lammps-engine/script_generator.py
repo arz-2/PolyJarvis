@@ -589,8 +589,47 @@ class ScriptGenerator:
                    if name.startswith("h")]
         info["h_type_ids"] = h_types
 
+        info["is_class2"] = self._content_is_class2(content)
+
         self.system_info = info
         return info
+
+    # Class II (PCFF/COMPASS) fingerprints. RadonPy cells embed cross-term Coeffs sections
+    # directly in the .data file; EMC cells keep all coefficients in an included params file
+    # (4-arg quartic bond_coeff, "# BondBond Coeffs" comments, "angle_coeff N bb/ba" cross-terms).
+    # Detecting any of these is an unambiguous signal of a class2 system.
+    _CLASS2_PATTERNS = (
+        r"(?m)^\s*BondBond\s+Coeffs\s*$",
+        r"(?m)^\s*BondAngle\s+Coeffs\s*$",
+        r"(?m)^\s*MiddleBondTorsion\s+Coeffs\s*$",
+        r"(?m)^\s*AngleAngleTorsion\s+Coeffs\s*$",
+        r"(?m)^\s*#\s*BondBond\s+Coeffs",          # EMC params-file section comment
+        r"(?m)^\s*angle_coeff\s+\d+\s+(?:bb|ba)\b",  # EMC class2 cross-term coeff lines
+        r"(?m)^\s*bond_style\s+class2\b",
+    )
+
+    @classmethod
+    def _content_is_class2(cls, content: str) -> bool:
+        """True if the content carries any Class II fingerprint (data file or params file)."""
+        return any(re.search(p, content) for p in cls._CLASS2_PATTERNS)
+
+    def _detect_class2(self, data_file: Optional[str],
+                       params_file: Optional[str] = None) -> Optional[bool]:
+        """Detect whether the system is Class II (PCFF). Checks the included params file first
+        (EMC cells), then the data file (RadonPy cells). Returns None only if nothing readable
+        (e.g. a remote override path not present locally) so callers fall back to the flag."""
+        seen = False
+        for path in (params_file, data_file or self.data_file):
+            if not path:
+                continue
+            try:
+                with open(path, "r") as f:
+                    seen = True
+                    if self._content_is_class2(f.read()):
+                        return True
+            except Exception:
+                continue
+        return False if seen else None
 
     def validate_data_file(
         self,
@@ -907,14 +946,17 @@ class ScriptGenerator:
         # Build all substitution blocks
         subs = self._build_substitutions(template_name, cfg, data_file, raw_params=params)
 
-        # Staircase expansion: npt_tg_step requires T_END + T_STEP → full cooling loop
+        # Staircase expansion: npt_tg_step + T_END + T_STEP → full cooling loop.
+        # A Tg sweep MUST be a multi-temperature ramp. Guard against the silent failure where
+        # the npt_tg_step template is requested without ramp bounds and falls through to a
+        # single-temperature NPT render (an invalid Tg sweep — no per-T dump, no cooling).
         if template_name == "npt_tg_step":
-            if not ("T_END" in params and "T_STEP" in params):
+            missing = [k for k in ("T_END", "T_STEP") if params.get(k) is None]
+            if missing:
                 raise ValueError(
-                    "npt_tg_step requires both T_END and T_STEP for the cooling staircase. "
-                    "Use template 'npt' for a single-temperature NPT run, or pass "
-                    "T_END=<low_K>, T_STEP=<step_K> alongside T_START to generate the sweep."
-                )
+                    f"Tg sweep (template 'npt_tg_step') requires ramp bounds {missing} "
+                    f"(plus T_START); without them this would emit a single-temperature NPT, "
+                    f"not a cooling sweep. Pass T_START, T_END and T_STEP.")
             script = self._generate_tg_staircase(cfg, subs, output_path)
             return script
 

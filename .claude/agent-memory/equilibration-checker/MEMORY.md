@@ -1,0 +1,3 @@
+- [PS glassy C(t) advisory](ps-ct-advisory.md) — C(t) slowness in glassy PS is ADVISORY-only; gate on structural convergence instead
+- [PEG rubbery energy drift](peg-rubbery-energy-drift.md) — rubbery C(t)/MSD ADVISORY but energy drift HARD gate for all regimes; EXTEND on energy 1.01%
+- [PEG3 recheck success](peg3-recheck-success.md) — +2 ns extension resolved PEG3 energy drift (1.01%→0.48%), all hard gates PASS

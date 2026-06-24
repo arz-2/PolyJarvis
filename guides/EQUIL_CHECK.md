@@ -25,7 +25,9 @@ Returns `overall_pass` verdict and a ready-to-paste D-05 markdown block. Copy `r
 
 `backbone_types` is **REQUIRED** — from `inspect_data_file()`; do not guess.
 
-Pass the paths verbatim from the prompt — thermo from `log_file`, chain dynamics from `dump_file` (always the melt).
+**Thermo and structural checks read different files — this is deliberate.** The tool decouples Section A (thermo, from `log_file`) from Sections B/C (chain conformation + spatial, from `dump_file`):
+- `log_file` = `npt_prod_log_path` — the production NPT log (`npt_prod300` glassy / `npt_production` rubbery), where density/energy convergence is meaningful.
+- `dump_file` = `melt_dump_path` — the **melt** `nvt_production.dump` (T_workflow, chains mobile), where C(t)/MSD/Rg/R_ee actually report chain relaxation. Do **not** point this at the production NPT dump: for a glassy polymer the production state is below Tg, so C(t) never decays and MSD shows a kinetic trap *by construction* — the structural check would be meaningless. `gen_prompt.py` already resolves all three paths; use them verbatim, do not construct them.
 
 **`ct_min_decay_melt` may be `null`.** When the prompt gives a number, pass it as `ct_min_decay` (C(t) becomes a hard gate). When it is `null` (aromatic main-chain classes — PSU/PEEK/PC/Kapton/PPS/PPV — where the backbone path cannot be defined by atom-type selection, so C(t)/C∞ are meaningless), **omit `ct_min_decay` entirely**: C(t)/C∞ are then reported as advisory warnings and never block `overall_pass`. This is the property-aware default that prevents the spurious aromatic-backbone FAIL; do not hand-override it back on.
 
@@ -61,6 +63,8 @@ check_equilibration_comprehensive(**kwargs)
 - `result["chain"]["ree"]["n_chains"]`               → `end_to_end_n_chains`
 - Histogram PNG auto-saved to `graphs_dir/end_to_end_distribution.png`
 - C(t)/MSD/R_ee are computed on the melt dump in both phases, so `ct_decay_fraction` and `ct_tau_relax_ps` are always populated (no N/A rubbery branch)
+
+For PHYC class (PE): `ct_decayed=True` plus `tau_relax_ps` is the chain relaxation evidence R1M10 requires. Include both in the RESULT block even for passes.
 
 ---
 
