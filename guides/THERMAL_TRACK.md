@@ -82,6 +82,9 @@ On session restart mid-thermal-track: re-read this file before resuming.
     KEEP the registry rows. Do NOT /recover on slope sign for rubbery. Equilibration quality is
     already guarded upstream by the equil-check require_rubbery carve-out (density SEM/CV); the
     slope-gate only guards glassy-Tg extrapolation, which the rubbery path never performs.
+    VF caveat: a Vogel–Fulcher Tg0 fit needs ≥2 rate decades; our 3-rate sets span ~1 decade
+    ([25,50,100] or [40,160,400] K/ns), so VF diverges ("initial guess outside bounds") — this is
+    expected, and `rubbery_flat_mean` (mean of per-rate Tg) is the correct fallback (PEG3 2026-06-24).
 
   [is_glassy determination]
   if "tg" in properties_requested:

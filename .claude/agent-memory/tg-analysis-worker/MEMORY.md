@@ -1,7 +1,1 @@
-- [PEG3 r40: EXCELLENT fit (R²=0.9994)](success_peg3_r40_excellent_fit.md) — Tg 244.4 K, +38 K above expt (206 K); hyperbola fit, all n_eff good
-- [PEG3 multirate: VF failure on 1-decade span](project_peg3_multirate_vf_failure.md) — 2 replicates × 3 rates; rubbery_flat_mean=235.6 K (DSC-equiv); log-linear R²=0.366 weak
-- [PVC2 degenerate multirate (all rates fail)](project_pvc2_degenerate_multirate.md) — r40, r160, r400 all exhibit density drift > 1% + undersampling (n_eff < 5); NPT production undersized
-- [PVC3 r100: GOOD fit (R²=0.9815)](success_pvc3_r100_good_fit.md) — Tg 284 K (−70 K below expt 354 K); Tg_alt 329 K; improvement from PVC2 degenerate fits
-- [PVC3 r25: GOOD fit (R²=0.9845)](success_pvc3_r25_good_fit.md) — Tg 310.6 K (−43 K below expt 354 K); primary hyperbola swap; multirate needed for Tg_0
-- [PS3 r160: EXCELLENT fit (R²=0.9969)](success_ps3_r160_excellent_fit.md) — Tg 377.5 K within expt (373–383 K); clean bilinear, good plateau equilibration
-- [PS3 r40: GOOD fit (R²=0.9918)](success_ps3_r40_good_fit.md) — Tg 376.5 K within expt; bilinear post-hyperbola-swap; ΔCp 0.1557 J/(g·K)
+
