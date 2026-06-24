@@ -915,6 +915,10 @@ Forward every field above to generate_run_summary as its matching --flag (dp→-
 n_chains→--n_chains, n_atoms→--n_atoms, charge_method→--charge_method, date_start→--date_start,
 date_end→--date_end, d01_ff→--d01, …, d05_verdict→--d05, d06_tg_fit_quality→--d06,
 run_plan→--run_plan). Skip any field whose value is `null`.
+
+# generate_run_summary returns {{"status":"submitted","run_id":...}} but it completes IN-PROCESS in
+# seconds — do NOT poll with get_run_status (you have no such tool). After the call, Read
+# {output_dir}run_summary.json directly and parse it.
 """
 
 

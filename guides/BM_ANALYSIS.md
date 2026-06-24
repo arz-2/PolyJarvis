@@ -110,6 +110,8 @@ extract_bulk_modulus_murnaghan(
 - `fit_converged=True` — linear_fallback means EOS curvature not resolved; flag as WARNING
 - B0' in [4, 20] — outside this range is unphysical for polymers
 - `r_squared ≥ 0.999` for a 5-point series; lower suggests poor equilibration at one or more pressures
+- **B0' out-of-range with `fit_converged=True` is WARNING, not FAIL** (the ±1000 atm span under-constrains EOS curvature): high B0'≥13 with `r²<0.999` = EOS nonlinearity artifact (K still correct, e.g. PMMA2 B0'=15.2); low B0'<4 with `r²≥0.999` = under-constrained curvature (K robust, e.g. PLA2 B0'=1.95, K=5.29 vs fluctuation 5.27). Note the artifact; route to deform fallback or a wider pressure series.
+- **Rubbery (is_glassy=False):** flag any Murnaghan-vs-fluctuation divergence >15% prominently; fluctuation is often more reliable for low-K rubber at ±1000 atm (cis-PBD3: Murnaghan 1.263 vs fluctuation 1.566 GPa). PHYC/PDIE now ship a wider [1,500,1000,2000,5000] atm series.
 
 **Reporting (include in RESULT block):** `bulk_modulus_sem_GPa`, `r_squared`, `B0_prime`
 

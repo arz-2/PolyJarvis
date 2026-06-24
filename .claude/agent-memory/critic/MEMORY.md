@@ -1,2 +1,1 @@
 # Critic Memory Index
-

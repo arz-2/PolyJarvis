@@ -520,11 +520,12 @@
       ],
       "bm_pressures_atm": [
         1,
-        100,
-        300,
-        600,
-        1000
+        500,
+        1000,
+        2000,
+        5000
       ],
+      "bm_pressures_note": "Widened from [1,100,300,600,1000] (~0.1 GPa span) on 2026-06-24: narrow ±1000 atm under-constrains EOS curvature for low-K rubbery polymers → B0_prime runaway (PE3 Murnaghan 1.358 vs fluctuation 1.651 GPa, 21.6% gap). Cross-check K against NPT fluctuation; flag divergence >15%.",
       "exp_K_GPa": {
         "min": 1.5,
         "max": 2.0,
@@ -940,11 +941,12 @@
       ],
       "bm_pressures_atm": [
         1,
-        100,
-        300,
-        600,
-        1000
+        500,
+        1000,
+        2000,
+        5000
       ],
+      "bm_pressures_note": "Widened from [1,100,300,600,1000] (~0.1 GPa span) on 2026-06-24: narrow ±1000 atm under-constrains EOS curvature for low-K rubbery polymers → B0_prime runaway (cis-PBD3 Murnaghan 1.263 vs fluctuation 1.566 GPa, ~24% gap). Cross-check K against NPT fluctuation; flag divergence >15%.",
       "experimental_density_gcm3": 0.9,
       "exp_density_note": "PBD amorphous = 0.90 g/cm³; PI amorphous = 0.91 g/cm³ (Brandrup & Immergut). Use 0.90 as the default comparator for PBD SMILES; override to 0.91 for PI.",
       "exp_K_GPa": {
@@ -1012,7 +1014,7 @@
         600,
         1000
       ],
-      "bm_pressures_note": "Rubbery class (all members Tg<300, produced above Tg). Murnaghan EOS pressure series at T>Tg is the primary K method; the volume-fluctuation estimate overestimates rubbery K (~+70%, PEG2 2026-06-23), so it is kept only as a diagnostic cross-check. Series matches the proven PHYC/PDIE rubbery series.",
+      "bm_pressures_note": "Rubbery class (all members Tg<300, produced above Tg). Murnaghan EOS pressure series at T>Tg is the primary K method; the volume-fluctuation estimate overestimates rubbery K (~+70%, PEG2 2026-06-23), so it is kept only as a diagnostic cross-check. Retains the original narrow [1,100,300,600,1000] atm series; PHYC/PDIE were widened to [1,500,1000,2000,5000] on 2026-06-24 — widen here too if B0' runs away.",
       "experimental_tg_K": {
         "PEO": 206,
         "PPO": 198,
@@ -1710,7 +1712,7 @@
         600,
         1000
       ],
-      "bm_pressures_note": "Rubbery class (PDMS/PMHS Tg<160, produced above Tg). Murnaghan EOS pressure series at T>Tg is the primary K method; the volume-fluctuation estimate overestimates rubbery K, so it is kept only as a diagnostic cross-check. Series matches the proven PHYC/PDIE rubbery series.",
+      "bm_pressures_note": "Rubbery class (PDMS/PMHS Tg<160, produced above Tg). Murnaghan EOS pressure series at T>Tg is the primary K method; the volume-fluctuation estimate overestimates rubbery K, so it is kept only as a diagnostic cross-check. Retains the original narrow [1,100,300,600,1000] atm series; PHYC/PDIE were widened to [1,500,1000,2000,5000] on 2026-06-24 — widen here too if B0' runs away.",
       "experimental_tg_K": {
         "PDMS": 148,
         "PMHS": 158,
