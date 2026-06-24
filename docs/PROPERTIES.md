@@ -21,16 +21,31 @@ To request a subset, pass `--properties density,tg` (or `all`) to `gen_prompt.py
 
 ## 2. Glass Transition Temperature (Tg)
 
+Tg is measured **multirate**: one stepped cooling sweep is run per cooling rate, each sweep yields a per-rate Tg, and the per-rate Tg values are extrapolated to the experimental (DSC-equivalent) rate.
+
+### Per-rate sweep
+
 | Field | Value |
 |-------|-------|
 | Units | K (MD value) |
-| Source log | `thermal/tg_sweep/tg_sweep.log` |
+| Source log | `thermal/tg_sweep_r<rate>/tg_sweep.log` (one per rate in `tg_rates_K_per_ns`, e.g. [25, 50, 100]) |
 | Tool | `extract_thermal` |
-| Method | Stepped cooling sweep from high T to ≤200 K; bilinear fit of density vs T; breakpoint = Tg_MD |
+| Method | Stepped cooling sweep from high T to ≤200 K; bilinear fit of density vs T; breakpoint = Tg_MD at that rate. CTE (α_g, α_r) and ΔCp come from the same fit's branch slopes |
 | Fit quality | PASS / WARN / ABORT; R² and segment slopes reported |
+| Outputs | per-rate `tg_summary.json`, `tg_density_vs_T.png` |
+
+### Multirate aggregation → DSC-equivalent Tg
+
+| Field | Value |
+|-------|-------|
+| Tool | `extract_tg_multirate` |
+| Method | Fit Tg vs ln(cooling rate); extrapolate to `dsc_equiv_rate_K_per_ns` (~1.67e-10 K/ns) → headline DSC-equivalent Tg |
+| Registry | Per-rate rows accumulate (append-only) in `data/_tg_registry/<CLASS>__<slug>.csv`, so the fit tightens across replicates |
+| Slope gate (glassy) | Tg must rise with rate (slope > 0); a non-positive slope marks the per-rate data contaminated → re-run with a new seed |
+| Rubbery regime | When T_workflow ≫ Tg the rate-dependence is ~flat: `is_flat_rate_regime=True`, `tg_method=flat_rate_mean` reports the mean across rates (not an extrapolation), slope gate exempted |
 | Validation | `experimental_tg_K` from polymer_rules.json; MD Tg overestimates experiment by ~80–120 K (fast cooling rate artifact — Patrone 2016, Webb 2024) |
-| Outputs | `tg_fit.json`, `tg_density_vs_T.png` |
-| Side effect | `is_glassy = (Tg_K > 300)` — this flag selects the bulk modulus path |
+| Outputs | `tg_multirate_result.json` |
+| Side effect | `is_glassy` selects the bulk modulus path — decided from the **highest-rate** MD Tg (`is_glassy = Tg_highest_rate > 300`); on a degenerate highest-rate fit it falls back to `experimental_tg_K > 300` |
 
 **If Tg is not requested:** `is_glassy` is inferred from `experimental_tg_K` in polymer_rules.json (glassy_hint). Tg_K is reported as N/A.
 
@@ -38,54 +53,65 @@ To request a subset, pass `--properties density,tg` (or `all`) to `gen_prompt.py
 
 ## 3. Bulk Modulus (K_T)
 
-Path is selected automatically from `is_glassy` and `bm_pressures_atm` (from polymer_rules.json).
+Path is selected automatically from `is_glassy` and `bm_pressures_atm` (from polymer_rules.json). Every path reports the isothermal bulk modulus K_T in GPa. Murnaghan is the primary method for both phases; deformation is its fallback.
 
-### Path A — Born NVT  *(glassy polymers, default)*
+### Path A — Murnaghan EOS, glassy  *(glassy polymers, primary)*
 
 `is_glassy=True`
 
-**Formula:**
-```
-K_T = K_Born + NkT/V − (V/kT)·Var(P)_NVT
-```
-- `K_Born` — Born elastic tensor from `compute born/matrix numdiff` (LAMMPS EXTRA-COMPUTE)
-- `NkT/V` — ideal-gas kinetic correction at finite N
-- `(V/kT)·Var(P)` — stress-fluctuation correction from NVT pressure variance
-
-| Field | Value |
-|-------|-------|
-| Worker | born-worker: `nvt_born` template, 4 ns NVT at 300 K |
-| CPU-only | Yes — `compute born/matrix numdiff` displaces atoms in CPU arrays; GPU pair styles incompatible |
-| Tool | `extract_bulk_modulus_born` |
-| Fallback | If `born_log_path=null`, falls back to Path C (deformation) |
-| Method label | `born_nvt` |
-| Outputs | `bulk_modulus_born.json` |
-
----
-
-### Path B — Murnaghan EOS  *(rubbery polymers with pressure series)*
-
-`is_glassy=False` and `bm_pressures_atm` set in polymer_rules.json
+An NPT pressure series around 1 atm (e.g. ±1000 atm) is run from the 300 K production cell; the mean volume at each pressure is fit to the Murnaghan equation of state.
 
 **Formula:**
 ```
-P = (B0/B0') × [(V0/V)^B0' - 1]
+P = (B0/B0') × [(V0/V)^B0' − 1]
 ```
-Fit parameters: B0 (GPa), B0' (pressure derivative, typically 7–11 for polymer melts), V0 (reference volume Å³).
+Fit parameters: B0 (GPa) = K_T, B0' (pressure derivative), V0 (reference volume Å³).
 
 | Field | Value |
 |-------|-------|
-| Worker | murnaghan-worker: `run_bulk_modulus_series` submits N NPT runs at each pressure in `bm_pressures_atm` (e.g. [1, 100, 300, 600, 1000] atm), then fits |
+| Worker | murnaghan-worker: `run_bulk_modulus_series` submits N NPT runs at each pressure from `npt_prod300_out.data` (the 300 K cell), then fits |
 | Tool | `extract_bulk_modulus_murnaghan` |
-| Advantage over fluctuation | Barostat-independent (uses mean V per pressure, not variance); captures EOS nonlinearity |
-| Convergence fallback | If curve_fit fails → linear regression of P vs ln V (method label: `linear_fallback`) |
-| Diagnostic | `extract_bulk_modulus` also runs in parallel to report B_dyn; not the reported value |
+| Acceptance | `fit_converged=True` and `B0_prime ∈ [4, 20]`; otherwise fall back to Path C (deformation) |
+| Cross-check | `extract_bulk_modulus` (volume fluctuation) runs in parallel as a diagnostic, not the reported value |
 | Method label | `murnaghan` |
 | Outputs | `bulk_modulus_murnaghan.json`, `murnaghan_eos.png` |
 
 ---
 
-### Path C — Volume Fluctuation fallback  *(rubbery polymers, no pressure series)*
+### Path B — Murnaghan EOS, rubbery  *(rubbery polymers with pressure series)*
+
+`is_glassy=False` and `bm_pressures_atm` set in polymer_rules.json
+
+Same Murnaghan EOS fit as Path A, run at T>Tg from the melt production cell over the per-class pressure list.
+
+| Field | Value |
+|-------|-------|
+| Worker | murnaghan-worker: `run_bulk_modulus_series` over `bm_pressures_atm` (e.g. [1, 100, 300, 600, 1000] atm) from `npt_production_out.data` |
+| Tool | `extract_bulk_modulus_murnaghan` |
+| Advantage over fluctuation | Barostat-independent (uses mean V per pressure, not variance); captures EOS nonlinearity |
+| Convergence fallback | If curve_fit fails → linear regression of P vs ln V (method label: `linear_fallback`) |
+| Method label | `murnaghan` |
+| Outputs | `bulk_modulus_murnaghan.json`, `murnaghan_eos.png` |
+
+---
+
+### Path C — 3-direction deformation  *(Murnaghan fallback)*
+
+Invoked when a Murnaghan fit fails acceptance (`fit_converged=False`, or `B0_prime` outside [4, 20]).
+
+`extract_bulk_modulus_deform` reads three uniaxial-deformation logs (DEFORM_DIR x/y/z, run sequentially by deform-worker from `npt_prod300_out.data`) and derives the bulk modulus from the stress–strain response.
+
+| Field | Value |
+|-------|-------|
+| Worker | deform-worker: `npt_deform` template, x/y/z directions |
+| Tool | `extract_bulk_modulus_deform` |
+| Caveat | `isotropy_delta_pct ≥ 20 %` across the three directions flags a hard FAIL (cell not isotropic) |
+| Method label | `deformation` |
+| Outputs | `bulk_modulus_deform.json`, `stress_strain.csv` |
+
+---
+
+### Path D — Volume Fluctuation  *(rubbery polymers, no pressure series)*
 
 `is_glassy=False` and `bm_pressures_atm` not set in polymer_rules.json
 
@@ -101,14 +127,6 @@ K_T = kB·T·<V> / Var(V)
 | Caveat | Sensitive to barostat P_DAMP. Cross-checked against `B_def = −dP/d(ln V)` from P vs ln V regression; disagreement >20 % emits a warning |
 | Method label | `fluctuation` |
 | Outputs | `bulk_modulus.json`, `volume_fluctuations.png` |
-
----
-
-### Deformation — optional cross-check only
-
-`extract_bulk_modulus_deform` reads a `npt_deform` log (uniaxial deformation, deform-worker) and derives Young's modulus and bulk modulus from the stress-strain curve. Not called in the default pipeline. Use manually for rate-sensitivity diagnostics or when EXTRA-COMPUTE is unavailable.
-
-Method label: `deformation`
 
 ---
 

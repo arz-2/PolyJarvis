@@ -139,21 +139,19 @@ RadonPy supports random, block, and blend cell construction but these are not ye
 
 ### I2 — Bulk modulus: adaptive pressure selection + method unification decision
 
-**Context (2026-06-16):** Three paths now exist — Born+NVT (glassy), Murnaghan EOS sweep (rubbery), volume fluctuation (rubbery fallback). The method routing is class-specific: only PHYC and PDIE have `bm_pressures_atm` set; all glassy classes use Born. The pressure ranges are hardcoded guesses, not derived from the polymer's stiffness. This is the current gap.
+**Update (2026-06-24):** The unification question below is resolved — Murnaghan EOS is now the primary path for **both** glassy (NPT compression at 300 K) and rubbery (T>Tg) polymers, with 3-direction uniaxial deformation as the fallback when a Murnaghan fit fails acceptance. The Born+NVT path is no longer used, so the Born-dependent items (I2-A cross-validation, I2-D Born fallback) are obsolete. The remaining live work is the adaptive pressure-range selection (I2-B/C/E).
+
+**Context (2026-06-16):** Method routing is class-specific: only PHYC and PDIE have `bm_pressures_atm` set. The pressure ranges are hardcoded guesses, not derived from the polymer's stiffness. This is the current gap.
 
 **Method assessment:**
 
 | Method | Phase | GPU | Rate artifact | Status |
 |--------|-------|-----|---------------|--------|
-| Born + NVT stress-fluctuation | Glassy only | No (CPU-only) | None (rate-free) | Primary for glassy |
-| Murnaghan EOS sweep (NPT) | Both | Yes | None | Primary for rubbery |
+| Murnaghan EOS sweep (NPT) | Both | Yes | None | **Primary (glassy + rubbery)** |
 | Volume fluctuation | Rubbery | Yes | None (but barostat-sensitive) | Cross-check only |
-| NEMD uniaxial deformation | Glassy only | Yes | ~20–50% overestimate | Fallback only |
+| 3-direction uniaxial deformation | Both | Yes | ~20–50% overestimate | Fallback (Murnaghan fit fails) |
 
-Born is the correct physics for glassy polymers (unrelaxed modulus, rate-free, gives full elastic tensor). It cannot be the unified path — it is glassy-only and CPU-only. The EOS sweep is the only GPU-compatible, both-phase candidate.
-
-**Key open question — unify or keep two paths?**
-Morikami 1996 (Fig. 3, PE at 150 K < Tg) shows well-behaved P-V response even in the glassy state at moderate pressures, suggesting EOS works below Tg. If Born and Murnaghan agree within ~10% on a glassy test polymer (PMMA), the EOS sweep can replace Born as the fallback and eventually as an equal-validity alternative. If they diverge, Born is the primary and the EOS sweep is only for rubbery.
+The EOS sweep is GPU-compatible and works in both phases — Morikami 1996 (Fig. 3, PE at 150 K < Tg) shows a well-behaved P-V response in the glassy state at moderate pressures, confirming the EOS holds below Tg. It is therefore the unified primary path; deformation is the fallback when a Murnaghan fit fails acceptance (`fit_converged=False` or `B0_prime` outside [4, 20]).
 
 **Agentic mechanism — strain-targeted adaptive pressure selection:**
 
