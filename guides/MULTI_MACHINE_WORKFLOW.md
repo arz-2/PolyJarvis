@@ -26,6 +26,11 @@ are **fresh off `main` and deleted right after merge**.
    → effectively zero conflict surface. (If both machines append to the same `MEMORY.md` index, that
    one file may conflict trivially — resolve by keeping both lines.)
 
+> ⚠️ **Do NOT run `/ingest-memory` on the non-integrator machine.** Capture and push raw memory
+> only; ingestion happens *once*, on the integrator. Ingesting on both machines edits the same
+> shared files (`polymer_rules.json`, guides, `MEMORY.md` indexes) twice and produces the merge
+> conflicts this whole protocol exists to avoid. Distribute findings cheaply, centralize fixes.
+
 ### Integrator machine — to land code + ingest findings
 1. `git fetch origin --prune`, then run the helper:
    ```
