@@ -99,5 +99,7 @@ Quick index of all available MCP tools.
 | `calculate_rdf` | async | g(r) for atom-type pairs |
 | `unwrap_coordinates` | async | Image-flag-unwrapped dump file |
 
+**`generate_run_summary` — call exactly once with ALL parameters** (smiles, polymer_class, ff, d05, d06, exp ranges, n_replicates, `tg_path`). It is NOT async despite a `{"status":"submitted","message":"Poll with get_run_status"}` reply — that text is informational only. A minimal follow-up call (e.g. just `output_dir, run_name`) silently re-assembles from scratch and **overwrites the good summary with nulls**. Always pass `tg_path` explicitly so it doesn't rglob the wrong rate folder.
+
 
 

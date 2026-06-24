@@ -88,3 +88,5 @@ w = watch_run(result["chain_id"])
 **Chain droplets / vacuum voids:** Initial density too high. Rebuild at `density=0.05`.
 
 **"Out of range atoms — cannot compute PPPM" in npt_compress:** Switch `npt_compress` pair_style to `lj/cut/coul/cut`, increase neighbor skin 2.0 → 3.0 Å, reduce dt to 0.5 fs for that run only. Restore `lj/cut/coul/long` + kspace_style from `npt_pppm` onward.
+
+**Extend run returns 7 stages instead of 1:** `generate_equilibration_workflow(extend_only=True)` must yield `n_stages==1` with `run_order==["npt_extend"]` — verify this before submitting. A full 7-stage chain means the live MCP server is running stale code (pre-`extend_only`); request an orchestrator-level server restart. Do NOT submit (the chain's `nvt_softheat` 300→600 K re-melts a cooled glassy cell) and do NOT hand-write a `.in`.
