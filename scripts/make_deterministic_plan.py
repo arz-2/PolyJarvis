@@ -149,7 +149,9 @@ def build_planned_stages(cls: dict, properties: set) -> list:
                          {"loglinear_r_squared_min": 0.90, "n_rates_min": 2}))
     if "bulk_modulus" in properties:
         if glassy_hint:
-            stages.append(_s("born", {"born_matrix_written": True}, fallback="deform"))
+            # Murnaghan-primary at 300 K; deform fallback. (Born+NVT removed 2026-06-21:
+            # PCFF+PPPM virial inflated K_Born 8–15×.)
+            stages.append(_s("murnaghan", {"chain_submitted": True}, fallback="deform"))
         elif bm_pressures_atm:
             stages.append(_s("murnaghan", {"chain_submitted": True}))
         # else: rubbery without pressures — fluctuation path, no submit stage

@@ -1,3 +1,4 @@
 # Molecule Builder Memory Index
 
-- [PSFO routing](psfo_routing.md) — PSFO→EMC/PCFF, charge none, pppm; co-occurs POXI+PPNL (expected); use_pcff:true
+- [PEST routing](pest_routing.md) — PEST (PLA/PET/PCL)→EMC/PCFF, charge none, pppm; no co-occur/warning; use_pcff:true
+- [EMC output_name ignored](feedback_emc_output_name_ignored.md) — submit_emc_cell_job always writes emc_build.data/.params, not <output_name>.data; poll job status, read data_path from result

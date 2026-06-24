@@ -106,6 +106,7 @@ result = generate_script(
 # result["n_tg_stages"] is the number of temperature steps (used by run_lammps_script)
 ```
 
+**Velocity seed caveat:** the `npt_tg_step` template currently emits `velocity all create T <fresh random>` and does NOT honor the `velocity_seed` arg passed above — each generated deck gets a new seed. To record the actual seed for recovery/replication, grep the generated `.in` for the `velocity all create` line and log the 3rd token; do not assume the passed value was used.
 **Verify the FF before submitting.** After `generate_script`, `grep` the generated `.in`
 for `pair_style` and confirm it matches the planned force field — abort and re-check the
 FF flags if it shows a GAFF2 deck:

@@ -70,6 +70,11 @@ On session restart mid-thermal-track: re-read this file before resuming.
     the per-rate data is contaminated. Do NOT write registry rows for any rate from this sweep.
     Spawn /recover immediately (re-run from equil cell with a different seed). Max 2 attempts,
     then UNRESOLVED.
+    PEST slope-fragility (recovery ladder): PEST defaults are [25,50,100] K/ns; a budget-forced
+    recovery may drop to [40,100]. If the Tg-vs-rate response is near-flat (|ΔTg| < 1 K over the
+    rate span, e.g. PLA r40→r160 moved 0.2 K), a two-point fit's slope sign is noise-dominated and
+    can fail the slope gate with no retry budget left. The planner should name slope_fragility as
+    the dominant uncertainty, set plan_mode=reasoned, reduction_probe=none (no cheap fix exists).
   Rubbery exemption: gen_prompt passes `--regime rubbery` to extract_tg_multirate for rubbery
     polymers (T_workflow >> Tg). In that regime a negative slope is meaningless scatter (the
     per-rate "Tg" is an extrapolation artefact), NOT contamination — the tool returns

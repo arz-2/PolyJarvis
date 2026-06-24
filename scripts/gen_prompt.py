@@ -868,6 +868,10 @@ tg_path:           {_v(getattr(args, 'tg_path', None), 'null')}   # explicit can
 slope_gate_pass:   {_v(_slope_gate, 'null')}   # False → single-rate fallback Tg; pass --tg_k with the fallback value
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}
+
+# generate_run_summary returns {{"status":"submitted","run_id":...}} but it completes IN-PROCESS in
+# seconds — do NOT poll with get_run_status (you have no such tool). After the call, Read
+# {output_dir}run_summary.json directly and parse it.
 """
 
 
