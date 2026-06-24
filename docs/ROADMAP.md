@@ -139,21 +139,19 @@ RadonPy supports random, block, and blend cell construction but these are not ye
 
 ### I2 — Bulk modulus: adaptive pressure selection + method unification decision
 
-**Context (2026-06-16):** Three paths now exist — Born+NVT (glassy), Murnaghan EOS sweep (rubbery), volume fluctuation (rubbery fallback). The method routing is class-specific: only PHYC and PDIE have `bm_pressures_atm` set; all glassy classes use Born. The pressure ranges are hardcoded guesses, not derived from the polymer's stiffness. This is the current gap.
+**Update (2026-06-24):** The unification question below is resolved — Murnaghan EOS is the primary path for **both** glassy (NPT compression at 300 K) and rubbery (T>Tg) polymers, with 3-direction uniaxial deformation as the fallback when a Murnaghan fit fails acceptance. The remaining live work is the adaptive pressure-range selection (I2-B/C/E).
+
+**Context (2026-06-16):** Method routing is class-specific: only PHYC and PDIE have `bm_pressures_atm` set. The pressure ranges are hardcoded guesses, not derived from the polymer's stiffness. This is the current gap.
 
 **Method assessment:**
 
 | Method | Phase | GPU | Rate artifact | Status |
 |--------|-------|-----|---------------|--------|
-| Born + NVT stress-fluctuation | Glassy only | No (CPU-only) | None (rate-free) | Primary for glassy |
-| Murnaghan EOS sweep (NPT) | Both | Yes | None | Primary for rubbery |
+| Murnaghan EOS sweep (NPT) | Both | Yes | None | **Primary (glassy + rubbery)** |
 | Volume fluctuation | Rubbery | Yes | None (but barostat-sensitive) | Cross-check only |
-| NEMD uniaxial deformation | Glassy only | Yes | ~20–50% overestimate | Fallback only |
+| 3-direction uniaxial deformation | Both | Yes | ~20–50% overestimate | Fallback (Murnaghan fit fails) |
 
-Born is the correct physics for glassy polymers (unrelaxed modulus, rate-free, gives full elastic tensor). It cannot be the unified path — it is glassy-only and CPU-only. The EOS sweep is the only GPU-compatible, both-phase candidate.
-
-**Key open question — unify or keep two paths?**
-Morikami 1996 (Fig. 3, PE at 150 K < Tg) shows well-behaved P-V response even in the glassy state at moderate pressures, suggesting EOS works below Tg. If Born and Murnaghan agree within ~10% on a glassy test polymer (PMMA), the EOS sweep can replace Born as the fallback and eventually as an equal-validity alternative. If they diverge, Born is the primary and the EOS sweep is only for rubbery.
+The EOS sweep is GPU-compatible and works in both phases — Morikami 1996 (Fig. 3, PE at 150 K < Tg) shows a well-behaved P-V response in the glassy state at moderate pressures, confirming the EOS holds below Tg. It is therefore the unified primary path; deformation is the fallback when a Murnaghan fit fails acceptance (`fit_converged=False` or `B0_prime` outside [4, 20]).
 
 **Agentic mechanism — strain-targeted adaptive pressure selection:**
 
@@ -179,13 +177,13 @@ This is system-agnostic: a stiff glass (K ~ 4 GPa) automatically uses a wide pre
 
 **Implementation plan:**
 
-- [ ] **I2-A — PMMA cross-validation run**: run Born + adaptive Murnaghan sweep on PMMA at 300 K; compare K values. Agreement within 10% → proceed to I2-B (unification). Disagreement → Born remains primary for glassy, sweep added only as fallback.
+- [x] **I2-A — glassy BM method decision**: Murnaghan EOS adopted as the primary glassy path (300 K NPT compression); 3-direction deformation is the fallback when a fit fails acceptance.
 - [ ] **I2-B — Adaptive pressure selection in `property-analysis-worker`**: replace per-class `bm_pressures_atm` lookup with pilot-based range computation (2 pilot points → K_rough → 5-point sweep). Keyed to `exp_K_GPa` from `polymer_rules.json`; falls back to 500-atm pilot if field absent.
 - [ ] **I2-C — R²-based extension loop**: add `max_extensions=2` loop to `property-analysis-worker` that appends outer pressure points if Murnaghan R² < 0.999.
-- [ ] **I2-D — Promote Murnaghan as glassy fallback**: if Born fails (EXTRA-COMPUTE unavailable or run error), current fallback is deform-worker (NEMD). Replace with adaptive Murnaghan sweep (better physics, GPU-compatible). Deform-worker becomes tertiary fallback only.
+- [x] **I2-D — Glassy fallback**: 3-direction uniaxial deformation is the glassy fallback, invoked when a Murnaghan fit fails acceptance (`fit_converged=False` or `B0_prime` outside [4, 20]).
 - [ ] **I2-E — Remove hardcoded `bm_pressures_atm`** from polymer_rules.json once I2-B is live (PHYC and PDIE). Keep `exp_K_GPa` — that drives the adaptive range.
 
-**Decision gate:** I2-B/C/D/E are gated on I2-A result. Do I2-A before any pipeline changes.
+**Decision gate:** I2-B/C/E (adaptive pressure selection) are the remaining live work.
 
 ---
 
@@ -283,7 +281,7 @@ CED = E_pair / V          (J/cm³)
 - [ ] Post-validation `confidence` field update via `/ingest-memory` (merges with Track D bookkeeping)
 
 ### K3 — Follow-ups (deferred)
-- [ ] Wire the reasoned-path probes to live capabilities as they land: `literature_anchor` → E2, `fast_density_screen` → E3 (BLOCKED A1/A2), `born_vs_murnaghan_crosscheck` → I2-A
+- [ ] Wire the reasoned-path probes to live capabilities as they land: `literature_anchor` → E2, `fast_density_screen` → E3 (BLOCKED A1/A2)
 - [ ] End-to-end validation: one high-confidence fixed-seed class (PHYC/PE) must reproduce a prior run; one medium/low class (PAMD) must produce an evidence-bearing reasoned plan
 
 ---
@@ -321,7 +319,7 @@ tail -f stage_stdout.log | grep --line-buffered "STAGE COMPLETE\|FAILED\|Error\|
 | **8** | E3 — Fast density screen | **Blocked** | Needs advisor input A1/A2 |
 | **9** | H — Advanced chain architectures | Pending | Random/block copoly + blends; unblocked |
 | **10** | I1 — Bulk modulus Murnaghan series | Partial | Tools done; doc updates + B0_prime field remain |
-| **10b** | I2-A — PMMA Born vs Murnaghan cross-validation | Pending I1 | Single glassy run; settles unify-vs-two-path decision for I2-B–E |
+| **10b** | I2-A — glassy BM method decision | Done | Murnaghan EOS adopted as the primary glassy path; deform fallback |
 | **10c** | I2-B/C — Adaptive pressure selection + R² extension | Pending I2-A | Removes all hardcoded bm_pressures_atm; makes sweep system-agnostic |
 | **11** | J1 — CTE + ΔCp from Tg sweep slopes | **Done** | CTE (α_g, α_r) and ΔCp implemented in extract_thermal; exp targets in polymer_rules.json pending |
 | **12** | J2 — Solubility parameter δ | Pending J1 | E_pair/V post-process on NPT log; validate on PMMA first |

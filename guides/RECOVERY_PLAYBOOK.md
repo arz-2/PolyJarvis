@@ -2,7 +2,7 @@
      regenerate: python -m tools.runlog_miner --playbook -o guides/RECOVERY_PLAYBOOK.md -->
 # Recovery Playbook
 
-`runlog_miner` · 0 runs · 0 recovery incidents · 2026-06-14
+`runlog_miner` · 17 runs · 0 recovery incidents · 2026-06-24
 
 Cluster-derived fixes distilled from past `run_log.md` RECOVERIES. The `recover`
 skill consults these first (ranked by empirical success rate) before its built-in taxonomy.
