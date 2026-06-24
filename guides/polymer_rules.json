@@ -458,10 +458,10 @@
       },
       "density_initial_gcm3": 0.65,
       "experimental_density_gcm3": {
-        "PE": 0.95,
+        "PE": 0.855,
         "PP": 0.91,
         "PIB": 0.92,
-        "note": "amorphous RT values; Ramos2015 TraPPE-UA PE validation target ~0.95"
+        "note": "fully amorphous TraPPE-UA densities at 300K: PE=0.855 (Ramos2015 validation + PE3 simulation 0.857; 0.95 was semicrystalline HDPE — wrong comparator). PP: 0.91; PIB: 0.92."
       },
       "electrostatics": "lj_cut",
       "cutoff_A": 14.0,
@@ -477,11 +477,11 @@
       "tg_t_low_K": 100,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 250000,
-      "tg_min_steps_per_T": 100000,
+      "tg_min_steps_per_T": 250000,
       "tg_rates_K_per_ns": [
+        10,
         25,
-        50,
-        100
+        40
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
@@ -914,11 +914,11 @@
       "tg_t_low_K": 80,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 250000,
-      "tg_min_steps_per_T": 100000,
+      "tg_min_steps_per_T": 250000,
       "tg_rates_K_per_ns": [
+        10,
         25,
-        50,
-        100
+        40
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
