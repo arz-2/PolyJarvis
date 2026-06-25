@@ -22,6 +22,9 @@ are **fresh off `main` and deleted right after merge**.
 1. Record run findings to `.claude/agent-memory/<worker>/*.md` as usual.
    Per CLAUDE.md Cross-Track Rule 5, log **repo-relative** paths (`data/<run>/...`), never
    `/home/<user>/...` — keeps captures portable (no sanitization needed).
+   Write the memory **body** in the same commit as its `MEMORY.md` index line — never push an
+   index pointer whose target file is absent (a `[[link]]`/index entry is a claim, not a guarantee;
+   a stranded pointer reads as a phantom on the other machine).
 2. Commit the new memory files to `main` and push frequently. These commits touch only memory files
    → effectively zero conflict surface. (If both machines append to the same `MEMORY.md` index, that
    one file may conflict trivially — resolve by keeping both lines.)

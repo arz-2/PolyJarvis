@@ -3,6 +3,7 @@ name: pstr-reasoned-plan
 description: How to build a PSTR (polystyrenics, e.g. aPS) reasoned run_plan — confidence=medium, in-table temps, PCFF/EMC, glassy K, hardware
 metadata:
   type: feedback
+  ingested_at: 2026-06-25
 ---
 
 PSTR is confidence=medium and IS in polymer_rules.json with class-specific temperatures (T_equil=550, anneal=630, Tg sweep 200-600 K @ 20 K step, rates [25,50,100] K/ns). Build a **reasoned** plan (not deterministic).

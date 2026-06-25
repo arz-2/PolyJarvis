@@ -3,6 +3,7 @@ name: pla3-equil-chain
 description: PLA3 glassy PEST, PCFF, kokkos, GPU 1, 9-stage chain 905e9409, 2026-06-24
 metadata:
   type: project
+  ingested_at: 2026-06-25
 ---
 
 PLA3 equilibration chain submitted 2026-06-24.
@@ -14,8 +15,8 @@ PLA3 equilibration chain submitted 2026-06-24.
 - T_equil_K: 620, T_anneal_high_K: 700, P: 1 atm
 - chain_id: 905e9409
 - n_stages: 9 (glassy path: npt_cool300 + npt_prod300 appended)
-- work_dir: /home/arz2/PolyJarvis/data/PLA3/lammps/equil
-- npt_prod300_data: /home/arz2/PolyJarvis/data/PLA3/lammps/equil/npt_prod300/npt_prod300_out.data
+- work_dir: data/PLA3/lammps/equil
+- npt_prod300_data: data/PLA3/lammps/equil/npt_prod300/npt_prod300_out.data
 - sentinel: /tmp/polyjarvis/sentinels/done_905e9409.json
 
 **Why:** Tracking for session recovery and cross-run context.

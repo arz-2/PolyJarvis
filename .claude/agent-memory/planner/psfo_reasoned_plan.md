@@ -3,6 +3,7 @@ name: psfo-reasoned-plan
 description: How to build a PSFO (polysulfones — PSU/PES/PPSU) reasoned run_plan — confidence=medium, in-table temps, PCFF/EMC, glassy K, multi-member exp Tg
 metadata:
   type: feedback
+  ingested_at: 2026-06-25
 ---
 
 PSFO (Polysulfones) is confidence=medium and IS in polymer_rules.json with class-specific temperatures (T_equil=700, anneal=780/8cyc, Tg sweep 250-750 K @ 20 K step, rates [25,50,100] K/ns, dp_typical=25, nchain=8). Build a **reasoned** plan (not deterministic).

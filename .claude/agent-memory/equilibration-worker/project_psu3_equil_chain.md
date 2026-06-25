@@ -3,6 +3,7 @@ name: project-psu3-equil-chain
 description: PSFO/PCFF 9-stage glassy equil chain for PSU3 (Polysulfone), temp=700 K, max_temp=780 K, n_atoms=10816, chain_id=b617e91c
 metadata:
   type: project
+  ingested_at: 2026-06-25
 ---
 
 PSFO/PCFF 9-stage glassy equilibration chain for PSU3 (Polysulfone).

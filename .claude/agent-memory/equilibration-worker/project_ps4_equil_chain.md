@@ -3,6 +3,7 @@ name: project-ps4-equil-chain
 description: PSTR/PCFF 9-stage glassy chain for PS4, temp=550 K, max_temp=630 K, n_atoms=6420, chain_id=ac214038; engine=kokkos, gpu_ids=1, mpi=1; velocity_seed=647974
 metadata:
   type: project
+  ingested_at: 2026-06-25
 ---
 
 PS4 Atactic Polystyrene equilibration chain submitted 2026-06-24.

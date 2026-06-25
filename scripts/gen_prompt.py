@@ -710,7 +710,7 @@ backbone_types:    {args.backbone_types or '<FILL from inspect_data_file>'}
 ct_min_decay_melt: {ct_decay if ct_decay is not None else 'null'}   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
 is_glassy:         {str(is_glassy_equil).lower()}   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
 regime:            {regime}   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<2% AND density-homogeneity CV<25% AND energy drift/SEM; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
-dp:                {dp_val if dp_val is not None else 'null'}   # DP≥30 required for require_glassy carve-out to apply
+dp:                {dp_val if dp_val is not None else 'null'}   # DP≥30 required for require_glassy carve-out to apply. NOTE: a class with ct_gate_reliable=false (aromatic main chain) already has ct_min_decay=null above, so its melt-diffusion C(t) gate is suppressed INDEPENDENT of DP — a DP<30 aromatic cell still passes equil on the structural gates (density/SEM/CV/P2/Rg). The DP≥30 clause only bites classes that would otherwise arm ct_min_decay.
 exp_density_range: {exp_density}
 output_dir:        {output_dir}
 graphs_dir:        {graphs_dir}

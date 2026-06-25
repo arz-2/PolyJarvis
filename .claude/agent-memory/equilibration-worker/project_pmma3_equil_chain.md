@@ -3,6 +3,7 @@ name: pmma3-equil-chain
 description: PMMA3/PACR PCFF 9-stage glassy chain, temp=550 K, max_temp=630 K, n_atoms=7520, chain_id=bd435bce (re-submit, EMC seed 555781); engine=kokkos, gpu_ids=3, mpi=1; params_file required; velocity_seed=random (read back from log)
 metadata:
   type: project
+  ingested_at: 2026-06-25
 ---
 
 PMMA3 equilibration chain re-submitted 2026-06-24 (rebuilt cell after PPPM overlap failure with seed 555780).

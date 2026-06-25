@@ -16,13 +16,13 @@ PEG3 (PEO/PEG, POXI class, PCFF force field) 7-stage rubbery equilibration chain
 - gpu_ids: "0", mpi: 1
 - engine: kokkos
 - velocity_seed: 182001 (pinned SEED_HOT for reproducibility)
-- params_file: /home/arz2/PolyJarvis/data/PEG3/lammps/cell/emc_build.params
+- params_file: data/PEG3/lammps/cell/emc_build.params
 
 Key paths:
-- data_file: /home/arz2/PolyJarvis/data/PEG3/lammps/cell/cell.data
-- npt_production_log: /home/arz2/PolyJarvis/data/PEG3/lammps/equil/npt_production/npt_production.log
-- npt_production_out: /home/arz2/PolyJarvis/data/PEG3/lammps/equil/npt_production/npt_production_out.data
-- expected_equil_data: /home/arz2/PolyJarvis/data/PEG3/lammps/equil/nvt_production/nvt_production_out.data
+- data_file: data/PEG3/lammps/cell/cell.data
+- npt_production_log: data/PEG3/lammps/equil/npt_production/npt_production.log
+- npt_production_out: data/PEG3/lammps/equil/npt_production/npt_production_out.data
+- expected_equil_data: data/PEG3/lammps/equil/nvt_production/nvt_production_out.data
 
 **Why:** POXI/PCFF EMC build — Coeffs live in params file, not .data; passed params_file to both inspect_data_file and run_lammps_chain to suppress false Coeffs errors. Same as PEG1 and PEG2. engine=kokkos is host default for single-GPU runs (GPU-package was CPU-bound at 0% util).
 

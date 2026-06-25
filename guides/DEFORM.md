@@ -91,6 +91,8 @@ w = watch_run(run_ids["z"])  # return run_ids and w["monitor_command"] to orches
 
 **Acceptance (3-direction):** Run `extract_bulk_modulus_deform` separately on each log. Report K_x, K_y, K_z, and K_mean = (K_x + K_y + K_z)/3 in the RESULT block. Gate: if K_std/K_mean > 20% across directions, flag BORDERLINE (isotropy still poor despite averaging — system too small or poorly equilibrated).
 
+> **G<0 in y/z is NOT a hard failure.** On small amorphous cells C11<C12 can occur in some directions → negative shear G (e.g. PLA2: G_y=-0.60, G_z=-0.65 GPa), but K=(C11+2C12)/3 averages the transverse stresses and stays robust. Report K_mean as bulk_modulus_GPa if the **cross-direction** K_std/K_mean<20% and all fit_r²≥0.90; report G and E from the x-direction (best-behaved) only, and note "G<0 y/z — small-cell anisotropy; K_mean robust." The per-direction `isotropy_delta_pct` from `extract_bulk_modulus_deform` (C12_yy vs C12_zz, within one direction) is a DIFFERENT metric from the cross-direction K spread used in this gate — check the cross-direction spread manually.
+
 **Acceptance (single-direction, x-only):** If running x-only as a quick check, `isotropy_delta_pct ≥ 20%` → FAIL; this run is informational only. The Murnaghan path should have been primary and should be the reported value.
 
 ---
