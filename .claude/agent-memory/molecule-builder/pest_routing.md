@@ -3,6 +3,7 @@ name: pest-routing
 description: PEST (polyester, e.g. PLA/PET/PCL) routes to EMC/PCFF, charge none, pppm electrostatics, use_pcff:true
 metadata:
   type: reference
+  ingested_at: 2026-06-25
 ---
 
 PEST (class 9, Polyester — PLA, PET, PCL) routing for Stage 1 build:

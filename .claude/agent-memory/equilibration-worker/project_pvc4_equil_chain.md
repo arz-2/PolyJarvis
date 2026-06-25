@@ -3,6 +3,7 @@ name: pvc4-equil-chain
 description: PVNL/PCFF PVC 9-stage glassy equil chain at 530 K, kokkos, GPU 2, chain_id=0e4c8878 [ingested 2026-06-24]
 metadata:
   type: project
+  ingested_at: 2026-06-25
 ---
 
 PVNL/PCFF (PVC4) glassy equilibration chain submitted 2026-06-24.

@@ -33,19 +33,19 @@
       "evidence_required": false,
       "evaluate": ["forcefield_cost_structure", "atom_count", "concurrent_load", "benchmark_evidence", "cell_size_vs_benchmark_cell", "host_match"],
       "require": [
-        "mpi>=4 for any PPPM/charged class2 system (mpi=1 starves kspace ~75x — never launch it)",
+        "mpi>=4 for any PPPM/charged class2 system ON THE GPU PACKAGE (engine=gpu): mpi=1 starves kspace ~75x there — never launch it. This does NOT apply to engine=kokkos, where kspace is GPU-resident and mpi=1 IS the correct PCFF/OPLS default (by_forcefield.pcff). Only flag mpi=1 when engine=gpu.",
         "UA classes (TraPPE: PHYC/PDIE/PSTR) route to GPU package with `neigh yes`, mpi=1, 1 GPU/run (neighbor build is ~71% of the loop and offloads to the GPU; script_generator emits `neigh yes` automatically for use_trappe). This is 3.7x vs CPU mpi=4 and beats KOKKOS on small UA cells (run-0 parity PASS 2026-06-20). NOT pair-only GPU (neigh on CPU ties CPU) and NOT CPU mpi=4 (the old default).",
         "small (<10k-atom) cells use 1 GPU per run, not 4 (comm overhead, GPU underfill)",
         "Sum of mpi across concurrent runs <= 18 physical cores (one GPU-heavy run per GPU)",
         "a multi-GPU pin (gpu_per_run>=2) requires BOTH an estimated cell >~10k atoms AND benchmark support (directional_probe.recommended_by_ff[fam].gpu>=2 on a matching host); otherwise use 1 GPU",
-        "when hardware_policy.values_are_benchmarked=false OR directional_probe.host != hardware_policy.host, any non-default D-08 pin MUST be accompanied by a planned hardware_benchmark probe and confidence:low — else keep the by_forcefield default"
+        "when hardware_policy.values_are_benchmarked=false OR the live host (nvidia-smi) does not match directional_probe.measured_on (the field that records where the probe ran — NOT the stale top-level hardware_policy.host, and NOT directional_probe.host which is null and would always mismatch), any non-default D-08 pin MUST be accompanied by a planned hardware_benchmark probe and confidence:low — else keep the by_forcefield default"
       ],
       "prefer": [
-        "when values_are_benchmarked=true AND directional_probe.host matches the live host AND the estimated cell is within ~[0.5x, 2x] of directional_probe.recommended_by_ff[fam].cell_atoms: adopt recommended_by_ff[fam] (engine/gpu/mpi) over the by_forcefield default — this is how measured optima reach runs",
+        "when values_are_benchmarked=true AND directional_probe.measured_on matches the live host (nvidia-smi) AND the estimated cell is within ~[0.5x, 2x] of directional_probe.recommended_by_ff[fam].cell_atoms: adopt recommended_by_ff[fam] (engine/gpu/mpi) over the by_forcefield default — this is how measured optima reach runs",
         "otherwise treat directional_probe ABSOLUTE ns/day as a HINT only — but a RATIO measured under uniform contention (all arms niced on the same busy box) plus a run-0 parity PASS is sufficient to flip an engine default, as was done for TraPPE neigh-yes (3.7x ratio, 0.000% parity, 2026-06-20). Do NOT bake in an absolute throughput claim from a contended sweep, and keep values_are_benchmarked=false until a drained-box sweep exists."
       ],
       "rationale": "Hardware config is a function of FF cost structure (UA lj/cut vs PCFF class2+pppm) AND cell size (the GPU-saturation / PPPM all-to-all crossover), so it belongs in policy, not ad-hoc submit-time choice. The live anti-patterns: mpi=1 PCFF on the GPU-package (~2.4 ns/day, ~75x slow — but mpi=1 IS correct for PCFF/OPLS on KOKKOS, where kspace is on the GPU); and UA on the GPU with neigh on the CPU (pair-only offload ties CPU). UA on the GPU with `neigh yes` is the CORRECT default (3.7x), NOT an anti-pattern. The planner emits a D-08_hardware decision grounded in directional_probe + the planned cell size; a deviation from the FF-family default flows to runtime via decided_params (engine/gpu_per_run/mpi_ranks) -> gen_prompt.apply_plan. The conservative gate above keeps the default until a CLEAN (values_are_benchmarked=true), host-matched, in-size benchmark exists.",
-      "evidence_source": "polymer_rules.json:hardware_policy.directional_probe.{recommended_by_ff,cells_atoms,host,date,values_are_benchmarked}",
+      "evidence_source": "polymer_rules.json:hardware_policy.directional_probe.{recommended_by_ff,cells_atoms,measured_on,date,values_are_benchmarked}",
       "default_source": "polymer_rules.json:hardware_policy.directional_probe.recommended_by_ff[fam] when benchmarked+host-match+in-size, else by_forcefield.<FF_FAMILY>"
     },
     "forcefield": {
@@ -97,7 +97,7 @@
       "decision_id": "D-06_tg_fit_quality",
       "evidence_required": false,
       "evaluate": ["t_range_brackets_experimental_tg", "n_temperature_bins", "bilinear_fit_r_squared", "cooling_rate_artifact", "tg_rates_clear_steps_floor"],
-      "require": ["never report Tg without verifying bilinear fit R^2 (cross-stage rule 3)", "T sweep range must bracket experimental_tg_K with margin", "every tg_rates_K_per_ns entry must clear tg_min_steps_per_T: N=tg_t_step_K/(rate*dt_fs*1e-6) >= floor (default 200000 steps=200ps@dt=1fs; TraPPE-UA dt=2fs floor=100000). Retired [40,160,400] gave 50/125ps degenerate fits (cis-PBD2, PEEK2)"],
+      "require": ["never report Tg without verifying bilinear fit R^2 (cross-stage rule 3)", "T sweep range must bracket experimental_tg_K with margin", "every tg_rates_K_per_ns entry must clear tg_min_steps_per_T: N=tg_t_step_K/(rate*dt_fs*1e-6) >= floor (default 200000 steps=200ps@dt=1fs; TraPPE-UA dt=2fs floor=100000). Critic MUST recompute N for EVERY rate independently — never trust the decision's prose arithmetic — and scrutinize the FASTEST rate hardest (that is where the floor gets violated; e.g. PVC4's 200 K/ns = 100ps/T-hold was wrongly stated as clearing the 200ps floor). Retired [40,160,400] gave 50/125ps degenerate fits (cis-PBD2, PEEK2)"],
       "rationale": "A too-narrow T range gives R^2<0.80 / <4 bins (known /recover failure mode). Planning the range from experimental_tg_K +/- margin catches this before the sweep runs.",
       "default_source": "polymer_rules.json:tg_protocol_reference"
     },
@@ -108,7 +108,8 @@
       "require": [
         "glassy bulk_modulus via Murnaghan NPT compression at 300 K (primary — symmetric, cell-size independent; Wu 2019 Comput. Mater. Sci. validated); 3-direction uniaxial deformation fallback if Murnaghan fails (fit_converged=False or B0_prime outside [4, 20]); Born+NVT REMOVED (PCFF+PPPM virial incompatibility — K_Born 8-15x too high, Var(P) ~10^7x too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1 2026-06-21; see BM_ANALYSIS.md)",
         "rubbery bulk_modulus via Murnaghan EOS sweep at T>Tg (unchanged); volume fluctuation is cross-check only",
-        "is_glassy from measured Tg>300K when tg requested, else from experimental_tg_K glassy_hint"
+        "is_glassy from measured Tg>300K when tg requested, else from experimental_tg_K glassy_hint",
+        "for a multi-member class (experimental_tg_K is an OBJECT keyed by member name, e.g. PVNL {PVA:303,PVC:354,PVAc:304}; also PACR, POXI), the planner MUST resolve which member the SMILES is (by substituent — PVNL: *CC(Cl)*=PVC, *CC(O)*=PVA, *CC(OC(C)=O)*=PVAc) and pin THAT member's exp Tg/density/K in the D-04 evidence and assumptions[]. Drive is_glassy off the pinned exp Tg, never the noisy MD Tg — otherwise is_glassy/grading use the wrong target"
       ],
       "rationale": "Born+NVT PCFF virial incompatibility confirmed 2026-06-21 across PMMA4, PVC1, PEEK1. Even a 4-ns run (PEEK1) gave K_T=-49.6 GPa. Wu (2019) Comput. Mater. Sci. validates NPT compression as faster and more reliable than volume-fluctuation for polymer K. Murnaghan reuses existing run_bulk_modulus_series tooling; glassy path uses npt_prod300_out.data at 300 K with ±1000 atm symmetric pressure range.",
       "default_source": "polymer_rules.json:classes.<CLASS>.{bm_pressures_atm,exp_K_GPa}"

@@ -27,6 +27,7 @@ Box: 4× Quadro RTX 6000 (ids 0–3) + i9-10980XE (18 physical cores).
 | npt_tg_step | gpu | 1 | 4 | 8 |
 
 ## Commands
+- Atom-count estimate (D-08 sizing): the bare `python3` lacks rdkit — call a conda-env python by absolute path, e.g. `"$(conda env list | awk '/mol-builder/{print $NF}')"/bin/python -c "from rdkit import Chem; ..."` (mol-builder or radonpy env). Derive the env path from `conda env list`; never hard-code `/home/<user>/...`.
 - Budget check: `python3 scripts/pick_gpu.py budget --mpi <N>` (exit 0 fits / 1 oversubscribed)
 - Claim/release GPU: `python3 scripts/pick_gpu.py claim --run <RUN>` / `release --run <RUN>`
 - Benchmark a cell: `python3 scripts/benchmark_hardware.py --data <cell>.data --ff <pcff|opls|trappe> [--pppm] --label <NAME>`

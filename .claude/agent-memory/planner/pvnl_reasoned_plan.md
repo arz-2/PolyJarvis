@@ -3,6 +3,7 @@ name: pvnl-reasoned-plan
 description: How to build a PVNL (polyvinyls, esp. PVC *CC(Cl)*) reasoned run_plan — medium confidence, in-table temps, PCFF/EMC, glassy K, Tg-ladder slope-gate fix
 metadata:
   type: feedback
+  ingested_at: 2026-06-25
 ---
 
 PVNL is confidence=medium and IS in polymer_rules.json with class-specific temperatures (T_equil=530, anneal=610, 7 cycles, Tg sweep 150-550 K @ 20 K, default rates [25,50,100]). Build a **reasoned** plan (not deterministic) — medium confidence forces it; the Critic escalates a deterministic plan on a non-high class.

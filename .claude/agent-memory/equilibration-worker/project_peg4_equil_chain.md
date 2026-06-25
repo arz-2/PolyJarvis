@@ -3,6 +3,7 @@ name: project_peg4_equil_chain
 description: PEG4 POXI/PCFF 9-stage rubbery chain with add_melt_npt=True (npt_cool_melt + npt_melt + npt_cool), temp=300 K, max_temp=580 K, n_atoms=7020, chain_id=9199fe26; engine=kokkos, gpu_ids=0, mpi=1, velocity_seed=409966
 metadata:
   type: project
+  ingested_at: 2026-06-25
 ---
 
 PEG4 equilibration chain submitted 2026-06-24.

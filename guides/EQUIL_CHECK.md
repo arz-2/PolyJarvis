@@ -23,7 +23,7 @@ Tools that produce PNG figures (always pass `graphs_dir`):
 
 Returns `overall_pass` verdict and a ready-to-paste D-05 markdown block. Copy `result["d05_markdown"]` directly into run_log.md as the D-05 CONVERGENCE DETAIL section.
 
-`backbone_types` is **REQUIRED** — from `inspect_data_file()`; do not guess.
+`backbone_types` is **REQUIRED** — from `inspect_data_file()`; do not guess. Read the **Masses** section, not Pair Coeffs: pick heavy backbone atoms (C≈12, O≈16, N≈14), never hydrogens (mass 1.008). E.g. PEEK = `[1,2,5]` (aromatic C + ether O); `[3,4]` are H → degenerate R_ee/P2.
 
 **Thermo and structural checks read different files — this is deliberate.** The tool decouples Section A (thermo, from `log_file`) from Sections B/C (chain conformation + spatial, from `dump_file`):
 - `log_file` = `npt_prod_log_path` — the production NPT log (`npt_prod300` glassy / `npt_production` rubbery), where density/energy convergence is meaningful.
