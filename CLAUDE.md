@@ -211,7 +211,9 @@ PHASE C — SUMMARY (always)
     2. Room-for-improvement / codebase friction (confusing/wrong guide, MCP-tool quirk,
        missing/incorrect polymer_rules param, awkward worker contract).
   Write these to the orchestrator's own auto-memory (`~/.claude/projects/<project-slug>/memory/` — the dir named in the # Memory system reminder)
-  and/or the relevant worker's repo-root .claude/agent-memory/<worker>/ dir — these are the inputs
+  and/or the relevant worker's canonical repo-root `.claude/agent-memory/<worker>/` dir (the absolute
+  path named in that worker's agent definition — NEVER resolved relative to a worker's cwd, NEVER a
+  `.claude/` created under a work_dir or data/<run>/ subdir) — these are the inputs
   /ingest-memory consumes. Do NOT put any of this in run_log.md: the run log is for users to
   interpret the simulation, not to fix the workflow. (RECOVERIES stays as-is — it documents what
   happened to the simulation, per cross-track rule 1 — but no new improvement/error-capture content
@@ -236,6 +238,6 @@ These rules are inlined into every worker prompt by `gen_prompt.py`. They apply 
 2. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, and SEED_COLD in the run_log header. For replication studies, use fixed seeds from `guides/REVISION_PARAMS.md`. For exploratory runs, read seeds back from job output and log them immediately after submission.
 3. **Check for existing writers before killing any process** — before killing and relaunching any LAMMPS run, run `lsof | grep <log_filename>` to check for existing writers. If another writer is present (concurrent orchestrator session), do NOT launch — coordinate via user first. A double-launch corrupts the shared log and requires a full restart from step 0.
 4. **Log the exact GPU claim label** — after any GPU claim (`pick_gpu.py claim --run <LABEL>`), copy the `run` field from the JSON response into the SIMULATION STATE table. Use that exact string verbatim at release (`pick_gpu.py release --run <LABEL>`). A label mismatch at release silently leaves the GPU stuck as claimed.
-5. **Log repo-relative run paths in memory** — when recording run artifacts or paths in any `.claude/agent-memory/**` file, write them repo-relative (`data/<run>/...`), never machine-absolute (`/home/<user>/...`). Keeps captures portable across the revision machines so integration needs no path sanitization.
+5. **Log repo-relative run paths in memory** — when recording run artifacts or paths in any `.claude/agent-memory/**` file, write them repo-relative (`data/<run>/...`), never machine-absolute (`/home/<user>/...`). Keeps captures portable across the revision machines so integration needs no path sanitization. The memory file ITSELF must live only in the repo-root `.claude/agent-memory/<worker>/` dir (the absolute path in your agent definition) — never a `.claude/` created under a work_dir or data/<run>/ subdir.
 <!-- CROSS_STAGE_RULES_END -->
 
