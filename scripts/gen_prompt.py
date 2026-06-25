@@ -82,7 +82,6 @@ WORKER_GUIDES = {
     "equil-check":  "EQUIL_CHECK.md",
     "analyze-bm":   "BM_ANALYSIS.md",
     "deform":       "DEFORM.md",
-    "born":         "BORN_MATRIX.md",
     "murnaghan":    "MURNAGHAN.md",
     "run-summary":  None,
 }
@@ -572,7 +571,7 @@ def born_prompt(args, cls: dict, cross_track_rules: str) -> str:
         "ERROR: --stage born is no longer supported. Born+NVT has been removed from the "
         "PolyJarvis pipeline (2026-06-21) due to PCFF+PPPM virial incompatibility (failed "
         "3/3 pipeline runs). Use --stage murnaghan for glassy bulk modulus. "
-        "See guides/BORN_MATRIX.md for the removal rationale."
+        "See guides/BM_ANALYSIS.md for the removal rationale."
     )
 
 
@@ -1012,7 +1011,7 @@ def main():
                    help="equil_verdict from equil-checker RESULT: PASS|EXTEND|FAIL (run-summary stage)")
     p.add_argument("--born_run_ns", type=float,
                    help="DEPRECATED — Born+NVT removed 2026-06-21 (PCFF+PPPM virial incompatibility). "
-                        "Use --stage murnaghan. See guides/BORN_MATRIX.md.")
+                        "Use --stage murnaghan. See guides/BM_ANALYSIS.md.")
     p.add_argument("--npt_prod_log")
     p.add_argument("--npt_prod_dump")
     p.add_argument("--ff")

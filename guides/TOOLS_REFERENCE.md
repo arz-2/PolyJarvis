@@ -92,7 +92,7 @@ Quick index of all available MCP tools.
 | `extract_bulk_modulus` | async | Isothermal K from NPT volume fluctuations (rubbery path; Path C) |
 | `extract_bulk_modulus_born` | sync | K_T from Born matrix file + NVT thermo log: K_T = K_Born + NkT/V − (V/kT)·Var(P) (glassy path; Path A) |
 | `extract_bulk_modulus_murnaghan` | sync | Fits Murnaghan EOS to P vs V from a pressure series; returns B0, B0', V0 (rubbery path; Path B) |
-| `run_bulk_modulus_series` | async | Submits N NPT runs at each pressure in `pressures_atm`; returns chain_id + log_files list (used internally by property-analysis-worker for rubbery Murnaghan path) |
+| `run_bulk_modulus_series` | async | Submits N NPT runs at each pressure in `pressures_atm`; returns chain_id + log_files list (used internally by murnaghan-worker for rubbery Murnaghan path) |
 | `extract_bulk_modulus_deform` | sync | Young's modulus and K from a uniaxial deformation log; recovery fallback or cross-check only |
 | `generate_run_summary` | sync | Assembles `run_summary.json` with all properties, validation status, and experimental comparison; call after all analysis tools complete |
 | `extract_end_to_end_vectors` | async | Per-chain R vectors |

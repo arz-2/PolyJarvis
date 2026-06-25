@@ -14,7 +14,7 @@ Inspect which inputs are non-null in your prompt:
 | `deform_log_path` non-null | `extract_bulk_modulus_deform` | `deformation` | `bulk_modulus_deform.json` |
 | all null | `extract_bulk_modulus` | `fluctuation` | `bulk_modulus.json` |
 
-**Born+NVT has been removed from the pipeline.** `born_matrix_file` and `born_log_path` are always null in standard runs. Do not call `extract_bulk_modulus_born`. See `guides/BORN_MATRIX.md` for the removal rationale (PCFF+PPPM virial incompatibility, failed 3/3 pipeline runs).
+**Born+NVT has been removed from the pipeline** (2026-06-21, PCFF+PPPM virial incompatibility: K_Born 8–15× too high, Var(P) ~10⁷× too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1). `born_matrix_file` and `born_log_path` are always null in standard runs. Do not call `extract_bulk_modulus_born`. The `born-worker` agent type is retained for emergency diagnostic use only — it is **never spawned** by the standard orchestrator and must be explicitly requested by the user; if a diagnostic run gives K_T < 0, do not retry Born (root cause is upstream, not sampling) — route to the deform-worker.
 
 Only one path runs per invocation. The `murnaghan` path additionally calls `extract_bulk_modulus(npt_prod_log)` in parallel for a diagnostic B_dyn cross-check (write to same `output_dir`; not the reported K).
 

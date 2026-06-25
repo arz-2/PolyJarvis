@@ -46,7 +46,7 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
 **6. Output a recovery plan in this format:**
 ```
 RECOVERY PLAN
-  Stage:        <molecule-builder | equilibration | tg-sweep | deform-worker | property-analysis-worker | phase-2>
+  Stage:        <molecule-builder | equilibration | tg-sweep | murnaghan-worker | deform-worker | bulk-modulus-extractor | phase-2>
   Failure:      <exact error string or condition from log>
   Root cause:   <diagnosis from taxonomy above>
   Action:       <parameter change or step to re-run>
