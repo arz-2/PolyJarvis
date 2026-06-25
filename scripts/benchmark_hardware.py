@@ -10,7 +10,7 @@ help and GPU does not; Pair-dominated => GPU offload helps.
 Two ways to define the run being benchmarked:
   (A) generate mode  — build a short NVT .in via the engine's ScriptGenerator from
       a .data file + FF flags (covers the lj/cut / class2+pppm / opls+pppm classes).
-  (B) reuse mode     — point at an existing fully-formed .in (e.g. a real nvt_born.in,
+  (B) reuse mode     — point at an existing fully-formed .in (e.g. a real nvt_production.in,
       npt_deform.in, tg_sweep.in) and only override its run length; faithful for the
       special integrators/computes whose scaling differs from plain MD.
 
@@ -32,9 +32,9 @@ Usage:
   # PCFF cell, class2 + pppm
   scripts/benchmark_hardware.py --data data/PMMA1/.../*.data --ff pcff --pppm
 
-  # faithful born/deform/tg cost class via an existing input deck
-  scripts/benchmark_hardware.py --data <equil.data> --reuse-in <real_nvt_born.in> \
-      --label PSU1_born
+  # faithful deform/tg cost class via an existing input deck
+  scripts/benchmark_hardware.py --data <equil.data> --reuse-in <real_npt_deform.in> \
+      --label PSU1_deform
 """
 
 from __future__ import annotations

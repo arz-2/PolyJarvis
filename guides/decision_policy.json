@@ -106,7 +106,7 @@
       "evidence_required": true,
       "evaluate": ["phase_glassy_vs_rubbery", "method_physics_validity", "gpu_vs_cpu", "rate_artifact"],
       "require": [
-        "glassy bulk_modulus via Murnaghan NPT compression at 300 K (primary — symmetric, cell-size independent; Wu 2019 Comput. Mater. Sci. validated); 3-direction uniaxial deformation fallback if Murnaghan fails (fit_converged=False or B0_prime outside [4, 20]); Born+NVT REMOVED (PCFF+PPPM virial incompatibility — K_Born 8-15x too high, Var(P) ~10^7x too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1 2026-06-21; see BORN_MATRIX.md)",
+        "glassy bulk_modulus via Murnaghan NPT compression at 300 K (primary — symmetric, cell-size independent; Wu 2019 Comput. Mater. Sci. validated); 3-direction uniaxial deformation fallback if Murnaghan fails (fit_converged=False or B0_prime outside [4, 20]); Born+NVT REMOVED (PCFF+PPPM virial incompatibility — K_Born 8-15x too high, Var(P) ~10^7x too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1 2026-06-21; see BM_ANALYSIS.md)",
         "rubbery bulk_modulus via Murnaghan EOS sweep at T>Tg (unchanged); volume fluctuation is cross-check only",
         "is_glassy from measured Tg>300K when tg requested, else from experimental_tg_K glassy_hint"
       ],

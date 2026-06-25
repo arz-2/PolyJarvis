@@ -152,6 +152,6 @@ All experimental ranges are per-class fields in `guides/polymer_rules.json`:
 |----------|-------|------------------|
 | Density | `experimental_density_gcm3` | OK: within ±5 % |
 | Tg | `experimental_tg_K` | OK: MD value within expected 80–120 K overestimate |
-| Bulk modulus | `exp_K_GPa` | OK / WARNING per property-analysis-worker comparison |
+| Bulk modulus | `exp_K_GPa` | OK / WARNING per bulk-modulus-extractor comparison |
 
 Status values in the RESULT block: `OK` | `WARNING` | `N/A`

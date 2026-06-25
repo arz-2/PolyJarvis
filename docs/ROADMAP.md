@@ -132,7 +132,7 @@ RadonPy supports random, block, and blend cell construction but these are not ye
 - [x] `extract_bulk_modulus_murnaghan.py` — Murnaghan EOS fit with R² check, linear fallback, bootstrap uncertainty
 - [x] `bm_pressures_atm` field set for PHYC and PDIE in `polymer_rules.json`
 - [ ] Update `TOOLS_REFERENCE.md`: replace B_dyn description with Murnaghan series protocol
-- [ ] Update `property-analysis-worker.md`: document Murnaghan as default for rubbery + bm_pressures_atm set
+- [ ] Update `murnaghan-worker.md`: document Murnaghan as default for rubbery + bm_pressures_atm set
 - [ ] Add `B0_prime` field to RESULTS table in `data/TEMPLATE/run_log.md`
 
 ---
@@ -178,8 +178,8 @@ This is system-agnostic: a stiff glass (K ~ 4 GPa) automatically uses a wide pre
 **Implementation plan:**
 
 - [x] **I2-A — glassy BM method decision**: Murnaghan EOS adopted as the primary glassy path (300 K NPT compression); 3-direction deformation is the fallback when a fit fails acceptance.
-- [ ] **I2-B — Adaptive pressure selection in `property-analysis-worker`**: replace per-class `bm_pressures_atm` lookup with pilot-based range computation (2 pilot points → K_rough → 5-point sweep). Keyed to `exp_K_GPa` from `polymer_rules.json`; falls back to 500-atm pilot if field absent.
-- [ ] **I2-C — R²-based extension loop**: add `max_extensions=2` loop to `property-analysis-worker` that appends outer pressure points if Murnaghan R² < 0.999.
+- [ ] **I2-B — Adaptive pressure selection in `murnaghan-worker`**: replace per-class `bm_pressures_atm` lookup with pilot-based range computation (2 pilot points → K_rough → 5-point sweep). Keyed to `exp_K_GPa` from `polymer_rules.json`; falls back to 500-atm pilot if field absent.
+- [ ] **I2-C — R²-based extension loop**: add `max_extensions=2` loop to `murnaghan-worker` that appends outer pressure points if Murnaghan R² < 0.999.
 - [x] **I2-D — Glassy fallback**: 3-direction uniaxial deformation is the glassy fallback, invoked when a Murnaghan fit fails acceptance (`fit_converged=False` or `B0_prime` outside [4, 20]).
 - [ ] **I2-E — Remove hardcoded `bm_pressures_atm`** from polymer_rules.json once I2-B is live (PHYC and PDIE). Keep `exp_K_GPa` — that drives the adaptive range.
 
@@ -251,7 +251,7 @@ CED = E_pair / V          (J/cm³)
 - [ ] Add `tc-worker` agent: submits `nvt_gk` from Stage 7 NPT data file; returns run_id
 - [ ] Add `extract_thermal_conductivity(log_path, output_dir)` tool: reads ACF output, integrates, block-averages, returns λ ± σ in W/m·K
 - [ ] Add `experimental_tc_W_per_mK` field to polymer_rules.json for classes with DB entries
-- [ ] Wire into orchestrator as an optional Stage after property-analysis-worker (only if `thermal_conductivity` in properties_requested)
+- [ ] Wire into orchestrator as an optional Stage after bulk-modulus-extractor (only if `thermal_conductivity` in properties_requested)
 - [ ] Add λ row to RESULTS table in `data/TEMPLATE/run_log.md`
 
 ---
