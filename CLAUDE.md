@@ -116,14 +116,26 @@ PHASE A — FOUNDATION (always)
         prompt=<gen_prompt.py --stage equil --plan PLAN_PATH --data_path ...>)
     → parse RESULT → extract chain_id, monitor_command, expected_equil_data, npt_tg_prep_data
       npt_tg_prep_data is non-null for rubbery polymers (npt_melt at T_equil_K); null for glassy.
-  Write SIMULATION STATE to run_log.md (status=monitoring)
-  Monitor(command=monitor_command, timeout_ms=3600000)
-  # The monitor_command loops to completion and persists per-stage progress (SEEN checkpoint), so a
-  # bare timeout on a still-running chain is ROUTINE: re-issue the SAME Monitor command (re-arm) —
-  # it is lossless, replays nothing, and is NOT a failure. The hourly cadence is the Monitor tool's
-  # fixed 1 h timeout_ms cap, not a problem with the run. Only investigate on RUN_COMPLETE / failure
-  # / PROCESS_DEAD_NO_SENTINEL.
-  get_run_status(chain_id) → check success/failure
+  Write SIMULATION STATE to run_log.md (status=monitoring, + bg task id)
+  *** BACKGROUND-WAIT — canonical pattern (referenced by THERMAL_TRACK.md, MECHANICAL_TRACK.md,
+      /recover; this is the ONE definition — do not re-paste it, reference it). Replaces blocking Monitor. ***
+  Bash(command=monitor_command, run_in_background=true)   # detached waiter; no & needed
+  # WHY this works: monitor_command is ALREADY a complete blocking waiter (sentinel-wait + PID-liveness
+  # loop, RUN_COMPLETE→exit 0, PROCESS_DEAD_NO_SENTINEL→exit 3). The ONLY reason the old Monitor tool
+  # re-armed ~hourly was its fixed 1 h timeout_ms cap — a harness limit, not a property of the command.
+  # Backgrounded, it runs to completion untouched and the harness re-invokes you EXACTLY ONCE on exit.
+  # >>> NOW END YOUR TURN. <<< Do NOT call get_run_status, spawn the next stage, release a GPU, or
+  # "just check on it" in this same turn. Treat it exactly like a backgrounded Agent spawn: launch the
+  # waiter, STOP, and wait to be woken. (This wait is a behavioral contract you must keep — unlike the
+  # old Monitor, nothing forces you to block, so acting early would consume an incomplete result.)
+  # On the completion wakeup (a later turn), branch on the waiter's exit/output — SAME routing as the
+  # old Monitor output:
+  #   RUN_COMPLETE (exit 0)             → get_run_status(chain_id) → check success/failure → proceed
+  #   PROCESS_DEAD_NO_SENTINEL (exit 3) → treat as FAILED → /recover (max 2/worker)
+  #   killed / no terminal line         → relaunch the SAME waiter (lossless; SEEN dedups progress)
+  # Optional safety net (long runs only, default OFF — re-introduces periodic wakeups): if you do not
+  # trust the wakeup on a multi-hour run, arm one long-fallback ScheduleWakeup(1800s+) as a heartbeat.
+  get_run_status(chain_id) → check success/failure   # ONLY after the RUN_COMPLETE wakeup, not before
 
   [Equil-check gate]
   Agent(subagent_type="equilibration-checker", description="🟠 Equil check {polymer_name}",
@@ -137,7 +149,8 @@ PHASE A — FOUNDATION (always)
     (300 K — the production temperature of the cell, NOT the melt T_equil/T_workflow; passing the
     melt T would re-melt a cooled glassy cell)). It generates a single deterministic npt_extend stage
     via generate_equilibration_workflow(extend_only=True) and submits it. Do NOT hand-write a
-    continuation .in. Re-Monitor, then re-run equil-check on npt_extend_out.data (max 2 extensions).
+    continuation .in. Re-run BACKGROUND-WAIT (launch the waiter, end your turn, resume on the
+    RUN_COMPLETE wakeup), then re-run equil-check on npt_extend_out.data (max 2 extensions).
   If equil_verdict=FAIL: write UNRESOLVED and stop
 
 PHASE B — TRACKS (property-conditional)
@@ -224,7 +237,7 @@ PHASE C — SUMMARY (always)
 
 Validate each worker result against `run_plan.json` `planned_stages[].success_criteria`; `/recover` if not met (max 2 attempts/worker), then write UNRESOLVED to run_log.md and stop.
 A probe result contradicting a plan assumption (wrong FF, D-08 mismatch) routes back to the planner (re-plan → re-critic); never let a worker improvise. For a planned `hardware_benchmark` probe: run `scripts/calibrate_hardware.py --cell <.data> --ff <fam>` politely before the affected GPU stage (idle-GPU + spare cores; never `--allow-busy`).
-Session restart: read SIMULATION STATE table in run_log.md → find `status=monitoring` → `get_run_status(id)` → `watch_run(id)` → re-issue Monitor; if in Phase B re-read the active track guide first.
+Session restart: read SIMULATION STATE table in run_log.md → find `status=monitoring` → `get_run_status(id)` → if still running, `watch_run(id)` → relaunch the waiter via BACKGROUND-WAIT (`Bash(command=monitor_command, run_in_background=true)`) and end your turn; if already completed, proceed. If in Phase B re-read the active track guide first.
 
 ---
 

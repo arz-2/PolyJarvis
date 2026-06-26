@@ -44,11 +44,13 @@ None
 
 ## SIMULATION STATE
 
-<!-- Written before each Monitor call; updated to done/failed after Monitor returns. Used for session restart. -->
+<!-- Written before launching each BACKGROUND-WAIT waiter; updated to done/failed on the completion
+     wakeup. Used for session restart. BgTask = the run_in_background Bash task id of the live waiter
+     (— once it has returned), so a restarting session can tell whether a waiter is still in flight. -->
 
-| Stage | ID | Submitted | Completed | Wall | Status |
-|-------|----|-----------|-----------|------|--------|
-| [equil / tg-sweep / born / deform / murnaghan] | [chain_id / run_id] | [HH:MM] | [HH:MM / —] | [Xh Ym / —] | [monitoring / done / failed] |
+| Stage | ID | BgTask | Submitted | Completed | Wall | Status |
+|-------|----|--------|-----------|-----------|------|--------|
+| [equil / tg-sweep / deform / murnaghan] | [chain_id / run_id] | [bg task id / —] | [HH:MM] | [HH:MM / —] | [Xh Ym / —] | [monitoring / done / failed] |
 
 GPU inventory (`nvidia-smi` at run start): GPU [ID]: [model], [VRAM] GB, [free] GB free
 

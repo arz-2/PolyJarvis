@@ -24,10 +24,13 @@ On session restart mid-thermal-track: re-read this file before resuming.
                   [--tg_start_data $npt_tg_prep_data | --data_path $npt_prod300_out_data]
                   --tg_rate_index {idx} --gpu_ids <claimed>>)
       → parse RESULT → run_id, tg_log_path (now .../thermal/tg_sweep_r{rate}/tg_sweep.log), monitor_command
-    Write SIMULATION STATE (status=monitoring) to run_log.md
-    Monitor(command=monitor_command, timeout_ms=3600000)
+    Write SIMULATION STATE (status=monitoring, + bg task id) to run_log.md
+    BACKGROUND-WAIT (CLAUDE.md canonical pattern): Bash(command=monitor_command, run_in_background=true),
+      then END YOUR TURN. Do NOT release the GPU or call get_run_status in this turn.
+    # On the completion wakeup (next turn):
     scripts/pick_gpu.py release --run <RUN>
-    get_run_status(run_id) → completed → proceed; failed → /recover (max 2/worker)
+    get_run_status(run_id) → RUN_COMPLETE/completed → proceed;
+      PROCESS_DEAD_NO_SENTINEL/failed → /recover (max 2/worker)
 
     [Tg analysis @ rate]
     Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg r{rate} {polymer_name}",
@@ -40,7 +43,10 @@ On session restart mid-thermal-track: re-read this file before resuming.
   # On a single-GPU host (e.g. PEG1, GPU 0 only) the three sweeps run SEQUENTIALLY → ~3× thermal
   # wall time (the 40 K/ns rate has 10× the steps of 400 K/ns and dominates). On a multi-GPU host
   # with ≥3 free GPUs the rates are independent: you MAY claim a distinct GPU per rate and run the
-  # three sweeps + Monitors in parallel (still politely — defer on shortfall, never --allow-busy).
+  # three sweeps in parallel — launch one BACKGROUND-WAIT waiter per sweep (run_in_background=true),
+  # then end your turn; the harness wakes you once per sweep as each exits. Map each bg task id → run_id
+  # via the SIMULATION STATE table so you know which sweep completed (still politely — defer on
+  # shortfall, never --allow-busy).
 
   [multirate extrapolation → DSC-equivalent Tg]
   Build --mr_rates / --mr_tg_values from ALL registry rows for this polymer/class

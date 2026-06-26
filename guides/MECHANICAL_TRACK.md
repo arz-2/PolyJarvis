@@ -24,10 +24,13 @@ On session restart mid-mechanical-track: re-read this file before resuming.
     # TraPPE-UA (PHYC/PDIE): SHAKE is automatically disabled in generated BM scripts.
     # Do not pass use_shake=True for these classes — the script_generator enforces it.
       → parse RESULT → extract chain_id_murnaghan, log_files (murnaghan_log_files), monitor_command_murnaghan
-    Write SIMULATION STATE (status=monitoring)
-    Monitor(command=monitor_command_murnaghan, timeout_ms=3600000)
+    Write SIMULATION STATE (status=monitoring, + bg task id)
+    BACKGROUND-WAIT (CLAUDE.md canonical pattern): Bash(command=monitor_command_murnaghan, run_in_background=true),
+      then END YOUR TURN. Do NOT release the GPU or call get_run_status in this turn.
+    # On the completion wakeup (next turn):
     scripts/pick_gpu.py release --run <RUN>
-    get_run_status → completed → proceed to extraction
+    get_run_status → RUN_COMPLETE/completed → proceed to extraction;
+      PROCESS_DEAD_NO_SENTINEL/failed → /recover
     # Check Murnaghan acceptance BEFORE extraction:
     #   extract_bulk_modulus_murnaghan → check fit_converged=True AND B0_prime ∈ [4, 20]
     #   If FAIL → spawn deform-worker fallback (3-direction)
@@ -41,9 +44,9 @@ On session restart mid-mechanical-track: re-read this file before resuming.
             prompt=<gen_prompt.py --stage deform --plan PLAN_PATH --data_path npt_prod300_data_path
                     --gpu_ids <claimed>>)
         → parse RESULT → extract run_id_deform, deform_log_path, monitor_command_deform
-      Write SIMULATION STATE (status=monitoring)
-      Monitor(command=monitor_command_deform, timeout_ms=3600000)
-      scripts/pick_gpu.py release --run <RUN>
+      Write SIMULATION STATE (status=monitoring, + bg task id)
+      BACKGROUND-WAIT (CLAUDE.md canonical pattern): Bash(command=monitor_command_deform, run_in_background=true),
+        then END YOUR TURN. On the completion wakeup: scripts/pick_gpu.py release --run <RUN>
   # else (rubbery + no pressures + bm_pressures_atm null): skip — fluctuation path, equil log already present
 
   # Key: for glassy Murnaghan always pass npt_prod300_data_path (300 K cell, not melt)

@@ -38,7 +38,7 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
 | "missing FF parameters" (EMC build) | SMILES attachment points wrong | Verify exactly two `*` atoms; try `dp: 15` if `dp: 20` fails |
 | LAMMPS crashes steps 0–10, wrong style keyword (`fourier` / `none` / `lj/charmm`) | FF directive mismatch: `generate_script` called without explicit FF flag | Confirm `**lammps_flags` is in `params_deform`; re-generate script passing `use_trappe=True` / `use_pcff=True` / `use_opls=True` explicitly |
 | Log truncated, no LAMMPS error string, process gone | External kill (OOM killer / GPU preemption) | Identify last completed stage `_out.data` via `ls`; submit remaining stages as new chain from that checkpoint |
-| Monitor hangs indefinitely after `run_lammps_chain` | `watch_run` sentinel lost on MCP server restart | `grep -r "STAGE COMPLETE" <work_dir>/` — if all stages present, proceed without Monitor and mark done in run_log |
+| Background waiter never returns after `run_lammps_chain` | `watch_run` sentinel lost on MCP server restart | `grep -r "STAGE COMPLETE" <work_dir>/` — if all stages present, proceed without waiting and mark done in run_log |
 | "Out of range atoms — cannot compute PPPM" in npt_compress | PPPM ghost region exceeded during high-pressure box shrink | Switch compress stage pair_style to `lj/cut/coul/cut`; skin=3.0 Å; dt=0.5 fs; restore kspace for all production stages |
 | K = negative or density at melt value (~0.8–0.9 g/cm³) for a glassy polymer | deform-worker received `npt_production` (melt) data instead of `npt_prod300` (300 K) data | Verify `equil_data_path` is `npt_prod300_out.data`; if `npt_prod300` missing, run the cool+prod 300 K phase first; re-spawn deform-worker |
 | `extract_thermal` returns "fewer than 4 temperature bins" after partial sweep kill | Sweep killed before sufficient T coverage | If ≥ 60% of planned T points completed AND both glassy+rubbery slopes present, attempt `extract_thermal`; if fit_quality ≥ ACCEPTABLE accept; else restart full sweep |
@@ -70,15 +70,15 @@ RECOVERY PLAN
 
 ## Session Recovery (Mode B)
 
-When the Claude process dies mid-Monitor (no tmux, machine reboot, or session killed):
+When the Claude process dies while a background waiter is in flight (no tmux, machine reboot, or session killed):
 
 1. `ssh lambda && pj && claude --continue` (or start fresh if conversation unavailable)
 2. Read `data/[RUN]/run_log.md` → find the row where `status = monitoring`; note the `id` value
 3. Call `get_run_status(id)`:
-   - **running** → `watch_run(id)` → re-issue `Monitor(command=monitor_command, timeout_ms=3600000)` → update run_log back to `monitoring`. A bare Monitor timeout (no `RUN_COMPLETE`/`PROCESS_DEAD` line) is not completion — re-arm via `watch_run` and Monitor again. `PROCESS_DEAD_NO_SENTINEL` → treat as **failed** below.
+   - **running** → `watch_run(id)` → relaunch the waiter via BACKGROUND-WAIT (`Bash(command=monitor_command, run_in_background=true)`, the CLAUDE.md canonical pattern) → update run_log back to `monitoring`, then **end your turn**; the harness re-invokes you when it exits. `RUN_COMPLETE` (exit 0) → completed; `PROCESS_DEAD_NO_SENTINEL` (exit 3) → treat as **failed** below.
    - **completed** → update run_log to `done` → continue from the next orchestrator step
    - **failed** → `get_run_output(id)` → diagnose with taxonomy above → re-spawn worker (counts as attempt 1)
    - **not found** → wait 60–90 s for MCP server restart; retry; if still missing, treat as failed
 4. `monitor_command` is deterministic — `watch_run(id)` regenerates it from the ID alone; always safe to re-call
 
-If tmux is still alive (B-1): `ssh lambda && pj` to re-attach; Monitor is still blocking, no action needed.
+If tmux is still alive (B-1): `ssh lambda && pj` to re-attach; the background waiter is still running and will re-invoke the session on exit — no action needed.
