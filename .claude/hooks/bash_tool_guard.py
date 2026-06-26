@@ -10,8 +10,24 @@ import re
 
 try:
     data = json.load(sys.stdin)
-    cmd = data.get("tool_input", {}).get("command", "")
+    tool_input = data.get("tool_input", {})
+    cmd = tool_input.get("command", "")
 except Exception:
+    sys.exit(0)
+
+# BACKGROUND-WAIT launch: a backgrounded sentinel-watch waiter (build_watch_command).
+# Detect by the stable tokens that command always echoes. Re-homes the run_log checkpoint
+# that the now-removed Monitor PreToolUse hook used to do, AND injects the end-turn contract
+# at point-of-use — the exact late-stage failure (acting early after launch). Warn-only.
+if tool_input.get("run_in_background") and (
+    "PROCESS_DEAD_NO_SENTINEL" in cmd or "RUN_COMPLETE" in cmd
+):
+    print(
+        "BACKGROUND-WAIT launched. (1) Write/update run_log.md SIMULATION STATE now "
+        "(status=monitoring, run_id, bg task id). (2) END YOUR TURN — do NOT get_run_status / "
+        "spawn the next stage / release a GPU this turn (acting early consumes an incomplete "
+        "result). The harness wakes you once on exit."
+    )
     sys.exit(0)
 
 SCRIPT_TO_TOOL = [

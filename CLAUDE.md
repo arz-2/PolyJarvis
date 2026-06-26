@@ -120,10 +120,9 @@ PHASE A — FOUNDATION (always)
   *** BACKGROUND-WAIT — canonical wait pattern. Defined ONCE here; THERMAL_TRACK.md,
       MECHANICAL_TRACK.md, /recover reference it by name. Never block in-conversation. ***
   Bash(command=monitor_command, run_in_background=true)   # detached waiter; no & needed
-  THEN END YOUR TURN — launch, STOP, get woken on exit, exactly like a backgrounded Agent spawn.
-  # The wait is a behavioral contract, NOT harness-enforced: do NOT get_run_status / spawn the next
-  # stage / release a GPU this turn (acting early consumes an incomplete result). The harness wakes
-  # you ONCE on exit; then route on the waiter's exit code:
+  THEN END YOUR TURN — launch, STOP, get woken ONCE on exit, like a backgrounded Agent spawn.
+  # Behavioral contract (a PreToolUse hook also reminds you at launch): do NOT get_run_status /
+  # spawn the next stage / release a GPU this turn. On the exit wakeup, route on the exit code:
   #   RUN_COMPLETE (exit 0)               → get_run_status(chain_id) → check success/failure → proceed
   #   PROCESS_DEAD_NO_SENTINEL (exit 3)   → FAILED → /recover (max 2/worker)
   #   killed / no terminal line (restart) → relaunch the SAME waiter (lossless; SEEN dedups progress)
@@ -182,14 +181,10 @@ PHASE C — SUMMARY (always)
   # In long sessions (>12 h) the MCP connection can drop silently. Do a minimal call
   # (e.g. list_templates) — if it returns, proceed; if it hangs or errors, restart the
   # MCP server before the Agent call.
-  # Determine tg_path and slope_gate_pass before spawning run-summary-worker:
-  #   SLOPE_GATE=$(jq -r '.slope_gate_pass' data/RUN/raw/tg_multirate_result.json)
-  #   RATES_ARR=$(jq -r '.decided_params.tg_rates_K_per_ns' PLAN_PATH)   # e.g. [25,50,100]
-  #   if [ "$SLOPE_GATE" = "false" ]; then
-  #     TG_PATH="data/RUN/raw/tg_r$(jq '.[length-1]' <<<$RATES_ARR)/tg_summary.json"  # highest rate (fallback)
-  #   else
-  #     TG_PATH="data/RUN/raw/tg_r$(jq '.[0]' <<<$RATES_ARR)/tg_summary.json"         # slowest rate (convention)
-  #   fi
+  # Determine tg_path and slope_gate_pass before spawning run-summary-worker — do NOT hand-derive
+  # the path (the PLA3 footgun); run the helper, which encodes the slowest/highest-rate convention:
+  #   eval "$(python3 scripts/select_tg_path.py --plan PLAN_PATH --multirate data/RUN/raw/tg_multirate_result.json)"
+  #   # → sets TG_PATH (slowest rate if gate passed, highest if failed) and SLOPE_GATE (true|false)
   # Exp ranges: prefer the exp-lookup-worker RESULT (condition-matched). Thread each non-null field
   # as a CLI override; omit nulls so gen_prompt falls back to its DB/polymer_rules ±5% band.
   #   --exp_tg_min/--exp_tg_max        (from exp_tg_min_K / exp_tg_max_K)

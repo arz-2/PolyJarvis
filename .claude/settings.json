@@ -66,15 +66,6 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/bash_tool_guard.py\""
           }
         ]
-      },
-      {
-        "matcher": "Monitor",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'CHECKPOINT: Before this Monitor call — write/update run_log.md SIMULATION STATE table now (status=monitoring, run_id, submit_time).'"
-          }
-        ]
       }
     ],
     "Stop": [
@@ -219,11 +210,11 @@
         ]
       },
       {
-        "matcher": "Monitor",
+        "matcher": "mcp__mcp-lammps-engine__get_run_status",
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'MONITOR RESULT — interpret by what was printed (not by exit): PROGRESS [##...] → relay to user, no action. RUN_COMPLETE → read sentinel JSON: status=completed→proceed; status=failed→/recover. PROCESS_DEAD_NO_SENTINEL → /recover (OOM/reboot). Neither line → TIMEOUT: run still going — call watch_run(run_id), re-issue Monitor. DO NOT treat timeout as done or failed. | If this was the EQUIL Monitor (equil chain): entering Phase B — Read(guides/THERMAL_TRACK.md) if tg requested; Read(guides/MECHANICAL_TRACK.md) if bulk_modulus requested.'"
+            "command": "echo 'ROUTING: status=completed/done → proceed to next stage; status=failed/error → /recover (do not retry ad-hoc). IF this get_run_status completes the EQUIL chain and a track is still pending → entering Phase B: Read(guides/THERMAL_TRACK.md) if tg requested and/or Read(guides/MECHANICAL_TRACK.md) if bulk_modulus requested before spawning workers. (Fires on every poll — apply only when it actually closes a stage.)'"
           }
         ]
       }
