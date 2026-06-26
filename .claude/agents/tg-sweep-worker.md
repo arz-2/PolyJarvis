@@ -1,6 +1,6 @@
 ---
 name: tg-sweep-worker
-description: Stage 3 worker — generates the Tg temperature-sweep LAMMPS script and submits it. Returns run_id and monitor_command immediately without calling Monitor. The orchestrator owns the Monitor call.
+description: Stage 3 worker — generates the Tg temperature-sweep LAMMPS script and submits it. Returns run_id and monitor_command immediately without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter.
 tools:
   - Read
   - Bash

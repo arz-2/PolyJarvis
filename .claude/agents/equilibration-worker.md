@@ -1,6 +1,6 @@
 ---
 name: equilibration-worker
-description: Stage 2 worker — validates a .data file, generates the equilibration workflow, and submits the LAMMPS chain. Returns chain_id and monitor_command immediately without calling Monitor. The orchestrator owns the Monitor call.
+description: Stage 2 worker — validates a .data file, generates the equilibration workflow, and submits the LAMMPS chain. Returns chain_id and monitor_command immediately without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter.
 tools:
   - Read
   - Bash

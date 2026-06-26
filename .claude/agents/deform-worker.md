@@ -1,6 +1,6 @@
 ---
 name: deform-worker
-description: Fallback for glassy bulk modulus — invoked if Murnaghan EOS fails (fit_converged=False or B0_prime outside [4,20]). Runs 3-direction uniaxial deformation (DEFORM_DIR x/y/z sequentially) from npt_prod300_out.data. Glassy polymers only (is_glassy=True). Born+NVT removed. Returns run_ids and monitor_command without calling Monitor. The orchestrator owns the Monitor call.
+description: Fallback for glassy bulk modulus — invoked if Murnaghan EOS fails (fit_converged=False or B0_prime outside [4,20]). Runs 3-direction uniaxial deformation (DEFORM_DIR x/y/z sequentially) from npt_prod300_out.data. Glassy polymers only (is_glassy=True). Born+NVT removed. Returns run_ids and monitor_command without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter.
 tools:
   - Read
   - Bash

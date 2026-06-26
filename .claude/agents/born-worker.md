@@ -1,6 +1,6 @@
 ---
 name: born-worker
-description: Stage 8 worker — runs NVT Born matrix simulation from the Stage 9 NPT output (.data file). Glassy polymers only (is_glassy=True). Requires LAMMPS compiled with EXTRA-COMPUTE (compute born/matrix numdiff). Returns run_id and monitor_command without calling Monitor. The orchestrator owns the Monitor call.
+description: Stage 8 worker — runs NVT Born matrix simulation from the Stage 9 NPT output (.data file). Glassy polymers only (is_glassy=True). Requires LAMMPS compiled with EXTRA-COMPUTE (compute born/matrix numdiff). Returns run_id and monitor_command without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter.
 tools:
   - Read
   - Bash

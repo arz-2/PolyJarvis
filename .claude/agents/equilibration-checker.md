@@ -1,6 +1,6 @@
 ---
 name: equilibration-checker
-description: Stage 9 gate worker — validates equilibration quality and extracts density immediately after the equil chain Monitor completes. Checks 06_nvt_production + 09_npt_prod300 logs. Returns PASS/EXTEND/FAIL verdict that gates all downstream property simulations. Single-purpose: equil check + density only, no BM, no generate_run_summary.
+description: Stage 9 gate worker — validates equilibration quality and extracts density immediately after the equil chain's BACKGROUND-WAIT waiter completes. Checks 06_nvt_production + 09_npt_prod300 logs. Returns PASS/EXTEND/FAIL verdict that gates all downstream property simulations. Single-purpose: equil check + density only, no BM, no generate_run_summary.
 tools:
   - Read
   - Bash
@@ -71,7 +71,7 @@ Histogram PNG is auto-saved to `graphs_dir/end_to_end_distribution.png` by the t
 ### Verdict mapping
 
 - `overall_pass=True` → `equil_verdict=PASS`
-- `overall_pass=False`, failing gate is density or energy convergence → `equil_verdict=EXTEND` (orchestrator extends chain and re-Monitors)
+- `overall_pass=False`, failing gate is density or energy convergence → `equil_verdict=EXTEND` (orchestrator extends chain and re-runs BACKGROUND-WAIT)
 - `overall_pass=False`, failing gate is hard structural failure (box collapse, charge imbalance) → `equil_verdict=FAIL` (orchestrator writes UNRESOLVED)
 
 **Do NOT call `generate_run_summary`.** That is run-summary-worker's job.

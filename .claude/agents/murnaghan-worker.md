@@ -1,6 +1,6 @@
 ---
 name: murnaghan-worker
-description: BM submit worker — submits run_bulk_modulus_series for glassy polymers at 300 K (npt_prod300_out.data, ±1000 atm, primary path) and rubbery polymers at T>Tg (npt_production_out.data, bm_pressures_atm set). Born+NVT removed. Returns chain_id, log_files, and monitor_command without calling Monitor. The orchestrator owns the Monitor call.
+description: BM submit worker — submits run_bulk_modulus_series for glassy polymers at 300 K (npt_prod300_out.data, ±1000 atm, primary path) and rubbery polymers at T>Tg (npt_production_out.data, bm_pressures_atm set). Born+NVT removed. Returns chain_id, log_files, and monitor_command without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter.
 tools:
   - Read
   - Bash

@@ -117,25 +117,16 @@ PHASE A — FOUNDATION (always)
     → parse RESULT → extract chain_id, monitor_command, expected_equil_data, npt_tg_prep_data
       npt_tg_prep_data is non-null for rubbery polymers (npt_melt at T_equil_K); null for glassy.
   Write SIMULATION STATE to run_log.md (status=monitoring, + bg task id)
-  *** BACKGROUND-WAIT — canonical pattern (referenced by THERMAL_TRACK.md, MECHANICAL_TRACK.md,
-      /recover; this is the ONE definition — do not re-paste it, reference it). Replaces blocking Monitor. ***
+  *** BACKGROUND-WAIT — canonical wait pattern. Defined ONCE here; THERMAL_TRACK.md,
+      MECHANICAL_TRACK.md, /recover reference it by name. Never block in-conversation. ***
   Bash(command=monitor_command, run_in_background=true)   # detached waiter; no & needed
-  # WHY this works: monitor_command is ALREADY a complete blocking waiter (sentinel-wait + PID-liveness
-  # loop, RUN_COMPLETE→exit 0, PROCESS_DEAD_NO_SENTINEL→exit 3). The ONLY reason the old Monitor tool
-  # re-armed ~hourly was its fixed 1 h timeout_ms cap — a harness limit, not a property of the command.
-  # Backgrounded, it runs to completion untouched and the harness re-invokes you EXACTLY ONCE on exit.
-  # >>> NOW END YOUR TURN. <<< Do NOT call get_run_status, spawn the next stage, release a GPU, or
-  # "just check on it" in this same turn. Treat it exactly like a backgrounded Agent spawn: launch the
-  # waiter, STOP, and wait to be woken. (This wait is a behavioral contract you must keep — unlike the
-  # old Monitor, nothing forces you to block, so acting early would consume an incomplete result.)
-  # On the completion wakeup (a later turn), branch on the waiter's exit/output — SAME routing as the
-  # old Monitor output:
-  #   RUN_COMPLETE (exit 0)             → get_run_status(chain_id) → check success/failure → proceed
-  #   PROCESS_DEAD_NO_SENTINEL (exit 3) → treat as FAILED → /recover (max 2/worker)
-  #   killed / no terminal line         → relaunch the SAME waiter (lossless; SEEN dedups progress)
-  # Optional safety net (long runs only, default OFF — re-introduces periodic wakeups): if you do not
-  # trust the wakeup on a multi-hour run, arm one long-fallback ScheduleWakeup(1800s+) as a heartbeat.
-  get_run_status(chain_id) → check success/failure   # ONLY after the RUN_COMPLETE wakeup, not before
+  THEN END YOUR TURN — launch, STOP, get woken on exit, exactly like a backgrounded Agent spawn.
+  # The wait is a behavioral contract, NOT harness-enforced: do NOT get_run_status / spawn the next
+  # stage / release a GPU this turn (acting early consumes an incomplete result). The harness wakes
+  # you ONCE on exit; then route on the waiter's exit code:
+  #   RUN_COMPLETE (exit 0)               → get_run_status(chain_id) → check success/failure → proceed
+  #   PROCESS_DEAD_NO_SENTINEL (exit 3)   → FAILED → /recover (max 2/worker)
+  #   killed / no terminal line (restart) → relaunch the SAME waiter (lossless; SEEN dedups progress)
 
   [Equil-check gate]
   Agent(subagent_type="equilibration-checker", description="🟠 Equil check {polymer_name}",

@@ -100,7 +100,7 @@ result = generate_script(
         "use_shake":           False,    # False for TraPPE-UA and PCFF; True for GAFF2
         "shake_bond_type_ids": <omit for TraPPE-UA and PCFF; only relevant for GAFF2>,
         "params_file":         "<work_dir>/emc_build.params",  # EMC only; omit for RadonPy
-        "PROGRESS_FILE":       progress_file,   # enables per-T PROGRESS lines in Monitor
+        "PROGRESS_FILE":       progress_file,   # enables per-T PROGRESS lines in the watch_run monitor_command
     }
 )
 # result["n_tg_stages"] is the number of temperature steps (used by run_lammps_script)
@@ -125,8 +125,8 @@ grep -E 'pair_style|dihedral_style|kspace' "<tg_sweep_dir>/tg_sweep.in"
 
 `run_lammps_script` is async — returns `run_id` immediately.
 
-Pass `progress_file` and `n_stages` so `watch_run` can expose them to the Monitor command,
-which will emit `PROGRESS [##---] 3/36 done: T560` as each temperature step completes.
+Pass `progress_file` and `n_stages` so `watch_run` can expose them in the `monitor_command`,
+which emits `PROGRESS [##---] 3/36 done: T560` as each temperature step completes.
 
 ```python
 run = run_lammps_script(

@@ -85,7 +85,7 @@ for deform_dir in ["x", "y", "z"]:
         gpu_ids=gpu_ids, mpi=mpi_ranks, engine=engine)  # engine MUST match generate_script
 # Submit all 3 runs; return run_ids dict and a combined monitor_command to the orchestrator.
 # Use watch_run on the last run_id to get a monitor_command that fires after all finish
-# (or run sequentially: submit x → Monitor → submit y → Monitor → submit z → Monitor).
+# (or sequentially via BACKGROUND-WAIT: submit x, wait on its waiter, then y, then z).
 w = watch_run(run_ids["z"])  # return run_ids and w["monitor_command"] to orchestrator
 ```
 

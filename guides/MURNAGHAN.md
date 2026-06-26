@@ -93,4 +93,4 @@ monitor_command = w["monitor_command"]
 
 **`run_bulk_modulus_series` returns empty `log_files`:** Check GPU memory with `nvidia-smi`. Re-submit with half `npt_steps`.
 
-**Monitor hangs after watch_run returns:** Sentinel was not created. Most likely `watch_run` was called with the placeholder string instead of the real `chain_id`. Re-submit: `run_bulk_modulus_series` → `watch_run(chain_id)` (tool call).
+**BACKGROUND-WAIT waiter never returns after watch_run:** Sentinel was not created. Most likely `watch_run` was called with the placeholder string instead of the real `chain_id`. Re-submit: `run_bulk_modulus_series` → `watch_run(chain_id)` (tool call).
