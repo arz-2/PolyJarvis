@@ -1,1 +1,1 @@
-- [query_best_match.py missing](feedback_script_missing.md) — Stage guide references nonexistent db/query_best_match.py script; creates hard blocker for exp-lookup-worker invocation
+# exp-lookup-worker Memory Index

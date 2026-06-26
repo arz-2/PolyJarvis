@@ -31,6 +31,10 @@ On session restart mid-mechanical-track: re-read this file before resuming.
     # Check Murnaghan acceptance BEFORE extraction:
     #   extract_bulk_modulus_murnaghan → check fit_converged=True AND B0_prime ∈ [4, 20]
     #   If FAIL → spawn deform-worker fallback (3-direction)
+    # Vitrification-kink check (rubbery Murnaghan, esp. POXI widened series to ~1.5 GPa):
+    #   inspect dV/dP across successive pressure intervals — a jump >3× at any interval
+    #   flags a vitrification discontinuity; report low-P points only. Smooth monotonic
+    #   stiffening (ratio drifts, no jump) + R²>0.999 rules out a kink → trust full-range fit.
     Recovery if murnaghan fails (fit_converged=False OR B0_prime outside [4, 20]):
       Claim GPU: scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
       Agent(subagent_type="deform-worker", description="🔵 Deform fallback {polymer_name}",
