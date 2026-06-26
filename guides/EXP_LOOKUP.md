@@ -127,3 +127,5 @@ RESULT:
   step_failed: query_best_match.py
   action_needed: <what caller should do — typically fall back to polymer_rules.json>
 ```
+
+**`db/` is gitignored — local-only on the integrator machine.** Both `query_best_match.py` and `polymer_db.sqlite` live under the gitignored `db/` dir and are NOT synced to other machines (the DB is built from external scraped sources, not rebuildable on demand). If the script or DB is **absent** (`FileNotFoundError` / `No such file`), do **NOT** hard-fail the run — return `match_method: none` / `match_confidence: none` with all range fields `null`. The orchestrator treats that as "omit exp overrides → fall back to `polymer_rules.json` ±5% band" (CLAUDE.md Phase C), and the needed experimental values already live in `polymer_rules.json`. A missing DB degrades grading precision (wider band), never blocks the run.

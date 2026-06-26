@@ -3,6 +3,7 @@ name: psu3_equil_aromatic_dp25
 description: PSU3 DP=25 aromatic glassy C(t)/MSD advisory-only (backbone too rigid); gate on density SEM/CV/P2/energy only
 metadata:
   type: project
+  ingested_at: 2026-06-25
 ---
 
 PSU3 (PSFO, polysulfone) is a glassy aromatic polymer with DP=25 < 30 threshold.
