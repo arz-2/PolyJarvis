@@ -124,6 +124,79 @@ def _conda_run(cmd: str, workdir: str = None, timeout: int = 3600):
     except subprocess.TimeoutExpired:
         return "", f"Timed out after {timeout}s", 1
 
+
+# ─── Double-launch guard ──────────────────────────────────────────────────────
+# Processes that legitimately hold a run's log open (via the wrapper's
+# `lmp … > stage.log 2>&1` redirect). Matching only these avoids false positives
+# on benign holders (tail -f, an editor, an analysis reader).
+_SIM_WRITER_CMDS = ("lmp", "lammps", "mpirun", "mpiexec", "orted")
+
+
+def _live_sim_writers(log_paths: list, timeout: int = 8) -> list:
+    """Return live LAMMPS/MPI processes currently holding any of log_paths open.
+
+    Reads OS state via ``lsof`` (survives MCP-server/context restarts — exactly the
+    failure that causes double-launch). Each element: {"pid","cmd","path"}.
+
+    FAIL-OPEN: if lsof is missing, errors, or times out, returns [] (allow the
+    launch) — the guard must never convert a tooling hiccup into a block. lsof
+    exits 1 with empty stdout when none of the paths are open (or don't exist),
+    which is the normal "no conflict" case.
+    """
+    paths = [p for p in log_paths if p]
+    if not paths:
+        return []
+    try:
+        # -w suppresses can't-stat warnings (docker overlays etc.) that lsof prints to
+        # stderr on this host; the machine-readable records go to stdout regardless.
+        r = subprocess.run(
+            ["lsof", "-w", "-F", "pcn", "--", *paths],
+            capture_output=True, text=True,
+            stdin=subprocess.DEVNULL, timeout=timeout,
+        )
+    except FileNotFoundError:
+        logger.warning("double-launch guard: lsof not found — allowing launch (fail-open)")
+        return []
+    except subprocess.TimeoutExpired:
+        logger.warning("double-launch guard: lsof timed out — allowing launch (fail-open)")
+        return []
+    except Exception as e:
+        logger.warning(f"double-launch guard: lsof error ({e}) — allowing launch (fail-open)")
+        return []
+
+    if not r.stdout.strip():
+        return []  # no process holds any of the paths open
+
+    writers, pid, cmd = [], None, None
+    for line in r.stdout.splitlines():
+        if not line:
+            continue
+        tag, val = line[0], line[1:]
+        if tag == "p":
+            pid, cmd = val, None
+        elif tag == "c":
+            cmd = val
+        elif tag == "n" and pid is not None:
+            low = (cmd or "").lower()
+            if any(low.startswith(s) for s in _SIM_WRITER_CMDS):
+                writers.append({"pid": pid, "cmd": cmd, "path": val})
+    return writers
+
+
+def _double_launch_error(conflict: list) -> dict:
+    """Structured refusal for a launch onto a log a live sim process is writing."""
+    return {
+        "status": "error",
+        "error": "Refusing to launch: a live LAMMPS/MPI process is already writing the "
+                 "target log. Launching now would corrupt the shared log "
+                 "(Cross-Track Rule 3 / PLA3). Kill the stale writer (or coordinate with "
+                 "the concurrent session), then resubmit.",
+        "conflicting_writers": conflict,
+        "hint": "Set allow_concurrent_writer=True only to override after confirming the "
+                "writer is stale.",
+    }
+
+
 # ─── Completion sentinels ─────────────────────────────────────────────────────
 # Each completed (or failed) run writes a small JSON file here.
 # Claude watches this directory via the Monitor tool so it is re-invoked
@@ -673,6 +746,7 @@ def run_lammps_script(
     engine: str = "gpu",
     progress_file: str = "",
     n_stages: int = 0,
+    allow_concurrent_writer: bool = False,
 ) -> dict:
     """
     Execute a LAMMPS .in script on the local GPU in the background.
@@ -703,6 +777,12 @@ def run_lammps_script(
     try:
         # Ensure remote work directory exists
         Path(work_dir).mkdir(parents=True, exist_ok=True)
+
+        # Double-launch guard: refuse if a live sim process already writes the target log.
+        if not allow_concurrent_writer:
+            conflict = _live_sim_writers([f"{work_dir}/{log_file}"])
+            if conflict:
+                return _double_launch_error(conflict)
 
         meta = {
             "script":        script,
@@ -749,6 +829,7 @@ def run_lammps_chain(
     backbone_types: Optional[list] = None,
     params_file: str = "",
     engine: str = "gpu",
+    allow_concurrent_writer: bool = False,
 ) -> dict:
     """
     Execute a sequence of LAMMPS scripts as a fully chained pipeline.
@@ -801,6 +882,16 @@ def run_lammps_chain(
         for s in stages:
             if "log_file" not in s:
                 s["log_file"] = f"{s.get('name', 'stage')}_run.log"
+
+        # Double-launch guard: refuse if a live sim process writes any target stage log
+        # (covers a prior chain stalled on any stage). Reads OS state, so it catches
+        # orphans left by a context/server restart — the PLA3 corruption class.
+        if not allow_concurrent_writer:
+            conflict = _live_sim_writers(
+                [f"{s['work_dir']}/{s['log_file']}" for s in stages]
+            )
+            if conflict:
+                return _double_launch_error(conflict)
 
         # ── Pre-flight validation ─────────────────────────────────────────────
         preflight_warnings = []
