@@ -18,7 +18,13 @@ shopt -s nullglob globstar
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-RUNS=(
+# --- Run selection -----------------------------------------------------------
+# Each machine has its own replicate set. Pick runs in priority order:
+#   * explicit args :  collect_reviewer_data.sh PVC2 PVC3 PE4 PEG1 ...
+#   * auto-discover :  collect_reviewer_data.sh auto    (every data/<dir> that
+#                      has a run_log.md, excluding TEMPLATE / CALIB_* / archive / _*)
+#   * no args       :  the DEFAULT_RUNS list below (this machine's committed 21).
+DEFAULT_RUNS=(
   PE1 PE2 PE3
   PLA1 PLA2 PLA3 PLA4
   PMMA1 PMMA2 PMMA3
@@ -27,6 +33,20 @@ RUNS=(
   cis-PBD1 cis-PBD-2 cis-PBD3 cis-PBD4
   PVC1
 )
+if [ "${1:-}" = "auto" ]; then
+  RUNS=()
+  for p in data/*/run_log.md; do
+    [ -e "$p" ] || continue
+    r="$(basename "$(dirname "$p")")"
+    case "$r" in TEMPLATE|CALIB_*|archive|_*) continue ;; esac
+    RUNS+=( "$r" )
+  done
+  echo "auto-discovered ${#RUNS[@]} runs: ${RUNS[*]}"
+elif [ "$#" -gt 0 ]; then
+  RUNS=( "$@" )
+else
+  RUNS=( "${DEFAULT_RUNS[@]}" )
+fi
 
 # Final equilibrated structures to include (basename allowlist). Covers both
 # glassy (npt_prod300_out.data) and rubbery (npt_production_out.data) regimes.
