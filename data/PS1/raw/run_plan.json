@@ -1,0 +1,348 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PSTR (*CC(c1ccccc1)*)",
+  "run_name": "PS1",
+  "polymer_class": "PSTR",
+  "smiles": "*CC(c1ccccc1)*",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "medium",
+  "plan_mode": "reasoned",
+  "assumptions": [
+    "atactic PS (aPS): backbone CH2-CHPh stereocenter randomized at build; DP>=30 averages tacticity fluctuations in Tg (Soldera2006)",
+    "exp anchors for this member (PS): Tg=373 K, RT density=1.05 g/cm3, K=3.5-5.5 GPa",
+    "PCFF Class II has full parameter coverage for sp3 backbone C/H and aromatic ca/ha types in styrene"
+  ],
+  "uncertainties": [
+    {
+      "name": "pcff_ps_tg_transferability",
+      "dominant": true,
+      "reduction_probe": "literature_anchor",
+      "note": "No direct PCFF PS Tg validation paper exists (confidence=medium). PCFF Class II validated on PC (Tg 417 vs 422 K) and PMMA vinyl backbone (<10%), but PS aromatic-pendant vinyl is an analogy, not a direct measurement. MD Tg expected high (430-500 K raw, SimPoly 399+/-22 K); 600 K sweep top covers it. literature_anchor (a cited PCFF or COMPASS PS Tg) would convert medium->high before committing to the Tg verdict."
+    },
+    {
+      "name": "K_underestimate_below_entanglement_dp",
+      "dominant": false,
+      "reduction_probe": "none",
+      "note": "DP=40 < DP@Me=160 (aPS Me=16,600 g/mol). K from sub-entanglement chains is screening-grade; Born/NVT (rate-free) avoids the strain-rate inflation that deform would add. Report MD K vs exp 3.5-5.5 GPa and flag the offset; a converged K needs DP>=160 in a dedicated run (out of 48h budget)."
+    },
+    {
+      "name": "hardware_optimum",
+      "dominant": false,
+      "reduction_probe": "hardware_benchmark",
+      "note": "hardware_policy.values_are_benchmarked=false (calibration was a partial/contended sweep). by_forcefield[pcff] default kept; benchmark on a drained box would authoritatively confirm gpu1_mpi4 for a ~6.4k-atom cell."
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "pcff",
+    "preferred_builder": "emc",
+    "charge_method": "RESP",
+    "electrostatics": "pppm",
+    "cutoff_A": 12.0,
+    "dt_fs": 1.0,
+    "confidence": "medium",
+    "dp_typical": 40,
+    "nchain": 10,
+    "density_initial_gcm3": 0.53,
+    "T_equil_K": 550.0,
+    "annealing_T_high_K": 630.0,
+    "eq_annealing_cycles": 5,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 5.0,
+    "tg_t_high_K": 600,
+    "tg_t_low_K": 200,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 500000,
+    "tg_rates_K_per_ns": [
+      40,
+      160,
+      640
+    ],
+    "K_deform_rate_inv_s": 10000000.0,
+    "K_deform_rate_slow_inv_s": 1000000.0,
+    "K_strain_max": 0.03,
+    "ct_min_decay_melt": 0.1,
+    "T_workflow_K": 550.0,
+    "experimental_tg_K": 373,
+    "experimental_density_gcm3": 1.05,
+    "tacticity": "atactic"
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF via EMC (Class II). Switched from TraPPE-UA 2026-06-11: UA representation ignores phenyl ring partial charges and pi-dihedral barriers that govern PS Tg (~373 K); no TraPPE-UA PS Tg validation exists in literature. PCFF Class II explicitly parameterizes aromatic C-H charges and cross-terms; validated for PC (Tang2022, PCFF Tg=417K vs exp 422K) and PMMA vinyl backbone (NkepsuMbitou2025, Class II within 10%). Soldera2006 (COMPASS/OPLS) confirms MD can reach PS Tg ~449-484 K raw, WLF-corrected ~373 K. No direct PCFF PS Tg paper found; confidence=medium until confirmed.",
+          "source_doi": "10.1021/ja00086a030"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Afzal2021"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Srivastava2026"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Tang2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Soldera2006"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "ff": "TraPPE-UA",
+          "rejected_because": "United-atom collapses phenyl ring H and omits aromatic partial charges + pi-dihedral barriers that govern PS Tg; no TraPPE-UA PS Tg validation in literature. Was the default until 2026-06-11."
+        },
+        {
+          "ff": "OPLS-AA / COMPASS",
+          "note": "Soldera2006 reached PS Tg 449-484 K raw (WLF->373 K) with COMPASS/OPLS — viable but PCFF Class II chosen for EMC-native Class II coverage and PolyJarvis validation history (PC, PMMA)."
+        }
+      ]
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "RESP",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [
+        {
+          "claim": "RESP (HF/6-31G*) recommended for PS/PSTR: phenyl pi-system polarization means QM-derived charges capture aromatic C-H partial charges that PCFF templates only approximate. AM1-BCC is an acceptable fallback.",
+          "citation": "polymer_rules.json:classes.PSTR.notes"
+        },
+        {
+          "claim": "charge_method_cost: RESP is the most expensive option — it requires a one-time HF/6-31G* single-point on the styrene repeat unit (minutes-to-tens-of-minutes on the build host) plus ESP fitting, vs near-zero for FF-embedded/Gasteiger and seconds for AM1-BCC (semi-empirical). The cost is incurred ONCE per chemistry at build time and is fully amortized over the multi-ns equilibration + Tg sweep + Born runs (tens of GPU-hours), so it adds <1% to total run cost. For an aromatic-pendant backbone the accuracy gain in ring C-H partial charges (which set density and Tg) outweighs the negligible marginal QM cost; AM1-BCC remains the fallback if the QM step is unavailable or fails.",
+          "citation": "Bayly1993 (RESP); Jakalian2002 (AM1-BCC)"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "method": "AM1-BCC",
+          "note": "acceptable fallback; faster (seconds, semi-empirical) but slightly less accurate ring charge distribution"
+        },
+        {
+          "method": "FF-embedded / Gasteiger",
+          "rejected_because": "near-zero cost but only approximates aromatic C-H charges; rejected because the dominant cost is the MD trajectory, not the one-time charge derivation, so the cheaper method buys no meaningful runtime while degrading ring-charge accuracy"
+        }
+      ]
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PSTR carries aromatic ring pi-system partial charges from PCFF (aromatic C-H); long-range Coulomb cannot be truncated without biasing density/Tg. PPPM required. lj/cut is only acceptable for purely apolar PHYC/PDIE backbones.",
+          "source": "polymer_rules.json:classes.PSTR.notes"
+        },
+        {
+          "claim": "computational_cost: PPPM adds an FFT-based kspace solve each step (the reason mpi>=4 is mandated in D-08 — mpi=1 starves kspace ~75x), making it materially more expensive per step than lj/cut, which drops kspace entirely. For this ~6,400-atom cell the kspace overhead is modest and well within the 48h/1-GPU budget. The cost is accepted because the aromatic C-H partial charges are non-negligible (|q| ~0.1-0.15 e on ring C/H): truncating their Coulomb at the 12 A cutoff would bias density and Tg by ~5-20% for a charged backbone, which is the very property the run measures. The accuracy gain therefore dominates the kspace cost; lj/cut's speed advantage is only realizable for genuinely apolar backbones (PHYC/PDIE) where it introduces no bias.",
+          "source": "polymer_rules.json:hardware_policy.by_forcefield.pcff (mpi>=4 for PPPM kspace)"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "method": "lj/cut (no kspace)",
+          "rejected_because": "cheaper per step (no FFT kspace solve) but drops aromatic partial-charge Coulomb; would bias density/Tg 5-20% for a charged backbone — the accuracy loss outweighs the speedup at this cell size"
+        }
+      ]
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=40, nchain=10",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "DP=40 >= DP_min=30, the atactic-tacticity-averaging floor (Soldera2006: DP>=30 needed to average backbone stereocenter fluctuations in Tg). Tg is chain-length independent above DP>=30, so 40 is a safe screening DP for the 48h budget (~6,400 atoms, ~10h on 1 GPU).",
+          "citation": "Soldera2006; polymer_rules.json:classes.PSTR.notes"
+        },
+        {
+          "claim": "Tg estimated/anchored to PS experimental value 373 K; sweep window 200-600 K brackets both the exp Tg and the expected high MD Tg (430-500 K raw).",
+          "method": "literature_anchor",
+          "value_K": 373
+        },
+        {
+          "claim": "DP=40 is below DP@Me=160 (aPS entanglement); acceptable for Tg (chain-length independent) but makes K screening-grade and is recorded as a non-dominant uncertainty.",
+          "citation": "Mark2007 Table 25.4 (Me=16,600 g/mol)"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "choice": "DP>=160 (entanglement-converged)",
+          "rejected_because": "needed for accurate K but ~4x larger cell exceeds the 48h budget; Tg does not require it"
+        }
+      ]
+    },
+    {
+      "id": "D-07_property_method",
+      "choice": "Born matrix + NVT (glassy), deform fallback",
+      "criteria_evaluated": [
+        "phase_glassy_vs_rubbery",
+        "method_physics_validity",
+        "gpu_vs_cpu",
+        "rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "PS is glassy at 300 K (exp Tg=373 K > 300 K), so K is taken via Born matrix + NVT: rate-free, gives the full elastic tensor, and avoids the strain-rate inflation (1.5-2x) that deform introduces. is_glassy will be confirmed from measured Tg>300 K (thermal track runs first).",
+          "citation": "decision_policy.json:policies.property_method.require; polymer_rules.json:classes.PSTR.exp_K_GPa"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "method": "uniaxial deform",
+          "note": "fallback only if Born fails; overestimates K 20-50% from rate artifact, compounding the sub-entanglement DP underestimate"
+        },
+        {
+          "method": "Murnaghan EOS",
+          "rejected_because": "rubbery-phase method; PS is glassy at 300 K"
+        }
+      ]
+    },
+    {
+      "id": "D-08_hardware",
+      "choice": {
+        "engine": "gpu",
+        "gpu_per_run": 1,
+        "mpi": 4
+      },
+      "criteria_evaluated": [
+        "forcefield_cost_structure",
+        "atom_count",
+        "concurrent_load",
+        "benchmark_evidence",
+        "cell_size_vs_benchmark_cell",
+        "host_match"
+      ],
+      "evidence": [
+        {
+          "claim": "FF family = pcff (all-atom Class II + PPPM). Estimated cell ~6,400 atoms (DP40 x nchain10 x 16 atoms/styrene monomer) is <10k -> 1 GPU per run (comm overhead/GPU underfill above that). mpi=4 mandatory: mpi=1 starves PPPM kspace ~75x. This equals by_forcefield[pcff] default {gpu, mpi4, gpu1}.",
+          "source": "polymer_rules.json:hardware_policy.by_forcefield.pcff"
+        },
+        {
+          "claim": "directional_probe (measured 2026-06-19 on 4x A800 / 32 cores) recommends gpu1_mpi4 at 17.985 ns/day for pcff at cell_atoms=3020. My ~6,400-atom estimate is ~2.1x that cell, just past the [0.5x,2x] adoption window, and values_are_benchmarked=false (partial/contended sweep). Per policy I keep the by_forcefield default (which coincides with the probe winner) rather than adopting the probe number, and schedule a hardware_benchmark probe.",
+          "source_date": "2026-06-19",
+          "measured_on": "4x NVIDIA A800 40GB Active / 32 phys cores (calibrate_hardware.py)"
+        },
+        {
+          "claim": "User resources (mpi_ranks<=4, gpu_ids=0) are consistent with the chosen {1 GPU, mpi=4} config.",
+          "citation": "task resources line"
+        }
+      ],
+      "confidence": "low",
+      "alternatives": [
+        {
+          "choice": "cpu mpi=4 (14.448 ns/day)",
+          "rejected_because": "slower than gpu1_mpi4 (17.985) on this host per probe"
+        },
+        {
+          "choice": "gpu_per_run>=2",
+          "rejected_because": "cell <10k atoms and no clean benchmark support; policy requires both"
+        }
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 373
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "born",
+      "track": "mechanical",
+      "success_criteria": {
+        "born_matrix_written": true
+      },
+      "fallback": "deform"
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 2,
+    "findings": [
+      "D-01_ff: all 4 criteria covered; source_doi + 5 citations; PCFF covers styrene atom types; TraPPE/OPLS alternatives recorded — pass.",
+      "D-03_electrostatics: |q|>0.1e aromatic ring charges require pppm; satisfied with evidence and lj/cut alternative rejected — pass.",
+      "D-04_system_size: DP=40>=20 for Tg; sub-entanglement K limitation acknowledged as non-dominant uncertainty (not hidden) — pass.",
+      "D-07_property_method: glassy phase -> Born+NVT (rate-free), is_glassy from measured Tg>300K, deform fallback recorded — pass.",
+      "D-08_hardware: pin {gpu,1,mpi4} == by_forcefield[pcff] default; mpi>=4 for PPPM, 1 GPU for 6.4k-atom cell, concurrent mpi<=32 all satisfied; values_are_benchmarked=false handled correctly via scheduled hardware_benchmark probe + confidence:low — pass.",
+      "Stage schema: all 8 stages carry stage/track/success_criteria; tracks valid and match track_map; planned_stages cover all 3 requested properties; dominant uncertainty named with valid literature_anchor probe — pass."
+    ]
+  },
+  "provenance": {
+    "generator": "make_deterministic_plan.py",
+    "generated_at": "2026-06-20T04:23:16.466552+00:00"
+  }
+}

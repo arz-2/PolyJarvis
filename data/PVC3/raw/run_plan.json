@@ -1,0 +1,365 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PVNL (*CC(Cl)*)",
+  "run_name": "PVC3",
+  "polymer_class": "PVNL",
+  "smiles": "*CC(Cl)*",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "medium",
+  "plan_mode": "reasoned",
+  "revises": "PVC2",
+  "assumptions": [
+    "PVNL (medium confidence) class defaults are a validated scaffold but tunable; two documented PVC2 failures are addressed by reasoned overrides (see revision_notes).",
+    "PVC member disambiguated from the PVNL class dict by the *CC(Cl)* substituent: exp Tg=354 K, exp RT density=1.38 g/cm3, exp K_T=3.5-4.5 GPa (glassy, 25 C).",
+    "PVC is physically glassy at 300 K (Tg 354 >> 300): mechanical K via glassy Murnaghan at 300 K; is_glassy confirmed by measured Tg from the thermal track."
+  ],
+  "revision_notes": {
+    "PVC2_failure_1_degenerate_tg": "PVC2 Tg fit was degenerate across all rates. Root cause (PVC2 run_log): retired [40,160,400] K/ns rate set gave 500/125/50 ps per-T holds (two fast rates degenerate by construction, transition_width c~0 kink artifacts) AND the melt/rubbery state was under-equilibrated before cooling (end-to-end tau_relax ~17.6 ns >> trajectory). FIX: (a) adopt the validated [25,50,100] K/ns set (800/400/200 ps per-T, all clear the 200 ps floor); (b) lengthen melt equilibration t_equil_ns 5->8 ns and eq_annealing_cycles 5->7 to relax chains via the high-T anneal, which is the policy-sanctioned substitute for unattainable melt self-diffusion at DP=60 (require_glassy rationale).",
+    "PVC2_failure_2_bm_b0prime_high": "PVC2 Murnaghan at +/-1000 atm (+/-0.1 GPa) gave B0'=16.34 (unphysical; glassy PVC should be 4-10), K=2.91 GPa vs exp ~4.0 (-27%). A narrow pressure span under-constrains the EOS curvature, letting B0' float high. FIX: widen bm_pressures_atm to +/-3000 atm (+/-0.3 GPa) to sample enough P-V curvature to constrain B0' into [4,20] while staying in the linear-elastic glassy regime (strain well below yield).",
+    "bm_span_recovery_R04": "BM-span recovery R-04 (2026-06-24): bm_pressures_atm [-3000, -1500, 0, 1500, 3000] -> [-1000, 0, 1500, 3000, 5000]. The -3000 atm (and likely -1500) tension cavitated the glassy PVC cell (density collapse 1.3->0.002 g/cm3, T runaway to 3655 K, 'Non-numeric pressure - simulation unstable' at bm_P-3000). Switched to a compression-biased span: tension capped at -1000 atm (PVC2-proven stable), compression extended to +5000 atm to retain the wide 6000-atm range that constrains B0'. Orchestrator inline recovery."
+  },
+  "uncertainties": [
+    {
+      "name": "tg_chain_equilibration",
+      "dominant": true,
+      "reduction_probe": "fast_density_screen",
+      "note": "Dominant carry-over risk from PVC2: at DP=60 melt self-diffusion is unattainable (tau_relax ~3.6e9 ps), so chain relaxation before cooling relies entirely on the high-T anneal. Mitigated here by t_equil_ns 5->8 ns and eq_annealing_cycles 5->7 plus the corrected [25,50,100] rate set. A small-cell NPT density screen vs 1.38 g/cm3 would cheaply confirm packing/FF transferability before the full thermal sweep. Recorded as planned, not executed; Validator decides."
+    },
+    {
+      "name": "bm_b0_prime_constraint",
+      "dominant": false,
+      "reduction_probe": "none",
+      "note": "PVC2 B0'=16.34 was unphysical at +/-1000 atm. Widening to +/-3000 atm is the planned remedy; if B0' still falls outside [4,20] the Murnaghan->deform fallback (D-07) engages. No cheaper probe than the run itself."
+    },
+    {
+      "name": "ff_transferability",
+      "dominant": false,
+      "reduction_probe": "fast_density_screen",
+      "note": "PCFF for PVC: Cl partial charges on backbone carbons make density/Tg sensitive to PPPM + charge embedding. EMC/PCFF build-tested PASS for PVC but no class-specific MD Tg paper. Same probe as tg_chain_equilibration (one density screen covers both)."
+    },
+    {
+      "name": "hardware_optimum",
+      "dominant": false,
+      "reduction_probe": "hardware_benchmark",
+      "note": "hardware_policy.values_are_benchmarked=false AND directional_probe host (4x A800/32 cores, 2026-06-21) != live host (4x Quadro RTX 6000/18 cores). by_forcefield[pcff] default kept (no D-08 override); a hardware_benchmark probe on the built cell would clean-benchmark this host."
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "pcff",
+    "preferred_builder": "emc",
+    "charge_method": "none",
+    "electrostatics": "pppm",
+    "cutoff_A": 12.0,
+    "dt_fs": 1.0,
+    "confidence": "medium",
+    "dp_typical": 60,
+    "nchain": 10,
+    "density_initial_gcm3": 0.55,
+    "T_equil_K": 530.0,
+    "annealing_T_high_K": 610.0,
+    "eq_annealing_cycles": 7,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 8.0,
+    "tg_t_high_K": 550,
+    "tg_t_low_K": 150,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 500000,
+    "tg_rates_K_per_ns": [
+      25,
+      50,
+      100
+    ],
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "K_strain_max": 0.03,
+    "ct_min_decay_melt": 0.1,
+    "T_workflow_K": 530.0,
+    "dsc_equiv_rate_K_per_ns": 1.6667e-10,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "experimental_tg_K": 354
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PVC PASS, PVAc PASS, PVA PASS). Note: OPLS-AA failed for PVC and PVAc; PCFF succeeded.",
+          "source_doi": "10.1007/s10118-019-2249-5"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Afzal2021"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Webb2024"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Li2019COMPASS"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": []
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "none",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF embeds charges via bond increments; no separate QM charge job. PVC Cl gives significant backbone-carbon partial charges, but these are carried by the PCFF increment table (EMC charge_method=none), consistent with the chosen FF. On the retired RadonPy route AM1-BCC was adequate for polar vinyl side chains without aromatic conjugation (RESP not required).",
+          "citation": "polymer_rules.json PVNL.notes (charge_method=none, EMC/PCFF)"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PVC backbone C-Cl gives |q|>0.1e partial charges on backbone carbons, so long-range Coulomb via PPPM is required; neglecting it biases density/Tg 5-20% for polar polymers. Heteroatom (Cl) present -> pppm mandated by policy.",
+          "source": "decision_policy.json:policies.electrostatics.require; polymer_rules.json:electrostatics_decision_guide; PVNL.notes (PVC chloride gives significant partial charges, PPPM required)"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=60, nchain=10 (~3600 all-atom atoms)",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "DP=60 is well above the Fox-Flory plateau (DP>=20) required for Tg, and above PVNL dp_min=30 for bulk_modulus finite-size convergence. PVC monomer (-CH2-CHCl-) = 6 all-atom atoms; 6 x 60 x 10 = ~3600 atoms (matches PVC2's measured 3620) \u2014 large enough to avoid self-imaging at the 12 A cutoff while staying within GPU budget.",
+          "citation": "polymer_rules.json PVNL {dp_typical:60, dp_min:30, nchain:10}"
+        },
+        {
+          "claim": "experimental comparators pinned to the PVC member (not the PVNL class dict) by the *CC(Cl)* substituent.",
+          "method": "member_disambiguation_by_substituent",
+          "value_K": 354,
+          "exp_density_gcm3": 1.38,
+          "exp_K_GPa": 4.0
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": []
+    },
+    {
+      "id": "D-05_convergence",
+      "choice": "require_glassy (DP>=30 glassy gate); melt equilibration lengthened (t_equil_ns 5->8, eq_annealing_cycles 5->7)",
+      "criteria_evaluated": [
+        "density_convergence",
+        "energy_convergence",
+        "chain_statistic_convergence"
+      ],
+      "evidence": [
+        {
+          "claim": "At DP=60 melt chain self-diffusion is unattainable on MD timescales (measured tau_relax ~3.6e9 ps for DP=60 PVC; PVC2 saw end-to-end tau_relax ~17.6 ns >> trajectory), so overall_pass via C(t) decay is unsatisfiable by construction. Gate on density plateau within experimental range + homogeneity CV<0.25 + P2 nematic<0.10 + energy drift/SEM bounds; diffusion metrics advisory. The high-T anneal substitutes for melt self-diffusion. PVC2 under-relaxed the melt before cooling; to strengthen the substitute, t_equil_ns is raised 5->8 ns and eq_annealing_cycles 5->7 (610 K anneal).",
+          "source": "decision_policy.json:policies.equilibration.require_glassy (authorized 2026-06-20, PVC1 precedent); PVC2 run_log root-cause"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-06_tg_fit_quality",
+      "choice": "stepwise-cooling multirate [25,50,100] K/ns, T_STEP=20K, sweep 150-550 K; replaces PVC2 retired [40,160,400]",
+      "criteria_evaluated": [
+        "t_range_brackets_experimental_tg",
+        "n_temperature_bins",
+        "bilinear_fit_r_squared",
+        "cooling_rate_artifact",
+        "tg_rates_clear_steps_floor"
+      ],
+      "evidence": [
+        {
+          "claim": "PVC2 used the retired [40,160,400] K/ns set: at T_STEP=20K this gives 500/125/50 ps per-T holds, so the two fast rates were degenerate by construction (rate is the same knob as per-T sampling), producing transition_width c~0 kink artifacts and an unreliable fit. The validated [25,50,100] set gives 800/400/200 ps (800k/400k/200k steps at dt=1fs), every rate clearing the 200 ps tg_min_steps_per_T floor. Sweep 150-550 K brackets exp Tg=354 K (and the expected MD overestimate of 380-470 K) with >100 K margin below and >150 K above per Patrone2016. Log-linear Tg(G)=a+b*ln(G) extrapolated to dsc_equiv_rate 1.6667e-10 K/ns.",
+          "source": "polymer_rules.json:tg_protocol_reference (note_on_steps: [40,160,400] RETIRED); decision_policy.json:policies.tg_protocol.require"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "method": "[40,160,400] K/ns",
+          "rejected_reason": "RETIRED: 500/125/50 ps per-T at T_STEP=20K; two fast rates degenerate; caused PVC2 degenerate Tg fit."
+        }
+      ]
+    },
+    {
+      "id": "D-07_property_method",
+      "choice": "Glassy Murnaghan NPT compression at 300 K, bm_pressures_atm widened to +/-3000 atm; deform fallback",
+      "criteria_evaluated": [
+        "phase_glassy_vs_rubbery",
+        "method_physics_validity",
+        "gpu_vs_cpu",
+        "rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "PVC is glassy at 300 K (exp Tg=354 > 300), so K via Murnaghan NPT compression at 300 K (symmetric, cell-size independent; Wu 2019 validated). Born+NVT REMOVED pipeline-wide (PCFF+PPPM virial incompatibility, K_Born 8-15x too high, failed 3/3 incl. PVC1, 2026-06-21). PVC2 at +/-1000 atm gave B0'=16.34 (unphysical) and K=2.91 GPa (-27% vs exp 4.0): the narrow span under-constrained EOS curvature. Widening to +/-3000 atm (+/-0.3 GPa) samples more P-V curvature to pin B0' into [4,20] while strain stays well below glassy yield. 3-direction uniaxial deform is the fallback if fit_converged=False or B0' outside [4,20].",
+          "source_doi": "10.1016/j.commatsci.2019.01.040",
+          "citation": "decision_policy.json:policies.property_method; polymer_rules.json PVNL exp_K_GPa[3.5,4.5]; BORN_MATRIX.md; PVC2 run_log B0'=16.34 root-cause"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "method": "born+nvt",
+          "rejected_reason": "Retired 2026-06-21: PCFF+PPPM virial incompatibility, failed 3/3 pipeline runs (PMMA4/PVC1/PEEK1)."
+        },
+        {
+          "method": "Murnaghan +/-1000 atm",
+          "rejected_reason": "PVC2 span too narrow: B0'=16.34 (unphysical), K -27% vs exp. Widened to +/-3000 atm."
+        }
+      ]
+    },
+    {
+      "id": "D-08_hardware",
+      "choice": {
+        "engine": "kokkos",
+        "gpu_per_run": 1,
+        "mpi": 1
+      },
+      "criteria_evaluated": [
+        "forcefield_cost_structure",
+        "atom_count",
+        "concurrent_load",
+        "benchmark_evidence",
+        "cell_size_vs_benchmark_cell",
+        "host_match"
+      ],
+      "evidence": [
+        {
+          "claim": "FF family pcff (class2+PPPM) -> KOKKOS full-offload, mpi=1 canonical (kspace on GPU). Estimated cell ~3600 atoms is <10k -> force 1 GPU (no multi-GPU pin). This equals by_forcefield[pcff] default {engine:kokkos, mpi:1, gpu_per_run:1}, so NO decided_params hardware override is written (worker prompt stays identical to the policy path). directional_probe (pcff gpu1_mpi1 42.83 ns/day, cell 3020 atoms) is in-size (~3600 within [0.5x,2x] of 3020) BUT values_are_benchmarked=false AND directional_probe host (4x A800/32 cores, 2026-06-21) != live host (4x Quadro RTX 6000/18 cores), so the absolute throughput is a HINT only and confidence is low. All GPUs currently busy; orchestrator claims a free GPU at submit (1 GPU).",
+          "source": "polymer_rules.json:hardware_policy.by_forcefield.pcff; directional_probe.recommended_by_ff.pcff (42.826 ns/day, measured_on 4x A800/32 cores, 2026-06-21, values_are_benchmarked=false)"
+        }
+      ],
+      "confidence": "low",
+      "alternatives": [
+        {
+          "method": "gpu-package engine=gpu, mpi=4",
+          "rejected_reason": "PCFF fallback only; KOKKOS full-offload is ~7.9x faster at mpi=1 and frees cores for ~4 concurrent runs (1/GPU)."
+        }
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": null
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "analyze-tg-multirate",
+      "track": "thermal",
+      "success_criteria": {
+        "loglinear_r_squared_min": 0.9,
+        "n_rates_min": 2
+      }
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "fit_converged": true,
+        "b0_prime_in_range": [
+          4,
+          20
+        ]
+      },
+      "fallback": "deform"
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 1,
+    "findings": [
+      "Gate verified: PVNL confidence=medium -> reasoned mode matches plan_mode (no bypass).",
+      "All reasoned policies (D-01..D-07) cover their evaluate criteria; evidence_required decisions (D-01,D-03,D-07) cite DOI/citation; empty alternatives on D-01 (PCFF only EMC FF that builds PVC) and D-03 (lj_cut excluded by heteroatom require) are explicitly justified.",
+      "Require clauses satisfied: pppm for Cl heteroatom backbone (D-03); require_glassy gate for DP=60 glassy (D-05); glassy Murnaghan 300K with deform fallback, Born+NVT excluded (D-07); all tg_rates [25,50,100] clear the 200ps/200000-step floor at T_STEP=20K (800/400/200 ps).",
+      "PVC2 root causes addressed: degenerate Tg fixed via validated rate set + longer melt anneal (t_equil 5->8 ns, cycles 5->7); unphysical B0'=16.34 fixed by widening bm_pressures to +/-3000 atm.",
+      "Stage schema clean: all stages carry stage/track/success_criteria; tracks valid; every stage->track pairing matches track_map; planned_stages cover all requested properties (density/tg/bulk_modulus).",
+      "D-08 hardware: decided_params unpinned (policy-derived, safe); recorded decision equals by_forcefield[pcff] default {kokkos,mpi:1,gpu:1}; mpi=1 canonical for PCFF/KOKKOS (kspace on GPU, not anti-pattern); <10k-atom cell -> 1 GPU; no non-default pin so staleness/host-mismatch rules not triggered; confidence:low appropriate."
+    ]
+  },
+  "provenance": {
+    "generator": "make_deterministic_plan.py",
+    "generated_at": "2026-06-24T01:14:56.406857+00:00"
+  }
+}

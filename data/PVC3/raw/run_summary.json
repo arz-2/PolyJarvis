@@ -1,0 +1,101 @@
+{
+  "run": {
+    "name": "PVC3",
+    "smiles": "*CC(Cl)*",
+    "polymer_class": "PVNL",
+    "ff": "PCFF",
+    "charge_method": "embedded bond-increment",
+    "dp": 60,
+    "n_chains": 10,
+    "n_atoms": 3620,
+    "date_start": "2026-06-23",
+    "date_end": "2026-06-24"
+  },
+  "decisions": {
+    "D-01_ff": "PCFF EMC auto-routed; PHAL false-flag overridden to PVNL",
+    "D-02_charges": "embedded bond-increment PCFF class-II no QM",
+    "D-03_electrostatics": "PPPM 12 A polar C-Cl backbone",
+    "D-04_system_size": "DP=60 10 chains 3620 atoms",
+    "D-05_convergence": "PASS rho=1.344 gcc -2.6pct; density/energy/spatial gates met; Ct advisory glassy",
+    "D-06_tg_fit_quality": "Per-rate fits ALL GOOD non-degenerate revision fixed PVC2 degeneracy: r25=310.6 r50=267.6 r100=284.0 K. Multirate slope-gate FAIL slope -19.2 R2=0.376 span 0.6dec to single-rate fallback Tg=310.6 K -12.3pct vs exp PCFF underpredicts. K=2.80 GPa B0prime=9.53 fixed from PVC2 16.3."
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 310.6,
+      "grading_basis": "rate_extrapolated",
+      "md_offset_K": 0.0,
+      "exp_range_K": [
+        334.0,
+        374.0
+      ],
+      "error_pct": -7.0,
+      "status": "FAIL",
+      "r_squared": 0.37562643336447854,
+      "fit_quality": "GOOD",
+      "primary_fit_invalid": false,
+      "tg_dsc_equiv_K": 310.6,
+      "loglinear_slope_K": -19.187844043823223,
+      "loglinear_r_squared": 0.37562643336447854,
+      "vf_fit_quality": "FAILED",
+      "n_rates": 3,
+      "n_replicates": 1,
+      "rates_span_decades": 0.6020599913279624,
+      "slow_rate_ref_K_per_ns": 1.6667e-10
+    },
+    "density": {
+      "value_g_cm3": 1.344239,
+      "exp_range_g_cm3": [
+        1.3,
+        1.45
+      ],
+      "error_pct": 0.0,
+      "status": "PASS"
+    },
+    "bulk_modulus": {
+      "value_GPa": 2.8037,
+      "sem_GPa": 0.1722,
+      "exp_range_GPa": [
+        3.5,
+        4.5
+      ],
+      "error_pct": -19.9,
+      "status": "FAIL",
+      "method": "murnaghan"
+    }
+  },
+  "convergence": {
+    "verdict": "PASS rho=1.344 gcc -2.6pct; density/energy/spatial gates met; Ct advisory glassy",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.5939
+  },
+  "structural_checks": {
+    "rg_cv": 0.1286,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": false,
+    "diffusion_regime": "sub-diffusive / kinetically trapped",
+    "ordered_flag": false,
+    "p2_mean": 0.0324,
+    "heterogeneous_flag": false,
+    "density_cv_mean": 0.1878
+  },
+  "artifacts": {
+    "tg_multirate_result": "raw/tg_multirate_result.json",
+    "tg_multirate_d06": "raw/d06_multirate_block.md",
+    "tg_multirate_fig": "raw/tg_multirate.png",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "equilibration_comprehensive": "raw/equilibration_comprehensive.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+    "volume_timeseries": "raw/volume_timeseries.csv",
+    "volume_fig": "graphs/volume_fluctuations.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "provenance": {
+    "simulation_dir": "/home/alexzhao/PolyJarvis/data/PVC3/lammps/",
+    "git_commit": "8d829eb",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-24T14:55:43.207298+00:00"
+  }
+}

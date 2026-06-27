@@ -1,0 +1,99 @@
+{
+  "run": {
+    "name": "PVC2",
+    "smiles": "*CC(Cl)*",
+    "polymer_class": "PVNL",
+    "ff": "PCFF",
+    "charge_method": "none",
+    "dp": 60,
+    "n_chains": 10,
+    "n_atoms": 3620,
+    "date_start": "2026-06-22",
+    "date_end": "2026-06-23"
+  },
+  "decisions": {
+    "D-01_ff": "PCFF (PVNL; PHAL false-flag overridden)",
+    "D-02_charges": "embedded bond-increment (PCFF class-II)",
+    "D-03_electrostatics": "pppm 12 A (C-Cl polar backbone)",
+    "D-04_system_size": "DP=60, 10 chains, 3620 atoms",
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "DEGENERATE/UNRELIABLE Tg fit (all 3 rates, transition_width c~0); MD Tg ~310 K low-confidence; is_glassy=True override"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 307.9,
+      "grading_basis": "raw_MD",
+      "md_offset_K": 100.0,
+      "exp_range_K": [
+        345.0,
+        360.0
+      ],
+      "error_pct": -10.8,
+      "status": "FAIL",
+      "r_squared": 0.9876,
+      "fit_quality": "POOR",
+      "tg_dsc_equiv_K": null,
+      "loglinear_slope_K": null,
+      "loglinear_r_squared": null,
+      "vf_fit_quality": null,
+      "n_rates": null,
+      "n_replicates": 1,
+      "rates_span_decades": null,
+      "slow_rate_ref_K_per_ns": null
+    },
+    "density": {
+      "value_g_cm3": 1.348576,
+      "exp_range_g_cm3": [
+        1.35,
+        1.45
+      ],
+      "error_pct": -0.1,
+      "status": "FAIL"
+    },
+    "bulk_modulus": {
+      "value_GPa": 2.9086,
+      "sem_GPa": 0.1231,
+      "exp_range_GPa": [
+        3.0,
+        5.0
+      ],
+      "error_pct": -3.0,
+      "status": "FAIL",
+      "method": "murnaghan"
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.5811
+  },
+  "structural_checks": {
+    "rg_cv": 0.2312,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": false,
+    "diffusion_regime": "sub-diffusive / kinetically trapped",
+    "ordered_flag": false,
+    "p2_mean": 0.0509,
+    "heterogeneous_flag": false,
+    "density_cv_mean": 0.1871
+  },
+  "artifacts": {
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "equilibration_comprehensive": "raw/equilibration_comprehensive.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+    "volume_timeseries": "raw/volume_timeseries.csv",
+    "volume_fig": "graphs/volume_fluctuations.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png",
+    "end_to_end_fig": "graphs/end_to_end_distribution.png"
+  },
+  "provenance": {
+    "simulation_dir": "/home/alexzhao/PolyJarvis/data/PVC2/lammps/",
+    "git_commit": "1cb9d21",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-23T10:52:37.199081+00:00"
+  }
+}

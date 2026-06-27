@@ -1,0 +1,105 @@
+{
+  "status": "success",
+  "overall_pass": false,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.2128,
+      "p_value": 0.0001
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.1412,
+      "p_value": 0.1559
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.039
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.0504
+    },
+    "tau_eff_density_fraction": 0.000780279000902152,
+    "meta": {
+      "n_total_rows": 2001,
+      "n_production_rows": 1001,
+      "T_mean": 299.95
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": true,
+      "cv": 0.1161,
+      "mean_Rg_A": 14.74,
+      "mean_Rg2_A2": 220.479,
+      "rg_spread_flag": false,
+      "C_inf": 14.303,
+      "n_chains": 10,
+      "frames_analysed": 1951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 33.9,
+      "std_R_ee_A": 9.08,
+      "n_chains": 10,
+      "end_to_end_distribution_png": "failed: [Errno 2] No such file or directory: '/home/alexzhao/PolyJarvis/data/PS2/graphs/end_to_end_distribution.png'"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.447,
+      "r2": 0.995,
+      "gaussian_pass": false,
+      "n_separations": 39
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 20691404.3,
+      "tau_ps": 5862680.6,
+      "beta": 0.392,
+      "decay_fraction_at_end": 0.035,
+      "trajectory_ps": 1951.0,
+      "pass": false
+    },
+    "msd": {
+      "alpha": 0.288,
+      "alpha_r2": 0.9684,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 524.81,
+      "kinetic_trap_flag": false
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.0336,
+      "p2_std": 0.0082,
+      "p2_max": 0.0636,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": true,
+      "cv_mean": 0.2373,
+      "cv_max": 0.282,
+      "grid_n": 6,
+      "atoms_per_voxel": 29.7,
+      "poisson_cv": 0.183,
+      "poisson_limited": false,
+      "heterogeneous_flag": false
+    }
+  },
+  "warnings": [
+    "MSID slope = 1.447 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension",
+    "C(t) partially decayed: 4% decayed at end of trajectory (\u03c4_relax=20691404.3 ps vs T_traj=1951.0 ps)"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=299.95 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-06-22 20:59\n\n**Overall: FAIL**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.2128% (p=0.0001) | <1%, p<0.01 | PASS |\n| Energy drift | 0.1412% (p=0.1559) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.039% | <1% | PASS |\n| Energy block-SEM | 0.0504% | <1% | PASS |\n| \u03c4_eff density | 0.1% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 11.6% | <30% | PASS |\n| C\u221e | 14.303 | lit. varies | INFO |\n| MSID slope | 1.447 (R\u00b2=0.995) | 1.0 \u00b120% | \u26a0 non-Gaussian |\n| C(t) \u03c4_relax | 20691404.3 ps (4% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | no (\u03b1=0.288, MSD=524.81 \u00c5\u00b2>>Rg\u00b2=220.479) | \u2014 | OK |\n| R_ee mean \u00b1 std | 33.9 \u00b1 9.08 \u00c5 (N=10 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0336 \u00b1 0.0082 | <0.10 | PASS |\n| Density homogeneity CV | 23.7% (6\u00b3 grid, 29.7 atoms/voxel) | <25% | PASS |\n\n**Warnings:** MSID slope = 1.447 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension; C(t) partially decayed: 4% decayed at end of trajectory (\u03c4_relax=20691404.3 ps vs T_traj=1951.0 ps)",
+  "log_file": "/home/alexzhao/PolyJarvis/data/PS2/lammps/equil/npt_prod300/npt_prod300.log",
+  "dump_file": "/home/alexzhao/PolyJarvis/data/PS2/lammps/equil/nvt_production/nvt_production.dump",
+  "data_file": "/home/alexzhao/PolyJarvis/data/PS2/lammps/equil/npt_prod300/npt_prod300_out.data",
+  "backbone_types": [
+    1,
+    2
+  ],
+  "timestamp": "2026-06-22 20:59"
+}

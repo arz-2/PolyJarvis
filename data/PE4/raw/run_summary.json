@@ -1,0 +1,101 @@
+{
+  "run": {
+    "name": "PE4",
+    "smiles": "*CC*",
+    "polymer_class": "PHYC",
+    "ff": "TraPPE-UA",
+    "charge_method": "none",
+    "dp": 120,
+    "n_chains": 20,
+    "n_atoms": 4840,
+    "date_start": "2026-06-25",
+    "date_end": "2026-06-26"
+  },
+  "decisions": {
+    "D-01_ff": "TraPPE-UA",
+    "D-02_charges": "none",
+    "D-03_electrostatics": "lj_cut",
+    "D-04_system_size": "DP=120, 20 chains",
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "EXCELLENT"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 225.33333333333334,
+      "grading_basis": "rate_extrapolated",
+      "md_offset_K": 0.0,
+      "exp_range_K": [
+        175.0,
+        215.0
+      ],
+      "error_pct": 4.8,
+      "status": "FAIL",
+      "r_squared": 0.9994631651230176,
+      "fit_quality": "EXCELLENT",
+      "primary_fit_invalid": false,
+      "tg_dsc_equiv_K": 225.33333333333334,
+      "loglinear_slope_K": 15.938301252382633,
+      "loglinear_r_squared": 0.9994631651230176,
+      "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
+      "n_rates": 3,
+      "n_replicates": 1,
+      "rates_span_decades": 0.6020599913279624,
+      "slow_rate_ref_K_per_ns": 1.6667e-10
+    },
+    "density": {
+      "value_g_cm3": 0.862329,
+      "exp_range_g_cm3": [
+        0.812,
+        0.898
+      ],
+      "error_pct": 0.0,
+      "status": "PASS"
+    },
+    "bulk_modulus": {
+      "value_GPa": 1.5583,
+      "sem_GPa": 0.09,
+      "exp_range_GPa": [
+        1.5,
+        2.0
+      ],
+      "error_pct": 0.0,
+      "status": "PASS",
+      "method": "murnaghan"
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.1224
+  },
+  "structural_checks": {
+    "rg_cv": 0.1922,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": true,
+    "diffusion_regime": "sub-diffusive / kinetically trapped",
+    "ordered_flag": false,
+    "p2_mean": 0.0238,
+    "heterogeneous_flag": false,
+    "density_cv_mean": 0.1292
+  },
+  "artifacts": {
+    "tg_multirate_result": "raw/tg_multirate_result.json",
+    "tg_multirate_d06": "raw/d06_multirate_block.md",
+    "tg_multirate_fig": "raw/tg_multirate.png",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "equilibration_comprehensive": "raw/equilibration_comprehensive.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+    "volume_timeseries": "raw/volume_timeseries.csv",
+    "volume_fig": "graphs/volume_fluctuations.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "7ad8428",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-26T11:18:10.894869+00:00"
+  }
+}

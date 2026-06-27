@@ -1,0 +1,59 @@
+{
+  "status": "success",
+  "method": "murnaghan",
+  "fit_converged": true,
+  "B0_GPa": 2.8986,
+  "bulk_modulus_GPa": 2.8986,
+  "B0_sem_GPa": 0.1118,
+  "bulk_modulus_sem_GPa": 0.1118,
+  "B0_prime": 10.3216,
+  "V0_A3": 46016.28,
+  "r_squared": 0.999596,
+  "n_points": 5,
+  "pressures_atm": [
+    -1000.0,
+    0.0,
+    1500.0,
+    3000.0,
+    5000.0
+  ],
+  "pressures_GPa": [
+    -0.101325,
+    0.0,
+    0.151988,
+    0.303975,
+    0.506625
+  ],
+  "volumes_A3": [
+    48151.33,
+    45900.04,
+    44143.42,
+    42890.5,
+    41630.61
+  ],
+  "vol_stds_A3": [
+    308.06,
+    231.39,
+    195.8,
+    173.38,
+    141.28
+  ],
+  "n_prod_rows": [
+    2501,
+    2501,
+    2501,
+    2501,
+    2501
+  ],
+  "log_files": [
+    "/home/alexzhao/PolyJarvis/data/PVC4/lammps/mechanical/bm_series/bm_P-1000/bm_P-1000.log",
+    "/home/alexzhao/PolyJarvis/data/PVC4/lammps/mechanical/bm_series/bm_P0/bm_P0.log",
+    "/home/alexzhao/PolyJarvis/data/PVC4/lammps/mechanical/bm_series/bm_P1500/bm_P1500.log",
+    "/home/alexzhao/PolyJarvis/data/PVC4/lammps/mechanical/bm_series/bm_P3000/bm_P3000.log",
+    "/home/alexzhao/PolyJarvis/data/PVC4/lammps/mechanical/bm_series/bm_P5000/bm_P5000.log"
+  ],
+  "eq_fraction": 0.5,
+  "output_dir": "/home/alexzhao/PolyJarvis/data/PVC4/raw",
+  "warnings": [],
+  "murnaghan_eos_fig": "/home/alexzhao/PolyJarvis/data/PVC4/graphs/murnaghan_eos.png"
+}

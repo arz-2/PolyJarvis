@@ -1,0 +1,59 @@
+{
+  "status": "success",
+  "method": "murnaghan",
+  "fit_converged": true,
+  "B0_GPa": 3.4984,
+  "bulk_modulus_GPa": 3.4984,
+  "B0_sem_GPa": 0.2081,
+  "bulk_modulus_sem_GPa": 0.2081,
+  "B0_prime": 8.9619,
+  "V0_A3": 68884.89,
+  "r_squared": 0.999728,
+  "n_points": 5,
+  "pressures_atm": [
+    -1000.0,
+    0.0,
+    3000.0,
+    7000.0,
+    15000.0
+  ],
+  "pressures_GPa": [
+    -0.101325,
+    0.0,
+    0.303975,
+    0.709275,
+    1.519875
+  ],
+  "volumes_A3": [
+    71573.53,
+    68570.21,
+    64588.12,
+    61412.99,
+    57692.6
+  ],
+  "vol_stds_A3": [
+    320.52,
+    261.89,
+    182.48,
+    151.66,
+    134.42
+  ],
+  "n_prod_rows": [
+    2501,
+    2501,
+    2501,
+    2501,
+    2501
+  ],
+  "log_files": [
+    "/home/alexzhao/PolyJarvis/data/PEG4/lammps/mechanical/bm_series/bm_P-1000/bm_P-1000.log",
+    "/home/alexzhao/PolyJarvis/data/PEG4/lammps/mechanical/bm_series/bm_P0/bm_P0.log",
+    "/home/alexzhao/PolyJarvis/data/PEG4/lammps/mechanical/bm_series/bm_P3000/bm_P3000.log",
+    "/home/alexzhao/PolyJarvis/data/PEG4/lammps/mechanical/bm_series/bm_P7000/bm_P7000.log",
+    "/home/alexzhao/PolyJarvis/data/PEG4/lammps/mechanical/bm_series/bm_P15000/bm_P15000.log"
+  ],
+  "eq_fraction": 0.5,
+  "output_dir": "/home/alexzhao/PolyJarvis/data/PEG4/raw",
+  "warnings": [],
+  "murnaghan_eos_fig": "/home/alexzhao/PolyJarvis/data/PEG4/graphs/murnaghan_eos.png"
+}

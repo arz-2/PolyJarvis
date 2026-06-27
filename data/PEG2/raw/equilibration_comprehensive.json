@@ -1,0 +1,105 @@
+{
+  "status": "success",
+  "overall_pass": false,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.1595,
+      "p_value": 0.0005
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.6375,
+      "p_value": 0.0128
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.0507
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.1499
+    },
+    "tau_eff_density_fraction": 0.0012232336338990819,
+    "meta": {
+      "n_total_rows": 2001,
+      "n_production_rows": 1001,
+      "T_mean": 300.09
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": true,
+      "cv": 0.224,
+      "mean_Rg_A": 20.835,
+      "mean_Rg2_A2": 455.921,
+      "rg_spread_flag": false,
+      "C_inf": 11.651,
+      "n_chains": 10,
+      "frames_analysed": 1951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 41.48,
+      "std_R_ee_A": 25.48,
+      "n_chains": 10,
+      "end_to_end_distribution_png": "/home/alexzhao/PolyJarvis/data/PEG2/graphs/end_to_end_distribution.png"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.018,
+      "r2": 0.9518,
+      "gaussian_pass": true,
+      "n_separations": 148
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 7394924569.3,
+      "tau_ps": 1000000000.0,
+      "beta": 0.316,
+      "decay_fraction_at_end": 0.011,
+      "trajectory_ps": 1951.0,
+      "pass": false
+    },
+    "msd": {
+      "alpha": 0.1,
+      "alpha_r2": 0.7082,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 117.47,
+      "kinetic_trap_flag": true
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.0461,
+      "p2_std": 0.0044,
+      "p2_max": 0.0589,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": true,
+      "cv_mean": 0.2215,
+      "cv_max": 0.2467,
+      "grid_n": 7,
+      "atoms_per_voxel": 20.5,
+      "poisson_cv": 0.221,
+      "poisson_limited": false,
+      "heterogeneous_flag": false
+    }
+  },
+  "warnings": [
+    "C(t) partially decayed: 1% decayed at end of trajectory (\u03c4_relax=7394924569.3 ps vs T_traj=1951.0 ps)",
+    "MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.09 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-06-22 20:45\n\n**Overall: FAIL**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.1595% (p=0.0005) | <1%, p<0.01 | PASS |\n| Energy drift | 0.6375% (p=0.0128) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0507% | <1% | PASS |\n| Energy block-SEM | 0.1499% | <1% | PASS |\n| \u03c4_eff density | 0.1% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 22.4% | <30% | PASS |\n| C\u221e | 11.651 | lit. varies | INFO |\n| MSID slope | 1.018 (R\u00b2=0.9518) | 1.0 \u00b120% | OK |\n| C(t) \u03c4_relax | 7394924569.3 ps (1% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | yes (\u03b1=0.1, MSD=117.47 \u00c5\u00b2>>Rg\u00b2=455.921) | \u2014 | \u26a0 trapped |\n| R_ee mean \u00b1 std | 41.48 \u00b1 25.48 \u00c5 (N=10 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0461 \u00b1 0.0044 | <0.10 | PASS |\n| Density homogeneity CV | 22.1% (7\u00b3 grid, 20.5 atoms/voxel) | <25% | PASS |\n\n**Warnings:** C(t) partially decayed: 1% decayed at end of trajectory (\u03c4_relax=7394924569.3 ps vs T_traj=1951.0 ps); MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state",
+  "log_file": "/home/alexzhao/PolyJarvis/data/PEG2/lammps/equil/npt_production_ext/npt_ext.log",
+  "dump_file": "/home/alexzhao/PolyJarvis/data/PEG2/lammps/equil/nvt_production/nvt_production.dump",
+  "data_file": "/home/alexzhao/PolyJarvis/data/PEG2/lammps/equil/npt_production_ext/npt_ext_out.data",
+  "backbone_types": [
+    1,
+    4
+  ],
+  "timestamp": "2026-06-22 20:45"
+}

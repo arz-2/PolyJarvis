@@ -1,0 +1,49 @@
+{
+  "status": "success",
+  "n_points": 3,
+  "rates_K_per_ns": [
+    40.0,
+    160.0,
+    400.0
+  ],
+  "tg_values_K": [
+    376.5,
+    377.5,
+    404.3
+  ],
+  "rates_span_decades": 1.0,
+  "loglinear_slope_K": 11.156073090490061,
+  "loglinear_intercept_K": 331.22878825053044,
+  "loglinear_r_squared": 0.6725790730032731,
+  "tg_at_slow_rate_K": 376.5,
+  "tg_at_slow_rate_K_loglinear_REJECTED": 80.04974341984538,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": true,
+  "is_flat_rate_regime": false,
+  "regime": "glassy",
+  "rubbery_regime_exemption": false,
+  "tg_method": "slowest_rate_accepted_loglinear_rejected",
+  "orchestrator_note": "Log-linear DSC extrapolation (80.0 K) REJECTED: loglinear_r_squared=0.673 < 0.90 plan gate, rate span only 1 decade (intrinsic <2-decade limitation, flagged by vf_fit_quality=POOR_POORLY_CONSTRAINED). Reported Tg = slowest-rate MD value (40 K/ns) = 376.5 K, corroborated by VF zero-rate limit tg0_K=375.5 K; both within exp 373-383 K. slope_gate PASSES (slope=+11.16 K/ln, correct direction). User-confirmed resolution; see run_log.md RECOVERY block.",
+  "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
+  "tg0_K": 375.49999999999994,
+  "tg0_K_ci95": Infinity,
+  "vf_A": -2.035031433077559,
+  "vf_c": -6.06212582972225,
+  "vf_B_ns_per_K": 0.0023294436197592483,
+  "vf_r_squared": 0.9999514525091442,
+  "vf_predicted_tg_K": [
+    376.3574884824404,
+    377.5619355381045,
+    404.2998088597762
+  ],
+  "vf_residuals_K": [
+    0.1425115175596261,
+    -0.06193553810447838,
+    0.00019114022381927498
+  ],
+  "polymer_name": "PS3",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 40 K/ns | 376.5 K |\n| 160 K/ns | 377.5 K |\n| 400 K/ns | 404.3 K |\n\n**Log-linear**: Tg = 331.2 + 11.16\u00b7ln(\u0393)  R\u00b2=0.6726\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **80.0 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): Tg\u2070 = 375.5 \u00b1 inf K (95% CI)  R\u00b2=1.0000  quality=POOR_POORLY_CONSTRAINED\n\u26a0 CI > 100 K: VF extrapolation is underconstrained with < 2 decades of rates. Use log-linear result for validation.\n",
+  "d06_markdown_path": "/home/alexzhao/PolyJarvis/data/PS3/raw/d06_multirate_block.md",
+  "plot_path": "/home/alexzhao/PolyJarvis/data/PS3/raw/tg_multirate.png"
+}
