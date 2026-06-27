@@ -1,0 +1,104 @@
+{
+  "status": "success",
+  "overall_pass": false,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.143,
+      "p_value": 0.0
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.0445,
+      "p_value": 0.2241
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.0205
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.0077
+    },
+    "tau_eff_density_fraction": 0.00031492952007201164,
+    "meta": {
+      "n_total_rows": 2001,
+      "n_production_rows": 1001,
+      "T_mean": 300.04
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": true,
+      "cv": 0.1923,
+      "mean_Rg_A": 14.287,
+      "mean_Rg2_A2": 211.689,
+      "rg_spread_flag": false,
+      "C_inf": null,
+      "n_chains": 10,
+      "frames_analysed": 1951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 29.93,
+      "std_R_ee_A": 14.5,
+      "n_chains": 10,
+      "end_to_end_distribution_png": "failed: [Errno 2] No such file or directory: '/home/arz2/PolyJarvis/data/PMMA3/graphs/end_to_end_distribution.png'"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.043,
+      "r2": 0.993,
+      "gaussian_pass": true,
+      "n_separations": 99
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 2929324640.0,
+      "tau_ps": 233743520.0,
+      "beta": 0.281,
+      "decay_fraction_at_end": 0.029,
+      "trajectory_ps": 1951.0,
+      "pass": false
+    },
+    "msd": {
+      "alpha": 0.181,
+      "alpha_r2": 0.8027,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 320.82,
+      "kinetic_trap_flag": false
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.0163,
+      "p2_std": 0.004,
+      "p2_max": 0.0291,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": false,
+      "cv_mean": 0.2875,
+      "cv_max": 0.315,
+      "grid_n": 7,
+      "atoms_per_voxel": 21.9,
+      "poisson_cv": 0.214,
+      "poisson_limited": false,
+      "heterogeneous_flag": true
+    }
+  },
+  "warnings": [
+    "C(t) partially decayed: 3% decayed at end of trajectory (\u03c4_relax=2929324640.0 ps vs T_traj=1951.0 ps)"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.04 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-06-25 18:00\n\n**Overall: FAIL**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.143% (p=0.0) | <1%, p<0.01 | PASS |\n| Energy drift | 0.0445% (p=0.2241) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0205% | <1% | PASS |\n| Energy block-SEM | 0.0077% | <1% | PASS |\n| \u03c4_eff density | 0.0% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 19.2% | <30% | PASS |\n| MSID slope | 1.043 (R\u00b2=0.993) | 1.0 \u00b120% | OK |\n| C(t) \u03c4_relax | 2929324640.0 ps (3% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | no (\u03b1=0.181, MSD=320.82 \u00c5\u00b2>>Rg\u00b2=211.689) | \u2014 | OK |\n| R_ee mean \u00b1 std | 29.93 \u00b1 14.5 \u00c5 (N=10 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0163 \u00b1 0.004 | <0.10 | PASS |\n| Density homogeneity CV | 28.7% (7\u00b3 grid, 21.9 atoms/voxel) | <25% | FAIL |\n\n**Warnings:** C(t) partially decayed: 3% decayed at end of trajectory (\u03c4_relax=2929324640.0 ps vs T_traj=1951.0 ps)",
+  "log_file": "/home/arz2/PolyJarvis/data/PMMA3/lammps/equil/npt_prod300/npt_prod300.log",
+  "dump_file": "/home/arz2/PolyJarvis/data/PMMA3/lammps/equil/nvt_production/nvt_production.dump",
+  "data_file": "/home/arz2/PolyJarvis/data/PMMA3/lammps/equil/npt_prod300/npt_prod300_out.data",
+  "backbone_types": [
+    1,
+    2
+  ],
+  "timestamp": "2026-06-25 18:00"
+}

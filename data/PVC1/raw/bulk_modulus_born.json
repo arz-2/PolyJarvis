@@ -1,0 +1,65 @@
+{
+  "status": "success",
+  "born_matrix_file": "/home/arz2/PolyJarvis/data/PVC1/lammps/mechanical/born/born_matrix.dat",
+  "log_file": "/home/arz2/PolyJarvis/data/PVC1/lammps/mechanical/born/nvt_born.log",
+  "output_dir": "/home/arz2/PolyJarvis/data/PVC1/raw",
+  "method": "born_nvt",
+  "n_atoms": 3620,
+  "bulk_modulus_GPa": -14.0314,
+  "bulk_modulus_atm": -138478.71,
+  "bulk_modulus_sem_GPa": 5.226,
+  "K_Born_GPa": 31.6177,
+  "kinetic_term_GPa": 0.3247,
+  "fluctuation_correction_GPa": 45.9738,
+  "V_mean_A3": 46154.66,
+  "T_mean_K": 299.83,
+  "Var_P_atm2": 401626.8937,
+  "n_effective_samples": 251,
+  "block_averaging": {
+    "block_count": 5,
+    "block_K_GPa_values": [
+      -21.4482,
+      -13.6288,
+      4.6223,
+      -15.0233,
+      -25.9662
+    ],
+    "K_block_mean_GPa": -14.2888,
+    "K_block_std_GPa": 11.6857,
+    "K_sem_GPa": 5.226
+  },
+  "diagnostics": {
+    "n_born_total": 500,
+    "n_born_production": 250,
+    "n_log_total": 501,
+    "n_log_production": 251,
+    "eq_fraction": 0.5,
+    "T_mean_K": 299.83,
+    "T_std_K": 4.29,
+    "V_mean_A3": 46154.66,
+    "V_std_A3": 0.0,
+    "P_mean_atm": -82.24,
+    "P_std_atm": 632.48,
+    "Var_P_atm2": 401626.8937,
+    "tau_eff_frames": 0.11,
+    "tau_eff_fraction": 0.000425,
+    "n_effective_samples": 251,
+    "K_Born_atm": 312042.77,
+    "NkT_V_atm": 3204.33,
+    "fluct_correction_atm": 453725.81,
+    "born_elements_mean_atm": {
+      "b11": 753171.9,
+      "b22": 741348.0,
+      "b33": 761171.46,
+      "b12": 92754.53,
+      "b13": 92998.56,
+      "b23": 90593.69
+    }
+  },
+  "warnings": [
+    "K_T = -14.031 GPa < 0 \u2014 stress-fluctuation term dominates. Check that simulation is at constant volume (NVT) and has converged. Possible causes: too-short run, non-equilibrium drift, wrong n_atoms.",
+    "Fluctuation correction (45.974 GPa) is >50% of K_Born (31.618 GPa). This is unexpected for a glassy polymer \u2014 verify the system is in the glassy state at 300 K."
+  ],
+  "born_timeseries_fig": "/home/arz2/PolyJarvis/data/PVC1/graphs/born_matrix_timeseries.png",
+  "note_technique": "Born+NVT gives unrelaxed (high-frequency) isothermal K_T. Comparable to ultrasonic/Brillouin K_S via K_T \u2248 K_S\u00d7(Cv/Cp) (~0.96 for glassy). For quasi-static PVT references expect K_T 5\u201310% lower than this value."
+}

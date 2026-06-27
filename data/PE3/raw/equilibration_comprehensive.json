@@ -1,0 +1,105 @@
+{
+  "status": "success",
+  "overall_pass": true,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.1266,
+      "p_value": 0.003
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.1415,
+      "p_value": 0.4663
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.027
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.1068
+    },
+    "tau_eff_density_fraction": 0.0010652295352717473,
+    "meta": {
+      "n_total_rows": 2501,
+      "n_production_rows": 1251,
+      "T_mean": 300.17
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": true,
+      "cv": 0.2542,
+      "mean_Rg_A": 29.58,
+      "mean_Rg2_A2": 931.831,
+      "rg_spread_flag": false,
+      "C_inf": null,
+      "n_chains": 20,
+      "frames_analysed": 951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 73.73,
+      "std_R_ee_A": 29.41,
+      "n_chains": 20,
+      "end_to_end_distribution_png": "/home/arz2/PolyJarvis/data/PE3/graphs/end_to_end_distribution.png"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.357,
+      "r2": 0.9925,
+      "gaussian_pass": false,
+      "n_separations": 119
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 1091062.5,
+      "tau_ps": 772111.5,
+      "beta": 0.631,
+      "decay_fraction_at_end": 0.009,
+      "trajectory_ps": 951.0,
+      "pass": true
+    },
+    "msd": {
+      "alpha": 0.215,
+      "alpha_r2": 0.9647,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 357.73,
+      "kinetic_trap_flag": true
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.0222,
+      "p2_std": 0.0052,
+      "p2_max": 0.0392,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": true,
+      "cv_mean": 0.1288,
+      "cv_max": 0.1481,
+      "grid_n": 6,
+      "atoms_per_voxel": 22.4,
+      "poisson_cv": 0.211,
+      "poisson_limited": false,
+      "heterogeneous_flag": false
+    }
+  },
+  "warnings": [
+    "MSID slope = 1.357 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension",
+    "C(t) partially decayed: 1% decayed at end of trajectory (\u03c4_relax=1091062.5 ps vs T_traj=951.0 ps)",
+    "MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.17 K \u00b7 951 frames analysed (skip=50) \u00b7 2026-06-24 05:36\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.1266% (p=0.003) | <1%, p<0.01 | PASS |\n| Energy drift | 0.1415% (p=0.4663) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.027% | <1% | PASS |\n| Energy block-SEM | 0.1068% | <1% | PASS |\n| \u03c4_eff density | 0.1% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 25.4% | <30% | PASS |\n| MSID slope | 1.357 (R\u00b2=0.9925) | 1.0 \u00b120% | \u26a0 non-Gaussian |\n| C(t) \u03c4_relax | 1091062.5 ps (1% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | yes (\u03b1=0.215, MSD=357.73 \u00c5\u00b2>>Rg\u00b2=931.831) | \u2014 | \u26a0 trapped |\n| R_ee mean \u00b1 std | 73.73 \u00b1 29.41 \u00c5 (N=20 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0222 \u00b1 0.0052 | <0.10 | PASS |\n| Density homogeneity CV | 12.9% (6\u00b3 grid, 22.4 atoms/voxel) | <25% | PASS |\n\n**Warnings:** MSID slope = 1.357 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension; C(t) partially decayed: 1% decayed at end of trajectory (\u03c4_relax=1091062.5 ps vs T_traj=951.0 ps); MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state",
+  "log_file": "/home/arz2/PolyJarvis/data/PE3/lammps/npt_production/npt_production.log",
+  "dump_file": "/home/arz2/PolyJarvis/data/PE3/lammps/nvt_production/nvt_production.dump",
+  "data_file": "/home/arz2/PolyJarvis/data/PE3/lammps/npt_production/npt_production_out.data",
+  "backbone_types": [
+    1
+  ],
+  "timestamp": "2026-06-24 05:36"
+}

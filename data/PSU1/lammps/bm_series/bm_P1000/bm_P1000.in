@@ -1,0 +1,26 @@
+log bm_P1000.log append
+units real
+atom_style full
+boundary p p p
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+read_data /home/arz2/PolyJarvis/data/PSU1/lammps/npt_prod300/npt_prod300_out.data
+include /home/arz2/PolyJarvis/data/PSU1/lammps/cell/emc_build.params
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo 100
+velocity all create 300.0 11004 mom yes rot yes dist gaussian
+timestep 1.0
+fix npt_bm all npt temp 300.0 300.0 100 iso 1000 1000 1000.0
+run 500000
+write_data bm_P1000_out.data

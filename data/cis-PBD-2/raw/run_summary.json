@@ -1,0 +1,99 @@
+{
+  "run": {
+    "name": "cis-PBD-2",
+    "smiles": "*C/C=C\\C*",
+    "polymer_class": "PDIE",
+    "ff": "trappe-ua",
+    "charge_method": "",
+    "dp": null,
+    "n_chains": null,
+    "n_atoms": null,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": null,
+    "D-02_charges": null,
+    "D-03_electrostatics": null,
+    "D-04_system_size": null,
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "EXCELLENT"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 133.0034673762272,
+      "grading_basis": "rate_extrapolated",
+      "md_offset_K": 0.0,
+      "exp_range_K": [
+        151.0,
+        191.0
+      ],
+      "error_pct": -11.9,
+      "status": "FAIL",
+      "r_squared": 0.9988,
+      "fit_quality": "POOR",
+      "tg_dsc_equiv_K": 133.0034673762272,
+      "loglinear_slope_K": 2.23617731337789,
+      "loglinear_r_squared": 1.0,
+      "vf_fit_quality": "SKIPPED (N < 3)",
+      "n_rates": 2,
+      "n_replicates": 1,
+      "rates_span_decades": 0.6020599913279624,
+      "slow_rate_ref_K_per_ns": 1.6667e-10
+    },
+    "density": {
+      "value_g_cm3": 0.898026,
+      "exp_range_g_cm3": [
+        0.869,
+        0.961
+      ],
+      "error_pct": 0.0,
+      "status": "PASS"
+    },
+    "bulk_modulus": {
+      "value_GPa": 1.6059,
+      "sem_GPa": 0.0423,
+      "exp_range_GPa": [
+        1.38,
+        1.95
+      ],
+      "error_pct": 0.0,
+      "status": "PASS",
+      "method": "murnaghan"
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": null,
+    "energy_equilibrated": null,
+    "density_drift_pct": null
+  },
+  "structural_checks": {
+    "rg_cv": null,
+    "rg_spread_flag": null,
+    "kinetic_trap_flag": null,
+    "diffusion_regime": null,
+    "ordered_flag": null,
+    "p2_mean": null,
+    "heterogeneous_flag": null,
+    "density_cv_mean": null
+  },
+  "artifacts": {
+    "tg_summary": "raw/tg_summary.json",
+    "tg_density_bins": "raw/tg_density_bins.csv",
+    "tg_multirate_result": "raw/tg_multirate_result.json",
+    "tg_multirate_d06": "raw/d06_multirate_block.md",
+    "tg_multirate_fig": "raw/tg_multirate.png",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+    "volume_timeseries": "raw/volume_timeseries.csv"
+  },
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "5b640ff",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-23T05:47:30.211395+00:00"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "status": "success",
+  "n_points": 3,
+  "rates_K_per_ns": [
+    40.0,
+    160.0,
+    400.0
+  ],
+  "tg_values_K": [
+    403.4,
+    427.2,
+    404.0
+  ],
+  "rates_span_decades": 1.0,
+  "loglinear_slope_K": 1.6268046217885779,
+  "loglinear_intercept_K": 403.5318851397687,
+  "loglinear_r_squared": 0.019311035127775947,
+  "tg_at_slow_rate_K": 366.90437044776434,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": true,
+  "is_flat_rate_regime": false,
+  "regime": "glassy",
+  "rubbery_regime_exemption": false,
+  "tg_method": "loglinear_extrapolation",
+  "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
+  "tg0_K": 1.0000000418191568,
+  "tg0_K_ci95": Infinity,
+  "vf_A": -107193.0765214779,
+  "vf_c": -266.02874992648674,
+  "vf_B_ns_per_K": 2.9186490666637144e-116,
+  "vf_r_squared": 0.01864805359544708,
+  "vf_predicted_tg_K": [
+    409.6038326520303,
+    411.77450682910313,
+    413.2219487715547
+  ],
+  "vf_residuals_K": [
+    -6.203832652030314,
+    15.425493170896857,
+    -9.221948771554707
+  ],
+  "polymer_name": "PMMA2",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 40 K/ns | 403.4 K |\n| 160 K/ns | 427.2 K |\n| 400 K/ns | 404.0 K |\n\n**Log-linear**: Tg = 403.5 + 1.63\u00b7ln(\u0393)  R\u00b2=0.0193\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **366.9 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): Tg\u2070 = 1.0 \u00b1 inf K (95% CI)  R\u00b2=0.0186  quality=POOR_POORLY_CONSTRAINED\n\u26a0 CI > 100 K: VF extrapolation is underconstrained with < 2 decades of rates. Use log-linear result for validation.\n",
+  "d06_markdown_path": "/home/arz2/PolyJarvis/data/PMMA2/raw/d06_multirate_block.md",
+  "plot_path": "/home/arz2/PolyJarvis/data/PMMA2/raw/tg_multirate.png"
+}

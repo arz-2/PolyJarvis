@@ -1,0 +1,49 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - NPT (Murnaghan BM series)
+# P=-1000 atm, T=300 K, 500000 steps (0.5 ns)
+# ============================================================
+log /home/arz2/PolyJarvis/data/PLA1/lammps/mechanical/bm_series/bm_P-1000/bm_P-1000.log
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+# KOKKOS (-sf kk) handles offload — no package gpu line
+
+read_data /home/arz2/PolyJarvis/data/PLA1/lammps/equil/npt_prod300/npt_prod300_out.data
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo 100
+
+# --- Trajectory ---
+dump dump_npt all custom 5000 /home/arz2/PolyJarvis/data/PLA1/lammps/mechanical/bm_series/bm_P-1000/bm_P-1000.dump id type mol x y z ix iy iz vx vy vz
+
+# --- NPT Thermostat + Barostat ---
+timestep 1.0
+fix npt_fix all npt temp 300.0 300.0 100.0 iso -1000.0 -1000.0 1000.0
+
+run 500000
+
+# --- Cleanup ---
+unfix npt_fix
+undump dump_npt
+
+write_dump all custom /home/arz2/PolyJarvis/data/PLA1/lammps/mechanical/bm_series/bm_P-1000/bm_P-1000_last.dump id type mol x y z xu yu zu vx vy vz modify sort id
+write_data /home/arz2/PolyJarvis/data/PLA1/lammps/mechanical/bm_series/bm_P-1000/bm_P-1000_out.data
+
+print "STAGE COMPLETE: BM P=-1000atm T=300.0K steps=500000"
+quit

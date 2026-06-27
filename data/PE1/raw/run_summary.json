@@ -1,0 +1,89 @@
+{
+  "run": {
+    "name": "PE1",
+    "smiles": "*CC*",
+    "polymer_class": "PHYC",
+    "ff": "TraPPE-UA",
+    "charge_method": "",
+    "dp": null,
+    "n_chains": null,
+    "n_atoms": null,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": null,
+    "D-02_charges": null,
+    "D-03_electrostatics": null,
+    "D-04_system_size": null,
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "EXCELLENT"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 230.7,
+      "exp_range_K": [
+        199.0,
+        239.0
+      ],
+      "error_pct": 5.3,
+      "status": "PASS",
+      "r_squared": 0.9974,
+      "fit_quality": "EXCELLENT"
+    },
+    "density": {
+      "value_g_cm3": 0.859792,
+      "exp_range_g_cm3": [
+        0.902,
+        0.997
+      ],
+      "error_pct": 9.4,
+      "status": "FAIL"
+    },
+    "bulk_modulus": {
+      "value_GPa": 1.4626,
+      "sem_GPa": 0.0976,
+      "exp_range_GPa": [
+        0.3,
+        0.8
+      ],
+      "error_pct": 165.9,
+      "status": "FAIL",
+      "method": "murnaghan"
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": null,
+    "energy_equilibrated": null,
+    "density_drift_pct": null
+  },
+  "structural_checks": {
+    "rg_cv": null,
+    "rg_spread_flag": null,
+    "kinetic_trap_flag": null,
+    "diffusion_regime": null,
+    "ordered_flag": null,
+    "p2_mean": null,
+    "heterogeneous_flag": null,
+    "density_cv_mean": null
+  },
+  "artifacts": {
+    "tg_summary": "raw/tg_summary.json",
+    "tg_density_bins": "raw/tg_density_bins.csv",
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+    "volume_timeseries": "raw/volume_timeseries.csv",
+    "volume_fig": "graphs/volume_fluctuations.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "17a4076",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-20T16:00:57.580875+00:00"
+  }
+}

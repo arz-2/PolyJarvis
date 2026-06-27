@@ -1,0 +1,59 @@
+{
+  "status": "success",
+  "n_points": 6,
+  "rates_K_per_ns": [
+    25.0,
+    40.0,
+    50.0,
+    100.0,
+    160.0,
+    640.0
+  ],
+  "tg_values_K": [
+    209.4,
+    231.5,
+    249.8,
+    276.6,
+    233.6,
+    232.5
+  ],
+  "rates_span_decades": 1.4082399653118496,
+  "loglinear_slope_K": 3.767916902258006,
+  "loglinear_intercept_K": 221.96849459775416,
+  "loglinear_r_squared": 0.03828581058365809,
+  "tg_at_slow_rate_K": 238.9,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": true,
+  "is_flat_rate_regime": true,
+  "regime": "rubbery",
+  "rubbery_regime_exemption": true,
+  "tg_method": "rubbery_flat_mean",
+  "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
+  "tg0_K": 1.000000000004815,
+  "tg0_K_ci95": 107771.13834373698,
+  "vf_A": -16907.774648070976,
+  "vf_c": -75.57979689525611,
+  "vf_B_ns_per_K": 1.500069099750394e-33,
+  "vf_r_squared": 0.03435208104681253,
+  "vf_predicted_tg_K": [
+    234.65891973133623,
+    236.1865193807533,
+    236.91879209284457,
+    239.22280485292728,
+    240.8108650106689,
+    245.62071004108915
+  ],
+  "vf_residuals_K": [
+    -25.25891973133622,
+    -4.68651938075331,
+    12.881207907155442,
+    37.37719514707274,
+    -7.210865010668897,
+    -13.120710041089154
+  ],
+  "polymer_name": "PE3",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 25 K/ns | 209.4 K |\n| 40 K/ns | 231.5 K |\n| 50 K/ns | 249.8 K |\n| 100 K/ns | 276.6 K |\n| 160 K/ns | 233.6 K |\n| 640 K/ns | 232.5 K |\n\n**Log-linear**: Tg = 222.0 + 3.77\u00b7ln(\u0393)  R\u00b2=0.0383\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **238.9 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): Tg\u2070 = 1.0 \u00b1 107771.1 K (95% CI)  R\u00b2=0.0344  quality=POOR_POORLY_CONSTRAINED\n\u26a0 CI > 100 K: VF extrapolation is underconstrained with < 2 decades of rates. Use log-linear result for validation.\n",
+  "d06_markdown_path": "/home/arz2/PolyJarvis/data/PE3/raw/d06_multirate_block.md",
+  "plot_path": "/home/arz2/PolyJarvis/data/PE3/raw/tg_multirate.png"
+}

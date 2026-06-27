@@ -1,0 +1,71 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - Minimization Template
+# ============================================================
+# Stage: Energy minimization (step 0 of equilibration)
+# Purpose: Relax bad contacts in newly generated amorphous cells
+#
+# Tunable parameters (injected by script_generator.py):
+#   DATA_FILE       - path to .data file
+#   LOG_FILE        - log output filename
+#   DUMP_FILE       - trajectory dump filename
+#   WRITE_DATA_FILE - output .data file after minimization
+#   LAST_DUMP_FILE  - final snapshot dump filename
+#   PAIR_STYLE_BLOCK- pair + kspace style lines (soft-core for dense systems)
+#   BOND_STYLE      - e.g. harmonic
+#   ANGLE_STYLE     - e.g. harmonic
+#   DIHEDRAL_STYLE  - e.g. fourier
+#   IMPROPER_STYLE  - e.g. cvff
+#   GPU_PACKAGE     - "package gpu 1 neigh no" or empty string
+#   MIN_STYLE       - cg (conjugate gradient) or hftn
+#   ETOL            - energy convergence tolerance (e.g. 1e-6)
+#   FTOL            - force convergence tolerance (e.g. 1e-6)
+#   MAXITER         - max iterations (e.g. 50000)
+#   MAXEVAL         - max force evaluations (e.g. 100000)
+#   THERMO_FREQ     - thermo output frequency
+#   DUMP_FREQ       - dump output frequency
+# ============================================================
+
+log minimize.log
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+# KOKKOS: package loaded via -pk kokkos on the command line
+
+read_data /home/arz2/PolyJarvis/data/PSU4/lammps/equil/cell.data
+include /home/arz2/PolyJarvis/data/PSU4/lammps/equil/emc_build.params
+
+# --- Thermo Output ---
+thermo_style custom step time temp press etotal pe ebond eangle edihed eimp evdwl ecoul elong vol lx ly lz density
+thermo_modify flush yes
+thermo 500
+
+# --- Trajectory ---
+dump dump_min all custom 1000 minimize.dump id type mol x y z ix iy iz
+
+# --- Minimization ---
+min_style cg
+minimize 1e-06 1e-06 50000 100000
+
+undump dump_min
+reset_timestep 0
+
+# --- Write Output ---
+write_dump all custom minimize_last.dump id type mol x y z xu yu zu vx vy vz modify sort id
+write_data /home/arz2/PolyJarvis/data/PSU4/lammps/equil/minimize/minimize_out.data
+
+print "STAGE COMPLETE: minimization"
+quit

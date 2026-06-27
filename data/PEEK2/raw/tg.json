@@ -1,0 +1,16 @@
+{
+  "tg_md_K": 523.6,
+  "tg_dsc_equiv_K": null,
+  "tg_fit_quality": "EXCELLENT",
+  "tg_r_squared": 0.9967,
+  "cooling_rate_K_per_ns": 40,
+  "n_rates_valid": 1,
+  "multirate_method": "single_rate_fallback",
+  "multirate_r_squared": null,
+  "loglinear_slope_K": null,
+  "is_flat_rate_regime": false,
+  "alpha_g_per_K": 0.000196506,
+  "alpha_r_per_K": 0.00042739,
+  "delta_cp_J_gK": 0.0923,
+  "notes": "Only rate 40 K/ns gave acceptable fit; rates 160 and 400 K/ns gave degenerate transition width (c→0) from fast-rate undersampling of rigid PEEK backbone. No DSC extrapolation possible. Tg_MD=523.6 K is best available estimate at 40 K/ns."
+}

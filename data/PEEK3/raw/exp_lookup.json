@@ -1,0 +1,75 @@
+{
+  "match_method": "name_match",
+  "match_confidence": "high",
+  "polymer_id": 963,
+  "polymer_name": "Poly(ether ether ketone)",
+  "n_polymer_ids": 1,
+  "tg": {
+    "agg_median_K": 420.1,
+    "agg_range_K": [
+      405.1,
+      431.1
+    ],
+    "n_rows": 9,
+    "form_filter": "all_clean",
+    "outliers_clipped": false,
+    "preferred_method": "DSC",
+    "rows": [
+      {
+        "tg_K": 418.15,
+        "form": null,
+        "method": "DSC",
+        "notes": "DSC with 10% crystallinity",
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(ether ether ketone)"
+      },
+      {
+        "tg_K": 430.15,
+        "form": null,
+        "method": "DSC",
+        "notes": "DSC with 28% crystallinity",
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(ether ether ketone)"
+      },
+      {
+        "tg_K": 405.15,
+        "form": null,
+        "method": null,
+        "notes": null,
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(ether ether ketone)"
+      },
+      {
+        "tg_K": 410.0,
+        "form": null,
+        "method": null,
+        "notes": "Quenched(DSC) 410 (8)",
+        "source_key": "PolymerDataHandbook1999",
+        "polymer_name": "Poly(ether ether ketone)"
+      },
+      {
+        "tg_K": 415.0,
+        "form": null,
+        "method": null,
+        "notes": "Annealed(DSC) 415 (8)",
+        "source_key": "PolymerDataHandbook1999",
+        "polymer_name": "Poly(ether ether ketone)"
+      },
+      {
+        "tg_K": 420.15,
+        "form": null,
+        "method": null,
+        "notes": null,
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(ether ether ketone)"
+      }
+    ]
+  },
+  "density": {
+    "value_gcm3": 1.263,
+    "T_K": 298.15,
+    "phase": "amorphous",
+    "source_key": "PolymerDataHandbook1999",
+    "n_rows": 1
+  }
+}

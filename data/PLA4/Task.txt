@@ -1,0 +1,33 @@
+# PolyJarvis Task Template
+# ============================================================
+# HOW TO USE:
+#   1. Fill in every [PLACEHOLDER] below before submitting.
+#   2. Remove this header block and all inline comments (#).
+#   3. Delete the "Example Fills" section at the bottom.
+#
+# REQUIRED PLACEHOLDERS:
+#   [RUN_NAME]            — Short identifier for this run (used as directory name)
+#                           e.g. "PE_001", "PS_atactic_tg", "PMMA_bulk_mod"
+#   [POLYMER_NAME]        — Full polymer name and common abbreviation
+#                           e.g. "Polyethylene (PE)", "Atactic Polystyrene (PS)"
+#   [POLYMER_SMILES]      — Repeat-unit SMILES with exactly two * attachment points
+#                           e.g. "*CC*", "*CC(c1ccccc1)*", "*CC(C(=O)OC)*"
+#   [TACTICITY]           — atactic / isotactic / syndiotactic
+#   [TARGET_PROPERTIES]   — Comma-separated: Tg, density, bulk modulus  (or "all" for full pipeline)
+#   [CPU_CORES]           — Integer total cores available, e.g. 8 or 24
+#   [MPI_RANKS]           — Integer MPI processes per simulation run, e.g. 4 or 8 (≤ CPU cores)
+#   [GPU_IDS]             — Comma-separated GPU IDs to use, e.g. "0", "0,1", "0,1,2,3"
+#   [MEMORY_GB]           — Integer GB, e.g. 64
+#   [MAX_RUNTIME]         — e.g. "48 hours", "1 week"
+# ============================================================
+
+## Task: Autonomous Polymer Property Prediction via MD Simulation
+
+**Run name:** PLA4
+**System:** Polylactic Acid, SMILES: `*C(C)C(=O)O*`, tacticity: atactic
+**Target properties:** all
+
+**Resources:**
+- CPU cores: 2 | MPI ranks: 1 | GPU ids: 3 | Memory: 32 GB
+- Max runtime: 48 hours
+

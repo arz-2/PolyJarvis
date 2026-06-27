@@ -1,0 +1,155 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/PolyJarvis/data/cis-PBD-2/lammps/thermal/tg_sweep_r40/tg_sweep.log",
+  "output_dir": "/home/arz2/PolyJarvis/data/cis-PBD-2/raw/tg_r40",
+  "Tg_K": 194.4,
+  "Tg_alternative_K": 211.1,
+  "r_squared": 0.9998,
+  "fit_quality": "EXCELLENT",
+  "fit_method": "hyperbola_curvefit",
+  "transition_width_c_K": 32.0,
+  "tg_uncertainty_K": 4.6,
+  "binning_method": "plateau_detection",
+  "fit_params": {
+    "a_glassy": -0.0002580152883543599,
+    "b_glassy": 1.0120529764445627,
+    "a_rubbery": -0.0005965850195325482,
+    "b_rubbery": 1.0778558531730191
+  },
+  "n_temperature_bins": 16,
+  "n_plateau_bins": 16,
+  "n_plateaus_skipped_drift": 0,
+  "n_plateaus_low_n_eff": 0,
+  "temp_range_K": [
+    80.0,
+    400.0
+  ],
+  "bins_csv": "/home/arz2/PolyJarvis/data/cis-PBD-2/raw/tg_r40/tg_density_bins.csv",
+  "bins_csv_plateau": "/home/arz2/PolyJarvis/data/cis-PBD-2/raw/tg_r40/tg_density_bins_plateau.csv",
+  "equilibration_fraction": 0.5,
+  "temp_col": "Temp",
+  "density_col": "Density",
+  "slope_signs_valid": true,
+  "slope_ordering_valid": true,
+  "fit_warnings": [],
+  "relaxation_metrics": [
+    {
+      "temperature": 400.0,
+      "n_eff": 21.37,
+      "tau_int_steps": 1.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 400.0,
+      "n_eff": 81.69,
+      "tau_int_steps": 1.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 380.0,
+      "n_eff": 52.52,
+      "tau_int_steps": 2.4,
+      "relax_warning": false
+    },
+    {
+      "temperature": 360.0,
+      "n_eff": 76.26,
+      "tau_int_steps": 1.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 360.0,
+      "n_eff": 35.54,
+      "tau_int_steps": 1.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 340.0,
+      "n_eff": 131.13,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 300.0,
+      "n_eff": 18.93,
+      "tau_int_steps": 13.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 280.0,
+      "n_eff": 22.45,
+      "tau_int_steps": 5.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 260.0,
+      "n_eff": 12.5,
+      "tau_int_steps": 10.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 240.0,
+      "n_eff": 155.37,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 220.0,
+      "n_eff": 115.72,
+      "tau_int_steps": 1.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 200.0,
+      "n_eff": 140.33,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 180.0,
+      "n_eff": 62.64,
+      "tau_int_steps": 2.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 160.0,
+      "n_eff": 149.18,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 140.0,
+      "n_eff": 56.57,
+      "tau_int_steps": 2.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 120.0,
+      "n_eff": 195.03,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 100.0,
+      "n_eff": 251.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 80.0,
+      "n_eff": 250.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    }
+  ],
+  "cte_glassy_per_K": 0.000264114,
+  "cte_rubbery_per_K": 0.000663857,
+  "dCp_status": "success",
+  "dCp_J_per_g_K": 0.2589,
+  "H_slope_glassy_kcal_per_mol_K": 51.8765,
+  "H_slope_rubbery_kcal_per_mol_K": 58.6077,
+  "H_r_squared": 0.9999,
+  "H_fit_quality": "EXCELLENT",
+  "system_mass_g_per_mol": 108784.19,
+  "tg_fit_png": "/home/arz2/PolyJarvis/data/cis-PBD-2/graphs/tg_r40/tg_fit.png"
+}

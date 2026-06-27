@@ -1,0 +1,417 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PSFO (*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1) \u2014 PSU2 revision run with locked seeds and nchain=10",
+  "run_name": "PSU2",
+  "polymer_class": "PSFO",
+  "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "medium",
+  "plan_mode": "reasoned",
+  "assumptions": [
+    "PSU1 (run-1) validated PCFF/PPPM on this exact SMILES: Tg=499.7K (+8% vs 463K exp), density=1.187 g/cm3 (-4.3% vs 1.24), K=4.43 GPa (exp 4.0-5.5 GPa, within range). PSU2 replicates with fixed seeds and nchain=10 for reproducibility.",
+    "is_glassy=True (T_workflow_K=700 >> 300K equilibration T; Tg measured PSU1=499.7K >> 300K).",
+    "Murnaghan NPT 300K is the primary BM method (Born removed 2026-06-21: PCFF+PPPM virial incompatibility).",
+    "tg_rates=[40,160,400] K/ns replaces PSU1 rate of 640 K/ns which degenerated; rates from polymer_rules.json."
+  ],
+  "uncertainties": [
+    {
+      "name": "ff_transferability",
+      "dominant": true,
+      "description": "No class-specific PCFF MD validation paper for PSFO yet (ff_note in polymer_rules.json). PSU1 empirical anchor reduces this risk: Tg within 8%, density within 4.3%, K within range. Remaining uncertainty from PSU1 Tg overestimate typical of MD cooling rates.",
+      "reduction_probe": "none"
+    },
+    {
+      "name": "hardware_optimum",
+      "dominant": false,
+      "description": "values_are_benchmarked=false; directional_probe measured on A800 (4x40GB) vs live RTX 6000 (4x24GB) \u2014 host mismatch. Estimated cell ~10,800 atoms is 3.6x the benchmark cell (3020 atoms), outside the [0.5x,2x] adoption window. by_forcefield default (kokkos, mpi=1) adopted conservatively.",
+      "reduction_probe": "hardware_benchmark"
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "pcff",
+    "preferred_builder": "emc",
+    "charge_method": "none",
+    "electrostatics": "pppm",
+    "cutoff_A": 12.0,
+    "dt_fs": 1.0,
+    "dp_typical": 20,
+    "nchain": 10,
+    "density_initial_gcm3": 0.62,
+    "T_equil_K": 700.0,
+    "annealing_T_high_K": 780.0,
+    "eq_annealing_cycles": 8,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 15.0,
+    "tg_t_high_K": 750,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 2000000,
+    "tg_rates_K_per_ns": [
+      40,
+      160,
+      400
+    ],
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "K_strain_max": 0.03,
+    "ct_min_decay_melt": 0.1,
+    "T_workflow_K": 700.0,
+    "dsc_equiv_rate_K_per_ns": 1.6667e-10,
+    "experimental_tg_K": 463,
+    "emc_seed": 820419,
+    "velocity_seed": 611213
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF (Class II) via EMC. Sun (1994) CFF93/PCFF is the force field origin; covers aryl-SO2-aryl and aryl-ether torsions via Class II cross terms. S atom types so2/o_2s verified in polymer_rules.json notes. PPPM mandatory: sulfone S (+0.08e), sulfone O (-0.11e), ether O charges from bond-increments accumulate to non-negligible long-range Coulomb.",
+          "source_doi": "10.1021/ja00086a030"
+        },
+        {
+          "claim": "PSU1 empirical validation: Tg=499.7K vs exp 463K (+8.1%), density=1.187 g/cm3 vs exp 1.24 (-4.3%), K=4.43 GPa vs exp range [4.0,5.5] GPa (within range). Same FF/builder path confirmed working for this exact SMILES.",
+          "source": "PSU1 run results 2026-06-21"
+        },
+        {
+          "claim": "Hayashi2022 and Afzal2021 provide supporting validation for PCFF on aromatic sulfone systems.",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "Afzal2021 supporting PSFO validation.",
+          "citation": "Afzal2021"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "name": "OPLS-AA",
+          "reason_rejected": "OPLS-AA lacks Class II cross terms for aryl ether + sulfone; no PSFO-specific validation. PCFF is the polymer_rules.json preferred_ff with DOI."
+        },
+        {
+          "name": "GAFF2",
+          "reason_rejected": "GAFF2 not validated for PSFO; known >45% Tg error for polar aromatic polymers in comparable classes (PACR precedent)."
+        }
+      ]
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "none (PCFF bond-increment embedded)",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF uses bond-increment charges by construction. Sulfone S \u2248+0.08e, sulfone O \u2248-0.11e per S-O bond; ether O and aromatic carbons carry increments from PCFF frc tables. These are native PCFF values, NOT OPLS/QM magnitudes. A charge of exactly 0.0000 on S or O indicates a missing frc increment and must be caught at build time (per polymer_rules.json note). No external QM charge assignment needed.",
+          "source": "polymer_rules.json:classes.PSFO.notes[0]"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "name": "RESP/AM1-BCC",
+          "reason_rejected": "Inconsistent with PCFF energy expression; would create mixed charge/vdW parametrization. charge_method=none is the correct PCFF path."
+        }
+      ]
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PSFO backbone contains S (sulfone), O (sulfone x2, ether x2), and aromatic C \u2014 all carrying PCFF bond-increment partial charges. Electrostatics_decision_guide in polymer_rules.json mandates PPPM for any heteroatom-bearing backbone with |q|>0.1e. Ether O charges (~-0.2e) and sulfone O (~-0.11e per bond) each exceed 0.1e. PPPM mandatory per policy.",
+          "source": "polymer_rules.json:electrostatics_decision_guide"
+        },
+        {
+          "claim": "PSU1 ran with PPPM successfully; lj_cut-only would produce significant density and Tg bias for this polar backbone.",
+          "source": "PSU1 run results 2026-06-21"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "name": "lj/cut (no long-range Coulomb)",
+          "reason_rejected": "Known to bias density/Tg by 5-20% for polar backbones per decision_policy.json D-03 rationale. Excluded by heteroatom content."
+        }
+      ]
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=20, nchain=10",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "DP=20 matches polymer_rules.json dp_min hard floor for PSFO (Fox-Flory plateau for Tg/bulk_modulus); dp_typical=25 would add GPU cost without PSU1 precedent support \u2014 PSU1 ran DP=20 successfully.",
+          "source": "polymer_rules.json:classes.PSFO"
+        },
+        {
+          "claim": "nchain=10 deviates from polymer_rules default (nchain=8) to increase statistical sampling and match REVISION_PARAMS.md locked value for PSU2 replication baseline. Cell atom estimate: ~54 atoms/monomer (all-atom PCFF) \u00d7 DP=20 \u00d7 nchain=10 \u2248 10,800 atoms. Sufficient for cutoff_A=12 \u00c5 with ~3 periodic images at typical PSU density.",
+          "source": "guides/REVISION_PARAMS.md"
+        },
+        {
+          "claim": "PSU1 DP=20 nchain=8 (~8640 atoms) gave density 1.187 g/cm3 and K within exp range. nchain=10 increases sampling; no finite-size concern flagged for PSU1.",
+          "source": "PSU1 run results 2026-06-21"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "name": "DP=25, nchain=8 (polymer_rules defaults)",
+          "reason_rejected": "PSU1 used DP=20 with good results. REVISION_PARAMS.md locks DP=20, nchain=10 for PSU2; deviating would break the replication baseline."
+        }
+      ]
+    },
+    {
+      "id": "D-05_convergence",
+      "choice": "glassy equil gate: density plateau + CV<25% + P2<0.10 gating; C(t)/MSD advisory",
+      "criteria_evaluated": [
+        "density_convergence",
+        "energy_convergence",
+        "chain_statistic_convergence"
+      ],
+      "evidence": [
+        {
+          "claim": "PSFO is a rigid aromatic backbone (Tg~463-493K). At T_equil=700K (~207K above Tg) chain relaxation is slow. policy:D-05_convergence require_glassy applies: DP=20 < 30 (require_glassy threshold is DP>=30), so standard overall_pass applies. However, PSFO aromatic backbone makes C(t)/C\u221e undefined via atom-type backbone (ct_gate_reliable=false per polymer_rules.json). The equil-check gate is: density plateau within exp range AND density CV<0.25 AND P2 nematic<0.10 AND energy drift within bounds. C(t) advisory only.",
+          "source": "polymer_rules.json:classes.PSFO._ct_note"
+        },
+        {
+          "claim": "t_equil_ns=15.0 with 8 annealing cycles at 780K is the polymer_rules.json default for PSFO; PSU1 used this protocol and passed equil-check.",
+          "source": "PSU1 run results + polymer_rules.json:classes.PSFO"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": []
+    },
+    {
+      "id": "D-06_tg_fit_quality",
+      "choice": "T range [250, 750] K, step 20K, rates [40, 160, 400] K/ns, multirate slope gate",
+      "criteria_evaluated": [
+        "t_range_brackets_experimental_tg",
+        "n_temperature_bins",
+        "bilinear_fit_r_squared",
+        "cooling_rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "Experimental Tg (PSU/Udel) = 463K. MD Tg expected ~499-580K after overestimate (PSU1 gave 499.7K). Sweep [250,750]K brackets both experimental and MD Tg with >200K margin on each side.",
+          "source": "polymer_rules.json:classes.PSFO.experimental_tg_K + PSU1 result"
+        },
+        {
+          "claim": "tg_rates=[40,160,400] K/ns from polymer_rules.json. PSU1 used 640 K/ns which degenerated (failed slope gate). Rates must satisfy slope-sign gate (b>0); multirate log-linear R2>=0.90 required. Slowest rate (40 K/ns) used for Tg report if gate passes.",
+          "source": "polymer_rules.json:classes.PSFO.tg_rates_K_per_ns + PSU1 post-mortem"
+        },
+        {
+          "claim": "tg_steps_per_T=2,000,000 (2 ns per 20K step at rate 40 K/ns: 20K/(40K/ns)=0.5ns steps; steps=500K per step at 40K/ns). Default from polymer_rules.json.",
+          "source": "polymer_rules.json:classes.PSFO.tg_steps_per_t"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "name": "single rate 640 K/ns (PSU1 approach)",
+          "reason_rejected": "PSU1 slope gate failure \u2014 rate too fast for this rigid backbone. [40,160,400] K/ns selected from polymer_rules.json update."
+        }
+      ]
+    },
+    {
+      "id": "D-07_property_method",
+      "choice": "Murnaghan NPT 300K (glassy primary); 3-dir deform fallback",
+      "criteria_evaluated": [
+        "phase_glassy_vs_rubbery",
+        "method_physics_validity",
+        "gpu_vs_cpu",
+        "rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "PSU is glassy at 300K (Tg=463K exp, 499.7K from PSU1 >> 300K). Glassy BM via Murnaghan NPT \u00b11000 atm at 300K using npt_prod300_out.data, per policy D-07 (Born removed 2026-06-21). PSU1 K=4.43 GPa from Murnaghan within exp range [4.0,5.5] GPa.",
+          "source_doi": "10.1016/j.commatsci.2019.06.006"
+        },
+        {
+          "claim": "Born+NVT removed from pipeline 2026-06-21: PCFF+PPPM virial inflates K_Born 8-15x and Var(P) ~1e7x; failed 3/3 runs (PMMA4/PVC1/PEEK1). Murnaghan is the only validated glassy K method.",
+          "source": "BORN_MATRIX.md + project memory 2026-06-21"
+        },
+        {
+          "claim": "Fallback: 3-direction uniaxial deformation if Murnaghan fit_converged=False or B0_prime outside [4,20]. Isotropy_delta_pct>=20% is hard FAIL.",
+          "source": "decision_policy.json:D-07_property_method"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "name": "Born matrix (NVT)",
+          "reason_rejected": "REMOVED 2026-06-21. PCFF+PPPM virial incompatibility confirmed across 3 runs."
+        },
+        {
+          "name": "Volume fluctuation",
+          "reason_rejected": "Cross-check only; not primary for glassy polymers per policy."
+        }
+      ]
+    },
+    {
+      "id": "D-08_hardware",
+      "choice": "engine=kokkos, gpu_per_run=1, mpi=1",
+      "criteria_evaluated": [
+        "forcefield_cost_structure",
+        "atom_count",
+        "concurrent_load",
+        "benchmark_evidence",
+        "cell_size_vs_benchmark_cell",
+        "host_match"
+      ],
+      "evidence": [
+        {
+          "claim": "FF family: PCFF \u2192 by_forcefield[pcff] default = engine=kokkos, mpi=1, gpu_per_run=1. KOKKOS full-offload (pair+class2 bonded+pppm+neigh on GPU). Parity PASS 2026-06-20 vs GPU-pkg (0.000% on all energy terms + pressure tensor). ~7.9x speedup vs GPU-pkg A0 baseline at 1 rank.",
+          "source": "polymer_rules.json:hardware_policy.by_forcefield.pcff + directional_probe.kokkos_offload_study"
+        },
+        {
+          "claim": "Estimated cell: ~54 atoms/monomer (PCFF all-atom) \u00d7 DP=20 \u00d7 nchain=10 \u2248 10,800 atoms. Benchmark cell: 3020 atoms. Ratio: 3.6\u00d7 \u2014 outside [0.5\u00d7,2\u00d7] adoption window for directional_probe.recommended_by_ff. Cannot adopt recommended_by_ff; must use by_forcefield default.",
+          "source": "hardware_policy.directional_probe + manual calculation"
+        },
+        {
+          "claim": "values_are_benchmarked=false (calibration_note: 'partial revalidation, CPU contended'). directional_probe measured_on: '4x A800 40GB / 32 phys cores' vs live host: '4x RTX 6000 24GB / 18 phys cores' \u2014 host mismatch. Hardware uncertainty recorded; hardware_benchmark probe planned.",
+          "source": "polymer_rules.json:hardware_policy.directional_probe"
+        },
+        {
+          "claim": "mpi=1 is CANONICAL for PCFF/KOKKOS (kspace on GPU, not CPU-serial). The context note 'MPI=4 (PCFF/PPPM needs multi-rank)' is pre-KOKKOS: that rule applies to the GPU-package path (engine=gpu). KOKKOS kspace is GPU-offloaded at mpi=1. Memory: 'pcff/opls defaults flipped to engine=kokkos mpi=1'.",
+          "source": "polymer_rules.json:by_forcefield.pcff.note + agent-memory:project_workstation_hardware.md"
+        },
+        {
+          "claim": "D-08 confidence: low (values_are_benchmarked=false + host mismatch + cell 3.6\u00d7 benchmark). Hardware_benchmark probe planned to validate on live host before or alongside PSU2 run.",
+          "source": "decision_policy.json:D-08_hardware require clause"
+        }
+      ],
+      "confidence": "low",
+      "alternatives": [
+        {
+          "name": "engine=gpu, mpi=4 (GPU-package fallback)",
+          "reason_rejected": "KOKKOS is 7.9\u00d7 faster than GPU-pkg A0 at mpi=1; GPU-pkg fallback reserved for KOKKOS binary failure only. mpi=4 is the pre-KOKKOS GPU-pkg setting, not applicable here."
+        },
+        {
+          "name": "engine=kokkos, mpi=4",
+          "reason_rejected": "mpi=1 is canonical for KOKKOS/PCFF per validated parity run. Multi-rank KOKKOS also carries GPU-pinning footgun (mpirun doesn't forward CUDA_VISIBLE_DEVICES; requires env CUDA_VISIBLE_DEVICES=N lmp without mpirun)."
+        }
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 463
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "analyze-tg-multirate",
+      "track": "thermal",
+      "success_criteria": {
+        "loglinear_r_squared_min": 0.9,
+        "n_rates_min": 2,
+        "slope_gate_pass": true
+      }
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "fit_converged": true,
+        "B0_prime_in_range": "[4, 20]",
+        "isotropy_delta_pct_max": 20
+      },
+      "fallback": "deform"
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {
+        "bulk_modulus_GPa_reported": true
+      }
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 1,
+    "findings": [
+      "Gate verified independently: PSFO confidence=medium -> reasoned mode; plan_mode=reasoned matches (no confidence-gate bypass).",
+      "D-01_ff (evidence_required): all 4 criteria covered; PCFF cited with source_doi 10.1021/ja00086a030 + PSU1 empirical anchor (Tg +8.1%, density -4.3%, K in range) + Hayashi2022/Afzal2021; alternatives (OPLS-AA, GAFF2) rejected with stated errors. PASS.",
+      "D-03_electrostatics (evidence_required): PPPM mandated for heteroatom backbone (S/O/aromatic-C, |q|>0.1e) per electrostatics_decision_guide; require satisfied; lj/cut alternative rejected. PASS.",
+      "D-07_property_method (evidence_required): glassy Murnaghan NPT 300K primary (Wu 2019 DOI 10.1016/j.commatsci.2019.06.006), Born removal cited, 3-dir deform fallback; require (glassy K via Murnaghan) satisfied. PASS.",
+      "D-05_convergence: DP=20<30 so require_glassy does NOT apply; equil success_criterion is overall_pass:true (correct standard gate). Aromatic-C(t) advisory note is over-explanation but does not weaken the binding gate field. PASS.",
+      "D-06_tg_fit_quality: T range [250,750] brackets exp Tg 463K with >200K margin; rates [40,160,400] match polymer_rules; multirate slope_gate + loglinear R2>=0.90 and bilinear R2 gates present (Tg never reported without R2). PASS.",
+      "D-08_hardware (always-on): pin kokkos/mpi=1/gpu_per_run=1 is IDENTICAL to by_forcefield[pcff] default, so staleness clauses (values_are_benchmarked=false + directional_probe.host A800 != live RTX 6000) do not bite; recommended_by_ff explicitly declined (cell ~10800 vs 3020, 3.6x outside adoption window). mpi=1 is canonical for PCFF/KOKKOS (kspace on GPU) per by_forcefield.pcff.note. confidence:low + hardware_benchmark probe over-delivered. Concurrency, GPU-count, size all consistent. PASS.",
+      "Locked params verified vs REVISION_PARAMS.md: emc_seed=820419, velocity_seed=611213, DP=20, nchain=10 all match the PSU2 baseline row.",
+      "Stage schema: all stages have stage/track/success_criteria; tracks valid. NOTE (non-blocking, stale-policy artifact): 'analyze-tg-multirate' is absent from decision_policy.json track_map though its track 'thermal' is correct and the stage is a required slope-gate hard stop; the gap is in the policy dict, not the plan, and has no planner-side fix.",
+      "All three requested properties (bulk_modulus, density, tg) are covered by planned_stages."
+    ]
+  },
+  "provenance": {
+    "generator": "planner (reasoned revision of make_deterministic_plan.py scaffold)",
+    "generated_at": "2026-06-23T05:01:00Z",
+    "scaffold": "make_deterministic_plan.py",
+    "deviations_from_defaults": [
+      "nchain: 8 -> 10 (REVISION_PARAMS.md locked for PSU2)",
+      "dp_typical: 25 -> 20 (dp_min floor; PSU1 precedent; REVISION_PARAMS.md locked)",
+      "plan_mode: deterministic -> reasoned (confidence=medium per polymer_rules.json)",
+      "critique.status: approved -> proposed (reasoned path requires critic round)",
+      "born stage removed: replaced by murnaghan (Born removed 2026-06-21)",
+      "added emc_seed=820419, velocity_seed=611213 (REVISION_PARAMS.md PSU2 locked seeds)",
+      "experimental_tg_K=463 added to decided_params (PSU/Udel specific)",
+      "analyze-tg-multirate restored as separate stage (scaffold omitted; required for slope-gate validation)"
+    ]
+  }
+}

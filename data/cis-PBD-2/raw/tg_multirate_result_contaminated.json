@@ -1,0 +1,30 @@
+{
+  "status": "success",
+  "n_points": 3,
+  "rates_K_per_ns": [
+    40.0,
+    160.0,
+    400.0
+  ],
+  "tg_values_K": [
+    194.4,
+    185.6,
+    182.1
+  ],
+  "rates_span_decades": 1.0,
+  "loglinear_slope_K": -5.42311593310334,
+  "loglinear_intercept_K": 214.04029459053712,
+  "loglinear_r_squared": 0.9840780272278961,
+  "tg_at_slow_rate_K": 182.1,
+  "slow_rate_ref_K_per_ns": 400.0,
+  "slope_gate_pass": false,
+  "is_flat_rate_regime": false,
+  "tg_method": "single_rate_fallback",
+  "vf_fit_quality": "FAILED",
+  "vf_fit_error": "Initial guess is outside of provided bounds",
+  "polymer_name": "cis-PBD-2",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 40 K/ns | 194.4 K |\n| 160 K/ns | 185.6 K |\n| 400 K/ns | 182.1 K |\n\n**Log-linear**: Tg = 214.0 + -5.42\u00b7ln(\u0393)  R\u00b2=0.9841\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **194.4 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): quality=FAILED\n",
+  "d06_markdown_path": "/home/arz2/PolyJarvis/data/cis-PBD-2/raw/d06_multirate_block.md",
+  "plot_path": "/home/arz2/PolyJarvis/data/cis-PBD-2/raw/tg_multirate.png"
+}

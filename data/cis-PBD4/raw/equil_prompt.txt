@@ -1,0 +1,131 @@
+data_path:         /home/arz2/PolyJarvis/data/cis-PBD4/lammps/cell/cell.data
+lammps_flags:      {"use_pcff": false, "use_opls": false, "use_trappe": true}
+run_name:          cis-PBD4
+work_dir:          /home/arz2/PolyJarvis/data/cis-PBD4/lammps/equil
+polymer_class:     PDIE
+T_equil_K:         400.0
+T_workflow_K:      300.0   # pass as temp=
+P_equil_atm:       1.0
+t_equil_ns:        3.0
+T_anneal_high_K:   480.0
+anneal_cycles:     3
+dt_fs:             2.0
+t_npt_prod_ns:     3.0
+npt_prod_steps:    1500000  # pass as npt_prod_steps=
+add_melt_npt:      true
+t_equil_K:         400.0
+melt_npt_ns:       1.0
+melt_npt_steps:    500000  # pass as melt_npt_steps=
+gpu_ids:           ""
+mpi_ranks:         8
+engine:            "cpu"   # ORCHESTRATOR OVERRIDE: CPU run (all GPUs busy; PDIE UA faster on CPU)
+velocity_seed:     614287   # ORCHESTRATOR PIN: SEED_HOT=614287
+
+--- Worker Guide (EQUILIBRATION) ---
+# Equilibration Guide
+**Read when:** You have a `.data` file and need to submit the equilibration chain.
+**Worker:** equilibration-worker — return RESULT block to orchestrator when done.
+
+---
+
+## Rules
+
+### Rule A: All Scripts Through lammps-engine — No Exceptions
+
+### Rule B: GPU — Check task.txt First, then nvidia-smi
+
+Check `task.txt` for a `gpu_ids` field first. Only check `nvidia-smi` when `task.txt` doesn't specify. Always pass `gpu_ids` and `mpi` explicitly — the default pins to GPU 0 regardless of what is free.
+
+### Rule C: Never Skip Annealing Cycles
+
+---
+
+## Workflow
+
+### Step 1: Copy and inspect the .data file
+
+Copy the `.data` file from `data_path` to `{work_dir}/cell.data`, then:
+
+```python
+info = inspect_data_file(data_file="{work_dir}/cell.data")
+# info.validation.errors must be empty before proceeding
+# save info.n_atoms for generate_equilibration_workflow
+```
+
+### Step 2: Generate the equilibration workflow
+
+```python
+workflow = generate_equilibration_workflow(
+    data_file="{work_dir}/cell.data",
+    work_dir_base="{work_dir}",
+    polymer_name=polymer_name,
+    temp=T_workflow_K,
+    max_temp=T_anneal_high_K,
+    press=1.0,
+    max_press=50000.0,
+    n_atoms=n_atoms,
+    use_pcff=lammps_flags["use_pcff"],
+    use_trappe=lammps_flags["use_trappe"],
+    params_file="{work_dir}/emc_build.params",  # EMC only — omit for RadonPy
+    npt_prod_steps=npt_prod_steps,               # from prompt
+    engine=engine,                               # from prompt — selects deck (kokkos: no `package gpu` line)
+    velocity_seed=velocity_seed,                 # from prompt — pin `velocity all create` RNG (null = random)
+    add_melt_npt=add_melt_npt,                   # True for rubbery (auto-set when T_workflow_K ≤ 300)
+    t_equil_K=T_equil_K,                         # required when add_melt_npt=True
+)
+```
+
+`temp` determines which chain is generated:
+- `temp ≤ 300.0` (rubbery): 7-run chain ending at `npt_production`
+- `temp > 300.0` (glassy): 9-run chain — `npt_cool300` + `npt_prod300` auto-appended
+
+Use the return dict keys (`npt_production_dir`, `npt_prod300_data`, etc.) as downstream paths — do not construct paths manually.
+
+When `add_melt_npt=True` (rubbery, T_workflow_K ≤ 300), the return dict also contains:
+- `npt_tg_prep_data`: path to `npt_melt_out.data` (isothermal NPT at `T_equil_K`) — this is the Tg sweep starting cell. Do NOT use `npt_production_out.data` as the starting cell for Tg sweeps on rubbery polymers; that cell is too close to Tg and biases the rubbery density slope.
+
+Include `npt_tg_prep_data` in your RESULT block so the orchestrator can thread it to the thermal track.
+
+### Step 3: Submit chain and watch
+
+```python
+result = run_lammps_chain(
+    stages=workflow["stages"],
+    gpu_ids=gpu_ids,
+    mpi=mpi,
+    data_file="{work_dir}/cell.data",
+    params_file="{work_dir}/emc_build.params",  # EMC only
+    engine=engine,                              # from prompt — MUST match the workflow's engine
+)
+w = watch_run(result["chain_id"])
+# Return chain_id and w["monitor_command"] to orchestrator — do not call Monitor.
+```
+
+---
+
+## Common Failures
+
+**GPU crash during NPT:** Check the log for the error. Do NOT switch to CPU. Common causes: out-of-memory (reduce system size or GPUs), bad initial geometry (more minimize steps), pair style mismatch (check params file).
+
+**Density not converging:** Add more annealing cycles (minimum 3, up to 5).
+
+**Chain droplets / vacuum voids:** Initial density too high. Rebuild at `density=0.05`.
+
+**"Out of range atoms — cannot compute PPPM" in npt_compress:** Switch `npt_compress` pair_style to `lj/cut/coul/cut`, increase neighbor skin 2.0 → 3.0 Å, reduce dt to 0.5 fs for that run only. Restore `lj/cut/coul/long` + kspace_style from `npt_pppm` onward.
+
+**Extend run returns 7 stages instead of 1:** `generate_equilibration_workflow(extend_only=True)` must yield `n_stages==1` with `run_order==["npt_extend"]` — verify this before submitting. A full 7-stage chain means the live MCP server is running stale code (pre-`extend_only`); request an orchestrator-level server restart. Do NOT submit (the chain's `nvt_softheat` 300→600 K re-melts a cooled glassy cell) and do NOT hand-write a `.in`.
+
+**Disk-full I/O error mid-chain (e.g. restart write fails):** completed stages' `_out.data` stay intact. Free disk, then delete only the failed stage's partial outputs, regenerate the full workflow with identical params, slice the stage list to resume at the failed stage, and resubmit via `run_lammps_chain`. Do NOT restart from stage 0 (PEEK3 2026-06-24: recovered stages 4–9 only).
+
+--- Cross-Track Rules ---
+## Cross-Track Rules (Always Active — Memorize These)
+
+These rules are inlined into every worker prompt by `gen_prompt.py`. They apply regardless of which worker or track is running.
+
+0. **GPU is used for ALL simulation runs** — always pass explicit `gpu_ids` and `mpi`; never leave them unset or default
+1. **Fill `run_log.md` in real time** — log each DECISION row when made, each RECOVERY block immediately after resolving an error; do not reconstruct at the end
+2. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, and SEED_COLD in the run_log header. For replication studies, use fixed seeds from `guides/REVISION_PARAMS.md`. For exploratory runs, read seeds back from job output and log them immediately after submission.
+3. **Check for existing writers before killing any process** — before killing and relaunching any LAMMPS run, run `lsof | grep <log_filename>` to check for existing writers. If another writer is present (concurrent orchestrator session), do NOT launch — coordinate via user first. A double-launch corrupts the shared log and requires a full restart from step 0.
+4. **Log the exact GPU claim label** — after any GPU claim (`pick_gpu.py claim --run <LABEL>`), copy the `run` field from the JSON response into the SIMULATION STATE table. Use that exact string verbatim at release (`pick_gpu.py release --run <LABEL>`). A label mismatch at release silently leaves the GPU stuck as claimed.
+5. **Log repo-relative run paths in memory** — when recording run artifacts or paths in any `.claude/agent-memory/**` file, write them repo-relative (`data/<run>/...`), never machine-absolute (`/home/<user>/...`). Keeps captures portable across the revision machines so integration needs no path sanitization. The memory file ITSELF must live only in the repo-root `.claude/agent-memory/<worker>/` dir (the absolute path in your agent definition) — never a `.claude/` created under a work_dir or data/<run>/ subdir.
+

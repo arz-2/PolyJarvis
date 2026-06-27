@@ -1,0 +1,66 @@
+{
+  "match_method": "name_match",
+  "match_confidence": "high",
+  "polymer_id": 1997,
+  "polymer_name": "Bisphenol-A polysulfone",
+  "n_polymer_ids": 4,
+  "tg": {
+    "agg_median_K": 459.1,
+    "agg_range_K": [
+      459.0,
+      459.1
+    ],
+    "n_rows": 2,
+    "form_filter": "all_clean",
+    "outliers_clipped": false,
+    "preferred_method": null,
+    "rows": [
+      {
+        "tg_K": 459.0,
+        "form": null,
+        "method": null,
+        "notes": "Glasstransitiontemperature K Forcedoscillationdynamic- 459 (6)",
+        "source_key": "PolymerDataHandbook1999",
+        "polymer_name": "Bisphenol-A polysulfone"
+      },
+      {
+        "tg_K": 459.15,
+        "form": null,
+        "method": null,
+        "notes": null,
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Polysulfone of Bisphenol A and diphenylene sulfone"
+      }
+    ]
+  },
+  "density": {
+    "value_gcm3": 1.234,
+    "T_K": 300.15,
+    "phase": "amorphous",
+    "source_key": "Zoller1978_PSU",
+    "n_rows": 3,
+    "all_range_gcm3": [
+      1.234,
+      1.25
+    ]
+  },
+  "bulk_modulus": {
+    "agg_median_GPa": 5.3,
+    "agg_range_GPa": [
+      5.3,
+      5.3
+    ],
+    "n_rows": 1,
+    "T_K_ref": 298.15,
+    "value_unit": "GPa",
+    "rows": [
+      {
+        "value_GPa": 5.3,
+        "T_K": 298.15,
+        "notes": "Table 13.6; Warfield et al. (1968-1972) ultrasonic; rho=1.24 g/cm3; RT (298K), glassy PSU (Tg~464K); adiabatic ~= isothermal for solids",
+        "source_key": "VanKrevelen2009",
+        "polymer_name": "Bisphenol-A polysulfone"
+      }
+    ]
+  }
+}

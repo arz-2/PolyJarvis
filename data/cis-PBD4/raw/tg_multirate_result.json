@@ -1,0 +1,42 @@
+{
+  "status": "success",
+  "n_points": 8,
+  "rates_K_per_ns": [
+    40.0,
+    160.0,
+    25.0,
+    50.0,
+    100.0,
+    10.0,
+    25.0,
+    40.0
+  ],
+  "tg_values_K": [
+    191.6,
+    194.7,
+    180.8,
+    175.2,
+    184.2,
+    179.6,
+    200.0,
+    186.5
+  ],
+  "rates_span_decades": 1.2041199826559248,
+  "loglinear_slope_K": 2.4416743168836925,
+  "loglinear_intercept_K": 177.5070907982732,
+  "loglinear_r_squared": 0.06308948725622539,
+  "tg_at_slow_rate_K": 186.575,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": true,
+  "is_flat_rate_regime": true,
+  "regime": "rubbery",
+  "rubbery_regime_exemption": true,
+  "tg_method": "rubbery_flat_mean",
+  "vf_fit_quality": "FAILED",
+  "vf_fit_error": "Initial guess is outside of provided bounds",
+  "polymer_name": "cis-PBD4",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 10 K/ns | 179.6 K |\n| 25 K/ns | 180.8 K |\n| 25 K/ns | 200.0 K |\n| 40 K/ns | 186.5 K |\n| 40 K/ns | 191.6 K |\n| 50 K/ns | 175.2 K |\n| 100 K/ns | 184.2 K |\n| 160 K/ns | 194.7 K |\n\n**Log-linear**: Tg = 177.5 + 2.44\u00b7ln(\u0393)  R\u00b2=0.0631\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **186.6 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): quality=FAILED\n",
+  "d06_markdown_path": "/home/arz2/PolyJarvis/data/cis-PBD4/raw/d06_multirate_block.md",
+  "plot_path": "/home/arz2/PolyJarvis/data/cis-PBD4/raw/tg_multirate.png"
+}

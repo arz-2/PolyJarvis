@@ -1,0 +1,32 @@
+{
+  "status": "success",
+  "n_points": 3,
+  "rates_K_per_ns": [
+    40.0,
+    80.0,
+    100.0
+  ],
+  "tg_values_K": [
+    446.9,
+    423.0,
+    363.4
+  ],
+  "rates_span_decades": 0.3979400086720376,
+  "loglinear_slope_K": -77.65597150970297,
+  "loglinear_intercept_K": 739.2243393496065,
+  "loglinear_r_squared": 0.7445027794010308,
+  "tg_at_slow_rate_K": 446.9,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": false,
+  "is_flat_rate_regime": false,
+  "regime": "glassy",
+  "rubbery_regime_exemption": false,
+  "tg_method": "single_rate_fallback",
+  "vf_fit_quality": "FAILED",
+  "vf_fit_error": "Initial guess is outside of provided bounds",
+  "polymer_name": "PLA4",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 40 K/ns | 446.9 K |\n| 80 K/ns | 423.0 K |\n| 100 K/ns | 363.4 K |\n\n**Log-linear**: Tg = 739.2 + -77.66\u00b7ln(\u0393)  R\u00b2=0.7445\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **446.9 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): quality=FAILED\n",
+  "d06_markdown_path": "/home/arz2/PolyJarvis/data/PLA4/raw/d06_multirate_block.md",
+  "plot_path": "/home/arz2/PolyJarvis/data/PLA4/raw/tg_multirate.png"
+}

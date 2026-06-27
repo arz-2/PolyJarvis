@@ -1,0 +1,358 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PHYC (*CC*)",
+  "run_name": "PE2",
+  "polymer_class": "PHYC",
+  "smiles": "*CC*",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "high",
+  "plan_mode": "reasoned",
+  "assumptions": [
+    "polymer_rules.json defaults are validated for this class (confidence=high), EXCEPT the equilibration stage, which is overridden by the revision.md corrected protocol (Priority 0, R1 Major #4) to fix a prior ~25% density over-estimation (1.19 vs exp 0.95 g/cm3).",
+    "This is replicate 2 of 5 (seeds 1004/1005/1006). Seeds are independent per-replicate (not locked to a single REVISION_PARAMS.md baseline — PE has no registry row; seeds continued from replicate 1 triple 1001/1002/1003). Seeds are recorded for the orchestrator (cross-track rule 2); gen_prompt.py does not consume them."
+  ],
+  "uncertainties": [
+    {
+      "name": "kinetic_over_densification_cooling_rate",
+      "dominant": true,
+      "reduction_probe": "fast_density_screen",
+      "note": "Prior PE run over-densified to ~1.19 g/cm3 (exp ~0.95). The revision.md fix asks for a >=2x slower melt->300 K cool, but the cool ramp N_STEPS=steps_npt is atom-count-tiered and is NOT expressible via decided_params or any generate_equilibration_workflow argument (no cool_steps override; t_equil_ns is display-only in gen_prompt, never threaded). add_melt_npt=true provides a PARTIAL ~1.28x slowdown on the glass-formation descent (cool segment shortens from 620->300 K=320 K to 550->300 K=250 K over the same steps_npt). The residual over-densification risk is therefore the dominant uncertainty; fast_density_screen (small-cell short NPT) cheaply reveals whether density still overshoots ~0.95 before committing the full cell. Full closure requires a code change (cool-ramp step override) or a manual intermediate cool stage — out of planner scope."
+    },
+    {
+      "name": "ff_transferability",
+      "dominant": false,
+      "reduction_probe": "none"
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "trappe-ua",
+    "preferred_builder": "emc",
+    "charge_method": "Gasteiger",
+    "electrostatics": "lj_cut",
+    "cutoff_A": 14.0,
+    "dt_fs": 2.0,
+    "confidence": "high",
+    "dp_typical": 120,
+    "nchain": 20,
+    "density_initial_gcm3": 0.65,
+    "T_equil_K": 550.0,
+    "annealing_T_high_K": 620.0,
+    "eq_annealing_cycles": 5,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 10.0,
+    "npt_prod_ns": 10.0,
+    "add_melt_npt": true,
+    "melt_npt_ns": 2.0,
+    "experimental_density_gcm3": 0.95,
+    "seeds": {
+      "emc_cell": 1004,
+      "SEED_HOT": 1005,
+      "SEED_COLD": 1006,
+      "note": "replicate 2 of 5; independent per-replicate seeds (continued from replicate 1 triple 1001/1002/1003); recorded for orchestrator (cross-track rule 2), not consumed by gen_prompt.py"
+    },
+    "tg_t_high_K": 450,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 250000,
+    "tg_rates_K_per_ns": [
+      40,
+      160,
+      640
+    ],
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_strain_max": 0.03,
+    "bm_pressures_atm": [
+      1,
+      100,
+      300,
+      600,
+      1000
+    ],
+    "ct_min_decay_melt": 0.25,
+    "T_workflow_K": 300.0
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "trappe-ua",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "Ramos 2015: TraPPE-UA PE Tg=187K vs exp 185-195K, density ±7%. Branched types (PP, PIB): UA types exist but no polymer-Tg validation — use with medium confidence.",
+          "source_doi": "10.1021/acs.macromol.5b00823"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "PE_RSC2016"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Srivastava2026"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Afzal2021"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Martin1998"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Ramos2015"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Boyer1973"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "Gasteiger",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [
+        {
+          "claim": "TraPPE-UA is a non-electrostatic UA force field; no explicit partial charges are placed on sites. Gasteiger is a nominal label for the charge_method field but carries zero weight: the EMC builder assigns no charges to a pure CH2/CH3 backbone. Charge assignment cost is effectively zero (no QM step needed).",
+          "citation": "polymer_rules.json:classes.PHYC.charge_method"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "lj_cut",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PE backbone is pure C/H (no heteroatoms); TraPPE-UA |q|=0 on all sites. electrostatics_decision_guide: pure C/H backbones with |q|<0.1e MAY use lj_cut; heteroatom/|q|>0.1e MUST use pppm. lj_cut eliminates kspace overhead (relevant for UA cells where kspace would be ~80% wasted compute). No long-range Coulomb contribution to density or Tg for apolar polyethylene.",
+          "source_doi": "10.1021/jp972543+"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=120, nchain=20",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "DP=120 exceeds Fox-Flory plateau (dp_min=60) for flexible PE backbone; nchain=20 (>10) satisfies revision.md 'larger system (>10 chains)' requirement for the density re-run.",
+          "source_doi": "revision.md:Priority0:R1_Major_4"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-06_tg_fit_quality",
+      "choice": "bilinear fit R^2>=0.80; T sweep 100-450 K brackets exp Tg~195 K with >100 K margin on both sides; tg_t_step=20 K (>=10 bins); cooling-rate artifact mitigated by three-rate multirate sweep (40/160/640 K/ns) and extrapolation to low rate.",
+      "criteria_evaluated": [
+        "t_range_brackets_experimental_tg",
+        "n_temperature_bins",
+        "bilinear_fit_r_squared",
+        "cooling_rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "PE experimental Tg ~185-205 K (Boyer 1973; Ramos 2015). Sweep 100-450 K gives 95 K margin below and 245 K above experimental Tg, bracketing it comfortably. At 20 K/step this yields 17 temperature bins across the 100-450 K window (>4 minimum). Three cooling rates (40/160/640 K/ns) mitigate systematic rate artifact via linear extrapolation to zero rate.",
+          "source_doi": "10.1021/acs.macromol.5b00823"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-07_property_method",
+      "choice": "bulk_modulus via Murnaghan EOS NPT pressure sweep (primary) at T_workflow_K=300 K; PE is RUBBERY at 300 K (exp Tg~195 K < 300 K), so routing is Murnaghan-rubbery; volume-fluctuation cross-check only; 3-direction uniaxial deform fallback if fit_converged=False or B0_prime outside [4,20].",
+      "criteria_evaluated": [
+        "phase_glassy_vs_rubbery",
+        "method_physics_validity",
+        "gpu_vs_cpu",
+        "rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "Wu (2019) Comput. Mater. Sci. validates Murnaghan NPT compression for polymer K: faster and more reliable than volume-fluctuation for low-modulus rubbery polymers. Symmetric ±1000 atm pressure sweep around 1 atm gives 5 volume-pressure points; Murnaghan EOS fit yields K_0 (isothermal bulk modulus at 300 K). For rubbery PE at 300 K the expected K is ~1-3 GPa (compliant, high volume response per atm — favorable for Murnaghan signal-to-noise).",
+          "source_doi": "10.1016/j.commatsci.2019.03.056"
+        },
+        {
+          "claim": "Born+NVT REMOVED (PCFF+PPPM virial incompatibility — K_Born 8-15x too high, Var(P) ~10^7x too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1 2026-06-21). Not applicable here (TraPPE-UA not PCFF), but Born is retired pipeline-wide.",
+          "citation": "born_stage_retired"
+        },
+        {
+          "claim": "PE (PHYC, TraPPE-UA) is rubbery at T_workflow_K=300 K: exp Tg ~195 K < 300 K. is_glassy=False → Murnaghan rubbery path (npt equilibrated at 300 K as baseline). Glassy path (npt_prod300_out.data at 300 K with ±1000 atm) would apply if Tg>300 K — not the case here.",
+          "source_doi": "10.1021/acs.macromol.5b00823"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "choice": "volume-fluctuation (NVT <delta V^2>/<V> method)",
+          "known_error": "Requires very long NVT runs for low-modulus rubbery polymers; noisy for K<5 GPa; cross-check only per pipeline policy."
+        },
+        {
+          "choice": "3-direction uniaxial deform",
+          "known_error": "Rate-dependent at accessible MD strain rates; anisotropy check needed (isotropy_delta_pct<20%); used as fallback only if Murnaghan fit fails."
+        }
+      ]
+    },
+    {
+      "id": "D-05_convergence",
+      "choice": "Corrected equilibration protocol: t_equil_ns=10 (2x standard), npt_prod_ns=10 (2x standard, 300 K density extraction), add_melt_npt=true with melt hold ~2 ns at 550 K; density-target detection gate added at equil-check.",
+      "criteria_evaluated": [
+        "density_convergence",
+        "energy_convergence",
+        "chain_statistic_convergence"
+      ],
+      "evidence": [
+        {
+          "claim": "Prior PE run over-densified to ~1.19 g/cm3 vs experimental ~0.95 (+25%). revision.md Priority 0 (R1 Major #4) prescribes >=2x extended NPT equilibration, >10 chains, and a lower cooling rate to avoid kinetic over-densification.",
+          "source_doi": "revision.md:Priority0:R1_Major_4"
+        },
+        {
+          "claim": "REQUESTED >=2x slower melt->300 K cool is NOT expressible via decided_params or generate_equilibration_workflow: the cool ramp N_STEPS=steps_npt is atom-count-tiered (server.py ~L1154-1170, L1345-1358) and there is no cool_steps/npt_cool_steps argument; t_equil_ns is display-only in gen_prompt.py (L280), never threaded into the ramp. add_melt_npt=true provides a PARTIAL ~1.28x slowdown on the glass-formation descent (final npt_cool shortens from 620->300 K to 550->300 K over the same steps_npt; server.py L1330-1343 vs L1345-1358), CONDITIONAL on the orchestrator passing the --add_melt_npt CLI flag to gen_prompt (it is read from argv L253, NOT from decided_params via _pick — see equil stage orchestrator_note). If the flag is omitted, the melt branch does not fire and there is ZERO cooling mitigation (standard 620->300 K cool), making the equil-check density-detection gate the sole safety net. Full fix requires a cool-ramp step override (code change) or a manual intermediate cool stage — recorded as the dominant uncertainty, deferred to critic/orchestrator.",
+          "source": "code_inspection:server.py:generate_equilibration_workflow"
+        },
+        {
+          "claim": "check_equilibration_comprehensive.overall_pass=True is a CONVERGENCE gate, not an ACCURACY gate — a run can converge tightly to 1.19 g/cm3 and pass (this is why the prior run failed silently). Therefore the equil-check stage adds an explicit density-target band (PE exp 0.95 g/cm3) so over-densification is autonomously DETECTED, per revision.md L20 ('test whether the agent autonomously detects over-densification ... or add it if it does not'). Density well above ~0.95 must route to /recover, not be silently extended past.",
+          "source_doi": "revision.md:Priority0:R1_Major_4:L20"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "choice": "standard PHYC deterministic equilibration (t_equil_ns=5, npt_prod_ns=5, no melt hold)",
+          "known_error": "produced ~1.19 g/cm3 (+25% over experimental 0.95) in the prior PE run — rejected"
+        }
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      },
+      "orchestrator_note": "REQUIRED: the equil-stage gen_prompt.py invocation MUST include the CLI flag --add_melt_npt. gen_prompt.py reads add_melt_npt from argv (L253), NOT from the plan's decided_params (no _pick/cls fallback; apply_plan does not thread it). Without --add_melt_npt the melt branch never fires: the 550 K melt-density hold (npt_melt) is dropped AND the ~1.28x cooling slowdown (the only implementable cooling mitigation) is lost, leaving the standard 620->300 K cool. decided_params.add_melt_npt=true records intent; the CLI flag activates it. melt_npt_ns=2.0 IS picked from the plan once the branch fires."
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS, OR EXTEND when blocked SOLELY by the melt-NVT C(t) dynamic-autocorrelation gate AND all static conformational/packing criteria below are met (high-DP rubbery-melt static-equilibration acceptance; applies to flexible high-DP classes PHYC/PDIE at DP >= ~80).",
+        "check_equilibration_comprehensive.overall_pass": "advisory_non_blocking — the tool's overall_pass embeds the melt-NVT C(t) full-decay sub-check, which is unreachable in feasible MD for a DP-120 (~3-6 entanglement) PE melt (KWW tau_relax ~88 ns extrapolated from PE1; full decorrelation would need ~360 ns NVT ~23 days — infeasible, and the standard 'extend 1-2 ns' remedy cannot close an 88 ns gap). overall_pass is therefore DEMOTED to advisory: it must NOT by itself FAIL the stage or trigger the extend loop when the static criteria below pass. ct_min_decay_melt=0.25 is retained in decided_params only as the tool's input; it does NOT re-impose a pass/fail gate here.",
+        "static_equilibration_criteria": {
+          "rationale": "decision_policy.json:policies.equilibration.evaluate requires 'chain_statistic_convergence' (a STATIC conformational-statistics test), NOT dynamic terminal decorrelation. The requested properties (density, Tg, K) are governed by equilibrium chain dimensions and packing, not by terminal chain reptation. This mirrors the validated PKTN/PEEK rigid-backbone screening-grade acceptance (static-structure + density gate, C(t)/MSD demoted to advisory). PE1 (replicate 1) confirmed this acceptance with static criteria passed; PE2 applies the same framework with fresh independent microstate.",
+          "characteristic_ratio_c_infinity": {
+            "target": "within ~10% of the TEMPERATURE-MATCHED, FINITE-N flexible-PE ideal C_n at the 550 K melt (~6.7; range ~6.7 @ 550 K to ~7.4 @ 300 K).",
+            "reconciliation_note": "polymer_rules.json/D-01 cite Ramos2015 asymptotic C_inf=8.2 @ 500 K and experimental 7.4-8.1; those are the INFINITE-CHAIN limit. A measured C_n for a DP-120 PE chain (n_bb=239 bonds) at 550 K is a FINITE-N value (C_n < C_inf) and legitimately sits below the asymptotic 8.2 and at the low edge of the experimental band. Gate against the temperature-matched finite-N ideal (~6.7), NOT the asymptotic 8.2 — a value near 6.7-7.4 is PASS. Source: 10.1021/acs.macromol.5b00823.",
+            "source_doi": "10.1021/acs.macromol.5b00823"
+          },
+          "rg_chain_chain_cv_max": 0.30,
+          "density_homogeneity_cv_max": 0.25,
+          "p2_nematic_max": 0.10,
+          "gating_metrics": "density_plateau_in_range, density_homogeneity_cv, p2_nematic, thermo_drift_sem",
+          "advisory_metrics": "C(t) decay, MSD diffusivity, MSID slope, Rg chain-chain CV, apparent C_inf — all advisory/non-blocking per PVC1-corrected gate set (2026-06-20)"
+        },
+        "dynamic_relaxation_caveat": "tau_relax ~88 ns (KWW, from PE1 extrapolation) and MSD subdiffusion are RECORDED as a dynamic lower-bound caveat ONLY, non-blocking. Implication: terminal chain relaxation is incomplete, which can leave a residual frozen-in conformational memory; this does not affect equilibrium chain dimensions or packing, the quantities governing density/Tg/K. Flag the caveat in the run summary.",
+        "density_gcm3_target": 0.95,
+        "density_gcm3_tolerance": 0.10,
+        "density_gcm3_max_acceptable": 1.05,
+        "over_densification_detection": "Density well above ~0.95 g/cm3 (e.g. >=1.05, repeating the prior +25% failure) must be flagged as over-densification and routed to /recover, NOT silently accepted. overall_pass=True alone is insufficient — it is a convergence gate, not an accuracy gate. This detection is the primary safety net because the requested 2x-slower cool is only ~1.28x implementable (see D-05). NOTE: this density gate (target 0.95, max_acceptable 1.05) is UNCHANGED by the static-equilibration revision."
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 205
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "chain_submitted": true
+      }
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 3,
+    "findings": [
+      "APPROVED (round 3, terminal). Gate verified independently: PHYC confidence=high => expected mode deterministic; plan declares reasoned. This is an UP-scrutiny override (more review, not skipped), NOT a confidence-gate bypass — the gate's anti-pattern is deterministic-on-non-high (under-scrutiny). Reasoned is REQUIRED here: the revision.md Priority-0 over-densification remediation (1.19 vs exp 0.95 g/cm3) is not expressible by deterministic transcription. PE1 user-approved precedent. No escalate on this.",
+      "Round count: the 2-round cap governs the revise LOOP (planner<->critic churn), not approval. At round 3 the effective choice is approved-or-escalate; escalate requires a NEW hard require-violation with no in-pipeline fix. None exists — the round-1 D-05 rubbery overall_pass demotion is cured by policies.equilibration.require_rubbery (authorized 2026-06-22, verified present in decision_policy.json). PE is rubbery at the gate (exp Tg~195K < T_workflow_K=300K); the plan's equil-check static criteria (density block-SEM/homogeneity-CV/energy gating; C(t)/MSD/tau_relax/MSID/Rg-CV advisory) CONFORM to require_rubbery.",
+      "Per-decision sweep clean: D-01_ff (4/4, Ramos2015 DOI), D-02_charges (3/3 incl charge_method_cost), D-03_electrostatics (3/3, source_doi 10.1021/jp972543+, lj_cut justified for |q|=0 C/H), D-04_system_size (DP=120>Fox-Flory, nchain=20>10), D-05_convergence (require_rubbery-conformant), D-06_tg (4/4, sweep 100-450K brackets exp Tg~195K), D-07_property_method (4/4, Murnaghan-rubbery, Wu2019 DOI, alternatives present). Stage schema valid: all 8 stages have stage/track/success_criteria; tracks match track_map. properties match planned_stages. Dominant uncertainty (kinetic_over_densification) named; fast_density_screen is a valid probes key. Hardware unpinned => TraPPE policy default (engine=gpu/mpi=1/1 GPU); ~4800 UA atoms <10k; values_are_benchmarked=false but no non-default pin => no probe required.",
+      "NON-BLOCKING: D-01_ff and D-03_electrostatics carry alternatives:[] (both evidence_required:true). Self-justifying for an apolar TraPPE-UA |q|=0 C/H backbone (pppm/all-atom alternatives physically pointless); present in the approved PE1 parent. At round 3 no revise path exists; a cosmetic gap cannot justify killing a legitimate replicate. Noted, not blocking.",
+      "NON-BLOCKING (orchestrator-scoped): equil cooling mitigation rests on the --add_melt_npt CLI flag firing (argv, not decided_params) AND the equil-check over-densification gate (target 0.95, max_acceptable 1.05 => /recover). Both documented in the plan's equil orchestrator_note and equil-check success_criteria. The critic cannot enforce the orchestrator's invocation; the note's presence is sufficient."
+    ]
+  },
+  "provenance": {
+    "generator": "planner (cloned from PE1/raw/run_plan.json)",
+    "generated_at": "2026-06-22T00:00:00+00:00",
+    "clone_source": "PE1/raw/run_plan.json",
+    "clone_notes": [
+      "run_name updated PE1->PE2",
+      "seeds updated to replicate-2 triple (emc_cell=1004, SEED_HOT=1005, SEED_COLD=1006)",
+      "assumptions updated to replicate 2 of 5",
+      "equil-check static_equilibration_criteria: stripped PE1-specific observed values (6.94 C_inf, 0.194 Rg-CV, 0.128 homogeneity CV, 1.18 MSID, 0.041 P2, 0.860 density); kept targets/gates/thresholds and reconciliation logic intact",
+      "advisory_metrics field added to make the PVC1-corrected gate/advisory split explicit (packing=gating; diffusion-limited=advisory)",
+      "critique reset to proposed/rounds=0 for fresh critic review",
+      "no hardware override added: PHYC=trappe, ~4800 UA atoms (<10k), by_forcefield default (engine=gpu/mpi=1/1 GPU) correct; values_are_benchmarked=false so no benchmark probe required"
+    ]
+  }
+}

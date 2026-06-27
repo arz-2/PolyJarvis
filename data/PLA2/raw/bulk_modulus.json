@@ -1,0 +1,61 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/PolyJarvis/data/PLA2/lammps/equil/npt_prod300/npt_prod300.log",
+  "output_dir": "/home/arz2/PolyJarvis/data/PLA2/raw",
+  "method": "volume_fluctuation",
+  "bulk_modulus_GPa": 5.2719,
+  "bulk_modulus_atm": 52029.52,
+  "bulk_modulus_sem_GPa": 0.4511,
+  "isothermal_compressibility_per_Pa": 1.8968525347181473e-10,
+  "V_mean_A3": 48943.4205,
+  "V_std_A3": 196.1372,
+  "tau_eff_frames": 0.1,
+  "tau_eff_fraction": 0.000101,
+  "n_effective_samples": 1001,
+  "B_def": {
+    "B_def_GPa": 5.623,
+    "r_squared": 0.05328325244478158,
+    "agreement_with_B_dyn_pct": 6.66,
+    "slope_atm": -55495.03520168257,
+    "intercept_atm": 599254.1743504946,
+    "p_value": 1.4232437033462917e-13,
+    "n_points": 1001
+  },
+  "block_averaging": {
+    "block_count": 5,
+    "block_size": 200,
+    "block_K_GPa_values": [
+      5.0994,
+      5.3539,
+      6.9997,
+      5.3896,
+      4.2086
+    ],
+    "K_block_mean_GPa": 5.4102,
+    "K_block_std_GPa": 1.0088,
+    "K_sem_GPa": 0.4511
+  },
+  "diagnostics": {
+    "n_total_rows": 2001,
+    "n_production_rows": 1001,
+    "eq_fraction": 0.5,
+    "T_mean_K": 300.13,
+    "T_std_K": 3.51,
+    "tau_eff_frames": 0.1,
+    "tau_eff_fraction": 0.000101,
+    "n_effective_samples": 1001,
+    "block_size_used": 200,
+    "block_count_used": 5,
+    "P_mean_atm": -4.09,
+    "P_std_atm": 963.29,
+    "density_mean": 1.22319,
+    "density_std": 0.0049,
+    "volume_drift_pct": 0.0619,
+    "volume_drift_regression_p": 0.15872630302915502,
+    "volume_equilibrated": true
+  },
+  "volume_timeseries_csv": "/home/arz2/PolyJarvis/data/PLA2/raw/volume_timeseries.csv",
+  "barostat_note": "B_dyn from NPT volume fluctuations is sensitive to barostat damping (P_DAMP). Nos\u00e9-Hoover (LAMMPS fix npt) gives a correct NPT ensemble; verify results are stable across P_DAMP values if reporting to high precision. B_def (P vs ln V slope) is barostat-independent and is provided as a cross-check (Wu, J. Phys. Chem. B 2020, 124, 10811). Agreement within 20% gives confidence in B_dyn.",
+  "warning_bdef_unreliable": "B_def R\u00b2=0.0533 < 0.98 \u2014 the P vs ln V relationship is nonlinear, indicating a large pressure derivative B0' (typical for soft melts). The B_def cross-check is unreliable here; B_dyn may also be biased by barostat damping. Use the Murnaghan multi-pressure series (run_bulk_modulus_series) for accurate K on rubbery polymers.",
+  "volume_fluctuations_fig": "/home/arz2/PolyJarvis/data/PLA2/graphs/volume_fluctuations.png"
+}

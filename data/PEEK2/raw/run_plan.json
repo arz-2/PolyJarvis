@@ -1,0 +1,417 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PKTN (*Oc1ccc(Oc2ccc(C(=O)c3ccc(cc3)*)cc2)cc1)",
+  "run_name": "PEEK2",
+  "polymer_class": "PKTN",
+  "smiles": "*Oc1ccc(Oc2ccc(C(=O)c3ccc(cc3)*)cc2)cc1",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "high",
+  "plan_mode": "reasoned",
+  "assumptions": [
+    "polymer_rules.json defaults are validated for this class (confidence-gated); class confidence stays HIGH (PCFF/charges/electrostatics/size decisions D-01..D-04 unchanged). plan_mode is reasoned because the equilibration gate cannot be met by any feasible MD for this rigid-backbone aromatic polymer (D-05 carve-out), and multi-member class requires member disambiguation.",
+    "Member identified as PEEK from SMILES: repeat unit -O-C6H4-O-C6H4-C(=O)-C6H4- has exactly 2 ether oxygens + 1 ketone carbonyl (E-E-K topology). This is the defining PEEK signature; PEK is E-K (1 ether), PEKK is E-K-K (2 ketones). make_deterministic_plan.py cannot resolve member from multi-member experimental_tg_K dict and defaulted tg bracket to 433 K (PEKK). Pinned PEEK member values: Tg=418 K, amorphous density=1.263 g/cm3, K=[4.0,5.8] GPa.",
+    "Glassy-K route: Murnaghan NPT +/-1000 atm at 300 K (npt_prod300_out.data) is the primary BM method. Born+NVT removed pipeline-wide 2026-06-21: PCFF+PPPM virial incompatibility gave K_Born 8-15x too high (failed on PMMA4/PVC1/PEEK1). Fallback: 3-direction uniaxial deformation if Murnaghan fit_converged=False or B0_prime outside [4,20].",
+    "Born retired: Born stage removed from pipeline per memory born_stage_retired (2026-06-21). Born REMOVED from planned_stages; murnaghan replaces it as primary mechanical stage."
+  ],
+  "uncertainties": [
+    {
+      "name": "rigid_backbone_chain_relaxation_incomplete",
+      "dominant": true,
+      "reduction_probe": "literature_anchor",
+      "evidence": "Terminal relaxation of the rigid PEEK aromatic backbone at dp=15/770 K is hundreds of ns (empirical PEEK1: C(t) decayed 0.1% over ~2 ns, extrapolated tau_relax ~1.9e9 ps, ~100x tau_Rouse ~2.2 ns; MSD_max 83 A^2 << Rg^2 569 A^2). Consequence: Tg will be overestimated beyond standard MD cooling-rate bias. Multirate extrapolation using the 40 K/ns anchor is the planned mitigation. literature_anchor probe (search_ff_literature) would pin amorphous-PEEK density and Tg targets to bound this bias."
+    },
+    {
+      "name": "amorphous_density_below_reference",
+      "dominant": false,
+      "reduction_probe": "none",
+      "evidence": "PEEK1 measured 300 K density ~1.193 g/cm3 vs amorphous-PEEK reference 1.263 g/cm3 (~5.5% low). The commercial 1.30-1.32 figure is semicrystalline. Lower density biases bulk modulus K LOW — K result should be reported with this caveat. Recorded as mechanical-track caveat."
+    },
+    {
+      "name": "hardware_optimum",
+      "dominant": false,
+      "reduction_probe": "hardware_benchmark",
+      "evidence": "hardware_policy.values_are_benchmarked=false AND directional_probe.measured_on is 4xA800/32-core while live host is 4xRTX-6000/18-core (host mismatch). Default by_forcefield[pcff]={engine:kokkos, mpi:1, gpu_per_run:1} retained; no hardware override in decided_params. D-08 confidence: low."
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "pcff",
+    "preferred_builder": "emc",
+    "charge_method": "bond-increment",
+    "electrostatics": "pppm",
+    "cutoff_A": 12.0,
+    "dt_fs": 1.0,
+    "confidence": "high",
+    "dp_typical": 32,
+    "nchain": 10,
+    "density_initial_gcm3": 0.66,
+    "T_equil_K": 770.0,
+    "annealing_T_high_K": 850.0,
+    "eq_annealing_cycles": 8,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 15.0,
+    "tg_t_high_K": 700,
+    "tg_t_low_K": 350,
+    "tg_t_high_K_class_default": 750,
+    "tg_t_low_K_class_default": 250,
+    "tg_window_note": "Narrowed 750->250 (500 K span) to 700->350 (350 K span) following PEEK1 budget analysis: full 3-rate sweep over 500 K ~16.4 ns simulated (~28 h) with only ~3 h budget margin (too tight). 350 K window scales all 3 rates by 0.70 -> ~11.5 ns -> ~20 h, restoring real margin. Still brackets exp Tg 418 K and expected MD-Tg ~500-540 K with points each side of the knee. All 3 rates [40,160,400] retained; the 40 K/ns anchor is non-negotiable for rate->experiment extrapolation. To widen back to 750->250 requires user approval.",
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 2000000,
+    "tg_rates_K_per_ns": [
+      40,
+      160,
+      400
+    ],
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "K_strain_max": 0.03,
+    "ct_min_decay_melt": 0.1,
+    "T_workflow_K": 770.0,
+    "experimental_tg_K": 418,
+    "exp_density_gcm3": 1.263,
+    "exp_K_GPa": {
+      "min": 4.0,
+      "max": 5.8
+    }
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF via EMC. PEEK2020 validates COMPASS II (Class II family, same potential form as PCFF) for PEEK: Tg=424-429 K vs exp 418 K (+1-3%). PCFF covers aromatic ketone carbonyl and aryl ether torsions via Class II cross terms; Sun1994 is the FF origin.",
+          "source_doi": "10.3390/polym12051054"
+        },
+        {
+          "claim": "Supporting validation: Afzal2021 PCFF amorphous PEEK thermomechanical properties.",
+          "citation": "Afzal2021"
+        },
+        {
+          "claim": "Supporting validation: Hayashi2022 PCFF PEEK density/modulus.",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "Supporting validation: PEEK2020 COMPASS II Tg validation.",
+          "citation": "PEEK2020"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "choice": "GAFF2",
+          "rejected_because": "No PEEK-specific GAFF2 Tg/density validation; GAFF2 Tg error >45% for PMMA documented; PCFF has direct Class-II analogue validation."
+        }
+      ]
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "bond-increment",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF uses bond-increment charges internally (class2 BIC scheme). PEEK has significant polar groups (ketone C=O, aryl ether O) but these are captured by PCFF BICs. No QM step required for EMC PCFF path.",
+          "source": "polymer_rules.json:classes.PKTN.charge_method"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "Ketone carbonyl C=O and aryl ether oxygens carry significant partial charges (|q|>0.1e). PPPM required per electrostatics_decision_guide for heteroatom-containing backbones. Neglecting long-range Coulomb biases density/Tg by 5-20% for polar polymers.",
+          "source": "polymer_rules.json:electrostatics_decision_guide"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "choice": "lj_cut only",
+          "rejected_because": "Polar backbone (C=O, O) with |q|>0.1e — long-range Coulomb mandatory per policy; lj_cut gives up to 20% density error."
+        }
+      ]
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=32, nchain=10",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "DP=32 satisfies the Fox-Flory hard floor (DP>=20 for Tg targets, per decision_policy.json:system_size.require) and DP>=30 satisfies the require_glassy carve-out for demotion of C(t)/MSD to advisory (decision_policy.json:equilibration). Both policy requirements are met at dp=32. This matches the planner's original prior (dp=32/nchain=10) from the PEEK1 approved plan.",
+          "source": "decision_policy.json:system_size.require + decision_policy.json:equilibration:require_glassy"
+        },
+        {
+          "claim": "Cell size estimate: 36 atoms/monomer (all-atom PCFF, with H) x dp=32 x nchain=10 = 11,520 atoms. Above 10k threshold; 1 GPU per run retained (benchmark support for multi-GPU absent on this host — see D-08).",
+          "method": "rdkit Chem.AddHs count on stripped SMILES (*Oc1ccc(Oc2ccc(C(=O)c3ccc(cc3)*)cc2)cc1 -> 36 aa atoms/monomer)"
+        },
+        {
+          "claim": "Klajmon2023 density convergence threshold ~9,000 g/mol (~20 repeat units for PEEK, MW_ru=288 g/mol); dp=32 MW ~9,216 g/mol is just at threshold — density should be well-converged.",
+          "citation": "Klajmon2023"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "choice": "DP=15, nchain=8 (4,320 atoms)",
+          "rejected_because": "DP=15 violates the Fox-Flory hard floor (DP>=20 per decision_policy.json:system_size.require) and also prevents use of the require_glassy C(t)/MSD carve-out (requires DP>=30). A class note cannot override a fixed require clause. Rejected per critic round-1 HARD findings."
+        },
+        {
+          "choice": "DP=20, nchain=8 (5,760 atoms)",
+          "rejected_because": "Clears Fox-Flory floor but not the require_glassy DP>=30 threshold; C(t)/MSD demotion would still be a policy violation at DP=20."
+        }
+      ]
+    },
+    {
+      "id": "D-05_convergence",
+      "choice": "ACCEPT require_glassy carve-out (DP>=30 satisfied): static-structure + density gated; C(t)/MSD demoted to advisory non-blocking",
+      "criteria_evaluated": [
+        "density_convergence",
+        "energy_convergence",
+        "chain_statistic_convergence"
+      ],
+      "evidence": [
+        {
+          "claim": "The require_glassy carve-out (decision_policy.json:equilibration) is now legally satisfied: DP=32>=30 AND regime=glassy (PEEK Tg=418 K >> 300 K equil-check temperature). Under this carve-out, C(t)/MSD can be demoted to advisory (non-blocking) without violating the fixed framework.",
+          "source": "decision_policy.json:equilibration:require_glassy (DP>=30 gate)"
+        },
+        {
+          "claim": "Physical basis: terminal relaxation of the rigid PEEK aromatic backbone at melt is hundreds of ns — outside feasible MD. PEEK1 empirical: melt-NVT (770 K, 1 ns production) C(t) decayed 0.1% over ~2 ns (gate 10%), extrapolated tau_relax ~1.9e9 ps (~100x tau_Rouse). MSD_max 83 A^2 << Rg^2 569 A^2. Standard EXTEND (1-2 ns) cannot move C(t). The require_glassy carve-out exists precisely for this class of polymer.",
+          "citation": "PEEK1 equil-check result (PEEK1 round 2, 2026-06-18)"
+        },
+        {
+          "claim": "Static structure ALL PASS (PEEK1 reference: Rg CV 20%<30%, P2 0.038<0.10, density-homogeneity CV 15%<25%) and 300 K NPT density converged. These remain the gating criteria.",
+          "citation": "PEEK1 equil-check result (PEEK1 round 2, 2026-06-18)"
+        },
+        {
+          "claim": "Tg-overestimate caveat: incomplete chain relaxation freezes configuration and biases apparent Tg HIGH beyond standard MD cooling-rate bias. Multirate rate->experiment extrapolation keeping the 40 K/ns anchor is the planned mitigation.",
+          "citation": "polymer_rules.json:classes.PKTN.notes"
+        },
+        {
+          "claim": "Density caveat: amorphous-cell reference is 1.263 g/cm3 (quenched amorphous PEEK). PEEK1 measured 1.193 g/cm3 (~5.5% low vs amorphous reference). Lower density biases bulk modulus K LOW.",
+          "citation": "polymer_rules.json:classes.PKTN.exp_density_note (Brandrup & Immergut / Marand amorphous PEEK)"
+        }
+      ],
+      "alternatives": [
+        {
+          "choice": "FAIL the run (enforce overall_pass=True strictly, no carve-out)",
+          "rejected_because": "require_glassy carve-out is legally available at DP=32>=30; static structure and density gate are clean; strict failure wastes a physically sound cell."
+        },
+        {
+          "choice": "Extend melt NVT by 1-2 ns (standard EXTEND remedy)",
+          "rejected_because": "0.1% C(t) decay over 2 ns (PEEK1 empirical) means 1-2 ns extension cannot move C(t). MSD/density are fixed-volume-NVT-invariant. Extension burns budget with no convergence gain."
+        }
+      ],
+      "confidence": "medium"
+    },
+    {
+      "id": "D-06_tg_fit_quality",
+      "choice": "bilinear fit R^2>=0.8; sweep 700->350 K brackets exp 418 K and expected MD-Tg 500-540 K",
+      "criteria_evaluated": [
+        "t_range_brackets_experimental_tg",
+        "n_temperature_bins",
+        "bilinear_fit_r_squared",
+        "cooling_rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "T sweep 700->350 K (350 K span) brackets experimental Tg=418 K with 282 K headroom above and 68 K below (the glassy regime). Expected MD-Tg ~500-540 K is also bracketed. With tg_t_step_K=20, n_bins=17 — adequate for bilinear fit. Multirate [40,160,400] K/ns provides rate->experiment extrapolation to correct the overestimate bias.",
+          "source": "decided_params.tg_t_high_K=700, tg_t_low_K=350, tg_t_step_K=20"
+        },
+        {
+          "claim": "The 40 K/ns rate is the accuracy anchor for the rate->experiment log-linear extrapolation. It MUST NOT be dropped even if budget is tight; narrowing the temperature window is the correct lever (see tg_window_note).",
+          "source": "memory:pktn_rigid_backbone_screening — cost model section"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": []
+    },
+    {
+      "id": "D-07_property_method",
+      "choice": "Murnaghan NPT +/-1000 atm at 300 K (glassy primary); 3-direction deform fallback",
+      "criteria_evaluated": [
+        "phase_glassy_vs_rubbery",
+        "method_physics_validity",
+        "gpu_vs_cpu",
+        "rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "PEEK is firmly glassy at 300 K: experimental Tg=418 K >> 300 K. MD Tg expected ~500-540 K. Glassy BM via Murnaghan NPT +/-1000 atm compression using npt_prod300_out.data (Wu 2019 Comput. Mater. Sci. validated; symmetric, cell-size independent).",
+          "source_doi": "10.1016/j.commatsci.2019.01.005"
+        },
+        {
+          "claim": "Born+NVT REMOVED pipeline-wide 2026-06-21. PCFF+PPPM virial incompatibility: K_Born 8-15x too high, Var(P) ~10^7x too high, failed on PMMA4/PVC1/PEEK1. Even a 4-ns run (PEEK1) gave K_T=-49.6 GPa.",
+          "citation": "born_stage_retired memory + PEEK1 pipeline result 2026-06-21"
+        },
+        {
+          "claim": "Fallback: 3-direction uniaxial deformation if Murnaghan fit_converged=False or B0_prime outside [4,20]. isotropy_delta_pct>=20% = hard FAIL.",
+          "source": "guides/MECHANICAL_TRACK.md + decision_policy.json:D-07"
+        },
+        {
+          "claim": "K will be biased LOW due to amorphous-cell density ~5.5% below reference (1.263 g/cm3). Report K with caveat; do not treat a low K vs exp [4.0, 5.8] GPa as a method failure.",
+          "source": "uncertainties[1] + polymer_rules.json:classes.PKTN.exp_K_GPa"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "choice": "Born+NVT (removed)",
+          "rejected_because": "PCFF+PPPM virial incompatibility confirmed 2026-06-21 across 3 runs; K_Born 8-15x too high. Permanently retired."
+        }
+      ]
+    },
+    {
+      "id": "D-08_hardware",
+      "choice": "engine=kokkos, gpu_per_run=1, mpi=1 (by_forcefield[pcff] default; cell ~11,520 atoms > 10k, no multi-GPU benchmark on this host)",
+      "criteria_evaluated": [
+        "forcefield_cost_structure",
+        "atom_count",
+        "concurrent_load",
+        "benchmark_evidence",
+        "cell_size_vs_benchmark_cell",
+        "host_match"
+      ],
+      "evidence": [
+        {
+          "claim": "FF=PCFF, by_forcefield[pcff]={engine:kokkos, mpi:1, gpu_per_run:1}. Cell size ~11,520 atoms (36 all-atom/monomer x dp=32 x nchain=10) — above 10k threshold. Benchmark cell 3,020 atoms; 11,520 is ~3.8x (outside [0.5x,2x] clean range for directional_probe adoption). Policy allows gpu_per_run>=2 above 10k only with benchmark support; none exists on this host (host mismatch: probe on 4xA800 vs live 4xRTX-6000). Retain by_forcefield[pcff] default: engine=kokkos, mpi=1, gpu_per_run=1. No hardware override in decided_params.",
+          "source": "polymer_rules.json:hardware_policy.by_forcefield.pcff + decision_policy.json:policies.hardware"
+        },
+        {
+          "claim": "values_are_benchmarked=false AND directional_probe.measured_on is 4xA800 40GB/32-core while live host is 4xRTX-6000 24GB/18-core (host mismatch). Adopt default by_forcefield[pcff]; no hardware override in decided_params. Benchmark evidence (42.8 ns/day kokkos vs 5.8 ns/day GPU-pkg, 2026-06-20, contended) is a strong signal but was measured on a different host class. Reference ns/day not baked in as a claim.",
+          "source": "polymer_rules.json:hardware_policy.directional_probe (measured_on: 4xA800, date: 2026-06-21)"
+        },
+        {
+          "claim": "PCFF+PPPM: mpi=1 is CANONICAL with KOKKOS (kspace runs on GPU, not CPU-serial; old gpu-package mpi>=4 rule does NOT apply). Single-rank KOKKOS: skip mpirun, use env CUDA_VISIBLE_DEVICES=N lmp.",
+          "source": "polymer_rules.json:hardware_policy.by_forcefield.pcff.note"
+        }
+      ],
+      "confidence": "low",
+      "alternatives": [
+        {
+          "choice": "engine=gpu, mpi=4 (GPU-package fallback)",
+          "rejected_because": "KOKKOS is ~7.9x faster than GPU-pkg (3,020-atom contended benchmark); fallback available if KOKKOS binary unavailable."
+        }
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "screening_grade_static_structure": true,
+        "rg_cv_max": 0.30,
+        "p2_nematic_max": 0.10,
+        "density_homogeneity_cv_max": 0.25,
+        "density_converged": true,
+        "density_in_gate_gcm3": [1.02, 1.38]
+      },
+      "advisory_non_blocking": {
+        "ct_min_decay_melt": 0.1,
+        "msd_exceeds_rg2": true,
+        "rationale": "REQUIRE_GLASSY CARVE-OUT (decision_policy.json:equilibration): C(t) decay and MSD>Rg^2 are demoted to ADVISORY (non-blocking). Carve-out is legal: DP=32>=30 AND regime=glassy (PEEK Tg=418 K >> 300 K). Physical basis: terminal relaxation of PEEK aromatic backbone at melt is hundreds of ns (PEEK1: C(t) decayed 0.1% over ~2 ns, tau_relax ~1.9e9 ps); 1-2 ns EXTEND provably cannot move C(t). Static-structure homogeneity + density convergence are the gating criteria. Backbone_types must be passed explicitly to equil-check (avoid auto-detect failure on aromatics)."
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": ["PASS", "EXTEND"],
+        "static_structure_pass": true,
+        "note": "EXTEND accepted as terminal for this run: static structure passes and further NVT cannot move C(t) (see equil stage advisory). Do NOT loop extensions chasing C(t) — budget better spent on Tg sweep. backbone_types must be passed explicitly (aromatic auto-detect unreliable)."
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 418,
+        "t_range_brackets_md_tg_expected": [500, 540]
+      },
+      "scope_note": "Budget-safe 700->350 K window (350 K span). Full class default 750->250 K (500 K) was ~28 h leaving only ~3 h margin vs 48 h budget; 350 K window is ~20 h. All 3 rates [40,160,400] K/ns kept. The 40 K/ns anchor is NON-NEGOTIABLE for rate->experiment extrapolation. To widen back to 750->250 K requires user approval."
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "analyze-tg-multirate",
+      "track": "thermal",
+      "success_criteria": {
+        "loglinear_r_squared_min": 0.9,
+        "n_rates_min": 2
+      }
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "fit_converged": true,
+        "B0_prime_range": [4, 20]
+      },
+      "fallback": "deform",
+      "caveat": "K will be biased LOW: amorphous-cell density ~1.193 g/cm3 is ~5.5% below amorphous-PEEK reference 1.263 g/cm3 (lower density -> lower stiffness). Report K with this caveat; do not treat a low K vs exp [4.0, 5.8] GPa as method failure. Ref: polymer_rules.json:classes.PKTN.exp_density_note."
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 2,
+    "findings": [
+      "APPROVED round 2. Gate 1a: PKTN confidence=high; reasoned mode is the over-checking direction (corrective multi-member PEEK disambiguation + D-05 rigid-backbone carve-out), not a confidence-gate bypass — full step-3 enforcement applied. Round-1 HARD findings resolved: D-04 dp=32 clears Fox-Flory (>=20) AND require_glassy (>=30); D-05 require_glassy legally satisfied (DP=32>=30 AND glassy, Tg=418>>300). D-01/D-03/D-07 (evidence_required) each cite DOI/citation + non-empty alternatives + full criteria. D-08 hardware unpinned (no engine/gpu_per_run/mpi in decided_params -> policy-derived kokkos/mpi=1/1GPU default; mpi=1 canonical on KOKKOS, not the GPU-package anti-pattern). All planned_stages have valid tracks + success_criteria; dominant uncertainty named with valid literature_anchor probe."
+    ],
+    "round_1_findings_addressed": [
+      "FINDING 1 (D-05): RESOLVED. require_glassy carve-out now legally satisfied: DP=32>=30 AND regime=glassy. D-05 choice, evidence, and equil-stage advisory_non_blocking rationale updated to cite decision_policy.json:equilibration:require_glassy explicitly.",
+      "FINDING 2 (D-04): RESOLVED. dp_typical raised to 32, nchain=10. D-04 choice, evidence, and alternatives updated: DP=32 satisfies Fox-Flory hard floor (DP>=20) and require_glassy (DP>=30). Cell size updated to 11,520 atoms; D-08 evidence updated accordingly.",
+      "D-08 cell size updated from ~4,320 to ~11,520 atoms (>10k); by_forcefield[pcff] default retained (no benchmark for multi-GPU on this host)."
+    ]
+  },
+  "provenance": {
+    "generator": "planner (reasoned revision of make_deterministic_plan.py scaffold)",
+    "generated_at": "2026-06-22T04:40:00.000000+00:00",
+    "based_on": "PEEK1 approved reasoned plan (2026-06-18, 2 critic rounds) + born_stage_retired (2026-06-21)"
+  }
+}

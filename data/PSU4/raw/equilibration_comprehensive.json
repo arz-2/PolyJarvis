@@ -1,0 +1,106 @@
+{
+  "status": "success",
+  "overall_pass": false,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.0827,
+      "p_value": 0.0092
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.0618,
+      "p_value": 0.205
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.0189
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.013
+    },
+    "tau_eff_density_fraction": 0.0002619234184580514,
+    "meta": {
+      "n_total_rows": 2001,
+      "n_production_rows": 1001,
+      "T_mean": 300.0
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": false,
+      "cv": 0.3164,
+      "mean_Rg_A": 32.113,
+      "mean_Rg2_A2": 1134.846,
+      "rg_spread_flag": true,
+      "C_inf": null,
+      "n_chains": 8,
+      "frames_analysed": 151
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 76.63,
+      "std_R_ee_A": 37.36,
+      "n_chains": 8,
+      "end_to_end_distribution_png": "failed: [Errno 2] No such file or directory: '/home/arz2/PolyJarvis/data/PSU4/graphs/end_to_end_distribution.png'"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.026,
+      "r2": 0.9952,
+      "gaussian_pass": true,
+      "n_separations": 349
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 29212.0,
+      "tau_ps": 20304.6,
+      "beta": 0.622,
+      "decay_fraction_at_end": 0.033,
+      "trajectory_ps": 151.0,
+      "pass": true
+    },
+    "msd": {
+      "alpha": 0.332,
+      "alpha_r2": 0.922,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 542.56,
+      "kinetic_trap_flag": true
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.0145,
+      "p2_std": 0.0041,
+      "p2_max": 0.0292,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": false,
+      "cv_mean": 0.262,
+      "cv_max": 0.2839,
+      "grid_n": 8,
+      "atoms_per_voxel": 21.1,
+      "poisson_cv": 0.218,
+      "poisson_limited": false,
+      "heterogeneous_flag": true
+    }
+  },
+  "warnings": [
+    "C(t) partially decayed: 3% decayed at end of trajectory (\u03c4_relax=29212.0 ps vs T_traj=151.0 ps)",
+    "MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.0 K \u00b7 151 frames analysed (skip=50) \u00b7 2026-06-27 04:16\n\n**Overall: FAIL**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.0827% (p=0.0092) | <1%, p<0.01 | PASS |\n| Energy drift | 0.0618% (p=0.205) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0189% | <1% | PASS |\n| Energy block-SEM | 0.013% | <1% | PASS |\n| \u03c4_eff density | 0.0% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 31.6% | <30% | FAIL |\n| MSID slope | 1.026 (R\u00b2=0.9952) | 1.0 \u00b120% | OK |\n| C(t) \u03c4_relax | 29212.0 ps (3% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | yes (\u03b1=0.332, MSD=542.56 \u00c5\u00b2>>Rg\u00b2=1134.846) | \u2014 | \u26a0 trapped |\n| R_ee mean \u00b1 std | 76.63 \u00b1 37.36 \u00c5 (N=8 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0145 \u00b1 0.0041 | <0.10 | PASS |\n| Density homogeneity CV | 26.2% (8\u00b3 grid, 21.1 atoms/voxel) | <25% | FAIL |\n\n**Warnings:** C(t) partially decayed: 3% decayed at end of trajectory (\u03c4_relax=29212.0 ps vs T_traj=151.0 ps); MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state",
+  "log_file": "/home/arz2/PolyJarvis/data/PSU4/lammps/equil/npt_prod300/npt_prod300.log",
+  "dump_file": "/home/arz2/PolyJarvis/data/PSU4/lammps/equil/nvt_production/nvt_production_decimated.dump",
+  "data_file": "/home/arz2/PolyJarvis/data/PSU4/lammps/equil/npt_prod300/npt_prod300_out.data",
+  "backbone_types": [
+    1,
+    2,
+    8
+  ],
+  "timestamp": "2026-06-27 04:16"
+}

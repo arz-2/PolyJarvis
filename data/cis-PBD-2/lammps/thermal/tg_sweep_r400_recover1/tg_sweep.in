@@ -1,0 +1,49 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - Tg Sweep Staircase
+# T_START=400.0 → T_END=80.0 K, step=20.0 K
+# 17 temperature points × 25000 steps/T
+# ============================================================
+
+log tg_sweep.log append
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/cut 14.0
+dielectric 1.000000
+bond_style harmonic
+angle_style harmonic
+dihedral_style multi/harmonic
+improper_style none
+special_bonds lj 0 0 0
+pair_modify mix arithmetic tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+package gpu 1 neigh yes
+
+read_data /home/arz2/PolyJarvis/data/cis-PBD-2/lammps/equil/npt_production/npt_production_out.data
+include /home/arz2/PolyJarvis/data/cis-PBD-2/lammps/cell/emc_build.params
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo 500
+
+# --- Velocity initialization at T_START (once only — Rule A) ---
+velocity all create 400.0 858241 mom yes rot yes dist gaussian
+
+# --- Temperature staircase (inherits momenta across steps — Rule A) ---
+variable temps index 400 380 360 340 320 300 280 260 240 220 200 180 160 140 120 100 80
+label TEMP_LOOP
+  timestep 2
+  fix npt_tg all npt temp ${temps} ${temps} 100 iso 1.0 1.0 1000.0
+  run 25000
+  unfix npt_tg
+  shell echo '{"stage":"T${temps}","status":"done"}' >> /home/arz2/PolyJarvis/data/cis-PBD-2/lammps/thermal/tg_sweep_r400/tg_progress.jsonl
+  print "STAGE COMPLETE: Tg step T=${temps}K P=1.0atm steps=25000"
+  next temps
+  jump SELF TEMP_LOOP
+
+write_data tg_step_out.data

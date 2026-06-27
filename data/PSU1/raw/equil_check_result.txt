@@ -1,0 +1,65 @@
+EQUILIBRATION CHECK RESULT FOR PSU1
+
+Run name: PSU1
+Polymer: Polysulfone (PSFO, DP=20, 8 chains, 8656 atoms)
+FF: PCFF (Class II, EMC)
+
+DENSITY EXTRACTION (NPT 300K):
+  plateau_density_mean: 1.187057 g/cm³
+  plateau_density_std: 0.003531 g/cm³
+  block_sem_density: 0.00013226 g/cm³
+  drift_p_value: 0.056 (no significant drift)
+  plateau_equilibrated: true
+  T_mean: 300.05 K
+
+COMPREHENSIVE EQUILIBRATION CHECK (NVT 700K + NPT 300K structural analysis):
+  overall_pass: false
+  backbone_types_used: [1, 2, 7, 8] (c, cp, oh, sf)
+
+  A. THERMO CONVERGENCE: PASS
+    - Density drift: 0% (N/A for NVT)
+    - Energy drift: 0.0467% (p=0.44) ✓
+    - Energy block-SEM: 0.0139% ✓
+
+  B. CHAIN CONFORMATION:
+    - Rg mean ± std: 28.06 ± 7.35 Å (CV=26.2%) ✓ PASS
+    - Rg_std_A: 7.35
+    - n_chains: 8
+    - C∞: 112.048 (⚠ warning: outside expected [3,15]; verify backbone_types)
+    - MSID slope: 0.958 (R²=0.9964) ✓ OK (Gaussian within 20%)
+    - MSD: kinetically trapped (α=0.022, MSD_max=102 Å²) ⚠ (expected below Tg, problematic at 700K melt)
+    - C(t) decay: 0.1% at end (τ_relax=1.93×10⁹ ps >> T_traj=1951 ps) ✗ FAIL
+
+  C. SPATIAL/PACKING: PASS
+    - P2 nematic order: 0.0141 ± 0.0022 ✓ (<0.10)
+    - Density homogeneity CV: 20.2% ✓ (<25%)
+
+CHAIN STRUCTURE SUMMARY (END-TO-END):
+  R_ee mean: 69.62 Å
+  R_ee std: 36.49 Å
+  n_chains: 8
+  end_to_end_histogram: /home/arz2/PolyJarvis/data/PSU1/graphs/end_to_end_distribution.png
+
+VERDICT: EXTEND
+  Reason: C(t) chain relaxation time is orders of magnitude longer than NVT trajectory (τ_relax ≈ 1.9 billion ps vs 1951 ps simulated). This is not a density/energy convergence failure but a chain dynamics / trajectory-duration issue. System otherwise equilibrated (density OK, energy OK, Rg consistent, spatial homogeneous). Recommend extending NVT production by 5–10 ns to allow C(t) to decay to ct_min_decay threshold.
+
+DENSITY STATUS: OK
+  Computed: 1.187 g/cm³
+  Expected: 1.24 g/cm³ (PSU exp)
+  Range: [0.958, 1.296] g/cm³
+  Error: −4.3% ✓ within ±5%
+
+WARNINGS:
+  1. C∞ = 112.048 is unusually high → verify backbone atom types (may include too many hydroxyls or oxygens)
+  2. C(t) partially decayed (hard gate H failure with ct_min_decay=0.1)
+  3. MSD kinetic trap at melt temperature (700 K) suggests chains may still be partially restricted
+
+RECOMMENDATIONS FOR ORCHESTRATOR:
+  - EXTEND the NVT production trajectory by 5–10 ns to allow C(t) to relax
+  - Re-run equilibration check after extension
+  - Consider investigating backbone atom type assignment (C∞ issue is a metadata concern, not a simulator failure)
+
+Output files:
+  - Equilibrated density JSON: /home/arz2/PolyJarvis/data/PSU1/raw/equilibrated_density.json
+  - Comprehensive check JSON: /home/arz2/PolyJarvis/data/PSU1/raw/equilibration_comprehensive.json
+  - End-to-end distribution PNG: /home/arz2/PolyJarvis/data/PSU1/graphs/end_to_end_distribution.png

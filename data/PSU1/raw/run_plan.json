@@ -1,0 +1,294 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PSFO (*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1)",
+  "run_name": "PSU1",
+  "polymer_class": "PSFO",
+  "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "medium",
+  "plan_mode": "reasoned",
+  "assumptions": [
+    "SMILES is BPA-polysulfone (Udel/PSU): isopropylidene C(C)(C) bridge between two aryls + aryl-ether-sulfone linkage. Member resolved as PSU (not PES/PPSU which lack the BPA bridge), so experimental_tg_K=463 K and exp_density=1.24 g/cm3 (PSFO class dict lists PSU:463, PES:493, PPSU:493).",
+    "PCFF FF transferability to aryl-SO2-aryl + aryl-ether validated by analogy (Hayashi2022, Afzal2021); no PSU-specific PCFF MD Tg/density paper, hence class confidence=medium.",
+    "RESOURCES (orchestrator-owned; no schema field, recorded here per policy): gpu_ids=\"0,1,2,3\", mpi=4. User resolved the round-1 budget-vs-policy conflict (run_log R-00) by allocating all 4 GPUs with MPI=4 (~4x throughput vs the original GPU=3/MPI=1), which makes a policy-compliant DP=20 feasible within the 48h budget. The orchestrator injects these into worker prompts."
+  ],
+  "uncertainties": [
+    {
+      "name": "ff_transferability",
+      "dominant": true,
+      "reduction_probe": "literature_anchor",
+      "detail": "PCFF has parameter coverage for aryl-SO2-aryl and aryl-ether via Class II cross terms but no PSU-specific MD Tg/density/K validation paper; mitigated by Hayashi2022/Afzal2021 analogy. With DP raised to the policy-compliant 20 (round-2 resolution), short-chain finite-size bias is no longer the leading residual; FF transferability to the polar sulfone+ether backbone is now the dominant uncertainty. literature_anchor (search_ff_literature, ROADMAP E2) recorded as PLANNED, not executed."
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "pcff",
+    "preferred_builder": "emc",
+    "charge_method": "RESP",
+    "electrostatics": "pppm",
+    "cutoff_A": 12.0,
+    "dt_fs": 1.0,
+    "confidence": "medium",
+    "dp_typical": 20,
+    "nchain": 8,
+    "density_initial_gcm3": 0.62,
+    "T_equil_K": 700.0,
+    "annealing_T_high_K": 780.0,
+    "eq_annealing_cycles": 8,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 15.0,
+    "tg_t_high_K": 750,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 2000000,
+    "tg_rates_K_per_ns": [
+      40,
+      160,
+      640
+    ],
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "K_strain_max": 0.03,
+    "ct_min_decay_melt": 0.1,
+    "T_workflow_K": 700.0,
+    "experimental_tg_K": 463,
+    "exp_density_gcm3": 1.24,
+    "exp_K_GPa": {
+      "min": 3.0,
+      "max": 5.0
+    }
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md).",
+          "source_doi": "10.1021/ja00086a030"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Afzal2021"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "choice": "GAFF2",
+          "known_error": "Generic FF; lacks Class II cross terms important for rigid aromatic backbone torsions; expected Tg/modulus bias larger than PCFF for stiff aryl-sulfone chains.",
+          "rejected_because": "PCFF covers aryl-SO2-aryl and aryl-ether via cross terms; preferred builder EMC emits PCFF directly."
+        },
+        {
+          "choice": "OPLS-AA",
+          "known_error": "OPLS-AA sulfone (-SO2-) parameters less validated for polymer condensed phase; no PSU MD precedent.",
+          "rejected_because": "No advantage over PCFF for this backbone; PCFF is class default with supporting citations."
+        }
+      ]
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "RESP",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [
+        {
+          "claim": "Sulfone -SO2- carries very large partial charges (S ~+1.3 e, O ~-0.55 e) and ether O adds polarity; bond-increment/Gasteiger charges underrepresent these, so QM-derived RESP charges are warranted for accurate electrostatics throughout the polar backbone.",
+          "citation": "polymer_rules.json:classes.PSFO.notes (sulfone partial-charge magnitudes)"
+        },
+        {
+          "claim": "RESP is more costly than FF-embedded charges but the cost is one-time per repeat unit and negligible vs the equilibration/Tg budget.",
+          "citation": "charge_method_cost evaluation"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "choice": "Gasteiger/bond-increment (PCFF default)",
+          "known_error": "Underrepresents large sulfone partial charges; biases density/CED for strongly polar backbone.",
+          "rejected_because": "Sulfone+ether polarity demands QM charges; RESP chosen despite PCFF normally pairing with bond-increment."
+        }
+      ]
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "Backbone contains S and O heteroatoms with |q|>>0.1 e (sulfone S ~+1.3 e); per electrostatics_decision_guide such backbones MUST use PPPM long-range Coulomb. Neglecting it biases density/Tg 5-20%.",
+          "source": "polymer_rules.json:electrostatics_decision_guide"
+        },
+        {
+          "claim": "PPPM adds modest GPU cost vs lj_cut but is mandatory here; cutoff_A=12.0 sets the real-space split.",
+          "citation": "computational_cost evaluation"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {
+          "choice": "lj_cut (no long-range Coulomb)",
+          "known_error": "5-20% density/Tg bias for polar backbones.",
+          "rejected_because": "Disallowed by policy for heteroatom/|q|>0.1e backbones."
+        }
+      ]
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=20, nchain=8",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "DP=20 satisfies the policy HARD floor 'DP>=20 (Fox-Flory plateau) for Tg targets'. Per-chain MW ~8,850 g/mol (442.5 g/mol repeat unit x 20), system total ~70,800 g/mol over nchain=8, ~8,640 atoms. Round-2 resolution: the original DP=15 (per-chain MW ~5,304, below the Fox-Flory/MW-convergence floor) is dropped; the 4-GPU/MPI=4 allocation makes DP=20 feasible within the 48h budget.",
+          "citation": "decision_policy.json:policies.system_size.require[0]; run_log R-00 (budget-vs-policy resolution)"
+        },
+        {
+          "claim": "bulk_modulus target: glassy K is computed via the Born/NVT elastic tensor at 300 K (<< Tg=463 K), a LOCAL elastic response governed by segmental packing and cohesive energy density, not by the entanglement network. The per-chain MW requirement for K is therefore met with margin at DP=20 (~8,850 g/mol, ~1 entanglement MW for polysulfone and well above the DP=15 below-threshold case); no per-class Me is tabulated in polymer_rules.json, so K validity rests on the segmental-elastic physics rather than network entanglement, which is robust at this chain length.",
+          "citation": "decision_policy.json:policies.system_size.require[1]; D-07 glassy Born/NVT method"
+        },
+        {
+          "claim": "Self-imaging check: at final density 1.24 g/cm3 the cubic cell edge L ~45.6 A (L/2 ~22.8 A) and at initial 0.62 g/cm3 L ~57.5 A; both give L/2 >> cutoff_A=12.0, so nchain=8 (the PSFO class default) gives a cell large enough to avoid minimum-image self-interaction. No nchain increase needed.",
+          "citation": "decision_policy.json:policies.system_size.require[2]; cell-size computation"
+        },
+        {
+          "claim": "PSU experimental RT density ~1.24 g/cm3; initial density 0.62 g/cm3 (~0.5x) for EMC packing.",
+          "citation": "polymer_rules.json:classes.PSFO.notes"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "choice": "DP=15, nchain=8 (round-1 screening choice)",
+          "known_error": "Per-chain MW ~5,304 g/mol is below the Fox-Flory DP>=20 floor; rigid aromatic backbone at DP=15 overestimates Tg by ~5-15% beyond standard MD bias and biases K high.",
+          "rejected_because": "Violates the policy HARD require DP>=20 for Tg targets (critic round-1 finding); the 4-GPU/MPI=4 allocation removes the budget rationale that motivated it."
+        },
+        {
+          "choice": "DP=25, nchain=10",
+          "known_error": "Further above the MW threshold but ~1.5-2x the atom count of DP=20/nchain=8; exceeds the 48h budget even with 4 GPUs.",
+          "rejected_because": "DP=20 already clears the Fox-Flory floor and the self-imaging check; extra chain length wastes GPU budget for no required accuracy gain."
+        }
+      ]
+    },
+    {
+      "id": "D-07_property_method",
+      "choice": "born_nvt (glassy bulk modulus), deform fallback",
+      "criteria_evaluated": [
+        "phase_glassy_vs_rubbery",
+        "method_physics_validity",
+        "gpu_vs_cpu",
+        "rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "PSU experimental Tg=463 K >> 300 K so the workflow phase at 300 K is glassy; glassy bulk modulus uses rate-free Born+NVT (full elastic tensor) per policy, with uniaxial deform as fallback only (deform overestimates K 20-50%).",
+          "source": "polymer_rules.json:classes.PSFO.exp_K_GPa"
+        },
+        {
+          "claim": "Experimental K reference 3.0-5.0 GPa (and E ~2.5-2.6 GPa, Mark2007) anchors the analyze-bm comparison.",
+          "citation": "Mark2007_Table24.4"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "choice": "Murnaghan EOS pressure sweep",
+          "known_error": "Both-phase candidate but no bm_pressures_atm defined for this class; Born is the validated glassy path.",
+          "rejected_because": "Class is glassy at 300 K and Born is the preferred glassy method."
+        },
+        {
+          "choice": "volume-fluctuation",
+          "known_error": "Cross-check only; noisy for stiff glass.",
+          "rejected_because": "Used only as cross-check, not primary."
+        }
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 463
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "born",
+      "track": "mechanical",
+      "success_criteria": {
+        "born_matrix_written": true
+      },
+      "fallback": "deform"
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 2,
+    "findings": [],
+    "round1_resolution": "Round-1 REVISE finding addressed: D-04 raised from DP=15 to the policy-compliant DP=20 (above the Fox-Flory plateau floor for the Tg target; per-chain MW ~8,850 g/mol with K validity resting on glassy segmental-elastic physics). nchain held at 8 after a self-imaging check (L/2 ~22.8 A >> cutoff 12.0 A at final density). GPU-budget-vs-policy conflict resolved by the user via 4-GPU/MPI=4 allocation (run_log R-00). Dominant uncertainty changed from short_chain_bias_DP15 (resolved) to ff_transferability."
+  },
+  "provenance": {
+    "generator": "make_deterministic_plan.py",
+    "generated_at": "2026-06-18T20:48:27.927732+00:00"
+  }
+}

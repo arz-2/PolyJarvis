@@ -1,0 +1,91 @@
+{
+  "run": {
+    "name": "PEEK1",
+    "smiles": "*Oc1ccc(Oc2ccc(C(=O)c3ccc(cc3)*)cc2)cc1",
+    "polymer_class": "PKTN",
+    "ff": "pcff",
+    "charge_method": "",
+    "dp": null,
+    "n_chains": null,
+    "n_atoms": null,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": null,
+    "D-02_charges": null,
+    "D-03_electrostatics": null,
+    "D-04_system_size": null,
+    "D-05_convergence": "EXTEND-accepted (screening-grade; melt terminal relaxation incomplete \u2014 documented)",
+    "D-06_tg_fit_quality": "GOOD"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 532.7,
+      "exp_range_K": [
+        398.0,
+        438.0
+      ],
+      "error_pct": 27.4,
+      "status": "FAIL",
+      "r_squared": 0.9909,
+      "fit_quality": "GOOD",
+      "note": "Re-extracted from the COMPLETE 19-point staircase (700->350 K, 29.5 h wall, status=completed); supersedes the earlier partial-log (16 pts, 700->400 K) Tg=537.4 K. -4.7 K shift from full glassy-branch constraint. +114.7 K (+27.4%) vs exp 418 K is the documented single-rate (40 K/ns) cooling-rate + screening-melt over-estimate. Tg_alternative_K=500 (secondary curve_fit) disagrees by 33 K \u2014 primary F-stat Tg (R2=0.9909) is the reported value."
+    },
+    "density": {
+      "value_g_cm3": 1.192765,
+      "exp_range_g_cm3": [
+        1.02,
+        1.38
+      ],
+      "error_pct": -5.6,
+      "status": "PASS_SCREENING",
+      "exp_amorphous_ref_g_cm3": 1.263,
+      "ref_note": "Compared to AMORPHOUS PEEK 1.263 g/cm3 (canonical for a fully amorphous MD cell). The 1.30-1.32 figure is SEMICRYSTALLINE, not a valid comparator. Prior 1.20 ref was discredited. Value is within the loose plan gate [1.02,1.38] but ~5.5% LOW vs amorphous ref -> threads K-low caveat."
+    },
+    "bulk_modulus": {
+      "value_GPa": 3.5307,
+      "sem_GPa": null,
+      "exp_range_GPa": [
+        4.0,
+        7.0
+      ],
+      "error_pct": -11.7,
+      "status": "WARNING",
+      "method": "deformation",
+      "error_pct_vs_midpoint": -35.8,
+      "ref_note": "Convention: error_pct is vs NEAREST exp bound (lower=4.0 GPa) = -11.8%; vs midpoint 5.5 GPa = -35.8%. Below 4-7 GPa range. Born infeasible -> deform fallback. Opposing biases: density -5.5% (K-low, dominant) vs fast strain rate 1e8/s (K-high). Affine K_Born=84.3 GPa = upper bound only."
+    }
+  },
+  "convergence": {
+    "verdict": "EXTEND-accepted (screening-grade; melt terminal relaxation incomplete \u2014 documented)",
+    "density_equilibrated": null,
+    "energy_equilibrated": null,
+    "density_drift_pct": null
+  },
+  "structural_checks": {
+    "rg_cv": null,
+    "rg_spread_flag": null,
+    "kinetic_trap_flag": null,
+    "diffusion_regime": null,
+    "ordered_flag": null,
+    "p2_mean": null,
+    "heterogeneous_flag": null,
+    "density_cv_mean": null
+  },
+  "artifacts": {
+    "tg_summary": "raw/tg_summary.json",
+    "tg_density_bins": "raw/tg_density_bins.csv",
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "bulk_modulus_deform": "raw/bulk_modulus_deform.json",
+    "stress_strain_csv": "raw/stress_strain.csv"
+  },
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "17a4076",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-20T15:42:24.663334+00:00"
+  }
+}

@@ -1,0 +1,98 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - Uniaxial Deformation Template
+# ============================================================
+# Stage 5b: Measure elastic constants via stress-strain response
+#
+# Purpose: Apply uniaxial strain in x at constant rate; record stress
+#          tensor. From the linear regime:
+#            C11 = -dσ_xx/dε_xx    (axial stiffness)
+#            C12 = -dσ_yy/dε_xx    (lateral coupling, isotropic assumption)
+#            K = (C11 + 2·C12) / 3  (bulk modulus)
+#            G = (C11 - C12) / 2    (shear modulus)
+#            E = 9KG / (3K + G)     (Young's modulus)
+#
+# Design:
+#   Phase 1: NVT pre-equilibration (N_EQ_STEPS) at T_TARGET.
+#            Removes NPT thermostat state; brief re-thermalisation.
+#   Phase 2: Uniaxial deformation (N_STEPS) via fix deform x erate.
+#            NVT — no barostat so y/z dimensions stay fixed.
+#            pxx, pyy, pzz written every THERMO_FREQ steps for analysis.
+#            STRAIN_MAX / (STRAIN_RATE * TIMESTEP) = N_STEPS.
+#
+# Prerequisites: Starting .data must be at T_TARGET (e.g. from npt Stage 5a).
+#
+# Tunable parameters:
+#   DATA_FILE        - equilibrated cell at T_TARGET (from Stage 5a NPT)
+#   LOG_FILE         - output log file name
+#   WRITE_DATA_FILE  - deformed cell written at end
+#   T_TARGET         - deformation temperature (K); default 300
+#   T_DAMP           - thermostat damping (fs)
+#   STRAIN_RATE      - engineering strain rate (1/fs); default 1e-7
+#                      = K_deform_rate_inv_s [s⁻¹] × 1e-15 [s/fs]
+#                      e.g. 1e8 s⁻¹ → 1e-7 /fs
+#   N_STEPS          - deformation run steps; set to STRAIN_MAX/(STRAIN_RATE*TIMESTEP)
+#                      e.g. 0.03 / (1e-7 * 1.0) = 300000 for 3% strain at 1e8 s⁻¹
+#   N_EQ_STEPS       - NVT pre-equilibration steps; default 200000 (0.2 ns)
+#   TIMESTEP         - integration timestep (fs); default 1.0
+#   THERMO_FREQ      - output frequency (steps); default 100 (→ ~3000 data points)
+#   DUMP_FREQ        - trajectory dump frequency; 0 = disabled (recommended)
+# ============================================================
+
+log 05_deform_fast.log 
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-4
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+package gpu 1 neigh no
+
+read_data /home/arz2/PolyJarvis/data/PMMA1/lammps/npt_prod300/npt_prod300_out.data
+
+
+# --- Thermo: stress tensor (pxx/pyy/pzz) required for elastic constant extraction ---
+thermo_style custom step time temp press pxx pyy pzz lx ly lz vol density etotal
+thermo_modify flush yes
+thermo 100
+
+# --- Trajectory (disabled by default — log is sufficient for elastic analysis) ---
+# Dump disabled (thermo-only run)
+
+# Velocities read from data file
+
+# ── Phase 1: NVT pre-equilibration ─────────────────────────────────────────
+# Brief re-thermalisation at T_TARGET before applying strain.
+timestep 1
+fix nvt_eq all nvt temp 300 300 100
+run 200000
+unfix nvt_eq
+
+# ── Phase 2: Uniaxial deformation in x ─────────────────────────────────────
+# fix deform x erate: engineering strain rate in 1/fs (LAMMPS real units).
+# NVT thermostat — no barostat; y/z box dimensions stay fixed.
+# "remap v" rescales velocities with the deforming cell (maintains
+# thermostat accuracy at large strains; required for SHAKE compatibility).
+fix nvt_def all nvt temp 300 300 100
+fix def all deform 1 x erate 1e-07 remap v
+run 500000
+unfix def
+unfix nvt_def
+
+
+
+
+write_data 05_deform_fast_out.data
+
+print "STAGE COMPLETE: npt_deform T=300K rate=1e-07/fs steps=500000"
+quit

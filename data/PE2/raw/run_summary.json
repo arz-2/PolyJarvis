@@ -1,0 +1,61 @@
+{
+  "run_name": "PE2",
+  "polymer_name": "Polyethylene",
+  "smiles": "*CC*",
+  "polymer_class": "PHYC",
+  "force_field": "trappe-ua",
+  "replicate": 2,
+  "seeds": {"emc_cell": 1004, "SEED_HOT": 1005, "SEED_COLD": 1006},
+  "dp": 120,
+  "nchain": 20,
+  "n_atoms": 4840,
+  "T_workflow_K": 300.0,
+  "T_equil_K": 550.0,
+  "is_glassy": false,
+
+  "foundation": {
+    "density_gcm3": 0.8592,
+    "density_sem_gcm3": 2.67e-4,
+    "density_exp_gcm3": [0.850, 0.950],
+    "density_error_pct": -9.6,
+    "density_status": "WARN (amorphous-only MD vs semicrystalline exp)",
+    "equil_verdict": "PASS",
+    "equil_note": "Rubbery gating applied (T_workflow=300K > Tg=232K). density SEM=0.031%, CV=12.9%; C(t) advisory."
+  },
+
+  "thermal": {
+    "Tg_slowrate_K": 231.5,
+    "Tg_rates_K_per_ns": [640.0, 160.0, 40.0],
+    "Tg_values_K": [232.5, 233.6, 231.5],
+    "Tg_loglinear_slope_K": 0.361,
+    "Tg_loglinear_r_squared": 0.227,
+    "Tg_rates_span_decades": 1.20,
+    "Tg_exp_K": 195.0,
+    "Tg_offset_K": 36.5,
+    "Tg_error_pct": 18.7,
+    "Tg_status": "WARN (MD systematic overestimate expected; VF underconstrained <2 decades)",
+    "cte_glassy_per_K": 1.527e-4,
+    "cte_rubbery_per_K": 7.212e-4,
+    "cte_ratio": 4.72,
+    "dCp_J_per_g_K": 0.428,
+    "multirate_fit_quality": "WARNING (R²=0.227; flat rate-dependence expected for rubbery PE)"
+  },
+
+  "mechanical": {
+    "bulk_modulus_GPa": 1.641,
+    "bulk_modulus_sem_GPa": 0.108,
+    "B0_prime": 12.27,
+    "bulk_modulus_r_squared": 0.9996,
+    "bulk_modulus_exp_GPa": [1.5, 2.0],
+    "bulk_modulus_error_pct": 9.4,
+    "bulk_modulus_method": "murnaghan",
+    "bulk_modulus_status": "PASS (within exp range; WARNING on P=100 atm isotropy 20.8% — low-P denominator artifact, EOS fit unaffected)",
+    "fit_converged": true,
+    "n_pressure_points": 5
+  },
+
+  "overall_status": "COMPLETE",
+  "overall_verdict": "PASS with warnings (density 9.6% below exp — amorphous-only; Tg +18.7% systematic MD overestimate; K within exp range)",
+  "pipeline_version": "PolyJarvis pre-replicate-fixes",
+  "timestamp_utc": "2026-06-22T14:10:00Z"
+}

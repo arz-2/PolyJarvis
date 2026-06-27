@@ -1,0 +1,129 @@
+{
+  "run": {
+    "name": "PMMA1",
+    "smiles": "*CC(C)(C(=O)OC)*",
+    "polymer_class": "PACR",
+    "ff": "PCFF",
+    "charge_method": "embedded in FF (PCFF bond-increment)",
+    "dp": 40,
+    "n_chains": 10,
+    "n_atoms": 6020,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": null,
+    "D-02_charges": null,
+    "D-03_electrostatics": null,
+    "D-04_system_size": null,
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "EXCELLENT"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 340.0,
+      "exp_range_K": [
+        358.0,
+        398.0
+      ],
+      "error_pct": -10.1,
+      "status": "WARN_soft",
+      "r_squared": 0.9971,
+      "fit_quality": "EXCELLENT",
+      "tg_dsc_equiv_K": null,
+      "loglinear_slope_K": null,
+      "loglinear_r_squared": null,
+      "vf_fit_quality": null,
+      "n_rates": null,
+      "n_replicates": null,
+      "rates_span_decades": null,
+      "slow_rate_ref_K_per_ns": null,
+      "exp_canonical_K": 378,
+      "range_note": "canonical PMMA 378 K; prior [326-366] was a gen_prompt bug (averaged PMMA+PMA+PAA)"
+    },
+    "density": {
+      "value_g_cm3": 1.11668,
+      "exp_range_g_cm3": [
+        1.145,
+        1.265
+      ],
+      "error_pct": 7.3,
+      "status": "WARN_soft"
+    },
+    "bulk_modulus": {
+      "value_GPa": 3.3932,
+      "sem_GPa": null,
+      "exp_range_GPa": [
+        3.5,
+        5.0
+      ],
+      "error_pct": -20.2,
+      "status": "WARN_soft",
+      "method": "deformation",
+      "range_note": "canonical PMMA [3.5-5.0]; prior [3.0-4.2] was hallucinated by summary worker"
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": null,
+    "energy_equilibrated": null,
+    "density_drift_pct": null
+  },
+  "structural_checks": {
+    "rg_cv": null,
+    "rg_spread_flag": null,
+    "kinetic_trap_flag": null,
+    "diffusion_regime": null,
+    "ordered_flag": null,
+    "p2_mean": null,
+    "heterogeneous_flag": null,
+    "density_cv_mean": null
+  },
+  "artifacts": {
+    "tg_summary": "raw/tg_summary.json",
+    "tg_density_bins": "raw/tg_density_bins.csv",
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "bulk_modulus_deform": "raw/bulk_modulus_deform.json",
+    "volume_timeseries": "raw/volume_timeseries.csv",
+    "volume_fig": "graphs/volume_fluctuations.png",
+    "stress_strain_csv": "raw/stress_strain.csv"
+  },
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "6bbef77",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-21T15:03:34.943594+00:00"
+  },
+  "orchestrator_reconciliation": {
+    "note": "Status labels use MW/condition-adjusted exp ranges. Versus CANONICAL high-MW PMMA targets (polymer_rules.json: Tg=378 K, K=[3.5-5.0] GPa, density=[1.145-1.265]), the simulated values are systematically SOFT: density -7.4%, Tg -10% (340 vs 378), K just below 3.5. This is internally coherent: PCFF underbinds PMMA, compounded by DP=40 finite-MW depression (Fox effect lowers Tg/density for short chains). Against MW-adjusted ranges (Tg [326-366], used here) Tg=340 is in-range.",
+    "bulk_modulus": {
+      "reported_GPa": 3.3932,
+      "method": "uniaxial_deform_slow_1e7",
+      "cross_check_fluctuation_GPa": 3.6879,
+      "agreement_pct": 8.7,
+      "born_excluded": "K=-10.53 GPa undersampled (R-04), file bulk_modulus_born.FAILED.json",
+      "assessment": "two independent methods agree at 3.4-3.7 GPa; borderline at/just-below canonical exp lower bound 3.5"
+    },
+    "tg": {
+      "reported_K": 340.0,
+      "alt_K": 353.9,
+      "fit": "EXCELLENT R2=0.9971",
+      "vs_canonical_378K_pct": -10.1,
+      "vs_mw_adjusted_range": "in [326-366]"
+    },
+    "recoveries": [
+      "R-01 MPI=1 stall",
+      "R-02 speed opt",
+      "R-03 Tg single-step bug",
+      "R-04 Born undersampled",
+      "R-05 deform AMBER FF bug"
+    ],
+    "reconciled_by": "orchestrator",
+    "reconciled_at": "2026-06-21",
+    "headline_verdict": "All 3 properties systematically SOFT ~7-10% vs canonical PMMA (PCFF underbinds + DP=40 finite-MW). density -7.4%, Tg -10.1%, K -3% below lower bound / -20% vs mid. Right ballpark, none cleanly in-range. Internally coherent.",
+    "range_corrections": "Fixed two spurious exp ranges: Tg [326-366]->[358-398] (gen_prompt _exp_tg_range averages all class polymers - BUG); K [3.0-4.2]->[3.5-5.0] (worker hallucination)."
+  }
+}
