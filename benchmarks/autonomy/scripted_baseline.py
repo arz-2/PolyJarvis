@@ -35,10 +35,20 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Pin system OpenMPI (/usr) BEFORE the lazy `from server import ...` in the dispatch helpers.
+# The lammps-engine server resolves OpenMPI paths at import time; absent OPENMPI_PREFIX it can
+# land on a stale /home/<user>/openmpi that does not exist, so the generated chain launcher
+# exports a broken OPAL_PREFIX and mpirun fails with "unknown option -np" (PMMA_STOCK gate,
+# 2026-06-27). setdefault honors a caller-supplied OPENMPI_PREFIX if one is already exported.
+os.environ.setdefault("OPENMPI_PREFIX", "/usr")
+os.environ.setdefault("OPENMPI_BIN", "/usr/bin")
+os.environ.setdefault("OPENMPI_LIB", "/usr/lib/x86_64-linux-gnu")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # NOTE: insert order matters. Both server dirs contain a module named `server.py`; the LAST
@@ -71,7 +81,7 @@ FOUNDATION_STAGES = {"build", "equil", "equil-check"}
 # numeric gap vs the curated arm is the honest measurement.
 # Ordering target: stock-defaults (floor) < scripted-curated (polymer_rules) < agent (LLM).
 STOCK_DEFAULTS = {
-    "density_initial_gcm3": 0.5,   # generic pack density (curated tunes per class, e.g. PHYC 0.65)
+    "density_initial_gcm3": 0.9,   # EMC build_cell's own default (curated tunes per class, e.g. PHYC 0.65)
     "dp_typical": 20,              # generic chain length
     "nchain": 10,                  # generic chain count
     "T_workflow_K": 300.0,         # generic production T
@@ -153,7 +163,7 @@ def _ctx_from_plan(run_name, polymer_class, smiles, properties, work_dir, seed, 
 def _dispatch_build(ctx, execute, smoke):
     dp = ctx["decided"]
     field = dp.get("preferred_ff", "pcff")
-    density = dp.get("density_initial_gcm3", 0.5)
+    density = dp.get("density_initial_gcm3", 0.9)  # EMC build_cell default if plan omits it
     n_dp = 5 if smoke else dp.get("dp_typical", 20)
     nchains = 2 if smoke else dp.get("nchain", 10)
     out_dir = ctx["work_dir"] / "build"
@@ -170,6 +180,14 @@ def _dispatch_build(ctx, execute, smoke):
             seed=ctx["seed"] if ctx["seed"] is not None else -1,
         )
         ctx["data_path"] = str(data_path)
+        # EMC (PCFF/Class II, OPLS) writes force-field coeffs to a sibling .params file, NOT
+        # inline in the .data. generate_equilibration_workflow's pre-flight validation FAILS
+        # ("'Pair Coeffs' section missing …") unless that params_file is threaded through —
+        # which silently returned a status=error dict and tripped a KeyError('stages') in
+        # _dispatch_equil (PMMA_STOCK gate, 2026-06-27). Capture it here.
+        params_path = Path(str(data_path)).with_suffix(".params")
+        if params_path.exists():
+            ctx["params_path"] = str(params_path)
         return True, "", f"built {data_path}"
     except Exception as e:  # build failure -> log tail for classifier
         return False, str(e), f"build raised: {e!r}"
@@ -192,11 +210,22 @@ def _dispatch_equil(ctx, execute, smoke, gpu_ids, mpi):
             temp=dp.get("T_workflow_K", 300.0), max_temp=dp.get("annealing_T_high_K", 600.0),
             n_chains=dp.get("nchain", 10),
             use_pcff=("pcff" in ff), use_trappe=("trappe" in ff), use_opls=("opls" in ff),
+            params_file=ctx.get("params_path"),
             npt_prod_steps=2000 if smoke else None,
             velocity_seed=ctx["seed"],
         )
+        if wf.get("status") == "error":
+            detail = wf.get("validation_errors") or wf.get("error")
+            return False, str(detail), f"equil workflow gen failed: {wf.get('error')}"
+        # run_lammps_chain re-runs its OWN pre-flight validation on data_path and only
+        # suppresses the "Coeffs section missing" errors when params_file is given — so the
+        # EMC .params must be threaded here too, else it returns a status=error dict with no
+        # chain_id (PMMA_STOCK gate, 2026-06-27).
         sub = run_lammps_chain(stages=wf["stages"], gpu_ids=gpu_ids, mpi=mpi,
-                               data_file=data_path, engine="gpu")
+                               data_file=data_path, params_file=ctx.get("params_path", ""),
+                               engine="gpu")
+        if sub.get("status") == "error":
+            return False, str(sub.get("error")), f"chain submit failed: {sub.get('error')}"
         chain_id = sub["chain_id"]
         ctx["equil_chain_id"] = chain_id
         while True:
@@ -208,29 +237,64 @@ def _dispatch_equil(ctx, execute, smoke, gpu_ids, mpi):
             from server import get_run_output
             tail = get_run_output(chain_id).get("lammps_log_tail", "")
             return False, tail, f"equil chain failed at {st.get('failed_stages')}"
-        ctx["npt_prod_data"] = f"{ctx['work_dir']}/equil/npt_production/npt_production_out.data"
+        # Use the workflow's own production dir. For the GLASSY 9-run path (curated arm,
+        # temp>300) this points to npt_prod300 — the 300 K density cell — NOT npt_production
+        # (the 550/600 K melt). Hardcoding npt_production would feed equil-check the MELT
+        # density for the curated arm and the 300 K density for stock, an apples-to-oranges
+        # comparison that would invert the accuracy result. For the rubbery 7-run path
+        # (stock arm, temp=300) it correctly points to npt_production.
+        prod_dir = wf.get("npt_production_dir") or f"{ctx['work_dir']}/equil/npt_production"
+        ctx["npt_prod_data"] = str(Path(prod_dir) / f"{Path(prod_dir).name}_out.data")
+        # npt_production_log already points to the 300 K stage for BOTH regimes (npt_prod300
+        # for glassy, npt_production for rubbery) — the right log for the density read.
+        ctx["npt_prod_log"] = wf.get("npt_production_log") or str(
+            Path(prod_dir) / f"{Path(prod_dir).name}.log")
         return True, "", f"equil completed: {chain_id}"
     except Exception as e:
         return False, str(e), f"equil raised: {e!r}"
 
 
 def _dispatch_equil_check(ctx, execute, smoke):
+    """Density gate. The foundation ablation's signal is the 300 K density, so this stage
+    extracts the equilibrated-plateau density from the production log (the 300 K stage for
+    BOTH arms — stock npt_production@300, curated npt_prod300@300) and writes density.json.
+    We parse the log directly — columns located by header NAME, robust to column order — rather
+    than calling check_equilibration_comprehensive.py, which requires --log_file/--dump_file/
+    --backbone_types and emits non-binding verdicts irrelevant to a density read (the missing
+    args silently failed the original gate; PMMA_STOCK, 2026-06-27)."""
     if not execute:
-        return True, "", "DRY check_equilibration_comprehensive (density gate)"
-    # Real path: subprocess to the analysis CLI (importable-as-CLI per exploration).
-    import subprocess
-    script = (REPO_ROOT / "mcp-servers" / "mcp-lammps-engine" /
-              "analysis_scripts" / "check_equilibration_comprehensive.py")
-    data = ctx.get("npt_prod_data")
-    if not data or not Path(data).exists():
-        return False, "npt_production_out.data missing", "equil-check missing input"
-    try:
-        out = subprocess.run([sys.executable, str(script), "--data_file", data],
-                             capture_output=True, text=True, timeout=600)
-        ok = out.returncode == 0
-        return ok, out.stderr if not ok else "", out.stdout[-400:]
-    except Exception as e:
-        return False, str(e), f"equil-check raised: {e!r}"
+        return True, "", "DRY density extraction from production log"
+    import json
+    import statistics as stx
+    log = ctx.get("npt_prod_log")
+    if not log or not Path(log).exists():
+        return False, f"production log missing: {log}", "equil-check missing input"
+    target_T = ctx.get("density_target_T", 300.0)
+    cols, rows = None, []
+    for line in Path(log).read_text().splitlines():
+        p = line.split()
+        if not p:
+            continue
+        if p[0] == "Step":
+            cols = {name: i for i, name in enumerate(p)}
+            continue
+        if cols and p[0].isdigit() and len(p) >= len(cols):
+            try:
+                rows.append((float(p[cols["Temp"]]), float(p[cols["Density"]])))
+            except (KeyError, ValueError):
+                pass
+    if not rows:
+        return False, "no thermo rows parsed", "equil-check parse failed"
+    # Keep rows near the target T (drops any ramp tail), then average the last half (plateau).
+    near = [d for T, d in rows if abs(T - target_T) <= 50.0] or [d for _, d in rows]
+    window = near[len(near) // 2:]
+    density = stx.mean(window)
+    std = stx.pstdev(window) if len(window) > 1 else 0.0
+    out = {"density_gcm3": round(density, 4), "density_std": round(std, 4),
+           "n_points": len(window), "target_temp_K": target_T, "source_log": str(log)}
+    (ctx["work_dir"] / "density.json").write_text(json.dumps(out, indent=2))
+    ctx["density_gcm3"] = density
+    return True, "", f"density={density:.4f} g/cm^3 (n={len(window)}, std={std:.4f})"
 
 
 DISPATCH = {
