@@ -38,6 +38,7 @@ The default mode is multi-agent. The orchestrator (this session) spawns speciali
 
 | Worker | Color | Role | Model |
 |--------|-------|------|-------|
+| `literature-grounding-worker` | ⚪ gray | **setup (off-table / low-medium confidence only)** — SMILES + class → DOI-verified `literature_grounding.json` (FF, electrostatics, DP/nchain, density & Tg targets) that feeds the planner | sonnet |
 | `planner` | 🟡 yellow | goal + class → `run_plan.json` (deterministic if confidence=high; reasoned otherwise) | opus |
 | `critic` | 🔴 red | proposed `run_plan.json` → verdict approved \| revise \| escalate | opus |
 | `molecule-builder` | 🔵 blue | SMILES → `.data` file (EMC or RadonPy) | opus |
@@ -73,8 +74,22 @@ SETUP
     properties_requested = {"density", "tg", "bulk_modulus"}  # default: all three
     If task says "all" or field absent → use full set. Otherwise normalize to lowercase set.
     Write "Requested: {properties_requested}" to run_log.md metadata line.
+  GROUND (off-table / low-medium confidence ONLY — skip for confidence=high so the deterministic,
+  byte-identical plan path is untouched by web nondeterminism):
+    `CONF=$(jq -r '.classes.CLASS_ID.confidence // "offtable"' guides/polymer_rules.json)`
+    (CONF=offtable when the class key is absent; also treat a classify_polymer "unknown" as offtable.)
+    If CONF in {low, medium, offtable}:
+      Agent(subagent_type="literature-grounding-worker", description="⚪ Ground {polymer_name}",
+          prompt="polymer_name: <canonical name>\npolymer_class: <CLASS_ID or offtable>\n"
+                 "smiles: <SMILES>\nproperties_requested: <comma-joined>\nconfidence: <CONF>\n"
+                 "output_path: data/<RUN>/raw/literature_grounding.json")
+        → parse RESULT → GROUNDING_PATH (grounding_path field). It is advisory planning evidence —
+          DOI-verified; never used as run-summary grading bounds (exp-lookup owns those in Phase C).
+      Then pass `grounding_path: GROUNDING_PATH` as an extra line in the planner prompt below.
+    If CONF=high: skip this step; do NOT pass grounding_path.
   PLAN — Agent(subagent_type="planner", description="🟡 Plan {polymer_name}",
-      prompt="run_name: <RUN>\nsmiles: <SMILES>\npolymer_class: <CLASS_ID>\nproperties_requested: <comma-joined>\nwork_dir: data/<RUN>/lammps")
+      prompt="run_name: <RUN>\nsmiles: <SMILES>\npolymer_class: <CLASS_ID>\nproperties_requested: <comma-joined>\nwork_dir: data/<RUN>/lammps"
+             + (off-table/low-medium: "\ngrounding_path: GROUNDING_PATH"))
     → parse RESULT block → extract plan_path (PLAN_PATH), plan_mode, confidence, critique_status.
     Write D-00 (plan) pointer to run_log.md header: PLAN_PATH + plan_mode + confidence.
   CRITIC loop (max 2 rounds) — Agent(subagent_type="critic", description="🔴 Critique plan",
