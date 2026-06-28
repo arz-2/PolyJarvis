@@ -1,0 +1,107 @@
+{
+  "status": "success",
+  "overall_pass": true,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.1925,
+      "p_value": 0.0636
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.4559,
+      "p_value": 0.4705
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.1172
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.3054
+    },
+    "tau_eff_density_fraction": 0.0009756579086286312,
+    "meta": {
+      "n_total_rows": 2001,
+      "n_production_rows": 1001,
+      "T_mean": 300.15
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": true,
+      "cv": 0.1628,
+      "mean_Rg_A": 15.309,
+      "mean_Rg2_A2": 241.585,
+      "rg_spread_flag": false,
+      "C_inf": null,
+      "n_chains": 10,
+      "frames_analysed": 1951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 34.24,
+      "std_R_ee_A": 12.67,
+      "n_chains": 10,
+      "end_to_end_distribution_png": null
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.227,
+      "r2": 0.9994,
+      "gaussian_pass": false,
+      "n_separations": 79
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 902578.5,
+      "tau_ps": 333125.2,
+      "beta": 0.433,
+      "decay_fraction_at_end": 0.076,
+      "trajectory_ps": 1951.0,
+      "pass": true
+    },
+    "msd": {
+      "alpha": 0.245,
+      "alpha_r2": 0.9459,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 707.97,
+      "kinetic_trap_flag": false
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.0193,
+      "p2_std": 0.007,
+      "p2_max": 0.0513,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": true,
+      "cv_mean": 0.2095,
+      "cv_max": 0.2503,
+      "grid_n": 5,
+      "atoms_per_voxel": 32.2,
+      "poisson_cv": 0.176,
+      "poisson_limited": false,
+      "heterogeneous_flag": false
+    }
+  },
+  "warnings": [
+    "MSID slope = 1.227 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension",
+    "C(t) partially decayed: 8% decayed at end of trajectory (\u03c4_relax=902578.5 ps vs T_traj=1951.0 ps)"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.15 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-06-28 11:14\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.1925% (p=0.0636) | <1%, p<0.01 | PASS |\n| Energy drift | 0.4559% (p=0.4705) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.1172% | <1% | PASS |\n| Energy block-SEM | 0.3054% | <1% | PASS |\n| \u03c4_eff density | 0.1% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 16.3% | <30% | PASS |\n| MSID slope | 1.227 (R\u00b2=0.9994) | 1.0 \u00b120% | \u26a0 non-Gaussian |\n| C(t) \u03c4_relax | 902578.5 ps (8% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | no (\u03b1=0.245, MSD=707.97 \u00c5\u00b2>>Rg\u00b2=241.585) | \u2014 | OK |\n| R_ee mean \u00b1 std | 34.24 \u00b1 12.67 \u00c5 (N=10 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0193 \u00b1 0.007 | <0.10 | PASS |\n| Density homogeneity CV | 20.9% (5\u00b3 grid, 32.2 atoms/voxel) | <25% | PASS |\n\n**Warnings:** MSID slope = 1.227 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension; C(t) partially decayed: 8% decayed at end of trajectory (\u03c4_relax=902578.5 ps vs T_traj=1951.0 ps)",
+  "log_file": "/home/alexzhao/PolyJarvis/data/PROPSULFIDE_CURATED/lammps/equil/npt_prod300/npt_prod300.log",
+  "dump_file": "/home/alexzhao/PolyJarvis/data/PROPSULFIDE_CURATED/lammps/equil/npt_prod300/npt_prod300.dump",
+  "data_file": "/home/alexzhao/PolyJarvis/data/PROPSULFIDE_CURATED/lammps/equil/npt_prod300/npt_prod300_out.data",
+  "backbone_types": [
+    1,
+    2,
+    5,
+    6
+  ],
+  "timestamp": "2026-06-28 11:14"
+}
