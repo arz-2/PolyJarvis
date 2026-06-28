@@ -1,0 +1,47 @@
+{
+  "status": "success",
+  "n_points": 3,
+  "rates_K_per_ns": [
+    25.0,
+    50.0,
+    100.0
+  ],
+  "tg_values_K": [
+    558.9,
+    495.8,
+    562.6
+  ],
+  "rates_span_decades": 0.6020599913279624,
+  "loglinear_slope_K": 2.668985825644624,
+  "loglinear_intercept_K": 528.6588660489166,
+  "loglinear_r_squared": 0.002428010981916806,
+  "tg_at_slow_rate_K": 468.5666360218897,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": true,
+  "is_flat_rate_regime": false,
+  "regime": "glassy",
+  "rubbery_regime_exemption": false,
+  "tg_method": "loglinear_extrapolation",
+  "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
+  "tg0_K": 494.79999999999995,
+  "tg0_K_ci95": Infinity,
+  "vf_A": -84.98541249775593,
+  "vf_c": -6.0468435868021295,
+  "vf_B_ns_per_K": 0.0023653161512379377,
+  "vf_r_squared": 0.02674854075988864,
+  "vf_predicted_tg_K": [
+    524.8517614244788,
+    534.609159251715,
+    553.7491437171338
+  ],
+  "vf_residuals_K": [
+    34.04823857552117,
+    -38.809159251715016,
+    8.850856282866175
+  ],
+  "polymer_name": "PEEK4",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 25 K/ns | 558.9 K |\n| 50 K/ns | 495.8 K |\n| 100 K/ns | 562.6 K |\n\n**Log-linear**: Tg = 528.7 + 2.67\u00b7ln(\u0393)  R\u00b2=0.0024\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **468.6 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): Tg\u2070 = 494.8 \u00b1 inf K (95% CI)  R\u00b2=0.0267  quality=POOR_POORLY_CONSTRAINED\n\u26a0 CI > 100 K: VF extrapolation is underconstrained with < 2 decades of rates. Use log-linear result for validation.\n",
+  "d06_markdown_path": "/home/alexzhao/PolyJarvis/data/PEEK4/raw/d06_multirate_block.md",
+  "plot_path": "/home/alexzhao/PolyJarvis/data/PEEK4/raw/tg_multirate.png"
+}

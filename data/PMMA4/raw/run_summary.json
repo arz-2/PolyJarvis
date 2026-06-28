@@ -1,0 +1,102 @@
+{
+  "run": {
+    "name": "PMMA4",
+    "smiles": "*CC(C)(C(=O)OC)*",
+    "polymer_class": "PACR",
+    "ff": "PCFF",
+    "charge_method": "none",
+    "dp": 50,
+    "n_chains": 10,
+    "n_atoms": 7520,
+    "date_start": "2026-06-27",
+    "date_end": "2026-06-28"
+  },
+  "decisions": {
+    "D-01_ff": "PCFF",
+    "D-02_charges": "none",
+    "D-03_electrostatics": "pppm",
+    "D-04_system_size": "DP=50, 10 chains",
+    "D-05_convergence": "ACCEPT",
+    "D-06_tg_fit_quality": "EXCELLENT"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 408.6,
+      "grading_basis": "rate_extrapolated",
+      "md_offset_K": 0.0,
+      "exp_range_K": [
+        358.0,
+        398.0
+      ],
+      "error_pct": 2.7,
+      "status": "FAIL",
+      "r_squared": 0.06602845542553552,
+      "fit_quality": "EXCELLENT",
+      "primary_fit_invalid": false,
+      "tg_dsc_equiv_K": 408.6,
+      "loglinear_slope_K": -27.916149041201482,
+      "loglinear_r_squared": 0.06602845542553552,
+      "vf_fit_quality": "FAILED",
+      "n_rates": 3,
+      "n_replicates": 1,
+      "rates_span_decades": 0.6020599913279624,
+      "slow_rate_ref_K_per_ns": 1.6667e-10
+    },
+    "density": {
+      "value_g_cm3": 1.110852,
+      "exp_range_g_cm3": [
+        1.13,
+        1.25
+      ],
+      "error_pct": -1.7,
+      "status": "FAIL"
+    },
+    "bulk_modulus": {
+      "value_GPa": 4.4576,
+      "sem_GPa": 0.1367,
+      "exp_range_GPa": [
+        3.5,
+        4.2
+      ],
+      "error_pct": 6.1,
+      "status": "FAIL",
+      "method": "murnaghan"
+    }
+  },
+  "convergence": {
+    "verdict": "ACCEPT",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.0229
+  },
+  "structural_checks": {
+    "rg_cv": 0.1251,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": false,
+    "diffusion_regime": "sub-diffusive / kinetically trapped",
+    "ordered_flag": false,
+    "p2_mean": 0.0137,
+    "heterogeneous_flag": true,
+    "density_cv_mean": 0.283
+  },
+  "artifacts": {
+    "tg_multirate_result": "raw/tg_multirate_result.json",
+    "tg_multirate_d06": "raw/d06_multirate_block.md",
+    "tg_multirate_fig": "raw/tg_multirate.png",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "equilibration_comprehensive": "raw/equilibration_comprehensive.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+    "volume_timeseries": "raw/volume_timeseries.csv",
+    "volume_fig": "graphs/volume_fluctuations.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png",
+    "end_to_end_fig": "graphs/end_to_end_distribution.png"
+  },
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "3cb31d0",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-28T16:27:57.354204+00:00"
+  }
+}
