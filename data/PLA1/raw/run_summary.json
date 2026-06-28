@@ -1,0 +1,99 @@
+{
+    "run": {
+        "name": "PLA1",
+        "smiles": "*C(C)C(=O)O*",
+        "polymer_class": "PEST",
+        "ff": "pcff",
+        "charge_method": "",
+        "dp": null,
+        "n_chains": null,
+        "n_atoms": null,
+        "date_start": "",
+        "date_end": ""
+    },
+    "decisions": {
+        "D-01_ff": null,
+        "D-02_charges": null,
+        "D-03_electrostatics": null,
+        "D-04_system_size": null,
+        "D-05_convergence": "PASS",
+        "D-06_tg_fit_quality": "GOOD"
+    },
+    "plan": null,
+    "results": {
+        "tg": {
+            "value_K": 425.2,
+            "grading_basis": "raw_MD",
+            "md_offset_K": 100.0,
+            "exp_range_K": [
+                307.0,
+                347.0
+            ],
+            "error_pct": 0.0,
+            "status": "PASS",
+            "r_squared": 0.9819,
+            "fit_quality": "GOOD",
+            "tg_dsc_equiv_K": null,
+            "loglinear_slope_K": null,
+            "loglinear_r_squared": null,
+            "vf_fit_quality": null,
+            "n_rates": null,
+            "n_replicates": 1,
+            "rates_span_decades": null,
+            "slow_rate_ref_K_per_ns": null,
+            "cooling_rate_K_per_ns": 40,
+            "tg_note": "Directly-measured at slowest rate (40 K/ns, R\u00b2=0.982, GOOD). Multirate log-linear extrapolation rejected (slope-sign gate: Tg decreased with rate \u2192 fast rates under-equilibrated over 1.2-decade window). MD overestimate ~94 K; implied experimental Tg ~331 K (exp range 307\u2013347 K)."
+        },
+        "density": {
+            "value_g_cm3": 1.229136,
+            "exp_range_g_cm3": [
+                1.186,
+                1.31
+            ],
+            "error_pct": 0.0,
+            "status": "PASS"
+        },
+        "bulk_modulus": {
+            "value_GPa": 4.5765,
+            "sem_GPa": 0.0379,
+            "exp_range_GPa": [
+                3.0,
+                4.5
+            ],
+            "error_pct": 1.7,
+            "status": "WARNING",
+            "method": "murnaghan",
+            "bm_note": "4.58 GPa is 1.7% above exp upper bound 4.5 GPa, within 2-SEM. Fluctuation cross-check: 4.54 GPa (0.8% agreement). B0'=1.00 artifact of narrow \u00b11000 atm span; K value reliable. Recommend \u00b15000 atm on future PLA Murnaghan runs."
+        }
+    },
+    "convergence": {
+        "verdict": "PASS",
+        "density_equilibrated": null,
+        "energy_equilibrated": null,
+        "density_drift_pct": null
+    },
+    "structural_checks": {
+        "rg_cv": null,
+        "rg_spread_flag": null,
+        "kinetic_trap_flag": null,
+        "diffusion_regime": null,
+        "ordered_flag": null,
+        "p2_mean": null,
+        "heterogeneous_flag": null,
+        "density_cv_mean": null
+    },
+    "artifacts": {
+        "equilibrated_density": "raw/equilibrated_density.json",
+        "bulk_modulus": "raw/bulk_modulus.json",
+        "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+        "volume_timeseries": "raw/volume_timeseries.csv",
+        "volume_fig": "graphs/volume_fluctuations.png",
+        "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+    },
+    "provenance": {
+        "simulation_dir": "",
+        "git_commit": "5c5a38c",
+        "mdanalysis_version": "unknown",
+        "generated_at": "2026-06-22T05:08:44.534170+00:00"
+    }
+}

@@ -1,0 +1,47 @@
+{
+  "status": "success",
+  "n_points": 3,
+  "rates_K_per_ns": [
+    10.0,
+    25.0,
+    40.0
+  ],
+  "tg_values_K": [
+    213.0,
+    228.0,
+    235.0
+  ],
+  "rates_span_decades": 0.6020599913279624,
+  "loglinear_slope_K": 15.938301252382633,
+  "loglinear_intercept_K": 176.40094017148724,
+  "loglinear_r_squared": 0.9994631651230176,
+  "tg_at_slow_rate_K": 225.33333333333334,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": true,
+  "is_flat_rate_regime": true,
+  "regime": "rubbery",
+  "rubbery_regime_exemption": true,
+  "tg_method": "rubbery_flat_mean",
+  "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
+  "tg0_K": 1.0000000003607046,
+  "tg0_K_ci95": Infinity,
+  "vf_A": -3114.2818505255646,
+  "vf_c": -16.97595397571826,
+  "vf_B_ns_per_K": 4.240693292393378e-08,
+  "vf_r_squared": 0.9976490472507287,
+  "vf_predicted_tg_K": [
+    213.24041155248796,
+    227.37669252014052,
+    235.38431427976434
+  ],
+  "vf_residuals_K": [
+    -0.24041155248795576,
+    0.6233074798594771,
+    -0.3843142797643395
+  ],
+  "polymer_name": "PE4",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 10 K/ns | 213.0 K |\n| 25 K/ns | 228.0 K |\n| 40 K/ns | 235.0 K |\n\n**Log-linear**: Tg = 176.4 + 15.94\u00b7ln(\u0393)  R\u00b2=0.9995\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **225.3 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): Tg\u2070 = 1.0 \u00b1 inf K (95% CI)  R\u00b2=0.9976  quality=POOR_POORLY_CONSTRAINED\n\u26a0 CI > 100 K: VF extrapolation is underconstrained with < 2 decades of rates. Use log-linear result for validation.\n",
+  "d06_markdown_path": "/home/alexzhao/PolyJarvis/data/PE4/raw/d06_multirate_block.md",
+  "plot_path": "/home/alexzhao/PolyJarvis/data/PE4/raw/tg_multirate.png"
+}

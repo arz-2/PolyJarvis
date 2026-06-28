@@ -1,0 +1,297 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PEST (*C(C)C(=O)O*)",
+  "run_name": "PLA2",
+  "polymer_class": "PEST",
+  "smiles": "*C(C)C(=O)O*",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "high",
+  "plan_mode": "reasoned",
+  "recovery_plan": true,
+  "recovery_attempt": 1,
+  "recovery_reason": "Thermal track failed slope_gate on original plan: tg_rates_K_per_ns=[40,160,400] included r160 (125k steps < 200k floor) and r400 (50k steps contaminated). r400 gave Tg=281.1 K spurious -> slope b<0 -> slope_gate_pass=False. Registry rows discarded. Foundation (Phase A) is COMPLETE and not re-run.",
+  "assumptions": [
+    "polymer_rules.json defaults are validated for this class (confidence=high, PEST)",
+    "Foundation (build/equil/equil-check) is COMPLETE; cell at data/PLA2/lammps/equil/npt_prod300/npt_prod300_out.data",
+    "r40 sweep is COMPLETE and reusable: Tg=428.6 K, R2=0.9942, 500k steps/T (above 200k floor)",
+    "r160 sweep COMPLETE but EXCLUDED from new ladder: 125k steps/T < 200k floor per D-06 policy",
+    "r400 sweep DISCARDED: contaminated (50k steps/T, Tg=281.1 K, drift-excluded windows)"
+  ],
+  "uncertainties": [
+    {
+      "name": "slope_fragility",
+      "dominant": true,
+      "description": "Measured Tg(r40)=428.6 K, Tg(r160)=428.8 K — only 0.2 K over 4x rate span. Expected Tg(r100)~428.7 K gives b~0.1 K/decade. Statistical noise on r100 could push Tg(r100) <= Tg(r40), yielding b<=0 and a second slope_gate failure. No budget remains for a 3rd attempt if this occurs.",
+      "reduction_probe": "none"
+    },
+    {
+      "name": "ff_transferability",
+      "dominant": false,
+      "reduction_probe": "none"
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "pcff",
+    "preferred_builder": "emc",
+    "charge_method": "none",
+    "electrostatics": "pppm",
+    "cutoff_A": 12.0,
+    "dt_fs": 1.0,
+    "confidence": "high",
+    "dp_typical": 50,
+    "nchain": 10,
+    "density_initial_gcm3": 0.63,
+    "T_equil_K": 620.0,
+    "annealing_T_high_K": 700.0,
+    "eq_annealing_cycles": 5,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 5.0,
+    "tg_t_high_K": 600,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 500000,
+    "tg_rates_K_per_ns": [
+      40,
+      100
+    ],
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "K_strain_max": 0.03,
+    "ct_min_decay_melt": 0.15,
+    "T_workflow_K": 620.0,
+    "dsc_equiv_rate_K_per_ns": 1.6667e-10
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PLA PASS, PET PASS). PCFF has explicit ester types (c_1, o_2, oe). Klajmon2023 benchmarks PLA/PEG with AA-MD.",
+          "source_doi": "10.1021/acsapm.0c00524"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Afzal2021"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Webb2024"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Klajmon2023"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "none",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF uses bond-increment charges embedded in FF; no external QM charge assignment required for PEST class",
+          "source": "polymer_rules.json:classes.PEST.charge_method"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge"
+      ],
+      "evidence": [
+        {
+          "claim": "Ester linkage carries C=O dipole (~0.7 D); PPPM required for all polyesters per polymer_rules.json ester-polarity note",
+          "source": "polymer_rules.json:electrostatics_decision_guide"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=50, nchain=10",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "DP=50 above Fox-Flory plateau for PLA; 10 chains provides adequate statistics for Tg/K; cell complete and confirmed (density=1.2232 g/cm3 PASS)",
+          "source": "polymer_rules.json:classes.PEST.dp_typical"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-09_tg_rate_ladder",
+      "choice": "[40, 100] K/ns",
+      "criteria_evaluated": [
+        "tg_rates_clear_steps_floor",
+        "time_budget_constraint",
+        "slope_sign_robustness",
+        "reuse_of_completed_sweeps"
+      ],
+      "evidence": [
+        {
+          "claim": "r40 (40 K/ns): 500k steps/T >= 200k floor; COMPLETE; Tg=428.6 K, R2=0.9942; 0h cost to reuse.",
+          "source": "existing simulation data"
+        },
+        {
+          "claim": "r100 (100 K/ns): steps_per_T = 20/(100*1e-6) = 200k steps = exactly at floor; estimated ~5h on GPU3 at 1.05M steps/h; fits 9.5h remaining budget leaving ~4.5h for BM.",
+          "source": "budget_arithmetic: reference_speed=1.05M_steps/h, r100_total=5.2M_steps"
+        },
+        {
+          "claim": "r25 (25 K/ns, polymer_rules default): steps=800k/T, total=20.8M steps, ~20h — EXCEEDS 9.5h budget; infeasible.",
+          "source": "budget_arithmetic"
+        },
+        {
+          "claim": "r50 (50 K/ns, polymer_rules default): steps=400k/T, total=10.4M steps, ~10h — marginal; leaves <0h for BM run (~1-2h); infeasible given BM requirement.",
+          "source": "budget_arithmetic"
+        },
+        {
+          "claim": "r160 (160 K/ns): EXCLUDED. steps_per_T=125k < 200k floor per D-06 require clause. Sweep is physically clean (Tg=428.8 K, R2=0.988, no drift contamination) and consistent with r40, but policy prohibits below-floor rates in the official ladder. Noted as corroborating evidence only.",
+          "source": "decision_policy.json:policies.tg_protocol.require"
+        },
+        {
+          "claim": "r400 (400 K/ns): DISCARDED. steps_per_T=50k (far below floor); 13/38 drift-excluded windows; spurious Tg=281.1 K; caused slope_gate failure.",
+          "source": "existing simulation data — post-mortem"
+        },
+        {
+          "claim": "SLOPE FRAGILITY NOTE: measured Tg(r40)=428.6 K, Tg(r160)=428.8 K — delta=0.2 K over 4x rate change. Expected Tg(r100)~428.6-428.8 K; slope b=(Tg_r100 - Tg_r40)/ln(100/40)~0.1 K/decade. Statistical noise on a single r100 run could produce b<=0 -> slope_gate failure with no budget for retry. This is the dominant uncertainty.",
+          "source": "existing_simulation_data + analytical_extrapolation"
+        },
+        {
+          "claim": "2-rate fit [40,100] is the minimum multirate fit (n_rates_min=2 per planned_stages success_criteria); slope direction confirmed by corroborating [40,160] pair (b=+0.14 K/decade) even though r160 is excluded from the official ladder.",
+          "source": "existing_simulation_data"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "name": "[25, 50, 100]",
+          "reason_rejected": "r25 and r50 both exceed 9.5h budget; infeasible on current timeline"
+        },
+        {
+          "name": "[40, 50, 100]",
+          "reason_rejected": "r50 (~10h) + r100 (~5h) = 15h total new compute; exceeds budget"
+        },
+        {
+          "name": "[40, 160] using existing r160 data",
+          "reason_rejected": "r160 excluded by D-06 floor policy (125k steps < 200k minimum); cannot be in official ladder regardless of physical cleanliness"
+        }
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "status": "COMPLETE",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "status": "COMPLETE",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "status": "COMPLETE",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": null,
+        "tg_rates_K_per_ns": [40, 100],
+        "note": "r40 is REUSED from existing data; only r100 requires new simulation"
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "analyze-tg-multirate",
+      "track": "thermal",
+      "success_criteria": {
+        "loglinear_r_squared_min": 0.9,
+        "n_rates_min": 2
+      }
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "bulk_modulus_gpa_written": true
+      },
+      "fallback": "deform"
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 1,
+    "findings": [
+      "GATE: plan_mode=reasoned on PEST(confidence=high) is the SAFE direction — every decision gets full step-3 enforcement (not auto-approved). The gate only escalates the inverse (deterministic-on-non-high). Reasoned mode is justified here: the deterministic default [25,50,100] is infeasible in the 9.5h budget (r25~20h); the feasibility filter checks only the step-floor, not wall-clock, so a budget-forced deviation is exactly what reasoned mode is for.",
+      "D-09_tg_rate_ladder [40,100]: APPROVED. Floor math verified — r40=500k (clears 200k floor), r100=200k (=floor, '>=' satisfied), r160=125k (<floor, correctly excluded from official ladder). PEST tg_min_steps_per_T=200000 confirmed. [40,100] is the widest feasible span on the reused r40 anchor: cannot widen slower (no budget) nor faster (drops below floor).",
+      "D-09 slope_fragility (dominant uncertainty): proceed, do NOT escalate. Corroborating [40,160] pair gives b=+0.14 K/decade (>0), so physics expectation is b>0 though small. Escalate-now = guaranteed UNRESOLVED discarding complete foundation + complete r40; proceed-then-fail is no worse, proceed-then-succeed strictly better. No clear better option within budget.",
+      "D-06 tg_protocol require clauses satisfied: bilinear R^2 gate present (success_criteria bilinear_fit_r_squared_min=0.8, multirate loglinear>=0.9), T range 100-600K brackets exp Tg, every ladder rate clears the per-T floor.",
+      "D-07 property_method: no explicit decision entry, but BM path is policy-forced glassy-Murnaghan-300K (Tg=428.6>300 -> glassy) with deform fallback — matches require clause. murnaghan stage present with deform fallback. Not a finding (carried-over policy default, not a reasoned judgment call).",
+      "D-01_ff/D-04_system_size: alternatives:[] on evidence_required D-01. Advisory only, NOT a revise trigger — these are carried-over PEST high-confidence validated defaults (FF pcff with Klajmon2023/Afzal2021 DOI evidence; cell COMPLETE, density 1.2232 PASS). Bouncing to backfill boilerplate changes zero substance and costs a round-trip the recovery cannot afford.",
+      "Stage schema: all planned_stages have stage/track/success_criteria; tracks valid; stage->track pairings match track_map. D-08 hardware unpinned -> policy-derived (safe), no finding. reduction_probe='none' is the no-probe sentinel (both uncertainties), not a named probe -> not a finding."
+    ]
+  },
+  "provenance": {
+    "generator": "planner_agent_reasoned_recovery",
+    "generated_at": "2026-06-23T20:30:00+00:00",
+    "based_on": "data/PLA2/raw/run_plan.json (original deterministic plan 2026-06-22T16:06:23)"
+  }
+}

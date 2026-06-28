@@ -1,0 +1,355 @@
+{
+  "status": "success",
+  "log_file": "/home/alexzhao/PolyJarvis/data/PEG4/lammps/thermal/tg_sweep_r25/tg_step.log",
+  "output_dir": "/home/alexzhao/PolyJarvis/data/PEG4/raw/tg_r25",
+  "Tg_K": 236.7,
+  "Tg_alternative_K": 350.0,
+  "r_squared": 0.9995,
+  "fit_quality": "EXCELLENT",
+  "fit_method": "hyperbola_curvefit",
+  "transition_width_c_K": 145.2,
+  "tg_uncertainty_K": 23.9,
+  "binning_method": "plateau_detection",
+  "fit_params": {
+    "a_glassy": -9.291042698090542e-05,
+    "b_glassy": 1.158703472854043,
+    "a_rubbery": -0.0007442026231954941,
+    "b_rubbery": 1.3128462858855536
+  },
+  "n_temperature_bins": 18,
+  "n_plateau_bins": 18,
+  "n_plateaus_skipped_drift": 0,
+  "n_plateaus_low_n_eff": 0,
+  "temp_range_K": [
+    100.0,
+    440.0
+  ],
+  "bins_csv": "/home/alexzhao/PolyJarvis/data/PEG4/raw/tg_r25/tg_density_bins.csv",
+  "bins_csv_plateau": "/home/alexzhao/PolyJarvis/data/PEG4/raw/tg_r25/tg_density_bins_plateau.csv",
+  "equilibration_fraction": 0.5,
+  "temp_col": "Temp",
+  "density_col": "Density",
+  "slope_signs_valid": true,
+  "slope_ordering_valid": true,
+  "primary_fit_invalid": false,
+  "fit_swapped": false,
+  "fit_warnings": [],
+  "relaxation_metrics": [
+    {
+      "temperature": 440.0,
+      "n_eff": 51.94,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 15.78,
+      "tau_int_steps": 1.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 28.47,
+      "tau_int_steps": 3.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 12.43,
+      "tau_int_steps": 2.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 21.29,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 16.03,
+      "tau_int_steps": 2.3,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 24.61,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 20.51,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 13.11,
+      "tau_int_steps": 1.4,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 8.45,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 10.35,
+      "tau_int_steps": 2.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 48.17,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 45.47,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 440.0,
+      "n_eff": 11.46,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 420.0,
+      "n_eff": 168.59,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 420.0,
+      "n_eff": 9.41,
+      "tau_int_steps": 3.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 420.0,
+      "n_eff": 15.1,
+      "tau_int_steps": 3.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 420.0,
+      "n_eff": 30.96,
+      "tau_int_steps": 2.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 420.0,
+      "n_eff": 60.14,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 420.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 420.0,
+      "n_eff": 74.18,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 420.0,
+      "n_eff": 96.72,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 400.0,
+      "n_eff": 13.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 400.0,
+      "n_eff": 30.6,
+      "tau_int_steps": 3.4,
+      "relax_warning": false
+    },
+    {
+      "temperature": 400.0,
+      "n_eff": 8.64,
+      "tau_int_steps": 3.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 400.0,
+      "n_eff": 17.11,
+      "tau_int_steps": 6.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 400.0,
+      "n_eff": 19.46,
+      "tau_int_steps": 1.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 400.0,
+      "n_eff": 35.13,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 400.0,
+      "n_eff": 20.68,
+      "tau_int_steps": 3.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 400.0,
+      "n_eff": 52.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 400.0,
+      "n_eff": 11.14,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 380.0,
+      "n_eff": 38.98,
+      "tau_int_steps": 4.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 380.0,
+      "n_eff": 34.31,
+      "tau_int_steps": 3.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 380.0,
+      "n_eff": 21.39,
+      "tau_int_steps": 2.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 380.0,
+      "n_eff": 8.93,
+      "tau_int_steps": 2.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 380.0,
+      "n_eff": 23.82,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 360.0,
+      "n_eff": 12.75,
+      "tau_int_steps": 31.4,
+      "relax_warning": false
+    },
+    {
+      "temperature": 340.0,
+      "n_eff": 49.96,
+      "tau_int_steps": 8.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 320.0,
+      "n_eff": 17.74,
+      "tau_int_steps": 22.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 300.0,
+      "n_eff": 22.9,
+      "tau_int_steps": 17.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 280.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 260.0,
+      "n_eff": 44.39,
+      "tau_int_steps": 9.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 240.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 220.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 200.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 180.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 160.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 140.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 120.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 100.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    }
+  ],
+  "cte_glassy_per_K": 8.339e-05,
+  "cte_rubbery_per_K": 0.000720504,
+  "dCp_status": "skipped (mass parse failed: file not found: /home/alexzhao/PolyJarvis/data/PEG4/lammps/equilibration/npt_production_300K/npt_production.data)",
+  "Tg_dynamic_K": null,
+  "n_T_steps_p2_flag": null,
+  "n_T_steps_rg_cv_flag": null,
+  "structural_metrics_per_T": [],
+  "structural_analysis_status": "failed",
+  "structural_analysis_error": "MDAnalysis load failed: [Errno 2] No such file or directory: '/home/alexzhao/PolyJarvis/data/PEG4/lammps/equilibration/npt_production_300K/npt_production.data'",
+  "tg_fit_png": "/home/alexzhao/PolyJarvis/data/PEG4/graphs/tg_fit.png"
+}

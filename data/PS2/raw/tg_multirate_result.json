@@ -1,0 +1,27 @@
+{
+  "status": "success",
+  "n_points": 2,
+  "rates_K_per_ns": [
+    400.0,
+    160.0
+  ],
+  "tg_values_K": [
+    328.0,
+    436.9
+  ],
+  "rates_span_decades": 0.3979400086720376,
+  "loglinear_slope_K": -118.84874113837101,
+  "loglinear_intercept_K": 1040.078018998964,
+  "loglinear_r_squared": 1.0,
+  "tg_at_slow_rate_K": 436.9,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": false,
+  "is_flat_rate_regime": false,
+  "tg_method": "single_rate_fallback",
+  "vf_fit_quality": "SKIPPED (N < 3)",
+  "polymer_name": "PS2",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 160 K/ns | 436.9 K |\n| 400 K/ns | 328.0 K |\n\n**Log-linear**: Tg = 1040.1 + -118.85\u00b7ln(\u0393)  R\u00b2=1.0000\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **436.9 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): quality=SKIPPED (N < 3)\n",
+  "d06_markdown_path": "/home/alexzhao/PolyJarvis/data/PS2/raw/d06_multirate_block.md",
+  "plot_path": "/home/alexzhao/PolyJarvis/data/PS2/raw/tg_multirate.png"
+}

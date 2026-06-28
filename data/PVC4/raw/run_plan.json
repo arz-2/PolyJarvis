@@ -1,0 +1,373 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PVNL (*CC(Cl)*) — PVC",
+  "run_name": "PVC4",
+  "polymer_class": "PVNL",
+  "smiles": "*CC(Cl)*",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "medium",
+  "plan_mode": "reasoned",
+  "assumptions": [
+    "SMILES *CC(Cl)* is PVC specifically (the chloride PVNL member); exp targets: Tg 354 K, density 1.38 g/cm3, K_T 3.5-4.5 GPa.",
+    "PCFF Class II params (EMC-embedded charges) cover C/H/Cl for PVC — build-tested PASS in prior PVC2/PVC3 runs."
+  ],
+  "uncertainties": [
+    {
+      "name": "tg_rate_span_slope_gate",
+      "dominant": false,
+      "reduction_probe": "none",
+      "note": "DESCOPED by user 2026-06-25: thermal reduced to SINGLE rate 25 K/ns over full 150-550 K window. Multirate slope-gate / DSC-equivalent extrapolation NOT performed — single-rate MD Tg only (reads high vs exp; partially offsets PCFF underprediction). 6.25 (32h) dropped for budget; [25,100] would only span 0.6 dec so multirate is moot without 6.25."
+    },
+    {
+      "name": "ff_transferability",
+      "dominant": false,
+      "reduction_probe": "literature_anchor",
+      "note": "PCFF systematically underpredicts PVC Tg (~-12%, MD ~310 vs exp 354 K) and K (~-20%, ~2.8-2.9 vs exp 3.5-4.5 GPa) — consistent sign across PVC2/PVC3, a known FF limitation, not a fit artifact. Density is reliable (~-2.5%). An OPLS-AA cross-check would test it but OPLS-AA failed to build PVC; literature_anchor (Tait/PVT K_T) already bounds the exp target."
+    },
+    {
+      "name": "hardware_optimum",
+      "dominant": false,
+      "reduction_probe": "none",
+      "note": "by_forcefield.pcff default adopted (kokkos/mpi=1/1 GPU). Live host IS 4x NVIDIA A800 40GB (nvidia-smi confirmed) — the SAME host the directional_probe was measured_on (A800, 2026-06-21), so the 42.8 ns/day PCFF kokkos figure is host-matched. Cell ~3,600 atoms is within [0.5x,2x] of the 3,020-atom PCFF benchmark. hardware_benchmark probe dropped (no longer needed). Residual caveat: polymer_rules hardware_policy.values_are_benchmarked is still flagged false (the 2026-06-21 revalidation ran under CPU contention), but engine/config selection is host-matched and sound."
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "pcff",
+    "preferred_builder": "emc",
+    "charge_method": "none",
+    "electrostatics": "pppm",
+    "cutoff_A": 12,
+    "dt_fs": 1,
+    "confidence": "medium",
+    "dp_typical": 60,
+    "nchain": 10,
+    "density_initial_gcm3": 0.55,
+    "T_equil_K": 530,
+    "annealing_T_high_K": 610,
+    "eq_annealing_cycles": 7,
+    "P_equil_atm": 1,
+    "t_equil_ns": 8,
+    "tg_t_high_K": 550,
+    "tg_t_low_K": 150,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 500000,
+    "tg_rates_K_per_ns": [
+      25
+    ],
+    "K_deform_rate_inv_s": 100000000,
+    "K_deform_rate_slow_inv_s": 10000000,
+    "K_strain_max": 0.03,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "ct_min_decay_melt": 0.1,
+    "T_workflow_K": 530,
+    "dsc_equiv_rate_K_per_ns": 1.6667e-10
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "EMC/PCFF is the validated route for PVNL; build-tested PVC PASS, PVAc PASS, PVA PASS. OPLS-AA FAILED to build PVC and PVAc, PCFF succeeded — so OPLS-AA is not an available alternative for PVC.",
+          "source_doi": "10.1007/s10118-019-2249-5"
+        },
+        {
+          "claim": "PCFF Class II reproduces PVC density to ~-2.5% (PVC2 1.349, PVC3 1.344 vs exp 1.38) — FF is well-parameterized for the C/H/Cl backbone.",
+          "citation": "PVC2/PVC3 run evidence (Afzal2021, Li2019COMPASS)"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "ff": "opls-aa",
+          "rejected_because": "EMC build FAILED for PVC (and PVAc) on the OPLS-AA path; not a viable cross-check despite being the usual transferability probe."
+        },
+        {
+          "ff": "gaff2_mod",
+          "rejected_because": "retired RadonPy path; PCFF Class II gives better thermomechanical accuracy for polar vinyls."
+        }
+      ]
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "none",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF/EMC embeds bond-increment charges; PVC chloride partial charges are carried by the FF without a separate QM charge job. AM1-BCC was adequate on the retired RadonPy route (no aromatic conjugation, RESP not required).",
+          "source": "polymer_rules.json:classes.PVNL.notes"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": []
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PVC chloride gives significant partial charges on backbone carbons — PPPM required for proper long-range electrostatics. lj/cut is only for apolar UA classes (PHYC/PDIE).",
+          "source": "polymer_rules.json:classes.PVNL.notes"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=60, nchain=10",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "DP=60/10 chains reproduced PVC density to -2.5% and gave good per-rate Tg fits in PVC3 once cooling was slowed. ~3,600 all-atom atoms is affordable on 1 GPU.",
+          "citation": "PVC2/PVC3 run evidence"
+        },
+        {
+          "claim": "exp_tg for PVC is 354 K; sweep 250-450 K @ 20 K (narrowed from 150-550 in round 4 for budget) brackets it with margin. Glassy at 300 K (354 > 300) -> Murnaghan compression primary.",
+          "method": "polymer_rules exp target",
+          "value_K": 354
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": []
+    },
+    {
+      "id": "D-06_tg_ladder",
+      "choice": "[6.25, 25, 100] K/ns",
+      "criteria_evaluated": [
+        "steps_per_t_floor",
+        "rate_span_decades",
+        "dsc_extrapolation_quality",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "PVC3 [25,50,100] K/ns spanned only 0.6 decades -> multirate slope-gate FAILED (slope inverted -19 K, loglinear R2=0.38, VF failed), tg_method fell back to single_rate. PVC4 sets endpoints 6.25 and 100 K/ns: span = log10(100/6.25) = 1.204 decades (>= the 1.2-decade threshold to resolve the Tg-vs-ln(rate) slope against per-fit noise; slope-gate OK). n_rates = 3 >= success_criteria n_rates_min = 2.",
+          "citation": "PVC3 run evidence (pvc-pcff-tg-degenerate-underpredict memory)"
+        },
+        {
+          "claim": "Steps-per-T-hold hard floor is 200 ps (200000 steps at dt=1fs). At 20 K step: rate r K/ns gives N=20/(r*1e-6) steps. 100 K/ns = 200 ps (exactly at floor); 25 K/ns = 800 ps; 6.25 K/ns = 3200 ps -> all three rates clear the floor. The fast end is NOT widened: 200 K/ns = 100 ps would VIOLATE the floor and reproduce the retired-[40,160,400] degenerate c~0 fits.",
+          "method": "steps-per-T-hold arithmetic; N = dT / (rate * dt)",
+          "value": "200-3200 ps per hold; top rate 100 K/ns at the floor"
+        },
+        {
+          "claim": "Round-3 RESOURCE-BUDGET trim 5->3 rates. Cell built at 3620 atoms; measured A800 PCFF/kokkos throughput 48.5 ns/day (from completed equil logs, not the stale RTX-6000 benchmark). The 5-rate ladder over the full 150-550 K window (~130 ns) ~= 64 h on the single free GPU (GPU2; other A800s spoken for, sweeps sequential, no parallelism), exceeding the 48 h task budget. Dropping the two INTERIOR rates (12.5, 50) -> [6.25,25,100] ~= 88 ns ~= 44 h thermal + ~5 h mechanical ~= 49 h (tight, user-accepted). Removing interior points preserves the span and both endpoints, so the slope-gate span is unaffected; it costs fit DENSITY (3-point vs 5-point log-linear multirate fit). A 3-point fit is noisier, so loglinear_r_squared_min=0.90 may be harder to hit -- the accepted tradeoff. Full 150-550 K window retained (tg_t_low/high/step unchanged).",
+          "method": "runtime estimate at 48.5 ns/day, 1 GPU, sequential",
+          "value": "~88 ns ~= 49 h total vs 48 h budget"
+        },
+        {
+          "claim": "Round-4 WINDOW NARROW 150-550 -> 250-450 K (user decision, 2026-06-25). Total sweep time per rate = T_range / rate (independent of T_step), so the 6.25 K/ns sweep was 64 ns ~= 32 h over the 400 K window -> thermal ~43 h. Narrowing the window is the ONLY time lever that does NOT touch the rate ladder, so the slope-gate span (1.204 dec) and floor (200/800/3200 ps/hold) are UNAFFECTED -- window width does not enter the slope-gate. 250-450 K = 11 holds (was 21), cutting every sweep 2.0x -> thermal ~43 h -> ~23 h. The narrowed window still brackets the transition: it contains exp_tg 354 K AND the expected underpredicted PVC PCFF MD Tg ~310-330 K, with 4 glassy-side holds (250-310) and 7 rubbery-side holds (330-450) for the bilinear fit -> t_range_brackets_exp_tg stays satisfiable.",
+          "method": "sweep time = T_range / rate; bracket check",
+          "value": "250-450 K, 11 holds, 2.0x thermal time cut, ~23 h"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "ladder": "[6.25, 12.5, 25, 50, 100] K/ns",
+          "rejected_because": "round-2 approved 5-rate ladder; ~64 h on the single free A800 GPU exceeds the 48 h task budget. Trimmed to 3 interior-sparse rates [6.25,25,100] per user budget decision (round 3); span/endpoints preserved."
+        },
+        {
+          "ladder": "[12.5, 25, 50, 100, 200] K/ns",
+          "rejected_because": "200 K/ns = 100 ps/T-hold violates the 200 ps steps-per-T-hold hard floor (the round-1 critic finding). Must widen at the slow end, not the fast end."
+        },
+        {
+          "ladder": "[25, 50, 100] K/ns",
+          "rejected_because": "PVC3 default; 0.6-decade span failed the slope-gate and fell back to single_rate. PVC4 explicitly targets the slope-gate fix the memory prescribes."
+        }
+      ]
+    },
+    {
+      "id": "D-07_mechanical_regime",
+      "choice": "glassy (Murnaghan NPT compression at 300 K, primary)",
+      "criteria_evaluated": [
+        "phase_glassy_vs_rubbery",
+        "method_physics_validity",
+        "gpu_vs_cpu",
+        "rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "PVC is glassy at 300 K (exp Tg 354 > 300; is_glassy from measured Tg>300K, else glassy_hint). Murnaghan NPT compression is the validated glassy primary (Wu 2019 Comput. Mater. Sci.; symmetric, cell-size independent; Born+NVT removed for PCFF+PPPM virial incompatibility). Compression-biased pressures [-1000,0,1500,3000,5000] atm avoid tension cavitation and gave B0'=9.5 (R2=0.999), K=2.80 GPa, B_dyn=2.93 GPa (4.6% agreement) in the PVC3 revision.",
+          "citation": "polymer_rules.json:classes.PVNL.bm_pressures_note; pvc-murnaghan-tension-cavitation memory"
+        },
+        {
+          "claim": "gpu_vs_cpu: Murnaghan reuses the GPU pcff kokkos engine (D-08), no CPU path. rate_artifact: Murnaghan is a quasi-static EOS (no strain rate) so the deform-rate artifact that biases uniaxial K does not apply; deform (K_deform_rate 1e8/1e7 s^-1) is fallback only.",
+          "source": "polymer_rules.json:property_method policy require[]"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "method": "deform uniaxial",
+          "rejected_because": "fallback only; DP=60 below entanglement Me -> deform underestimates K by 30-50%. Murnaghan is less size-sensitive."
+        }
+      ]
+    },
+    {
+      "id": "D-08_hardware",
+      "choice": {
+        "engine": "kokkos",
+        "gpu_per_run": 1,
+        "mpi": 1
+      },
+      "criteria_evaluated": [
+        "ff_family",
+        "cell_size_atoms",
+        "benchmark_validity",
+        "host_match",
+        "concurrency"
+      ],
+      "evidence": [
+        {
+          "claim": "FF family pcff. Cell ~= dp60 x nchain10 x 6 all-atom atoms/monomer (C2H3Cl) ~= 3,600 atoms < 10k -> 1 GPU. Within [0.5x,2x] of the 3,020-atom PCFF benchmark cell, so by_forcefield.pcff default (kokkos, mpi=1, gpu_per_run=1) adopted.",
+          "method": "atoms = dp_typical x nchain x atoms_per_monomer"
+        },
+        {
+          "claim": "Host-matched: live host is 4x NVIDIA A800 40GB (nvidia-smi confirmed) — the SAME host the directional_probe was measured_on (A800, 2026-06-21). PCFF kokkos full-offload recommended_by_ff = 42.8 ns/day at gpu1_mpi1, parity PASS, on this exact host. mpi=1 canonical for class2/kk (kspace on GPU). Cell ~3,600 atoms within [0.5x,2x] of the 3,020-atom benchmark cell, so the recommended config transfers directly.",
+          "source": "polymer_rules.json:hardware_policy.directional_probe.recommended_by_ff.pcff (2026-06-21); nvidia-smi"
+        },
+        {
+          "claim": "Residual caveat: hardware_policy.values_are_benchmarked is still flagged false (the 2026-06-21 revalidation ran under CPU contention, suppressing absolute ns/day uniformly). Engine/config SELECTION is host-matched and parity-validated; only the absolute throughput number carries the contention caveat. No re-benchmark needed for config choice.",
+          "source": "polymer_rules.json:hardware_policy.directional_probe.calibration_note"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "config": "engine=gpu, mpi=4 (GPU package)",
+          "rejected_because": "fallback; KOKKOS full-offload is ~7.9x faster on PCFF and mpi=1 frees cores for concurrent runs."
+        }
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": true
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "analyze-tg-multirate",
+      "track": "thermal",
+      "success_criteria": {
+        "loglinear_r_squared_min": 0.9,
+        "n_rates_min": 2
+      }
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "fallback": "deform"
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 5,
+    "findings": [
+      "approved (round 4): the ONLY change since round-3 approval is the Tg WINDOW NARROW tg_t_high_K 550->450, tg_t_low_K 150->250 (tg_t_step_K=20 and rates [6.25,25,100] UNCHANGED). Re-verified all three gate invariants independently: (1) slope-gate UNAFFECTED — span log10(100/6.25)=1.2041 dec >= 1.2, and recomputed N=dT/(rate*dt*1e-6) for EVERY rate at dT=20K dt=1fs = 3200/800/200 ps per hold, all >= 200 ps floor (top rate 100 K/ns sits exactly at the floor, PASS >=); both depend on rates only, not window width. (2) n_rates=3 >= analyze-tg-multirate.n_rates_min=2. (3) D-01..D-08 unchanged from round-3 approved state; D-08 carries no hardware override in decided_params (policy-derived kokkos/mpi=1/1GPU == by_forcefield.pcff default), host-matched A800 — no finding.",
+      "Bracket (tg_protocol t_range_brackets_experimental_tg): narrowed 250-450 K window contains exp_tg 354 K with 96 K margin on both sides AND the expected underpredicted PVC PCFF MD Tg ~310-330 K. Recomputed holds at dT=20K: 11 total (250-450), 4 glassy-side (250-310) + 7 rubbery-side (330-450) -> enough holds each side of the transition for the bilinear fit. t_range_brackets_exp_tg stays satisfiable.",
+      "Advisory (not a defect): 250 K low-end is the tight side. Expected MD Tg ~310-330 leaves only 4 glassy holds; if the slowest-rate MD Tg dips below ~270 K (PVC3 showed a -19 K inverted-slope artifact at the fast end), the glassy branch could be under-sampled and the per-rate bilinear fit noisier on that branch. 4 holds is the bilinear minimum, not comfortable margin. Accepted under the user-approved 48 h budget; watch glassy-branch R^2 in the per-rate fits.",
+      "Advisory carried from round 3 (not a defect): 3-point log-linear multirate fit is sparser than the round-2 5-point ladder, so loglinear_r_squared_min=0.90 may be harder to hit; span/endpoints unaffected, R^2 risk is on fit density only."
+    ],
+    "round4_window_narrow": [
+      "D-06_tg_ladder / D-04: post-approval WINDOW NARROW 150-550 -> 250-450 K (user decision, 2026-06-25); tg_t_step_K=20 and rates [6.25,25,100] UNCHANGED. Driver: 6.25 K/ns sweep = T_range/rate = 400K/6.25 = 64 ns ~= 32 h -> thermal ~43 h > 48 h budget. Total sweep time scales with T_range only (not T_step), so narrowing the window is the time lever that preserves the rate ladder and thus the slope-gate. 250-450 K = 11 holds (was 21) -> 2.0x cut, thermal ~43 h -> ~23 h. Slope-gate UNAFFECTED: span 1.204 dec and floor (200/800/3200 ps/hold) depend on rates, not window width. Bracket preserved: 250-450 contains exp_tg 354 + expected underpredicted MD Tg ~310-330 (4 glassy-side + 7 rubbery-side holds for the bilinear fit) -> t_range_brackets_exp_tg stays satisfiable. Status reset proposed -> re-critique the narrowed window. No other decision changed."
+    ],
+    "round3_approved": [
+      "approved (round 3): user-approved budget trim of D-06_tg_ladder [6.25,12.5,25,50,100]->[6.25,25,100] is the only change since round-2 approval. Independently recomputed steps-per-T floor for all 3 rates at dt=1fs, dT=20K: N=dT/(rate*1e-6) = 3200000/800000/200000 steps = 3200/800/200 ps/hold, all >= 200ps (200000 steps) floor; top rate 100 K/ns sits exactly at the floor (PASS, >=). Span log10(100/6.25)=1.204 >= 1.2-decade slope-gate threshold; both endpoints preserved. n_rates=3 >= success_criteria.analyze-tg-multirate.n_rates_min=2.",
+      "Advisory (not a defect): dropping the two interior rates yields a sparser 3-point log-linear multirate fit, so loglinear_r_squared_min=0.90 may be harder to hit. Planner logged this as the accepted budget tradeoff. Span/endpoints are unaffected by interior thinning so the slope-gate is preserved; the R^2 risk is on fit density only.",
+      "D-08 hardware unchanged from round-2 approval: kokkos/mpi=1/1GPU == by_forcefield.pcff default == recommended_by_ff.pcff; host-matched A800 (directional_probe.measured_on); mpi=1 correct for PCFF/KOKKOS. No hw override in decided_params."
+    ],
+    "round3_budget_trim": [
+      "D-06_tg_ladder: post-approval RESOURCE-BUDGET trim 5->3 rates [6.25,12.5,25,50,100] -> [6.25,25,100], dropping the two INTERIOR rates (12.5, 50). Driver: cell=3620 atoms, measured 48.5 ns/day A800 PCFF/kokkos (from completed equil logs, not the stale RTX-6000 benchmark), single free GPU (GPU2; other A800s spoken for; sweeps sequential, no parallelism) -> 5-rate full-window ~130 ns ~= 64 h > 48 h task budget; 3-rate ~88 ns ~= 44 h thermal + ~5 h mechanical ~= 49 h (tight, user-accepted). Span 1.204 dec and both endpoints PRESERVED (slope-gate OK); floor OK (3200/800/200 ps/hold, top rate at floor); n_rates=3 >= n_rates_min=2. Full 150-550 K window unchanged (tg_t_low/high/step retained). Tradeoff: sparser 3-point log-linear multirate fit (noisier; loglinear_r_squared_min=0.90 may be harder to hit). Status reset proposed->re-critique the trimmed ladder. No other decision changed; D-08 already host-matched A800 kokkos/mpi=1/1GPU."
+    ],
+    "round2_approved": [
+      "approved (round 2): round-1 D-06 floor violation resolved. Independently recomputed N=tg_t_step/(rate*dt*1e-6) for all 5 rates of [6.25,12.5,25,50,100] K/ns -> 3200/1600/800/400/200 ps/hold, all >= 200 ps floor; top rate 100 K/ns sits exactly at the floor. Span log10(100/6.25)=1.20 decades clears the slope-gate threshold. D-08 pin kokkos/mpi=1/1GPU == by_forcefield.pcff default == recommended_by_ff.pcff (configs coincide); decided_params carries no hw override (policy-derived, safe); live host nvidia-smi-confirmed 4x A800 matching directional_probe.measured_on. mpi=1 correct for PCFF on KOKKOS (not the stale GPU-package anti-pattern). Advisory only: hardware_policy.host is stale (lists Quadro RTX 6000, actual A800) and values_are_benchmarked=false — bookkeeping lag in polymer_rules, not a plan defect; config selection is the policy default so require[5] does not bite."
+    ],
+    "round1_resolved": [
+      "D-06_tg_ladder: tg ladder changed [12.5,25,50,100,200] -> [6.25,12.5,25,50,100]. Top rate anchored at 100 K/ns = 200 ps/T-hold (exactly at the 200 ps hard floor); span widened at the SLOW end to 6.25 K/ns (3200 ps/hold) -> log10(100/6.25)=1.20 decades. Evidence arithmetic corrected.",
+      "D-02_charges: added 'charge_method_cost' to criteria_evaluated.",
+      "D-03_electrostatics: added 'computational_cost' to criteria_evaluated.",
+      "D-07_mechanical_regime: criteria_evaluated realigned to the property_method policy list (phase_glassy_vs_rubbery, method_physics_validity, gpu_vs_cpu, rate_artifact); added evidence covering gpu_vs_cpu and rate_artifact.",
+      "D-08_hardware: host-fact corrected — live host IS A800 (nvidia-smi), the SAME host the directional_probe was measured_on, so the 42.8 ns/day PCFF kokkos figure is host-matched. Confidence raised low->medium; hardware_benchmark probe dropped from the hardware_optimum uncertainty (reduction_probe=none); values_are_benchmarked=false caveat noted separately."
+    ],
+    "user_overrides": [
+      "r5 2026-06-25: user descoped thermal to single-rate 25 K/ns over full 150-550 K window (orchestrator-applied per explicit directive; slope-gate objective dropped). Window reverted 250-450->150-550; rates [6.25,25,100]->[25]."
+    ]
+  },
+  "provenance": {
+    "generator": "make_deterministic_plan.py + planner reasoned revision",
+    "generated_at": "2026-06-24T23:17:30.245346+00:00"
+  }
+}

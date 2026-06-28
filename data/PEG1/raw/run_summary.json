@@ -1,0 +1,186 @@
+{
+  "run": {
+    "name": "PEG1",
+    "smiles": "*CCO*",
+    "polymer_class": "POXI",
+    "ff": "pcff",
+    "charge_method": "AM1-BCC",
+    "dp": 100,
+    "n_chains": 10,
+    "n_atoms": 7020,
+    "date_start": "2026-06-20",
+    "date_end": "2026-06-21"
+  },
+  "decisions": {
+    "D-01_ff": "PCFF (Class II, via EMC)",
+    "D-02_charges": "AM1-BCC",
+    "D-03_electrostatics": "PPPM (cutoff 12 \u00c5)",
+    "D-04_system_size": "DP=100, 10 chains",
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "EXCELLENT"
+  },
+  "plan": {
+    "plan_mode": "deterministic",
+    "confidence": "high",
+    "critique": {
+      "status": "approved",
+      "rounds": 0,
+      "findings": [
+        "deterministic plan: defaults transcribed verbatim; auto-approved by confidence gate"
+      ]
+    },
+    "uncertainties": [
+      {
+        "name": "ff_transferability",
+        "dominant": false,
+        "reduction_probe": "none"
+      }
+    ],
+    "decisions": {
+      "D-01_ff": {
+        "id": "D-01_ff",
+        "choice": "pcff",
+        "criteria_evaluated": [
+          "literature_support",
+          "parameter_coverage",
+          "validation_data",
+          "computational_cost"
+        ],
+        "evidence": [
+          {
+            "claim": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested 2026-05-31: PEO PASS). PCFF Class II outperforms GAFF2 for thermomechanical properties (NkepsuMbitou2025). EMC recommended.",
+            "source_doi": "10.1021/acsapm.0c00524"
+          },
+          {
+            "claim": "supporting validation",
+            "citation": "Webb2024"
+          },
+          {
+            "claim": "supporting validation",
+            "citation": "Hayashi2022"
+          },
+          {
+            "claim": "supporting validation",
+            "citation": "Wu2011"
+          },
+          {
+            "claim": "supporting validation",
+            "citation": "Klajmon2023"
+          }
+        ],
+        "confidence": "high",
+        "alternatives": []
+      },
+      "D-02_charges": {
+        "id": "D-02_charges",
+        "choice": "AM1-BCC",
+        "criteria_evaluated": [
+          "backbone_polarity",
+          "ff_embedded_vs_qm"
+        ],
+        "evidence": [],
+        "confidence": "high",
+        "alternatives": []
+      },
+      "D-03_electrostatics": {
+        "id": "D-03_electrostatics",
+        "choice": "pppm",
+        "criteria_evaluated": [
+          "backbone_heteroatoms",
+          "max_partial_charge"
+        ],
+        "evidence": [
+          {
+            "claim": "see electrostatics_decision_guide",
+            "source": "polymer_rules.json:electrostatics_decision_guide"
+          }
+        ],
+        "confidence": "high",
+        "alternatives": []
+      },
+      "D-04_system_size": {
+        "id": "D-04_system_size",
+        "choice": "DP=100, nchain=10",
+        "criteria_evaluated": [
+          "property_target",
+          "finite_size_effects",
+          "gpu_budget"
+        ],
+        "evidence": [],
+        "confidence": "high",
+        "alternatives": []
+      }
+    }
+  },
+  "results": {
+    "tg": {
+      "value_K": 207.39166666666665,
+      "exp_range_K": [
+        186.0,
+        226.0
+      ],
+      "error_pct": 0.7,
+      "status": "PASS",
+      "r_squared": 0.9996346524814403,
+      "fit_quality": "EXCELLENT",
+      "tg_dsc_equiv_K": 207.39166666666665,
+      "loglinear_slope_K": 5.446173779355835,
+      "loglinear_r_squared": 0.9996346524814403,
+      "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
+      "n_rates": 3,
+      "n_replicates": 1,
+      "rates_span_decades": 1.2041199826559248,
+      "slow_rate_ref_K_per_ns": 5.0
+    },
+    "density": {
+      "value_g_cm3": 1.057698,
+      "exp_range_g_cm3": [
+        1.007,
+        1.113
+      ],
+      "error_pct": 0.2,
+      "status": "PASS"
+    },
+    "bulk_modulus": {
+      "value_GPa": 3.1397,
+      "sem_GPa": 0.1155,
+      "exp_range_GPa": null,
+      "error_pct": null,
+      "status": "no exp ref",
+      "method": "fluctuation"
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.3844
+  },
+  "structural_checks": {
+    "rg_cv": 0.2161,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": true,
+    "diffusion_regime": "sub-diffusive / kinetically trapped",
+    "ordered_flag": false,
+    "p2_mean": 0.0,
+    "heterogeneous_flag": false,
+    "density_cv_mean": 0.2198
+  },
+  "artifacts": {
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "tg_multirate_result": "raw/tg_multirate_result.json",
+    "tg_multirate_d06": "raw/d06_multirate_block.md",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "equilibration_comprehensive": "raw/equilibration_comprehensive.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "volume_timeseries": "raw/volume_timeseries.csv",
+    "volume_fig": "graphs/volume_fluctuations.png",
+    "run_plan": "raw/run_plan.json"
+  },
+  "provenance": {
+    "simulation_dir": "/home/alexzhao/PolyJarvis/data/PEG1/lammps",
+    "git_commit": "76899f2",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-21T17:19:43.070452+00:00"
+  }
+}

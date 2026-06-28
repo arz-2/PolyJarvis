@@ -1,0 +1,98 @@
+{
+  "run": {
+    "name": "PMMA3",
+    "smiles": "*CC(C)(C(=O)OC)*",
+    "polymer_class": "PACR",
+    "ff": "PCFF",
+    "charge_method": "none",
+    "dp": 50,
+    "n_chains": 10,
+    "n_atoms": 7520,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": "PCFF",
+    "D-02_charges": "none",
+    "D-03_electrostatics": "pppm",
+    "D-04_system_size": "DP=50, 10 chains, 7520 atoms",
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "EXCELLENT"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 379.0,
+      "grading_basis": "raw_MD",
+      "md_offset_K": 100.0,
+      "exp_range_K": [
+        378.1,
+        380.1
+      ],
+      "error_pct": 0.0,
+      "status": "PASS",
+      "r_squared": 0.9976,
+      "fit_quality": "EXCELLENT",
+      "primary_fit_invalid": false,
+      "tg_dsc_equiv_K": null,
+      "loglinear_slope_K": null,
+      "loglinear_r_squared": null,
+      "vf_fit_quality": null,
+      "n_rates": null,
+      "n_replicates": 1,
+      "rates_span_decades": null,
+      "slow_rate_ref_K_per_ns": null
+    },
+    "density": {
+      "value_g_cm3": 1.116631,
+      "exp_range_g_cm3": [
+        1.17,
+        1.188
+      ],
+      "error_pct": -4.6,
+      "status": "FAIL"
+    },
+    "bulk_modulus": {
+      "value_GPa": 5.0048,
+      "sem_GPa": 0.0726,
+      "exp_range_GPa": [
+        3.5,
+        4.2
+      ],
+      "error_pct": 19.2,
+      "status": "FAIL",
+      "method": "murnaghan"
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.143
+  },
+  "structural_checks": {
+    "rg_cv": 0.1923,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": false,
+    "diffusion_regime": "sub-diffusive / kinetically trapped",
+    "ordered_flag": false,
+    "p2_mean": 0.0163,
+    "heterogeneous_flag": true,
+    "density_cv_mean": 0.2875
+  },
+  "artifacts": {
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "equilibration_comprehensive": "raw/equilibration_comprehensive.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+    "volume_timeseries": "raw/volume_timeseries.csv",
+    "volume_fig": "graphs/volume_fluctuations.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "provenance": {
+    "simulation_dir": "/home/arz2/PolyJarvis/data/PMMA3/lammps/",
+    "git_commit": "7ad8428",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-26T11:13:12.208025+00:00"
+  }
+}

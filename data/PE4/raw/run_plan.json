@@ -1,0 +1,224 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PHYC (*CC*)",
+  "run_name": "PE4",
+  "polymer_class": "PHYC",
+  "smiles": "*CC*",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "high",
+  "plan_mode": "deterministic",
+  "assumptions": [
+    "polymer_rules.json defaults are validated for this class (confidence-gated)"
+  ],
+  "uncertainties": [
+    {
+      "name": "ff_transferability",
+      "dominant": false,
+      "reduction_probe": "none"
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "trappe-ua",
+    "preferred_builder": "emc",
+    "charge_method": "none",
+    "electrostatics": "lj_cut",
+    "cutoff_A": 14.0,
+    "dt_fs": 2.0,
+    "confidence": "high",
+    "dp_typical": 120,
+    "nchain": 20,
+    "density_initial_gcm3": 0.65,
+    "T_equil_K": 550.0,
+    "annealing_T_high_K": 620.0,
+    "eq_annealing_cycles": 5,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 5.0,
+    "npt_prod_ns": 5.0,
+    "melt_npt_ns": 1.0,
+    "tg_t_high_K": 450,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 250000,
+    "tg_rates_K_per_ns": [
+      10,
+      25,
+      40
+    ],
+    "tg_min_steps_per_T": 250000,
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_strain_max": 0.03,
+    "bm_pressures_atm": [
+      1,
+      500,
+      1000,
+      2000,
+      5000
+    ],
+    "ct_min_decay_melt": 0.25,
+    "T_workflow_K": 300.0,
+    "dsc_equiv_rate_K_per_ns": 1.6667e-10
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "trappe-ua",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "Ramos 2015: TraPPE-UA PE Tg=187K vs exp 185-195K, density \u00b17%. Branched types (PP, PIB): UA types exist but no polymer-Tg validation \u2014 use with medium confidence.",
+          "source_doi": "10.1021/acs.macromol.5b00823"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "PE_RSC2016"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Srivastava2026"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Afzal2021"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Martin1998"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Ramos2015"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Boyer1973"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "none",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "lj_cut",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge"
+      ],
+      "evidence": [
+        {
+          "claim": "see electrostatics_decision_guide",
+          "source": "polymer_rules.json:electrostatics_decision_guide"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=120, nchain=20",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [],
+      "confidence": "high",
+      "alternatives": []
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": null
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "analyze-tg-multirate",
+      "track": "thermal",
+      "success_criteria": {
+        "loglinear_r_squared_min": 0.9,
+        "n_rates_min": 2
+      }
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "chain_submitted": true
+      }
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 1,
+    "findings": [
+      "deterministic plan on PHYC (confidence=high): gate verified independently, defaults transcribed verbatim, hardware unpinned (policy-derived/safe); auto-approved"
+    ]
+  },
+  "provenance": {
+    "generator": "make_deterministic_plan.py",
+    "generated_at": "2026-06-26T02:42:51.644039+00:00"
+  }
+}

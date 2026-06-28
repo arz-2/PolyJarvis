@@ -1,0 +1,36 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/PolyJarvis/data/PVC1/lammps/mechanical/deform/05_deform.log",
+  "output_dir": "/home/arz2/PolyJarvis/data/PVC1/raw",
+  "method": "uniaxial_deformation",
+  "C11_GPa": 1.9008,
+  "C12_GPa": 1.572,
+  "C12_yy_GPa": 1.3814,
+  "C12_zz_GPa": 1.7626,
+  "K_GPa": 1.6816,
+  "G_GPa": 0.1644,
+  "E_GPa": 0.4776,
+  "nu_Poisson": 0.4527,
+  "fit_r2_C11": 0.9816,
+  "fit_r2_C12_yy": 0.9794,
+  "fit_r2_C12_zz": 0.9659,
+  "fit_p_C11": 0.0,
+  "fit_p_C12_yy": 0.0,
+  "isotropy_delta_pct": 24.24,
+  "n_fit_points": 2801,
+  "strain_range": [
+    0.002,
+    0.03
+  ],
+  "T_mean_K": 300.12,
+  "strain_rate_per_fs": 1e-07,
+  "avg_window_frames": 2000,
+  "stress_strain_csv": "/home/arz2/PolyJarvis/data/PVC1/raw/stress_strain.csv",
+  "diagnostics": {
+    "n_phase1_rows": 2000,
+    "n_phase2_rows": 3002,
+    "step_0": 200000,
+    "strain_max_reached": 0.03
+  },
+  "warning_anisotropy": "C12_yy=1.381 and C12_zz=1.763 GPa disagree by 24.2% \u2014 system may not be isotropic. Run more chains or longer equilibration."
+}

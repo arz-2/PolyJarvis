@@ -1,0 +1,153 @@
+npt_prod_log_path: /home/arz2/PolyJarvis/data/cis-PBD4/lammps/equil/npt_production/npt_production.log
+melt_dump_path:    /home/arz2/PolyJarvis/data/cis-PBD4/lammps/equil/nvt_production/nvt_production.dump
+npt_prod_temp_K:   300.0   # target_temp= for extract_equilibrated_density
+equil_data_path:   /home/arz2/PolyJarvis/data/cis-PBD4/lammps/equil/npt_production/npt_production_out.data
+run_name:          cis-PBD4
+polymer_class:     PDIE
+backbone_types:    <FILL from inspect_data_file>
+ct_min_decay_melt: 0.25   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
+is_glassy:         false   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
+regime:            rubbery   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<2% AND density-homogeneity CV<25% AND energy drift/SEM; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
+dp:                100   # DP≥30 required for require_glassy carve-out to apply. NOTE: a class with ct_gate_reliable=false (aromatic main chain) already has ct_min_decay=null above, so its melt-diffusion C(t) gate is suppressed INDEPENDENT of DP — a DP<30 aromatic cell still passes equil on the structural gates (density/SEM/CV/P2/Rg). The DP≥30 clause only bites classes that would otherwise arm ct_min_decay.
+exp_density_range: [0.855, 0.945]
+output_dir:        /home/arz2/PolyJarvis/data/cis-PBD4/raw/
+graphs_dir:        /home/arz2/PolyJarvis/data/cis-PBD4/graphs/
+tasks:
+  - check_equilibration_comprehensive
+  - extract_equilibrated_density
+
+### D-05 REQUIREMENT (PEEK2 I-04): paste result["d05_markdown"] (also written to
+### /home/arz2/PolyJarvis/data/cis-PBD4/raw/d05_block.md) VERBATIM into the run_log.md D-05 CONVERGENCE DETAIL section.
+### It contains the real Rg/MSD/density/C(t)/R_ee values. Leaving any [X ± Y] / [X]% /
+### [PASS / FAIL] placeholder in run_log.md is a FAILURE of this equil-check step — the tool
+### already fills every field, so there is no reason to leave a placeholder.
+
+--- Worker Guide (EQUIL_CHECK) ---
+# Equilibration Check Guide
+**Read when:** You are `equilibration-checker` and need to validate the equil chain and extract density.
+**Scope:** Equilibration quality check + density extraction only.
+
+---
+
+## Rule: Always Pass `output_dir` and `graphs_dir`
+
+Default `output_dir` scatters files into subdirectories next to the input log. Always pass both:
+
+```python
+output_dir = "data/<run_name>/raw/"
+graphs_dir = "data/<run_name>/graphs/"
+```
+
+Tools that produce PNG figures (always pass `graphs_dir`):
+- `check_equilibration_comprehensive` → `equilibration_convergence.png`
+- `extract_equilibrated_density` → density plateau PNG
+
+---
+
+## Tool: `check_equilibration_comprehensive`
+
+Returns `overall_pass` verdict and a ready-to-paste D-05 markdown block. Copy `result["d05_markdown"]` directly into run_log.md as the D-05 CONVERGENCE DETAIL section.
+
+`backbone_types` is **REQUIRED** — from `inspect_data_file()`; do not guess. Read the **Masses** section, not Pair Coeffs: pick heavy backbone atoms (C≈12, O≈16, N≈14), never hydrogens (mass 1.008). E.g. PEEK = `[1,2,5]` (aromatic C + ether O); `[3,4]` are H → degenerate R_ee/P2.
+
+**Thermo and structural checks read different files — this is deliberate.** The tool decouples Section A (thermo, from `log_file`) from Sections B/C (chain conformation + spatial, from `dump_file`):
+- `log_file` = `npt_prod_log_path` — the production NPT log (`npt_prod300` glassy / `npt_production` rubbery), where density/energy convergence is meaningful.
+- `dump_file` = `melt_dump_path` — the **melt** `nvt_production.dump` (T_workflow, chains mobile), where C(t)/MSD/Rg/R_ee actually report chain relaxation. Do **not** point this at the production NPT dump: for a glassy polymer the production state is below Tg, so C(t) never decays and MSD shows a kinetic trap *by construction* — the structural check would be meaningless. `gen_prompt.py` already resolves all three paths; use them verbatim, do not construct them.
+
+**`ct_min_decay_melt` may be `null`.** When the prompt gives a number, pass it as `ct_min_decay` (C(t) becomes a hard gate). When it is `null` (aromatic main-chain classes — PSU/PEEK/PC/Kapton/PPS/PPV — where the backbone path cannot be defined by atom-type selection, so C(t)/C∞ are meaningless), **omit `ct_min_decay` entirely**: C(t)/C∞ are then reported as advisory warnings and never block `overall_pass`. This is the property-aware default that prevents the spurious aromatic-backbone FAIL; do not hand-override it back on.
+
+**Call signature:**
+```python
+kwargs = dict(
+    log_file=npt_prod_log_path,   # npt_prod300.log (glassy) or npt_production.log (rubbery)
+                                  # → thermo convergence: density/energy drift + block-SEM
+    dump_file=melt_dump_path,     # nvt_production.dump — always the MELT dump, both phases
+                                  # → structural checks: C(t)/MSD/Rg/R_ee on MOBILE chains
+                                  # Do NOT use npt_prod300.dump — chains are frozen below Tg
+    data_file=equil_data_path,
+    backbone_types=backbone_types,
+    output_dir=output_dir,
+    graphs_dir=graphs_dir,
+)
+if ct_min_decay_melt is not None:        # null ⇒ aromatic main chain: leave C(t) advisory
+    kwargs["ct_min_decay"] = ct_min_decay_melt
+check_equilibration_comprehensive(**kwargs)
+```
+
+**Key result fields:**
+- `overall_pass` — True/False gate
+- `d05_markdown` — ready-to-paste run_log.md block
+- `density_converged`, `energy_converged`, `ct_decayed`
+- `warnings` — list of soft warnings (non-fatal)
+
+**C(t) and R_ee numeric fields** (extract from result dict — all from a single `check_equilibration_comprehensive` call):
+- `result["chain"]["ct"]["decay_fraction_at_end"]`  → `ct_decay_fraction` (0.0–1.0)
+- `result["chain"]["ct"]["tau_relax_ps"]`            → `ct_tau_relax_ps` (KWW chain relaxation time in ps)
+- `result["chain"]["ree"]["mean_R_ee_A"]`            → `end_to_end_r_mean_A`
+- `result["chain"]["ree"]["std_R_ee_A"]`             → `end_to_end_r_std_A`
+- `result["chain"]["ree"]["n_chains"]`               → `end_to_end_n_chains`
+- Histogram PNG auto-saved to `graphs_dir/end_to_end_distribution.png`
+- C(t)/MSD/R_ee are computed on the melt dump in both phases, so `ct_decay_fraction` and `ct_tau_relax_ps` are always populated (no N/A rubbery branch)
+
+For PHYC class (PE): `ct_decayed=True` plus `tau_relax_ps` is the chain relaxation evidence R1M10 requires. Include both in the RESULT block even for passes.
+
+---
+
+## Tool: `extract_equilibrated_density`
+
+**Call signature:**
+```python
+extract_equilibrated_density(
+    log_file=npt_prod_log_path,
+    output_dir=output_dir,
+    graphs_dir=graphs_dir,
+    eq_fraction=0.5,                 # discard first 50% as burn-in (default)
+    target_temp=npt_prod_temp_K,     # production temperature from prompt — filter to those rows if log is multi-T
+)
+```
+
+**Result fields:**
+- `plateau_density_mean`, `plateau_density_std` — primary output
+- `plateau_step_range` — verify plateau starts after compression ramp ends
+- `naive_mean`, `naive_std` — compare to plateau for sanity
+
+Density passes if `plateau_density_mean` is within ±5% of experimental; flag if outside ±10%.
+
+---
+
+## Common Failures
+
+**`check_equilibration_comprehensive` returns `overall_pass=False`:**
+- Convergence failure (density drift, energy not plateaued) → return `EXTEND`
+- Hard structural failure (box collapse, charge imbalance, or C(t)=0% / **fully flat** — a dead/frozen cell with no relaxation at all) → return `FAIL`. NOTE: this is distinct from a rubbery cell with INCOMPLETE terminal relaxation (partial C(t) decay), which under `regime: rubbery` (require_rubbery) is ADVISORY, not a FAIL — see "Common Failures" below. C(t) exactly 0% = no dynamics (genuine failure); C(t) decaying but not to completion = reptation-limited (carve-out applies).
+
+**`extract_equilibrated_density` returns implausibly low density (<0.5 g/cm³):**
+The NPT production log may contain the compression ramp rather than the production plateau. Verify `plateau_step_range` starts after the ramp ends. Increase `eq_fraction` to 0.7.
+
+**`overall_pass=False` on a glassy DP≥30 system blocked SOLELY by melt chain-self-diffusion (C(t) decay, MSD, MSID slope, Rg chain-chain CV):** This is NOT a FAIL. Rigid-aromatic (PKTN/PEEK) and high-DP glassy melts have τ_relax ~10⁹ ps — terminal relaxation is unreachable in MD and a 1–2 ns EXTEND cannot move C(t). Per `decision_policy.json:require_glassy`, gate on the STRUCTURAL set only (density plateau in range, density-homogeneity CV<0.25, P2<0.10, thermo drift/SEM); the four chain-diffusion metrics are ADVISORY (non-blocking). Do not loop EXTEND. Flag the dynamic-relaxation lower-bound caveat (Tg over-estimate, K low) in the run summary.
+
+**`overall_pass=False` on a `regime: rubbery` system (prompt line `regime: rubbery`, e.g. PHYC/PDIE/POXI — PE/PP/PIB/PBD/PI/PEG produced above Tg) blocked by chain-reptation metrics:** This is NOT a FAIL and NOT an EXTEND. A rubbery melt at finite DP is reptation-limited — full C(t) decay, MSD diffusivity, τ_relax, MSID slope, and Rg chain-chain CV are unreachable, and EXTEND cannot fix them. Per `decision_policy.json:require_rubbery`, the verdict gates ONLY on **density block-SEM < 2% AND density-homogeneity CV < 25% AND energy drift/SEM within bounds**; the reptation metrics are ADVISORY (logged, non-blocking). If those density/energy criteria pass, return `PASS` even with `overall_pass=False`. Do not loop EXTEND on reptation metrics. (Mirrors the glassy carve-out above; the difference is rubbery has `is_glassy=False`, so `require_glassy` does not apply — `regime: rubbery` is the trigger.)
+
+**Marginal density-homogeneity CV in band [24.5%, 25.5%] on a small DP<30 aromatic cell:** a Poisson-limited geometric fluctuation (few atoms/voxel), not underpacking. Route **EXTEND** (1–2 ns NPT), not FAIL, when density-plateau SEM<0.5% and drift p significant; FAIL only if SEM>1% or drift p>0.05. Report `grid_n` + atoms/voxel for context (e.g. "8³, 21 atoms/voxel"). A co-marginal **Rg chain-chain CV (e.g. 36.5% > 30%)** on the same small cell is the same finite-size noise across few chains (N=8) — treat it as marginal→EXTEND alongside the density CV, never a standalone FAIL (PSU3 DP=25, 2026-06-25).
+
+**`check_equilibration_comprehensive` does not return on a large dump (>~1 GB / >1000 frames):** the MCP call can hang in trajectory I/O (PSU3 1.5 GB / 1951-frame dump timed out >30 min). Do NOT block the verdict on it: rely on `extract_equilibrated_density` (the load-bearing gate for small aromatic glassy cells) plus the most recent *pre-extension* comprehensive result. If density SEM/drift pass and the prior comprehensive gates (P2/energy) held, return that verdict — the structural metrics cannot have moved over a 2 ns 300 K extension of an already-equilibrated cell.
+
+---
+
+## Backlog (unconfirmed — needs a 2nd run before acting)
+
+- **Glassy 300 K energy-drift worsens on EXTEND (physical aging):** PVC4 (PVNL DP=60) energy drift went 5.55%→9.56% across a 2 ns extension while density was rock-solid (drift 0.11%, block-SEM 0.0012%). Hypothesis: sub-Tg physical aging means 2 ns windows are too short for glassy thermo statistics; looping EXTEND on energy alone never converges. *This contradicts `decision_policy.json:require_glassy`, which lists thermo drift/SEM in the hard structural set — so do NOT loosen it on n=1.* If a 2nd run confirms, the scoped change is loop-*termination* only (after max EXTEND, energy-only failure + solid density/P2 → PASS-with-caveat, don't FAIL/loop), edited in `decision_policy.json`, not slipped into a guide note.
+- **C∞ inflation from `n_backbone_bonds` miscount:** PVC4 reported C∞ 8.81→2.91 between checks with `n_backbone_bonds=179` for DP=60 (expected ~59). Suspected the tool counts all inter-atomic separations, not just backbone single bonds. This is a *count* mechanism, distinct from the existing backbone-type *selection* note (read Masses, exclude H). Confirm on a 2nd cell before opening a code fix; C∞ is advisory for glassy aromatics regardless.
+
+--- Cross-Track Rules ---
+## Cross-Track Rules (Always Active — Memorize These)
+
+These rules are inlined into every worker prompt by `gen_prompt.py`. They apply regardless of which worker or track is running.
+
+0. **GPU is used for ALL simulation runs** — always pass explicit `gpu_ids` and `mpi`; never leave them unset or default
+1. **Fill `run_log.md` in real time** — log each DECISION row when made, each RECOVERY block immediately after resolving an error; do not reconstruct at the end
+2. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, and SEED_COLD in the run_log header. For replication studies, use fixed seeds from `guides/REVISION_PARAMS.md`. For exploratory runs, read seeds back from job output and log them immediately after submission.
+3. **Check for existing writers before killing any process** — before killing and relaunching any LAMMPS run, run `lsof | grep <log_filename>` to check for existing writers. If another writer is present (concurrent orchestrator session), do NOT launch — coordinate via user first. A double-launch corrupts the shared log and requires a full restart from step 0.
+4. **Log the exact GPU claim label** — after any GPU claim (`pick_gpu.py claim --run <LABEL>`), copy the `run` field from the JSON response into the SIMULATION STATE table. Use that exact string verbatim at release (`pick_gpu.py release --run <LABEL>`). A label mismatch at release silently leaves the GPU stuck as claimed.
+5. **Log repo-relative run paths in memory** — when recording run artifacts or paths in any `.claude/agent-memory/**` file, write them repo-relative (`data/<run>/...`), never machine-absolute (`/home/<user>/...`). Keeps captures portable across the revision machines so integration needs no path sanitization. The memory file ITSELF must live only in the repo-root `.claude/agent-memory/<worker>/` dir (the absolute path in your agent definition) — never a `.claude/` created under a work_dir or data/<run>/ subdir.
+

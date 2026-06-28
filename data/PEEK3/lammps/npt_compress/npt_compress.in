@@ -1,0 +1,84 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - NPT Compression Template
+# ============================================================
+# Stage: High-pressure NPT compression (density packing step)
+# Purpose: Compress low-density amorphous cell to target density
+#          before switching to full PPPM electrostatics.
+#
+# Design choice: Uses lj/charmm/coul/charmm (short-range Coulomb, no PPPM)
+# to avoid PPPM instability at low density while preserving short-range
+# electrostatics for polar/charged systems (PEG, PMMA, etc.).
+# Switch to lj/charmm/coul/long + pppm AFTER reaching ~0.8 g/cm3.
+#
+# Tunable parameters:
+#   DATA_FILE        - input .data file
+#   READ_COMMAND     - "read_data" or "read_restart"
+#   LOG_FILE, LOG_APPEND
+#   DUMP_FILE, LAST_DUMP_FILE, WRITE_DATA_FILE
+#   RESTART_BLOCK, RESTART_FILE_1/2, RESTART_FREQ
+#   PAIR_STYLE_BLOCK - pair style lines (injected by generator based on use_pppm)
+#                      Default (use_pppm=False): lj/charmm/coul/charmm 8.0 12.0
+#                      Override (use_pppm=True):  lj/charmm/coul/long 8.0 12.0 + pppm
+#   BOND_STYLE, ANGLE_STYLE, DIHEDRAL_STYLE, IMPROPER_STYLE
+#   GPU_PACKAGE
+#   T_START, T_FINAL - temperature ramp during compression
+#   T_DAMP
+#   P_START, P_FINAL - pressure ramp (e.g. 1 -> 50000 atm)
+#   P_DAMP
+#   TIMESTEP, N_STEPS
+#   THERMO_FREQ, DUMP_FREQ
+#   SHAKE_BLOCK, UNSHAKE_BLOCK
+#   INIT_VELOCITY_BLOCK
+# ============================================================
+
+log npt_compress.log 
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field (injected via PAIR_STYLE_BLOCK) ---
+pair_style lj/class2/coul/cut 9.5 9.5
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+# KOKKOS: package loaded via -pk kokkos on the command line
+
+read_data /home/arz2/PolyJarvis/data/PEEK3/lammps/nvt_softheat/nvt_softheat_out.data
+include /home/arz2/PolyJarvis/data/PEEK3/lammps/cell/emc_build.params
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo 1000
+
+# --- Trajectory ---
+dump dump_comp all custom 2000 npt_compress.dump id type mol x y z ix iy iz vx vy vz
+
+restart 10000 compress_1.rst compress_2.rst
+velocity all create 600.0 939288 mom yes rot yes dist gaussian
+# SHAKE disabled
+
+# --- NPT Compression ---
+# High pressure compresses the cell from low to target density
+# P ramp: 1.0 -> 50000.0 atm
+timestep 0.5
+fix npt_comp all npt temp 850.0 850.0 100.0 iso 1.0 50000.0 1000.0
+
+run 500000
+
+unfix npt_comp
+
+undump dump_comp
+
+write_dump all custom npt_compress_last.dump id type mol x y z xu yu zu vx vy vz modify sort id
+write_data /home/arz2/PolyJarvis/data/PEEK3/lammps/npt_compress/npt_compress_out.data
+
+print "STAGE COMPLETE: NPT compression P=1.0->50000.0atm density target reached"
+quit

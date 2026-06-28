@@ -1,0 +1,54 @@
+# ============================================================
+# PolyJarvis - NPT prod300 RESUME deck (disk-full recovery, PLA4)
+# Identical to npt_prod300.in but with the per-step trajectory dump
+# removed: the original died at step 1.23M/2M on ENOSPC writing the
+# 400MB npt_prod300.dump, which is not needed downstream (equil-check
+# reads density from the log + structure from nvt_production.dump; the
+# mechanical track reads npt_prod300_out.data). Disk <60GB -> dump
+# disabled per retention policy. write_data output is unchanged.
+# ============================================================
+
+log npt_prod300.log
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+# KOKKOS: package loaded via -pk kokkos on the command line
+
+read_data /home/arz2/PolyJarvis/data/PLA4/lammps/equil/npt_cool300/npt_cool300_out.data
+include /home/arz2/PolyJarvis/data/PLA4/lammps/equil/emc_build.params
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo 1000
+
+# --- Trajectory: DISABLED (disk-full recovery; dump not needed downstream) ---
+
+# --- NPT Thermostat + Barostat (Nose-Hoover) ---
+timestep 1.0
+fix npt_fix all npt temp 300.0 300.0 100.0 iso 1.0 1.0 1000.0
+
+run 2000000
+
+# --- Cleanup ---
+unfix npt_fix
+
+# --- Write Output ---
+write_data /home/arz2/PolyJarvis/data/PLA4/lammps/equil/npt_prod300/npt_prod300_out.data
+
+print "STAGE COMPLETE: NPT T=300.0->300.0K P=1.0->1.0atm steps=2000000"
+quit

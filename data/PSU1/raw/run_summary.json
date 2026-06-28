@@ -1,0 +1,93 @@
+{
+  "run": {
+    "name": "PSU1",
+    "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+    "polymer_class": "PSFO",
+    "ff": "PCFF",
+    "charge_method": "PCFF bond-increment (EMC-embedded)",
+    "dp": 20,
+    "n_chains": 8,
+    "n_atoms": 8656,
+    "date_start": "2026-06-18",
+    "date_end": "2026-06-21"
+  },
+  "decisions": {
+    "D-01_ff": null,
+    "D-02_charges": null,
+    "D-03_electrostatics": null,
+    "D-04_system_size": null,
+    "D-05_convergence": null,
+    "D-06_tg_fit_quality": null
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 499.7,
+      "exp_range_K": [
+        439.0,
+        479.0
+      ],
+      "error_pct": 4.3,
+      "status": "FAIL",
+      "r_squared": 0.9965,
+      "fit_quality": "EXCELLENT",
+      "tg_dsc_equiv_K": null,
+      "loglinear_slope_K": null,
+      "loglinear_r_squared": null,
+      "vf_fit_quality": null,
+      "n_rates": null,
+      "n_replicates": null,
+      "rates_span_decades": null,
+      "slow_rate_ref_K_per_ns": null
+    },
+    "density": {
+      "value_g_cm3": 1.187057,
+      "exp_range_g_cm3": [
+        1.172,
+        1.296
+      ],
+      "error_pct": 0.0,
+      "status": "PASS"
+    },
+    "bulk_modulus": {
+      "value_GPa": 4.4268,
+      "sem_GPa": 0.0598,
+      "exp_range_GPa": [
+        3.0,
+        5.3
+      ],
+      "error_pct": 0.0,
+      "status": "PASS",
+      "method": "murnaghan"
+    }
+  },
+  "convergence": {
+    "verdict": null,
+    "density_equilibrated": null,
+    "energy_equilibrated": null,
+    "density_drift_pct": null
+  },
+  "structural_checks": {
+    "rg_cv": null,
+    "rg_spread_flag": null,
+    "kinetic_trap_flag": null,
+    "diffusion_regime": null,
+    "ordered_flag": null,
+    "p2_mean": null,
+    "heterogeneous_flag": null,
+    "density_cv_mean": null
+  },
+  "artifacts": {
+    "tg_summary": "raw/tg_summary.json",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png",
+    "end_to_end_fig": "graphs/end_to_end_distribution.png"
+  },
+  "provenance": {
+    "simulation_dir": "/home/arz2/PolyJarvis/data/PSU1/lammps",
+    "git_commit": "c22864b",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-22T02:24:52.554781+00:00"
+  }
+}

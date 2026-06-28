@@ -1,0 +1,35 @@
+run_name:          cis-PBD4
+polymer_class:     PDIE
+smiles:            *C/C=C\C*
+ff:                TraPPE-UA
+charge_method:     none
+dp:                100
+n_chains:          20
+n_atoms:           null
+date_start:        null
+date_end:          null
+d01_ff:            TraPPE-UA
+d02_charges:       none
+d03_electrostatics: lj_cut
+d04_system_size:   DP=100, 20 chains
+d05_verdict:       PASS
+d06_tg_fit_quality: EXCELLENT
+run_plan:          /home/arz2/PolyJarvis/data/cis-PBD4/raw/run_plan.json   # always pass to generate_run_summary --run_plan (skip if file absent)
+exp_tg_range:      [167.0, 178.0]
+exp_density_range: [0.869, 0.961]
+exp_K_range:       [1.38, 1.95]
+n_replicates:      3   # distinct replicates in the multi-rate Tg registry; pass to generate_run_summary --n_replicates
+tg_path:           data/cis-PBD4/raw/tg_r10/tg_summary.json   # explicit canonical tg_summary.json path (slowest-rate folder (slope_gate=True or N/A)); pass to generate_run_summary --tg_path
+slope_gate_pass:   True   # False → single-rate fallback Tg; pass --tg_k with the fallback value
+output_dir:        /home/arz2/PolyJarvis/data/cis-PBD4/raw/
+graphs_dir:        /home/arz2/PolyJarvis/data/cis-PBD4/graphs/
+
+Forward every field above to generate_run_summary as its matching --flag (dp→--dp,
+n_chains→--n_chains, n_atoms→--n_atoms, charge_method→--charge_method, date_start→--date_start,
+date_end→--date_end, d01_ff→--d01, …, d05_verdict→--d05, d06_tg_fit_quality→--d06,
+run_plan→--run_plan). Skip any field whose value is `null`.
+
+# generate_run_summary returns {"status":"submitted","run_id":...} but it completes IN-PROCESS in
+# seconds — do NOT poll with get_run_status (you have no such tool). After the call, Read
+# /home/arz2/PolyJarvis/data/cis-PBD4/raw/run_summary.json directly and parse it.
+

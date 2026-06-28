@@ -1,0 +1,106 @@
+{
+  "status": "success",
+  "overall_pass": false,
+  "thermo": {
+    "equilibrated": false,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.9393,
+      "p_value": 0.0
+    },
+    "energy_drift": {
+      "pass": false,
+      "drift_pct": 9.5613,
+      "p_value": 0.0
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.1098
+    },
+    "energy_sem": {
+      "pass": false,
+      "sem_pct": 1.0155
+    },
+    "tau_eff_density_fraction": 0.0018392936894333623,
+    "meta": {
+      "n_total_rows": 2001,
+      "n_production_rows": 1001,
+      "T_mean": 300.0
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": true,
+      "cv": 0.1812,
+      "mean_Rg_A": 14.089,
+      "mean_Rg2_A2": 205.553,
+      "rg_spread_flag": false,
+      "C_inf": 2.905,
+      "n_chains": 10,
+      "frames_analysed": 951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 28.76,
+      "std_R_ee_A": 11.99,
+      "n_chains": 10,
+      "end_to_end_distribution_png": "/home/alexzhao/PolyJarvis/data/PVC4/graphs/end_to_end_distribution.png"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.209,
+      "r2": 0.9689,
+      "gaussian_pass": false,
+      "n_separations": 59
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 14387.5,
+      "tau_ps": 9309.9,
+      "beta": 0.588,
+      "decay_fraction_at_end": 0.158,
+      "trajectory_ps": 951.0,
+      "pass": true
+    },
+    "msd": {
+      "alpha": 0.264,
+      "alpha_r2": 0.9913,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 563.96,
+      "kinetic_trap_flag": false
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.0271,
+      "p2_std": 0.008,
+      "p2_max": 0.0547,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": true,
+      "cv_mean": 0.1846,
+      "cv_max": 0.2282,
+      "grid_n": 5,
+      "atoms_per_voxel": 29.0,
+      "poisson_cv": 0.186,
+      "poisson_limited": false,
+      "heterogeneous_flag": false
+    }
+  },
+  "warnings": [
+    "C\u221e = 2.905 is outside broad expected range [3, 15] \u2014 verify backbone_types and n_backbone_bonds",
+    "MSID slope = 1.209 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension",
+    "C(t) partially decayed: 16% decayed at end of trajectory (\u03c4_relax=14387.5 ps vs T_traj=951.0 ps)"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.0 K \u00b7 951 frames analysed (skip=50) \u00b7 2026-06-24 23:44\n\n**Overall: FAIL**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.9393% (p=0.0) | <1%, p<0.01 | PASS |\n| Energy drift | 9.5613% (p=0.0) | <1%, p<0.01 | FAIL |\n| Density block-SEM | 0.1098% | <1% | PASS |\n| Energy block-SEM | 1.0155% | <1% | FAIL |\n| \u03c4_eff density | 0.2% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 18.1% | <30% | PASS |\n| C\u221e | 2.905 | lit. varies | INFO |\n| MSID slope | 1.209 (R\u00b2=0.9689) | 1.0 \u00b120% | \u26a0 non-Gaussian |\n| C(t) \u03c4_relax | 14387.5 ps (16% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | no (\u03b1=0.264, MSD=563.96 \u00c5\u00b2>>Rg\u00b2=205.553) | \u2014 | OK |\n| R_ee mean \u00b1 std | 28.76 \u00b1 11.99 \u00c5 (N=10 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0271 \u00b1 0.008 | <0.10 | PASS |\n| Density homogeneity CV | 18.5% (5\u00b3 grid, 29.0 atoms/voxel) | <25% | PASS |\n\n**Warnings:** C\u221e = 2.905 is outside broad expected range [3, 15] \u2014 verify backbone_types and n_backbone_bonds; MSID slope = 1.209 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension; C(t) partially decayed: 16% decayed at end of trajectory (\u03c4_relax=14387.5 ps vs T_traj=951.0 ps)",
+  "log_file": "/home/alexzhao/PolyJarvis/data/PVC4/lammps/equil/npt_extend/npt_extend.log",
+  "dump_file": "/home/alexzhao/PolyJarvis/data/PVC4/lammps/equil/nvt_production/nvt_production.dump",
+  "data_file": "/home/alexzhao/PolyJarvis/data/PVC4/lammps/equil/npt_extend/npt_extend_out.data",
+  "backbone_types": [
+    1,
+    2
+  ],
+  "timestamp": "2026-06-24 23:44"
+}

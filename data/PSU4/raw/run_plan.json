@@ -1,0 +1,355 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PSFO/PSU (*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1)",
+  "run_name": "PSU4",
+  "polymer_class": "PSFO",
+  "polymer_member": "PSU (Udel, bisphenol-A polysulfone)",
+  "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "medium",
+  "plan_mode": "reasoned",
+  "assumptions": [
+    "SMILES resolves to PSU (Udel): isopropylidene bridge C(C)(C) between aryl ether and aryl sulfone => bisphenol-A polysulfone. exp Tg=463 K, RT density ~1.24-1.25 g/cm3, K_T 4.0-5.5 GPa.",
+    "PSFO is a multi-member class (exp Tg dict {PSU:463, PES:493, PPSU:493}); member disambiguated by SMILES, not by class median.",
+    "PCFF Class II covers aryl-SO2-aryl + aryl ether torsions by analogy (no class-specific PCFF MD Tg/density validation paper for polysulfones); MD Tg expected ~540-580 K (overprediction) so sweep tops at 750 K.",
+    "Glassy regime (exp Tg 463 >> 300 K): mechanical track = Murnaghan NPT compression at 300 K primary, 3-direction deform fallback; Born+NVT removed (PCFF+PPPM virial inflation).",
+    "DP=25, nchain=8 ~ 1 M_e for PSU (MW~11,050): adequate for Tg, short of entanglement plateau for K -> flag K offset."
+  ],
+  "uncertainties": [
+    {
+      "name": "ff_transferability",
+      "dominant": true,
+      "reduction_probe": "literature_anchor",
+      "note": "No class-specific PCFF MD Tg/density validation paper for polysulfones. PCFF Class II covers aryl-SO2-aryl + aryl ether by analogy (PC Tg 417 vs exp 422 K). Expect MD Tg overprediction ~540-580 K and density ~-4% vs exp (PSU1+PSU2 confirmed systematic PCFF bias). Bulk modulus K is the headline PASS for this class."
+    },
+    {
+      "name": "hardware_optimum",
+      "dominant": false,
+      "reduction_probe": "hardware_benchmark",
+      "note": "hardware_policy.values_are_benchmarked=false; directional_probe.measured_on (A800 40GB / 32 cores) does not match live host (RTX 6000 24GB / 18 cores), and the ~11,400-atom cell is ~3.8x the 3020-atom pcff benchmark cell (outside [0.5x,2x]). Keeping the by_forcefield.pcff default (kokkos/mpi=1/1 GPU); probe is PLANNED only, not executed."
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "pcff",
+    "preferred_builder": "emc",
+    "charge_method": "none",
+    "electrostatics": "pppm",
+    "cutoff_A": 12.0,
+    "dt_fs": 1.0,
+    "confidence": "medium",
+    "dp_typical": 25,
+    "nchain": 8,
+    "density_initial_gcm3": 0.62,
+    "T_equil_K": 700.0,
+    "annealing_T_high_K": 780.0,
+    "eq_annealing_cycles": 8,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 15.0,
+    "tg_t_high_K": 750,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 2000000,
+    "tg_rates_K_per_ns": [
+      25,
+      50,
+      100
+    ],
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "K_strain_max": 0.03,
+    "ct_min_decay_melt": 0.1,
+    "experimental_tg_K": 463,
+    "T_workflow_K": 700.0,
+    "dsc_equiv_rate_K_per_ns": 1.6667e-10
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF (Class II) via EMC. Sun1994 (CFF93/PCFF) is the FF origin; PCFF Class II cross terms cover aryl-SO2-aryl sulfone and aryl ether torsions by analogy. No class-specific PCFF MD Tg/density validation paper for polysulfones yet (ROADMAP Track G).",
+          "source_doi": "10.1021/ja00086a030"
+        },
+        {
+          "claim": "PCFF supporting validation for polar aromatic backbones",
+          "citation": "Hayashi2022, Afzal2021"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "ff": "GAFF2_mod",
+          "rejected_because": "Tg error >45% for PMMA; weaker Class I cross-term coverage for aromatic sulfone."
+        },
+        {
+          "ff": "OPLS-AA",
+          "rejected_because": "OPLS sulfone charges (~S +1.3 / O -0.55) differ fundamentally from PCFF native bond-increment values (S ~+0.08 / sulfone O ~-0.11); mixing would be inconsistent and EMC routes PSFO to PCFF."
+        }
+      ]
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "none",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF embeds charges via bond-increment rules; no separate QM/Gasteiger pass. Sulfone S ~+0.08 e and sulfone O (o=) ~-0.11 e per S-O bond are native PCFF values (NOT OPLS/QM magnitudes).",
+          "source": "polymer_rules.json:classes.PSFO.notes"
+        },
+        {
+          "claim": "VERIFY at build: a charge of exactly 0.0000 on S or sulfone O indicates a MISSING frc increment, not a small value. Confirm so2/o_2s atom types are assigned in EMC PCFF output before run.",
+          "source": "polymer_rules.json:classes.PSFO.notes"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "method": "Gasteiger/QM",
+          "rejected_because": "inconsistent with PCFF bond-increment parameterization; would double-count or mismatch the FF-native electrostatics."
+        }
+      ]
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "Backbone carries sulfone S + 2 sulfone O + ether O, all bond-increment charged, plus aromatic ring charges. Even with small per-atom magnitudes the charges accumulate along a rigid aromatic chain -> long-range Coulomb required. PPPM mandatory; lj/cut only for apolar UA backbones.",
+          "source": "polymer_rules.json:electrostatics_decision_guide"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "method": "lj_cut (no kspace)",
+          "rejected_because": "neglecting long-range Coulomb biases density/Tg by 5-20% for polar heteroatom backbones; only valid for pure C/H."
+        }
+      ]
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=25, nchain=8",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "DP=25 clears the Fox-Flory floor (decision_policy requires DP>=20 for Tg/bulk_modulus). MW~11,050 g/mol ~ 1 M_e for PSU; adequate for Tg. nchain=8 -> ~11,400 all-atom in the cell (~57 atoms/monomer x 200 monomers).",
+          "source": "polymer_rules.json:classes.PSFO"
+        },
+        {
+          "claim": "PSU is rigid-aromatic; ~1 M_e is short of the entanglement plateau, so glassy K may be biased slightly high (finite-MW). Flag K as offset; bulk modulus PASS is still the headline result for this class.",
+          "method": "entanglement_MW_judgement"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "choice": "DP=20 (dp_min)",
+          "rejected_because": "at the Fox-Flory hard floor; DP=25 gives a safer Tg plateau margin within the same GPU budget."
+        }
+      ]
+    },
+    {
+      "id": "D-05_convergence",
+      "choice": "require_glassy advisory gating (aromatic C(t)/C-infinity non-binding)",
+      "criteria_evaluated": [
+        "density_convergence",
+        "energy_convergence",
+        "chain_statistic_convergence"
+      ],
+      "evidence": [
+        {
+          "claim": "Aromatic main chain: C(t)/C-infinity is undefined via atom-type backbone detection (ct_gate_reliable=false). Gate on density plateau within range + homogeneity CV<0.25 + P2<0.10 + energy drift/SEM; melt self-diffusion metrics advisory only. 15 ns equil + 8 anneal cycles substitute for unattainable melt self-diffusion.",
+          "source": "polymer_rules.json:classes.PSFO._ct_note + decision_policy.json:policies.equilibration.require_glassy"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": []
+    },
+    {
+      "id": "D-06_tg_fit_quality",
+      "choice": "multirate [25,50,100] K/ns, bilinear hyperbola, sweep 250-750 K @ 20 K step",
+      "criteria_evaluated": [
+        "rate_ladder_feasibility",
+        "steps_per_T_floor",
+        "t_range_brackets_exp_tg"
+      ],
+      "evidence": [
+        {
+          "claim": "At dt=1 fs and T_step=20 K, rates [25,50,100] K/ns give 800/400/200 ps per T-hold, all above the steps-per-T floor (2,000,000 steps configured). Sweep 250-750 K brackets exp 463 K AND expected MD Tg 540-580 K. Slowest rate (25 K/ns) is the DSC-convention reported Tg.",
+          "source": "polymer_rules.json:classes.PSFO"
+        },
+        {
+          "claim": "[25,50,100] is the polymer_rules.json default ladder for PSFO. PSFO is rigid-aromatic, but the r40-only degeneracy warning applies at r400 (50 ps/T); the fastest rate here (r100 = 200 ps/T) is well clear of that artifact. Prior PSU runs used faster ladders ([40,160,640]/[40,160,400]) and one tripped the slope gate at the high rate; this slower default reduces that risk, and the slope-gate hard-stop remains downstream as the safety net.",
+          "method": "rate_ladder_judgement"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [],
+      "t_range_brackets_exp_tg": true
+    },
+    {
+      "id": "D-07_property_method",
+      "choice": "glassy: Murnaghan NPT compression at 300 K (primary), 3-direction deform (fallback)",
+      "criteria_evaluated": [
+        "phase_glassy_vs_rubbery",
+        "method_physics_validity",
+        "gpu_vs_cpu",
+        "rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "PSU exp Tg 463 K >> 300 K -> glassy at the 300 K mechanical-track temperature. Glassy K from Murnaghan EOS fit to NPT volume vs pressure at 300 K on the cooled npt_prod300 cell; 3-dir uniaxial deform as fallback (isotropy_delta>=20% = hard FAIL). Born+NVT removed (PCFF+PPPM virial inflates K_Born 8-15x).",
+          "source_doi": "10.1021/ja00086a030"
+        },
+        {
+          "claim": "Exp K_T (isothermal) 4.0-5.5 GPa for glassy PSU at 25 C; Mark 2007 Table 7.6 Tait params (b0=4323 bar, b1=0.00154) give K_T~4.65 GPa at 25 C.",
+          "citation": "Zoller 1978 (J.Polym.Sci.Polym.Phys. 16,1261) via Mark 2007 Table 7.6 ref [24]"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "method": "Born matrix / NVT fluctuation",
+          "rejected_because": "REMOVED 2026-06-21: PCFF+PPPM virial inflates K_Born 8-15x and Var(P) ~10^7x; failed 3/3 runs, no run-length fix."
+        }
+      ]
+    },
+    {
+      "id": "D-08_hardware",
+      "choice": {
+        "engine": "kokkos",
+        "gpu_per_run": 1,
+        "mpi": 1
+      },
+      "criteria_evaluated": [
+        "forcefield_cost_structure",
+        "atom_count",
+        "concurrent_load",
+        "benchmark_evidence",
+        "cell_size_vs_benchmark_cell",
+        "host_match"
+      ],
+      "evidence": [
+        {
+          "claim": "FF family = pcff -> by_forcefield.pcff default (kokkos full-offload, mpi=1, 1 GPU/run): kspace is GPU-resident so the 'never mpi=1' GPU-package rule does not apply. Estimated cell ~11,400 all-atom (dp25 x nchain8 x ~57 atoms/monomer), >10k atoms.",
+          "source": "polymer_rules.json:hardware_policy.by_forcefield.pcff"
+        },
+        {
+          "claim": "directional_probe is a HINT only: values_are_benchmarked=false, measured_on=A800 40GB/32 cores does NOT match live RTX 6000 24GB/18 cores, and 11.4k atoms is ~3.8x the 3020-atom pcff bench cell (outside [0.5x,2x]). recommended_by_ff.pcff.gpu=1 with no benchmark support for >10k -> no multi-GPU pin. Keep the FF-family default; choice == default so decided_params stays hardware-free.",
+          "source": "polymer_rules.json:hardware_policy.directional_probe (date 2026-06-21)"
+        },
+        {
+          "claim": "Task pins GPU id 3, MPI=1, 1 CPU core, 32 GB, 48 h -> consistent with the kokkos/mpi=1/1-GPU default. PPPM-heavy KOKKOS run saturates one GPU (do NOT pack >1 run/GPU).",
+          "source": "task_resource_pin"
+        }
+      ],
+      "confidence": "low",
+      "alternatives": [
+        {
+          "choice": "gpu_per_run>=2",
+          "rejected_because": "multi-GPU pin requires BOTH >10k cell AND benchmark support on a matching host; neither host-match nor a clean benchmark exists -> conservative gate keeps 1 GPU."
+        }
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": true
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "analyze-tg-multirate",
+      "track": "thermal",
+      "success_criteria": {
+        "loglinear_r_squared_min": 0.9,
+        "n_rates_min": 2
+      }
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "fallback": "deform"
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 1,
+    "findings": [
+      "APPROVED. Gate verified independently: PSFO confidence=medium -> reasoned mode matches plan_mode. All evidence_required decisions (D-01/D-03/D-07) carry source_doi/citation+alternatives; D-07 multi-member hard-require satisfied (SMILES isopropylidene C(C)(C) bridge -> PSU/Udel, exp Tg=463 pinned, not PES/PPSU). Tg floor recomputed independently: [25,50,100] K/ns -> 800/400/200 ps per T-hold, all >=200 ps floor (r100 exactly at floor). D-08 hardware = by_forcefield.pcff default (kokkos/mpi=1/1 GPU), decided_params hardware-free -> policy-derived, no finding. Stage schema + track_map all valid.",
+      "ADVISORY D-07: PSFO has no bm_pressures_atm in polymer_rules, so the Murnaghan worker defaults to ~+/-1000 atm, likely too narrow for stiff glassy PSU (exp K 4.0-5.5 GPa; cf. PEST B0' runaway at +/-1000). Expect possible B0' outside [4,20] -> deform 3-dir fallback (already in planned_stages, so K remains obtainable). NOT plan-fixable: gen_prompt murnaghan reads cls.bm_pressures_atm from polymer_rules, not decided_params -> polymer_rules PSFO needs bm_pressures_atm ~ [-5000..5000]. Captured to memory.",
+      "ADVISORY D-06: top rate 100 K/ns = 200 ps/T exceeds the rigid-aromatic [40,80] K/ns recommendation (memory: PKTN+PSFO degeneracy). Plan's argument is sound (200 ps/T well clear of the 50 ps/T artifact threshold; slowest r25/r50 safe; slope-gate hard-stop downstream). Not blocking; polymer_rules PSFO tg_rates curation worth revisiting. Captured to memory.",
+      "ADVISORY D-05: plan cites require_glassy advisory gating, but the decision_policy require_glassy exemption is keyed on DP>=30 and this cell is DP=25. Substance is correct via PSFO._ct_note (ct_gate_reliable=false -> C(t) non-binding for aromatics), the proper DP-independent basis. decision_policy gap: require_glassy should also key on ct_gate_reliable=false, not DP>=30 alone. Captured to memory."
+    ]
+  },
+  "provenance": {
+    "generator": "make_deterministic_plan.py + planner reasoned revision",
+    "generated_at": "2026-06-26T14:43:10.393880+00:00"
+  }
+}

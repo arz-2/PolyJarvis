@@ -1,0 +1,208 @@
+equil_data_path:   /home/arz2/PolyJarvis/data/cis-PBD4/lammps/equil/npt_melt/npt_melt_out.data
+lammps_flags:      {"use_pcff": false, "use_opls": false, "use_trappe": true}
+polymer_class:     PDIE
+run_name:          cis-PBD4
+work_dir:          /home/arz2/PolyJarvis/data/cis-PBD4/lammps/thermal
+tg_sweep_dir:      /home/arz2/PolyJarvis/data/cis-PBD4/lammps/thermal/tg_sweep_r25
+tg_params:
+  T_start:         400
+  T_end:           80
+  T_step:          20
+  n_steps_per_t:   400000
+tg_rate_index:     1  # rate 25 K/ns
+  cooling_rate:    25
+dt_fs:             2.0
+gpu_ids:           "1"
+mpi_ranks:         1
+engine:            "gpu"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
+velocity_seed:     558931   # ORCHESTRATOR PIN (SEED for r25 sweep)
+per_t_dump:
+  enabled:         true
+  file:            /home/arz2/PolyJarvis/data/cis-PBD4/lammps/thermal/tg_sweep_r25/per_t_structs.dump   # one final frame per T step
+  param_key:       WRITE_PER_T_DUMP=True, PER_T_DUMP_FILE=per_t_structs.dump
+  note:            Pass these in generate_script params alongside T_START/T_END/etc.
+generate_script:
+  template_name:   npt_tg_step   # REQUIRED — the multi-temperature cooling staircase.
+  WARNING:         NEVER use template "npt" for a Tg sweep — it renders a single-temperature
+                   NPT (no cooling, no per-T dump) and is an invalid sweep.
+  required_params: T_START=400, T_END=80, T_STEP=20 (map from tg_params above).
+                   generate_script RAISES if T_END/T_STEP are missing — verify the rendered .in
+                   has a `variable temps index ...` loop before submitting.
+
+--- Worker Guide (THERMAL_SWEEP) ---
+# Tg Sweep Guide
+**Read when:** You have a converged equilibrated cell and need to run a Tg sweep  
+**Worker:** tg-sweep-worker — generate sweep script, submit run, return RESULT block to orchestrator
+
+---
+
+## Rules
+
+### Rule A: No Velocity Re-initialization Between Temperature Steps
+
+Only initialize velocities once at the very first temperature step. Every subsequent step inherits momenta from the previous one.
+
+### Rule B: No Dump Files During Tg Sweep
+
+Set `"DUMP_FILE": ""` in the `generate_script` params — no full trajectory during the sweep (large I/O).
+
+**Opt-in per-T structural snapshot:** keep `DUMP_FILE=""`, but if per-T Rg/P2/nematic order is wanted,
+additionally pass `"WRITE_PER_T_DUMP": True` (optionally `"PER_T_DUMP_FILE": "per_t_structs.dump"`).
+This writes ONE single-frame snapshot per temperature step (a `dump … 1 … ; run 0 ; undump` block),
+not a trajectory, so the I/O cost is negligible while still enabling per-T structural analysis. Default
+off; only enable when the run explicitly requests per-T structural metrics. (Previously these metrics
+silently failed because the flag was never set — PVC2 2026-06-23.)
+
+### Rule C: Simulation Time Per T is System-Dependent
+
+**Absolute floor: 500 ps.** For most common polymers (PE, PS, PMMA, PEO): 1–4 ns per temperature.
+
+TraPPE-UA classes (PHYC, PDIE) use `dt_fs=2.0` (no SHAKE — UA eliminates C-H fast modes). Halve `N_STEPS_PER_T` relative to PCFF to maintain the same cooling rate.
+
+---
+
+## Temperature Range Selection
+
+The sweep must bracket the transition — too narrow and the bilinear fit fails to capture both slopes.
+
+Rule of thumb: start ~1.5× Tg, end ~0.75× Tg, span ≥300 K, step 10–20 K.
+
+---
+
+## Starting Cell
+
+The `equil_data_path` in the prompt differs by polymer regime — never substitute one for the other:
+
+- **Rubbery** (Tg_exp < 300 K, T_workflow_K = 300): use `npt_tg_prep_data` from the equil RESULT — the `npt_melt` output at `T_equil_K` (e.g., 400 K for PDIE). The 300 K production cell is only ~Tg_exp + 20 K; the chains are poorly relaxed at that temperature and bias the rubbery density slope in the sweep.
+- **Glassy** (Tg_exp > 300 K): use `npt_prod300_out.data` (300 K cell, well-quenched from T_equil_K). This is below Tg so the sweep re-melts it cleanly before detecting the transition.
+
+The orchestrator passes the correct path as `equil_data_path` via `--tg_start_data` (rubbery) or `--data_path` (glassy).
+
+---
+
+## Workflow
+
+### Step 1: Generate Tg sweep script
+
+`generate_script` is synchronous — returns the script path immediately.
+
+Choose a `progress_file` path before calling `generate_script`; pass it as `PROGRESS_FILE`
+in params so the generated script writes a JSON event after each temperature step completes.
+
+For TraPPE-UA systems (`use_trappe=True`), detect the number of bond types before generating the script:
+```bash
+n_bond_types=$(grep -m1 "bond types" <equil_data_path> | awk '{print $1}')
+# shake_bond_type_ids = list(range(1, n_bond_types + 1)), e.g. [1] for PE, [1, 2] for PBD
+```
+
+**Use `tg_sweep_dir` from the prompt** — for a multi-rate sweep it is the per-rate dir
+(`.../thermal/tg_sweep_r40`), and analyze-tg reads `tg_sweep_dir/tg_sweep.log`. Do NOT
+hardcode `.../thermal/tg_sweep/`; that collides across rates and mismatches the analysis path.
+
+```python
+progress_file = f"{tg_sweep_dir}/tg_progress.jsonl"   # tg_sweep_dir from prompt (rate-suffixed)
+
+result = generate_script(
+    template_name="npt_tg_step",
+    output_script=f"{tg_sweep_dir}/tg_sweep.in",
+    data_file=equil_data_path,
+    velocity_seed=<velocity_seed from prompt, or None for random>,   # pin for recovery/replication
+    params={
+        "LOG_FILE":            "tg_sweep.log",
+        "DUMP_FILE":           "",
+        "T_START":             <T_start>,
+        "T_END":               <T_end>,
+        "T_STEP":              <T_step>,
+        "N_STEPS_PER_T":       <n_steps_per_t>,
+        "P_START":             1.0,
+        "P_FINAL":             1.0,
+        "T_DAMP":              100.0,
+        "TIMESTEP":            <dt_fs from prompt>,  # 2.0 for TraPPE-UA, 1.0 otherwise
+        "use_pppm":            <True unless TraPPE-UA>,
+        "use_gpu":             True,
+        "engine":              <engine from prompt>,  # kokkos for PCFF/OPLS → deck omits `package gpu`
+        "use_pcff":            <copy lammps_flags["use_pcff"] verbatim>,
+        "use_opls":            <copy lammps_flags["use_opls"] verbatim>,
+        "use_trappe":          <copy lammps_flags["use_trappe"] verbatim>,
+        # ↑ ALWAYS pass all three FF booleans, copied literally from the lammps_flags
+        # dict in your prompt. Do NOT omit them: on an equilibrated .data the engine
+        # cannot always re-derive the FF and will silently emit a GAFF2 deck (wrong
+        # pair_style/dihedral_style → corrupt Tg). Passing the wrong flag now hard-fails
+        # with "FF flag mismatch" rather than running a bad deck — also do not guess.
+        "use_shake":           False,    # False for TraPPE-UA and PCFF; True for GAFF2
+        "shake_bond_type_ids": <omit for TraPPE-UA and PCFF; only relevant for GAFF2>,
+        "params_file":         "<work_dir>/emc_build.params",  # EMC only; omit for RadonPy
+        "PROGRESS_FILE":       progress_file,   # enables per-T PROGRESS lines in the watch_run monitor_command
+    }
+)
+# result["n_tg_stages"] is the number of temperature steps (used by run_lammps_script)
+```
+
+**Velocity seed caveat:** the `npt_tg_step` template currently emits `velocity all create T <fresh random>` and does NOT honor the `velocity_seed` arg passed above — each generated deck gets a new seed. To record the actual seed for recovery/replication, grep the generated `.in` for the `velocity all create` line and log field **$5** — the seed integer *after* T_START (e.g. `velocity all create 440.0 859566 mom yes ...` → `859566`), not the 3rd token; do not assume the passed value was used.
+
+**Pass an ABSOLUTE `data_file`.** The sweep `work_dir` is a sibling of the equil cell, so a relative `data_file` (e.g. `../equil/.../npt_extend_out.data`) hits a silent `read_data` failure. Resolve the repo-relative artifact against `REPO_ROOT` before calling `generate_script`, and `grep read_data` the generated `.in` to confirm the absolute path landed before submitting.
+**Verify the FF before submitting.** After `generate_script`, `grep` the generated `.in`
+for `pair_style` and confirm it matches the planned force field — abort and re-check the
+FF flags if it shows a GAFF2 deck:
+```bash
+grep -E 'pair_style|dihedral_style|kspace' "<tg_sweep_dir>/tg_sweep.in"
+# TraPPE-UA → "pair_style lj/cut ..." + "dihedral_style multi/harmonic", NO kspace/pppm
+# PCFF      → "pair_style lj/class2/coul/long ..." + "kspace_style pppm ..."
+# GAFF2 leak (pair_style lj/charmm... / dihedral_style fourier) = wrong → do NOT submit
+```
+
+**GPU neighbor list optimization (small PCFF cells <5k atoms):** After `generate_script`, edit `package gpu 1 neigh no` → `package gpu 1 neigh yes` in the generated `.in` file for +30% speedup (NPT-stable; do not apply to kokkos engine — kokkos manages its own neighbor list).
+
+### Step 2: Submit sweep
+
+`run_lammps_script` is async — returns `run_id` immediately.
+
+Pass `progress_file` and `n_stages` so `watch_run` can expose them in the `monitor_command`,
+which emits `PROGRESS [##---] 3/36 done: T560` as each temperature step completes.
+
+```python
+run = run_lammps_script(
+    script=result["output_script"],
+    work_dir=tg_sweep_dir,            # from prompt (rate-suffixed for multi-rate)
+    log_file="tg_sweep_run.log",
+    gpu_ids="<from orchestrator>",
+    mpi=<n>,
+    engine=<engine from prompt>,   # MUST match the generate_script engine above
+    progress_file=progress_file,
+    n_stages=result["n_tg_stages"],
+)
+w = watch_run(run["run_id"])
+# Return run_id and w["monitor_command"] to the orchestrator — do not call Monitor.
+```
+
+---
+
+### Rule D: Never Set use_gpu=False
+
+`use_gpu: True` is mandatory for all Tg sweep runs — the generated script includes GPU package
+directives (kspace/pair acceleration). Setting `use_gpu=False` strips these flags while the
+script retains GPU syntax, causing a crash at runtime.
+
+On recovery or re-submit, preserve `use_gpu: True` exactly as in the original `generate_script`
+call. Do not change it to recover from a crash — the crash is never caused by GPU use itself.
+The only template that legitimately uses `use_gpu=False` is `nvt_born`, which is no longer part
+of the standard pipeline.
+
+---
+
+## Common Failures
+
+**Tg sweep killed mid-run (system failure):** Attempt to restart from the last completed temperature (max 2 recovery attempts). If still failing, return the error to the orchestrator.
+
+--- Cross-Track Rules ---
+## Cross-Track Rules (Always Active — Memorize These)
+
+These rules are inlined into every worker prompt by `gen_prompt.py`. They apply regardless of which worker or track is running.
+
+0. **GPU is used for ALL simulation runs** — always pass explicit `gpu_ids` and `mpi`; never leave them unset or default
+1. **Fill `run_log.md` in real time** — log each DECISION row when made, each RECOVERY block immediately after resolving an error; do not reconstruct at the end
+2. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, and SEED_COLD in the run_log header. For replication studies, use fixed seeds from `guides/REVISION_PARAMS.md`. For exploratory runs, read seeds back from job output and log them immediately after submission.
+3. **Check for existing writers before killing any process** — before killing and relaunching any LAMMPS run, run `lsof | grep <log_filename>` to check for existing writers. If another writer is present (concurrent orchestrator session), do NOT launch — coordinate via user first. A double-launch corrupts the shared log and requires a full restart from step 0.
+4. **Log the exact GPU claim label** — after any GPU claim (`pick_gpu.py claim --run <LABEL>`), copy the `run` field from the JSON response into the SIMULATION STATE table. Use that exact string verbatim at release (`pick_gpu.py release --run <LABEL>`). A label mismatch at release silently leaves the GPU stuck as claimed.
+5. **Log repo-relative run paths in memory** — when recording run artifacts or paths in any `.claude/agent-memory/**` file, write them repo-relative (`data/<run>/...`), never machine-absolute (`/home/<user>/...`). Keeps captures portable across the revision machines so integration needs no path sanitization. The memory file ITSELF must live only in the repo-root `.claude/agent-memory/<worker>/` dir (the absolute path in your agent definition) — never a `.claude/` created under a work_dir or data/<run>/ subdir.
+

@@ -1,0 +1,278 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PHYC (*CC*)",
+  "run_name": "PE3",
+  "polymer_class": "PHYC",
+  "smiles": "*CC*",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "high",
+  "plan_mode": "deterministic",
+  "assumptions": [
+    "polymer_rules.json defaults are validated for this class (confidence-gated)"
+  ],
+  "uncertainties": [
+    {
+      "name": "ff_transferability",
+      "dominant": false,
+      "reduction_probe": "none"
+    },
+    {
+      "name": "hardware_optimum",
+      "dominant": true,
+      "description": "CPU MPI=8 override deviates from the TraPPE by_forcefield default (engine=gpu, mpi=1, neigh yes). Speed-optimum at ~4800 UA atoms on RTX6000 host is not cleanly benchmarked: legacy feedback_small_ua_cpu_faster (~8k atom finding) predates the 2026-06-20 neigh-yes benchmark that reversed the default for TraPPE (GPU 3.7x at 1640 atoms); crossover cell size unknown. A drained-box sweep via calibrate_hardware.py will settle this.",
+      "reduction_probe": "hardware_benchmark"
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "trappe-ua",
+    "preferred_builder": "emc",
+    "charge_method": "none",
+    "electrostatics": "lj_cut",
+    "cutoff_A": 14.0,
+    "dt_fs": 2.0,
+    "confidence": "high",
+    "dp_typical": 120,
+    "nchain": 20,
+    "density_initial_gcm3": 0.65,
+    "T_equil_K": 550.0,
+    "annealing_T_high_K": 620.0,
+    "eq_annealing_cycles": 5,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 5.0,
+    "npt_prod_ns": 5.0,
+    "melt_npt_ns": 1.0,
+    "tg_t_high_K": 450,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 250000,
+    "tg_rates_K_per_ns": [
+      25,
+      50,
+      100
+    ],
+    "tg_min_steps_per_T": 100000,
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_strain_max": 0.03,
+    "bm_pressures_atm": [
+      1,
+      100,
+      300,
+      600,
+      1000
+    ],
+    "ct_min_decay_melt": 0.25,
+    "T_workflow_K": 300.0,
+    "dsc_equiv_rate_K_per_ns": 1.6667E-10,
+    "emc_seed": 1007,
+    "velocity_seed": 1008,
+    "use_gpu": false,
+    "mpi_ranks": 8,
+    "gpu_per_run": 0,
+    "engine": "cpu"
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "trappe-ua",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "Ramos 2015: TraPPE-UA PE Tg=187K vs exp 185-195K, density ±7%. Branched types (PP, PIB): UA types exist but no polymer-Tg validation — use with medium confidence.",
+          "source_doi": "10.1021/acs.macromol.5b00823"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "PE_RSC2016"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Srivastava2026"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Afzal2021"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Martin1998"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Ramos2015"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Boyer1973"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "none",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "lj_cut",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge"
+      ],
+      "evidence": [
+        {
+          "claim": "see electrostatics_decision_guide",
+          "source": "polymer_rules.json:electrostatics_decision_guide"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=120, nchain=20",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-08_hardware",
+      "choice": {
+        "engine": "cpu",
+        "gpu_per_run": 0,
+        "mpi_ranks": 8,
+        "use_gpu": false
+      },
+      "criteria_evaluated": [
+        "forcefield_cost_structure",
+        "atom_count",
+        "concurrent_load",
+        "benchmark_evidence",
+        "cell_size_vs_benchmark_cell",
+        "host_match"
+      ],
+      "evidence": [
+        {
+          "claim": "PE replication-campaign consistency: PE1 (emc_seed=1001, 2026-06-20) and PE2 (emc_seed=1004, 2026-06-22) both ran engine=cpu/mpi=8 on this exact RTX6000 workstation host and completed successfully. Replication integrity requires the same hardware path across replicates.",
+          "source": "PE replication campaign directive; PE1/PE2 run completions on RTX6000 host"
+        },
+        {
+          "claim": "Physics-neutral: CPU and GPU (lj/cut) agree to 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl (run-0 parity PASS 2026-06-20, CALIB_PHYC). The CPU override is replication-consistency, not a speed claim.",
+          "source": "polymer_rules.json:hardware_policy.directional_probe.trappe_neigh_yes_2026-06-20"
+        },
+        {
+          "claim": "values_are_benchmarked=false AND directional_probe host (4x A800) != live host (RTX6000). By policy, any non-default pin under these conditions requires confidence=low + hardware_benchmark probe. The by_forcefield default for TraPPE is engine=gpu/mpi=1/neigh-yes (3.7x vs CPU at 1640 atoms, 2026-06-20); whether GPU remains faster at ~4800 atoms on RTX6000 is unknown. The CPU pin is a directive-honored replication-consistency override against the benchmark-favored default.",
+          "source": "polymer_rules.json:hardware_policy; decision_policy.json:D-08_hardware.require"
+        }
+      ],
+      "confidence": "low",
+      "rationale": "CPU MPI=8 is a replication-consistency override (PE1/PE2 campaign on RTX6000). Speed-optimal for ~4800 UA atoms on this host is not cleanly benchmarked — legacy CPU>GPU finding (feedback_small_ua_cpu_faster, ~8k atoms, pre-neigh-yes) is superseded by the 2026-06-20 TraPPE flip to GPU+neigh-yes; crossover unknown. hardware_benchmark probe planned to settle this.",
+      "alternatives": [
+        {
+          "engine": "gpu",
+          "mpi_ranks": 1,
+          "gpu_per_run": 1,
+          "note": "GPU pkg + neigh yes (3.7x at 1640 atoms by benchmarked ratio); may be faster at 4800 atoms but not validated at this cell size on this host"
+        }
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": null
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "analyze-tg-multirate",
+      "track": "thermal",
+      "success_criteria": {
+        "loglinear_r_squared_min": 0.9,
+        "n_rates_min": 2
+      }
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "chain_submitted": true
+      }
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 2,
+    "findings": [
+      "D-08_hardware: round-1 finding resolved. Non-default CPU pin (engine=cpu/mpi=8/gpu=0 vs TraPPE by_forcefield default engine=gpu/mpi=1/neigh-yes) is now policy-compliant under values_are_benchmarked=false + host mismatch (A800 probe vs RTX6000 policy host): confidence=low set, hardware_benchmark reduction_probe named on the dominant uncertainty, and a GPU alternative provided. mpi=8 is within concurrency budget and the never-mpi=1/PPPM rules do not apply to a UA lj/cut class. recommended_by_ff is host-mismatched + unbenchmarked here, so it is a hint and cannot force GPU.",
+      "Gate OK: PHYC confidence=high -> deterministic mode matches plan_mode. All stages carry stage/track/success_criteria; tracks valid; stage->track pairings match track_map. Both reduction_probes (none, hardware_benchmark) are valid uncertainty_reduction_probes keys. No stale born stage."
+    ]
+  },
+  "provenance": {
+    "generator": "make_deterministic_plan.py",
+    "generated_at": "2026-06-24T04:25:00.190292+00:00"
+  }
+}

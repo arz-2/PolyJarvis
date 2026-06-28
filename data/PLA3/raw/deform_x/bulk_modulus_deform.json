@@ -1,0 +1,35 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/PolyJarvis/data/PLA3/lammps/mechanical/deform/x/05_deform_x.log",
+  "output_dir": "/home/arz2/PolyJarvis/data/PLA3/raw/deform_x",
+  "method": "uniaxial_deformation",
+  "C11_GPa": 4.0445,
+  "C12_GPa": 2.8201,
+  "C12_yy_GPa": 2.8516,
+  "C12_zz_GPa": 2.7885,
+  "K_GPa": 3.2282,
+  "G_GPa": 0.6122,
+  "E_GPa": 1.7274,
+  "nu_Poisson": 0.4108,
+  "fit_r2_C11": 0.9901,
+  "fit_r2_C12_yy": 0.9834,
+  "fit_r2_C12_zz": 0.956,
+  "fit_p_C11": 0.0,
+  "fit_p_C12_yy": 0.0,
+  "isotropy_delta_pct": 2.24,
+  "n_fit_points": 2801,
+  "strain_range": [
+    0.002,
+    0.03
+  ],
+  "T_mean_K": 299.93,
+  "strain_rate_per_fs": 1e-07,
+  "avg_window_frames": 2000,
+  "stress_strain_csv": "/home/arz2/PolyJarvis/data/PLA3/raw/deform_x/stress_strain.csv",
+  "diagnostics": {
+    "n_phase1_rows": 2000,
+    "n_phase2_rows": 5002,
+    "step_0": 200000,
+    "strain_max_reached": 0.05
+  }
+}

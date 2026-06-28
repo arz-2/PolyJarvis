@@ -1,0 +1,37 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/PolyJarvis/data/PLA2/lammps/mechanical/deform_y/05_deform.log",
+  "output_dir": "/home/arz2/PolyJarvis/data/PLA2/raw/deform_y",
+  "method": "uniaxial_deformation",
+  "C11_GPa": 2.6216,
+  "C12_GPa": 3.8201,
+  "C12_yy_GPa": 4.8945,
+  "C12_zz_GPa": 2.7457,
+  "K_GPa": 3.4206,
+  "G_GPa": -0.5992,
+  "E_GPa": -1.9092,
+  "nu_Poisson": 0.593,
+  "fit_r2_C11": 0.9793,
+  "fit_r2_C12_yy": 0.9794,
+  "fit_r2_C12_zz": 0.9837,
+  "fit_p_C11": 0.0,
+  "fit_p_C12_yy": 0.0,
+  "isotropy_delta_pct": 56.25,
+  "n_fit_points": 2801,
+  "strain_range": [
+    0.002,
+    0.03
+  ],
+  "T_mean_K": 299.96,
+  "strain_rate_per_fs": 1e-07,
+  "avg_window_frames": 2000,
+  "stress_strain_csv": "/home/arz2/PolyJarvis/data/PLA2/raw/deform_y/stress_strain.csv",
+  "diagnostics": {
+    "n_phase1_rows": 2000,
+    "n_phase2_rows": 3002,
+    "step_0": 200000,
+    "strain_max_reached": 0.03
+  },
+  "warning_anisotropy": "C12_yy=4.895 and C12_zz=2.746 GPa disagree by 56.2% \u2014 system may not be isotropic. Run more chains or longer equilibration.",
+  "warning_negative_E": "Negative Young's modulus E=-1.909 GPa from K=3.421, G=-0.599. Check that K > 0 and G > 0."
+}

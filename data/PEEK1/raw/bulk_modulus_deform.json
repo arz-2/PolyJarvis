@@ -1,0 +1,35 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/PolyJarvis/data/PEEK1/lammps/mechanical/deform/npt_deform.log",
+  "output_dir": "/home/arz2/PolyJarvis/data/PEEK1/raw",
+  "method": "uniaxial_deformation",
+  "C11_GPa": 4.714,
+  "C12_GPa": 2.939,
+  "C12_yy_GPa": 2.9094,
+  "C12_zz_GPa": 2.9687,
+  "K_GPa": 3.5307,
+  "G_GPa": 0.8875,
+  "E_GPa": 2.4567,
+  "nu_Poisson": 0.384,
+  "fit_r2_C11": 0.9863,
+  "fit_r2_C12_yy": 0.9864,
+  "fit_r2_C12_zz": 0.9736,
+  "fit_p_C11": 0.0,
+  "fit_p_C12_yy": 0.0,
+  "isotropy_delta_pct": 2.02,
+  "n_fit_points": 2801,
+  "strain_range": [
+    0.002,
+    0.03
+  ],
+  "T_mean_K": 299.93,
+  "strain_rate_per_fs": 1e-07,
+  "avg_window_frames": 2000,
+  "stress_strain_csv": "/home/arz2/PolyJarvis/data/PEEK1/raw/stress_strain.csv",
+  "diagnostics": {
+    "n_phase1_rows": 2000,
+    "n_phase2_rows": 3002,
+    "step_0": 200000,
+    "strain_max_reached": 0.03
+  }
+}

@@ -1,0 +1,53 @@
+# ============================================================
+# PolyJarvis — NPT production EXTENSION (+2 ns) for PEG3 equil R-01
+# Continues from equilibrated npt_production_out.data (300 K / 1 atm).
+# FF styles mirror the original npt_production.in exactly (PCFF class2 / KOKKOS).
+# ============================================================
+
+log npt_ext.log
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles (identical to npt_production.in) ---
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+# KOKKOS: package loaded via -pk kokkos on the command line
+
+read_data /home/alexzhao/PolyJarvis/data/PEG3/lammps/equil/npt_production/npt_production_out.data
+include /home/alexzhao/PolyJarvis/data/PEG3/lammps/equil/emc_build.params
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo 1000
+
+# --- Trajectory ---
+dump dump_npt all custom 2000 npt_ext.dump id type mol x y z ix iy iz vx vy vz
+
+# --- NPT Thermostat + Barostat (Nose-Hoover), continue at 300 K / 1 atm ---
+timestep 1.0
+fix npt_fix all npt temp 300.0 300.0 100.0 iso 1.0 1.0 1000.0
+
+run 2000000
+
+# --- Cleanup ---
+unfix npt_fix
+undump dump_npt
+
+# --- Write Output ---
+write_dump all custom npt_ext_last.dump id type mol x y z xu yu zu vx vy vz modify sort id
+write_data /home/alexzhao/PolyJarvis/data/PEG3/lammps/equil/npt_production_ext/npt_ext_out.data
+
+print "STAGE COMPLETE: NPT EXTENSION T=300.0->300.0K P=1.0->1.0atm steps=2000000"
+quit

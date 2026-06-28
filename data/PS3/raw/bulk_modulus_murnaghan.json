@@ -1,0 +1,61 @@
+{
+  "status": "success",
+  "method": "murnaghan",
+  "fit_converged": true,
+  "B0_GPa": 2.5306,
+  "bulk_modulus_GPa": 2.5306,
+  "B0_sem_GPa": 0.108,
+  "bulk_modulus_sem_GPa": 0.108,
+  "B0_prime": 13.5654,
+  "V0_A3": 69945.89,
+  "r_squared": 0.997755,
+  "n_points": 5,
+  "pressures_atm": [
+    -1000.0,
+    -500.0,
+    0.0,
+    500.0,
+    1000.0
+  ],
+  "pressures_GPa": [
+    -0.101325,
+    -0.050663,
+    0.0,
+    0.050663,
+    0.101325
+  ],
+  "volumes_A3": [
+    74178.85,
+    71523.33,
+    69863.41,
+    68851.32,
+    67703.96
+  ],
+  "vol_stds_A3": [
+    456.19,
+    358.55,
+    323.63,
+    297.77,
+    271.27
+  ],
+  "n_prod_rows": [
+    2501,
+    2501,
+    2501,
+    2501,
+    2501
+  ],
+  "log_files": [
+    "/home/alexzhao/PolyJarvis/data/PS3/lammps/mechanical/bm_series/bm_P-1000/bm_P-1000.log",
+    "/home/alexzhao/PolyJarvis/data/PS3/lammps/mechanical/bm_series/bm_P-500/bm_P-500.log",
+    "/home/alexzhao/PolyJarvis/data/PS3/lammps/mechanical/bm_series/bm_P0/bm_P0.log",
+    "/home/alexzhao/PolyJarvis/data/PS3/lammps/mechanical/bm_series/bm_P500/bm_P500.log",
+    "/home/alexzhao/PolyJarvis/data/PS3/lammps/mechanical/bm_series/bm_P1000/bm_P1000.log"
+  ],
+  "eq_fraction": 0.5,
+  "output_dir": "/home/alexzhao/PolyJarvis/data/PS3/raw",
+  "warnings": [
+    "Murnaghan fit R\u00b2=0.99775 < 0.999. Check that NPT runs are fully equilibrated (increase --eq_fraction or NPT steps) and that the pressure range is appropriate for this polymer."
+  ],
+  "murnaghan_eos_fig": "/home/alexzhao/PolyJarvis/data/PS3/graphs/murnaghan_eos.png"
+}

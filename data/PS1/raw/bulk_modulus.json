@@ -1,0 +1,64 @@
+{
+  "status": "success",
+  "born_matrix_file": "/home/alexzhao/PolyJarvis/data/PS1/lammps/mechanical/born/born_matrix.dat",
+  "log_file": "/home/alexzhao/PolyJarvis/data/PS1/lammps/mechanical/born/08_nvt_born.log",
+  "output_dir": "/home/alexzhao/PolyJarvis/data/PS1/raw",
+  "method": "born_nvt",
+  "n_atoms": 6420,
+  "bulk_modulus_GPa": 3.8545,
+  "bulk_modulus_atm": 38040.81,
+  "bulk_modulus_sem_GPa": 4.1836,
+  "K_Born_GPa": 94.0372,
+  "kinetic_term_GPa": 0.3775,
+  "fluctuation_correction_GPa": 90.5602,
+  "V_mean_A3": 70423.55,
+  "T_mean_K": 299.94,
+  "Var_P_atm2": 518685.2208,
+  "n_effective_samples": 751,
+  "block_averaging": {
+    "block_count": 5,
+    "block_K_GPa_values": [
+      -12.92,
+      7.4395,
+      4.9438,
+      7.2556,
+      10.4817
+    ],
+    "K_block_mean_GPa": 3.4401,
+    "K_block_std_GPa": 9.3548,
+    "K_sem_GPa": 4.1836
+  },
+  "diagnostics": {
+    "n_born_total": 1500,
+    "n_born_production": 750,
+    "n_log_total": 1501,
+    "n_log_production": 751,
+    "eq_fraction": 0.5,
+    "T_mean_K": 299.94,
+    "T_std_K": 3.43,
+    "V_mean_A3": 70423.55,
+    "V_std_A3": 0.0,
+    "P_mean_atm": 35.38,
+    "P_std_atm": 719.72,
+    "Var_P_atm2": 518685.2208,
+    "tau_eff_frames": 0.09,
+    "tau_eff_fraction": 0.000121,
+    "n_effective_samples": 751,
+    "K_Born_atm": 928074.85,
+    "NkT_V_atm": 3725.79,
+    "fluct_correction_atm": 893759.83,
+    "born_elements_mean_atm": {
+      "b11": 1925050.73,
+      "b22": 1865357.8,
+      "b33": 1842751.69,
+      "b12": 450783.81,
+      "b13": 453235.88,
+      "b23": 455737.02
+    }
+  },
+  "warnings": [
+    "Fluctuation correction (90.560 GPa) is >50% of K_Born (94.037 GPa). This is unexpected for a glassy polymer \u2014 verify the system is in the glassy state at 300 K."
+  ],
+  "born_timeseries_fig": "/home/alexzhao/PolyJarvis/data/PS1/graphs/born_matrix_timeseries.png",
+  "note_technique": "Born+NVT gives unrelaxed (high-frequency) isothermal K_T. Comparable to ultrasonic/Brillouin K_S via K_T \u2248 K_S\u00d7(Cv/Cp) (~0.96 for glassy). For quasi-static PVT references expect K_T 5\u201310% lower than this value."
+}

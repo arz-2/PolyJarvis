@@ -1,0 +1,30 @@
+{
+  "status": "success",
+  "n_points": 3,
+  "rates_K_per_ns": [
+    40.0,
+    160.0,
+    400.0
+  ],
+  "tg_values_K": [
+    238.7,
+    245.3,
+    214.8
+  ],
+  "rates_span_decades": 1.0,
+  "loglinear_slope_K": -9.156191459373675,
+  "loglinear_intercept_K": 277.96811540322267,
+  "loglinear_r_squared": 0.437530550100029,
+  "tg_at_slow_rate_K": 238.7,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": false,
+  "is_flat_rate_regime": false,
+  "tg_method": "single_rate_fallback",
+  "vf_fit_quality": "FAILED",
+  "vf_fit_error": "Initial guess is outside of provided bounds",
+  "polymer_name": "PEG2",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 40 K/ns | 238.7 K |\n| 160 K/ns | 245.3 K |\n| 400 K/ns | 214.8 K |\n\n**Log-linear**: Tg = 278.0 + -9.16\u00b7ln(\u0393)  R\u00b2=0.4375\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **238.7 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): quality=FAILED\n",
+  "d06_markdown_path": "/home/alexzhao/PolyJarvis/data/PEG2/raw/d06_multirate_block.md",
+  "plot_path": "/home/alexzhao/PolyJarvis/data/PEG2/raw/tg_multirate.png"
+}

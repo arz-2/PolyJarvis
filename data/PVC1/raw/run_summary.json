@@ -1,0 +1,95 @@
+{
+  "run": {
+    "name": "PVC1",
+    "smiles": "*CC(Cl)*",
+    "polymer_class": "PVNL",
+    "ff": "PCFF",
+    "charge_method": "embedded in FF (PCFF templated)",
+    "dp": 60,
+    "n_chains": 10,
+    "n_atoms": 3620,
+    "date_start": "2026-06-18",
+    "date_end": "2026-06-21"
+  },
+  "decisions": {
+    "D-01_ff": "PCFF (EMC auto, field=pcff via PVNL)",
+    "D-02_charges": "embedded in FF (PCFF templated)",
+    "D-03_electrostatics": "PPPM",
+    "D-04_system_size": "DP=60, 10 chains",
+    "D-05_convergence": "PASS (glassy-path criteria, R-01)",
+    "D-06_tg_fit_quality": "GOOD"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 347.9,
+      "exp_range_K": [
+        336.0,
+        376.0
+      ],
+      "error_pct": 2.3,
+      "status": "PASS",
+      "r_squared": 0.9899,
+      "fit_quality": "GOOD",
+      "tg_dsc_equiv_K": null,
+      "loglinear_slope_K": null,
+      "loglinear_r_squared": null,
+      "vf_fit_quality": null,
+      "n_rates": null,
+      "n_replicates": null,
+      "rates_span_decades": null,
+      "slow_rate_ref_K_per_ns": null
+    },
+    "density": {
+      "value_g_cm3": 1.353167,
+      "exp_range_g_cm3": [
+        1.321,
+        1.461
+      ],
+      "error_pct": 2.7,
+      "status": "PASS"
+    },
+    "bulk_modulus": {
+      "value_GPa": 1.6816,
+      "sem_GPa": null,
+      "exp_range_GPa": [
+        1.923,
+        5.5
+      ],
+      "error_pct": 54.7,
+      "status": "FAIL",
+      "method": "deformation"
+    }
+  },
+  "convergence": {
+    "verdict": "PASS (glassy-path criteria, R-01)",
+    "density_equilibrated": null,
+    "energy_equilibrated": null,
+    "density_drift_pct": null
+  },
+  "structural_checks": {
+    "rg_cv": null,
+    "rg_spread_flag": null,
+    "kinetic_trap_flag": null,
+    "diffusion_regime": null,
+    "ordered_flag": null,
+    "p2_mean": null,
+    "heterogeneous_flag": null,
+    "density_cv_mean": null
+  },
+  "artifacts": {
+    "tg_summary": "raw/tg_summary.json",
+    "tg_density_bins": "raw/tg_density_bins.csv",
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "bulk_modulus_deform": "raw/bulk_modulus_deform.json",
+    "bulk_modulus_born": "raw/bulk_modulus_born.json",
+    "stress_strain_csv": "raw/stress_strain.csv"
+  },
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "e166673",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-21T18:34:45.733141+00:00"
+  }
+}

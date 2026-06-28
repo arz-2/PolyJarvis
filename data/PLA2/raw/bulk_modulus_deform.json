@@ -1,0 +1,22 @@
+{
+  "status": "success",
+  "method": "uniaxial_deformation_3dir",
+  "bulk_modulus_GPa": 3.4159,
+  "bulk_modulus_sem_GPa": 0.0802,
+  "K_x_GPa": 3.2747,
+  "K_y_GPa": 3.4206,
+  "K_z_GPa": 3.5525,
+  "K_std_GPa": 0.139,
+  "isotropy_delta_pct": 4.07,
+  "fit_r2_x": 0.9805,
+  "fit_r2_y": 0.9793,
+  "fit_r2_z": 0.9872,
+  "exp_K_range_GPa": [
+    3.0,
+    4.5
+  ],
+  "within_exp_range": 1,
+  "G_x_GPa": 0.7261,
+  "E_x_GPa": 2.0283,
+  "notes": "Cross-direction K spread 4.1% (PASS). Within-direction C12_yy vs C12_zz anisotropy 28-57% (small cell effect); G<0 for y,z indicates C11<C12 in those dirs but K_mean is robust."
+}

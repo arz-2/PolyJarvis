@@ -1,0 +1,54 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - Tg Sweep Staircase
+# T_START=550.0 → T_END=150.0 K, step=20.0 K
+# 21 temperature points × 800000 steps/T
+# ============================================================
+
+log tg_sweep.log append
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+# KOKKOS: package loaded via -pk kokkos on the command line
+
+read_data /home/alexzhao/PolyJarvis/data/PVC3/lammps/equil/npt_prod300/npt_prod300_out.data
+include /home/alexzhao/PolyJarvis/data/PVC3/lammps/equil/emc_build.params
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo 500
+
+# --- Velocity initialization at T_START (once only — Rule A) ---
+velocity all create 550.0 295072 mom yes rot yes dist gaussian
+
+# --- Temperature staircase (inherits momenta across steps — Rule A) ---
+variable temps index 550 530 510 490 470 450 430 410 390 370 350 330 310 290 270 250 230 210 190 170 150
+label TEMP_LOOP
+  timestep 1
+  fix npt_tg all npt temp ${temps} ${temps} 100 iso 1.0 1.0 1000.0
+  run 800000
+  unfix npt_tg
+  shell echo '{"stage":"T${temps}","status":"done"}' >> /home/alexzhao/PolyJarvis/data/PVC3/lammps/thermal/tg_sweep_r25/tg_progress.jsonl
+  dump per_t_snap all atom 1 per_t_structs.dump
+  dump_modify per_t_snap append yes
+  run 0
+  undump per_t_snap
+  print "STAGE COMPLETE: Tg step T=${temps}K P=1.0atm steps=800000"
+  next temps
+  jump SELF TEMP_LOOP
+
+write_data tg_step_out.data

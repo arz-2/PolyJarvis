@@ -1,0 +1,62 @@
+{
+  "status": "success",
+  "method": "murnaghan",
+  "fit_converged": true,
+  "B0_GPa": 4.3001,
+  "bulk_modulus_GPa": 4.3001,
+  "B0_sem_GPa": 2.4566,
+  "bulk_modulus_sem_GPa": 2.4566,
+  "B0_prime": 30.0,
+  "V0_A3": 48961.24,
+  "r_squared": 0.966313,
+  "n_points": 5,
+  "pressures_atm": [
+    1.0,
+    100.0,
+    300.0,
+    600.0,
+    1000.0
+  ],
+  "pressures_GPa": [
+    0.000101,
+    0.010133,
+    0.030398,
+    0.060795,
+    0.101325
+  ],
+  "volumes_A3": [
+    48997.43,
+    48738.82,
+    48729.52,
+    48355.14,
+    48117.99
+  ],
+  "vol_stds_A3": [
+    194.32,
+    198.02,
+    195.15,
+    197.78,
+    176.44
+  ],
+  "n_prod_rows": [
+    2501,
+    2501,
+    2501,
+    2501,
+    2501
+  ],
+  "log_files": [
+    "/home/arz2/PolyJarvis/data/PLA3/lammps/mechanical/bm_series/bm_P1/bm_P1.log",
+    "/home/arz2/PolyJarvis/data/PLA3/lammps/mechanical/bm_series/bm_P100/bm_P100.log",
+    "/home/arz2/PolyJarvis/data/PLA3/lammps/mechanical/bm_series/bm_P300/bm_P300.log",
+    "/home/arz2/PolyJarvis/data/PLA3/lammps/mechanical/bm_series/bm_P600/bm_P600.log",
+    "/home/arz2/PolyJarvis/data/PLA3/lammps/mechanical/bm_series/bm_P1000/bm_P1000.log"
+  ],
+  "eq_fraction": 0.5,
+  "output_dir": "/home/arz2/PolyJarvis/data/PLA3/raw",
+  "warnings": [
+    "Murnaghan fit R\u00b2=0.96631 < 0.999. Check that NPT runs are fully equilibrated (increase --eq_fraction or NPT steps) and that the pressure range is appropriate for this polymer.",
+    "B0'=30.00 is outside the expected range [4, 20] for polymers. Verify pressure range and equilibration quality."
+  ],
+  "murnaghan_eos_fig": "/home/arz2/PolyJarvis/data/PLA3/graphs/murnaghan_eos.png"
+}

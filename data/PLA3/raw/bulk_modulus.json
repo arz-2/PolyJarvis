@@ -1,0 +1,18 @@
+{
+  "bulk_modulus_GPa": 3.1258,
+  "bulk_modulus_sem_GPa": 0.1523,
+  "method": "deformation_3dir",
+  "K_x_GPa": 3.2282,
+  "K_y_GPa": 2.8262,
+  "K_z_GPa": 3.3229,
+  "K_std_GPa": 0.2637,
+  "isotropy_delta_pct": 8.44,
+  "exp_K_range_GPa": [3.0, 4.5],
+  "within_exp_range": true,
+  "fit_r2_C11_x": 0.9901,
+  "fit_r2_C11_y": 0.981,
+  "fit_r2_C11_z": 0.9896,
+  "status": "success",
+  "B_dyn_diagnostic_GPa": 5.2796,
+  "notes": "Murnaghan fallback: B0_prime=30.0 exceeded [4,20] bound at ±1000 atm. 3-direction deform used. B_dyn (volume fluctuation) = 5.28 GPa is diagnostic only — glassy NPT volume fluctuations are unreliable for K. Deform K_mean in exp range [3.0,4.5] GPa. y-direction shows negative G/E (C12>C11), indicating residual anisotropy in that direction; K_y is still physically reasonable as isotropic K estimator. Isotropy delta 8.44% < 20% gate."
+}

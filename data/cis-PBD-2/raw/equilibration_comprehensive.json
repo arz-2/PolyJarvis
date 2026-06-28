@@ -1,0 +1,104 @@
+{
+  "status": "success",
+  "overall_pass": true,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.1896,
+      "p_value": 0.0
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.2138,
+      "p_value": 0.0458
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.0342
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.0535
+    },
+    "tau_eff_density_fraction": 0.0006159939638864676,
+    "meta": {
+      "n_total_rows": 1501,
+      "n_production_rows": 751,
+      "T_mean": 300.07
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": true,
+      "cv": 0.175,
+      "mean_Rg_A": 24.101,
+      "mean_Rg2_A2": 598.942,
+      "rg_spread_flag": false,
+      "C_inf": null,
+      "n_chains": 20,
+      "frames_analysed": 1951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 52.73,
+      "std_R_ee_A": 24.68,
+      "n_chains": 20,
+      "end_to_end_distribution_png": "/home/arz2/PolyJarvis/data/cis-PBD-2/graphs/end_to_end_distribution.png"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.031,
+      "r2": 0.9793,
+      "gaussian_pass": true,
+      "n_separations": 199
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 153255.8,
+      "tau_ps": 96141.4,
+      "beta": 0.575,
+      "decay_fraction_at_end": 0.067,
+      "trajectory_ps": 1951.0,
+      "pass": true
+    },
+    "msd": {
+      "alpha": 0.279,
+      "alpha_r2": 0.984,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 986.61,
+      "kinetic_trap_flag": false
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.0104,
+      "p2_std": 0.0035,
+      "p2_max": 0.0241,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": true,
+      "cv_mean": 0.1274,
+      "cv_max": 0.1456,
+      "grid_n": 7,
+      "atoms_per_voxel": 23.4,
+      "poisson_cv": 0.207,
+      "poisson_limited": false,
+      "heterogeneous_flag": false
+    }
+  },
+  "warnings": [
+    "C(t) partially decayed: 7% decayed at end of trajectory (\u03c4_relax=153255.8 ps vs T_traj=1951.0 ps)"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.07 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-06-22 13:55\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.1896% (p=0.0) | <1%, p<0.01 | PASS |\n| Energy drift | 0.2138% (p=0.0458) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0342% | <1% | PASS |\n| Energy block-SEM | 0.0535% | <1% | PASS |\n| \u03c4_eff density | 0.1% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 17.5% | <30% | PASS |\n| MSID slope | 1.031 (R\u00b2=0.9793) | 1.0 \u00b120% | OK |\n| C(t) \u03c4_relax | 153255.8 ps (7% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | no (\u03b1=0.279, MSD=986.61 \u00c5\u00b2>>Rg\u00b2=598.942) | \u2014 | OK |\n| R_ee mean \u00b1 std | 52.73 \u00b1 24.68 \u00c5 (N=20 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0104 \u00b1 0.0035 | <0.10 | PASS |\n| Density homogeneity CV | 12.7% (7\u00b3 grid, 23.4 atoms/voxel) | <25% | PASS |\n\n**Warnings:** C(t) partially decayed: 7% decayed at end of trajectory (\u03c4_relax=153255.8 ps vs T_traj=1951.0 ps)",
+  "log_file": "/home/arz2/PolyJarvis/data/cis-PBD-2/lammps/equil/npt_production/npt_production.log",
+  "dump_file": "/home/arz2/PolyJarvis/data/cis-PBD-2/lammps/equil/nvt_production/nvt_production.dump",
+  "data_file": "/home/arz2/PolyJarvis/data/cis-PBD-2/lammps/equil/npt_production/npt_production_out.data",
+  "backbone_types": [
+    1,
+    2
+  ],
+  "timestamp": "2026-06-22 13:55"
+}

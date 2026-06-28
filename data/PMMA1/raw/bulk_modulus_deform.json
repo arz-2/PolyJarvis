@@ -1,0 +1,35 @@
+{
+  "status": "success",
+  "log_file": "/home/arz2/PolyJarvis/data/PMMA1/lammps/mechanical/05_deform_slow/05_deform_slow.log",
+  "output_dir": "/home/arz2/PolyJarvis/data/PMMA1/raw/deform_slow",
+  "method": "uniaxial_deformation",
+  "C11_GPa": 4.8103,
+  "C12_GPa": 2.6846,
+  "C12_yy_GPa": 2.5709,
+  "C12_zz_GPa": 2.7983,
+  "K_GPa": 3.3932,
+  "G_GPa": 1.0629,
+  "E_GPa": 2.8872,
+  "nu_Poisson": 0.3582,
+  "fit_r2_C11": 0.9758,
+  "fit_r2_C12_yy": 0.9073,
+  "fit_r2_C12_zz": 0.9682,
+  "fit_p_C11": 0.0,
+  "fit_p_C12_yy": 0.0,
+  "isotropy_delta_pct": 8.47,
+  "n_fit_points": 28000,
+  "strain_range": [
+    0.002,
+    0.03
+  ],
+  "T_mean_K": 300.01,
+  "strain_rate_per_fs": 1e-08,
+  "avg_window_frames": 2000,
+  "stress_strain_csv": "/home/arz2/PolyJarvis/data/PMMA1/raw/deform_slow/stress_strain.csv",
+  "diagnostics": {
+    "n_phase1_rows": 2000,
+    "n_phase2_rows": 32002,
+    "step_0": 200000,
+    "strain_max_reached": 0.032
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "status": "success",
+  "overall_pass": false,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.0,
+      "p_value": NaN
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.0545,
+      "p_value": 0.8758
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.0
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.0569
+    },
+    "tau_eff_density_fraction": 0.0,
+    "meta": {
+      "n_total_rows": 1001,
+      "n_production_rows": 501,
+      "T_mean": 529.77
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": false,
+      "cv": 0.3037,
+      "mean_Rg_A": 16.354,
+      "mean_Rg2_A2": 292.127,
+      "rg_spread_flag": true,
+      "C_inf": null,
+      "n_chains": 10,
+      "frames_analysed": 1951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 40.38,
+      "std_R_ee_A": 17.84,
+      "n_chains": 10,
+      "end_to_end_distribution_png": "failed: [Errno 2] No such file or directory: '/home/arz2/PolyJarvis/data/PVC1/graphs/end_to_end_distribution.png'"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.317,
+      "r2": 0.9871,
+      "gaussian_pass": false,
+      "n_separations": 59
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 3618757684.0,
+      "tau_ps": 1000000000.0,
+      "beta": 0.388,
+      "decay_fraction_at_end": 0.004,
+      "trajectory_ps": 1951.0,
+      "pass": false
+    },
+    "msd": {
+      "alpha": 0.272,
+      "alpha_r2": 0.8705,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 222.58,
+      "kinetic_trap_flag": true
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.0252,
+      "p2_std": 0.0039,
+      "p2_max": 0.0373,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": true,
+      "cv_mean": 0.1661,
+      "cv_max": 0.1981,
+      "grid_n": 5,
+      "atoms_per_voxel": 29.0,
+      "poisson_cv": 0.186,
+      "poisson_limited": false,
+      "heterogeneous_flag": false
+    }
+  },
+  "warnings": [
+    "MSID slope = 1.317 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension",
+    "C(t) partially decayed: 0% decayed at end of trajectory (\u03c4_relax=3618757684.0 ps vs T_traj=1951.0 ps)",
+    "MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=529.77 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-06-20 08:42\n\n**Overall: FAIL**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.0% (p=nan) | <1%, p<0.01 | N/A (NVT \u2014 fixed volume) |\n| Energy drift | 0.0545% (p=0.8758) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0% | <1% | N/A (NVT \u2014 fixed volume) |\n| Energy block-SEM | 0.0569% | <1% | PASS |\n| \u03c4_eff density | 0.0% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 30.4% | <30% | FAIL |\n| MSID slope | 1.317 (R\u00b2=0.9871) | 1.0 \u00b120% | \u26a0 non-Gaussian |\n| C(t) \u03c4_relax | 3618757684.0 ps (0% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | yes (\u03b1=0.272, MSD=222.58 \u00c5\u00b2>>Rg\u00b2=292.127) | \u2014 | \u26a0 trapped |\n| R_ee mean \u00b1 std | 40.38 \u00b1 17.84 \u00c5 (N=10 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0252 \u00b1 0.0039 | <0.10 | PASS |\n| Density homogeneity CV | 16.6% (5\u00b3 grid, 29.0 atoms/voxel) | <25% | PASS |\n\n**Warnings:** MSID slope = 1.317 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension; C(t) partially decayed: 0% decayed at end of trajectory (\u03c4_relax=3618757684.0 ps vs T_traj=1951.0 ps); MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state",
+  "log_file": "/home/arz2/PolyJarvis/data/PVC1/lammps/equil/nvt_production/nvt_production.log",
+  "dump_file": "/home/arz2/PolyJarvis/data/PVC1/lammps/equil/npt_prod300/npt_prod300.dump",
+  "data_file": "/home/arz2/PolyJarvis/data/PVC1/lammps/equil/npt_prod300/npt_prod300_out.data",
+  "backbone_types": [
+    1,
+    2
+  ],
+  "timestamp": "2026-06-20 08:42"
+}

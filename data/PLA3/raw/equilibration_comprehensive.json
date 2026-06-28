@@ -1,0 +1,107 @@
+{
+  "status": "success",
+  "overall_pass": false,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.0961,
+      "p_value": 0.028
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.092,
+      "p_value": 0.0526
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.0243
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.0165
+    },
+    "tau_eff_density_fraction": 0.0001921450482880349,
+    "meta": {
+      "n_total_rows": 2001,
+      "n_production_rows": 1001,
+      "T_mean": 299.95
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": true,
+      "cv": 0.198,
+      "mean_Rg_A": 16.691,
+      "mean_Rg2_A2": 289.796,
+      "rg_spread_flag": false,
+      "C_inf": 14.963,
+      "n_chains": 10,
+      "frames_analysed": 951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 35.41,
+      "std_R_ee_A": 12.11,
+      "n_chains": 10,
+      "end_to_end_distribution_png": "/home/arz2/PolyJarvis/data/PLA3/graphs/end_to_end_distribution.png"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.21,
+      "r2": 0.9971,
+      "gaussian_pass": false,
+      "n_separations": 99
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 5093.1,
+      "tau_ps": 4979.6,
+      "beta": 0.951,
+      "decay_fraction_at_end": 0.103,
+      "trajectory_ps": 951.0,
+      "pass": false
+    },
+    "msd": {
+      "alpha": 0.262,
+      "alpha_r2": 0.976,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 296.55,
+      "kinetic_trap_flag": false
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.017,
+      "p2_std": 0.0061,
+      "p2_max": 0.0361,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": true,
+      "cv_mean": 0.238,
+      "cv_max": 0.2715,
+      "grid_n": 6,
+      "atoms_per_voxel": 20.9,
+      "poisson_cv": 0.219,
+      "poisson_limited": false,
+      "heterogeneous_flag": false
+    }
+  },
+  "warnings": [
+    "MSID slope = 1.21 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension",
+    "C(t) partially decayed: 10% decayed at end of trajectory (\u03c4_relax=5093.1 ps vs T_traj=951.0 ps)"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=299.95 K \u00b7 951 frames analysed (skip=50) \u00b7 2026-06-24 19:44\n\n**Overall: FAIL**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.0961% (p=0.028) | <1%, p<0.01 | PASS |\n| Energy drift | 0.092% (p=0.0526) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0243% | <1% | PASS |\n| Energy block-SEM | 0.0165% | <1% | PASS |\n| \u03c4_eff density | 0.0% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 19.8% | <30% | PASS |\n| C\u221e | 14.963 | lit. varies | INFO |\n| MSID slope | 1.21 (R\u00b2=0.9971) | 1.0 \u00b120% | \u26a0 non-Gaussian |\n| C(t) \u03c4_relax | 5093.1 ps (10% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | no (\u03b1=0.262, MSD=296.55 \u00c5\u00b2>>Rg\u00b2=289.796) | \u2014 | OK |\n| R_ee mean \u00b1 std | 35.41 \u00b1 12.11 \u00c5 (N=10 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.017 \u00b1 0.0061 | <0.10 | PASS |\n| Density homogeneity CV | 23.8% (6\u00b3 grid, 20.9 atoms/voxel) | <25% | PASS |\n\n**Warnings:** MSID slope = 1.21 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension; C(t) partially decayed: 10% decayed at end of trajectory (\u03c4_relax=5093.1 ps vs T_traj=951.0 ps)",
+  "log_file": "/home/arz2/PolyJarvis/data/PLA3/lammps/equil/npt_prod300/npt_prod300.log",
+  "dump_file": "/home/arz2/PolyJarvis/data/PLA3/lammps/equil/nvt_production/nvt_production.dump",
+  "data_file": "/home/arz2/PolyJarvis/data/PLA3/lammps/equil/npt_prod300/npt_prod300_out.data",
+  "backbone_types": [
+    1,
+    3,
+    6,
+    7
+  ],
+  "timestamp": "2026-06-24 19:44"
+}

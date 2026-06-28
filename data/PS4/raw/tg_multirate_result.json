@@ -1,0 +1,49 @@
+{
+  "status": "success",
+  "n_points": 3,
+  "rates_K_per_ns": [
+    25.0,
+    50.0,
+    100.0
+  ],
+  "tg_values_K": [
+    434.0,
+    415.8,
+    501.2
+  ],
+  "rates_span_decades": 0.6020599913279624,
+  "loglinear_slope_K": 48.474553373869156,
+  "loglinear_intercept_K": 260.6997653569026,
+  "loglinear_r_squared": 0.5579593154665807,
+  "tg_at_slow_rate_K": 434.0,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": true,
+  "is_flat_rate_regime": false,
+  "regime": "glassy",
+  "rubbery_regime_exemption": false,
+  "tg_method": "loglinear_extrapolation",
+  "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
+  "tg0_K": 414.79999999999995,
+  "tg0_K_ci95": Infinity,
+  "vf_A": -6.994571661680633,
+  "vf_c": -4.686167108098495,
+  "vf_B_ns_per_K": 0.009221965298593452,
+  "vf_r_squared": 0.9325684267147832,
+  "vf_predicted_tg_K": [
+    419.5669959888822,
+    423.8352321196446,
+    501.1560179749382
+  ],
+  "vf_residuals_K": [
+    14.433004011117816,
+    -8.035232119644604,
+    0.04398202506177995
+  ],
+  "polymer_name": "PS4",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 25 K/ns | 434.0 K |\n| 50 K/ns | 415.8 K |\n| 100 K/ns | 501.2 K |\n\n**Log-linear**: Tg = 260.7 + 48.47\u00b7ln(\u0393)  R\u00b2=0.5580\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **-830.7 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): Tg\u2070 = 414.8 \u00b1 inf K (95% CI)  R\u00b2=0.9326  quality=POOR_POORLY_CONSTRAINED\n\u26a0 CI > 100 K: VF extrapolation is underconstrained with < 2 decades of rates. Use log-linear result for validation.\n",
+  "d06_markdown_path": "/home/alexzhao/PolyJarvis/data/PS4/raw/d06_multirate_block.md",
+  "plot_path": "/home/alexzhao/PolyJarvis/data/PS4/raw/tg_multirate.png",
+  "tg_at_slow_rate_K_rejected_extrapolation": -830.7050610798935,
+  "tg_at_slow_rate_patch_reason": "loglinear R2=0.558 (<0.90, 0.6-decade span) -> DSC extrap unreliable (-830.7 K nonsense); accept slowest-rate MD Tg per ps-pcff-tg-slopegate-fail memory + plan D-06b. VF tg0=414.8 K corroborates."
+}

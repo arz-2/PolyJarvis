@@ -1,0 +1,335 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PSTR (*CC(c1ccccc1)*)",
+  "run_name": "PS3",
+  "polymer_class": "PSTR",
+  "smiles": "*CC(c1ccccc1)*",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "medium",
+  "plan_mode": "reasoned",
+  "assumptions": [
+    "PSTR is confidence=medium: class-specific temperatures exist in polymer_rules.json, so group-contribution Tg estimation is skipped",
+    "Member resolved to PS (polystyrene): atactic, exp Tg=373 K, exp RT density=1.05 g/cm3, exp K_T=3.3-4.0 GPa"
+  ],
+  "uncertainties": [
+    {
+      "name": "pcff_ps_tg_transferability",
+      "dominant": true,
+      "reduction_probe": "literature_anchor",
+      "note": "No direct PCFF PS Tg validation paper exists. PCFF Class II is validated on PC (Tg 417 vs 422 K, Tang2022) and PMMA vinyl backbone (<10%, NkepsuMbitou2025); PS aromatic-pendant vinyl is an analogy. SimPoly reports PS MD Tg 399+/-22 K vs exp 373 K."
+    },
+    {
+      "name": "k_subentanglement_dp",
+      "dominant": false,
+      "reduction_probe": "none",
+      "note": "DP=40 < DP@Me=160 (aPS Me=16,600 g/mol). Bulk modulus is screening-grade; sub-entanglement DP underestimates K vs converged value while MD strain-rate overestimates. Reported alongside exp reference, not used to revise plan."
+    },
+    {
+      "name": "hardware_optimum",
+      "dominant": false,
+      "reduction_probe": "hardware_benchmark",
+      "note": "directional_probe recommends kokkos gpu1_mpi1 (42.8 ns/day) but measured_on A800/32-core (host mismatch vs RTX6000/18-core) and values_are_benchmarked=false; ~6.4k cell is ~2.1x the 3020-atom probe cell. Kept by_forcefield default."
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "pcff",
+    "preferred_builder": "emc",
+    "charge_method": "bond-increment",
+    "electrostatics": "pppm",
+    "cutoff_A": 12.0,
+    "dt_fs": 1.0,
+    "confidence": "medium",
+    "dp_typical": 40,
+    "nchain": 10,
+    "density_initial_gcm3": 0.53,
+    "T_equil_K": 550.0,
+    "annealing_T_high_K": 630.0,
+    "eq_annealing_cycles": 5,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 5.0,
+    "tg_t_high_K": 600,
+    "tg_t_low_K": 200,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 500000,
+    "tg_rates_K_per_ns": [
+      40,
+      160,
+      400
+    ],
+    "K_deform_rate_inv_s": 10000000.0,
+    "K_deform_rate_slow_inv_s": 1000000.0,
+    "K_strain_max": 0.03,
+    "ct_min_decay_melt": 0.1,
+    "T_workflow_K": 550.0,
+    "dsc_equiv_rate_K_per_ns": 1.6667e-10,
+    "experimental_tg_K": 373,
+    "experimental_density_gcm3": 1.05,
+    "exp_K_GPa_min": 3.3,
+    "exp_K_GPa_max": 4.0,
+    "tacticity": "atactic",
+    "bm_method": "murnaghan",
+    "bm_pressures_atm": [-1000, -500, 0, 500, 1000],
+    "is_glassy_hint": true
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF via EMC (Class II). Switched from TraPPE-UA 2026-06-11: UA representation ignores phenyl ring partial charges and pi-dihedral barriers that govern PS Tg (~373 K); no TraPPE-UA PS Tg validation exists in literature. PCFF Class II explicitly parameterizes aromatic C-H charges and cross-terms; validated for PC (Tang2022, PCFF Tg=417K vs exp 422K) and PMMA vinyl backbone (NkepsuMbitou2025, Class II within 10%). Soldera2006 (COMPASS/OPLS) confirms MD can reach PS Tg ~449-484 K raw, WLF-corrected ~373 K. No direct PCFF PS Tg paper found; confidence=medium until confirmed.",
+          "source_doi": "10.1021/ja00086a030"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Srivastava2026"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Tang2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Soldera2006"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "NkepsuMbitou2025"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Klajmon2023"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {
+          "choice": "TraPPE-UA",
+          "rejected": true,
+          "reason": "UA representation omits phenyl ring partial charges and pi-dihedral barriers that govern PS Tg; no TraPPE-UA PS Tg validation exists. Switched to PCFF 2026-06-11."
+        }
+      ]
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "bond-increment",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF Class II uses bond-increment charges (FF-embedded), consistent with the PCFF aromatic C-H parameterization. Charge method must be consistent with chosen FF.",
+          "citation": "polymer_rules.json:classes.PSTR.charge_method"
+        },
+        {
+          "claim": "RESP charges (HF/6-31G*) recommended for PS/PSTR due to phenyl pi-system polarization; AM1-BCC acceptable fallback. bond-increment is the EMC/PCFF default and adequate for screening-grade Tg/density.",
+          "citation": "polymer_rules.json:classes.PSTR.notes"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {"choice": "RESP (HF/6-31G*)", "reason": "more accurate ring pi polarization; not required for screening-grade"},
+        {"choice": "AM1-BCC", "reason": "acceptable fallback"}
+      ]
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF assigns aromatic C-H partial charges to the phenyl ring (|q|>0.1e on ring atoms), so long-range Coulomb (PPPM) is required; lj/cut is acceptable only for purely apolar PHYC/PDIE. Neglecting long-range Coulomb biases density/Tg.",
+          "source": "polymer_rules.json:electrostatics_decision_guide"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {"choice": "lj_cut", "rejected": true, "reason": "valid only for pure C/H apolar backbones; PCFF ring charges make it incorrect for PS"}
+      ]
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=40, nchain=10 (~6,400 atoms)",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [
+        {
+          "claim": "DP=40 > Fox-Flory plateau (DP>=20) and > atactic-tacticity averaging floor (DP>=30, Soldera2006) -> Tg is chain-length converged. styrene C8H8 = 16 all-atom; DP40 x nchain10 x 16 = ~6,400 atoms.",
+          "citation": "Soldera2006; polymer_rules.json:classes.PSTR.notes"
+        },
+        {
+          "claim": "PS member exp anchors: Tg=373 K, RT density=1.05 g/cm3, K_T=3.3-4.0 GPa (Mark2007 Table 7.6 Tait params, Zoller1978).",
+          "value_K": 373,
+          "citation": "Mark2007; Zoller1978"
+        },
+        {
+          "claim": "For bulk_modulus, DP=40 < DP@Me=160 (aPS Me=16,600 g/mol) -> K is screening-grade; converged K needs DP>=160 in a dedicated property run.",
+          "citation": "Mark2007 Table 25.4"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": [
+        {"choice": "DP>=160", "reason": "entanglement-converged K, but ~4x atoms; outside 48h screening budget"}
+      ]
+    },
+    {
+      "id": "D-06_tg_fit_quality",
+      "choice": "multirate sweep 200-600 K, 20 K bins, rates [40,160,400] K/ns; bracket exp Tg=373 K",
+      "criteria_evaluated": [
+        "t_range_brackets_experimental_tg",
+        "n_temperature_bins",
+        "bilinear_fit_r_squared",
+        "cooling_rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "Sweep 200-600 K at 20 K steps = 21 bins, brackets exp Tg=373 K with wide margin and covers raw MD Tg ~430-500 K (SimPoly 399+/-22 K). Multirate WLF/log-linear extrapolation corrects cooling-rate artifact toward DSC-equivalent rate. Bilinear fit R^2 verified before reporting.",
+          "citation": "polymer_rules.json:tg_protocol_reference; Soldera2006"
+        }
+      ],
+      "confidence": "medium",
+      "alternatives": []
+    },
+    {
+      "id": "D-07_property_method",
+      "choice": "Murnaghan NPT compression at 300 K (glassy), pressures [-1000,-500,0,500,1000] atm",
+      "criteria_evaluated": [
+        "phase_glassy_vs_rubbery",
+        "method_physics_validity",
+        "gpu_vs_cpu",
+        "rate_artifact"
+      ],
+      "evidence": [
+        {
+          "claim": "PS is glassy at 300 K (Tg~373 K > 300 K). Glassy bulk modulus via Murnaghan NPT compression (Wu 2019 Comput. Mater. Sci. validated; symmetric, cell-size independent). Born+NVT REMOVED pipeline-wide 2026-06-21 (PCFF+PPPM virial incompatibility, K_Born 8-15x too high, failed 3/3 runs). Deform 3-direction uniaxial is the fallback if Murnaghan fit fails or B0_prime outside [4,20].",
+          "source_doi": "10.1016/j.commatsci.2019.02.046"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": [
+        {"choice": "Born+NVT", "rejected": true, "reason": "retired pipeline-wide 2026-06-21; PCFF+PPPM virial incompatibility"},
+        {"choice": "uniaxial deformation", "reason": "Murnaghan fallback only"}
+      ]
+    },
+    {
+      "id": "D-08_hardware",
+      "choice": {"engine": "kokkos", "gpu_per_run": 1, "mpi": 1},
+      "criteria_evaluated": [
+        "forcefield_cost_structure",
+        "atom_count",
+        "concurrent_load",
+        "benchmark_evidence",
+        "cell_size_vs_benchmark_cell",
+        "host_match"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF = class2 + PPPM; by_forcefield[pcff] default is kokkos full-offload (pair+class2 bonded+pppm+neigh on GPU), mpi=1, 1 GPU/run (run-0 parity 0.000% on energies+forces+pressure, 2026-06-20). Cell ~6,400 atoms < 10k -> 1 GPU (GPU-saturated by one PPPM job; >1 run/GPU degrades). directional_probe recommends kokkos gpu1_mpi1 at 42.826 ns/day but measured_on 4x A800/32-core (host mismatch vs RTX6000/18-core), values_are_benchmarked=false, and ~6.4k cell is ~2.1x the 3020-atom probe cell -> treat as hint only. Kept by_forcefield default; choice == default.",
+          "citation": "polymer_rules.json:hardware_policy.by_forcefield.pcff; directional_probe date 2026-06-20/2026-06-21"
+        }
+      ],
+      "confidence": "low",
+      "alternatives": [
+        {"choice": "engine=gpu, mpi=4 (GPU package)", "reason": "fallback if KOKKOS binary unavailable"}
+      ]
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 373
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "analyze-tg-multirate",
+      "track": "thermal",
+      "success_criteria": {
+        "loglinear_r_squared_min": 0.9,
+        "n_rates_min": 2
+      }
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "fit_converged": true,
+        "eos_r_squared_min": 0.999,
+        "b0_prime_range": [4, 20],
+        "volume_equilibrated_all_points": true
+      },
+      "fallback": "deform"
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 1,
+    "findings": [
+      "Gate verified independently: PSTR confidence=medium -> reasoned (matches plan_mode).",
+      "D-01..D-07 policy coverage, evidence (DOIs/citations on FF/electrostatics/property_method), require clauses, and alternatives all satisfied.",
+      "D-08_hardware: pin {kokkos, gpu1, mpi1} == by_forcefield[pcff] default; mpi=1 is canonical for PCFF KOKKOS full-offload (kspace on GPU). Host mismatch + values_are_benchmarked=false correctly handled: recommended_by_ff treated as hint, default kept, confidence:low, hardware_benchmark probe planned.",
+      "All planned_stages have required fields + valid tracks; stages match properties {density,tg,bulk_modulus}; dominant uncertainty named with valid reduction_probe."
+    ]
+  },
+  "provenance": {
+    "generator": "make_deterministic_plan.py",
+    "generated_at": "2026-06-23T19:33:03.344812+00:00"
+  }
+}

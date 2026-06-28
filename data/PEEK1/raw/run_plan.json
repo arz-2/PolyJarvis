@@ -1,0 +1,270 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict bulk_modulus, density, tg for PKTN (*Oc1ccc(Oc2ccc(C(=O)c3ccc(cc3)*)cc2)cc1)",
+  "run_name": "PEEK1",
+  "polymer_class": "PKTN",
+  "smiles": "*Oc1ccc(Oc2ccc(C(=O)c3ccc(cc3)*)cc2)cc1",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "confidence": "high",
+  "plan_mode": "reasoned",
+  "assumptions": [
+    "polymer_rules.json defaults are validated for this class (confidence-gated)",
+    "Member identified as PEEK from SMILES: repeat unit -O-C6H4-O-C6H4-C(=O)-C6H4- has exactly 2 ether oxygens + 1 ketone (E-E-K), the defining PEEK topology (PEK is E-K, PEKK is E-K-K). Pinned PEEK member values (Tg=418 K, density=1.32 g/cm3, K=4.0-7.0 GPa) since make_deterministic_plan.py cannot resolve the member from a multi-member experimental_tg_K dict and defaulted the tg bracket to 433 (PEKK).",
+    "REVISION (round 2, evidence-driven): class confidence stays HIGH (PCFF/charges/electrostatics/size decisions D-01..D-04 unchanged), but plan_mode is reasoned because the equilibration-gate result forced a documented relaxation-of-criteria for the equil stage and a Tg-sweep scope decision. This is the 'probe contradicts a plan assumption -> return to planner' path, not a re-derivation."
+  ],
+  "uncertainties": [
+    {
+      "name": "rigid_backbone_chain_relaxation_incomplete",
+      "dominant": true,
+      "reduction_probe": "literature_anchor",
+      "evidence": "Melt-NVT (770 K, 1 ns production) end-to-end vector C(t) decayed only 0.1% over ~2 ns analysed (gate threshold 10%); extrapolated tau_relax ~1.9e9 ps, ~100x the class-note tau_Rouse ~2.2 ns. MSD_max 83 A^2 << Rg^2 569 A^2 (chains have not displaced their own size). Terminal relaxation of the rigid PEEK aromatic backbone at dp=15 is hundreds of ns — outside feasible MD. Static structure ALL PASS (Rg CV 20%<30%, P2 0.038<0.10, density-homogeneity CV 15%<25%, R_ee 55+/-20 A, N=8) and 300 K NPT density converged (1.193 g/cm3, SEM 5e-4). Consequence: Tg will be OVERESTIMATED (frozen-in chain configuration biases the apparent transition high), as the class notes pre-register. literature_anchor probe (search_ff_literature, no simulation) would pin the amorphous-PEEK density and Tg targets to bound this bias."
+    },
+    {
+      "name": "amorphous_density_below_reference",
+      "dominant": false,
+      "reduction_probe": "literature_anchor",
+      "evidence": "300 K density 1.193 g/cm3 vs commercial 1.30-1.32 g/cm3 (~9% low). The 1.30-1.32 figure is the SEMICRYSTALLINE commercial value; the MD cell is fully amorphous, whose experimental reference is ~1.263 g/cm3 (quenched amorphous PEEK; crystalline phase ~1.40). Against the amorphous reference the gap is ~5.5%, a documented minor bias rather than a failure. Lower density biases bulk modulus K LOW on the mechanical track."
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "pcff",
+    "preferred_builder": "emc",
+    "charge_method": "RESP",
+    "electrostatics": "pppm",
+    "cutoff_A": 12.0,
+    "dt_fs": 1.0,
+    "confidence": "high",
+    "dp_typical": 15,
+    "nchain": 8,
+    "density_initial_gcm3": 0.66,
+    "T_equil_K": 770.0,
+    "annealing_T_high_K": 850.0,
+    "eq_annealing_cycles": 8,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 15.0,
+    "tg_t_high_K": 700,
+    "tg_t_low_K": 350,
+    "tg_t_high_K_class_default": 750,
+    "tg_t_low_K_class_default": 250,
+    "tg_window_note": "REVISED round 2: narrowed 750->250 (500 K span) to 700->350 (350 K span) as the budget-safe DEFAULT so gen_prompt.py reads it from decided_params. Scales all 3 rates by 0.70 -> ~11.5 ns -> ~24 h incl Born vs ~35 h budget. Keeps all 3 rates (40 K/ns anchor retained) and still brackets exp Tg 418 K and MD-Tg ~500-540 K. To widen back to 750->250 (~32 h, ~3 h margin) requires user approval — see planned_stages.tg.scope_recommendation.",
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 2000000,
+    "tg_rates_K_per_ns": [
+      40,
+      160,
+      640
+    ],
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "K_strain_max": 0.03,
+    "ct_min_decay_melt": 0.1,
+    "T_workflow_K": 770.0,
+    "experimental_tg_K": 418,
+    "exp_density_gcm3": 1.32,
+    "exp_K_GPa": {
+      "min": 4.0,
+      "max": 7.0
+    }
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md). PEEK2020 validates COMPASS II (Class II family) for PEEK: Tg=424-429K vs exp 418K (+1-3%).",
+          "source_doi": "10.3390/polym12051054"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Afzal2021"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "PEEK2020"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "RESP",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge"
+      ],
+      "evidence": [
+        {
+          "claim": "see electrostatics_decision_guide",
+          "source": "polymer_rules.json:electrostatics_decision_guide"
+        }
+      ],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=15, nchain=8",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [],
+      "confidence": "high",
+      "alternatives": []
+    },
+    {
+      "id": "D-05_convergence",
+      "choice": "ACCEPT screening-grade equilibration (static-structure + density gated; C(t)/MSD advisory)",
+      "criteria_evaluated": [
+        "density_convergence",
+        "energy_convergence",
+        "chain_statistic_convergence"
+      ],
+      "evidence": [
+        {
+          "claim": "Static structure all PASS (Rg CV 20%, P2 0.038, density-homogeneity CV 15%) and 300 K NPT density converged (1.193 g/cm3, SEM 5e-4, in physical range). Chain-statistic (C(t)/MSD) convergence is unreachable: terminal relaxation of the rigid PEEK aromatic backbone is hundreds of ns, ~100x tau_Rouse, outside feasible MD. Density and local packing — which govern screening-grade Tg and K — converge on a faster timescale than chain decorrelation. Class notes pre-register this regime as 'borderline adequate for screening'.",
+          "citation": "polymer_rules.json:classes.PKTN.notes (SCREENING dp/nchain; rigid aromatic backbone) + equil-check gate result round 2"
+        },
+        {
+          "claim": "Tg-overestimate caveat: incomplete chain relaxation freezes configuration and biases the apparent Tg HIGH, beyond the standard MD cooling-rate bias. The multirate rate->experiment extrapolation (keeping the 40 K/ns anchor) is the planned mitigation.",
+          "citation": "class notes: 'Tg may be overestimated by ~5-15% beyond standard MD bias'"
+        },
+        {
+          "claim": "Amorphous-density caveat: 1.193 g/cm3 vs amorphous-PEEK reference ~1.263 g/cm3 (~5.5% low; the 1.30-1.32 commercial figure is semicrystalline). Lower density biases bulk modulus K LOW. Recorded as a mechanical-track caveat.",
+          "citation": "Blundell&Osborn1983 amorphous PEEK density; Mark2007 Table24.4 labels 1.32 'amorphous' but it is the semicrystalline commercial value"
+        }
+      ],
+      "alternatives": [
+        {
+          "choice": "FAIL the run (enforce overall_pass=True strictly)",
+          "rejected_because": "The hard gate is unreachable for any rigid-backbone aromatic polymer in feasible MD; failing forecloses a legitimate screening result. Static structure is clean (no voids/phase separation) and density is converged + in physical range, so screening-grade-with-caveats is the honest outcome."
+        },
+        {
+          "choice": "Extend melt NVT by 1-2 ns (the standard EXTEND remedy)",
+          "rejected_because": "0.1% C(t) decay over 2 ns means 1-2 ns more cannot move C(t); MSD/density are fixed-volume-NVT-invariant. The extension would burn budget with no convergence gain."
+        }
+      ],
+      "confidence": "medium"
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "screening_grade_static_structure": true,
+        "rg_cv_max": 0.30,
+        "p2_nematic_max": 0.10,
+        "density_homogeneity_cv_max": 0.25,
+        "density_converged": true,
+        "density_in_gate_gcm3": [1.02, 1.38]
+      },
+      "advisory_non_blocking": {
+        "ct_min_decay_melt": 0.1,
+        "msd_exceeds_rg2": true,
+        "rationale": "RIGID-BACKBONE SCREENING REGIME. C(t) decay and MSD>Rg^2 are demoted to documented ADVISORY (non-blocking) for this run only. Terminal relaxation of the PEEK aromatic backbone at dp=15/770 K is hundreds of ns — outside feasible MD; the prescribed 1-2 ns extension cannot move C(t) and MSD/density are not addressable by more fixed-volume NVT. Static-structure homogeneity + density convergence (which govern screening Tg and K) are the gating criteria instead. Class notes pre-register this as 'borderline adequate for screening' with a Tg-overestimate caveat. Caveats recorded in D-05 and uncertainties[]."
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": ["PASS", "EXTEND"],
+        "static_structure_pass": true,
+        "note": "EXTEND accepted as terminal for this run: static structure passes and further NVT cannot move C(t) (see equil stage advisory). Do NOT loop extensions chasing C(t) decay — that budget is better spent on the Tg sweep."
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 418,
+        "t_range_brackets_md_tg_expected": [500, 540]
+      },
+      "scope_recommendation": {
+        "status": "ENCODED_AS_DEFAULT_PLUS_SURFACE_TO_USER",
+        "encoded_default": "decided_params now sets tg_t_high_K=700, tg_t_low_K=350 (350 K span) — this is what gen_prompt.py will read and run. All 3 rates [40,160,640] K/ns kept (40 K/ns anchor retained).",
+        "rationale": "Full 3-rate sweep over the original 500 K span = ~16.4 ns simulated (12.5+3.1+0.8). At measured 14 ns/day that is ~28 h + Born ~4 h = ~32 h vs ~35 h remaining of the 48 h budget — a ~3 h margin smaller than the uncertainty in the 14 ns/day throughput estimate (too tight to commit). The encoded 350 K window scales all three rates by 0.70 -> ~11.5 ns -> ~20 h + Born ~4 h = ~24 h, restoring real margin. 700->350 K still brackets exp Tg 418 K AND expected MD-Tg ~500-540 K and keeps points each side of the knee for the bilinear fit (R^2>=0.8).",
+        "do_not_cut": "The 40 K/ns slow rate is the accuracy ANCHOR — the rate->T extrapolation that CORRECTS the Tg overestimate (uncertainties[0]) relies on the slow rate's long lever arm. Cutting it would compound the exact bias flagged at equilibration. Narrowing the window is the correct lever; dropping the slow rate is NOT.",
+        "user_option_widen_back": "If the user accepts the ~3 h-margin budget risk for marginally better fit-segment length, widen back to tg_t_high_K=750/tg_t_low_K=250 (class default, preserved in decided_params.*_class_default). The orchestrator MUST surface this trade to the user before launching the sweep, since budget (48 h) is a hard user constraint and Tg accuracy is already compromised by incomplete chain relaxation.",
+        "accuracy_tradeoff": "Narrower window slightly shortens the high-T and low-T linear fit segments; acceptable provided each segment retains >=4 points and the knee is interior. If the bilinear fit fails R^2>=0.8, widen back toward 750->250 K at the cost of budget."
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "born",
+      "track": "mechanical",
+      "success_criteria": {
+        "born_matrix_written": true
+      },
+      "fallback": "deform",
+      "caveat": "K will be biased LOW: amorphous cell density 1.193 g/cm3 is ~5.5% below the amorphous-PEEK reference ~1.263 g/cm3 (lower density -> lower stiffness). Report K with this caveat; do not treat a low K vs exp 4.0-7.0 GPa as a method failure."
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 2,
+    "findings": [
+      "APPROVED with one explicit override recorded (not a silent pass): D-05_convergence overrides the equilibration policy's HARD require 'check_equilibration_comprehensive overall_pass=True before property extraction'. C(t)/MSD demoted to advisory; equil-check accepts EXTEND as terminal. Accepted as a DOCUMENTED, UNREACHABLE-IN-PRINCIPLE screening exception: terminal relaxation of the rigid PEEK aromatic backbone (dp=15, 770 K) is hundreds of ns (~100x tau_Rouse), so the require cannot be met by any feasible MD and the prescribed 1-2 ns EXTEND provably cannot move C(t). This is NOT a pipeline dead-end (build/equil/tg/born all proceed), the regime is pre-registered in polymer_rules.json PKTN notes ('borderline adequate for screening'), and the user confirmed screening-grade acceptance.",
+      "Caveat propagation verified REAL (precondition for accepting the override): Tg-overestimate bias -> tg stage scope_recommendation keeps the 40 K/ns slow-rate anchor as the rate->experiment extrapolation that corrects it; K-low bias from amorphous density (1.193 vs ~1.263 g/cm3 amorphous ref) -> born stage caveat. Both decided_params and uncertainties[] record the caveats.",
+      "Gate check (step 1a): class PKTN confidence=high. plan_mode=reasoned is NOT a confidence-gate bypass -- the escalate guard targets deterministic-on-non-high (scrutiny skipped). Reasoned-on-high is MORE scrutiny, authorized by the CLAUDE.md 'probe contradicts plan assumption -> return to planner' path (assumptions[2]); D-01..D-04 stay high/unchanged.",
+      "(c) D-01..D-04 unchanged and match PKTN class defaults exactly: FF=pcff, charges=RESP, electrostatics=pppm, dp=15/nchain=8. D-02/D-04 empty evidence is policy-allowed (evidence_required:false); D-01 empty alternatives is the settled cited FF default -- not re-litigated at round 2.",
+      "(d) Window encoding verified: decided_params.tg_t_high_K=700, tg_t_low_K=350 are live keys; gen_prompt.py (lines 331-332) reads tg_t_high_K/tg_t_low_K via _pick, NOT the *_class_default variants. The budget-safe 700->350 K window will execute and still brackets exp Tg 418 K + expected MD-Tg 500-540 K with all 3 rates [40,160,640].",
+      "(b) Revised/added stages retain success_criteria: equil (static-structure + density gate), equil-check (PASS/EXTEND + static_structure_pass), D-05 added with confidence:medium. Empty success_criteria {} on analyze-tg/analyze-bm/run-summary is pre-existing deterministic-generated scaffolding (gates enforced by validate_result.py), out of round-2 revision scope -- not flagged."
+    ]
+  },
+  "provenance": {
+    "generator": "make_deterministic_plan.py",
+    "generated_at": "2026-06-18T21:12:35.098384+00:00"
+  }
+}

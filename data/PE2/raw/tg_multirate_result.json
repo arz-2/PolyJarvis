@@ -1,0 +1,42 @@
+{
+  "status": "success",
+  "n_points": 3,
+  "rates_K_per_ns": [
+    640.0,
+    160.0,
+    40.0
+  ],
+  "tg_values_K": [
+    232.5,
+    233.6,
+    231.5
+  ],
+  "rates_span_decades": 1.2041199826559248,
+  "loglinear_slope_K": 0.3606737602222408,
+  "loglinear_intercept_K": 230.7028513096115,
+  "loglinear_r_squared": 0.22658610271903445,
+  "tg_at_slow_rate_K": 231.53333333333333,
+  "slow_rate_ref_K_per_ns": 10.0,
+  "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
+  "tg0_K": 1.000000026508116,
+  "tg0_K_ci95": Infinity,
+  "vf_A": -149317.0960984585,
+  "vf_c": -649.9825521633161,
+  "vf_B_ns_per_K": 5.201927104741077e-283,
+  "vf_r_squared": 0.22554667061807154,
+  "vf_predicted_tg_K": [
+    233.03139699855146,
+    232.53262178210247,
+    232.03598630273964
+  ],
+  "vf_residuals_K": [
+    -0.5313969985514575,
+    1.0673782178975273,
+    -0.5359863027396443
+  ],
+  "polymer_name": "PE2",
+  "is_dsc_extrapolation": false,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 40 K/ns | 231.5 K |\n| 160 K/ns | 233.6 K |\n| 640 K/ns | 232.5 K |\n\n**Log-linear**: Tg = 230.7 + 0.36\u00b7ln(\u0393)  R\u00b2=0.2266\n\u2192 Tg at 10 K/ns (slow MD) = **231.5 K**  (slow-MD Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): Tg\u2070 = 1.0 \u00b1 inf K (95% CI)  R\u00b2=0.2255  quality=POOR_POORLY_CONSTRAINED\n\u26a0 CI > 100 K: VF extrapolation is underconstrained with < 2 decades of rates. Use log-linear result for validation.\n",
+  "d06_markdown_path": "/home/arz2/PolyJarvis/data/PE2/raw/d06_multirate_block.md",
+  "plot_path": "/home/arz2/PolyJarvis/data/PE2/raw/tg_multirate.png"
+}
