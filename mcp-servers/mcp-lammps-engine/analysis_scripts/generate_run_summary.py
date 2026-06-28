@@ -182,8 +182,24 @@ def main():
         for sub in sorted(output_dir.glob("tg_r*/tg_summary.json")):
             tg_quality = _load_json(sub).get("fit_quality")
             break
+    def _floor_band(band, *, min_abs=None, min_rel=None):
+        """Widen a too-narrow exp band symmetrically to a physical minimum width, so a
+        degenerate/single-point or hand-entered tight band can't cause a false FAIL
+        (PVC2 0.07% density; PSU4 0.1 K Tg). The floor is set BELOW MD/FF systematic
+        error, so it can never mask a genuine method failure. Returns (band, widened)."""
+        if not band or band[0] is None or band[1] is None:
+            return band, False
+        lo, hi = float(band[0]), float(band[1])
+        mid = 0.5 * (lo + hi)
+        floor = max(min_abs or 0.0, (min_rel or 0.0) * abs(mid))
+        if (hi - lo) >= floor or floor <= 0:
+            return [lo, hi], False
+        r = floor / 2.0
+        return [round(mid - r, 4), round(mid + r, 4)], True
+
     exp_tg = ([args.exp_tg_min, args.exp_tg_max]
               if args.exp_tg_min is not None and args.exp_tg_max is not None else None)
+    exp_tg, tg_band_widened = _floor_band(exp_tg, min_abs=10.0)   # >=10 K total (+/-5 K)
     tg_err = None
     tg_status = "no exp ref"
     if Tg_val is not None and exp_tg:
@@ -202,6 +218,7 @@ def main():
     rho_val = eq_dens.get("plateau_density_mean") or eq_dens.get("density_mean")
     exp_rho = ([args.exp_density_min, args.exp_density_max]
                if args.exp_density_min is not None and args.exp_density_max is not None else None)
+    exp_rho, rho_band_widened = _floor_band(exp_rho, min_rel=0.06)   # >=6% total (+/-3%)
     rho_err = None
     rho_status = "no exp ref"
     if rho_val is not None and exp_rho:
@@ -232,6 +249,7 @@ def main():
 
     exp_K = ([args.exp_K_min, args.exp_K_max]
              if args.exp_K_min is not None and args.exp_K_max is not None else None)
+    exp_K, K_band_widened = _floor_band(exp_K, min_rel=0.20)   # >=20% total (+/-10%)
     K_status = "no exp ref"
     K_err = None
     if K_val is not None and exp_K:
@@ -345,6 +363,7 @@ def main():
                 "grading_basis":  tg_basis,   # rate_extrapolated (strict) | raw_MD (+offset band)
                 "md_offset_K":    (0.0 if tg_basis == "rate_extrapolated" else args.tg_md_offset_K),
                 "exp_range_K":    exp_tg,
+                "band_widened":   tg_band_widened,
                 "error_pct":      tg_err,
                 "status":         tg_status,
                 "r_squared":      tg_r2,
@@ -368,6 +387,7 @@ def main():
             "density": {
                 "value_g_cm3":    rho_val,
                 "exp_range_g_cm3": exp_rho,
+                "band_widened":   rho_band_widened,
                 "error_pct":      rho_err,
                 "status":         rho_status,
             },
@@ -375,6 +395,7 @@ def main():
                 "value_GPa":      K_val,
                 "sem_GPa":        K_sem,
                 "exp_range_GPa":  exp_K,
+                "band_widened":   K_band_widened,
                 "error_pct":      K_err,
                 "status":         K_status,
                 "method":         K_method,

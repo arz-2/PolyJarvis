@@ -39,6 +39,17 @@ def test_previously_divergent_classes_now_authoritative(cid, expected_ff):
     assert got["preferred_ff"] != "opls-aa/2024"
 
 
+@pytest.mark.parametrize("cid", ["PHAL", "PSIL"])
+def test_opls_classes_use_canonical_field_string(cid):
+    """The two OPLS classes must carry EMC's canonical field name "opls/2024/opls-aa"
+    (matches mcp-emc-server _select_field). PHAL previously held the malformed
+    "opls-aa/2024", which EMC fails to resolve and silently downgrades to united-atom
+    opls/2012/opls-ua (no rules for halogenated monomers)."""
+    got = ff_routing.get_preferred_ff(cid)
+    assert got["preferred_ff"] == "opls/2024/opls-aa"
+    assert got["preferred_ff"] != "opls-aa/2024"
+
+
 def test_pstr_routes_pcff():
     """PSTR (polystyrenics) uses PCFF via EMC: Class II explicitly parameterizes aromatic
     C-H charges and pi-dihedral cross-terms governing PS Tg (~373 K). OPLS-AA over-predicts
