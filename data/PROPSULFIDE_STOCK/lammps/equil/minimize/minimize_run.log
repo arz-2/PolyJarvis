@@ -1,0 +1,240 @@
+LAMMPS (22 Jul 2025 - Update 3)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread.
+  using 1 OpenMP thread(s) per MPI task
+Reading data file ...
+  orthogonal box = (0 0 0) to (30.146484 30.146484 30.146484)
+  2 by 2 by 2 MPI processor grid
+  reading atoms ...
+  2020 atoms
+  scanning bonds ...
+  4 = max bonds/atom
+  scanning angles ...
+  6 = max angles/atom
+  scanning dihedrals ...
+  11 = max dihedrals/atom
+  scanning impropers ...
+  4 = max impropers/atom
+  orthogonal box = (0 0 0) to (30.146484 30.146484 30.146484)
+  2 by 2 by 2 MPI processor grid
+  reading bonds ...
+  2010 bonds
+  reading angles ...
+  3800 angles
+  reading dihedrals ...
+  4770 dihedrals
+  reading impropers ...
+  2400 impropers
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        1       
+  special bond factors coul:  0        0        1       
+     4 = max # of 1-2 neighbors
+     7 = max # of 1-3 neighbors
+    11 = max # of special neighbors
+  special bonds CPU = 0.000 seconds
+  read_data CPU = 0.036 seconds
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+- GPU package (short-range, long-range and three-body potentials): doi:10.1016/j.cpc.2010.12.021, doi:10.1016/j.cpc.2011.10.012, doi:10.1016/j.cpc.2013.08.002, doi:10.1016/j.commatsci.2014.10.068, doi:10.1016/j.cpc.2016.10.020, doi:10.3233/APC200086
+The log file lists these citations in BibTeX format.
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.28588689
+  grid = 18 18 18
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00033011456
+  estimated relative force accuracy = 9.941302e-07
+  using double precision KISS FFT
+  3d grid and FFT values/proc = 4096 810
+
+--------------------------------------------------------------------------
+- Using acceleration for pppm:
+-  with 8 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: NVIDIA A800 40GB Active, 108 CUs, 36/39 GB, 1.4 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+Initializing Device 0 on core 1...Done.
+Initializing Device 0 on core 2...Done.
+Initializing Device 0 on core 3...Done.
+Initializing Device 0 on core 4...Done.
+Initializing Device 0 on core 5...Done.
+Initializing Device 0 on core 6...Done.
+Initializing Device 0 on core 7...Done.
+
+
+--------------------------------------------------------------------------
+- Using acceleration for lj/class2/coul/long:
+-  with 8 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: NVIDIA A800 40GB Active, 108 CUs, 36/39 GB, 1.4 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+Initializing Device 0 on core 1...Done.
+Initializing Device 0 on core 2...Done.
+Initializing Device 0 on core 3...Done.
+Initializing Device 0 on core 4...Done.
+Initializing Device 0 on core 5...Done.
+Initializing Device 0 on core 6...Done.
+Initializing Device 0 on core 7...Done.
+
+Generated 15 of 15 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 4000, page size: 100000
+  master list distance cutoff = 11.5
+  ghost atom cutoff = 11.5
+  binsize = 5.75, bins = 6 6 6
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/class2/coul/long/gpu, perpetual
+      attributes: full, newton on
+      pair build: full/bin
+      stencil: full/bin/3d
+      bin: standard
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 0
+Per MPI rank memory allocation (min/avg/max) = 16.2 | 16.46 | 16.58 Mbytes
+   Step          Time           Temp          Press          TotEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         Volume           Lx             Ly             Lz          Density    
+         0   0              0              16105.348     -490.05333     -490.05333      727.67098      1633.8868     -3189.7574      6.4118443      722.21029      270.8122      -661.28802      27397.441      30.146484      30.146484      30.146484      0.89999998   
+       500   500            0             -778.27194     -3946.2979     -3946.2979      30.200142      321.83136     -3476.6911      2.2517291     -430.27813      267.2945      -660.90636      27397.441      30.146484      30.146484      30.146484      0.89999998   
+      1000   1000           0             -1094.2168     -4005.7917     -4005.7917      30.495528      305.13207     -3486.8481      2.1784148     -460.56584      265.95319     -662.13694      27397.441      30.146484      30.146484      30.146484      0.89999998   
+      1500   1500           0             -1108.6327     -4023.4354     -4023.4354      30.106913      287.74294     -3477.4258      1.9092267     -470.09358      267.01538     -662.69051      27397.441      30.146484      30.146484      30.146484      0.89999998   
+      2000   2000           0             -949.36095     -4038.7842     -4038.7842      29.293144      285.89046     -3479.387       1.7710757     -477.67371      264.68455     -663.3627       27397.441      30.146484      30.146484      30.146484      0.89999998   
+      2194   2194           0             -959.2005      -4042.1903     -4042.1903      29.414673      285.96687     -3481.6693      1.7645339     -478.8459       264.55557     -663.3767       27397.441      30.146484      30.146484      30.146484      0.89999998   
+Loop time of 22.5576 on 8 procs for 2194 steps with 2020 atoms
+
+98.1% CPU use with 8 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+     -490.053333731127  -4042.18627231704  -4042.19025885789
+  Force two-norm initial, final = 1464.4246 3.9586247
+  Force max component initial, final = 103.41551 0.56823065
+  Final line search alpha, max atom move = 0.026174218 0.014872993
+  Iterations, force evaluations = 2194 4388
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 7.5234     | 9.7128     | 11.568     |  42.5 | 43.06
+Bond    | 0.78019    | 1.0155     | 1.1981     |  14.4 |  4.50
+Kspace  | 8.0817     | 8.2833     | 8.5653     |   5.3 | 36.72
+Neigh   | 0.11468    | 0.11529    | 0.1163     |   0.2 |  0.51
+Comm    | 0.41889    | 0.46385    | 0.50283    |   4.0 |  2.06
+Output  | 0.0008383  | 0.00094269 | 0.0010693  |   0.0 |  0.00
+Modify  | 0.00022181 | 0.00025162 | 0.00028282 |   0.0 |  0.00
+Other   |            | 2.966      |            |       | 13.15
+
+Nlocal:          252.5 ave         309 max         182 min
+Histogram: 1 1 0 1 0 1 1 1 0 2
+Nghost:        3858.75 ave        4066 max        3642 min
+Histogram: 3 0 1 0 0 0 0 0 1 3
+Neighs:              0 ave           0 max           0 min
+Histogram: 8 0 0 0 0 0 0 0 0 0
+FullNghs:       122505 ave      156234 max       81971 min
+Histogram: 1 1 1 0 1 0 1 1 0 2
+
+Total # of neighbors = 980040
+Ave neighs/atom = 485.16832
+Ave special neighs/atom = 5.7524752
+Neighbor list builds = 43
+Dangerous builds = 0
+System init for write_data ...
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.28588689
+  grid = 18 18 18
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00033011456
+  estimated relative force accuracy = 9.941302e-07
+  using double precision KISS FFT
+  3d grid and FFT values/proc = 4096 810
+
+
+---------------------------------------------------------------------
+    Device Time Info (average) for kspace: 
+---------------------------------------------------------------------
+CPU Poisson:     4.5622 s.
+CPU Data Cast:   0.0044 s.
+CPU Idle Time:   3.6244 s.
+Max Mem / Proc:  0.81 MB.
+---------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------
+- Using acceleration for pppm:
+-  with 8 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: NVIDIA A800 40GB Active, 108 CUs, 36/39 GB, 1.4 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+Initializing Device 0 on core 1...Done.
+Initializing Device 0 on core 2...Done.
+Initializing Device 0 on core 3...Done.
+Initializing Device 0 on core 4...Done.
+Initializing Device 0 on core 5...Done.
+Initializing Device 0 on core 6...Done.
+Initializing Device 0 on core 7...Done.
+
+
+
+---------------------------------------------------------------------
+      Device Time Info (average): 
+---------------------------------------------------------------------
+CPU Cast/Pack:   0.0070 s.
+CPU Driver_Time: 0.0464 s.
+CPU Idle_Time:   2.7038 s.
+Average split:   1.0000.
+Max Mem / Proc:  2.03 MB.
+Prefetch mode:   None.
+Vector width:    32.
+Lanes / atom:    8.
+Pair block:      256.
+Neigh block:     128.
+Neigh mode:      Host.
+---------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------
+- Using acceleration for lj/class2/coul/long:
+-  with 8 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: NVIDIA A800 40GB Active, 108 CUs, 36/39 GB, 1.4 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+Initializing Device 0 on core 1...Done.
+Initializing Device 0 on core 2...Done.
+Initializing Device 0 on core 3...Done.
+Initializing Device 0 on core 4...Done.
+Initializing Device 0 on core 5...Done.
+Initializing Device 0 on core 6...Done.
+Initializing Device 0 on core 7...Done.
+
+Generated 15 of 15 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+STAGE COMPLETE: minimization

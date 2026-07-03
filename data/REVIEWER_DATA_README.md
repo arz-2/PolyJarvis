@@ -44,6 +44,7 @@ best-of (Major 5/6).
 | `lammps/**/*.in` | **LAMMPS input scripts** for every stage (minimize → npt → tg sweep → mechanical) | Major 12 |
 | `lammps/**/emc_build.params` | Force-field parameters (FF provenance) | Major 8, 12 |
 | `lammps/**/*.sh`, `lammps/**/*.jsonl` | Chain submit scripts + progress / tool-call traces | Major 11/12 (workflow traces) |
+| `lammps/**/*.log` | **Per-stage LAMMPS step logs** — committed for runs where they were retained (see *Log coverage* below) | Major 12 (raw output) |
 | `lammps/cell/cell.data` | Initial packed cell (starting structure) | Major 12 (structures) |
 | `lammps/**/npt_production_out.data`, `**/npt_prod300_out.data` | **Final equilibrated structures** (rubbery: `npt_production`; glassy: `npt_prod300`) | Major 12 (structures) |
 
@@ -56,10 +57,18 @@ archived release cited in the manuscript's Data & Software Availability statemen
 
 - Full atomistic **trajectories** (`*.dump`, ~44 GB),
 - Binary **restart/checkpoint** files (`*.restart`, `*.rst`),
-- Per-stage LAMMPS step **logs** (`*.log`) — the extracted thermodynamic data is preserved in
-  `raw/*.csv` and `raw/*.json`,
 - **Intermediate-stage** structures (minimize / compress / cool / pppm / softheat / melt
   `*_out.data`) — deterministically reproducible from the `.in` scripts + seeds above.
+
+### Log coverage
+
+Per-stage LAMMPS step **logs** (`*.log`) are now committed **for the runs where they were
+retained locally**: `PE4`, `PEEK4`, `PEG1`–`PEG4`, `PMMA4`, `PS1`–`PS4`, `PSU3`,
+`PVC2`–`PVC4`. For the earlier benchmark replicates the step logs were not retained; their
+**thermodynamic content is fully preserved** in `raw/*.csv` and `raw/*.json` (density / volume
+timeseries, Tg-fit bins, stress-strain, convergence diagnostics), and every stage is
+deterministically reproducible from the committed `.in` scripts + seeds. Full atomistic
+trajectories remain in the archived release for all runs.
 
 ## Prompts, tool schemas, and the agent
 
