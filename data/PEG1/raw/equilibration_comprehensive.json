@@ -35,18 +35,32 @@
       "mean_Rg_A": 19.818,
       "mean_Rg2_A2": 411.124,
       "rg_spread_flag": false,
-      "C_inf": 346.706,
+      "C_inf": 3.924,
       "n_chains": 10,
       "frames_analysed": 1951
     },
     "ree": {
-      "available": false
+      "available": true,
+      "mean_R_ee_A": 51.21,
+      "std_R_ee_A": 22.18,
+      "n_chains": 10,
+      "end_to_end_distribution_png": null
     },
     "msid": {
-      "available": false
+      "available": true,
+      "slope": 0.973,
+      "r2": 0.9438,
+      "gaussian_pass": true,
+      "n_separations": 148
     },
     "ct": {
-      "available": false
+      "available": true,
+      "tau_relax_ps": 28923664.7,
+      "tau_ps": 14540287.8,
+      "beta": 0.501,
+      "decay_fraction_at_end": 0.008,
+      "trajectory_ps": 1951.0,
+      "pass": true
     },
     "msd": {
       "alpha": 0.114,
@@ -59,9 +73,9 @@
   "spatial": {
     "p2": {
       "pass": true,
-      "p2_mean": 0.0,
-      "p2_std": 0.0,
-      "p2_max": 0.0,
+      "p2_mean": 0.0244,
+      "p2_std": 0.0043,
+      "p2_max": 0.0376,
       "ordered_flag": false
     },
     "density_homogeneity": {
@@ -76,16 +90,16 @@
     }
   },
   "warnings": [
-    "C\u221e = 346.706 is outside broad expected range [3, 15] \u2014 verify backbone_types and n_backbone_bonds",
+    "C(t) partially decayed: 1% decayed at end of trajectory (\u03c4_relax=28923664.7 ps vs T_traj=1951.0 ps)",
     "MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state"
   ],
-  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.13 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-06-20 14:16\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.3844% (p=0.0) | <1%, p<0.01 | PASS |\n| Energy drift | 0.694% (p=0.0047) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0607% | <1% | PASS |\n| Energy block-SEM | 0.1801% | <1% | PASS |\n| \u03c4_eff density | 0.1% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 21.6% | <30% | PASS |\n| C\u221e | 346.706 | lit. varies | INFO |\n| MSID slope | \u2014 | 1.0 \u00b120% | skipped (short backbone) |\n| C(t) \u03c4_relax | \u2014 | \u2014 | insufficient frames |\n| MSD kinetic trap | yes (\u03b1=0.114, MSD=45.45 \u00c5\u00b2>>Rg\u00b2=411.124) | \u2014 | \u26a0 trapped |\n| R_ee mean \u00b1 std | \u2014 | \u2014 | not available |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0 \u00b1 0.0 | <0.10 | PASS |\n| Density homogeneity CV | 22.0% (7\u00b3 grid, 20.5 atoms/voxel) | <25% | PASS |\n\n**Warnings:** C\u221e = 346.706 is outside broad expected range [3, 15] \u2014 verify backbone_types and n_backbone_bonds; MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state",
-  "log_file": "/home/alexzhao/PolyJarvis/data/PEG1/lammps/equil/npt_production/npt_production.log",
-  "dump_file": "/home/alexzhao/PolyJarvis/data/PEG1/lammps/equil/nvt_production/nvt_production.dump",
-  "data_file": "/home/alexzhao/PolyJarvis/data/PEG1/lammps/equil/npt_production/npt_production_out.data",
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.13 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-07-03 00:57\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.3844% (p=0.0) | <1%, p<0.01 | PASS |\n| Energy drift | 0.694% (p=0.0047) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0607% | <1% | PASS |\n| Energy block-SEM | 0.1801% | <1% | PASS |\n| \u03c4_eff density | 0.1% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 21.6% | <30% | PASS |\n| C\u221e | 3.924 | lit. varies | INFO |\n| MSID slope | 0.973 (R\u00b2=0.9438) | 1.0 \u00b120% | OK |\n| C(t) \u03c4_relax | 28923664.7 ps (1% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | yes (\u03b1=0.114, MSD=45.45 \u00c5\u00b2>>Rg\u00b2=411.124) | \u2014 | \u26a0 trapped |\n| R_ee mean \u00b1 std | 51.21 \u00b1 22.18 \u00c5 (N=10 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0244 \u00b1 0.0043 | <0.10 | PASS |\n| Density homogeneity CV | 22.0% (7\u00b3 grid, 20.5 atoms/voxel) | <25% | PASS |\n\n**Warnings:** C(t) partially decayed: 1% decayed at end of trajectory (\u03c4_relax=28923664.7 ps vs T_traj=1951.0 ps); MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state",
+  "log_file": "data/PEG1/lammps/equil/npt_production/npt_production.log",
+  "dump_file": "data/PEG1/lammps/equil/nvt_production/nvt_production.dump",
+  "data_file": "data/PEG1/lammps/equil/npt_production/npt_production_out.data",
   "backbone_types": [
-    6,
-    7
+    1,
+    4
   ],
-  "timestamp": "2026-06-20 14:16"
+  "timestamp": "2026-07-03 00:57"
 }

@@ -35,18 +35,32 @@
       "mean_Rg_A": 14.756,
       "mean_Rg2_A2": 220.829,
       "rg_spread_flag": false,
-      "C_inf": 14.325,
+      "C_inf": 7.072,
       "n_chains": 10,
       "frames_analysed": 1951
     },
     "ree": {
-      "available": false
+      "available": true,
+      "mean_R_ee_A": 30.44,
+      "std_R_ee_A": 11.86,
+      "n_chains": 10,
+      "end_to_end_distribution_png": null
     },
     "msid": {
-      "available": false
+      "available": true,
+      "slope": 1.476,
+      "r2": 0.9952,
+      "gaussian_pass": false,
+      "n_separations": 39
     },
     "ct": {
-      "available": false
+      "available": true,
+      "tau_relax_ps": 23732.1,
+      "tau_ps": 19221.3,
+      "beta": 0.719,
+      "decay_fraction_at_end": 0.109,
+      "trajectory_ps": 1951.0,
+      "pass": true
     },
     "msd": {
       "alpha": 0.221,
@@ -59,9 +73,9 @@
   "spatial": {
     "p2": {
       "pass": true,
-      "p2_mean": 0.0,
-      "p2_std": 0.0,
-      "p2_max": 0.0,
+      "p2_mean": 0.0308,
+      "p2_std": 0.0084,
+      "p2_max": 0.0577,
       "ordered_flag": false
     },
     "density_homogeneity": {
@@ -75,13 +89,17 @@
       "heterogeneous_flag": false
     }
   },
-  "warnings": [],
-  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.01 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-06-20 21:00\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.0206% (p=0.6863) | <1%, p<0.01 | PASS |\n| Energy drift | 0.1141% (p=0.2428) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.013% | <1% | PASS |\n| Energy block-SEM | 0.0205% | <1% | PASS |\n| \u03c4_eff density | 0.0% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 11.6% | <30% | PASS |\n| C\u221e | 14.325 | lit. varies | INFO |\n| MSID slope | \u2014 | 1.0 \u00b120% | skipped (short backbone) |\n| C(t) \u03c4_relax | \u2014 | \u2014 | insufficient frames |\n| MSD kinetic trap | no (\u03b1=0.221, MSD=630.06 \u00c5\u00b2>>Rg\u00b2=220.829) | \u2014 | OK |\n| R_ee mean \u00b1 std | \u2014 | \u2014 | not available |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0 \u00b1 0.0 | <0.10 | PASS |\n| Density homogeneity CV | 23.7% (6\u00b3 grid, 29.7 atoms/voxel) | <25% | PASS |",
-  "log_file": "/home/alexzhao/PolyJarvis/data/PS1/lammps/equil/npt_prod300/npt_prod300.log",
-  "dump_file": "/home/alexzhao/PolyJarvis/data/PS1/lammps/equil/nvt_production/nvt_production.dump",
-  "data_file": "/home/alexzhao/PolyJarvis/data/PS1/lammps/equil/npt_prod300/npt_prod300_out.data",
-  "backbone_types": [
-    6
+  "warnings": [
+    "MSID slope = 1.476 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension",
+    "C(t) partially decayed: 11% decayed at end of trajectory (\u03c4_relax=23732.1 ps vs T_traj=1951.0 ps)"
   ],
-  "timestamp": "2026-06-20 21:00"
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.01 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-07-03 00:57\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.0206% (p=0.6863) | <1%, p<0.01 | PASS |\n| Energy drift | 0.1141% (p=0.2428) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.013% | <1% | PASS |\n| Energy block-SEM | 0.0205% | <1% | PASS |\n| \u03c4_eff density | 0.0% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 11.6% | <30% | PASS |\n| C\u221e | 7.072 | lit. varies | INFO |\n| MSID slope | 1.476 (R\u00b2=0.9952) | 1.0 \u00b120% | \u26a0 non-Gaussian |\n| C(t) \u03c4_relax | 23732.1 ps (11% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | no (\u03b1=0.221, MSD=630.06 \u00c5\u00b2>>Rg\u00b2=220.829) | \u2014 | OK |\n| R_ee mean \u00b1 std | 30.44 \u00b1 11.86 \u00c5 (N=10 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0308 \u00b1 0.0084 | <0.10 | PASS |\n| Density homogeneity CV | 23.7% (6\u00b3 grid, 29.7 atoms/voxel) | <25% | PASS |\n\n**Warnings:** MSID slope = 1.476 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension; C(t) partially decayed: 11% decayed at end of trajectory (\u03c4_relax=23732.1 ps vs T_traj=1951.0 ps)",
+  "log_file": "data/PS1/lammps/equil/npt_prod300/npt_prod300.log",
+  "dump_file": "data/PS1/lammps/equil/nvt_production/nvt_production.dump",
+  "data_file": "data/PS1/lammps/equil/npt_prod300/npt_prod300_out.data",
+  "backbone_types": [
+    1,
+    2
+  ],
+  "timestamp": "2026-07-03 00:57"
 }
