@@ -132,7 +132,6 @@ def main():
     eq_comp      = _load_json(output_dir / "equilibration_comprehensive.json")
     bulk         = _load_json(output_dir / "bulk_modulus.json")
     bulk_deform  = _load_json(output_dir / "bulk_modulus_deform.json")
-    bulk_born    = _load_json(output_dir / "bulk_modulus_born.json")
     bulk_murnaghan = _load_json(output_dir / "bulk_modulus_murnaghan.json")
     e2e     = _load_json(output_dir / "end_to_end_summary.json")
     rdf     = _load_json(output_dir / "rdf_summary.json")
@@ -285,7 +284,6 @@ def main():
         "equilibration_fig":       rel_fig("equilibration_convergence.png"),
         "bulk_modulus":            rel("bulk_modulus.json"),
         "bulk_modulus_deform":     rel("bulk_modulus_deform.json"),
-        "bulk_modulus_born":       rel("bulk_modulus_born.json"),
         "bulk_modulus_murnaghan":  rel("bulk_modulus_murnaghan.json"),
         "volume_timeseries":       rel("volume_timeseries.csv"),
         "volume_fig":              rel_fig("volume_fluctuations.png"),

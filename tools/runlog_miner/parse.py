@@ -1,6 +1,6 @@
 """Tolerant parser for PolyJarvis ``run_log.md`` files.
 
-P0a of the B.4 learning-loop spec (``docs/specs/B4_runlog_miner_spec.md``): turns a
+P0a of the B.4 learning-loop design: turns a
 semi-structured, LLM-authored ``run_log.md`` into a structured :class:`RunRecord`.
 
 Read-only — emits no suggestions. Parsing is deliberately *tolerant*: logs are

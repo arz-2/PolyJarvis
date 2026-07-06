@@ -1,7 +1,6 @@
 """runlog_miner — parse and summarize the PolyJarvis run_log.md corpus.
 
-P0a (this package): read-only parsing + a markdown summary report. See
-``docs/specs/B4_runlog_miner_spec.md`` for the full B.4 learning-loop design.
+P0a (this package): read-only parsing + a markdown summary report.
 """
 from .parse import (
     Decision,

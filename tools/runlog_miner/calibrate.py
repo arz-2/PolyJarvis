@@ -7,8 +7,6 @@ Design-critical: raw Tg error vs experiment is *expected* to be large (MD
 over-predicts Tg by ~80–120 K), so calibration keys off the **✓/⚠ status** the agent
 already recorded (which accounts for the expected offset) and off **density error**
 (which is expected to be small) — never a naive zero-error Tg threshold.
-
-See ``docs/specs/B4_runlog_miner_spec.md`` §2.3.
 """
 from __future__ import annotations
 

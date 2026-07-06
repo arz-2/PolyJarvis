@@ -153,8 +153,8 @@ script retains GPU syntax, causing a crash at runtime.
 
 On recovery or re-submit, preserve `use_gpu: True` exactly as in the original `generate_script`
 call. Do not change it to recover from a crash — the crash is never caused by GPU use itself.
-The only template that legitimately uses `use_gpu=False` is `nvt_born`, which is no longer part
-of the standard pipeline.
+No current template legitimately uses `use_gpu=False` (the old `nvt_born` template, which did,
+has been removed from the codebase along with the Born method).
 
 ---
 

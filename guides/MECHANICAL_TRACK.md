@@ -7,7 +7,7 @@ On session restart mid-mechanical-track: re-read this file before resuming.
 
 ```
   [mechanical track — if "bulk_modulus" in properties_requested]
-  # Born+NVT is REMOVED — do not spawn born-worker. Never use --stage born.
+  # Born+NVT is REMOVED from the codebase (tool, template, and worker deleted). Never use --stage born.
   # Glassy primary: Murnaghan NPT compression at 300 K (npt_prod300_out.data)
   # Rubbery primary: Murnaghan EOS at T>Tg (npt_production_out.data, bm_pressures_atm set)
   # GATE: Do not spawn murnaghan-worker (or deform-worker) until thermal track confirms

@@ -10,7 +10,6 @@
       "mcp__mcp-lammps-engine__extract_equilibrated_density",
       "mcp__mcp-lammps-engine__extract_bulk_modulus",
       "mcp__mcp-lammps-engine__extract_bulk_modulus_deform",
-      "mcp__mcp-lammps-engine__extract_bulk_modulus_born",
       "mcp__mcp-lammps-engine__generate_run_summary",
       "mcp__mcp-lammps-engine__inspect_data_file",
       "mcp__mcp-lammps-engine__run_bulk_modulus_series",
@@ -174,7 +173,7 @@
         ]
       },
       {
-        "matcher": "mcp__mcp-lammps-engine__extract_bulk_modulus_born|mcp__mcp-lammps-engine__extract_bulk_modulus_deform|mcp__mcp-lammps-engine__extract_bulk_modulus_murnaghan",
+        "matcher": "mcp__mcp-lammps-engine__extract_bulk_modulus_deform|mcp__mcp-lammps-engine__extract_bulk_modulus_murnaghan",
         "hooks": [
           {
             "type": "command",

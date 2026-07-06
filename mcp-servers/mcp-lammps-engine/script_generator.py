@@ -385,35 +385,6 @@ TEMPLATE_DEFAULTS = {
         "use_gpu":          False,   # no restart GPU issues but SLLOD+GPU needs testing
         "use_pppm":         True,
     },
-    # ── NVT Born matrix (Stage 8: glassy bulk modulus) ──────────────────
-    "nvt_born": {
-        "LOG_FILE":          "nvt_born.log",
-        "LOG_APPEND":        False,
-        "DUMP_FILE":         "nvt_born.dump",
-        "LAST_DUMP_FILE":    "nvt_born_last.dump",
-        "WRITE_DATA_FILE":   "nvt_born_out.data",
-        "RESTART_FILE_1":    "nvt_born_1.rst",
-        "RESTART_FILE_2":    "nvt_born_2.rst",
-        "RESTART_FREQ":      50000,
-        "T_START":           300.0,
-        "T_FINAL":           300.0,
-        "T_DAMP":            100.0,
-        "TIMESTEP":          1.0,
-        "N_STEPS":           4000000,   # 4 ns at 1 fs
-        "THERMO_FREQ":       1000,
-        "DUMP_FREQ":         5000,
-        "BORN_NUMDIFF_DELTA": 0.0001,  # finite-diff displacement [Å]
-        "BORN_EVERY":        10,        # sample Born every N steps
-        "BORN_REPEAT":       100,       # samples per average block
-        "BORN_FREQ":         1000,      # output period [steps]
-        "BORN_MATRIX_FILE":  "born_matrix.dat",
-        "use_restart":       False,
-        "use_shake":         True,
-        "init_velocity":     None,
-        "write_restart":     True,
-        "use_gpu":           False,     # long NVT + restart → CPU safe
-        "use_pppm":          True,
-    },
     # ── Uniaxial deformation (Stage 5b: elastic constants) ───────────────
     "npt_deform": {
         "LOG_FILE":         "npt_deform.log",
@@ -488,7 +459,6 @@ TEMPLATE_DOCS = {
     "nemd_langevin":  "NEMD direct Langevin thermostat method. SHAKE=OK, dt=1.0fs. Needs longer box.",
     "nemd_shear":     "NEMD SLLOD shear viscosity. fix deform xy + fix nvt/sllod. SHAKE=OFF, dt=1.0fs. Extracts eta, N1, N2.",
     "npt_deform":     "Uniaxial x-strain at constant rate (Stage 5b). NVT, no barostat. Records pxx/pyy/pzz for C11/C12 → K, G, E. GPU-safe (no restarts).",
-    "nvt_born":       "NVT Born matrix (Stage 8, glassy only). compute born/matrix numdiff + stress-fluctuation → K_T. Requires EXTRA-COMPUTE. CPU run, 3–5 ns. Formula: K_T = K_Born + NkT/V − (V/kT)·Var(P).",
 }
 
 
@@ -1182,7 +1152,7 @@ write_data tg_step_out.data
         #            keeps plain style names (e.g. `kspace_style pppm`) so the suffix machinery
         #            rewrites them — an explicit `/kk` style here would conflict with `-sf kk`.
         #   cpu    : no accelerator package.
-        # use_gpu=False stages (NPT+restart, born numdiff) stay CPU regardless of engine — those
+        # use_gpu=False stages (NPT+restart) stay CPU regardless of engine — those
         # are intentionally off-GPU. Only GPU-enabled stages honor the engine choice.
         engine = cfg.get("engine", "gpu") if cfg.get("use_gpu", False) else "cpu"
         if engine == "kokkos":
@@ -1329,13 +1299,6 @@ write_data tg_step_out.data
         # Legacy placeholder kept for backward compat (old nemd_thermal used these)
         subs["NEMD_BIN_WIDTH"] = cfg.get("NEMD_BIN_WIDTH", round(box_len / n_slabs, 4) if box_len > 0 else 2.0)
         subs["NEMD_HEAT_RATE"] = cfg.get("NEMD_HEAT_RATE", 0.0)
-
-        # ── Born matrix NVT specifics (nvt_born) ─────────────────────────────
-        subs["BORN_NUMDIFF_DELTA"] = cfg.get("BORN_NUMDIFF_DELTA", 0.0001)
-        subs["BORN_EVERY"]         = cfg.get("BORN_EVERY",         10)
-        subs["BORN_REPEAT"]        = cfg.get("BORN_REPEAT",        100)
-        subs["BORN_FREQ"]          = cfg.get("BORN_FREQ",          1000)
-        subs["BORN_MATRIX_FILE"]   = cfg.get("BORN_MATRIX_FILE",   "born_matrix.dat")
 
         # ── Uniaxial deformation specifics (npt_deform) ──────────────────────
         subs["STRAIN_RATE"]  = cfg.get("STRAIN_RATE",  1e-7)

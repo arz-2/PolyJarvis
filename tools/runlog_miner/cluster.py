@@ -4,8 +4,6 @@ Clusters past ``Recovery`` incidents (parsed from ``run_log.md`` RECOVERIES) int
 ``recover``-skill-compatible markdown table: a curated *symptom → root cause →
 action* taxonomy annotated with an empirical ``k/n`` success rate. Read-only — the
 emitted markdown is reviewed/committed to ``guides/RECOVERY_PLAYBOOK.md`` separately.
-
-See ``docs/specs/B4_runlog_miner_spec.md`` §2.2.
 """
 from __future__ import annotations
 

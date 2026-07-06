@@ -114,7 +114,6 @@ STAGE_TRACK = {
     "tg":          "thermal",
     "analyze-tg":  "thermal",
     "analyze-tg-multirate": "thermal",
-    "born":        "mechanical",
     "deform":      "mechanical",
     "murnaghan":   "mechanical",
     "analyze-bm":  "mechanical",

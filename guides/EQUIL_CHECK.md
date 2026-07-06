@@ -86,14 +86,31 @@ extract_equilibrated_density(
 - `plateau_step_range` — verify plateau starts after compression ramp ends
 - `naive_mean`, `naive_std` — compare to plateau for sanity
 
-Density passes if `plateau_density_mean` is within ±5% of experimental; flag if outside ±10%.
+Density passes if `plateau_density_mean` is within ±5% of experimental. **A value below −5% is BINDING, not a soft warning** (the old "flag if outside ±10%" zone is gone — that loophole let PMMA's −6% be accepted four times as "PCFF bias", which was wrong).
+
+### Convergence ≠ correctness — run the under-anneal check before accepting a low density
+
+A converged density (drift/SEM flat) only proves the cell **stopped moving**, not that it stopped at the **right value**. A kinetically trapped / under-annealed glass converges *perfectly* at a too-low density because free volume is frozen in during cooling. So when a glassy 300 K density is below −5%, you MUST decompose melt-stage vs cooling-stage before any verdict:
+
+```
+assess_cooling_contraction(
+    melt_data  = <npt_production_out.data>,   # melt at T_equil (chains mobile)
+    glass_data = <npt_prod300_out.data>,      # glass at 300 K
+    exp_density_gcm3 = <class exp density>, tg_K = <Tg>, t_equil_K = <T_workflow>)
+```
+
+Route on `verdict`:
+- **`UNDER_ANNEALED_COOLING`** (melt density OK, cell under-contracted on cooling) → return `RE-ANNEAL` (re-melt + slow re-cool, see EQUILIBRATION.md). Do **NOT** `EXTEND` at 300 K — a glass cannot densify below Tg — and do **NOT** accept as force-field bias. This is fixable.
+- **`MELT_STAGE_DEFICIT`** (melt density already low, or rubbery) → the deficit is at the equilibrium/melt stage: force-field underbinding OR melt-stage under-annealing. Accepting as "FF bias" is allowed ONLY with the `assess_cooling_contraction` evidence (melt gap + shortfall) pasted into D-05 and flagged unresolved — never on a bare "known PCFF bias" caveat.
+- **`extrapolation_reliable=False`** (cooling span >300 K, e.g. PEEK) → split is indicative only; prefer `RE-ANNEAL` and lean on the absolute glass-vs-exp density.
 
 ---
 
 ## Common Failures
 
 **`check_equilibration_comprehensive` returns `overall_pass=False`:**
-- Convergence failure (density drift, energy not plateaued) → return `EXTEND`
+- Convergence failure (density still drifting, energy not plateaued) → return `EXTEND` (more NPT at the **same** T finishes an unfinished plateau).
+- **Converged but density too low (glassy, below −5%)** → this is NOT an `EXTEND` case. EXTEND at 300 K cannot densify a vitrified glass. Run `assess_cooling_contraction` (above) and return `RE-ANNEAL` for `UNDER_ANNEALED_COOLING`. Symptom: density drift/SEM tiny *and* density ~5–7% low *and* MSD kinetic-trap flagged — a stable wrong value, not an unfinished one.
 - Hard structural failure (box collapse, charge imbalance, or C(t)=0% / **fully flat** — a dead/frozen cell with no relaxation at all) → return `FAIL`. NOTE: this is distinct from a rubbery cell with INCOMPLETE terminal relaxation (partial C(t) decay), which under `regime: rubbery` (require_rubbery) is ADVISORY, not a FAIL — see "Common Failures" below. C(t) exactly 0% = no dynamics (genuine failure); C(t) decaying but not to completion = reptation-limited (carve-out applies).
 
 **`extract_equilibrated_density` returns implausibly low density (<0.5 g/cm³):**
@@ -107,9 +124,4 @@ The NPT production log may contain the compression ramp rather than the producti
 
 **`check_equilibration_comprehensive` does not return on a large dump (>~1 GB / >1000 frames):** the MCP call can hang in trajectory I/O (PSU3 1.5 GB / 1951-frame dump timed out >30 min). Do NOT block the verdict on it: rely on `extract_equilibrated_density` (the load-bearing gate for small aromatic glassy cells) plus the most recent *pre-extension* comprehensive result. If density SEM/drift pass and the prior comprehensive gates (P2/energy) held, return that verdict — the structural metrics cannot have moved over a 2 ns 300 K extension of an already-equilibrated cell.
 
----
 
-## Backlog (unconfirmed — needs a 2nd run before acting)
-
-- **Glassy 300 K energy-drift worsens on EXTEND (physical aging):** PVC4 (PVNL DP=60) energy drift went 5.55%→9.56% across a 2 ns extension while density was rock-solid (drift 0.11%, block-SEM 0.0012%). Hypothesis: sub-Tg physical aging means 2 ns windows are too short for glassy thermo statistics; looping EXTEND on energy alone never converges. *This contradicts `decision_policy.json:require_glassy`, which lists thermo drift/SEM in the hard structural set — so do NOT loosen it on n=1.* If a 2nd run confirms, the scoped change is loop-*termination* only (after max EXTEND, energy-only failure + solid density/P2 → PASS-with-caveat, don't FAIL/loop), edited in `decision_policy.json`, not slipped into a guide note.
-- **C∞ inflation from `n_backbone_bonds` miscount:** PVC4 reported C∞ 8.81→2.91 between checks with `n_backbone_bonds=179` for DP=60 (expected ~59). Suspected the tool counts all inter-atomic separations, not just backbone single bonds. This is a *count* mechanism, distinct from the existing backbone-type *selection* note (read Masses, exclude H). Confirm on a 2nd cell before opening a code fix; C∞ is advisory for glassy aromatics regardless.

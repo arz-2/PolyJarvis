@@ -33,11 +33,6 @@ if tool_input.get("run_in_background") and (
 SCRIPT_TO_TOOL = [
     ("mda_rdf.py",                      "calculate_rdf"),
     ("mda_end_to_end.py",               "extract_end_to_end_vectors"),
-    ("mda_msd.py",                      "calculate_msd"),
-    ("mda_radius_of_gyration.py",       "extract_radius_of_gyration"),
-    ("mda_orientation_order.py",        "check_orientation_order"),
-    ("mda_density_homogeneity.py",      "check_density_homogeneity"),
-    ("check_equilibration.py",          "check_equilibration_comprehensive"),
     ("extract_thermal.py",              "extract_thermal"),
     ("extract_bulk_modulus.py",         "extract_bulk_modulus"),
     ("extract_equilibrated_density.py", "extract_equilibrated_density"),

@@ -301,7 +301,7 @@
         "id": "Tang2022",
         "citation": "Tang, Z.; Okazaki, S. All-Atomistic Molecular Dynamics Study of the Glass Transition of Amorphous Polymers. Polymer 2022, 254, 125044.",
         "doi": "10.1016/j.polymer.2022.125044",
-        "relevance": "AA-MD Tg study of polycarbonate (PC) and PMMA via cooling simulations; radius of gyration, dihedral transitions, end effects, and INM analysis near Tg. Various DoFs show glass transition slightly above experimental Tg. Validates PCBN (PC) and PACR (PMMA) simulation protocols."
+        "relevance": "AA-MD glass-transition/dynamics study of polycarbonate (PC) and PMMA via cooling simulations (Tg, radius of gyration, dihedral transitions, end effects, INM). IMPORTANT: PC uses the Kremer et al. force field and PMMA uses OPLS-AA — NEITHER is PCFF. It validates that AA-MD reproduces PC/PMMA Tg & Rg; it does NOT validate PCFF and does NOT benchmark mass density. Do not cite as a PCFF or density source. The 'PCFF PMMA density within 2%' result is NkepsuMbitou2025 (10.1016/j.commatsci.2025.113861, Fig 4 / §5.1)."
       },
       {
         "id": "NkepsuMbitou2025",
@@ -544,7 +544,7 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/ja00086a030",
-      "ff_note": "PCFF via EMC (Class II). Switched from TraPPE-UA 2026-06-11: UA representation ignores phenyl ring partial charges and pi-dihedral barriers that govern PS Tg (~373 K); no TraPPE-UA PS Tg validation exists in literature. PCFF Class II explicitly parameterizes aromatic C-H charges and cross-terms; validated for PC (Tang2022, PCFF Tg=417K vs exp 422K) and PMMA vinyl backbone (NkepsuMbitou2025, Class II within 10%). Soldera2006 (COMPASS/OPLS) confirms MD can reach PS Tg ~449-484 K raw, WLF-corrected ~373 K. No direct PCFF PS Tg paper found; confidence=medium until confirmed.",
+      "ff_note": "PCFF via EMC (Class II). Switched from TraPPE-UA 2026-06-11: UA representation ignores phenyl ring partial charges and pi-dihedral barriers that govern PS Tg (~373 K); no TraPPE-UA PS Tg validation exists in literature. PCFF Class II explicitly parameterizes aromatic C-H charges and cross-terms; validated for PMMA vinyl backbone (NkepsuMbitou2025, Class II within 10%). (Note: Tang2022 studied PC/PMMA Tg with the Kremer and OPLS-AA force fields, NOT PCFF; the prior 'PC Tang2022 PCFF Tg=417K' claim was a misattribution and is removed.) Soldera2006 (COMPASS/OPLS) confirms MD can reach PS Tg ~449-484 K raw, WLF-corrected ~373 K. No direct PCFF PS Tg paper found; confidence=medium until confirmed.",
       "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "dp_typical": 40,
@@ -733,7 +733,7 @@
       "experimental_density_gcm3": {
         "PMMA": 1.19,
         "PMA": 1.22,
-        "note": "amorphous RT; Tang2022 PCFF PMMA within 2%"
+        "note": "amorphous RT (1.19). PCFF PMMA density within 2% of exp is reported by NkepsuMbitou2025 (Fig 4 / §5.1) — but achieved via ~10 temperature-annealing cycles with ~10 ns NpT relaxation each (~100 ns total) from rho=0.5, optionally box-deforming to target. NOT Tang2022 (which used OPLS-AA for PMMA and measured Tg, not density)."
       },
       "exp_E_GPa": {
         "PMMA": "2.5-3.3",
@@ -780,7 +780,7 @@
         "MD Tg for PMMA expected ~430-500 K; Webb2024 protocol: 40-540 K sweep, 20 K steps.",
         "Ester carbonyl dipole in PMMA/PMA requires PPPM to avoid significant electrostatic errors.",
         "PMA has flexible ester side chain → lower Tg; sweep lower bound at 150 K to sample deep glassy state.",
-        "PCFF Class II cross terms accurately reproduce ester/methacrylate torsional parameters (NkepsuMbitou2025; Tang2022).",
+        "PCFF Class II cross terms accurately reproduce ester/methacrylate torsional parameters (NkepsuMbitou2025). (Tang2022 used OPLS-AA for PMMA, not PCFF — it is not a PCFF validation source.)",
         "Exp. RT density: PMMA=1.19 g/cm³, PMA=1.22 g/cm³. Initial 0.60 g/cm³ = ~0.5x PMMA density.",
         "GAFF2 Tg failure (critical): NkepsuMbitou2025 benchmark shows GAFF Tg error >45% for both PMMA and PIB — the largest error of all tested FFs. Class II FFs (PCFF, IFF) reproduce PMMA density within 2% and Tg within ~10% after WLF rate correction. PCFF (Class II) is used here via EMC.",
         "SCREENING dp: dp_typical=40 for 48h-budget Tg sweep (6,000 atoms, ~10h/4GPU). Tg is chain-length independent above dp≥30 for PMMA. ENTANGLEMENT NOTE: a-PMMA Me=12,500 g/mol → DP@Me=125 (Mark2007 Table 25.3). At dp=40 < Me: K from uniaxial deformation will be systematically underestimated by ~30-50% vs converged value. dp_min=30 is the Tg-convergence floor; for accurate K use dp≥150 in a dedicated property run. PMA (Tg=281 K) is rubbery — Me-based dp limit irrelevant for PMA modulus.",
@@ -1134,7 +1134,7 @@
     },
     "PEST": {
       "name": "Polyester",
-      "_tg_rate_note": "steps_per_T = tg_t_step_K / (rate * dt_fs * 1e-6). Floor = tg_min_steps_per_T (200000 steps = 200 ps at dt=1fs). Feasible default [25,50,100] K/ns -> 800k/400k/200k steps, all clear the floor. The retired [40,160,400] gave 500k/125k/50k (125/50 ps degenerate). Plan-time feasibility filter (make_deterministic_plan._feasible_tg_rates) + gen_prompt warning enforce this.",
+      "_tg_rate_note": "steps_per_T = tg_t_step_K / (rate * dt_fs * 1e-6). Floor = tg_min_steps_per_T (200000 steps = 200 ps at dt=1fs). Rates [40,80,100] K/ns -> 500k/250k/200k steps, all at or above the floor. Retired [25,50,100]: r25 gives delocalized bilinear fit for stiff ester backbones (PLA3: r25 primary=464.8K vs alt=360K, 105K gap; negative multirate slope b=-35.1 K/dec -> slope_gate_pass=False). Plan-time feasibility filter (make_deterministic_plan._feasible_tg_rates) + gen_prompt warning enforce this.",
       "examples": [
         "PET",
         "PLA",
@@ -1169,8 +1169,8 @@
       "tg_steps_per_t": 500000,
       "tg_min_steps_per_T": 200000,
       "tg_rates_K_per_ns": [
-        25,
-        50,
+        40,
+        80,
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
@@ -1215,7 +1215,14 @@
         "max": 4.5
       },
       "K_deform_rate_slow_inv_s": 10000000.0,
-      "melt_npt_ns": 1.0
+      "melt_npt_ns": 1.0,
+      "bm_pressures_atm": [
+        -5000,
+        -2500,
+        0,
+        2500,
+        5000
+      ]
     },
     "PAMD": {
       "name": "Polyamide",
@@ -1584,6 +1591,10 @@
         "BPA_PC": 422,
         "notes": "Bisphenol-A polycarbonate: ~149°C (422 K). Literature DSC consensus."
       },
+      "experimental_density_gcm3": {
+        "BPA_PC": 1.20,
+        "notes": "Amorphous BPA-PC at RT, 1.20-1.22 g/cm³ (Mark2007; cf. exp_E_GPa notes). Used for the R1M7 ablation accuracy read."
+      },
       "exp_E_GPa": {
         "PC": "2.1-2.4",
         "source": "Mark2007_Table24.4",
@@ -1598,15 +1609,15 @@
         "Carbonate linkage (-O-CO-O-) plus bisphenol aromatic rings: significant partial charges. PPPM mandatory.",
         "PCFF (CFF93/Sun1994) covers aryl carbonate and bisphenol ether torsions via Class II cross terms; PPPM required for carbonate C=O dipole and aromatic pi partial charges.",
         "MD Tg for BPA-PC expected ~500-540 K after overestimation. Upper sweep 700 K covers this.",
-        "PCFF outperforms GAFF for PC Tg in comparative studies (Tang2022); Tang2022 validates AA-MD Tg and Rg for BPA-PC with PCFF.",
+        "Tang2022 validates that all-atom MD reproduces BPA-PC Tg and Rg — but using the Kremer et al. force field, NOT PCFF; it is neither a PCFF-vs-GAFF comparison nor a PCFF validation. The PCFF choice here rests on Sun1994 (CFF93/PCFF origin) covering aryl-carbonate Class II terms, not on Tang2022.",
         "BPA phenyl ring flip motions: important sub-Tg relaxation. Requires adequate sampling: 8 ns equilibration (Tang2022).",
         "Exp. RT density: BPA-PC=1.20 g/cm³. Initial 0.60 g/cm³ = ~0.5x PC density.",
         "Langevin thermostat at 500 K then NPT equilibration at 500 K before cooling is a documented protocol for PC MD."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1016/j.polymer.2022.125044",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; Tang2022 validates AA-MD Tg and Rg for BPA-PC specifically.",
+      "ff_justification_doi": "10.1021/ja00086a030",
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin and the PCFF justification. Tang2022 shows AA-MD reproduces BPA-PC Tg/Rg but with the Kremer et al. FF (NOT PCFF) — it supports AA-MD for PC generally, not the PCFF choice specifically.",
       "exp_K_GPa": {
         "min": 3.0,
         "max": 4.0
