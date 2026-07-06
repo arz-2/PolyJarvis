@@ -180,3 +180,8 @@ GPU inventory: GPU 1: released 2026-06-26 05:00 (PLA3 deform complete) | GPU 0: 
 
 Simulation dir: `data/PLA3/lammps/`
 Outputs: `data/PLA3/raw/` — JSONs; `data/PLA3/graphs/` — PNGs; `data/PLA3/raw/run_summary.json`
+- RESULT (wide [-1000,0,1500,3000,5000]): K_Murnaghan = 4.462 GPa (r²=0.9998, B0'=11.4) → GATE PASS; overwrote old r²=0.966/B0'=30 fail. status: DONE
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 57.1 h  |  **GPU**: 57.1 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PLA3/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

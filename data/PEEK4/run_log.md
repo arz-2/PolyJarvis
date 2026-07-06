@@ -175,3 +175,7 @@ Outputs: `data/PEEK4/raw/` — JSONs; `data/PEEK4/graphs/` — PNGs; `data/PEEK4
 - **Tg FAIL** = the auto-grader scored the DSC-equivalent *extrapolation* (468.6 K), which is meaningless here (R²≈0.00; a 0.6-decade rate span cannot constrain a 22-decade extrapolation). The robust MD Tg (~527 K) overpredicts exp by the documented PCFF margin; no FF/method fix exists within this pipeline.
 
 **Bottom line:** K is quantitatively validated; density and Tg reproduce the known PCFF-for-aromatic-PEEK biases (low density, high Tg). The slope gate ultimately passed (recovery 2, slope +2.67 K/ln) after the rate-dependence proved seed-noise-dominated over 3 rounds.
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 80.3 h  |  **GPU**: 80.3 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PEEK4/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

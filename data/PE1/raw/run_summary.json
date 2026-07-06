@@ -24,33 +24,47 @@
     "tg": {
       "value_K": 230.7,
       "exp_range_K": [
-        199.0,
-        239.0
+        185.0,
+        205.0
       ],
-      "error_pct": 5.3,
-      "status": "PASS",
+      "exp_basis": "amorphous beta-relaxation Tg ~195 K (Boyer 1973); NOT pooled gamma/beta/alpha [145,243]",
+      "error_pct": 12.5,
+      "status": "FAIL",
+      "rate_valid": false,
+      "rate_note": "single-rate ~40 K/ns hyperbola fit; rate-elevated (no multirate extrapolation)",
+      "n_replicates": 1,
       "r_squared": 0.9974,
       "fit_quality": "EXCELLENT"
     },
     "density": {
       "value_g_cm3": 0.859792,
       "exp_range_g_cm3": [
-        0.902,
-        0.997
+        0.812,
+        0.898
       ],
-      "error_pct": 9.4,
-      "status": "FAIL"
+      "error_pct": 0.0,
+      "status": "PASS"
     },
     "bulk_modulus": {
-      "value_GPa": 1.4626,
-      "sem_GPa": 0.0976,
+      "value_GPa": 1.5889,
+      "sem_GPa": 0.0636,
       "exp_range_GPa": [
-        0.3,
-        0.8
+        1.5,
+        2.0
       ],
-      "error_pct": 165.9,
-      "status": "FAIL",
-      "method": "murnaghan"
+      "error_pct": 0.0,
+      "status": "PASS",
+      "method": "volume_fluctuation",
+      "murnaghan_GPa": 1.4626,
+      "murnaghan_B0_prime": 13.4557,
+      "murnaghan_pressures_atm": [
+        1.0,
+        100.0,
+        300.0,
+        600.0,
+        1000.0
+      ],
+      "method_note": "fluctuation headline (range-independent). Murnaghan shown for reference; PE1/2/3 used pre-correction narrow window [1,100,300,600,1000] (B0' 12-16, K biased); PE4 used corrected wide window [1,500,1000,2000,5000]."
     }
   },
   "convergence": {
@@ -85,5 +99,6 @@
     "git_commit": "17a4076",
     "mdanalysis_version": "unknown",
     "generated_at": "2026-06-20T16:00:57.580875+00:00"
-  }
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

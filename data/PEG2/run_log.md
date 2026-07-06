@@ -139,3 +139,8 @@ PEO (POXI/PCFF, DP=100, 10 chains, 7020 atoms). All three properties delivered. 
 - **K 3.45 ± 0.24 GPa** (fluctuation, rubbery) — +72% vs plan ref 2.0 GPa. Fluctuation method is known to overestimate for rubbery melts (B_dyn vs B_def disagree 36%, nonlinear EOS); a Murnaghan multi-pressure series (not in the approved plan) would refine the absolute K.
 
 Recoveries: 1 (R-01 equil energy-plateau extension, converged). Pipeline completed end-to-end; no UNRESOLVED stages. Honest caveats: entangled-melt terminal relaxation incomplete (advisory, does not affect segmental properties); Tg DSC extrapolation limited by rate span; K likely high (method-dependent).
+- RESULT (wide [-1000,0,3000,7000,15000]): K_Murnaghan = 3.291 GPa (r²=1.000, B0'=9.33) → GATE PASS; supersedes fluctuation 3.453. status: DONE
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 5.0 h  |  **GPU**: 5.0 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PEG2/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

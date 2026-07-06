@@ -5,57 +5,116 @@
   "polymer_class": "PHYC",
   "force_field": "trappe-ua",
   "replicate": 2,
-  "seeds": {"emc_cell": 1004, "SEED_HOT": 1005, "SEED_COLD": 1006},
+  "seeds": {
+    "emc_cell": 1004,
+    "SEED_HOT": 1005,
+    "SEED_COLD": 1006
+  },
   "dp": 120,
   "nchain": 20,
   "n_atoms": 4840,
   "T_workflow_K": 300.0,
   "T_equil_K": 550.0,
   "is_glassy": false,
-
   "foundation": {
     "density_gcm3": 0.8592,
-    "density_sem_gcm3": 2.67e-4,
-    "density_exp_gcm3": [0.850, 0.950],
+    "density_sem_gcm3": 0.000267,
+    "density_exp_gcm3": [
+      0.85,
+      0.95
+    ],
     "density_error_pct": -9.6,
     "density_status": "WARN (amorphous-only MD vs semicrystalline exp)",
     "equil_verdict": "PASS",
     "equil_note": "Rubbery gating applied (T_workflow=300K > Tg=232K). density SEM=0.031%, CV=12.9%; C(t) advisory."
   },
-
   "thermal": {
     "Tg_slowrate_K": 231.5,
-    "Tg_rates_K_per_ns": [640.0, 160.0, 40.0],
-    "Tg_values_K": [232.5, 233.6, 231.5],
+    "Tg_rates_K_per_ns": [
+      640.0,
+      160.0,
+      40.0
+    ],
+    "Tg_values_K": [
+      232.5,
+      233.6,
+      231.5
+    ],
     "Tg_loglinear_slope_K": 0.361,
     "Tg_loglinear_r_squared": 0.227,
-    "Tg_rates_span_decades": 1.20,
+    "Tg_rates_span_decades": 1.2,
     "Tg_exp_K": 195.0,
     "Tg_offset_K": 36.5,
     "Tg_error_pct": 18.7,
     "Tg_status": "WARN (MD systematic overestimate expected; VF underconstrained <2 decades)",
-    "cte_glassy_per_K": 1.527e-4,
-    "cte_rubbery_per_K": 7.212e-4,
+    "cte_glassy_per_K": 0.0001527,
+    "cte_rubbery_per_K": 0.0007212,
     "cte_ratio": 4.72,
     "dCp_J_per_g_K": 0.428,
-    "multirate_fit_quality": "WARNING (R²=0.227; flat rate-dependence expected for rubbery PE)"
+    "multirate_fit_quality": "WARNING (R\u00b2=0.227; flat rate-dependence expected for rubbery PE)"
   },
-
   "mechanical": {
     "bulk_modulus_GPa": 1.641,
     "bulk_modulus_sem_GPa": 0.108,
     "B0_prime": 12.27,
     "bulk_modulus_r_squared": 0.9996,
-    "bulk_modulus_exp_GPa": [1.5, 2.0],
+    "bulk_modulus_exp_GPa": [
+      1.5,
+      2.0
+    ],
     "bulk_modulus_error_pct": 9.4,
     "bulk_modulus_method": "murnaghan",
-    "bulk_modulus_status": "PASS (within exp range; WARNING on P=100 atm isotropy 20.8% — low-P denominator artifact, EOS fit unaffected)",
+    "bulk_modulus_status": "PASS (within exp range; WARNING on P=100 atm isotropy 20.8% \u2014 low-P denominator artifact, EOS fit unaffected)",
     "fit_converged": true,
     "n_pressure_points": 5
   },
-
-  "overall_status": "COMPLETE",
-  "overall_verdict": "PASS with warnings (density 9.6% below exp — amorphous-only; Tg +18.7% systematic MD overestimate; K within exp range)",
+  "overall_status": "reconciled_review_2026-06-28",
+  "overall_verdict": "PASS with warnings (density 9.6% below exp \u2014 amorphous-only; Tg +18.7% systematic MD overestimate; K within exp range)",
   "pipeline_version": "PolyJarvis pre-replicate-fixes",
-  "timestamp_utc": "2026-06-22T14:10:00Z"
+  "timestamp_utc": "2026-06-22T14:10:00Z",
+  "results": {
+    "tg": {
+      "value_K": 231.5,
+      "exp_range_K": [
+        185.0,
+        205.0
+      ],
+      "exp_basis": "amorphous beta-relaxation Tg ~195 K (Boyer 1973); NOT pooled gamma/beta/alpha [145,243]",
+      "error_pct": 12.9,
+      "status": "FAIL",
+      "rate_valid": false,
+      "rate_note": "rates [40,160,640] all above 500 ps/T floor (40 K/ns) -> rate-invalid; validation-rate set",
+      "n_replicates": 1
+    },
+    "density": {
+      "value_g_cm3": 0.8592,
+      "exp_range_g_cm3": [
+        0.812,
+        0.898
+      ],
+      "error_pct": 0.0,
+      "status": "PASS"
+    },
+    "bulk_modulus": {
+      "value_GPa": 1.4909,
+      "sem_GPa": 0.0793,
+      "exp_range_GPa": [
+        1.5,
+        2.0
+      ],
+      "error_pct": -0.6,
+      "status": "FAIL",
+      "method": "volume_fluctuation",
+      "murnaghan_GPa": 1.6409,
+      "murnaghan_B0_prime": 12.2658,
+      "murnaghan_pressures_atm": [
+        1.0,
+        100.0,
+        300.0,
+        600.0,
+        1000.0
+      ],
+      "method_note": "fluctuation headline (range-independent). Murnaghan shown for reference; PE1/2/3 used pre-correction narrow window [1,100,300,600,1000] (B0' 12-16, K biased); PE4 used corrected wide window [1,500,1000,2000,5000]."
+    }
+  }
 }

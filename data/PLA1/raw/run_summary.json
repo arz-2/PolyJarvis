@@ -1,99 +1,101 @@
 {
-    "run": {
-        "name": "PLA1",
-        "smiles": "*C(C)C(=O)O*",
-        "polymer_class": "PEST",
-        "ff": "pcff",
-        "charge_method": "",
-        "dp": null,
-        "n_chains": null,
-        "n_atoms": null,
-        "date_start": "",
-        "date_end": ""
+  "run": {
+    "name": "PLA1",
+    "smiles": "*C(C)C(=O)O*",
+    "polymer_class": "PEST",
+    "ff": "pcff",
+    "charge_method": "",
+    "dp": null,
+    "n_chains": null,
+    "n_atoms": null,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": null,
+    "D-02_charges": null,
+    "D-03_electrostatics": null,
+    "D-04_system_size": null,
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "GOOD"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 425.2,
+      "rate_used": "r40 (slowest)",
+      "grading_basis": "single_rate_fallback (slope-gate FAIL, glassy)",
+      "exp_range_K": [
+        314.5,
+        347.5
+      ],
+      "exp_basis": "amorphous PLA Tg 331 K (58 C); honest +/-5% band. NOT the exp_lookup single-point [326,327.1].",
+      "error_pct": 22.4,
+      "status": "FAIL",
+      "md_offset_K": 100.0,
+      "tg_note": "single-rate slowest; rates [40,160,640]->[425.2,389.1,365.0] INVERTED (Tg falls with rate) -> slope-gate FAIL, no extrapolation. Raw MD Tg ~425.2 K vs exp 331 K = FAIL (+22.4%); consistent with the well-known glassy MD cooling-rate overestimate (~+100 K) -- offset-corrected Tg lands at exp. Headline property for PLA is DENSITY (PASS), not Tg.",
+      "n_replicates": 1
     },
-    "decisions": {
-        "D-01_ff": null,
-        "D-02_charges": null,
-        "D-03_electrostatics": null,
-        "D-04_system_size": null,
-        "D-05_convergence": "PASS",
-        "D-06_tg_fit_quality": "GOOD"
+    "density": {
+      "value_g_cm3": 1.229136,
+      "exp_range_g_cm3": [
+        1.186,
+        1.31
+      ],
+      "exp_basis": "amorphous PLA 1.248 g/cm3 +/-5% (crystalline PLLA ~1.290 excluded). polymer_rules PEST density is null; 1.248 is the amorphous literature value.",
+      "error_pct": 0.0,
+      "status": "PASS",
+      "density_note": "HEADLINE PASS x4 (PLA glassy: density is the clean validated property). PCFF ~2% low, well inside band."
     },
-    "plan": null,
-    "results": {
-        "tg": {
-            "value_K": 425.2,
-            "grading_basis": "raw_MD",
-            "md_offset_K": 100.0,
-            "exp_range_K": [
-                307.0,
-                347.0
-            ],
-            "error_pct": 0.0,
-            "status": "PASS",
-            "r_squared": 0.9819,
-            "fit_quality": "GOOD",
-            "tg_dsc_equiv_K": null,
-            "loglinear_slope_K": null,
-            "loglinear_r_squared": null,
-            "vf_fit_quality": null,
-            "n_rates": null,
-            "n_replicates": 1,
-            "rates_span_decades": null,
-            "slow_rate_ref_K_per_ns": null,
-            "cooling_rate_K_per_ns": 40,
-            "tg_note": "Directly-measured at slowest rate (40 K/ns, R\u00b2=0.982, GOOD). Multirate log-linear extrapolation rejected (slope-sign gate: Tg decreased with rate \u2192 fast rates under-equilibrated over 1.2-decade window). MD overestimate ~94 K; implied experimental Tg ~331 K (exp range 307\u2013347 K)."
-        },
-        "density": {
-            "value_g_cm3": 1.229136,
-            "exp_range_g_cm3": [
-                1.186,
-                1.31
-            ],
-            "error_pct": 0.0,
-            "status": "PASS"
-        },
-        "bulk_modulus": {
-            "value_GPa": 4.5765,
-            "sem_GPa": 0.0379,
-            "exp_range_GPa": [
-                3.0,
-                4.5
-            ],
-            "error_pct": 1.7,
-            "status": "WARNING",
-            "method": "murnaghan",
-            "bm_note": "4.58 GPa is 1.7% above exp upper bound 4.5 GPa, within 2-SEM. Fluctuation cross-check: 4.54 GPa (0.8% agreement). B0'=1.00 artifact of narrow \u00b11000 atm span; K value reliable. Recommend \u00b15000 atm on future PLA Murnaghan runs."
-        }
-    },
-    "convergence": {
-        "verdict": "PASS",
-        "density_equilibrated": null,
-        "energy_equilibrated": null,
-        "density_drift_pct": null
-    },
-    "structural_checks": {
-        "rg_cv": null,
-        "rg_spread_flag": null,
-        "kinetic_trap_flag": null,
-        "diffusion_regime": null,
-        "ordered_flag": null,
-        "p2_mean": null,
-        "heterogeneous_flag": null,
-        "density_cv_mean": null
-    },
-    "artifacts": {
-        "equilibrated_density": "raw/equilibrated_density.json",
-        "bulk_modulus": "raw/bulk_modulus.json",
-        "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
-        "volume_timeseries": "raw/volume_timeseries.csv",
-        "volume_fig": "graphs/volume_fluctuations.png",
-        "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
-    },
-    "provenance": {
-        "simulation_dir": "",
-        "git_commit": "5c5a38c",
-        "mdanalysis_version": "unknown",
-        "generated_at": "2026-06-22T05:08:44.534170+00:00"
+    "bulk_modulus": {
+      "value_GPa": 4.541,
+      "sem_GPa": 0.2963,
+      "exp_range_GPa": [
+        3.0,
+        4.5
+      ],
+      "error_pct": 0.9,
+      "status": "WARNING",
+      "method": "volume_fluctuation",
+      "cross_check": {
+        "value_GPa": 4.5765,
+        "B0_prime": 1.0,
+        "method": "murnaghan",
+        "note": "Murnaghan 4.58 GPa, B0'=1.00 narrow-window artifact (invalid)"
+      },
+      "method_note": "glassy hierarchy: Murnaghan narrow B0'=1.00 (invalid, +-1000 atm) and no deform run -> fluctuation last-resort. 4.54 sits +0.9% over upper 4.5 (within SEM) -> boundary WARNING. Glassy BM hierarchy is Murnaghan-wide -> deform -> fluctuation (NOT uniform fluctuation, which is the rubbery convention). Method+run spread 3.1-5.1 GPa IS the finding: deform clusters in-band, wide-window Murnaghan (PLA4) runs high."
     }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": null,
+    "energy_equilibrated": null,
+    "density_drift_pct": null
+  },
+  "structural_checks": {
+    "rg_cv": null,
+    "rg_spread_flag": null,
+    "kinetic_trap_flag": null,
+    "diffusion_regime": null,
+    "ordered_flag": null,
+    "p2_mean": null,
+    "heterogeneous_flag": null,
+    "density_cv_mean": null
+  },
+  "artifacts": {
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+    "volume_timeseries": "raw/volume_timeseries.csv",
+    "volume_fig": "graphs/volume_fluctuations.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "5c5a38c",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-22T05:08:44.534170+00:00",
+    "review_note": "PLA replicate cross-check 2026-06-28: removed +100 K md_offset gamed-PASS (PLA1/PLA4); honest single-rate Tg FAIL (all slope-gate inverted); density headline PASS; glassy BM hierarchy per run."
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

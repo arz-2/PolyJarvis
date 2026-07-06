@@ -23,45 +23,43 @@
   "results": {
     "tg": {
       "value_K": 379.0,
-      "grading_basis": "raw_MD",
-      "md_offset_K": 100.0,
+      "rate_used": "r100 (FAST, only rate)",
+      "grading_basis": "single_rate_fallback (glassy)",
       "exp_range_K": [
-        378.1,
-        380.1
+        359.1,
+        396.9
       ],
+      "exp_basis": "amorphous PMMA Tg 378 K (105 C) +/-5%.",
       "error_pct": 0.0,
       "status": "PASS",
-      "r_squared": 0.9976,
-      "fit_quality": "EXCELLENT",
-      "primary_fit_invalid": false,
-      "tg_dsc_equiv_K": null,
-      "loglinear_slope_K": null,
-      "loglinear_r_squared": null,
-      "vf_fit_quality": null,
-      "n_rates": null,
-      "n_replicates": 1,
-      "rates_span_decades": null,
-      "slow_rate_ref_K_per_ns": null
+      "reliability": "uncorroborated fast-rate coincidence",
+      "tg_note": "lands at exp on the FAST r100 rate; slower rates in PMMA2/4 land 403-409 -> at-exp here is COINCIDENCE not validation. md_offset=100 stale/NOT applied (value=raw). PMMA raw Tg STRADDLES exp (340-408 K across replicates); scattered, not a clean systematic. PASS here is coincidental -- do NOT treat as validation."
     },
     "density": {
       "value_g_cm3": 1.116631,
       "exp_range_g_cm3": [
-        1.17,
-        1.188
+        1.1305,
+        1.2495
       ],
-      "error_pct": -4.6,
-      "status": "FAIL"
+      "exp_basis": "amorphous PMMA 1.19 g/cm3 +/-5% (polymer_rules PACR).",
+      "error_pct": -6.2,
+      "status": "FAIL",
+      "density_note": "FAIL -6.2% vs exp 1.19. ANOMALOUS: ~4% below the class's own PCFF benchmark (Tang2022 within 2%), systematic across all 4 replicates. Cells ARE equilibrated (plateau converged, drift<0.2%, sem<0.03%) -> NOT under-equilibration; a build/cell-quality concern (charges/tacticity/DP). Low density + high K is physically incoherent -> lowers confidence across the whole PMMA set."
     },
     "bulk_modulus": {
       "value_GPa": 5.0048,
-      "sem_GPa": 0.0726,
       "exp_range_GPa": [
         3.5,
         4.2
       ],
       "error_pct": 19.2,
       "status": "FAIL",
-      "method": "murnaghan"
+      "method": "murnaghan",
+      "B0_prime": 13.11,
+      "isotropy_delta_pct": null,
+      "fluctuation_cross_check_GPa": 5.3656,
+      "fluctuation_sem_GPa": 0.1896,
+      "method_note": "Murnaghan 5.0048 graded FAIL-HIGH vs K_T [3.5,4.2], but this is a K_T/K_S methodology gap: the MD value sits INSIDE the K_S-derived [4.3,5.4] (ultrasonic) and exceeds only direct-PVT K_T (graded under polymer_rules K_T-priority). NOT a gross sim overestimate; narrow-window B0'=13.11 also inflates. No property passes cleanly for PMMA (weakest/lowest-confidence set)."
     }
   },
   "convergence": {
@@ -93,6 +91,8 @@
     "simulation_dir": "/home/arz2/PolyJarvis/data/PMMA3/lammps/",
     "git_commit": "7ad8428",
     "mdanalysis_version": "unknown",
-    "generated_at": "2026-06-26T11:13:12.208025+00:00"
-  }
+    "generated_at": "2026-06-26T11:13:12.208025+00:00",
+    "review_note": "PMMA replicate cross-check 2026-06-28: WEAKEST set, no property passes cleanly. Density FAIL x4 anomalous (-6%, below PCFF benchmark -> build/cell-quality concern). Tg scattered straddle (PMMA3 PASS is fast-rate coincidence). K FAIL-high vs K_T (K_T/K_S gap). PMMA2 468-style false slope-gate killed; PMMA1 degenerate."
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

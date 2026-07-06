@@ -22,26 +22,27 @@
   "plan": null,
   "results": {
     "tg": {
-      "value_K": 185.3,
+      "value_K": 180.0667,
       "grading_basis": "rate_extrapolated",
       "md_offset_K": 0.0,
       "exp_range_K": [
         167.0,
         178.0
       ],
-      "error_pct": 4.1,
+      "error_pct": 1.2,
       "status": "FAIL",
-      "r_squared": 1.0,
-      "fit_quality": "EXCELLENT",
+      "r_squared": 0.1399,
+      "fit_quality": "rubbery_flat_mean (regime-exempt; N=3 rates, no extrapolation fit)",
       "primary_fit_invalid": false,
-      "tg_dsc_equiv_K": 185.3,
-      "loglinear_slope_K": 5.434420676827985,
-      "loglinear_r_squared": 0.25678056110372205,
+      "tg_dsc_equiv_K": 180.0667,
+      "loglinear_slope_K": 2.452581569511221,
+      "loglinear_r_squared": 0.1399289864428645,
       "vf_fit_quality": "FAILED",
-      "n_rates": 5,
-      "n_replicates": 2,
-      "rates_span_decades": 0.8061799739838872,
-      "slow_rate_ref_K_per_ns": 1.6667e-10
+      "n_rates": 3,
+      "n_replicates": 1,
+      "rates_span_decades": 0.6020599913279624,
+      "slow_rate_ref_K_per_ns": 1.6667e-10,
+      "tg_method": "rubbery_flat_mean"
     },
     "density": {
       "value_g_cm3": 0.898415,
@@ -53,15 +54,15 @@
       "status": "PASS"
     },
     "bulk_modulus": {
-      "value_GPa": 1.2628,
-      "sem_GPa": 0.1797,
+      "value_GPa": 1.5664,
+      "sem_GPa": 0.1512,
       "exp_range_GPa": [
         1.38,
         1.95
       ],
-      "error_pct": -8.5,
-      "status": "FAIL",
-      "method": "murnaghan"
+      "error_pct": 0.0,
+      "status": "PASS",
+      "method": "volume_fluctuation"
     }
   },
   "convergence": {

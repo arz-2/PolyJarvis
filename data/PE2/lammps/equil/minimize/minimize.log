@@ -1,0 +1,299 @@
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/cut 14.0
+dielectric 1.000000
+bond_style harmonic
+angle_style harmonic
+dihedral_style multi/harmonic
+improper_style none
+special_bonds lj 0 0 0
+pair_modify mix arithmetic tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+package gpu 1 neigh yes
+
+read_data /home/arz2/PolyJarvis/data/PE2/lammps/equil/cell.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (55.778372 55.778372 55.778372)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  4840 atoms
+  scanning bonds ...
+  2 = max bonds/atom
+  scanning angles ...
+  1 = max angles/atom
+  scanning dihedrals ...
+  2 = max dihedrals/atom
+  orthogonal box = (0 0 0) to (55.778372 55.778372 55.778372)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  4820 bonds
+  reading angles ...
+  4800 angles
+  reading dihedrals ...
+  4780 dihedrals
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0       
+     2 = max # of 1-2 neighbors
+     2 = max # of 1-3 neighbors
+     4 = max # of 1-4 neighbors
+     6 = max # of special neighbors
+  special bonds CPU = 0.002 seconds
+  read_data CPU = 0.085 seconds
+include /home/arz2/PolyJarvis/data/PE2/lammps/equil/emc_build.params
+# LAMMPS parameters created by EMC v9.4.4, build Jul 31 2025 20:33:44
+
+# Variables
+
+variable	seed		index	1004
+variable	ntotal		index	4840
+variable	fshape		index	1
+variable	output		index	emc_build
+variable	field		index	trappe/2014/trappe-ua
+variable	location1	index	/home/arz2/emc/field/
+variable	nav		index	0.6022141179
+variable	temperature	index	300
+variable	radius		index	5
+variable	nrelax		index	100
+variable	weight_nonbond	index	0.0001
+variable	weight_bond	index	0.0001
+variable	weight_focus	index	1
+variable	cutoff		index	14
+variable	charge_cutoff	index	14
+variable	kappa		index	4
+variable	density1	index	0.65
+variable	lprevious	index	0
+variable	lphase		index	55.7783720511
+variable	f_poly		index	20
+variable	chem_repeat	index	*CC*
+variable	chem_cap	index	*C
+variable	lg_repeat	index	2
+variable	lg_cap		index	1
+variable	norm_poly	index	100
+variable	l_poly		index	242
+variable	mg_repeat	index	28.0536
+variable	mg_cap		index	15.0347
+variable	m_poly		index	3396.5014
+variable	n_poly		index	20
+variable	mtotal		index	67930.028
+variable	nphase1		index	4840
+variable	mphase1		index	67930.028
+variable	vphase1		index	173539.165354
+variable	lbox		index	55.7783720511
+variable	lphase1		index	55.7783720511
+variable	lxx		index	55.7783720511
+variable	lyy		index	55.7783720511
+variable	lzz		index	55.7783720511
+variable	lzy		index	0
+variable	lzx		index	0
+variable	lyx		index	0
+variable	vtotal		index	173539.165354
+variable	nl_poly		index	20
+
+# Types
+
+variable	type_c4h2	index	1
+variable	type_c4h3	index	2
+
+variable	type_bond_c4h2_c4h2 index	1
+variable	type_bond_c4h2_c4h3 index	2
+
+variable	type_angle_c4h2_c4h2_c4h2 index	1
+variable	type_angle_c4h2_c4h2_c4h3 index	2
+
+# Clusters
+
+variable	n0_poly		index	1
+variable	n1_poly		index	20
+variable	nl_poly		index	20
+
+# Flags
+
+variable	flag_charged	index	0
+
+# Masses
+
+mass		1    14.02680  # c4h2
+mass		2    15.03470  # c4h3
+
+# Potentials
+
+pair_modify	mix arithmetic tail yes
+special_bonds	lj 0 0 0 coul 0 0 0.5
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0.5     
+     2 = max # of 1-2 neighbors
+     2 = max # of 1-3 neighbors
+     4 = max # of 1-4 neighbors
+     6 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+
+# Pair Coeffs
+
+pair_coeff	1 1    0.09141    3.95000  # c4h2,c4h2
+pair_coeff	2 2    0.19475    3.75000  # c4h3,c4h3
+
+# Bond Coeffs
+
+bond_coeff	1  260.00013    1.54000  # c4h2,c4h2
+bond_coeff	2  260.00013    1.54000  # c4h2,c4h3
+
+# Angle Coeffs
+
+angle_coeff	1   62.10020  114.00000  # c4h2,c4h2,c4h2
+angle_coeff	2   62.10020  114.00000  # c4h2,c4h2,c4h3
+
+# Dihedral Coeffs
+
+dihedral_coeff	1    2.00702   -4.01203    0.27102    6.29006    0.00000  # c4h2,c4h2,c4h2,c4h2
+dihedral_coeff	2    2.00702   -4.01203    0.27102    6.29006    0.00000  # c4h2,c4h2,c4h2,c4h3
+
+
+# --- Thermo Output ---
+thermo_style custom step time temp press etotal pe ebond eangle edihed eimp evdwl ecoul elong vol lx ly lz density
+thermo_modify flush yes
+thermo 500
+
+# --- Trajectory ---
+dump dump_min all custom 1000 minimize.dump id type mol x y z ix iy iz
+
+# --- Minimization ---
+min_style cg
+minimize 1e-06 1e-06 50000 100000
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- GPU package (short-range, long-range and three-body potentials): doi:10.1016/j.cpc.2010.12.021, doi:10.1016/j.cpc.2011.10.012, doi:10.1016/j.cpc.2013.08.002, doi:10.1016/j.commatsci.2014.10.068, doi:10.1016/j.cpc.2016.10.020, doi:10.3233/APC200086
+
+@Article{Brown11,
+ author = {W. M. Brown and P. Wang and S. J. Plimpton and A. N. Tharrington},
+ title = {Implementing Molecular Dynamics on Hybrid High Performance Computers---Short Range Forces},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2011,
+ volume =  182,
+ pages =   {898--911},
+ doi =     {10.1016/j.cpc.2010.12.021}
+}
+
+@Article{Brown12,
+ author = {W. M. Brown and A. Kohlmeyer and S. J. Plimpton and A. N. Tharrington},
+ title = {Implementing Molecular Dynamics on Hybrid High Performance Computers - Particle-Particle Particle-Mesh},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2012,
+ volume =  183,
+ doi =     {10.1016/j.cpc.2011.10.012},
+ pages =   {449--459}
+}
+
+@Article{Brown13,
+ author = {W. M. Brown and Y. Masako},
+ title = {Implementing Molecular Dynamics on Hybrid High Performance Computers---Three-Body Potentials},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2013,
+ volume =  184,
+ pages =   {2785--2793},
+ doi =     {10.1016/j.cpc.2013.08.002},
+}
+
+@Article{Trung15,
+ author = {T. D. Nguyen and S. J. Plimpton},
+ title = {Accelerating Dissipative Particle Dynamics Simulations for Soft Matter Systems},
+ journal = {Comput.\ Mater.\ Sci.},
+ year =    2015,
+ doi =     {10.1016/j.commatsci.2014.10.068},
+ volume =  100,
+ pages =   {173--180}
+}
+
+@Article{Trung17,
+ author = {T. D. Nguyen},
+ title = {{GPU}-Accelerated {T}ersoff Potentials for Massively Parallel
+    Molecular Dynamics Simulations},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2017,
+ doi =     {10.1016/j.cpc.2016.10.020},
+ volume =  212,
+ pages =   {113--122}
+}
+
+@inproceedings{Nikolskiy19,
+ author = {V. Nikolskiy and V. Stegailov},
+ title = {{GPU} Acceleration of Four-Site Water Models in {LAMMPS}},
+ booktitle = {Proceedings of the International Conference on Parallel
+    Computing (ParCo 2019), Prague, Czech Republic},
+ doi =     {10.3233/APC200086},
+ year =    2019
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Generated 1 of 1 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 17.13 | 17.13 | 17.13 Mbytes
+   Step          Time           Temp          Press          TotEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         Volume           Lx             Ly             Lz          Density    
+         0   0              0              8302.7521      7825.1757      7825.1757      1724.8502      2583.1207      4796.0839      0             -1278.8791      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+       500   500            0             -659.62993     -2348.2852     -2348.2852      8.6855563      159.58444      2166.9859      0             -4683.5411      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      1000   1000           0             -703.39658     -2505.1477     -2505.1477      8.194216       153.26369      2124.4674      0             -4791.073       0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      1500   1500           0             -722.66431     -2562.5571     -2562.5571      8.0775244      150.08881      2124.5849      0             -4845.3083      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      2000   2000           0             -724.14167     -2639.1829     -2639.1829      8.1642013      147.67156      2101.1612      0             -4896.1799      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      2500   2500           0             -679.69766     -2693.8841     -2693.8841      8.1758529      147.31434      2089.3937      0             -4938.768       0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      3000   3000           0             -633.73267     -2726.1354     -2726.1354      8.5743116      152.15102      2101.4588      0             -4988.3196      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      3500   3500           0             -647.69731     -2766.6626     -2766.6626      8.4668646      157.68624      2093.5123      0             -5026.3279      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      4000   4000           0             -632.70707     -2789.0207     -2789.0207      8.5401604      156.59666      2083.8235      0             -5037.9811      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      4055   4055           0             -632.79831     -2789.3939     -2789.3939      8.5447199      156.75159      2084.1797      0             -5038.8699      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+Loop time of 7.55742 on 1 procs for 4055 steps with 4840 atoms
+
+99.9% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      7825.17574391822  -2789.39140207492  -2789.39394805063
+  Force two-norm initial, final = 2041.1476 1.9508172
+  Force max component initial, final = 79.366181 0.26387054
+  Final line search alpha, max atom move = 0.10855856 0.028645406
+  Iterations, force evaluations = 4055 8088
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.71627    | 0.71627    | 0.71627    |   0.0 |  9.48
+Bond    | 5.3695     | 5.3695     | 5.3695     |   0.0 | 71.05
+Neigh   | 0.0883     | 0.0883     | 0.0883     |   0.0 |  1.17
+Comm    | 0.53102    | 0.53102    | 0.53102    |   0.0 |  7.03
+Output  | 0.025219   | 0.025219   | 0.025219   |   0.0 |  0.33
+Modify  | 0.00036612 | 0.00036612 | 0.00036612 |   0.0 |  0.00
+Other   |            | 0.8267     |            |       | 10.94
+
+Nlocal:           4840 ave        4840 max        4840 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          16034 ave       16034 max       16034 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 0
+Ave neighs/atom = 0
+Ave special neighs/atom = 5.9504132
+Neighbor list builds = 90
+Dangerous builds = 0
+
+undump dump_min
+reset_timestep 0
+
+# --- Write Output ---
+write_dump all custom minimize_last.dump id type mol x y z xu yu zu vx vy vz modify sort id
+write_data /home/arz2/PolyJarvis/data/PE2/lammps/equil/minimize/minimize_out.data
+System init for write_data ...
+Generated 1 of 1 mixed pair_coeff terms from arithmetic mixing rule
+
+print "STAGE COMPLETE: minimization"
+STAGE COMPLETE: minimization
+quit

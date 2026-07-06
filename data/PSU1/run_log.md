@@ -250,3 +250,7 @@ Outputs: `data/PSU1/raw/` — `run_summary.json`, `tg_summary.json` (+tg_r40/160
 | K (bulk modulus) | 4.43 ± 0.06 GPa | 3–5 (5.3 DB) | in range | ✓ PASS |
 
 Tg "FAIL" vs the tight 439–479 summary band is the **expected MD overestimate** (fast cooling, 40 K/ns ≫ exp), not a model failure — magnitude (+8%) is good for PCFF/MD. All physically sound.
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 55.0 h  |  **GPU**: 55.0 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1/4
+- Source: `data/PSU1/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

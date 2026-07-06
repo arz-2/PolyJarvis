@@ -43,5 +43,6 @@
   "is_dsc_extrapolation": true,
   "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 25 K/ns | 558.9 K |\n| 50 K/ns | 495.8 K |\n| 100 K/ns | 562.6 K |\n\n**Log-linear**: Tg = 528.7 + 2.67\u00b7ln(\u0393)  R\u00b2=0.0024\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **468.6 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): Tg\u2070 = 494.8 \u00b1 inf K (95% CI)  R\u00b2=0.0267  quality=POOR_POORLY_CONSTRAINED\n\u26a0 CI > 100 K: VF extrapolation is underconstrained with < 2 decades of rates. Use log-linear result for validation.\n",
   "d06_markdown_path": "/home/alexzhao/PolyJarvis/data/PEEK4/raw/d06_multirate_block.md",
-  "plot_path": "/home/alexzhao/PolyJarvis/data/PEEK4/raw/tg_multirate.png"
+  "plot_path": "/home/alexzhao/PolyJarvis/data/PEEK4/raw/tg_multirate.png",
+  "review_note_2026_06_28": "FALSE slope-gate pass: slope_gate_pass=True only because b=+2.67~=0 is trivially positive, but loglinear_r2=0.002 (no resolvable rate dependence -- values are rec2 sweeps [558.9,495.8,562.6] dominated by \u00b150 K sweep-to-sweep scatter). The 468.6 DSC-extrapolation is a noise artifact and is NOT used; run_summary grades single_rate_fallback (r25 replicate mean 533.6 K)."
 }

@@ -22,46 +22,49 @@
   "plan": null,
   "results": {
     "tg": {
-      "value_K": 238.9,
-      "grading_basis": "rate_extrapolated",
-      "md_offset_K": 0.0,
+      "value_K": 245.27,
       "exp_range_K": [
-        145.2,
-        243.2
+        185.0,
+        205.0
       ],
-      "error_pct": 0.0,
-      "status": "PASS",
+      "exp_basis": "amorphous beta-relaxation Tg ~195 K (Boyer 1973); NOT pooled gamma/beta/alpha [145,243]",
+      "error_pct": 19.6,
+      "status": "FAIL",
+      "rate_valid": false,
+      "rate_note": "de-pooled own rates [25,50,100]; 50/100 above 40 K/ns floor -> only 25 valid; rate-elevated",
+      "n_replicates": 1,
       "r_squared": 0.9979,
-      "fit_quality": "EXCELLENT",
-      "primary_fit_invalid": false,
-      "tg_dsc_equiv_K": 238.9,
-      "loglinear_slope_K": 3.767916902258006,
-      "loglinear_r_squared": 0.03828581058365809,
-      "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
-      "n_rates": 6,
-      "n_replicates": 2,
-      "rates_span_decades": 1.4082399653118496,
-      "slow_rate_ref_K_per_ns": 1.6667e-10
+      "fit_quality": "EXCELLENT"
     },
     "density": {
       "value_g_cm3": 0.857239,
       "exp_range_g_cm3": [
-        0.81,
-        0.9
+        0.812,
+        0.898
       ],
       "error_pct": 0.0,
       "status": "PASS"
     },
     "bulk_modulus": {
-      "value_GPa": 1.3577,
-      "sem_GPa": 0.3228,
+      "value_GPa": 1.6513,
+      "sem_GPa": 0.072,
       "exp_range_GPa": [
         1.5,
         2.0
       ],
-      "error_pct": -9.5,
-      "status": "FAIL",
-      "method": "murnaghan"
+      "error_pct": 0.0,
+      "status": "PASS",
+      "method": "volume_fluctuation",
+      "murnaghan_GPa": 1.3577,
+      "murnaghan_B0_prime": 16.2434,
+      "murnaghan_pressures_atm": [
+        1.0,
+        100.0,
+        300.0,
+        600.0,
+        1000.0
+      ],
+      "method_note": "fluctuation headline (range-independent). Murnaghan shown for reference; PE1/2/3 used pre-correction narrow window [1,100,300,600,1000] (B0' 12-16, K biased); PE4 used corrected wide window [1,500,1000,2000,5000]."
     }
   },
   "convergence": {
@@ -97,5 +100,6 @@
     "git_commit": "7680020",
     "mdanalysis_version": "unknown",
     "generated_at": "2026-06-24T17:46:01.880191+00:00"
-  }
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

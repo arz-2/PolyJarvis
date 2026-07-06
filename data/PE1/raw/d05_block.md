@@ -1,7 +1,7 @@
 ## D-05 CONVERGENCE DETAIL
-`check_equilibration_comprehensive` · T=299.98 K · 4951 frames analysed (skip=50) · 2026-06-19 14:18
+`check_equilibration_comprehensive` · T=299.98 K · 4951 frames analysed (skip=50) · 2026-07-02 16:09
 
-**Overall: FAIL**
+**Overall: PASS**
 
 ### A. Thermo convergence
 | Check | Value | Threshold | Result |

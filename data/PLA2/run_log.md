@@ -153,3 +153,8 @@ GPU inventory: GPU 3: Quadro RTX 6000 24GB (claimed label: PLA2)
 
 Simulation dir: `data/PLA2/lammps/`
 Outputs: `data/PLA2/raw/` — JSONs; `data/PLA2/graphs/` — PNGs; `data/PLA2/raw/run_summary.json`
+- RESULT (wide [-1000,0,1500,3000,5000]): K_Murnaghan = 5.391 GPa (r²=0.9998, B0'=6.15) → GATE PASS; overwrote old B0'=1.95 fail. status: DONE
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 59.4 h  |  **GPU**: 59.4 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PLA2/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

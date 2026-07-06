@@ -175,3 +175,7 @@ Thermal multirate slope-gate FAILED (structural PEST, not rate/seed) → r100 si
 
 Simulation dir: `data/PLA4/lammps/`
 Outputs: `data/PLA4/raw/` — JSONs; `data/PLA4/graphs/` — PNGs; `data/PLA4/raw/run_summary.json`
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 33.4 h  |  **GPU**: 33.4 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PLA4/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

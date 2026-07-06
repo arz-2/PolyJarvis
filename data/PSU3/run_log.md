@@ -158,3 +158,7 @@ GPU inventory (`nvidia-smi` at run start): GPU 3: NVIDIA A800 40GB Active, 40 GB
 
 Simulation dir: `data/[RUN]/lammps/`
 Outputs: `data/[RUN]/raw/` — JSONs; `data/[RUN]/graphs/` — PNGs; `data/[RUN]/raw/run_summary.json`
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 40.1 h  |  **GPU**: 40.1 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PSU3/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

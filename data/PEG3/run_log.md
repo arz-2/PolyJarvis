@@ -155,3 +155,8 @@ Outputs: `data/PEG3/raw/` — JSONs; `data/PEG3/graphs/` — PNGs; `data/PEG3/ra
 - K 2.73 ± 0.16 GPa vs [2–4]: within range → **PASS** (fluctuation; Murnaghan x-check 3.61, B0' unresolvable for rubbery melt)
 
 Headline: ρ=1.0579 g/cm³ · Tg=235.6 K · K=2.73 GPa. All 3 properties physically reasonable; the two "FAIL" flags are marginal band-edge misses driven by PCFF's known systematic ether-O overbinding (Tg) and amorphous-vs-semicrystalline density offset.
+- RESULT (wide [-1000,0,3000,7000,15000]): K_Murnaghan = 3.337 GPa (r²=0.9999, B0'=9.20) → GATE PASS; supersedes fluctuation 2.732 (Murnaghan higher). status: DONE
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 3.0 h  |  **GPU**: 3.0 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PEG3/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

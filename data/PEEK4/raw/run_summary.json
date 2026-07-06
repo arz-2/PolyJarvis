@@ -22,26 +22,18 @@
   "plan": null,
   "results": {
     "tg": {
-      "value_K": 468.5666360218897,
-      "grading_basis": "rate_extrapolated",
-      "md_offset_K": 0.0,
+      "value_K": 533.6,
+      "rate_used": "r25 replicate mean [512.8,529.2,558.9], +/-23 K",
+      "grading_basis": "single_rate_fallback (glassy; slope-gate FAIL/irreproducible)",
       "exp_range_K": [
-        398.0,
-        438.0
+        397.1,
+        438.9
       ],
-      "error_pct": 7.0,
+      "exp_basis": "amorphous PEEK Tg 418 K (145 C) +/-5%.",
+      "error_pct": 21.6,
       "status": "FAIL",
-      "r_squared": 0.002428010981916806,
-      "fit_quality": "GOOD",
-      "primary_fit_invalid": false,
-      "tg_dsc_equiv_K": 468.5666360218897,
-      "loglinear_slope_K": 2.668985825644624,
-      "loglinear_r_squared": 0.002428010981916806,
-      "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
-      "n_rates": 3,
-      "n_replicates": 1,
-      "rates_span_decades": 0.6020599913279624,
-      "slow_rate_ref_K_per_ns": 1.6667e-10
+      "reliability": "genuine gross overestimate where resolved, but IRREPRODUCIBLE (rigid-aromatic; PEEK4 \u00b150 K sweep-to-sweep at fixed rate)",
+      "tg_note": "killed bogus 468.6 'rate_extrapolated' (slope-gate FALSE pass: b=+2.67~=0 on r2=0.002 noise fit). 468.6 was the ONLY near-exp PEEK Tg in the set -- a noise artifact. PEEK4 looked like the best replicate but was the most misleading.. Raw 533.6 K vs exp 418 K = FAIL (+21.6%): LARGEST overestimate of any class (rigid-aromatic PCFF + cooling-rate + screening-melt). PEEK is between PSU (resolved->genuine) and PVC (degenerate->unreliable)."
     },
     "density": {
       "value_g_cm3": 1.196999,
@@ -49,19 +41,26 @@
         1.2,
         1.326
       ],
-      "error_pct": -0.3,
-      "status": "FAIL"
+      "exp_basis": "amorphous PEEK 1.263 g/cm3 +/-5% (polymer_rules PKTN experimental_density_gcm3).",
+      "error_pct": -5.2,
+      "status": "FAIL",
+      "density_note": "MARGINAL FAIL: -5.2% vs amorphous 1.263 = documented PKTN PCFF underdensity, just past the -5% floor. Honest +/-5% band (NOT the 1.150-floor band -- that band-loosening is superseded by this review's +/-5% standard). Density is NOT a headline PASS for PEEK."
     },
     "bulk_modulus": {
       "value_GPa": 5.1315,
-      "sem_GPa": 0.1766,
       "exp_range_GPa": [
         4.0,
         5.8
       ],
       "error_pct": 0.0,
       "status": "PASS",
-      "method": "murnaghan"
+      "method": "murnaghan",
+      "B0_prime": 16.16,
+      "isotropy_delta_pct": null,
+      "fluctuation_cross_check_GPa": 4.5293,
+      "fluctuation_sem_GPa": 0.2578,
+      "fluctuation_gap_pct": 11.7,
+      "method_note": "Murnaghan primary (uniform B0' in [4,20] gate). PASS but note fluctuation 4.5293 vs Murnaghan 5.1315 = 11.7% gap (larger than PSU's <=3.4%; both still in-band). K is the headline (closest property) but only 3/4 PASS -- PEEK1 reads low. No property passes all four."
     }
   },
   "convergence": {
@@ -96,6 +95,8 @@
     "simulation_dir": "",
     "git_commit": "6a71646",
     "mdanalysis_version": "unknown",
-    "generated_at": "2026-06-27T22:33:12.204853+00:00"
-  }
+    "generated_at": "2026-06-27T22:33:12.204853+00:00",
+    "review_note": "PEEK replicate cross-check 2026-06-28: weakest aromatic set, NO property passes all 4. K headline (3/4 PASS; PEEK1 deform low). Density marginal FAIL x4 (-5% PKTN underdensity). Tg FAIL x4 (+20-26%, genuine-but-irreproducible). PEEK4 468.6 was a slope-gate noise artifact."
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

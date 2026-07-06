@@ -141,3 +141,7 @@ Note: run_summary.json flags K=FAIL because it prioritises bulk_modulus_murnagha
 
 Simulation dir: `data/[RUN]/lammps/`
 Outputs: `data/[RUN]/raw/` — JSONs; `data/[RUN]/graphs/` — PNGs; `data/[RUN]/raw/run_summary.json`
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 17.5 h  |  **GPU**: 8.2 h  |  **CPU**: 9.3 h (74 core-h)  |  procs: 2/8
+- Source: `data/PE3/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

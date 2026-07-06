@@ -196,3 +196,7 @@ Outputs: `data/PE1/raw/` — `run_summary.json`, `equilibrated_density.json`, `t
 **Reference-range caveat (avoid favorable-reading bias):** of the three polymer_rules ranges, Tg is trusted (PASS) while density and K ranges are disputed (FAIL→overridden). Each override is individually defensible (amorphous vs semicrystalline density; bulk vs shear K), but the pattern always lands on the favorable reading — each per-property reference judgment needs an independent citation in the manuscript, and the Tg PASS should be presented with its cooling-rate caveat, not as a clean hit.
 
 **Headline:** Corrected protocol resolves the PE over-densification (revision Priority 0): ρ **1.19 (+25%, wrong) → 0.860 g/cm³ (correct amorphous)**. All three property values are physically defensible; the two auto-"FAIL"s reflect questionable reference ranges, not wrong simulation. Agent-value evidence is in the RECOVERIES: R-01 (finite-size fix), R-02 (static-equilibration acceptance when dynamic C(t) is infeasible), R-03 (caught + bypassed two server FF/path bugs that would have silently produced a wrong K). **Caveat for replicates 2–5:** the BM force-field bug (R-03) is documented but NOT shipped (latent until MCP reload) — each remaining rubbery BM run needs the manual-chain bypass or a reload+verified fix.
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 33.5 h  |  **GPU**: 33.5 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PE1/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

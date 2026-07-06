@@ -102,3 +102,13 @@ GPU inventory (`nvidia-smi` at run start): GPU [ID]: [model], [VRAM] GB, [free] 
 
 Simulation dir: `data/[RUN]/lammps/`
 Outputs: `data/[RUN]/raw/` — JSONs; `data/[RUN]/graphs/` — PNGs; `data/[RUN]/raw/run_summary.json`
+
+## K-method backfill (2026-06-30 17:08) — gated Murnaghan @300K
+- chain_id: 1f631478 | GPU claim: PVC1-murnbackfill (gpu 0) | mpi=1 kokkos PCFF
+- pressures: [-1000,-500,0,500,1000] atm | cell: npt_prod300_out.data | out: data/PVC1/raw/bulk_modulus_murnaghan.json
+- status: monitoring
+- RESULT: K_Murnaghan = 2.852 GPa (r²=0.996, B0'=14.5) → GATE PASS; supersedes deform/none_valid. status: DONE
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 58.4 h  |  **GPU**: 58.4 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1/4
+- Source: `data/PVC1/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

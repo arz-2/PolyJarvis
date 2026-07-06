@@ -165,3 +165,7 @@ Outputs: `data/PVC3/raw/` — JSONs; `data/PVC3/graphs/` — PNGs; `data/PVC3/ra
 2. **B0' inflation FIXED.** PVC2's narrow ±1000 atm Murnaghan gave B0'=16.3 (unphysical). PVC3's compression-biased span [−1000..+5000] atm (after R-04 cavitation recovery on the original ±3000) gave **B0'=9.53 ∈ [4,20]**, R²=0.9990, fluctuation cross-check 2.93 GPa. K=2.80 GPa still −20% vs exp = PCFF systematic underprediction (matches PVC2).
 
 **Net:** density validates; Tg and K remain ~12–20% below experiment — a documented **PCFF systematic underprediction for PVC**, now cleanly characterized rather than masked by degenerate/ill-conditioned fits. For experiment-matching Tg/K, a different FF (or empirical PCFF-PVC correction) is needed; for a clean DSC-equivalent MD Tg, a wider-rate-span campaign (≥1.2 decades) is the recommended next step.
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 17.8 h  |  **GPU**: 17.8 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PVC3/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

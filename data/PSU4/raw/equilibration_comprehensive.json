@@ -44,7 +44,8 @@
       "mean_R_ee_A": 76.63,
       "std_R_ee_A": 37.36,
       "n_chains": 8,
-      "end_to_end_distribution_png": "failed: [Errno 2] No such file or directory: '/home/arz2/PolyJarvis/data/PSU4/graphs/end_to_end_distribution.png'"
+      "end_to_end_distribution_png": "not_saved: graphs dir absent at run time. Local dump present but clean regen blocked by aromatic backbone (MDAnalysis sort_backbone fails on PSU ring atoms = degree-3 branches; only first/last-atom fallback available).",
+      "mean_R_ee_A_note": "ree data valid (mean_R=76.63 A, 8 chains); only the figure write failed"
     },
     "msid": {
       "available": true,

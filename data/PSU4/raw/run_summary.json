@@ -1,0 +1,103 @@
+{
+  "run": {
+    "name": "PSU4",
+    "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+    "polymer_class": "PSFO",
+    "ff": "PCFF",
+    "charge_method": "none",
+    "dp": 25,
+    "n_chains": 8,
+    "n_atoms": 10816,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": "PCFF",
+    "D-02_charges": "none",
+    "D-03_electrostatics": "pppm",
+    "D-04_system_size": "DP=25, 8 chains, 10816 atoms",
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "EXCELLENT per-rate; multirate degenerate (single-rate fallback)"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 496.4,
+      "rate_used": "r25 (slowest)",
+      "grading_basis": "single_rate_fallback (glassy; slope-gate FAIL)",
+      "exp_range_K": [
+        439.9,
+        486.2
+      ],
+      "exp_basis": "PSU/Udel Tg 463 K (190 C) +/-5%; honest band (NOT tight [459,463]/[459,459.1] exp_lookup single-points).",
+      "error_pct": 2.1,
+      "status": "FAIL",
+      "reliability": "well-resolved (real overestimate, NOT degenerate -- contrast PVC)",
+      "tg_note": "width_c=165.3 K EXCELLENT; rates [25,50,80,100] scattered (slope-fail). Slowest-rate 496.4 K vs exp 463 K = FAIL (+2.1%): GENUINE rigid-aromatic PCFF + cooling-rate overestimate (fits well-resolved, width 49-165 K). Was mislabeled 'rate_extrapolated' though slope_gate_pass=False -> single_rate_fallback."
+    },
+    "density": {
+      "value_g_cm3": 1.17877,
+      "exp_range_g_cm3": [
+        1.178,
+        1.302
+      ],
+      "exp_basis": "amorphous PSU/Udel 1.24 g/cm3 +/-5% (polymer_rules PSFO density null).",
+      "error_pct": -4.9,
+      "status": "PASS",
+      "density_note": "PASS but AT THE -4 to -5% FLOOR (MARGINAL, razor-thin at floor) -- documented PCFF aromatic underdensity. (Honest +/-5% band; the tight DB [1.234,1.25] false-FAILs this expected bias.)"
+    },
+    "bulk_modulus": {
+      "value_GPa": 4.0317,
+      "sem_GPa": null,
+      "exp_range_GPa": [
+        4.0,
+        5.5
+      ],
+      "error_pct": 0.0,
+      "status": "PASS",
+      "method": "murnaghan",
+      "B0_prime": 9.48,
+      "fluctuation_cross_check_GPa": 3.9425,
+      "fluctuation_sem_GPa": 0.2438,
+      "fluctuation_agreement_pct": 2.2,
+      "method_note": "HEADLINE PASS (only in-band property) but LOW-END of [4.0,5.5]; PSU4 4.03 at floor, fluctuation 3.94 just below within SEM. Murnaghan validity by uniform gate (B0' in [4,20], converged, r2>0.999) + fluctuation agreement 2.2%. Consistent with uniformly-soft PCFF (density low, K low-end, Tg high)."
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.0827
+  },
+  "structural_checks": {
+    "rg_cv": 0.3164,
+    "rg_spread_flag": true,
+    "kinetic_trap_flag": true,
+    "diffusion_regime": "sub-diffusive / kinetically trapped",
+    "ordered_flag": false,
+    "p2_mean": 0.0145,
+    "heterogeneous_flag": true,
+    "density_cv_mean": 0.262
+  },
+  "artifacts": {
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "tg_multirate_result": "raw/tg_multirate_result.json",
+    "tg_multirate_d06": "raw/d06_multirate_block.md",
+    "tg_multirate_fig": "raw/tg_multirate.png",
+    "equilibrated_density": "raw/equilibrated_density.json",
+    "equilibration_comprehensive": "raw/equilibration_comprehensive.json",
+    "bulk_modulus": "raw/bulk_modulus.json",
+    "bulk_modulus_murnaghan": "raw/bulk_modulus_murnaghan.json",
+    "volume_timeseries": "raw/volume_timeseries.csv",
+    "volume_fig": "graphs/volume_fluctuations.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "ab82afc",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-06-28T16:50:59.179934+00:00",
+    "review_note": "PSU replicate cross-check 2026-06-28: K headline PASS (low-end); density PASS at -4/-5% floor; Tg FAIL (genuine rigid-aromatic overestimate, well-resolved); uniformly-soft PCFF. Honest bands."
+  },
+  "overall_status": "reconciled_review_2026-06-28"
+}

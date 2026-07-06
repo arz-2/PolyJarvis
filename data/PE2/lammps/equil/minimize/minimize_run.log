@@ -1,0 +1,193 @@
+--------------------------------------------------------------------------
+Sorry!  You were supposed to get help about:
+    opal_init:startup:internal-failure
+But I couldn't open the help file:
+    /home/arz2/openmpi/share/openmpi/help-opal-runtime.txt: No such file or directory.  Sorry!
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+Sorry!  You were supposed to get help about:
+    orte_init:startup:internal-failure
+But I couldn't open the help file:
+    /home/arz2/openmpi/share/openmpi/help-orte-runtime: No such file or directory.  Sorry!
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+Sorry!  You were supposed to get help about:
+    mpi_init:startup:internal-failure
+But I couldn't open the help file:
+    /home/arz2/openmpi/share/openmpi/help-mpi-runtime.txt: No such file or directory.  Sorry!
+--------------------------------------------------------------------------
+*** An error occurred in MPI_Init
+*** on a NULL communicator
+*** MPI_ERRORS_ARE_FATAL (processes in this communicator will now abort,
+***    and potentially your MPI job)
+[MAIL-30:715561] Local abort before MPI_INIT completed completed successfully, but am not able to aggregate error messages, and not able to guarantee that all other processes were killed!
+Authorization required, but no authorization protocol specified
+
+Authorization required, but no authorization protocol specified
+
+Authorization required, but no authorization protocol specified
+
+Authorization required, but no authorization protocol specified
+
+LAMMPS (22 Jul 2025 - Update 3)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread.
+  using 1 OpenMP thread(s) per MPI task
+Reading data file ...
+  orthogonal box = (0 0 0) to (55.778372 55.778372 55.778372)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  4840 atoms
+  scanning bonds ...
+  2 = max bonds/atom
+  scanning angles ...
+  1 = max angles/atom
+  scanning dihedrals ...
+  2 = max dihedrals/atom
+  orthogonal box = (0 0 0) to (55.778372 55.778372 55.778372)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  4820 bonds
+  reading angles ...
+  4800 angles
+  reading dihedrals ...
+  4780 dihedrals
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0       
+     2 = max # of 1-2 neighbors
+     2 = max # of 1-3 neighbors
+     4 = max # of 1-4 neighbors
+     6 = max # of special neighbors
+  special bonds CPU = 0.002 seconds
+  read_data CPU = 0.085 seconds
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0.5     
+     2 = max # of 1-2 neighbors
+     2 = max # of 1-3 neighbors
+     4 = max # of 1-4 neighbors
+     6 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+- GPU package (short-range, long-range and three-body potentials): doi:10.1016/j.cpc.2010.12.021, doi:10.1016/j.cpc.2011.10.012, doi:10.1016/j.cpc.2013.08.002, doi:10.1016/j.commatsci.2014.10.068, doi:10.1016/j.cpc.2016.10.020, doi:10.3233/APC200086
+The log file lists these citations in BibTeX format.
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+
+--------------------------------------------------------------------------
+- Using acceleration for lj/cut:
+-  with 1 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: Quadro RTX 6000, 72 CUs, 17/24 GB, 1.8 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+
+Generated 1 of 1 mixed pair_coeff terms from arithmetic mixing rule
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 0
+Per MPI rank memory allocation (min/avg/max) = 17.13 | 17.13 | 17.13 Mbytes
+   Step          Time           Temp          Press          TotEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         Volume           Lx             Ly             Lz          Density    
+         0   0              0              8302.7521      7825.1757      7825.1757      1724.8502      2583.1207      4796.0839      0             -1278.8791      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+       500   500            0             -659.62993     -2348.2852     -2348.2852      8.6855563      159.58444      2166.9859      0             -4683.5411      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      1000   1000           0             -703.39658     -2505.1477     -2505.1477      8.194216       153.26369      2124.4674      0             -4791.073       0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      1500   1500           0             -722.66431     -2562.5571     -2562.5571      8.0775244      150.08881      2124.5849      0             -4845.3083      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      2000   2000           0             -724.14167     -2639.1829     -2639.1829      8.1642013      147.67156      2101.1612      0             -4896.1799      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      2500   2500           0             -679.69766     -2693.8841     -2693.8841      8.1758529      147.31434      2089.3937      0             -4938.768       0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      3000   3000           0             -633.73267     -2726.1354     -2726.1354      8.5743116      152.15102      2101.4588      0             -4988.3196      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      3500   3500           0             -647.69731     -2766.6626     -2766.6626      8.4668646      157.68624      2093.5123      0             -5026.3279      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      4000   4000           0             -632.70707     -2789.0207     -2789.0207      8.5401604      156.59666      2083.8235      0             -5037.9811      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+      4055   4055           0             -632.79831     -2789.3939     -2789.3939      8.5447199      156.75159      2084.1797      0             -5038.8699      0              0              173539.17      55.778372      55.778372      55.778372      0.64999999   
+Loop time of 7.55742 on 1 procs for 4055 steps with 4840 atoms
+
+99.9% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      7825.17574391822  -2789.39140207492  -2789.39394805063
+  Force two-norm initial, final = 2041.1476 1.9508172
+  Force max component initial, final = 79.366181 0.26387054
+  Final line search alpha, max atom move = 0.10855856 0.028645406
+  Iterations, force evaluations = 4055 8088
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.71627    | 0.71627    | 0.71627    |   0.0 |  9.48
+Bond    | 5.3695     | 5.3695     | 5.3695     |   0.0 | 71.05
+Neigh   | 0.0883     | 0.0883     | 0.0883     |   0.0 |  1.17
+Comm    | 0.53102    | 0.53102    | 0.53102    |   0.0 |  7.03
+Output  | 0.025219   | 0.025219   | 0.025219   |   0.0 |  0.33
+Modify  | 0.00036612 | 0.00036612 | 0.00036612 |   0.0 |  0.00
+Other   |            | 0.8267     |            |       | 10.94
+
+Nlocal:           4840 ave        4840 max        4840 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          16034 ave       16034 max       16034 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 0
+Ave neighs/atom = 0
+Ave special neighs/atom = 5.9504132
+Neighbor list builds = 90
+Dangerous builds = 0
+System init for write_data ...
+
+
+---------------------------------------------------------------------
+      Device Time Info (average): 
+---------------------------------------------------------------------
+Data Transfer:   0.4233 s.
+Neighbor copy:   0.0105 s.
+Neighbor build:  0.0471 s.
+Force calc:      2.1059 s.
+Device Overhead: 0.2898 s.
+CPU Neighbor:    0.0166 s.
+CPU Cast/Pack:   0.4101 s.
+CPU Driver_Time: 0.2556 s.
+CPU Idle_Time:   0.0112 s.
+Average split:   1.0000.
+Max Mem / Proc:  40.00 MB.
+Prefetch mode:   None.
+Vector width:    32.
+Lanes / atom:    4.
+Pair block:      256.
+Neigh block:     128.
+Neigh mode:      Hybrid (binning on host) with subgroup support.
+Neigh sorting:   Unavailable or disabled.
+---------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------
+- Using acceleration for lj/cut:
+-  with 1 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: Quadro RTX 6000, 72 CUs, 17/24 GB, 1.8 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+
+Generated 1 of 1 mixed pair_coeff terms from arithmetic mixing rule
+STAGE COMPLETE: minimization
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 98.
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 99.
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 98.
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 99.
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 98.
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 99.

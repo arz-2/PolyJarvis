@@ -2,41 +2,41 @@
   "status": "success",
   "method": "murnaghan",
   "fit_converged": true,
-  "B0_GPa": 5.2901,
-  "bulk_modulus_GPa": 5.2901,
-  "B0_sem_GPa": 0.0567,
-  "bulk_modulus_sem_GPa": 0.0567,
-  "B0_prime": 1.9547,
-  "V0_A3": 48962.33,
-  "r_squared": 0.999771,
+  "B0_GPa": 5.3913,
+  "bulk_modulus_GPa": 5.3913,
+  "B0_sem_GPa": 0.1468,
+  "bulk_modulus_sem_GPa": 0.1468,
+  "B0_prime": 6.1501,
+  "V0_A3": 48970.77,
+  "r_squared": 0.99977,
   "n_points": 5,
   "pressures_atm": [
     -1000.0,
-    -500.0,
     0.0,
-    500.0,
-    1000.0
+    1500.0,
+    3000.0,
+    5000.0
   ],
   "pressures_GPa": [
     -0.101325,
-    -0.050663,
     0.0,
-    0.050663,
-    0.101325
+    0.151988,
+    0.303975,
+    0.506625
   ],
   "volumes_A3": [
-    49920.71,
-    49449.84,
-    48965.41,
-    48484.37,
-    48057.71
+    49982.29,
+    48944.49,
+    47691.98,
+    46691.29,
+    45460.87
   ],
   "vol_stds_A3": [
-    226.15,
-    208.37,
-    199.66,
-    180.05,
-    178.87
+    205.56,
+    200.27,
+    170.55,
+    158.78,
+    145.04
   ],
   "n_prod_rows": [
     2501,
@@ -47,15 +47,13 @@
   ],
   "log_files": [
     "/home/arz2/PolyJarvis/data/PLA2/lammps/mechanical/bm_series/bm_P-1000/bm_P-1000.log",
-    "/home/arz2/PolyJarvis/data/PLA2/lammps/mechanical/bm_series/bm_P-500/bm_P-500.log",
     "/home/arz2/PolyJarvis/data/PLA2/lammps/mechanical/bm_series/bm_P0/bm_P0.log",
-    "/home/arz2/PolyJarvis/data/PLA2/lammps/mechanical/bm_series/bm_P500/bm_P500.log",
-    "/home/arz2/PolyJarvis/data/PLA2/lammps/mechanical/bm_series/bm_P1000/bm_P1000.log"
+    "/home/arz2/PolyJarvis/data/PLA2/lammps/mechanical/bm_series/bm_P1500/bm_P1500.log",
+    "/home/arz2/PolyJarvis/data/PLA2/lammps/mechanical/bm_series/bm_P3000/bm_P3000.log",
+    "/home/arz2/PolyJarvis/data/PLA2/lammps/mechanical/bm_series/bm_P5000/bm_P5000.log"
   ],
   "eq_fraction": 0.5,
   "output_dir": "/home/arz2/PolyJarvis/data/PLA2/raw",
-  "warnings": [
-    "B0'=1.95 is outside the expected range [4, 20] for polymers. Verify pressure range and equilibration quality."
-  ],
+  "warnings": [],
   "murnaghan_eos_fig": "/home/arz2/PolyJarvis/data/PLA2/graphs/murnaghan_eos.png"
 }

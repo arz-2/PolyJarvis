@@ -23,35 +23,43 @@
   "results": {
     "tg": {
       "value_K": 436.9,
-      "grading_basis": "rate_extrapolated",
-      "md_offset_K": 0.0,
-      "exp_range_K": null,
-      "error_pct": null,
-      "status": "no exp ref",
-      "r_squared": 1.0,
-      "fit_quality": "ACCEPTABLE",
-      "tg_dsc_equiv_K": 436.9,
-      "loglinear_slope_K": -118.84874113837101,
-      "loglinear_r_squared": 1.0,
-      "vf_fit_quality": "SKIPPED (N < 3)",
-      "n_rates": 2,
-      "n_replicates": 1,
-      "rates_span_decades": 0.3979400086720376,
-      "slow_rate_ref_K_per_ns": 1.6667e-10
+      "rate_used": "r160 (slowest of 2 FAST rates)",
+      "grading_basis": "single_rate_fallback (glassy)",
+      "exp_range_K": [
+        354.35,
+        391.65
+      ],
+      "exp_basis": "amorphous atactic PS Tg 373 K (100 C) +/-5%.",
+      "error_pct": 11.6,
+      "status": "FAIL",
+      "reliability": "UNRELIABLE (2 fast rates only, 108 K scatter, slope-gate FAIL)",
+      "tg_note": "single_rate_fallback off rates [400,160]->[328,436.9]; loglinear slope b=-118.8 (wrong sign) so gate correctly failed. 436.9 is rate-inflated (lacks the slow 40 K/ns rate PS1/PS3 have). run_summary had mislabeled this 'rate_extrapolated' and carried NO exp band. PS Tg STRADDLES exp across replicates (376-437 K): the well-resolved slow/single fits (PS1 375.9, PS3 376.5) land at exp; the runs lacking a clean slow rate (PS2 2 fast rates, PS4 noisy) inflate +11%. "
     },
     "density": {
       "value_g_cm3": 0.974437,
-      "exp_range_g_cm3": null,
-      "error_pct": null,
-      "status": "no exp ref"
+      "exp_range_g_cm3": [
+        0.9975,
+        1.1025
+      ],
+      "exp_basis": "amorphous atactic PS 1.05 g/cm3 +/-5% (polymer_rules PSTR), at 300 K (measured target_temp_K=300, actual ~300.0).",
+      "error_pct": -2.3,
+      "error_pct_vs_midpoint": -7.2,
+      "status": "FAIL",
+      "density_note": "MARGINAL FAIL: graded -2.3% past the 0.9975 floor (~-7.2% vs the 1.05 midpoint) = documented aromatic-PCFF underdensity, PEEK-style, NOT a cliff. Cells ARE equilibrated at 300 K (drift<0.22%, sem pass, homogeneous) -> NOT under-equilibration. Under-dense cell is COHERENT with the low K (under-packed -> soft), unlike PMMA's incoherent low-density/high-K."
     },
     "bulk_modulus": {
       "value_GPa": 2.442,
-      "sem_GPa": 0.0319,
-      "exp_range_GPa": null,
-      "error_pct": null,
-      "status": "no exp ref",
-      "method": "murnaghan"
+      "exp_range_GPa": [
+        3.3,
+        4.0
+      ],
+      "exp_basis": "K_T [3.3,4.0] GPa, glassy aPS 25 C (Mark2007 Tait/Zoller1978); supersedes the stale K_S [3.5,5.5].",
+      "error_pct": -26.0,
+      "status": "FAIL",
+      "method": "murnaghan",
+      "B0_prime": 13.47,
+      "fluctuation_K_GPa": null,
+      "method_note": "Murnaghan primary, +/-1000 atm, converged (B0'=13.47, high from the narrow window -- same inflation as PMMA/PEEK). FAIL-low -26.0% vs K_T floor 3.3. ALL PS K land 2.4-3.0 GPa (-10 to -26%), a systematic underestimate COHERENT with the ~-6% underdensity (under-packed cells are softer). K is NOT a headline PASS for PS."
     }
   },
   "convergence": {
@@ -86,6 +94,8 @@
     "simulation_dir": "",
     "git_commit": "1cb9d21",
     "mdanalysis_version": "unknown",
-    "generated_at": "2026-06-23T15:42:17.142892+00:00"
-  }
+    "generated_at": "2026-06-23T15:42:17.142892+00:00",
+    "review_note": "PS replicate cross-check 2026-06-28: Tg is the headline (PS1 375.9 + PS3 376.5 PASS at well-resolved slow/single fits; PS2/PS4 inflate +11% lacking a clean slow rate). Density MARGINAL FAIL x4 (aromatic-PCFF underdensity at 300 K) and K FAIL x4 (2.4-3.0 GPa) are COHERENT (under-packed -> soft). PS1 K corrected: the reported 3.85 'fluctuation' PASS was the REMOVED Born value -> real fluctuation 2.71 FAIL. PS2 relabeled from bandless 'rate_extrapolated' to single_rate_fallback with K_T/Tg bands applied."
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

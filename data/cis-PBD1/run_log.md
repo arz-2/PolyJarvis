@@ -185,3 +185,9 @@ GPU inventory (`nvidia-smi` at run start):
 Simulation dir: `/home/arz2/PolyJarvis/data/cis-PBD1/lammps/`
 Outputs: `data/cis-PBD1/raw/` — run_summary.json, equilibrated_density.json, tg_summary.json,
 bulk_modulus_murnaghan.json, equilibration_comprehensive.json; `data/cis-PBD1/graphs/` — tg_fit.png, murnaghan_eos.png
+
+---
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 33.5 h  |  **GPU**: 7.9 h  |  **CPU**: 25.6 h (205 core-h)  |  procs: 1/8
+- Source: `data/cis-PBD1/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

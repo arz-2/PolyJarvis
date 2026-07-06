@@ -163,3 +163,7 @@ GPU inventory (`nvidia-smi` at run start): GPU 1: RTX 6000, 24 GB
 
 Simulation dir: `data/PMMA2/lammps/`
 Outputs: `data/PMMA2/raw/` — JSONs; `data/PMMA2/graphs/` — PNGs; `data/PMMA2/raw/run_summary.json`
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 41.3 h  |  **GPU**: 41.3 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PMMA2/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.
