@@ -22,26 +22,27 @@
   "plan": null,
   "results": {
     "tg": {
-      "value_K": 186.575,
+      "value_K": 188.7,
       "grading_basis": "rate_extrapolated",
       "md_offset_K": 0.0,
       "exp_range_K": [
         167.0,
         178.0
       ],
-      "error_pct": 4.8,
+      "error_pct": 6.0,
       "status": "FAIL",
-      "r_squared": 0.06308948725622539,
-      "fit_quality": "EXCELLENT",
+      "r_squared": 0.2492,
+      "fit_quality": "rubbery_flat_mean (regime-exempt; N=3 rates, no extrapolation fit)",
       "primary_fit_invalid": false,
-      "tg_dsc_equiv_K": 186.575,
-      "loglinear_slope_K": 2.4416743168836925,
-      "loglinear_r_squared": 0.06308948725622539,
+      "tg_dsc_equiv_K": 188.7,
+      "loglinear_slope_K": 7.347578167657906,
+      "loglinear_r_squared": 0.24922660572797395,
       "vf_fit_quality": "FAILED",
-      "n_rates": 8,
-      "n_replicates": 3,
-      "rates_span_decades": 1.2041199826559248,
-      "slow_rate_ref_K_per_ns": 1.6667e-10
+      "n_rates": 3,
+      "n_replicates": 1,
+      "rates_span_decades": 0.6020599913279624,
+      "slow_rate_ref_K_per_ns": 1.6667e-10,
+      "tg_method": "rubbery_flat_mean"
     },
     "density": {
       "value_g_cm3": 0.898629,

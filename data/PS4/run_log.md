@@ -162,3 +162,7 @@ GPU inventory (`nvidia-smi` at run start): GPU 0-3: NVIDIA A800 40GB, 40 GB each
 
 Simulation dir: `data/PS4/lammps/`
 Outputs: `data/PS4/raw/` — JSONs; `data/PS4/graphs/` — PNGs; `data/PS4/raw/run_summary.json`
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 24.1 h  |  **GPU**: 24.1 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PS4/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

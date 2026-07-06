@@ -1,0 +1,21 @@
+{
+  "arm": "agent",
+  "system": "RECOV_F5",
+  "polymer_class": "PURA",
+  "seed": null,
+  "interventions": 0,
+  "wall_clock_s": 0.0,
+  "terminal_state": "unknown",
+  "recovery_events": [
+    {
+      "fault": "emc_pcff_missing_urea_increment",
+      "prescripted": false,
+      "resolved": true,
+      "attempts": 1,
+      "note": "from RECOVERY tag"
+    }
+  ],
+  "stages_completed": [],
+  "smoke": false,
+  "notes": "parsed from run_log.md (self-reported; rules fixed a priori); wall_clock_s is sim-bound and excludes LLM latency"
+}

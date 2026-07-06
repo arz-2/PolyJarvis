@@ -144,3 +144,9 @@ GPU inventory (`nvidia-smi` at run start): all 4× RTX 6000 busy (PLA3/PLA4, PSU
 
 Simulation dir: `data/cis-PBD4/lammps/`
 Outputs: `data/cis-PBD4/raw/` — JSONs; `data/cis-PBD4/graphs/` — PNGs; `data/cis-PBD4/raw/run_summary.json`
+
+---
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 31.7 h  |  **GPU**: 11.2 h  |  **CPU**: 20.5 h (164 core-h)  |  procs: 1/8
+- Source: `data/cis-PBD4/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

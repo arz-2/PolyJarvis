@@ -114,40 +114,43 @@
   },
   "results": {
     "tg": {
-      "value_K": 207.39166666666665,
+      "value_K": 226.27,
       "exp_range_K": [
-        186.0,
-        226.0
+        195.7,
+        216.3
       ],
-      "error_pct": 0.7,
-      "status": "PASS",
-      "r_squared": 0.9996346524814403,
-      "fit_quality": "EXCELLENT",
-      "tg_dsc_equiv_K": 207.39166666666665,
-      "loglinear_slope_K": 5.446173779355835,
+      "exp_basis": "amorphous PEO Tg ~206 K (Boyer; PEO ~-67degC). Honest +/-5% band; NOT a single-point or pooled-relaxation band.",
+      "error_pct": 4.6,
+      "status": "FAIL",
+      "rate_valid": false,
+      "rate_note": "rubbery_flat_mean own rates [40,160,640]; normalized from prior loglinear-to-5K/ns artifact (207.4); rates rate-elevated",
+      "tg_method": "rubbery_flat_mean",
       "loglinear_r_squared": 0.9996346524814403,
-      "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
       "n_rates": 3,
-      "n_replicates": 1,
-      "rates_span_decades": 1.2041199826559248,
-      "slow_rate_ref_K_per_ns": 5.0
+      "n_replicates": 1
     },
     "density": {
       "value_g_cm3": 1.057698,
       "exp_range_g_cm3": [
-        1.007,
-        1.113
+        1.064,
+        1.176
       ],
-      "error_pct": 0.2,
-      "status": "PASS"
+      "exp_basis": "amorphous PEO 1.12 g/cm3 (Wu2011 OPLS-AA 1.10-1.12). PCFF underestimates ~5% -> marginal FAIL (FF systematic, cf. PEEK).",
+      "error_pct": -0.6,
+      "status": "FAIL"
     },
     "bulk_modulus": {
       "value_GPa": 3.1397,
       "sem_GPa": 0.1155,
-      "exp_range_GPa": null,
-      "error_pct": null,
-      "status": "no exp ref",
-      "method": "fluctuation"
+      "exp_range_GPa": [
+        2.0,
+        4.0
+      ],
+      "error_pct": 0.0,
+      "status": "PASS",
+      "method": "volume_fluctuation",
+      "murnaghan_xcheck": null,
+      "method_note": "Fluctuation headline for cross-run consistency (all four have it; all PASS [2,4]). POXI rules name Murnaghan primary for rubbery PEO, but only PEG4 has a valid wide-window series; PEG3's is narrow/invalid, PEG1-PEG2 have none. Run data does NOT show the noted +70% fluctuation overestimate (fluctuation <= Murnaghan in PEG3 and PEG4)."
     }
   },
   "convergence": {
@@ -181,6 +184,8 @@
     "simulation_dir": "/home/alexzhao/PolyJarvis/data/PEG1/lammps",
     "git_commit": "76899f2",
     "mdanalysis_version": "unknown",
-    "generated_at": "2026-06-21T17:19:43.070452+00:00"
-  }
+    "generated_at": "2026-06-21T17:19:43.070452+00:00",
+    "machine_origin": "machine-2 (alexzhao); curated subset synced, trajectory dumps not local"
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

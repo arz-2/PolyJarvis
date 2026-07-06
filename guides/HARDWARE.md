@@ -22,7 +22,6 @@ Box: 4× Quadro RTX 6000 (ids 0–3) + i9-10980XE (18 physical cores).
 
 | Template | engine | gpus | mpi | mpi solo |
 |----------|--------|------|-----|----------|
-| nvt_born | cpu | 0 | 4 | 8 |
 | npt_deform | gpu | 1 | 4 | 8 |
 | npt_tg_step | gpu | 1 | 4 | 8 |
 

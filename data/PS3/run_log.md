@@ -131,3 +131,7 @@ Outputs: `data/PS3/raw/` — JSONs; `data/PS3/graphs/` — PNGs; `data/PS3/raw/r
 **Headline:** Tg is the standout result — 376.5 K lands squarely on experiment, and uniquely for this PSTR/PCFF system the multirate slope was physically correct (slope_gate PASS), unlike the prior inversion failures. Density is marginally below the experimental band; K underpredicts by the documented PCFF/PSTR margin (prior PS2: 2.44 GPa). The DSC log-linear extrapolation was rejected (R²=0.67, 1-decade rate span) and the slowest-rate MD Tg reported instead, corroborated by the VF Γ→0 limit (375.5 K).
 
 run_summary.json: `data/PS3/raw/run_summary.json` (run_id 5132ae42)
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 14.4 h  |  **GPU**: 14.4 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PS3/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

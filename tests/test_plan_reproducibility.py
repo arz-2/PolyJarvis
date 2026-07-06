@@ -66,10 +66,9 @@ def test_deterministic_plan_matches_no_plan(cls, stage, plan_files):
         "--npt_prod_dump", "/tmp/x/09_npt_prod300.dump",
         "--data_path", "/tmp/x/09_npt_prod300_out.data",
     ]),
-    # analyze-bm (glassy, born path): born args non-null
+    # analyze-bm (glassy, Murnaghan-primary path): murnaghan_logs non-null
     ("PACR", "analyze-bm", [
-        "--born_log", "/tmp/x/08_nvt_born.log",
-        "--born_matrix", "/tmp/x/born_matrix.dat", "--born_n_atoms", "2904",
+        "--murnaghan_logs", '["/tmp/x/bm_P1.log", "/tmp/x/bm_P1000.log"]',
         "--npt_prod_log", "/tmp/x/09_npt_prod300.log",
         "--is_glassy", "true",
     ]),

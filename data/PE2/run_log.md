@@ -129,3 +129,7 @@ Simulation dir: `data/PE2/lammps/`
 Outputs: `data/PE2/raw/` — JSONs; `data/PE2/graphs/` — PNGs; `data/PE2/raw/run_summary.json`
 
 **Run complete 2026-06-22 ~10:10 EDT.** Total wall: ~8.5h (equil 3h18m + Tg sweeps 1h30m + Murnaghan 42m + analysis).
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 4.6 h  |  **GPU**: 4.6 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PE2/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

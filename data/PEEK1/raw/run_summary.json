@@ -23,39 +23,44 @@
   "results": {
     "tg": {
       "value_K": 532.7,
+      "rate_used": "single r40",
+      "grading_basis": "single_rate_fallback (glassy; slope-gate FAIL/irreproducible)",
       "exp_range_K": [
-        398.0,
-        438.0
+        397.1,
+        438.9
       ],
-      "error_pct": 27.4,
+      "exp_basis": "amorphous PEEK Tg 418 K (145 C) +/-5%.",
+      "error_pct": 21.4,
       "status": "FAIL",
-      "r_squared": 0.9909,
-      "fit_quality": "GOOD",
-      "note": "Re-extracted from the COMPLETE 19-point staircase (700->350 K, 29.5 h wall, status=completed); supersedes the earlier partial-log (16 pts, 700->400 K) Tg=537.4 K. -4.7 K shift from full glassy-branch constraint. +114.7 K (+27.4%) vs exp 418 K is the documented single-rate (40 K/ns) cooling-rate + screening-melt over-estimate. Tg_alternative_K=500 (secondary curve_fit) disagrees by 33 K \u2014 primary F-stat Tg (R2=0.9909) is the reported value."
+      "reliability": "genuine gross overestimate where resolved, but IRREPRODUCIBLE (rigid-aromatic; PEEK4 \u00b150 K sweep-to-sweep at fixed rate)",
+      "tg_note": "width_c=0 (degenerate fit); +21% over band. Raw 532.7 K vs exp 418 K = FAIL (+21.4%): LARGEST overestimate of any class (rigid-aromatic PCFF + cooling-rate + screening-melt). PEEK is between PSU (resolved->genuine) and PVC (degenerate->unreliable)."
     },
     "density": {
       "value_g_cm3": 1.192765,
       "exp_range_g_cm3": [
-        1.02,
-        1.38
+        1.2,
+        1.326
       ],
+      "exp_basis": "amorphous PEEK 1.263 g/cm3 +/-5% (polymer_rules PKTN experimental_density_gcm3).",
       "error_pct": -5.6,
-      "status": "PASS_SCREENING",
-      "exp_amorphous_ref_g_cm3": 1.263,
-      "ref_note": "Compared to AMORPHOUS PEEK 1.263 g/cm3 (canonical for a fully amorphous MD cell). The 1.30-1.32 figure is SEMICRYSTALLINE, not a valid comparator. Prior 1.20 ref was discredited. Value is within the loose plan gate [1.02,1.38] but ~5.5% LOW vs amorphous ref -> threads K-low caveat."
+      "status": "FAIL",
+      "density_note": "MARGINAL FAIL: -5.6% vs amorphous 1.263 = documented PKTN PCFF underdensity, just past the -5% floor. Honest +/-5% band (NOT the 1.150-floor band -- that band-loosening is superseded by this review's +/-5% standard). Density is NOT a headline PASS for PEEK."
     },
     "bulk_modulus": {
       "value_GPa": 3.5307,
-      "sem_GPa": null,
       "exp_range_GPa": [
         4.0,
-        7.0
+        5.8
       ],
       "error_pct": -11.7,
-      "status": "WARNING",
-      "method": "deformation",
-      "error_pct_vs_midpoint": -35.8,
-      "ref_note": "Convention: error_pct is vs NEAREST exp bound (lower=4.0 GPa) = -11.8%; vs midpoint 5.5 GPa = -35.8%. Below 4-7 GPa range. Born infeasible -> deform fallback. Opposing biases: density -5.5% (K-low, dominant) vs fast strain rate 1e8/s (K-high). Affine K_Born=84.3 GPa = upper bound only."
+      "status": "FAIL",
+      "method": "uniaxial_deformation",
+      "B0_prime": null,
+      "isotropy_delta_pct": 2.02,
+      "fluctuation_cross_check_GPa": null,
+      "fluctuation_sem_GPa": null,
+      "fluctuation_gap_pct": null,
+      "method_note": "deform-only (no Murnaghan); VALID fit (iso 2.0%, G=0.89, nu=0.38) but reads LOW below the 4.0 floor -- same deform-only artifact as PVC1/PLA1. K is the headline (closest property) but only 3/4 PASS -- PEEK1 reads low. No property passes all four."
     }
   },
   "convergence": {
@@ -86,6 +91,8 @@
     "simulation_dir": "",
     "git_commit": "17a4076",
     "mdanalysis_version": "unknown",
-    "generated_at": "2026-06-20T15:42:24.663334+00:00"
-  }
+    "generated_at": "2026-06-20T15:42:24.663334+00:00",
+    "review_note": "PEEK replicate cross-check 2026-06-28: weakest aromatic set, NO property passes all 4. K headline (3/4 PASS; PEEK1 deform low). Density marginal FAIL x4 (-5% PKTN underdensity). Tg FAIL x4 (+20-26%, genuine-but-irreproducible). PEEK4 468.6 was a slope-gate noise artifact."
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

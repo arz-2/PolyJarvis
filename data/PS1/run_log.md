@@ -165,3 +165,13 @@ GPU inventory (`nvidia-smi` at run start, 2026-06-20 00:21):
 
 Simulation dir: `/home/alexzhao/PolyJarvis/data/PS1/lammps`
 Outputs: `data/PS1/raw/` — `run_summary.json`, `tg_summary.json`, `bulk_modulus.json` (born, canonical) + `bulk_modulus_born.json`/`bulk_modulus_fluctuation.json`, `equilibrated_density.json`, `equilibration_comprehensive.json`; figures in `data/PS1/graphs/`
+
+## K-method backfill (2026-06-30 17:08) — gated Murnaghan @300K
+- chain_id: 340ed49e | GPU claim: PS1-murnbackfill (gpu 3) | mpi=1 kokkos PCFF
+- pressures: [-1000,-500,0,500,1000] atm | cell: npt_prod300_out.data | out: data/PS1/raw/bulk_modulus_murnaghan.json
+- status: monitoring
+- RESULT: K_Murnaghan = 2.726 GPa (r²=0.9996, B0'=13.3) → GATE PASS; supersedes fluctuation 2.710. status: DONE
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 2.9 h  |  **GPU**: 2.9 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PS1/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

@@ -23,44 +23,46 @@
   "results": {
     "tg": {
       "value_K": 307.9,
-      "grading_basis": "raw_MD",
-      "md_offset_K": 100.0,
+      "rate_used": "r40 (slowest)",
+      "grading_basis": "single_rate_fallback (glassy)",
       "exp_range_K": [
-        345.0,
-        360.0
+        336.3,
+        371.7
       ],
-      "error_pct": -10.8,
+      "exp_basis": "PVC Tg 354 K (81 C) +/-5%; honest band (NOT the tight [345,360]/[334,374] variants).",
+      "error_pct": -8.4,
       "status": "FAIL",
-      "r_squared": 0.9876,
-      "fit_quality": "POOR",
-      "tg_dsc_equiv_K": null,
-      "loglinear_slope_K": null,
-      "loglinear_r_squared": null,
-      "vf_fit_quality": null,
-      "n_rates": null,
-      "n_replicates": 1,
-      "rates_span_decades": null,
-      "slow_rate_ref_K_per_ns": null
+      "reliability": "UNRELIABLE",
+      "tg_note": "3 rates [40,160,400]->[307.9,270.0,271.6] POOR fits, slope-fail (inverted); recovery r40=310.6 agrees. UNRELIABLE. PVC MD Tg from these runs is fit-limited and scattered (308-348 K), straddling exp 354 K from below; multirate fits are POOR/inverted (slope-fail). Tg is NOT a validated property for PVC -- treat as unreliable, density is the validated headline. (No physical FF-underestimate claim: below-exp glassy Tg despite fast cooling is fit pathology, not a real offset.)"
     },
     "density": {
       "value_g_cm3": 1.348576,
       "exp_range_g_cm3": [
-        1.35,
-        1.45
+        1.316,
+        1.454
       ],
-      "error_pct": -0.1,
-      "status": "FAIL"
+      "exp_basis": "amorphous PVC 1.385 g/cm3 +/-5% (polymer_rules PVNL density is null).",
+      "error_pct": 0.0,
+      "status": "PASS",
+      "density_note": "HEADLINE PASS x4 (PVC's only validated property). PCFF ~2.5-3% low -- inside band but on the low side."
     },
     "bulk_modulus": {
-      "value_GPa": 2.9086,
-      "sem_GPa": 0.1231,
+      "value_GPa": 2.7054,
+      "sem_GPa": 0.1386,
       "exp_range_GPa": [
-        3.0,
-        5.0
+        3.5,
+        4.5
       ],
-      "error_pct": -3.0,
+      "error_pct": -22.7,
       "status": "FAIL",
-      "method": "murnaghan"
+      "method": "volume_fluctuation",
+      "cross_check": {
+        "value_GPa": 2.9086,
+        "B0_prime": 16.3428,
+        "method": "murnaghan",
+        "note": "Murnaghan 2.91 GPa, B0'=16.3 narrow-window (non-primary)"
+      },
+      "method_note": "glassy hierarchy: Murnaghan was NARROW window [-1000..1000], B0'=16.3 (non-primary) -> fluctuation. FAIL low. PVC2/3/4 cluster 2.7-2.9 GPa vs exp [3.5,4.5] = robust ~20-35% PCFF underestimate (consistent across methods+replicates; caveat: PCFF/PPPM virial). PVC1 has no valid K."
     }
   },
   "convergence": {
@@ -94,6 +96,8 @@
     "simulation_dir": "/home/alexzhao/PolyJarvis/data/PVC2/lammps/",
     "git_commit": "1cb9d21",
     "mdanalysis_version": "unknown",
-    "generated_at": "2026-06-23T10:52:37.199081+00:00"
-  }
+    "generated_at": "2026-06-23T10:52:37.199081+00:00",
+    "review_note": "PVC replicate cross-check 2026-06-28: consistent bands; density headline PASS (low); Tg unreliable (scattered/inverted fits); K robust ~20-35% PCFF underestimate; PVC1 no valid K. Weakest validation set -- only density passes, and it passes low."
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

@@ -1,0 +1,143 @@
+{
+  "status": "success",
+  "data_file": "data/PLA4/lammps/equil/npt_production/npt_production_out.data",
+  "dump_file": "data/PLA4/lammps/equil/npt_production/npt_production.dump",
+  "output_dir": "data/PLA4/raw",
+  "csv_file": "data/PLA4/raw/end_to_end_vectors.csv",
+  "num_chains": 10,
+  "frames_analysed": 501,
+  "backbone_types": [
+    2,
+    3,
+    7
+  ],
+  "termini_used": {
+    "1": [
+      7,
+      450
+    ],
+    "2": [
+      459,
+      902
+    ],
+    "3": [
+      911,
+      1354
+    ],
+    "4": [
+      1363,
+      1806
+    ],
+    "5": [
+      1815,
+      2258
+    ],
+    "6": [
+      2267,
+      2710
+    ],
+    "7": [
+      2719,
+      3162
+    ],
+    "8": [
+      3171,
+      3614
+    ],
+    "9": [
+      3623,
+      4066
+    ],
+    "10": [
+      4075,
+      4518
+    ]
+  },
+  "per_chain": [
+    {
+      "chain": 1,
+      "mean_R": 39.509417737553456,
+      "std_R": 3.473515255190771,
+      "mean_R2": 1573.0353105253891,
+      "std_R2": 252.30247648565057,
+      "n_frames": 501
+    },
+    {
+      "chain": 2,
+      "mean_R": 67.8949316104729,
+      "std_R": 2.639687027704384,
+      "mean_R2": 4616.675795514087,
+      "std_R2": 361.5499068545933,
+      "n_frames": 501
+    },
+    {
+      "chain": 3,
+      "mean_R": 29.486831132047428,
+      "std_R": 3.8364128314960655,
+      "mean_R2": 884.1618908406961,
+      "std_R2": 220.57136303617304,
+      "n_frames": 501
+    },
+    {
+      "chain": 4,
+      "mean_R": 41.039479124331905,
+      "std_R": 2.253849148985534,
+      "mean_R2": 1689.3085487440574,
+      "std_R2": 185.37982862437198,
+      "n_frames": 501
+    },
+    {
+      "chain": 5,
+      "mean_R": 63.762549341319804,
+      "std_R": 3.15832563978666,
+      "mean_R2": 4075.6177944883357,
+      "std_R2": 398.45515727894076,
+      "n_frames": 501
+    },
+    {
+      "chain": 6,
+      "mean_R": 17.86188291789529,
+      "std_R": 3.918080615631993,
+      "mean_R2": 334.367575526309,
+      "std_R2": 142.726861587496,
+      "n_frames": 501
+    },
+    {
+      "chain": 7,
+      "mean_R": 19.761890464676117,
+      "std_R": 2.083872309404399,
+      "mean_R2": 394.86617189184705,
+      "std_R2": 83.18982571855875,
+      "n_frames": 501
+    },
+    {
+      "chain": 8,
+      "mean_R": 19.874898881969337,
+      "std_R": 2.8121574708990598,
+      "mean_R2": 402.9040512109102,
+      "std_R2": 113.35233834787016,
+      "n_frames": 501
+    },
+    {
+      "chain": 9,
+      "mean_R": 25.15906544074327,
+      "std_R": 1.8871283145218039,
+      "mean_R2": 636.5327168791082,
+      "std_R2": 93.62027257484421,
+      "n_frames": 501
+    },
+    {
+      "chain": 10,
+      "mean_R": 15.631352351335233,
+      "std_R": 4.495128098646043,
+      "mean_R2": 264.5050219658487,
+      "std_R2": 135.66363597878188,
+      "n_frames": 501
+    }
+  ],
+  "overall_mean_R": 33.99822990023447,
+  "overall_mean_R2": 1487.1974877586588,
+  "method": "MDAnalysis.analysis.polymer.sort_backbone",
+  "mdanalysis_version": "2.10.0",
+  "end_to_end_distribution_png": "data/PLA4/graphs/end_to_end_distribution.png"
+}

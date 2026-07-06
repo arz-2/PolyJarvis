@@ -163,3 +163,7 @@ Outputs: `data/PS2/raw/` — JSONs; `data/PS2/graphs/` — PNGs; `data/PS2/raw/r
 - **Bulk modulus 2.44 GPa** (−26% vs exp) — ⚠ screening-grade, magnitude as predicted by DP≪Me (DP=40 vs Me@160); Murnaghan fit clean (R²=0.9998), fluctuation cross-check agrees within 2.3%.
 - **Tg 437 K** — ⚠ screening-grade/unreliable; multirate slope-gate failed (see R-01). Honest limitation, not a silent pass.
 - Total wall: ~equil 5h15m + 3 Tg sweeps (~8h) + Murnaghan 1h40m; within 48 h budget. 1 GPU (shared host).
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 15.3 h  |  **GPU**: 15.3 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PS2/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

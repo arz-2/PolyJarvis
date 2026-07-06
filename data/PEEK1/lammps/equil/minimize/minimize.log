@@ -1,0 +1,590 @@
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+package gpu 1 neigh no
+
+read_data /home/arz2/PolyJarvis/data/PEEK1/lammps/equil/cell.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (44.324856 44.324856 44.324856)
+  1 by 1 by 3 MPI processor grid
+  reading atoms ...
+  4096 atoms
+  scanning bonds ...
+  3 = max bonds/atom
+  scanning angles ...
+  3 = max angles/atom
+  scanning dihedrals ...
+  9 = max dihedrals/atom
+  scanning impropers ...
+  1 = max impropers/atom
+  orthogonal box = (0 0 0) to (44.324856 44.324856 44.324856)
+  1 by 1 by 3 MPI processor grid
+  reading bonds ...
+  4448 bonds
+  reading angles ...
+  7080 angles
+  reading dihedrals ...
+  10544 dihedrals
+  reading impropers ...
+  2280 impropers
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        1       
+  special bond factors coul:  0        0        1       
+     3 = max # of 1-2 neighbors
+     6 = max # of 1-3 neighbors
+     9 = max # of special neighbors
+  special bonds CPU = 0.000 seconds
+  read_data CPU = 0.079 seconds
+include /home/arz2/PolyJarvis/data/PEEK1/lammps/equil/emc_build.params
+# LAMMPS parameters created by EMC v9.4.4, build Jul 31 2025 20:33:44
+
+# Variables
+
+variable	seed		index	-1
+variable	ntotal		index	4096
+variable	fshape		index	1
+variable	output		index	emc_build
+variable	field		index	pcff/pcff
+variable	location1	index	/home/arz2/emc/field/
+variable	nav		index	0.6022141179
+variable	temperature	index	300
+variable	radius		index	5
+variable	nrelax		index	100
+variable	weight_nonbond	index	0.0001
+variable	weight_bond	index	0.0001
+variable	weight_focus	index	1
+variable	cutoff		index	9.5
+variable	charge_cutoff	index	9.5
+variable	kappa		index	4
+variable	density1	index	0.66
+variable	lprevious	index	0
+variable	lphase		index	44.3248558022
+variable	f_poly		index	8
+variable	chem_repeat	index	*Oc1ccc(Oc2ccc(C(=O)c3ccc(cc3)*)cc2)cc1
+variable	chem_cap	index	*[H]
+variable	lg_repeat	index	34
+variable	lg_cap		index	1
+variable	norm_poly	index	100
+variable	l_poly		index	512
+variable	mg_repeat	index	260.29514
+variable	mg_cap		index	0
+variable	m_poly		index	3904.4271
+variable	n_poly		index	8
+variable	mtotal		index	34612.81032
+variable	nphase1		index	4096
+variable	mphase1		index	34612.81032
+variable	vphase1		index	87084.7269122
+variable	lbox		index	44.3248558022
+variable	lphase1		index	44.3248558022
+variable	lxx		index	44.3248558022
+variable	lyy		index	44.3248558022
+variable	lzz		index	44.3248558022
+variable	lzy		index	0
+variable	lzx		index	0
+variable	lyx		index	0
+variable	vtotal		index	87084.7269122
+variable	nl_poly		index	8
+
+# Types
+
+variable	type_c_0	index	1
+variable	type_cp		index	2
+variable	type_hc		index	3
+variable	type_ho		index	4
+variable	type_o_1	index	5
+variable	type_oc		index	6
+variable	type_oh		index	7
+
+variable	type_bond_c_0_cp index	1
+variable	type_bond_c_0_o_1 index	2
+variable	type_bond_cp_cp	index	3
+variable	type_bond_cp_hc	index	4
+variable	type_bond_cp_oc	index	5
+variable	type_bond_cp_oh	index	6
+variable	type_bond_ho_oh	index	7
+
+variable	type_angle_c_0_cp_cp index	1
+variable	type_angle_cp_c_0_cp index	2
+variable	type_angle_cp_c_0_o_1 index	3
+variable	type_angle_cp_cp_cp index	4
+variable	type_angle_cp_cp_hc index	5
+variable	type_angle_cp_cp_oc index	6
+variable	type_angle_cp_cp_oh index	7
+variable	type_angle_cp_oc_cp index	8
+variable	type_angle_cp_oh_ho index	9
+
+# Clusters
+
+variable	n0_poly		index	1
+variable	n1_poly		index	8
+variable	nl_poly		index	8
+
+# Flags
+
+variable	flag_charged	index	1
+
+# Masses
+
+mass		1    12.01115  # c_0
+mass		2    12.01115  # cp
+mass		3     1.00797  # hc
+mass		4     1.00797  # ho
+mass		5    15.99940  # o_1
+mass		6    15.99940  # oc
+mass		7    15.99940  # oh
+
+# Potentials
+
+pair_modify	mix sixthpower tail yes
+special_bonds	lj/coul 0 0 1
+
+# Pair Coeffs
+
+pair_coeff	 1  1    0.12000    3.30800  # c_0,c_0
+pair_coeff	 2  2    0.06400    4.01000  # cp,cp
+pair_coeff	 3  3    0.02000    2.99500  # hc,hc
+pair_coeff	 4  4    0.01300    1.09800  # ho,ho
+pair_coeff	 5  5    0.26700    3.30000  # o_1,o_1
+pair_coeff	 6  6    0.24000    3.53500  # oc,oc
+pair_coeff	 7  7    0.24000    3.53500  # oh,oh
+
+# Bond Coeffs
+
+bond_coeff	1    1.48900  339.35740 -655.72360  670.23620  # c_0,cp
+bond_coeff	2    1.21600  823.79480 -1878.79400 2303.53110  # c_0,o_1
+bond_coeff	3    1.41700  470.83610 -627.61790 1327.63450  # cp,cp
+bond_coeff	4    1.09820  372.82510 -803.45260  894.31730  # cp,hc
+bond_coeff	5    1.37680  428.87980 -738.23510 1114.96550  # cp,oc
+bond_coeff	6    1.37680  428.87980 -738.23510 1114.96550  # cp,oh
+bond_coeff	7    0.96500  532.50620 -1282.90500 2004.76580  # ho,oh
+
+# Angle Coeffs
+
+angle_coeff	1  108.40000   43.95940   -8.39240   -9.33790  # c_0,cp,cp
+angle_coeff	2  110.58840   34.62140   -7.09390   -7.40320  # cp,c_0,cp
+angle_coeff	3  119.30000   65.10160  -17.97660    0.00000  # cp,c_0,o_1
+angle_coeff	4  118.90000   61.02260  -34.99310    0.00000  # cp,cp,cp
+angle_coeff	5  117.94000   35.15580  -12.46820    0.00000  # cp,cp,hc
+angle_coeff	6  123.42000   73.67810  -21.67870    0.00000  # cp,cp,oc
+angle_coeff	7  123.42000   73.67810  -21.67870    0.00000  # cp,cp,oh
+angle_coeff	8  109.50000   60.00000    0.00000    0.00000  # cp,oc,cp
+angle_coeff	9  108.19000   53.12500   -8.50160    0.00000  # cp,oh,ho
+
+# BondBond Coeffs
+
+angle_coeff	1 bb    0.00000    1.48900    1.41700  # c_0,cp,cp
+angle_coeff	2 bb    0.00000    1.48900    1.48900  # cp,c_0,cp
+angle_coeff	3 bb    0.00000    1.48900    1.21600  # cp,c_0,o_1
+angle_coeff	4 bb   68.28560    1.41700    1.41700  # cp,cp,cp
+angle_coeff	5 bb    1.07950    1.41700    1.09820  # cp,cp,hc
+angle_coeff	6 bb   48.47540    1.41700    1.37680  # cp,cp,oc
+angle_coeff	7 bb   48.47540    1.41700    1.37680  # cp,cp,oh
+angle_coeff	8 bb    0.00000    1.37680    1.37680  # cp,oc,cp
+angle_coeff	9 bb   20.65770    1.37680    0.96500  # cp,oh,ho
+
+# BondAngle Coeffs
+
+angle_coeff	1 ba    0.00000    0.00000    1.48900    1.41700  # c_0,cp,cp
+angle_coeff	2 ba    0.00000    0.00000    1.48900    1.48900  # cp,c_0,cp
+angle_coeff	3 ba    0.00000    0.00000    1.48900    1.21600  # cp,c_0,o_1
+angle_coeff	4 ba   28.87080   28.87080    1.41700    1.41700  # cp,cp,cp
+angle_coeff	5 ba   20.00330   24.21830    1.41700    1.09820  # cp,cp,hc
+angle_coeff	6 ba   58.47900  107.68060    1.41700    1.37680  # cp,cp,oc
+angle_coeff	7 ba   58.47900  107.68060    1.41700    1.37680  # cp,cp,oh
+angle_coeff	8 ba    0.00000    0.00000    1.37680    1.37680  # cp,oc,cp
+angle_coeff	9 ba   53.86140   23.92240    1.37680    0.96500  # cp,oh,ho
+
+# Dihedral Coeffs
+
+dihedral_coeff	 1    0.00000    0.00000    4.62820    0.00000    0.00000    0.00000  # c_0,cp,cp,cp
+dihedral_coeff	 2    0.00000    0.00000    2.16700    0.00000    0.00000    0.00000  # c_0,cp,cp,hc
+dihedral_coeff	 3    0.00000    0.00000    2.50000    0.00000    0.00000    0.00000  # cp,c_0,cp,cp
+dihedral_coeff	 4    0.00000    0.00000    0.90630    0.00000    0.00000    0.00000  # cp,cp,c_0,o_1
+dihedral_coeff	 5    8.36670    0.00000    1.19320    0.00000    0.00000    0.00000  # cp,cp,cp,cp
+dihedral_coeff	 6    0.00000    0.00000    3.96610    0.00000    0.00000    0.00000  # cp,cp,cp,hc
+dihedral_coeff	 7    0.00000    0.00000    4.84980    0.00000    0.00000    0.00000  # cp,cp,cp,oc
+dihedral_coeff	 8    0.00000    0.00000    4.84980    0.00000    0.00000    0.00000  # cp,cp,cp,oh
+dihedral_coeff	 9    0.00000    0.00000    1.80000    0.00000    0.00000    0.00000  # cp,cp,oc,cp
+dihedral_coeff	10   -0.69000    0.00000    0.50970    0.00000    0.00950    0.00000  # cp,cp,oh,ho
+dihedral_coeff	11    0.00000    0.00000    1.87690    0.00000    0.00000    0.00000  # hc,cp,cp,hc
+dihedral_coeff	12    0.00000    0.00000    1.72340    0.00000    0.00000    0.00000  # hc,cp,cp,oc
+dihedral_coeff	13    0.00000    0.00000    1.72340    0.00000    0.00000    0.00000  # hc,cp,cp,oh
+
+# MiddleBondTorsion Coeffs
+
+dihedral_coeff	 1 mbt    0.00000    0.00000    0.00000    1.41700  # c_0,cp,cp,cp
+dihedral_coeff	 2 mbt    0.00000    0.00000    0.00000    1.41700  # c_0,cp,cp,hc
+dihedral_coeff	 3 mbt    0.00000    0.00000    0.00000    1.48900  # cp,c_0,cp,cp
+dihedral_coeff	 4 mbt    0.00000    0.00000    0.00000    1.48900  # cp,cp,c_0,o_1
+dihedral_coeff	 5 mbt   27.59890   -2.31200    0.00000    1.41700  # cp,cp,cp,cp
+dihedral_coeff	 6 mbt    0.00000   -1.15210    0.00000    1.41700  # cp,cp,cp,hc
+dihedral_coeff	 7 mbt    0.00000    4.82550    0.00000    1.41700  # cp,cp,cp,oc
+dihedral_coeff	 8 mbt    0.00000    4.82550    0.00000    1.41700  # cp,cp,cp,oh
+dihedral_coeff	 9 mbt    0.00000    0.00000    0.00000    1.37680  # cp,cp,oc,cp
+dihedral_coeff	10 mbt    1.15800    3.26970    3.51320    1.37680  # cp,cp,oh,ho
+dihedral_coeff	11 mbt    0.00000    4.82280    0.00000    1.41700  # hc,cp,cp,hc
+dihedral_coeff	12 mbt    0.00000    5.54320    0.00000    1.41700  # hc,cp,cp,oc
+dihedral_coeff	13 mbt    0.00000    5.54320    0.00000    1.41700  # hc,cp,cp,oh
+
+# EndBondTorsion Coeffs
+
+dihedral_coeff	 1 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.48900    1.41700  # c_0,cp,cp,cp
+dihedral_coeff	 2 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.48900    1.09820  # c_0,cp,cp,hc
+dihedral_coeff	 3 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.48900    1.41700  # cp,c_0,cp,cp
+dihedral_coeff	 4 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.41700    1.21600  # cp,cp,c_0,o_1
+dihedral_coeff	 5 ebt   -0.11850    6.32040    0.00000   -0.11850    6.32040    0.00000    1.41700    1.41700  # cp,cp,cp,cp
+dihedral_coeff	 6 ebt    0.00000   -6.89580    0.00000    0.00000   -0.46690    0.00000    1.41700    1.09820  # cp,cp,cp,hc
+dihedral_coeff	 7 ebt    0.00000    0.26550    0.00000    0.00000    4.89050    0.00000    1.41700    1.37680  # cp,cp,cp,oc
+dihedral_coeff	 8 ebt    0.00000    0.26550    0.00000    0.00000    4.89050    0.00000    1.41700    1.37680  # cp,cp,cp,oh
+dihedral_coeff	 9 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.41700    1.37680  # cp,cp,oc,cp
+dihedral_coeff	10 ebt    0.90000   -1.34560    1.19000    3.41320    0.58730   -0.13230    1.41700    0.96500  # cp,cp,oh,ho
+dihedral_coeff	11 ebt    0.00000   -0.68900    0.00000    0.00000   -0.68900    0.00000    1.09820    1.09820  # hc,cp,cp,hc
+dihedral_coeff	12 ebt    0.00000   -1.58670    0.00000    0.00000    4.26410    0.00000    1.09820    1.37680  # hc,cp,cp,oc
+dihedral_coeff	13 ebt    0.00000   -1.58670    0.00000    0.00000    4.26410    0.00000    1.09820    1.37680  # hc,cp,cp,oh
+
+# AngleTorsion Coeffs
+
+dihedral_coeff	 1 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  108.40000  118.90000  # c_0,cp,cp,cp
+dihedral_coeff	 2 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  108.40000  117.94000  # c_0,cp,cp,hc
+dihedral_coeff	 3 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  110.58840  108.40000  # cp,c_0,cp,cp
+dihedral_coeff	 4 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  108.40000  119.30000  # cp,cp,c_0,o_1
+dihedral_coeff	 5 at    1.97670    1.02390    0.00000    1.97670    1.02390    0.00000  118.90000  118.90000  # cp,cp,cp,cp
+dihedral_coeff	 6 at    0.00000    2.50140    0.00000    0.00000    2.71470    0.00000  118.90000  117.94000  # cp,cp,cp,hc
+dihedral_coeff	 7 at    0.00000   10.01550    0.00000    0.00000    1.74040    0.00000  118.90000  123.42000  # cp,cp,cp,oc
+dihedral_coeff	 8 at    0.00000   10.01550    0.00000    0.00000    1.74040    0.00000  118.90000  123.42000  # cp,cp,cp,oh
+dihedral_coeff	 9 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  123.42000  109.50000  # cp,cp,oc,cp
+dihedral_coeff	10 at   -5.13600   -1.01220    0.00000    4.68520    0.02300   -0.59800  123.42000  108.19000  # cp,cp,oh,ho
+dihedral_coeff	11 at    0.00000    2.45010    0.00000    0.00000    2.45010    0.00000  117.94000  117.94000  # hc,cp,cp,hc
+dihedral_coeff	12 at    0.00000    1.87290    0.00000    0.00000    2.57060    0.00000  117.94000  123.42000  # hc,cp,cp,oc
+dihedral_coeff	13 at    0.00000    1.87290    0.00000    0.00000    2.57060    0.00000  117.94000  123.42000  # hc,cp,cp,oh
+
+# AngleAngleTorsion Coeffs
+
+dihedral_coeff	 1 aat    0.00000  108.40000  118.90000  # c_0,cp,cp,cp
+dihedral_coeff	 2 aat    0.00000  108.40000  117.94000  # c_0,cp,cp,hc
+dihedral_coeff	 3 aat    0.00000  110.58840  108.40000  # cp,c_0,cp,cp
+dihedral_coeff	 4 aat    0.00000  108.40000  119.30000  # cp,cp,c_0,o_1
+dihedral_coeff	 5 aat    0.00000  118.90000  118.90000  # cp,cp,cp,cp
+dihedral_coeff	 6 aat   -4.81410  118.90000  117.94000  # cp,cp,cp,hc
+dihedral_coeff	 7 aat  -21.02470  118.90000  123.42000  # cp,cp,cp,oc
+dihedral_coeff	 8 aat  -21.02470  118.90000  123.42000  # cp,cp,cp,oh
+dihedral_coeff	 9 aat    0.00000  123.42000  109.50000  # cp,cp,oc,cp
+dihedral_coeff	10 aat   -4.60720  123.42000  108.19000  # cp,cp,oh,ho
+dihedral_coeff	11 aat    0.35980  117.94000  117.94000  # hc,cp,cp,hc
+dihedral_coeff	12 aat    4.22960  117.94000  123.42000  # hc,cp,cp,oc
+dihedral_coeff	13 aat    4.22960  117.94000  123.42000  # hc,cp,cp,oh
+
+# BondBond13 Coeffs
+
+dihedral_coeff	 1 bb13    0.00000    1.48900    1.41700  # c_0,cp,cp,cp
+dihedral_coeff	 2 bb13    0.00000    1.48900    1.09820  # c_0,cp,cp,hc
+dihedral_coeff	 3 bb13    0.00000    1.48900    1.41700  # cp,c_0,cp,cp
+dihedral_coeff	 4 bb13    0.00000    1.41700    1.21600  # cp,cp,c_0,o_1
+dihedral_coeff	 5 bb13   53.00000    1.41700    1.41700  # cp,cp,cp,cp
+dihedral_coeff	 6 bb13   -6.27410    1.41700    1.09820  # cp,cp,cp,hc
+dihedral_coeff	 7 bb13   -2.24360    1.41700    1.37680  # cp,cp,cp,oc
+dihedral_coeff	 8 bb13   -2.24360    1.41700    1.37680  # cp,cp,cp,oh
+dihedral_coeff	 9 bb13    0.00000    1.41700    1.37680  # cp,cp,oc,cp
+dihedral_coeff	10 bb13    1.15900    1.41700    0.96500  # cp,cp,oh,ho
+dihedral_coeff	11 bb13   -1.70770    1.09820    1.09820  # hc,cp,cp,hc
+dihedral_coeff	12 bb13    2.05170    1.09820    1.37680  # hc,cp,cp,oc
+dihedral_coeff	13 bb13    2.05170    1.09820    1.37680  # hc,cp,cp,oh
+
+# Improper Coeffs
+
+improper_coeff	1   38.79490    0.00000  # c_0,cp,cp,o_1
+improper_coeff	2    0.00000    0.00000  # cp,c_0,cp,cp
+improper_coeff	3    4.89120    0.00000  # cp,cp,cp,hc
+improper_coeff	4   13.04210    0.00000  # cp,cp,cp,oc
+improper_coeff	5   13.04210    0.00000  # cp,cp,cp,oh
+
+# AngleAngle Coeffs
+
+improper_coeff	1 aa    0.00000    0.00000    0.00000  110.58840  119.30000  119.30000  # c_0,cp,cp,o_1
+improper_coeff	2 aa    0.00000    0.00000    0.00000  108.40000  108.40000  118.90000  # cp,c_0,cp,cp
+improper_coeff	3 aa    0.00000    0.00000    0.00000  118.90000  117.94000  117.94000  # cp,cp,cp,hc
+improper_coeff	4 aa    0.00000    0.00000    0.00000  118.90000  123.42000  123.42000  # cp,cp,cp,oc
+improper_coeff	5 aa    0.00000    0.00000    0.00000  118.90000  123.42000  123.42000  # cp,cp,cp,oh
+
+
+# --- Thermo Output ---
+thermo_style custom step time temp press etotal pe ebond eangle edihed eimp evdwl ecoul elong vol lx ly lz density
+thermo_modify flush yes
+thermo 500
+
+# --- Trajectory ---
+dump dump_min all custom 1000 minimize.dump id type mol x y z ix iy iz
+
+# --- Minimization ---
+min_style cg
+minimize 1e-06 1e-06 50000 100000
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- GPU package (short-range, long-range and three-body potentials): doi:10.1016/j.cpc.2010.12.021, doi:10.1016/j.cpc.2011.10.012, doi:10.1016/j.cpc.2013.08.002, doi:10.1016/j.commatsci.2014.10.068, doi:10.1016/j.cpc.2016.10.020, doi:10.3233/APC200086
+
+@Article{Brown11,
+ author = {W. M. Brown and P. Wang and S. J. Plimpton and A. N. Tharrington},
+ title = {Implementing Molecular Dynamics on Hybrid High Performance Computers---Short Range Forces},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2011,
+ volume =  182,
+ pages =   {898--911},
+ doi =     {10.1016/j.cpc.2010.12.021}
+}
+
+@Article{Brown12,
+ author = {W. M. Brown and A. Kohlmeyer and S. J. Plimpton and A. N. Tharrington},
+ title = {Implementing Molecular Dynamics on Hybrid High Performance Computers - Particle-Particle Particle-Mesh},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2012,
+ volume =  183,
+ doi =     {10.1016/j.cpc.2011.10.012},
+ pages =   {449--459}
+}
+
+@Article{Brown13,
+ author = {W. M. Brown and Y. Masako},
+ title = {Implementing Molecular Dynamics on Hybrid High Performance Computers---Three-Body Potentials},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2013,
+ volume =  184,
+ pages =   {2785--2793},
+ doi =     {10.1016/j.cpc.2013.08.002},
+}
+
+@Article{Trung15,
+ author = {T. D. Nguyen and S. J. Plimpton},
+ title = {Accelerating Dissipative Particle Dynamics Simulations for Soft Matter Systems},
+ journal = {Comput.\ Mater.\ Sci.},
+ year =    2015,
+ doi =     {10.1016/j.commatsci.2014.10.068},
+ volume =  100,
+ pages =   {173--180}
+}
+
+@Article{Trung17,
+ author = {T. D. Nguyen},
+ title = {{GPU}-Accelerated {T}ersoff Potentials for Massively Parallel
+    Molecular Dynamics Simulations},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2017,
+ doi =     {10.1016/j.cpc.2016.10.020},
+ volume =  212,
+ pages =   {113--122}
+}
+
+@inproceedings{Nikolskiy19,
+ author = {V. Nikolskiy and V. Stegailov},
+ title = {{GPU} Acceleration of Four-Site Water Models in {LAMMPS}},
+ booktitle = {Proceedings of the International Conference on Parallel
+    Computing (ParCo 2019), Prague, Czech Republic},
+ doi =     {10.3233/APC200086},
+ year =    2019
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.30180103
+  grid = 32 32 32
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00037991268
+  estimated relative force accuracy = 1.1440958e-06
+  using double precision KISS FFT
+  3d grid and FFT values/proc = 25857 11264
+Generated 21 of 21 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 4000, page size: 100000
+  master list distance cutoff = 11.5
+  ghost atom cutoff = 11.5
+  binsize = 5.75, bins = 8 8 8
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/class2/coul/long/gpu, perpetual
+      attributes: full, newton on
+      pair build: full/bin
+      stencil: full/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 17.17 | 17.73 | 18.04 Mbytes
+   Step          Time           Temp          Press          TotEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         Volume           Lx             Ly             Lz          Density    
+         0   0              0              7426.8269      13617.379      13617.379      1979.5935      3764.3657      2693.2144      225.24274      2305.3049      7487.9386     -4838.2807      87084.727      44.324856      44.324856      44.324856      0.65999999   
+       500   500            0             -972.65185      6874.9311      6874.9311      560.18265      1933.6502      1349.5899      13.682392      566.31899      7323.1011     -4871.5942      87084.727      44.324856      44.324856      44.324856      0.65999999   
+      1000   1000           0             -1028.9133      6699.7496      6699.7496      561.10383      1935.3948      1305.2285      13.309422      435.10023      7320.9874     -4871.3746      87084.727      44.324856      44.324856      44.324856      0.65999999   
+      1500   1500           0             -1027.272       6632.2449      6632.2449      560.30036      1945.6643      1289.5309      14.271333      378.44093      7316.2209     -4872.1839      87084.727      44.324856      44.324856      44.324856      0.65999999   
+      2000   2000           0             -981.31041      6576.8326      6576.8326      561.55124      1954.2674      1273.9753      14.628963      324.78298      7319.9392     -4872.3125      87084.727      44.324856      44.324856      44.324856      0.65999999   
+      2500   2500           0             -975.92314      6546.7735      6546.7735      561.82893      1948.6331      1272.1552      14.440905      302.4702       7319.0946     -4871.8494      87084.727      44.324856      44.324856      44.324856      0.65999999   
+      2698   2698           0             -979.54589      6538.1333      6538.1333      562.13854      1952.1211      1274.1455      14.778491      286.31682      7320.8461     -4872.2133      87084.727      44.324856      44.324856      44.324856      0.65999999   
+Loop time of 31.6932 on 3 procs for 2698 steps with 4096 atoms
+
+95.5% CPU use with 3 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      13617.3791106349   6538.13929464465   6538.13332293353
+  Force two-norm initial, final = 2465.5567 7.0540977
+  Force max component initial, final = 128.04572 0.81298221
+  Final line search alpha, max atom move = 0.0097526296 0.0079287144
+  Iterations, force evaluations = 2698 5396
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 2.8968     | 3.4533     | 3.8918     |  22.3 | 10.90
+Bond    | 8.645      | 11.181     | 12.57      |  53.7 | 35.28
+Kspace  | 13.063     | 14.469     | 17.027     |  47.6 | 45.65
+Neigh   | 0.8519     | 0.8526     | 0.85329    |   0.1 |  2.69
+Comm    | 0.56318    | 0.5891     | 0.6037     |   2.4 |  1.86
+Output  | 0.0047188  | 0.0048272  | 0.0049648  |   0.1 |  0.02
+Modify  | 0.00031109 | 0.00041973 | 0.00059788 |   0.0 |  0.00
+Other   |            | 1.143      |            |       |  3.61
+
+Nlocal:        1365.33 ave        1563 max         979 min
+Histogram: 1 0 0 0 0 0 0 0 0 2
+Nghost:        6160.67 ave        6345 max        6001 min
+Histogram: 1 0 0 1 0 0 0 0 0 1
+Neighs:              0 ave           0 max           0 min
+Histogram: 3 0 0 0 0 0 0 0 0 0
+FullNghs:       479859 ave      576505 max      305163 min
+Histogram: 1 0 0 0 0 0 0 0 0 2
+
+Total # of neighbors = 1439578
+Ave neighs/atom = 351.45947
+Ave special neighs/atom = 5.6289062
+Neighbor list builds = 57
+Dangerous builds = 0
+
+undump dump_min
+reset_timestep 0
+
+# --- Write Output ---
+write_dump all custom minimize_last.dump id type mol x y z xu yu zu vx vy vz modify sort id
+write_data /home/arz2/PolyJarvis/data/PEEK1/lammps/equil/minimize/minimize_out.data
+System init for write_data ...
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.30180103
+  grid = 32 32 32
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00037991268
+  estimated relative force accuracy = 1.1440958e-06
+  using double precision KISS FFT
+  3d grid and FFT values/proc = 25857 11264
+Generated 21 of 21 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+
+print "STAGE COMPLETE: minimization"
+STAGE COMPLETE: minimization
+quit
+.181     | 12.57      |  53.7 | 35.28
+Kspace  | 13.063     | 14.469     | 17.027     |  47.6 | 45.65
+Neigh   | 0.8519     | 0.8526     | 0.85329    |   0.1 |  2.69
+Comm    | 0.56318    | 0.5891     | 0.6037     |   2.4 |  1.86
+Output  | 0.0047188  | 0.0048272  | 0.0049648  |   0.1 |  0.02
+Modify  | 0.00031109 | 0.00041973 | 0.00059788 |   0.0 |  0.00
+Other   |            | 1.143      |            |       |  3.61
+
+Nlocal:        1365.33 ave        1563 max         979 min
+Histogram: 1 0 0 0 0 0 0 0 0 2
+Nghost:        6160.67 ave        6345 max        6001 min
+Histogram: 1 0 0 1 0 0 0 0 0 1
+Neighs:              0 ave           0 max           0 min
+Histogram: 3 0 0 0 0 0 0 0 0 0
+FullNghs:       479859 ave      576505 max      305163 min
+Histogram: 1 0 0 0 0 0 0 0 0 2
+
+Total # of neighbors = 1439578
+Ave neighs/atom = 351.45947
+Ave special neighs/atom = 5.6289062
+Neighbor list builds = 57
+Dangerous builds = 0
+System init for write_data ...
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.30180103
+  grid = 32 32 32
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00037991268
+  estimated relative force accuracy = 1.1440958e-06
+  using double precision KISS FFT
+  3d grid and FFT values/proc = 25857 11264
+
+
+---------------------------------------------------------------------
+    Device Time Info (average) for kspace: 
+---------------------------------------------------------------------
+CPU Poisson:     14.2104 s.
+CPU Data Cast:   0.0200 s.
+CPU Idle Time:   0.0379 s.
+Max Mem / Proc:  6.21 MB.
+---------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------
+- Using acceleration for pppm:
+-  with 3 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: Quadro RTX 6000, 72 CUs, 22/24 GB, 1.8 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+Initializing Device 0 on core 1...Done.
+Initializing Device 0 on core 2...Done.
+
+
+
+---------------------------------------------------------------------
+      Device Time Info (average): 
+---------------------------------------------------------------------
+CPU Cast/Pack:   0.0524 s.
+CPU Driver_Time: 0.1035 s.
+CPU Idle_Time:   0.0186 s.
+Average split:   1.0000.
+Max Mem / Proc:  4.79 MB.
+Prefetch mode:   None.
+Vector width:    32.
+Lanes / atom:    8.
+Pair block:      256.
+Neigh block:     128.
+Neigh mode:      Host.
+---------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------
+- Using acceleration for lj/class2/coul/long:
+-  with 3 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: Quadro RTX 6000, 72 CUs, 22/24 GB, 1.8 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+Initializing Device 0 on core 1...Done.
+Initializing Device 0 on core 2...Done.
+
+Generated 21 of 21 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+STAGE COMPLETE: minimization

@@ -1,27 +1,21 @@
 {
   "status": "success",
-  "n_points": 6,
+  "n_points": 3,
   "rates_K_per_ns": [
-    40.0,
-    160.0,
-    400.0,
     40.0,
     160.0,
     400.0
   ],
   "tg_values_K": [
-    238.7,
-    245.3,
-    214.8,
     244.4,
     233.8,
     236.4
   ],
   "rates_span_decades": 1.0,
-  "loglinear_slope_K": -6.483832175702309,
-  "loglinear_intercept_K": 267.4574337291615,
-  "loglinear_r_squared": 0.36588132184374067,
-  "tg_at_slow_rate_K": 235.5666666666667,
+  "loglinear_slope_K": -3.811472892030946,
+  "loglinear_intercept_K": 256.94675205510026,
+  "loglinear_r_squared": 0.639679817441404,
+  "tg_at_slow_rate_K": 238.20000000000002,
   "slow_rate_ref_K_per_ns": 1.6667e-10,
   "slope_gate_pass": true,
   "is_flat_rate_regime": true,
@@ -32,7 +26,7 @@
   "vf_fit_error": "Initial guess is outside of provided bounds",
   "polymer_name": "PEG3",
   "is_dsc_extrapolation": true,
-  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 40 K/ns | 238.7 K |\n| 40 K/ns | 244.4 K |\n| 160 K/ns | 233.8 K |\n| 160 K/ns | 245.3 K |\n| 400 K/ns | 214.8 K |\n| 400 K/ns | 236.4 K |\n\n**Log-linear**: Tg = 267.5 + -6.48\u00b7ln(\u0393)  R\u00b2=0.3659\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **235.6 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): quality=FAILED\n",
-  "d06_markdown_path": "/home/alexzhao/PolyJarvis/data/PEG3/raw/d06_multirate_block.md",
-  "plot_path": "/home/alexzhao/PolyJarvis/data/PEG3/raw/tg_multirate.png"
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 40 K/ns | 244.4 K |\n| 160 K/ns | 233.8 K |\n| 400 K/ns | 236.4 K |\n\n**Log-linear**: Tg = 256.9 + -3.81\u00b7ln(\u0393)  R\u00b2=0.6397\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **238.2 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): quality=FAILED\n",
+  "d06_markdown_path": "data/PEG3/raw/d06_multirate_block.md",
+  "plot_path": "data/PEG3/raw/tg_multirate.png"
 }

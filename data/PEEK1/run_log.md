@@ -177,3 +177,15 @@ GPU inventory (`nvidia-smi` at run start, 06-18):
 
 Simulation dir: `/home/arz2/PolyJarvis/data/PEEK1/lammps/`
 Outputs: `data/PEEK1/raw/` — JSONs (equilibrated_density, tg_summary, bulk_modulus_deform, equilibration_comprehensive, run_summary), `data/PEEK1/graphs/*.png`
+
+## K-method backfill (2026-06-30 17:08) — gated Murnaghan @300K
+- chain_id: cfac7ef2 | GPU claim: PEEK1-murnbackfill (gpu 1) | mpi=1 kokkos PCFF
+- pressures: [-1000,-500,0,500,1000] atm | cell: npt_prod300_out.data | out: data/PEEK1/raw/bulk_modulus_murnaghan.json
+- status: monitoring
+- RESULT (attempt 1, ±1000 atm): K0=4.912 GPa r²=0.9996 but B0'=1.06 → GATE FAIL (low-B0' breakdown, stiff aromatic). Queued for WIDE rerun [-1000,0,1500,3000,5000]. status: rerun-pending
+- STATE: PEEK1 wide rerun chain 94a9ca92 (GPU3) pressures [-1000,0,1500,3000,5000]. status: monitoring
+- RESULT (attempt 2, WIDE [-1000,0,1500,3000,5000]): K_Murnaghan = 5.158 GPa (r²=0.9998, B0'=6.30) → GATE PASS. Recovery from attempt-1 B0'=1.06 fail via wide compression-biased pressures. status: DONE
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 45.1 h  |  **GPU**: 45.1 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1/3
+- Source: `data/PEEK1/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

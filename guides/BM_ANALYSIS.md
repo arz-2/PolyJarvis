@@ -14,10 +14,6 @@ Inspect which inputs are non-null in your prompt:
 | `deform_log_path` non-null | `extract_bulk_modulus_deform` | `deformation` | `bulk_modulus_deform.json` |
 | all null | `extract_bulk_modulus` | `fluctuation` | `bulk_modulus.json` |
 
-**Born+NVT has been removed from the pipeline** (2026-06-21, PCFF+PPPM virial incompatibility: K_Born 8–15× too high, Var(P) ~10⁷× too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1). `born_matrix_file` and `born_log_path` are always null in standard runs. Do not call `extract_bulk_modulus_born`. The `born-worker` agent type is retained for emergency diagnostic use only — it is **never spawned** by the standard orchestrator and must be explicitly requested by the user; if a diagnostic run gives K_T < 0, do not retry Born (root cause is upstream, not sampling) — route to the deform-worker.
-
-Only one path runs per invocation. The `murnaghan` path additionally calls `extract_bulk_modulus(npt_prod_log)` in parallel for a diagnostic B_dyn cross-check (write to same `output_dir`; not the reported K).
-
 **Glassy (is_glassy=True) path:** Murnaghan at 300 K is primary (murnaghan_log_files non-null). 3-direction deform is fallback when Murnaghan fails (`fit_converged=False` or `B0_prime` outside [4, 20]).
 
 **Rubbery (is_glassy=False) path:** Murnaghan at T>Tg is now the **primary** rubbery K method — the rubbery classes (PHYC/PDIE/POXI/PSIL) all ship `bm_pressures_atm` in polymer_rules.json, so the plan emits a murnaghan stage. Volume fluctuation overestimates rubbery K (~+70%, PEG2 2026-06-23) and is kept ONLY as the diagnostic B_dyn cross-check (`extract_bulk_modulus`), never the reported K when Murnaghan is present. The pure-fluctuation path (all-null) now applies only to a rubbery class with no `bm_pressures_atm` defined — add one to polymer_rules.json rather than relying on fluctuation.

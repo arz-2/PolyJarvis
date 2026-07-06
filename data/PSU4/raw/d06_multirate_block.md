@@ -1,0 +1,13 @@
+### Multi-rate Tg analysis
+
+| Rate | Tg_MD |
+|------|-------|
+| 25 K/ns | 496.4 K |
+| 50 K/ns | 528.7 K |
+| 80 K/ns | 487.4 K |
+| 100 K/ns | 477.2 K |
+
+**Log-linear**: Tg = 561.9 + -16.00·ln(Γ)  R²=0.1936
+→ Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **496.4 K**  (theoretical DSC-equivalent experimental Tg)
+
+**VF extrapolation** (Tg0 at Γ→0): quality=FAILED

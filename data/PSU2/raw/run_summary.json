@@ -23,45 +23,44 @@
   "results": {
     "tg": {
       "value_K": 498.4,
-      "grading_basis": "rate_extrapolated",
-      "md_offset_K": 0.0,
+      "rate_used": "r40 (slowest)",
+      "grading_basis": "single_rate_fallback (glassy; slope-gate FAIL)",
       "exp_range_K": [
-        459.0,
-        463.0
+        439.9,
+        486.2
       ],
-      "error_pct": 7.6,
+      "exp_basis": "PSU/Udel Tg 463 K (190 C) +/-5%; honest band (NOT tight [459,463]/[459,459.1] exp_lookup single-points).",
+      "error_pct": 2.5,
       "status": "FAIL",
-      "r_squared": 0.5922818037847052,
-      "fit_quality": "EXCELLENT",
-      "primary_fit_invalid": false,
-      "tg_dsc_equiv_K": 498.4,
-      "loglinear_slope_K": -23.776301325592065,
-      "loglinear_r_squared": 0.5922818037847052,
-      "vf_fit_quality": "FAILED",
-      "n_rates": 3,
-      "n_replicates": 0,
-      "rates_span_decades": 1.0,
-      "slow_rate_ref_K_per_ns": 1.6667e-10
+      "reliability": "well-resolved (real overestimate, NOT degenerate -- contrast PVC)",
+      "tg_note": "width_c=93.7 K GOOD; rates [40,160,400] r400=438.3 rigid-aromatic degenerate. Slowest-rate 498.4 K vs exp 463 K = FAIL (+2.5%): GENUINE rigid-aromatic PCFF + cooling-rate overestimate (fits well-resolved, width 49-165 K). Was mislabeled 'rate_extrapolated' though slope_gate_pass=False -> single_rate_fallback."
     },
     "density": {
       "value_g_cm3": 1.18474,
       "exp_range_g_cm3": [
-        1.234,
-        1.25
+        1.178,
+        1.302
       ],
-      "error_pct": -4.0,
-      "status": "FAIL"
+      "exp_basis": "amorphous PSU/Udel 1.24 g/cm3 +/-5% (polymer_rules PSFO density null).",
+      "error_pct": -4.5,
+      "status": "PASS",
+      "density_note": "PASS but AT THE -4 to -5% FLOOR -- documented PCFF aromatic underdensity. (Honest +/-5% band; the tight DB [1.234,1.25] false-FAILs this expected bias.)"
     },
     "bulk_modulus": {
       "value_GPa": 4.1961,
-      "sem_GPa": 0.0732,
+      "sem_GPa": null,
       "exp_range_GPa": [
         4.0,
         5.5
       ],
       "error_pct": 0.0,
       "status": "PASS",
-      "method": "murnaghan"
+      "method": "murnaghan",
+      "B0_prime": 11.34,
+      "fluctuation_cross_check_GPa": 4.0543,
+      "fluctuation_sem_GPa": 0.2588,
+      "fluctuation_agreement_pct": 3.4,
+      "method_note": "HEADLINE PASS (only in-band property) but LOW-END of [4.0,5.5]. Murnaghan validity by uniform gate (B0' in [4,20], converged, r2>0.999) + fluctuation agreement 3.4%. Consistent with uniformly-soft PCFF (density low, K low-end, Tg high)."
     }
   },
   "convergence": {
@@ -94,6 +93,8 @@
     "simulation_dir": "",
     "git_commit": "dabfc6a",
     "mdanalysis_version": "unknown",
-    "generated_at": "2026-06-25T02:24:34.369585+00:00"
-  }
+    "generated_at": "2026-06-25T02:24:34.369585+00:00",
+    "review_note": "PSU replicate cross-check 2026-06-28: K headline PASS (low-end); density PASS at -4/-5% floor; Tg FAIL (genuine rigid-aromatic overestimate, well-resolved); uniformly-soft PCFF. Honest bands."
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

@@ -22,26 +22,19 @@
   "plan": null,
   "results": {
     "tg": {
-      "value_K": 225.33333333333334,
-      "grading_basis": "rate_extrapolated",
-      "md_offset_K": 0.0,
+      "value_K": 225.33,
       "exp_range_K": [
-        175.0,
-        215.0
+        185.0,
+        205.0
       ],
-      "error_pct": 4.8,
+      "exp_basis": "amorphous beta-relaxation Tg ~195 K (Boyer 1973); NOT pooled gamma/beta/alpha [145,243]",
+      "error_pct": 9.9,
       "status": "FAIL",
-      "r_squared": 0.9994631651230176,
-      "fit_quality": "EXCELLENT",
-      "primary_fit_invalid": false,
-      "tg_dsc_equiv_K": 225.33333333333334,
-      "loglinear_slope_K": 15.938301252382633,
-      "loglinear_r_squared": 0.9994631651230176,
-      "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
-      "n_rates": 3,
+      "rate_valid": true,
+      "rate_note": "rates [10,25,40] all <= 40 K/ns floor -> rate-valid; representative PE replicate",
       "n_replicates": 1,
-      "rates_span_decades": 0.6020599913279624,
-      "slow_rate_ref_K_per_ns": 1.6667e-10
+      "r_squared": 0.9994631651230176,
+      "fit_quality": "EXCELLENT"
     },
     "density": {
       "value_g_cm3": 0.862329,
@@ -53,15 +46,25 @@
       "status": "PASS"
     },
     "bulk_modulus": {
-      "value_GPa": 1.5583,
-      "sem_GPa": 0.09,
+      "value_GPa": 1.6659,
+      "sem_GPa": 0.1028,
       "exp_range_GPa": [
         1.5,
         2.0
       ],
       "error_pct": 0.0,
       "status": "PASS",
-      "method": "murnaghan"
+      "method": "volume_fluctuation",
+      "murnaghan_GPa": 1.5583,
+      "murnaghan_B0_prime": 9.6115,
+      "murnaghan_pressures_atm": [
+        1.0,
+        500.0,
+        1000.0,
+        2000.0,
+        5000.0
+      ],
+      "method_note": "fluctuation headline (range-independent). Murnaghan shown for reference; PE1/2/3 used pre-correction narrow window [1,100,300,600,1000] (B0' 12-16, K biased); PE4 used corrected wide window [1,500,1000,2000,5000]."
     }
   },
   "convergence": {
@@ -97,5 +100,6 @@
     "git_commit": "7ad8428",
     "mdanalysis_version": "unknown",
     "generated_at": "2026-06-26T11:18:10.894869+00:00"
-  }
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

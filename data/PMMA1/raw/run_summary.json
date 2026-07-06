@@ -23,45 +23,43 @@
   "results": {
     "tg": {
       "value_K": 340.0,
+      "rate_used": "single",
+      "grading_basis": "single_rate_fallback (glassy)",
       "exp_range_K": [
-        358.0,
-        398.0
+        359.1,
+        396.9
       ],
-      "error_pct": -10.1,
-      "status": "WARN_soft",
-      "r_squared": 0.9971,
-      "fit_quality": "EXCELLENT",
-      "tg_dsc_equiv_K": null,
-      "loglinear_slope_K": null,
-      "loglinear_r_squared": null,
-      "vf_fit_quality": null,
-      "n_rates": null,
-      "n_replicates": null,
-      "rates_span_decades": null,
-      "slow_rate_ref_K_per_ns": null,
-      "exp_canonical_K": 378,
-      "range_note": "canonical PMMA 378 K; prior [326-366] was a gen_prompt bug (averaged PMMA+PMA+PAA)"
+      "exp_basis": "amorphous PMMA Tg 378 K (105 C) +/-5%.",
+      "error_pct": -5.3,
+      "status": "FAIL",
+      "reliability": "UNRELIABLE (degenerate, width_c=0.1)",
+      "tg_note": "lone degenerate-kink fit far below exp; not a real low-Tg result. PMMA raw Tg STRADDLES exp (340-408 K across replicates); scattered, not a clean systematic. "
     },
     "density": {
       "value_g_cm3": 1.11668,
       "exp_range_g_cm3": [
-        1.145,
-        1.265
+        1.1305,
+        1.2495
       ],
-      "error_pct": 7.3,
-      "status": "WARN_soft"
+      "exp_basis": "amorphous PMMA 1.19 g/cm3 +/-5% (polymer_rules PACR).",
+      "error_pct": -6.2,
+      "status": "FAIL",
+      "density_note": "FAIL -6.2% vs exp 1.19. ANOMALOUS: ~4% below the class's own PCFF benchmark (Tang2022 within 2%), systematic across all 4 replicates. Cells ARE equilibrated (plateau converged, drift<0.2%, sem<0.03%) -> NOT under-equilibration; a build/cell-quality concern (charges/tacticity/DP). Low density + high K is physically incoherent -> lowers confidence across the whole PMMA set."
     },
     "bulk_modulus": {
       "value_GPa": 3.3932,
-      "sem_GPa": null,
       "exp_range_GPa": [
         3.5,
-        5.0
+        4.2
       ],
-      "error_pct": -20.2,
-      "status": "WARN_soft",
-      "method": "deformation",
-      "range_note": "canonical PMMA [3.5-5.0]; prior [3.0-4.2] was hallucinated by summary worker"
+      "error_pct": -3.1,
+      "status": "FAIL",
+      "method": "uniaxial_deformation",
+      "B0_prime": null,
+      "isotropy_delta_pct": 8.47,
+      "fluctuation_cross_check_GPa": 3.6879,
+      "fluctuation_sem_GPa": 0.4676,
+      "method_note": "deform-only (no Murnaghan); VALID fit (iso 8.47%, G=1.06, nu=0.36) but LOW outlier 3.39 vs Murnaghan replicates -- deform underestimates K here. No property passes cleanly for PMMA (weakest/lowest-confidence set)."
     }
   },
   "convergence": {
@@ -95,7 +93,8 @@
     "simulation_dir": "",
     "git_commit": "6bbef77",
     "mdanalysis_version": "unknown",
-    "generated_at": "2026-06-21T15:03:34.943594+00:00"
+    "generated_at": "2026-06-21T15:03:34.943594+00:00",
+    "review_note": "PMMA replicate cross-check 2026-06-28: WEAKEST set, no property passes cleanly. Density FAIL x4 anomalous (-6%, below PCFF benchmark -> build/cell-quality concern). Tg scattered straddle (PMMA3 PASS is fast-rate coincidence). K FAIL-high vs K_T (K_T/K_S gap). PMMA2 468-style false slope-gate killed; PMMA1 degenerate."
   },
   "orchestrator_reconciliation": {
     "note": "Status labels use MW/condition-adjusted exp ranges. Versus CANONICAL high-MW PMMA targets (polymer_rules.json: Tg=378 K, K=[3.5-5.0] GPa, density=[1.145-1.265]), the simulated values are systematically SOFT: density -7.4%, Tg -10% (340 vs 378), K just below 3.5. This is internally coherent: PCFF underbinds PMMA, compounded by DP=40 finite-MW depression (Fox effect lowers Tg/density for short chains). Against MW-adjusted ranges (Tg [326-366], used here) Tg=340 is in-range.",
@@ -125,5 +124,6 @@
     "reconciled_at": "2026-06-21",
     "headline_verdict": "All 3 properties systematically SOFT ~7-10% vs canonical PMMA (PCFF underbinds + DP=40 finite-MW). density -7.4%, Tg -10.1%, K -3% below lower bound / -20% vs mid. Right ballpark, none cleanly in-range. Internally coherent.",
     "range_corrections": "Fixed two spurious exp ranges: Tg [326-366]->[358-398] (gen_prompt _exp_tg_range averages all class polymers - BUG); K [3.0-4.2]->[3.5-5.0] (worker hallucination)."
-  }
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

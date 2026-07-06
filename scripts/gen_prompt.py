@@ -26,7 +26,7 @@ Optional overrides (defaults come from polymer_rules.json):
   --dp N                  degree of polymerisation override
   --nchain N              number of chains override
   --lammps_flags JSON     e.g. '{"use_pcff":true,"use_opls":false}'
-  --is_glassy BOOL        true|false (deform, born, murnaghan, analyze-bm)
+  --is_glassy BOOL        true|false (deform, murnaghan, analyze-bm)
   --tg_k FLOAT            Tg in K (from tg-analysis-worker RESULT)
   --tg_fit_quality STR    Tg fit quality (run-summary + analyze-bm)
   --deform_log PATH       npt_deform log (analyze-bm, glassy deform fallback)
@@ -232,10 +232,12 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
     if flags_json:
         return json.loads(flags_json)
     ff = cls.get("preferred_ff", "").lower()
+    # Substring/family match (mutually exclusive tokens) — an exact-match here returned
+    # use_opls=False for both PHAL and PSIL, whose canonical field is "opls/2024/opls-aa".
     return {
-        "use_pcff": ff == "pcff",
-        "use_opls": ff in ("opls-aa", "opls"),
-        "use_trappe": ff in ("trappe-ua", "trappe"),
+        "use_pcff": "pcff" in ff,
+        "use_opls": "opls" in ff,
+        "use_trappe": "trappe" in ff,
     }
 
 

@@ -1,0 +1,109 @@
+{
+  "status": "success",
+  "overall_pass": true,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.3385,
+      "p_value": 0.0
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.0555,
+      "p_value": 0.143
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.0398
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.0122
+    },
+    "tau_eff_density_fraction": 0.0014989702163072376,
+    "meta": {
+      "n_total_rows": 2001,
+      "n_production_rows": 1001,
+      "T_mean": 299.98
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": true,
+      "cv": 0.1841,
+      "mean_Rg_A": 33.294,
+      "mean_Rg2_A2": 1146.647,
+      "rg_spread_flag": false,
+      "C_inf": null,
+      "n_chains": 8,
+      "frames_analysed": 1951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 72.84,
+      "std_R_ee_A": 17.17,
+      "n_chains": 8,
+      "end_to_end_distribution_png": "not_saved: graphs dir absent at run time; machine-2 dump not synced.",
+      "mean_R_ee_A_note": "ree data valid (mean_R=72.84 A, 8 chains); only the figure write failed"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.042,
+      "r2": 0.9963,
+      "gaussian_pass": true,
+      "n_separations": 351
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 1390437.7,
+      "tau_ps": 776393.3,
+      "beta": 0.533,
+      "decay_fraction_at_end": 0.028,
+      "trajectory_ps": 1951.0,
+      "pass": true
+    },
+    "msd": {
+      "alpha": 0.23,
+      "alpha_r2": 0.9809,
+      "diffusion_regime": "sub-diffusive / kinetically trapped",
+      "msd_max_A2": 740.66,
+      "kinetic_trap_flag": true
+    }
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.0184,
+      "p2_std": 0.0063,
+      "p2_max": 0.0395,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": true,
+      "cv_mean": 0.2058,
+      "cv_max": 0.2321,
+      "grid_n": 7,
+      "atoms_per_voxel": 25.4,
+      "poisson_cv": 0.198,
+      "poisson_limited": false,
+      "heterogeneous_flag": false
+    }
+  },
+  "warnings": [
+    "C(t) partially decayed: 3% decayed at end of trajectory (\u03c4_relax=1390437.7 ps vs T_traj=1951.0 ps)",
+    "MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=299.98 K \u00b7 1951 frames analysed (skip=50) \u00b7 2026-06-26 04:36\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.3385% (p=0.0) | <1%, p<0.01 | PASS |\n| Energy drift | 0.0555% (p=0.143) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0398% | <1% | PASS |\n| Energy block-SEM | 0.0122% | <1% | PASS |\n| \u03c4_eff density | 0.1% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 18.4% | <30% | PASS |\n| MSID slope | 1.042 (R\u00b2=0.9963) | 1.0 \u00b120% | OK |\n| C(t) \u03c4_relax | 1390437.7 ps (3% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | yes (\u03b1=0.23, MSD=740.66 \u00c5\u00b2>>Rg\u00b2=1146.647) | \u2014 | \u26a0 trapped |\n| R_ee mean \u00b1 std | 72.84 \u00b1 17.17 \u00c5 (N=8 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0184 \u00b1 0.0063 | <0.10 | PASS |\n| Density homogeneity CV | 20.6% (7\u00b3 grid, 25.4 atoms/voxel) | <25% | PASS |\n\n**Warnings:** C(t) partially decayed: 3% decayed at end of trajectory (\u03c4_relax=1390437.7 ps vs T_traj=1951.0 ps); MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state",
+  "log_file": "/home/alexzhao/PolyJarvis/data/PEEK4/lammps/equil/npt_prod300/npt_prod300.log",
+  "dump_file": "/home/alexzhao/PolyJarvis/data/PEEK4/lammps/equil/nvt_production/nvt_production.dump",
+  "data_file": "/home/alexzhao/PolyJarvis/data/PEEK4/lammps/equil/npt_prod300/npt_prod300_out.data",
+  "backbone_types": [
+    1,
+    2,
+    5,
+    6,
+    7
+  ],
+  "timestamp": "2026-06-26 04:36"
+}

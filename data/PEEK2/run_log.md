@@ -119,3 +119,7 @@ Murnaghan params: glassy 300K, ±1000 atm (5 points), 0.5 ns/point, engine=kokko
 
 Simulation dir: `data/[RUN]/lammps/`
 Outputs: `data/[RUN]/raw/` — JSONs; `data/[RUN]/graphs/` — PNGs; `data/[RUN]/raw/run_summary.json`
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 39.8 h  |  **GPU**: 39.8 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PEEK2/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

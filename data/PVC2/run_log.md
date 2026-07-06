@@ -187,3 +187,7 @@ Outputs: `data/PVC2/raw/` — JSONs; `data/PVC2/graphs/` — PNGs; `data/PVC2/ra
 **Note on run_summary.json "FAIL" labels.** The summary marks all three FAIL only because the PASS/FAIL ranges supplied are tight (ρ floor 1.35 → 1.349 is 0.07% under = boundary artifact; ρ vs central 1.38 is −2.3%, a clear pass). Treat density as a pass.
 
 **If higher Tg/K fidelity were required (not attempted — budget/diminishing returns):** longer per-T equilibration + lower DP or more chains to relax the melt; and/or an FF cross-check (OPLS-AA) to test the PCFF underprediction hypothesis.
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 11.8 h  |  **GPU**: 11.8 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PVC2/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

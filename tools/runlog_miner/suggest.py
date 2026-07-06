@@ -9,8 +9,6 @@ Turns parsed :class:`~tools.runlog_miner.parse.RunRecord`s into *proposed*
     ``guides/polymer_rules.json`` — this module never writes that file;
   * qualitative signals (finite-size, added annealing cycles) become
     ``suggested: null`` *review flags*, never auto-numbers.
-
-See ``docs/specs/B4_runlog_miner_spec.md`` §2.1 for the aggregation rules.
 """
 from __future__ import annotations
 

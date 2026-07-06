@@ -1,0 +1,142 @@
+{
+  "status": "success",
+  "data_file": "data/PMMA2/lammps/equil/npt_production/npt_production_out.data",
+  "dump_file": "data/PMMA2/lammps/equil/npt_production/npt_production.dump",
+  "output_dir": "data/PMMA2/raw",
+  "csv_file": "data/PMMA2/raw/end_to_end_vectors.csv",
+  "num_chains": 10,
+  "frames_analysed": 1001,
+  "backbone_types": [
+    1,
+    4
+  ],
+  "termini_used": {
+    "1": [
+      1,
+      752
+    ],
+    "2": [
+      753,
+      1504
+    ],
+    "3": [
+      1505,
+      2256
+    ],
+    "4": [
+      2257,
+      3008
+    ],
+    "5": [
+      3009,
+      3760
+    ],
+    "6": [
+      3761,
+      4512
+    ],
+    "7": [
+      4513,
+      5264
+    ],
+    "8": [
+      5265,
+      6016
+    ],
+    "9": [
+      6017,
+      6768
+    ],
+    "10": [
+      6769,
+      7520
+    ]
+  },
+  "per_chain": [
+    {
+      "chain": 1,
+      "mean_R": 43.41701461837723,
+      "std_R": 1.0521575670372068,
+      "mean_R2": 1886.1430932102683,
+      "std_R2": 90.38271833000026,
+      "n_frames": 1001
+    },
+    {
+      "chain": 2,
+      "mean_R": 33.5917870276696,
+      "std_R": 1.7377573263067465,
+      "mean_R2": 1131.424939430638,
+      "std_R2": 117.32778467876985,
+      "n_frames": 1001
+    },
+    {
+      "chain": 3,
+      "mean_R": 21.087568187808895,
+      "std_R": 1.3431099231573653,
+      "mean_R2": 446.4876753889994,
+      "std_R2": 56.98032648526318,
+      "n_frames": 1001
+    },
+    {
+      "chain": 4,
+      "mean_R": 31.647461604405116,
+      "std_R": 1.3487942812143743,
+      "mean_R2": 1003.3792544029403,
+      "std_R2": 85.02515871656198,
+      "n_frames": 1001
+    },
+    {
+      "chain": 5,
+      "mean_R": 29.49781695850841,
+      "std_R": 1.5008779597481634,
+      "mean_R2": 872.3715921514588,
+      "std_R2": 87.13906893299426,
+      "n_frames": 1001
+    },
+    {
+      "chain": 6,
+      "mean_R": 49.00153167907532,
+      "std_R": 1.9798196773762096,
+      "mean_R2": 2405.0658791247192,
+      "std_R2": 189.56218899617699,
+      "n_frames": 1001
+    },
+    {
+      "chain": 7,
+      "mean_R": 39.349536270766585,
+      "std_R": 1.2773038819448785,
+      "mean_R2": 1550.0158762036017,
+      "std_R2": 100.11218776192007,
+      "n_frames": 1001
+    },
+    {
+      "chain": 8,
+      "mean_R": 49.370959747802246,
+      "std_R": 1.4022415569973252,
+      "mean_R2": 2439.4559880711654,
+      "std_R2": 137.7040620915477,
+      "n_frames": 1001
+    },
+    {
+      "chain": 9,
+      "mean_R": 16.555499472222724,
+      "std_R": 1.2767291244901173,
+      "mean_R2": 275.7129719345825,
+      "std_R2": 42.69559345248993,
+      "n_frames": 1001
+    },
+    {
+      "chain": 10,
+      "mean_R": 53.6200082685564,
+      "std_R": 1.0291422463184319,
+      "mean_R2": 2876.1633659116055,
+      "std_R2": 110.20317369676016,
+      "n_frames": 1001
+    }
+  ],
+  "overall_mean_R": 36.71391838351925,
+  "overall_mean_R2": 1488.622063582998,
+  "method": "MDAnalysis.analysis.polymer.sort_backbone",
+  "mdanalysis_version": "2.10.0",
+  "end_to_end_distribution_png": "data/PMMA2/graphs/end_to_end_distribution.png"
+}

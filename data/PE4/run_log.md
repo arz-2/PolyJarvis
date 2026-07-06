@@ -146,3 +146,7 @@ Fluctuation cross-check B_dyn=1.666±0.103 GPa (divergence 6.9% < 15%, consisten
 
 Simulation dir: `data/[RUN]/lammps/`
 Outputs: `data/[RUN]/raw/` — JSONs; `data/[RUN]/graphs/` — PNGs; `data/[RUN]/raw/run_summary.json`
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 8.1 h  |  **GPU**: 8.1 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PE4/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

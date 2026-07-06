@@ -160,3 +160,7 @@ Fluctuation B_dyn cross-check = 2.41 GPa (20% below Murnaghan; B_def R²=0.02, n
 
 Simulation dir: `data/[RUN]/lammps/`
 Outputs: `data/[RUN]/raw/` — JSONs; `data/[RUN]/graphs/` — PNGs; `data/[RUN]/raw/run_summary.json`
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 13.7 h  |  **GPU**: 13.7 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PVC4/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

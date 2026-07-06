@@ -13,6 +13,8 @@ __pycache__/
 *.py[cod]
 *.pyc
 .python-version
+.pytest_cache/
+.venv/
 
 # ── Runtime state (not source) ────────────────────────────────────────────────
 mcp-lammps-engine/run_state.json
@@ -42,7 +44,15 @@ db/
 # ── Manuscript & internal planning docs (not for public repo) ─
 revision.md
 literature/
-paper/
+# paper/ stays local EXCEPT the published analysis data (csv) and figure generators below
+paper/*
+!paper/csv/
+!paper/gen_figure3_density_parity.py
+!paper/gen_figure4_tg_curves.py
+!paper/gen_figure5_bulk_modulus.py
+!paper/gen_figure6_rdf.py
+!paper/plot_rdf.py
+!paper/replot_from_tool.py
 docs/LLM_CONTRIBUTION_PLAN.md
 docs/UI_PLAN.md
 guides/TODO_OWNER.md

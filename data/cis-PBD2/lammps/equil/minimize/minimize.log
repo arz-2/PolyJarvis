@@ -1,0 +1,390 @@
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/cut 14.0
+dielectric 1.000000
+bond_style harmonic
+angle_style harmonic
+dihedral_style multi/harmonic
+improper_style none
+special_bonds lj 0 0 0
+pair_modify mix arithmetic tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+package gpu 1 neigh yes
+
+read_data /home/arz2/PolyJarvis/data/cis-PBD2/lammps/equil/cell.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (68.178378 68.178378 68.178378)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  8040 atoms
+  scanning bonds ...
+  2 = max bonds/atom
+  scanning angles ...
+  1 = max angles/atom
+  scanning dihedrals ...
+  2 = max dihedrals/atom
+  orthogonal box = (0 0 0) to (68.178378 68.178378 68.178378)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  8020 bonds
+  reading angles ...
+  8000 angles
+  reading dihedrals ...
+  7980 dihedrals
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0       
+     2 = max # of 1-2 neighbors
+     2 = max # of 1-3 neighbors
+     4 = max # of 1-4 neighbors
+     6 = max # of special neighbors
+  special bonds CPU = 0.002 seconds
+  read_data CPU = 0.093 seconds
+include /home/arz2/PolyJarvis/data/cis-PBD2/lammps/cell/emc_build.params
+# LAMMPS parameters created by EMC v9.4.4, build Jul 31 2025 20:33:44
+
+# Variables
+
+variable	seed		index	734812
+variable	ntotal		index	8040
+variable	fshape		index	1
+variable	output		index	emc_build
+variable	field		index	trappe/2014/trappe-ua
+variable	location1	index	/home/arz2/emc/field/
+variable	nav		index	0.6022141179
+variable	temperature	index	300
+variable	radius		index	5
+variable	nrelax		index	100
+variable	weight_nonbond	index	0.0001
+variable	weight_bond	index	0.0001
+variable	weight_focus	index	1
+variable	cutoff		index	14
+variable	charge_cutoff	index	14
+variable	kappa		index	4
+variable	density1	index	0.57
+variable	lprevious	index	0
+variable	lphase		index	68.1783775471
+variable	f_poly		index	20
+variable	chem_repeat	index	*C/C=C\C*
+variable	chem_cap	index	*C
+variable	lg_repeat	index	4
+variable	lg_cap		index	1
+variable	norm_poly	index	100
+variable	l_poly		index	402
+variable	mg_repeat	index	54.0914
+variable	mg_cap		index	15.0347
+variable	m_poly		index	5439.2094
+variable	n_poly		index	20
+variable	mtotal		index	108784.188
+variable	nphase1		index	8040
+variable	mphase1		index	108784.188
+variable	vphase1		index	316912.949994
+variable	lbox		index	68.1783775471
+variable	lphase1		index	68.1783775471
+variable	lxx		index	68.1783775471
+variable	lyy		index	68.1783775471
+variable	lzz		index	68.1783775471
+variable	lzy		index	0
+variable	lzx		index	0
+variable	lyx		index	0
+variable	vtotal		index	316912.949994
+variable	nl_poly		index	20
+
+# Types
+
+variable	type_c3h	index	1
+variable	type_c4h2	index	2
+variable	type_c4h3	index	3
+
+variable	type_bond_c3h_c3h index	1
+variable	type_bond_c3h_c4h2 index	2
+variable	type_bond_c4h2_c4h2 index	3
+variable	type_bond_c4h2_c4h3 index	4
+
+variable	type_angle_c3h_c3h_c4h2 index	1
+variable	type_angle_c3h_c4h2_c4h2 index	2
+variable	type_angle_c3h_c4h2_c4h3 index	3
+
+# Clusters
+
+variable	n0_poly		index	1
+variable	n1_poly		index	20
+variable	nl_poly		index	20
+
+# Flags
+
+variable	flag_charged	index	0
+
+# Masses
+
+mass		1    13.01890  # c3h
+mass		2    14.02680  # c4h2
+mass		3    15.03470  # c4h3
+
+# Potentials
+
+pair_modify	mix arithmetic tail yes
+special_bonds	lj 0 0 0 coul 0 0 0.5
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0.5     
+     2 = max # of 1-2 neighbors
+     2 = max # of 1-3 neighbors
+     4 = max # of 1-4 neighbors
+     6 = max # of special neighbors
+  special bonds CPU = 0.002 seconds
+
+# Pair Coeffs
+
+pair_coeff	1 1    0.09340    3.71000  # c3h,c3h
+pair_coeff	2 2    0.09141    3.95000  # c4h2,c4h2
+pair_coeff	3 3    0.19475    3.75000  # c4h3,c4h3
+
+# Bond Coeffs
+
+bond_coeff	1  529.99987    1.33000  # c3h,c3h
+bond_coeff	2  260.00013    1.54000  # c3h,c4h2
+bond_coeff	3  260.00013    1.54000  # c4h2,c4h2
+bond_coeff	4  260.00013    1.54000  # c4h2,c4h3
+
+# Angle Coeffs
+
+angle_coeff	1   69.96954  119.70000  # c3h,c3h,c4h2
+angle_coeff	2   62.10020  114.00000  # c3h,c4h2,c4h2
+angle_coeff	3   62.10020  114.00000  # c3h,c4h2,c4h3
+
+# Dihedral Coeffs
+
+dihedral_coeff	1    1.91086    1.85422    0.43627   -2.24348    0.00000  # c3h,c3h,c4h2,c4h2
+dihedral_coeff	2    1.91086    1.85422    0.43627   -2.24348    0.00000  # c3h,c3h,c4h2,c4h3
+dihedral_coeff	3    2.00702   -4.01203    0.27102    6.29006    0.00000  # c3h,c4h2,c4h2,c3h
+dihedral_coeff	4   25.63496    0.99360  -25.63496   -0.99360    0.00000  # c4h2,c3h,c3h,c4h2
+
+
+# --- Thermo Output ---
+thermo_style custom step time temp press etotal pe ebond eangle edihed eimp evdwl ecoul elong vol lx ly lz density
+thermo_modify flush yes
+thermo 500
+
+# --- Trajectory ---
+dump dump_min all custom 1000 minimize.dump id type mol x y z ix iy iz
+
+# --- Minimization ---
+min_style cg
+minimize 1e-06 1e-06 50000 100000
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- GPU package (short-range, long-range and three-body potentials): doi:10.1016/j.cpc.2010.12.021, doi:10.1016/j.cpc.2011.10.012, doi:10.1016/j.cpc.2013.08.002, doi:10.1016/j.commatsci.2014.10.068, doi:10.1016/j.cpc.2016.10.020, doi:10.3233/APC200086
+
+@Article{Brown11,
+ author = {W. M. Brown and P. Wang and S. J. Plimpton and A. N. Tharrington},
+ title = {Implementing Molecular Dynamics on Hybrid High Performance Computers---Short Range Forces},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2011,
+ volume =  182,
+ pages =   {898--911},
+ doi =     {10.1016/j.cpc.2010.12.021}
+}
+
+@Article{Brown12,
+ author = {W. M. Brown and A. Kohlmeyer and S. J. Plimpton and A. N. Tharrington},
+ title = {Implementing Molecular Dynamics on Hybrid High Performance Computers - Particle-Particle Particle-Mesh},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2012,
+ volume =  183,
+ doi =     {10.1016/j.cpc.2011.10.012},
+ pages =   {449--459}
+}
+
+@Article{Brown13,
+ author = {W. M. Brown and Y. Masako},
+ title = {Implementing Molecular Dynamics on Hybrid High Performance Computers---Three-Body Potentials},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2013,
+ volume =  184,
+ pages =   {2785--2793},
+ doi =     {10.1016/j.cpc.2013.08.002},
+}
+
+@Article{Trung15,
+ author = {T. D. Nguyen and S. J. Plimpton},
+ title = {Accelerating Dissipative Particle Dynamics Simulations for Soft Matter Systems},
+ journal = {Comput.\ Mater.\ Sci.},
+ year =    2015,
+ doi =     {10.1016/j.commatsci.2014.10.068},
+ volume =  100,
+ pages =   {173--180}
+}
+
+@Article{Trung17,
+ author = {T. D. Nguyen},
+ title = {{GPU}-Accelerated {T}ersoff Potentials for Massively Parallel
+    Molecular Dynamics Simulations},
+ journal = {Comput.\ Phys.\ Commun.},
+ year =    2017,
+ doi =     {10.1016/j.cpc.2016.10.020},
+ volume =  212,
+ pages =   {113--122}
+}
+
+@inproceedings{Nikolskiy19,
+ author = {V. Nikolskiy and V. Stegailov},
+ title = {{GPU} Acceleration of Four-Site Water Models in {LAMMPS}},
+ booktitle = {Proceedings of the International Conference on Parallel
+    Computing (ParCo 2019), Prague, Czech Republic},
+ doi =     {10.3233/APC200086},
+ year =    2019
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Generated 3 of 3 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 17.65 | 17.65 | 17.65 Mbytes
+   Step          Time           Temp          Press          TotEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         Volume           Lx             Ly             Lz          Density    
+         0   0              0              9270.7751      19222.807      19222.807      3055.8846      5177.9182      10750.557      0              238.44753      0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+       500   500            0             -573.57991      62.135526      62.135526      7.4468069      152.8173       7157.5432      0             -7255.6718      0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      1000   1000           0             -535.07966     -433.50357     -433.50357      6.8633494      145.14815      7081.4079      0             -7666.9229      0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      1500   1500           0             -522.7313      -586.74817     -586.74817      6.6660231      140.52726      7070.0217      0             -7803.9632      0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      2000   2000           0             -518.68594     -647.48581     -647.48581      6.7769942      138.78556      7075.3866      0             -7868.435       0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      2500   2500           0             -509.38944     -722.0658      -722.0658       6.9093748      137.62471      7076.0861      0             -7942.686       0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      3000   3000           0             -506.21548     -769.55183     -769.55183      7.0474381      136.72519      7075.9653      0             -7989.2898      0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      3500   3500           0             -504.85846     -817.09202     -817.09202      7.1452556      135.70025      7076.7369      0             -8036.6744      0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      4000   4000           0             -513.8395      -838.00564     -838.00564      7.0707451      135.06612      7079.373       0             -8059.5155      0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      4500   4500           0             -481.94542     -873.86649     -873.86649      7.2792825      135.78629      7076.6967      0             -8093.6288      0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      5000   5000           0             -481.12131     -903.19574     -903.19574      7.2459211      135.48631      7075.649       0             -8121.577       0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      5500   5500           0             -481.30404     -931.18606     -931.18606      7.1232233      136.6787       7074.2746      0             -8149.2626      0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      6000   6000           0             -486.3765      -947.10564     -947.10564      7.0089588      135.70404      7069.7561      0             -8159.5747      0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      6500   6500           0             -478.7985      -965.73154     -965.73154      7.0830757      134.83103      7069.4934      0             -8177.139       0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      7000   7000           0             -480.14798     -973.79419     -973.79419      7.0035537      133.78227      7069.459       0             -8184.039       0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+      7039   7039           0             -479.13077     -973.969       -973.969        7.0216186      133.7605       7069.5998      0             -8184.351       0              0              316912.95      68.178378      68.178378      68.178378      0.56999999   
+Loop time of 21.2192 on 1 procs for 7039 steps with 8040 atoms
+
+99.9% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      19222.8071534487   -973.96897523998  -973.969001408785
+  Force two-norm initial, final = 3025.4703 3.0157181
+  Force max component initial, final = 149.26107 1.8050369
+  Final line search alpha, max atom move = 3.5215442e-08 6.3565171e-08
+  Iterations, force evaluations = 7039 14098
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.6082     | 1.6082     | 1.6082     |   0.0 |  7.58
+Bond    | 15.733     | 15.733     | 15.733     |   0.0 | 74.15
+Neigh   | 0.16707    | 0.16707    | 0.16707    |   0.0 |  0.79
+Comm    | 1.2634     | 1.2634     | 1.2634     |   0.0 |  5.95
+Output  | 0.073923   | 0.073923   | 0.073923   |   0.0 |  0.35
+Modify  | 0.00084215 | 0.00084215 | 0.00084215 |   0.0 |  0.00
+Other   |            | 2.372      |            |       | 11.18
+
+Nlocal:           8040 ave        8040 max        8040 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          20529 ave       20529 max       20529 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 0
+Ave neighs/atom = 0
+Ave special neighs/atom = 5.9701493
+Neighbor list builds = 106
+Dangerous builds = 0
+
+undump dump_min
+reset_timestep 0
+
+# --- Write Output ---
+write_dump all custom minimize_last.dump id type mol x y z xu yu zu vx vy vz modify sort id
+write_data /home/arz2/PolyJarvis/data/cis-PBD2/lammps/equil/minimize/minimize_out.data
+System init for write_data ...
+Generated 3 of 3 mixed pair_coeff terms from arithmetic mixing rule
+
+print "STAGE COMPLETE: minimization"
+STAGE COMPLETE: minimization
+quit
+ alpha, max atom move = 3.5215442e-08 6.3565171e-08
+  Iterations, force evaluations = 7039 14098
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.6082     | 1.6082     | 1.6082     |   0.0 |  7.58
+Bond    | 15.733     | 15.733     | 15.733     |   0.0 | 74.15
+Neigh   | 0.16707    | 0.16707    | 0.16707    |   0.0 |  0.79
+Comm    | 1.2634     | 1.2634     | 1.2634     |   0.0 |  5.95
+Output  | 0.073923   | 0.073923   | 0.073923   |   0.0 |  0.35
+Modify  | 0.00084215 | 0.00084215 | 0.00084215 |   0.0 |  0.00
+Other   |            | 2.372      |            |       | 11.18
+
+Nlocal:           8040 ave        8040 max        8040 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          20529 ave       20529 max       20529 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 0
+Ave neighs/atom = 0
+Ave special neighs/atom = 5.9701493
+Neighbor list builds = 106
+Dangerous builds = 0
+System init for write_data ...
+
+
+---------------------------------------------------------------------
+      Device Time Info (average): 
+---------------------------------------------------------------------
+Data Transfer:   1.3816 s.
+Neighbor copy:   0.0166 s.
+Neighbor build:  0.0622 s.
+Force calc:      3.8658 s.
+Device Overhead: 0.4407 s.
+CPU Neighbor:    0.0249 s.
+CPU Cast/Pack:   1.0415 s.
+CPU Driver_Time: 0.1685 s.
+CPU Idle_Time:   0.0239 s.
+Average split:   1.0000.
+Max Mem / Proc:  68.72 MB.
+Prefetch mode:   None.
+Vector width:    32.
+Lanes / atom:    4.
+Pair block:      256.
+Neigh block:     128.
+Neigh mode:      Hybrid (binning on host) with subgroup support.
+Neigh sorting:   Unavailable or disabled.
+---------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------
+- Using acceleration for lj/cut:
+-  with 1 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: Quadro RTX 6000, 72 CUs, 23/24 GB, 1.8 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+
+Generated 3 of 3 mixed pair_coeff terms from arithmetic mixing rule
+STAGE COMPLETE: minimization
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 98.
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 99.
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 98.
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 99.
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 98.
+Cuda driver error 4 in call at file '/home/arz2/lammps/lib/gpu/geryon/nvd_timer.h' in line 99.

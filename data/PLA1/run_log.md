@@ -199,3 +199,8 @@ GPU inventory (`nvidia-smi` at run start):
 
 Simulation dir: `[PATH]`
 Outputs: `data/[RUN]/outputs/` — CSVs, JSONs, `figures/*.png`, `run_summary.json`
+- RESULT (wide [-1000,0,1500,3000,5000]): K_Murnaghan = 4.984 GPa (r²=0.9998, B0'=7.84) → GATE PASS; overwrote old B0'=1.0 fail. status: DONE
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 54.8 h  |  **GPU**: 54.8 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1/4
+- Source: `data/PLA1/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

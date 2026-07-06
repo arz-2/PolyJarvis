@@ -44,12 +44,12 @@ References:
 
 import argparse
 import json
-import re
 import sys
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from scipy import stats as sp_stats
+from analysis_utils import parse_lammps_log
 
 
 # ---------------------------------------------------------------------------
@@ -64,38 +64,6 @@ ATM_TO_GPA = ATM_TO_PA * PA_TO_GPA
 # ---------------------------------------------------------------------------
 # LAMMPS log parser (shared with extract_bulk_modulus.py)
 # ---------------------------------------------------------------------------
-
-def parse_lammps_log(path):
-    """Parse all thermo-output tables from a LAMMPS log file."""
-    all_dfs = []
-    header = None
-    rows = []
-    with open(path) as f:
-        for raw in f:
-            line = raw.strip()
-            if re.match(r'^Step\s', line):
-                if rows and header is not None:
-                    all_dfs.append(pd.DataFrame(rows, columns=header))
-                    rows = []
-                header = line.split()
-                continue
-            if header is not None:
-                tokens = line.split()
-                if len(tokens) == len(header):
-                    try:
-                        rows.append([float(t) for t in tokens])
-                        continue
-                    except ValueError:
-                        pass
-                if rows:
-                    all_dfs.append(pd.DataFrame(rows, columns=header))
-                    rows = []
-                    header = None
-    if rows and header is not None:
-        all_dfs.append(pd.DataFrame(rows, columns=header))
-    if not all_dfs:
-        raise ValueError(f"No thermo data found in {path}")
-    return pd.concat(all_dfs, ignore_index=True)
 
 
 # ---------------------------------------------------------------------------

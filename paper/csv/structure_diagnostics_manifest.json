@@ -1,0 +1,58 @@
+{
+  "source": "data/<RUN>/raw/equilibration_comprehensive.json",
+  "T_window_K": [
+    280.0,
+    320.0
+  ],
+  "n_runs_kept": 36,
+  "kept_runs": [
+    "PE1",
+    "PE2",
+    "PE3",
+    "PE4",
+    "PEEK1",
+    "PEEK2",
+    "PEEK3",
+    "PEEK4",
+    "PEG1",
+    "PEG2",
+    "PEG3",
+    "PEG4",
+    "PLA1",
+    "PLA2",
+    "PLA3",
+    "PLA4",
+    "PMMA1",
+    "PMMA2",
+    "PMMA3",
+    "PMMA4",
+    "PS1",
+    "PS2",
+    "PS3",
+    "PS4",
+    "PSU1",
+    "PSU2",
+    "PSU3",
+    "PSU4",
+    "PVC1",
+    "PVC2",
+    "PVC3",
+    "PVC4",
+    "cis-PBD1",
+    "cis-PBD2",
+    "cis-PBD3",
+    "cis-PBD4"
+  ],
+  "dropped": [
+    {
+      "run": "PROPSULFIDE_AGENT",
+      "reason": "stray dir, not a benchmark system",
+      "T": null
+    }
+  ],
+  "energy_drift_artifact_threshold_pct": 5.0,
+  "notes": {
+    "C_inf": "dropped (populated 11/37, nonphysical); MSID slope used instead",
+    "density_homogeneity": "judged as measured voxel CV vs random-packing Poisson floor; heterogeneous_flag (abs 0.25) trips on PMMA/PSU but excess over floor is small (~0.04-0.07)"
+  }
+}

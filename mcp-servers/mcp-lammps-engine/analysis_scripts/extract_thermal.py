@@ -63,6 +63,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from plot_style import apply_style, save_fig
+from analysis_utils import parse_lammps_log
 
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -71,47 +72,6 @@ warnings.filterwarnings("ignore", category=UserWarning)
 # ---------------------------------------------------------------------------
 # LAMMPS log parser
 # ---------------------------------------------------------------------------
-
-def parse_lammps_log(path):
-    """
-    Parse all thermo-output tables from a LAMMPS log file.
-    Returns a single DataFrame with all rows concatenated.
-    """
-    all_dfs = []
-    header = None
-    rows = []
-
-    with open(path) as f:
-        for raw in f:
-            line = raw.strip()
-
-            if re.match(r'^Step\s', line) or re.match(r'^(Step|TotEng|Temp)', line):
-                if rows:
-                    all_dfs.append(pd.DataFrame(rows, columns=header))
-                    rows = []
-                header = line.split()
-                continue
-
-            if header is not None:
-                tokens = line.split()
-                if len(tokens) == len(header):
-                    try:
-                        rows.append([float(t) for t in tokens])
-                        continue
-                    except ValueError:
-                        pass
-                if rows:
-                    all_dfs.append(pd.DataFrame(rows, columns=header))
-                    rows = []
-                    header = None
-
-    if rows and header is not None:
-        all_dfs.append(pd.DataFrame(rows, columns=header))
-
-    if not all_dfs:
-        raise ValueError(f"No thermo data found in {path}")
-
-    return pd.concat(all_dfs, ignore_index=True)
 
 
 # ---------------------------------------------------------------------------

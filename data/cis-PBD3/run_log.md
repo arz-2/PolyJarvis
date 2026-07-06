@@ -142,3 +142,9 @@ GPU inventory: GPU 2: Quadro RTX 6000, 24 GB, free at claim; GPU 0 (PSU2), GPU 1
 
 Simulation dir: `data/[RUN]/lammps/`
 Outputs: `data/[RUN]/raw/` — JSONs; `data/[RUN]/graphs/` — PNGs; `data/[RUN]/raw/run_summary.json`
+
+---
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 11.6 h  |  **GPU**: 11.6 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/cis-PBD3/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

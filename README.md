@@ -1,28 +1,48 @@
 # PolyJarvis
 
-**PolyJarvis** is an AI-driven framework for autonomous polymer property prediction via all-atom molecular dynamics simulation. A researcher describes a polymer system in natural language; an LLM agent (Claude) then handles the entire workflow — from SMILES string to computed material properties — by orchestrating two MCP servers: one for molecular construction and one for remote GPU simulation.
+**PolyJarvis** is an AI-driven framework for autonomous polymer property prediction via all-atom molecular dynamics simulation. A researcher describes a polymer system in natural language; a stateful LLM orchestrator (Claude) then handles the entire workflow — from SMILES string to computed material properties — by planning the run, spawning specialist sub-agents for each stage, and driving three MCP servers (molecular construction via EMC/RadonPy, plus local GPU simulation and analysis) end to end.
 
 ![PolyJarvis Architecture](figures/figure1_architecture.png)
 
 ---
 
-## Overview
-
-Traditional polymer MD workflows require manual intervention across several software environments (RDKit, RadonPy, LAMMPS, MDAnalysis) and substantial domain expertise to set up correctly. PolyJarvis automates this end-to-end by giving an LLM agent structured tools for each stage, along with documented decision rules (force field selection, convergence thresholds, fit quality checks) that ensure physical correctness without hand-holding.
-
-### Properties computed
-
-- Glass transition temperature (T<sub>g</sub>) via a multirate density–temperature sweep extrapolated to the experimental (DSC-equivalent) cooling rate
-- Equilibrated density at target T and P
-- Isothermal bulk modulus via the Murnaghan equation-of-state pressure series (volume-fluctuation cross-check)
-- Radial distribution functions (RDF) for structural analysis
-- End-to-end vector distributions for chain conformation analysis
-
----
-
 ## Architecture
 
-The system is organized into four sequential stages, each backed by MCP tools the agent can call directly:
+PolyJarvis is a **stateful orchestrator driving a fleet of stateless specialist agents** over a Model Context Protocol (MCP) tool layer. Given a SMILES string (or polymer name) and a set of target properties, it autonomously runs the full pipeline — construction → equilibration → property campaigns → experiment-validated reporting — on a local 4× Quadro RTX 6000 GPU node.
+
+### Three layers
+
+**Orchestration layer.** A single long-lived Claude session (the *orchestrator*) holds all run state, recovery logic, and the approved plan. It never runs simulations itself; it spawns workers and routes their results. Workers are **stateless** — each gets a self-contained prompt and returns a structured RESULT block — so the orchestrator is the only stateful component and the sole point of recovery.
+
+**Agent layer (14 specialist workers).** Each worker has a fixed role, a model tier matched to task difficulty, and a canonical guide inlined into its prompt:
+
+| Phase | Workers (model) |
+|-------|-----------------|
+| Setup | `literature-grounding-worker` (sonnet), `planner` (opus), `critic` (opus) |
+| Foundation | `molecule-builder` (opus), `equilibration-worker` (sonnet), `equilibration-checker` (haiku) |
+| Thermal track | `tg-sweep-worker`, `tg-analysis-worker` (haiku) |
+| Mechanical track | `murnaghan-worker`, `deform-worker` (haiku), `bulk-modulus-extractor` (sonnet) |
+| Summary | `exp-lookup-worker`, `run-summary-worker` (haiku) |
+
+**Tool layer (three MCP servers).** Standardized, discoverable tool interfaces the agents invoke: `mcp-emc-server` (EMC amorphous-cell builder, 20 polymer classes, auto-selecting PCFF / OPLS-AA / TraPPE-UA), `mcp-lammps-engine` (GPU LAMMPS execution + analysis), and the `mcp-mol-builder-server` RadonPy path (builder fallback for classes EMC cannot type).
+
+### Control flow: plan → critique → execute → validate
+
+1. **Ground & Plan.** For off-table or low-confidence chemistries, a grounding worker produces a DOI-verified evidence file; the planner emits a `run_plan.json`. High-confidence classes get a **deterministic, byte-identical plan** with no runtime LLM reasoning.
+2. **Critique.** A critic adjudicates the plan (approve / revise / escalate), looping up to two rounds. Deterministic plans pass in round 1 with zero findings.
+3. **Execute by track.** Foundation runs first (build → equilibrate → density), then the property-conditional **thermal** and **mechanical** tracks run against the equilibrated cell. Mechanical reads the glassy/rubbery regime from thermal.
+4. **Validate.** Every worker result is checked against the plan's `success_criteria`; failures trigger bounded recovery (max 2 attempts/worker) before the run is marked UNRESOLVED. A condition-matched experimental lookup supplies grading bounds before the final summary.
+
+The **`run_plan.json` is the single source of truth** — `scripts/gen_prompt.py` threads its `decided_params` into every worker prompt, so no worker improvises parameters and the whole run is reconstructable from the plan.
+
+### Inferred vs. inherited
+
+- **Inherited / encoded** (in `guides/polymer_rules.json`, `guides/decision_policy.json`, stage guides): per-class T<sub>g</sub>/density targets, DP defaults, force-field family rules, SMILES conventions, equilibration templates. On the high-confidence path these drive a fully deterministic plan.
+- **LLM-inferred at runtime**: off-table planning, critic adjudication, error root-causing and recovery routing, and adaptive extensions (equilibration EXTEND, T<sub>g</sub> slope-gate recovery).
+
+### Execution pipeline
+
+Within a run, the workers drive four sequential stages, each backed by MCP tools the agent calls directly:
 
 ```
 SMILES string
@@ -77,58 +97,24 @@ Below is a sample conversation between a user and the agent:
 
 ---
 
-## Repository Structure
+## Repository Map
 
-```
-PolyJarvis/
-├── guides/                         # Stage-by-stage execution guides (READ FIRST)
-│   ├── STAGE_INDEX.md              # Navigation hub — start here
-│   ├── STAGE_1_MOLECULAR_CONSTRUCTION.md
-│   ├── STAGE_2_EQUILIBRATION.md
-│   ├── STAGE_3_TG_MEASUREMENT.md
-│   ├── STAGE_4_ANALYSIS.md
-│   ├── TOOLS_REFERENCE.md          # Complete MCP tool signatures
-│   ├── ROADMAP.md                  # Force field expansion (Tracks A–E)
-│   └── polymer_rules.json          # Per-class FF, builder, confidence metadata
-├── mcp-servers/
-│   ├── mcp-mol-builder-server/         # Mol-Builder server (GAFF2/OPLS-AA path)
-│   │   ├── server.py               # 20+ MCP tools
-│   │   └── patch_fluorine_params.py  # PHAL LJ patch (Watkins & Jorgensen 2001)
-│   ├── mcp-emc-server/             # PCFF amorphous cell builder (EMC wrapper)
-│   │   ├── server.py               # 4 MCP tools (PCBN/PAMD/PKTN/PSFO/PIMD)
-│   │   ├── smiles_to_emc.py        # SMILES → EMC .esh → LAMMPS .data pipeline
-│   │   └── tests/                  # Unit tests (35 passing, all 5 PCFF classes)
-│   └── mcp-lammps-engine/          # Simulation & analysis (LAMMPS)
-│       ├── server.py               # 25 MCP tools
-│       ├── script_generator.py     # Template filler — GAFF2, OPLS-AA, PCFF
-│       ├── analysis_scripts/       # Bundled MDAnalysis scripts (extract_thermal, RDF, MSD…)
-│       └── templates/              # 9 validated LAMMPS script templates
-├── data/                           # Completed example runs
-│   ├── PE{1,2,3}/                  # Polyethylene
-│   ├── PEG{1,2,3}/                 # Poly(ethylene glycol)
-│   ├── PMMA{1,2,3}/                # Poly(methyl methacrylate)
-│   └── PS{1,2,3}/                  # Polystyrene
-├── figures/
-│   └── figure1_architecture.png
-└── Task_TEMPLATE.txt               # Template for specifying new simulation tasks
-```
-
----
-
-## MCP Servers
-
-### `mcp-mol-builder-server` (local)
-
-Wraps [RadonPy](https://github.com/RadonPy/RadonPy) for molecule construction. Handles the full GAFF2/OPLS-AA path: monomer build → charge assignment → polymerization → amorphous cell → LAMMPS `.data` file. Runs in the `mol-builder` conda environment.
-
-### `mcp-emc-server` (local)
-
-Wraps [EMC](http://montecarlo.sourceforge.net/emc/) for PCFF amorphous cell construction. Used only for PCBN, PAMD, PKTN, PSFO, and PIMD classes. Outputs a LAMMPS `.data` file with PCFF parameters assigned — no separate charge step needed.
-
-### `mcp-lammps-engine` (local)
-
-Script generation, simulation execution, and analysis on the local GPU server. Simulation chains run as `nohup` processes and survive MCP server disconnections. Bundles all MDAnalysis analysis scripts in `analysis_scripts/`.
-
+| Path | What lives there |
+|---|---|
+| `CLAUDE.md` | Orchestrator operating manual — the agent's workflow spec (start here to understand the pipeline) |
+| `.claude/` | Agent definitions (13 workers), hooks, slash commands, per-agent memory |
+| `guides/` | **Agent prompts & machine-read config**, not human docs — worker guides inlined by `gen_prompt.py`, orchestrator track guides, `polymer_rules.json` / `decision_policy.json` (see [`guides/README.md`](guides/README.md)) |
+| `scripts/` | CLI/orchestration helpers — prompt generation, deterministic planning, GPU allocation, hardware calibration (see [`scripts/README.md`](scripts/README.md)) |
+| `mcp-servers/` | The three MCP servers: `mcp-mol-builder-server` (RadonPy), `mcp-emc-server` (EMC), `mcp-lammps-engine` (LAMMPS + analysis scripts + templates) |
+| `data/` | Per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`); mostly git-excluded — the tracked subset is the reviewer provenance release (see `data/REVIEWER_DATA_README.md`) |
+| `db/` | Experimental property database (`polymer_db.sqlite`, schema, query + ingest scripts; local only) |
+| `benchmarks/recovery/` | Error-recovery benchmark (see its README) |
+| `tests/`, `mcp-servers/*/tests/`, `benchmarks/recovery/tests/`, `tools/runlog_miner/tests/` | Test suites (root `pytest.ini`) |
+| `tools/runlog_miner/` | Run-log mining/reporting package |
+| `docs/` | Human-facing docs: `PROPERTIES.md` (what gets computed & how), `ROADMAP.md`, specs |
+| `figures/` | Output of `paper/gen_figure{1,2}*.py`; included by the manuscript |
+| `env/` | Conda environment YAMLs |
+| `literature/`, `paper/` | Reference PDFs and manuscript sources (local only, git-excluded) |
 
 ---
 
@@ -136,7 +122,7 @@ Script generation, simulation execution, and analysis on the local GPU server. S
 
 New to the repo? The fastest path to a first run:
 
-1. **Read [`guides/STAGE_INDEX.md`](guides/STAGE_INDEX.md)** — the navigation hub for the whole pipeline.
+1. **Read [`guides/README.md`](guides/README.md)** — the navigation hub for the whole pipeline.
 2. **Complete [Setup](#setup) below** — build LAMMPS (GPU), create the conda envs, install EMC, configure `.mcp.json`.
 3. **Start the three MCP servers** (see [Starting the MCP Servers](#starting-the-mcp-servers)).
 4. **Calibrate once on a new machine:** run `/calibrate-hardware` (see [Hardware Calibration](#hardware-calibration-first-run-on-a-new-machine)).
@@ -275,7 +261,7 @@ Open Claude Code in the `PolyJarvis/` directory and describe your polymer:
 
 > *"Run a full MD simulation of PVDF. SMILES: \*CC(F)(F)\*. I want Tg and equilibrated density."*
 
-The agent reads `guides/STAGE_INDEX.md` automatically on every task, classifies the polymer, selects the correct force field and builder, builds the amorphous cell, equilibrates, runs the Tg sweep, and reports results — all without manual intervention.
+The agent reads `CLAUDE.md` automatically on every task, classifies the polymer, selects the correct force field and builder, builds the amorphous cell, equilibrates, runs the Tg sweep, and reports results — all without manual intervention.
 
 To start a new simulation, copy `Task_TEMPLATE.txt` and fill in the polymer name and SMILES.
 

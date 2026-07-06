@@ -23,5 +23,6 @@
   "is_dsc_extrapolation": true,
   "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 160 K/ns | 436.9 K |\n| 400 K/ns | 328.0 K |\n\n**Log-linear**: Tg = 1040.1 + -118.85\u00b7ln(\u0393)  R\u00b2=1.0000\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **436.9 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): quality=SKIPPED (N < 3)\n",
   "d06_markdown_path": "/home/alexzhao/PolyJarvis/data/PS2/raw/d06_multirate_block.md",
-  "plot_path": "/home/alexzhao/PolyJarvis/data/PS2/raw/tg_multirate.png"
+  "plot_path": "/home/alexzhao/PolyJarvis/data/PS2/raw/tg_multirate.png",
+  "review_note_2026_06_28": "run_summary had mislabeled this as 'rate_extrapolated' 436.9 with NO exp band. The multirate file is correct: tg_method=single_rate_fallback, slope_gate_pass=false (b=-118.8 wrong sign), only 2 FAST rates [400,160]->[328,436.9] with 108 K scatter. 436.9 (slowest r160) is rate-inflated; graded FAIL high vs PS Tg band [354.35,391.65]. PS2 lacks the slow 40 K/ns rate PS1/PS3 use to land near exp."
 }

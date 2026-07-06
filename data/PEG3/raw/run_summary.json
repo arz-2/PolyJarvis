@@ -22,26 +22,20 @@
   "plan": null,
   "results": {
     "tg": {
-      "value_K": 235.5666666666667,
-      "grading_basis": "rate_extrapolated",
-      "md_offset_K": 0.0,
+      "value_K": 238.2,
       "exp_range_K": [
-        186.0,
-        226.0
+        195.7,
+        216.3
       ],
-      "error_pct": 4.2,
+      "exp_basis": "amorphous PEO Tg ~206 K (Boyer; PEO ~-67degC). Honest +/-5% band; NOT a single-point or pooled-relaxation band.",
+      "error_pct": 10.1,
       "status": "FAIL",
-      "r_squared": 0.36588132184374067,
-      "fit_quality": "EXCELLENT",
-      "primary_fit_invalid": false,
-      "tg_dsc_equiv_K": 235.5666666666667,
-      "loglinear_slope_K": -6.483832175702309,
-      "loglinear_r_squared": 0.36588132184374067,
-      "vf_fit_quality": "FAILED",
-      "n_rates": 6,
-      "n_replicates": 2,
-      "rates_span_decades": 1.0,
-      "slow_rate_ref_K_per_ns": 1.6667e-10
+      "rate_valid": false,
+      "rate_note": "de-pooled 6->own [40,160,400] (PEG2 points removed); rubbery_flat_mean; rate-elevated",
+      "tg_method": "rubbery_flat_mean",
+      "loglinear_r_squared": 0.639679817441404,
+      "n_rates": 3,
+      "n_replicates": 1
     },
     "density": {
       "value_g_cm3": 1.057924,
@@ -49,6 +43,7 @@
         1.064,
         1.176
       ],
+      "exp_basis": "amorphous PEO 1.12 g/cm3 (Wu2011 OPLS-AA 1.10-1.12). PCFF underestimates ~5% -> marginal FAIL (FF systematic, cf. PEEK).",
       "error_pct": -0.6,
       "status": "FAIL"
     },
@@ -61,7 +56,21 @@
       ],
       "error_pct": 0.0,
       "status": "PASS",
-      "method": "fluctuation"
+      "method": "volume_fluctuation",
+      "murnaghan_xcheck": {
+        "value_GPa": 3.6066,
+        "B0_prime": 1.0,
+        "pressures_atm": [
+          1.0,
+          100.0,
+          300.0,
+          600.0,
+          1000.0
+        ],
+        "r_squared": 0.996473,
+        "validity": "INVALID narrow window [1,100,300,600,1000], B0' clamped to 1.0"
+      },
+      "method_note": "Fluctuation headline for cross-run consistency (all four have it; all PASS [2,4]). POXI rules name Murnaghan primary for rubbery PEO, but only PEG4 has a valid wide-window series; PEG3's is narrow/invalid, PEG1-PEG2 have none. Run data does NOT show the noted +70% fluctuation overestimate (fluctuation <= Murnaghan in PEG3 and PEG4)."
     }
   },
   "convergence": {
@@ -95,6 +104,8 @@
     "simulation_dir": "/home/alexzhao/PolyJarvis/data/PEG3/lammps/",
     "git_commit": "8d829eb",
     "mdanalysis_version": "unknown",
-    "generated_at": "2026-06-24T16:48:24.962791+00:00"
-  }
+    "generated_at": "2026-06-24T16:48:24.962791+00:00",
+    "machine_origin": "machine-2 (alexzhao); curated subset synced, trajectory dumps not local"
+  },
+  "overall_status": "reconciled_review_2026-06-28"
 }

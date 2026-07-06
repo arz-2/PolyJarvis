@@ -163,3 +163,8 @@ C∞ reported as 346.7 by the analysis — a backbone-type detection artifact (P
 
 Simulation dir: `/home/alexzhao/PolyJarvis/data/PEG1/lammps/`
 Outputs: `data/PEG1/raw/` — `run_summary.json`, `tg_multirate_result.json`, per-rate `tg_r{40,160,640}/`, `density.json`, `bulk_modulus.json`; figures in `data/PEG1/graphs/`
+- RESULT (wide [-1000,0,3000,7000,15000]): K_Murnaghan = 3.394 GPa (r²=1.000, B0'=8.93) → GATE PASS; supersedes fluctuation 3.140. status: DONE
+
+## COMPUTE COST (harvested from LAMMPS loop-time logs)
+- **Wall (loop-time)**: 4.9 h  |  **GPU**: 4.9 h  |  **CPU**: 0.0 h (0 core-h)  |  procs: 1
+- Source: `data/PEG1/lammps/**/*.log` (Born stages excluded); reproducible via `paper/gen_table_compute_cost.py`.

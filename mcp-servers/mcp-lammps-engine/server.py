@@ -2611,6 +2611,72 @@ def _run_extract_equilibrated_density(
 
 
 @mcp.tool()
+def assess_cooling_contraction(
+    glass_data: str,
+    exp_density_gcm3: float,
+    tg_K: float,
+    t_equil_K: float,
+    melt_data: Optional[str] = None,
+    alpha_glass: float = 2.5e-4,
+    alpha_melt: float = 6.0e-4,
+    band_pct: float = 5.0,
+) -> dict:
+    """
+    Melt-vs-glass density decomposition — distinguishes an UNDER-ANNEALED (kinetically
+    trapped) glass from force-field underbinding, which the convergence checks cannot.
+
+    A converged 300 K density only means the cell stopped moving, not that it stopped at the
+    RIGHT value: a trapped glass converges low because free volume froze in during cooling.
+    This computes densities directly from the final structures (box + masses), compares the
+    melt→glass contraction against the system's own thermal-expansion expectation, and routes
+    the correct remedy:
+
+      - UNDER_ANNEALED_COOLING : melt density OK but cell under-contracted on cooling →
+        re-melt + SLOW re-cool (NOT EXTEND at 300 K — a glass cannot densify below Tg).
+      - MELT_STAGE_DEFICIT     : melt density already low → FF underbinding OR melt-stage
+        under-annealing; probe with a heavy melt anneal (NkepsuMbitou 10-TAC). Re-cool won't help.
+      - OK                     : glass density within ±band_pct of experiment.
+
+    Use this as a ROUTING gate alongside the absolute glass-vs-experiment density check whenever
+    a glassy production density falls below experiment (do not accept a sub-band density as
+    "force-field bias" without running this first). The alpha-extrapolation degrades over large
+    cooling spans; `extrapolation_reliable=False` (span > 300 K) means lean on the absolute
+    density gate and treat the split as indicative.
+
+    Args:
+        glass_data:        npt_prod300_out.data at 300 K (the glass state). Required.
+        exp_density_gcm3:  experimental amorphous density at 300 K for the polymer.
+        tg_K:              experimental (or class) Tg in K. If <=300, treated as rubbery.
+        t_equil_K:         melt/equilibration temperature (T_workflow) in K.
+        melt_data:         npt_production_out.data at T_equil (melt). Optional but required
+                           for the melt/cooling split; without it only OK/below-band is returned.
+        alpha_glass:       volumetric thermal-expansion coeff below Tg (default 2.5e-4 /K).
+        alpha_melt:        volumetric thermal-expansion coeff above Tg (default 6.0e-4 /K).
+        band_pct:          pass band as % below experiment (default 5.0).
+
+    Returns:
+        dict with rho_melt, rho_glass, glass_density_gap_pct, melt_density_gap_pct,
+        expected_contraction, actual_contraction, contraction_shortfall,
+        under_annealed_cooling (bool), verdict, remedy, extrapolation_reliable, markdown.
+    """
+    parts = [f"python {MDA_SCRIPTS_DIR}/assess_cooling_contraction.py",
+             f"--glass_data {glass_data}",
+             f"--exp_density_gcm3 {exp_density_gcm3}",
+             f"--tg_K {tg_K}",
+             f"--t_equil_K {t_equil_K}",
+             f"--alpha_glass {alpha_glass}",
+             f"--alpha_melt {alpha_melt}",
+             f"--band_pct {band_pct}"]
+    if melt_data:
+        parts.append(f"--melt_data {melt_data}")
+    command = " ".join(parts)
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=600)
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
 def extract_equilibrated_density(
     log_file: str,
     output_dir: Optional[str] = None,
@@ -3315,125 +3381,6 @@ def _run_generate_run_summary(
         return {"status": "failed", "error": stderr, "stdout": stdout}
     return _parse_json_from_stdout(stdout, stderr)
 
-
-# ── Tool: extract_bulk_modulus_born ──────────────────────────────────────────
-
-def _run_extract_bulk_modulus_born(
-    born_matrix_file: str,
-    log_file: str,
-    n_atoms: int,
-    output_dir: str,
-    eq_fraction: float,
-    block_count: int,
-    graphs_dir: Optional[str] = None,
-) -> dict:
-    """Background worker — runs extract_bulk_modulus_born.py via CLI."""
-    parts = [f"python {MDA_SCRIPTS_DIR}/extract_bulk_modulus_born.py"]
-    parts.append(f"--born_matrix_file {born_matrix_file}")
-    parts.append(f"--log_file {log_file}")
-    parts.append(f"--n_atoms {n_atoms}")
-    parts.append(f"--output_dir {output_dir}")
-    parts.append(f"--eq_fraction {eq_fraction}")
-    parts.append(f"--block_count {block_count}")
-    if graphs_dir:
-        parts.append(f"--graphs_dir {graphs_dir}")
-
-    command = " ".join(parts)
-    logger.info(f"Running Born bulk modulus extraction via CLI: {command}")
-    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=36000)
-    if exit_code != 0:
-        return {"status": "failed", "error": stderr, "stdout": stdout}
-    return _parse_json_from_stdout(stdout, stderr)
-
-
-@mcp.tool()
-def extract_bulk_modulus_born(
-    born_matrix_file: str,
-    log_file: str,
-    n_atoms: int,
-    output_dir: Optional[str] = None,
-    graphs_dir: Optional[str] = None,
-    eq_fraction: float = 0.5,
-    block_count: int = 5,
-) -> dict:
-    """
-    Extract isothermal bulk modulus via the Born + NVT stress-fluctuation
-    method from an nvt_born simulation (Stage 8, glassy polymers only).
-
-    Method:
-        K_T = K_Born + NkT/V − (V/kT)·Var(P)_NVT
-
-    where K_Born is the Born elastic constant bulk average from
-    compute born/matrix numdiff (time-averaged over the NVT trajectory),
-    NkT/V is the kinetic (ideal-gas) contribution, and Var(P) is the
-    variance of isotropic pressure P = (pxx+pyy+pzz)/3 in the NVT ensemble.
-
-    This gives the unrelaxed (high-frequency) isothermal bulk modulus,
-    appropriate for comparison with ultrasonic or Brillouin scattering data.
-    Rate-free: no NEMD strain-rate artifacts.
-
-    Requires:
-      - born_matrix_file: fix ave/time output from nvt_born template
-        (columns: TimeStep b11 b22 b33 b12 b13 b23 in atm)
-      - log_file: NVT log with pxx, pyy, pzz, vol, temp columns
-      - n_atoms: total atom count (from inspect_data_file or born-worker RESULT)
-
-    Output files written to output_dir:
-        bulk_modulus_born.json   — full results and diagnostics
-        born_matrix_timeseries.png — Born elements + pressure time series
-
-    The job runs in the background — poll with get_run_status(run_id).
-
-    Args:
-        born_matrix_file: Path to fix ave/time Born matrix output.
-        log_file:         Path to nvt_born LAMMPS log.
-        n_atoms:          Number of atoms in simulation cell.
-        output_dir:       Output directory (defaults to <log_dir>/born_analysis).
-        eq_fraction:      Fraction of rows used as production window (last eq_fraction).
-        block_count:      Number of blocks for block-average uncertainty.
-
-    Returns:
-        dict with run_id. When completed, result includes:
-            bulk_modulus_GPa         — K_T in GPa
-            bulk_modulus_sem_GPa     — block-average SEM in GPa
-            K_Born_GPa               — Born contribution alone
-            kinetic_term_GPa         — NkT/V contribution
-            fluctuation_correction_GPa — (V/kT)·Var(P) correction
-            V_mean_A3, T_mean_K      — thermodynamic averages
-            Var_P_atm2               — pressure variance
-            n_effective_samples      — τ_eff-corrected sample count
-            block_averaging          — per-block K values and SEM
-            diagnostics              — full term breakdown and statistics
-            summary_json             — path to bulk_modulus_born.json
-    """
-    if output_dir is None:
-        output_dir = str(Path(log_file).parent / "born_analysis")
-
-    run_id = run_manager.create("extract_bulk_modulus_born",
-                                {"born_matrix_file": born_matrix_file, "output_dir": output_dir})
-    t = threading.Thread(
-        target=_analysis_run_background,
-        args=(run_id, _run_extract_bulk_modulus_born, dict(
-            born_matrix_file = born_matrix_file,
-            log_file         = log_file,
-            n_atoms          = n_atoms,
-            output_dir       = output_dir,
-            eq_fraction      = eq_fraction,
-            block_count      = block_count,
-            graphs_dir       = graphs_dir,
-        )),
-        daemon=True,
-    )
-    t.start()
-    return {
-        "status":            "submitted",
-        "run_id":            run_id,
-        "run_type":          "extract_bulk_modulus_born",
-        "born_matrix_file":  born_matrix_file,
-        "log_file":          log_file,
-        "output_dir":        output_dir,
-        "message":           "Poll with get_run_status(run_id)",
-    }
 
 
 @mcp.tool()

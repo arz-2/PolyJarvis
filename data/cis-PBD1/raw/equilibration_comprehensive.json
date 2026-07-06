@@ -5,83 +5,83 @@
     "equilibrated": true,
     "density_drift": {
       "pass": true,
-      "drift_pct": 0.0,
-      "p_value": 1.0
+      "drift_pct": 0.0258,
+      "p_value": 0.5618
     },
     "energy_drift": {
       "pass": true,
-      "drift_pct": 0.3615,
-      "p_value": 0.0001
+      "drift_pct": 0.0628,
+      "p_value": 0.5689
     },
     "density_sem": {
       "pass": true,
-      "sem_pct": 0.0
+      "sem_pct": 0.0259
     },
     "energy_sem": {
       "pass": true,
-      "sem_pct": 0.0551
+      "sem_pct": 0.0476
     },
-    "tau_eff_density_fraction": 0.0,
+    "tau_eff_density_fraction": 0.000392003360140123,
     "meta": {
-      "n_total_rows": 2001,
-      "n_production_rows": 1001,
-      "T_mean": 300.05
+      "n_total_rows": 1501,
+      "n_production_rows": 751,
+      "T_mean": 300.04
     }
   },
   "chain": {
     "rg": {
       "pass": true,
-      "cv": 0.169,
-      "mean_Rg_A": 23.906,
-      "mean_Rg2_A2": 588.111,
+      "cv": 0.1526,
+      "mean_Rg_A": 24.022,
+      "mean_Rg2_A2": 591.066,
       "rg_spread_flag": false,
-      "C_inf": 15.029,
+      "C_inf": null,
       "n_chains": 20,
-      "frames_analysed": 1451
+      "frames_analysed": 451
     },
     "ree": {
       "available": true,
-      "mean_R_ee_A": 54.34,
-      "std_R_ee_A": 18.13,
+      "mean_R_ee_A": 57.81,
+      "std_R_ee_A": 19.22,
       "n_chains": 20,
-      "end_to_end_distribution_png": "failed: [Errno 2] No such file or directory: '/home/arz2/PolyJarvis/data/cis-PBD1/graphs/end_to_end_distribution.png'"
+      "end_to_end_distribution_png": "/home/arz2/PolyJarvis/data/cis-PBD1/graphs/end_to_end_distribution.png"
     },
     "msid": {
       "available": true,
-      "slope": 1.016,
-      "r2": 0.9749,
+      "slope": 1.01,
+      "r2": 0.9709,
       "gaussian_pass": true,
       "n_separations": 199
     },
     "ct": {
       "available": true,
-      "tau_relax_ps": 71518.1,
-      "tau_ps": 58006.9,
-      "beta": 0.72,
-      "decay_fraction_at_end": 0.041,
-      "trajectory_ps": 1451.0,
+      "tau_relax_ps": 18249.2,
+      "tau_ps": 14933.7,
+      "beta": 0.727,
+      "decay_fraction_at_end": 0.047,
+      "trajectory_ps": 451.0,
       "pass": true
     },
     "msd": {
-      "alpha": 0.396,
-      "alpha_r2": 0.9817,
+      "alpha": 0.286,
+      "alpha_r2": 0.9625,
       "diffusion_regime": "sub-diffusive / kinetically trapped",
-      "msd_max_A2": 557.54,
-      "kinetic_trap_flag": true
+      "msd_max_A2": 669.85,
+      "kinetic_trap_flag": false
     }
   },
   "spatial": {
     "p2": {
       "pass": true,
-      "p2_mean": 0.0134,
-      "p2_std": 0.0036,
-      "p2_max": 0.0261,
+      "p2_mean": 0.0157,
+      "p2_std": 0.0037,
+      "p2_max": 0.0262,
       "ordered_flag": false
     },
     "density_homogeneity": {
       "pass": true,
-      "cv_mean": 0.1276,
-      "cv_max": 0.1416,
+      "cv_mean": 0.128,
+      "cv_max": 0.1436,
       "grid_n": 7,
       "atoms_per_voxel": 23.4,
       "poisson_cv": 0.207,
@@ -90,17 +90,15 @@
     }
   },
   "warnings": [
-    "C\u221e = 15.029 is outside broad expected range [3, 15] \u2014 verify backbone_types and n_backbone_bonds",
-    "C(t) partially decayed: 4% decayed at end of trajectory (\u03c4_relax=71518.1 ps vs T_traj=1451.0 ps)",
-    "MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state"
+    "C(t) partially decayed: 5% decayed at end of trajectory (\u03c4_relax=18249.2 ps vs T_traj=451.0 ps)"
   ],
-  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.05 K \u00b7 1451 frames analysed (skip=50) \u00b7 2026-06-19 21:20\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.0% (p=1.0) | <1%, p<0.01 | N/A (NVT \u2014 fixed volume) |\n| Energy drift | 0.3615% (p=0.0001) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0% | <1% | N/A (NVT \u2014 fixed volume) |\n| Energy block-SEM | 0.0551% | <1% | PASS |\n| \u03c4_eff density | 0.0% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 16.9% | <30% | PASS |\n| C\u221e | 15.029 | lit. varies | INFO |\n| MSID slope | 1.016 (R\u00b2=0.9749) | 1.0 \u00b120% | OK |\n| C(t) \u03c4_relax | 71518.1 ps (4% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | yes (\u03b1=0.396, MSD=557.54 \u00c5\u00b2>>Rg\u00b2=588.111) | \u2014 | \u26a0 trapped |\n| R_ee mean \u00b1 std | 54.34 \u00b1 18.13 \u00c5 (N=20 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0134 \u00b1 0.0036 | <0.10 | PASS |\n| Density homogeneity CV | 12.8% (7\u00b3 grid, 23.4 atoms/voxel) | <25% | PASS |\n\n**Warnings:** C\u221e = 15.029 is outside broad expected range [3, 15] \u2014 verify backbone_types and n_backbone_bonds; C(t) partially decayed: 4% decayed at end of trajectory (\u03c4_relax=71518.1 ps vs T_traj=1451.0 ps); MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state",
-  "log_file": "/home/arz2/PolyJarvis/data/cis-PBD1/lammps/equil/nvt_production/nvt_production.log",
-  "dump_file": "/home/arz2/PolyJarvis/data/cis-PBD1/lammps/equil/npt_production/npt_production.dump",
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=300.04 K \u00b7 451 frames analysed (skip=50) \u00b7 2026-07-02 16:09\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.0258% (p=0.5618) | <1%, p<0.01 | PASS |\n| Energy drift | 0.0628% (p=0.5689) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0259% | <1% | PASS |\n| Energy block-SEM | 0.0476% | <1% | PASS |\n| \u03c4_eff density | 0.0% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 15.3% | <30% | PASS |\n| MSID slope | 1.01 (R\u00b2=0.9709) | 1.0 \u00b120% | OK |\n| C(t) \u03c4_relax | 18249.2 ps (5% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | no (\u03b1=0.286, MSD=669.85 \u00c5\u00b2>>Rg\u00b2=591.066) | \u2014 | OK |\n| R_ee mean \u00b1 std | 57.81 \u00b1 19.22 \u00c5 (N=20 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0157 \u00b1 0.0037 | <0.10 | PASS |\n| Density homogeneity CV | 12.8% (7\u00b3 grid, 23.4 atoms/voxel) | <25% | PASS |\n\n**Warnings:** C(t) partially decayed: 5% decayed at end of trajectory (\u03c4_relax=18249.2 ps vs T_traj=451.0 ps)",
+  "log_file": "/home/arz2/PolyJarvis/data/cis-PBD1/lammps/equil/npt_production/npt_production.log",
+  "dump_file": "/home/arz2/PolyJarvis/data/cis-PBD1/lammps/equil/nvt_production/nvt_production_decimated.dump",
   "data_file": "/home/arz2/PolyJarvis/data/cis-PBD1/lammps/equil/npt_production/npt_production_out.data",
   "backbone_types": [
     1,
     2
   ],
-  "timestamp": "2026-06-19 21:20"
+  "timestamp": "2026-07-02 16:09"
 }

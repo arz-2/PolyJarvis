@@ -1,0 +1,34 @@
+{
+  "status": "success",
+  "n_points": 4,
+  "rates_K_per_ns": [
+    25.0,
+    50.0,
+    80.0,
+    100.0
+  ],
+  "tg_values_K": [
+    496.4,
+    528.7,
+    487.4,
+    477.2
+  ],
+  "rates_span_decades": 0.6020599913279624,
+  "loglinear_slope_K": -15.995450729484677,
+  "loglinear_intercept_K": 561.8790512095063,
+  "loglinear_r_squared": 0.1936159687913081,
+  "tg_at_slow_rate_K": 496.4,
+  "slow_rate_ref_K_per_ns": 1.6667e-10,
+  "slope_gate_pass": false,
+  "is_flat_rate_regime": false,
+  "regime": "glassy",
+  "rubbery_regime_exemption": false,
+  "tg_method": "single_rate_fallback",
+  "vf_fit_quality": "FAILED",
+  "vf_fit_error": "Initial guess is outside of provided bounds",
+  "polymer_name": "PSU4",
+  "is_dsc_extrapolation": true,
+  "d06_markdown": "### Multi-rate Tg analysis\n\n| Rate | Tg_MD |\n|------|-------|\n| 25 K/ns | 496.4 K |\n| 50 K/ns | 528.7 K |\n| 80 K/ns | 487.4 K |\n| 100 K/ns | 477.2 K |\n\n**Log-linear**: Tg = 561.9 + -16.00\u00b7ln(\u0393)  R\u00b2=0.1936\n\u2192 Tg at 1.67e-10 K/ns (DSC-equivalent, 10 K/min) = **496.4 K**  (theoretical DSC-equivalent experimental Tg)\n\n**VF extrapolation** (Tg0 at \u0393\u21920): quality=FAILED\n",
+  "d06_markdown_path": "/home/arz2/PolyJarvis/data/PSU4/raw/d06_multirate_block.md",
+  "plot_path": "/home/arz2/PolyJarvis/data/PSU4/raw/tg_multirate.png"
+}

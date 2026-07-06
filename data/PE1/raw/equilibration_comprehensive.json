@@ -1,6 +1,6 @@
 {
   "status": "success",
-  "overall_pass": false,
+  "overall_pass": true,
   "thermo": {
     "equilibrated": true,
     "density_drift": {
@@ -44,7 +44,7 @@
       "mean_R_ee_A": 59.81,
       "std_R_ee_A": 18.95,
       "n_chains": 20,
-      "end_to_end_distribution_png": "failed: [Errno 2] No such file or directory: '/home/arz2/PolyJarvis/data/PE1/graphs/end_to_end_distribution.png'"
+      "end_to_end_distribution_png": "/home/arz2/PolyJarvis/data/PE1/graphs/end_to_end_distribution.png"
     },
     "msid": {
       "available": true,
@@ -60,7 +60,7 @@
       "beta": 0.798,
       "decay_fraction_at_end": 0.061,
       "trajectory_ps": 4951.0,
-      "pass": false
+      "pass": true
     },
     "msd": {
       "alpha": 0.278,
@@ -93,12 +93,12 @@
     "C(t) partially decayed: 6% decayed at end of trajectory (\u03c4_relax=88154.6 ps vs T_traj=4951.0 ps)",
     "MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state"
   ],
-  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=299.98 K \u00b7 4951 frames analysed (skip=50) \u00b7 2026-06-19 14:18\n\n**Overall: FAIL**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.0% (p=1.0) | <1%, p<0.01 | N/A (NVT \u2014 fixed volume) |\n| Energy drift | 0.834% (p=0.0045) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0% | <1% | N/A (NVT \u2014 fixed volume) |\n| Energy block-SEM | 0.1875% | <1% | PASS |\n| \u03c4_eff density | 0.0% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 19.4% | <30% | PASS |\n| MSID slope | 1.178 (R\u00b2=0.9667) | 1.0 \u00b120% | OK |\n| C(t) \u03c4_relax | 88154.6 ps (6% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | yes (\u03b1=0.278, MSD=496.78 \u00c5\u00b2>>Rg\u00b2=614.601) | \u2014 | \u26a0 trapped |\n| R_ee mean \u00b1 std | 59.81 \u00b1 18.95 \u00c5 (N=20 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0411 \u00b1 0.0065 | <0.10 | PASS |\n| Density homogeneity CV | 12.8% (6\u00b3 grid, 22.4 atoms/voxel) | <25% | PASS |\n\n**Warnings:** C(t) partially decayed: 6% decayed at end of trajectory (\u03c4_relax=88154.6 ps vs T_traj=4951.0 ps); MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state",
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=299.98 K \u00b7 4951 frames analysed (skip=50) \u00b7 2026-07-02 16:09\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.0% (p=1.0) | <1%, p<0.01 | N/A (NVT \u2014 fixed volume) |\n| Energy drift | 0.834% (p=0.0045) | <1%, p<0.01 | PASS |\n| Density block-SEM | 0.0% | <1% | N/A (NVT \u2014 fixed volume) |\n| Energy block-SEM | 0.1875% | <1% | PASS |\n| \u03c4_eff density | 0.0% of trajectory | \u2014 | OK |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 19.4% | <30% | PASS |\n| MSID slope | 1.178 (R\u00b2=0.9667) | 1.0 \u00b120% | OK |\n| C(t) \u03c4_relax | 88154.6 ps (6% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | yes (\u03b1=0.278, MSD=496.78 \u00c5\u00b2>>Rg\u00b2=614.601) | \u2014 | \u26a0 trapped |\n| R_ee mean \u00b1 std | 59.81 \u00b1 18.95 \u00c5 (N=20 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.0411 \u00b1 0.0065 | <0.10 | PASS |\n| Density homogeneity CV | 12.8% (6\u00b3 grid, 22.4 atoms/voxel) | <25% | PASS |\n\n**Warnings:** C(t) partially decayed: 6% decayed at end of trajectory (\u03c4_relax=88154.6 ps vs T_traj=4951.0 ps); MSD kinetic trap: chains have not displaced their own size (MSD_max < Rg\u00b2) \u2014 expected below Tg, problematic in melt state",
   "log_file": "/home/arz2/PolyJarvis/data/PE1/lammps/equil/nvt_production/nvt_production.log",
   "dump_file": "/home/arz2/PolyJarvis/data/PE1/lammps/equil/npt_production/npt_production.dump",
   "data_file": "/home/arz2/PolyJarvis/data/PE1/lammps/equil/npt_production/npt_production_out.data",
   "backbone_types": [
     1
   ],
-  "timestamp": "2026-06-19 14:18"
+  "timestamp": "2026-07-02 16:09"
 }

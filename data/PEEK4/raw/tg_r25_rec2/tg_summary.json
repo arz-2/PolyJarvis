@@ -1,0 +1,4333 @@
+{
+  "status": "success",
+  "log_file": "/home/alexzhao/PolyJarvis/data/PEEK4/lammps/thermal/tg_sweep_r25/tg_sweep.log",
+  "output_dir": "/home/alexzhao/PolyJarvis/data/PEEK4/raw/tg_r25_rec2",
+  "Tg_K": 558.9,
+  "Tg_alternative_K": 529.6,
+  "r_squared": 0.9957,
+  "fit_quality": "EXCELLENT",
+  "fit_method": "hyperbola_curvefit",
+  "transition_width_c_K": 93.8,
+  "tg_uncertainty_K": 18.4,
+  "binning_method": "plateau_detection",
+  "fit_params": {
+    "a_glassy": -0.00023180085970895523,
+    "b_glassy": 1.285040354801621,
+    "a_rubbery": -0.0005266569512185747,
+    "b_rubbery": 1.4498321660770421
+  },
+  "n_temperature_bins": 56,
+  "n_plateau_bins": 56,
+  "n_plateaus_skipped_drift": 110,
+  "n_plateaus_low_n_eff": 178,
+  "temp_range_K": [
+    250.0,
+    760.0
+  ],
+  "bins_csv": "/home/alexzhao/PolyJarvis/data/PEEK4/raw/tg_r25_rec2/tg_density_bins.csv",
+  "bins_csv_plateau": "/home/alexzhao/PolyJarvis/data/PEEK4/raw/tg_r25_rec2/tg_density_bins_plateau.csv",
+  "equilibration_fraction": 0.5,
+  "temp_col": "Temp",
+  "density_col": "Density",
+  "slope_signs_valid": true,
+  "slope_ordering_valid": true,
+  "primary_fit_invalid": false,
+  "fit_swapped": false,
+  "fit_warnings": [],
+  "relaxation_metrics": [
+    {
+      "temperature": 750.0,
+      "n_eff": 10.36,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 5.14,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 2.57,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 3.71,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 6.58,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 11.45,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 4.71,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 6.29,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 3.16,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 4.4,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 9.77,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 5.75,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 11.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 740.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 3.9,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 3.72,
+      "tau_int_steps": 0.9,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 760.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 5.27,
+      "tau_int_steps": 1.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 16.84,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 10.04,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 760.0,
+      "n_eff": 3.35,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 4.61,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 5.78,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 11.25,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 10.43,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 4.72,
+      "tau_int_steps": 2.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 760.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 2.54,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 9.79,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 6.19,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 6.4,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 3.96,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 7.08,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 4.6,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 740.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 5.75,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 3.67,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 9.74,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 6.73,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 9.6,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 18.63,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 2.65,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 8.14,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 17.03,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 7.66,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 7.72,
+      "tau_int_steps": 1.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 4.49,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 3.63,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 9.88,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 3.61,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 3.05,
+      "tau_int_steps": 1.1,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 4.47,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 9.43,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 13.03,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 6.53,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 7.05,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 5.95,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 745.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 7.97,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 755.0,
+      "n_eff": 2.51,
+      "tau_int_steps": 1.0,
+      "relax_warning": true
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 12.33,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 6.41,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 8.05,
+      "tau_int_steps": 1.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 750.0,
+      "n_eff": 6.32,
+      "tau_int_steps": 1.3,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 15.12,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 6.85,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 11.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 9.75,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 6.94,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.75,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 7.84,
+      "tau_int_steps": 1.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 13.91,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 725.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 725.0,
+      "n_eff": 11.88,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 725.0,
+      "n_eff": 4.53,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 3.61,
+      "tau_int_steps": 1.1,
+      "relax_warning": true
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 4.4,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 9.65,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 12.82,
+      "tau_int_steps": 1.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 725.0,
+      "n_eff": 5.39,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 9.33,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.5,
+      "tau_int_steps": 0.9,
+      "relax_warning": true
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 5.93,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 2.62,
+      "tau_int_steps": 1.0,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 11.09,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 10.35,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 14.05,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 8.75,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 725.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 8.97,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 11.27,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 6.72,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 725.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 7.93,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 9.99,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 7.86,
+      "tau_int_steps": 1.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.99,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 725.0,
+      "n_eff": 4.96,
+      "tau_int_steps": 1.9,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 11.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 3.97,
+      "tau_int_steps": 1.1,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 5.01,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 8.4,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 3.34,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.74,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 13.18,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 2.75,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 5.36,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 8.46,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 725.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.83,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 18.84,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 2.9,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 8.38,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 6.99,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 725.0,
+      "n_eff": 9.48,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 725.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 735.0,
+      "n_eff": 4.3,
+      "tau_int_steps": 1.0,
+      "relax_warning": true
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 9.1,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 730.0,
+      "n_eff": 4.42,
+      "tau_int_steps": 1.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 6.37,
+      "tau_int_steps": 1.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 5.43,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 3.42,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 6.09,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 14.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 9.38,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 17.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 10.87,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 11.13,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 18.16,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 720.0,
+      "n_eff": 3.2,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 12.77,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 8.9,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 5.82,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 13.6,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 19.14,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 720.0,
+      "n_eff": 2.71,
+      "tau_int_steps": 0.9,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 22.88,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 4.27,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 2.71,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 11.29,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 8.05,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 19.6,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 5.16,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 4.48,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 20.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 13.51,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 4.06,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 6.43,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 5.28,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 9.06,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 6.22,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 12.69,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 4.17,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 3.37,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 4.2,
+      "tau_int_steps": 1.0,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 4.53,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 5.8,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 4.25,
+      "tau_int_steps": 1.1,
+      "relax_warning": true
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 3.29,
+      "tau_int_steps": 1.2,
+      "relax_warning": true
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 4.39,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 14.08,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 4.12,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 16.1,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 18.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 13.64,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 3.85,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 14.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 705.0,
+      "n_eff": 4.96,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 710.0,
+      "n_eff": 16.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 3.77,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 715.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 8.19,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 7.9,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 8.27,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 7.46,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 13.87,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 5.43,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 685.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 685.0,
+      "n_eff": 6.1,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 700.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 3.92,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 7.52,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 685.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 695.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 685.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 4.28,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 12.64,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 14.79,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 5.31,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 695.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 6.12,
+      "tau_int_steps": 3.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 2.88,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 12.51,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 7.13,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 7.35,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 6.84,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 19.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 695.0,
+      "n_eff": 18.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 4.51,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 15.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 13.21,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 13.13,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 8.68,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 17.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 10.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 30.43,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 2.86,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 680.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 680.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 3.09,
+      "tau_int_steps": 1.3,
+      "relax_warning": true
+    },
+    {
+      "temperature": 695.0,
+      "n_eff": 3.15,
+      "tau_int_steps": 1.0,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 10.21,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 6.32,
+      "tau_int_steps": 2.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 695.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 685.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 680.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 8.86,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 14.93,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 685.0,
+      "n_eff": 3.24,
+      "tau_int_steps": 0.9,
+      "relax_warning": true
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 16.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 14.2,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 16.1,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 7.82,
+      "tau_int_steps": 1.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 19.72,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 19.12,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 690.0,
+      "n_eff": 16.6,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 665.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 660.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 675.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 3.81,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 665.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 665.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 4.23,
+      "tau_int_steps": 0.9,
+      "relax_warning": true
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 13.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 18.74,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 675.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 675.0,
+      "n_eff": 12.92,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 11.55,
+      "tau_int_steps": 2.3,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 9.5,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 18.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 6.02,
+      "tau_int_steps": 1.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 3.95,
+      "tau_int_steps": 1.1,
+      "relax_warning": true
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 34.49,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 19.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 28.33,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 665.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 665.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 24.66,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 5.79,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 675.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 8.37,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 665.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 665.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 675.0,
+      "n_eff": 6.14,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 675.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 29.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 680.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 18.58,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 6.41,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 17.18,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 4.54,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 26.92,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 22.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 675.0,
+      "n_eff": 12.04,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 665.0,
+      "n_eff": 7.61,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 16.85,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 8.38,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 20.88,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 27.75,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 13.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 675.0,
+      "n_eff": 13.19,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 8.91,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 6.86,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 10.83,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 7.88,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 670.0,
+      "n_eff": 9.79,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 6.21,
+      "tau_int_steps": 4.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 660.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 11.78,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 20.85,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 645.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 645.0,
+      "n_eff": 9.81,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 6.71,
+      "tau_int_steps": 1.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 655.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 11.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 14.06,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 33.17,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 13.08,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 25.17,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 8.43,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 9.39,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 655.0,
+      "n_eff": 5.33,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 5.15,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 18.38,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 7.94,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 5.81,
+      "tau_int_steps": 3.2,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 14.16,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 645.0,
+      "n_eff": 13.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 16.43,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 32.27,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 640.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 13.11,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 655.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 11.7,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 21.5,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 3.61,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 655.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 11.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 655.0,
+      "n_eff": 3.96,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 17.41,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 15.72,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 4.15,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 645.0,
+      "n_eff": 10.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 4.82,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 645.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 4.09,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 7.64,
+      "tau_int_steps": 1.4,
+      "relax_warning": false
+    },
+    {
+      "temperature": 655.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 4.83,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 655.0,
+      "n_eff": 6.43,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 11.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 655.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 40.56,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 650.0,
+      "n_eff": 4.65,
+      "tau_int_steps": 0.9,
+      "relax_warning": true
+    },
+    {
+      "temperature": 625.0,
+      "n_eff": 10.14,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 11.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 4.37,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 6.46,
+      "tau_int_steps": 1.3,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 9.46,
+      "tau_int_steps": 2.4,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 4.27,
+      "tau_int_steps": 1.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 8.08,
+      "tau_int_steps": 1.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 635.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 33.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 635.0,
+      "n_eff": 6.7,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 15.87,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 635.0,
+      "n_eff": 10.09,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 625.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 635.0,
+      "n_eff": 12.76,
+      "tau_int_steps": 1.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 13.33,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 7.99,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 29.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 625.0,
+      "n_eff": 10.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 29.05,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 20.29,
+      "tau_int_steps": 1.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 19.49,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 3.12,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 5.92,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 15.99,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 5.96,
+      "tau_int_steps": 2.3,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 10.47,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 625.0,
+      "n_eff": 16.61,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 625.0,
+      "n_eff": 10.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 625.0,
+      "n_eff": 10.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 9.95,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 8.91,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 3.56,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 635.0,
+      "n_eff": 23.47,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 20.0,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 11.25,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 53.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 625.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 14.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 630.0,
+      "n_eff": 8.2,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 635.0,
+      "n_eff": 10.38,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 17.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 26.03,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 53.68,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 615.0,
+      "n_eff": 28.01,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 24.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 27.8,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 600.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 605.0,
+      "n_eff": 3.28,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 37.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 615.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 23.91,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 24.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 4.69,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 15.45,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 14.24,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 70.49,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 37.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 9.43,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 605.0,
+      "n_eff": 5.29,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 20.77,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 615.0,
+      "n_eff": 5.3,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 33.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 14.19,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 615.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 21.42,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 21.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 605.0,
+      "n_eff": 13.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 20.72,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 17.28,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 8.46,
+      "tau_int_steps": 1.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 9.78,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 610.0,
+      "n_eff": 20.13,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 585.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 9.14,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 585.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 16.16,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 17.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 585.0,
+      "n_eff": 6.93,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 595.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 6.2,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 73.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 72.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 8.38,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 30.8,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 585.0,
+      "n_eff": 15.64,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 595.0,
+      "n_eff": 4.14,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 595.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 33.08,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 18.79,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 15.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 9.88,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 595.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 22.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 595.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 8.12,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 41.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 27.39,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 44.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 16.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 8.36,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 4.78,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 12.71,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 26.44,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 4.92,
+      "tau_int_steps": 3.1,
+      "relax_warning": true
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 11.99,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 14.29,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 590.0,
+      "n_eff": 27.32,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 575.0,
+      "n_eff": 3.86,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 575.0,
+      "n_eff": 7.4,
+      "tau_int_steps": 0.9,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 26.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 565.0,
+      "n_eff": 4.23,
+      "tau_int_steps": 0.7,
+      "relax_warning": true
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 8.13,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 11.76,
+      "tau_int_steps": 3.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 23.58,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 20.52,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 575.0,
+      "n_eff": 35.34,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 13.91,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 18.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 10.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 18.46,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 33.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 40.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 7.75,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 4.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 22.86,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 20.69,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 17.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 4.46,
+      "tau_int_steps": 0.9,
+      "relax_warning": true
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 4.87,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 26.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 12.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 42.89,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 9.12,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 52.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 66.76,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 22.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 7.41,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 575.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 570.0,
+      "n_eff": 25.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 36.84,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 15.08,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 6.19,
+      "tau_int_steps": 2.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 32.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 25.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 14.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 14.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 12.33,
+      "tau_int_steps": 3.3,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 37.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 15.89,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 20.7,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 15.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 17.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 545.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 21.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 16.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 22.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 54.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 13.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 26.72,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 17.79,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 3.54,
+      "tau_int_steps": 0.6,
+      "relax_warning": true
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 38.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 9.09,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 27.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 15.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 30.38,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 24.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 555.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 7.48,
+      "tau_int_steps": 0.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 550.0,
+      "n_eff": 22.02,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 63.91,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 13.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 58.73,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 18.74,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 525.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 37.16,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 11.89,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 535.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 19.58,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 41.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 64.25,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 20.99,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 14.49,
+      "tau_int_steps": 0.7,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 54.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 28.63,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 10.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 10.98,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 31.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 10.99,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 25.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 6.57,
+      "tau_int_steps": 1.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 49.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 34.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 525.0,
+      "n_eff": 12.2,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 26.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 44.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 530.0,
+      "n_eff": 22.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 28.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 17.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 9.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 145.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 48.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 29.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 515.0,
+      "n_eff": 3.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": true
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 31.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 20.68,
+      "tau_int_steps": 1.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 70.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 47.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 31.31,
+      "tau_int_steps": 1.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 45.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 27.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 505.0,
+      "n_eff": 11.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 505.0,
+      "n_eff": 10.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 53.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 60.42,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 510.0,
+      "n_eff": 13.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 6.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 44.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 8.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 29.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 38.93,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 37.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 13.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 5.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 36.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 128.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 59.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 35.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 89.37,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 16.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 34.47,
+      "tau_int_steps": 1.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 14.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 485.0,
+      "n_eff": 15.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 490.0,
+      "n_eff": 86.74,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 201.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 27.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 168.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 47.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 5.72,
+      "tau_int_steps": 1.0,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 151.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 12.06,
+      "tau_int_steps": 0.6,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 7.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 20.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 44.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 470.0,
+      "n_eff": 109.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 475.0,
+      "n_eff": 2.54,
+      "tau_int_steps": 0.8,
+      "relax_warning": true
+    },
+    {
+      "temperature": 450.0,
+      "n_eff": 79.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 450.0,
+      "n_eff": 107.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 450.0,
+      "n_eff": 45.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 450.0,
+      "n_eff": 28.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 450.0,
+      "n_eff": 11.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 450.0,
+      "n_eff": 324.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 450.0,
+      "n_eff": 207.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 430.0,
+      "n_eff": 50.39,
+      "tau_int_steps": 1.8,
+      "relax_warning": false
+    },
+    {
+      "temperature": 430.0,
+      "n_eff": 35.77,
+      "tau_int_steps": 4.1,
+      "relax_warning": false
+    },
+    {
+      "temperature": 430.0,
+      "n_eff": 161.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 430.0,
+      "n_eff": 161.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 410.0,
+      "n_eff": 605.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 410.0,
+      "n_eff": 33.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 410.0,
+      "n_eff": 163.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 390.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 370.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 350.0,
+      "n_eff": 223.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 350.0,
+      "n_eff": 578.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 330.0,
+      "n_eff": 195.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 330.0,
+      "n_eff": 606.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 310.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 290.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 270.0,
+      "n_eff": 801.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    },
+    {
+      "temperature": 250.0,
+      "n_eff": 800.0,
+      "tau_int_steps": 0.5,
+      "relax_warning": false
+    }
+  ],
+  "cte_glassy_per_K": 0.000196425,
+  "cte_rubbery_per_K": 0.000481268,
+  "dCp_status": "success",
+  "dCp_J_per_g_K": 0.1059,
+  "H_slope_glassy_kcal_per_mol_K": 55.5614,
+  "H_slope_rubbery_kcal_per_mol_K": 57.4296,
+  "H_r_squared": 0.982,
+  "H_fit_quality": "GOOD",
+  "system_mass_g_per_mol": 73822.38,
+  "tg_fit_png": "/home/alexzhao/PolyJarvis/data/PEEK4/graphs/tg_r25_rec2/tg_fit.png"
+}

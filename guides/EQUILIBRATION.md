@@ -85,6 +85,12 @@ w = watch_run(result["chain_id"])
 
 **Density not converging:** Add more annealing cycles (minimum 3, up to 5).
 
+**RE-ANNEAL — glassy cell converged but density too low (under-annealed cooling):** When the equil-checker returns `RE-ANNEAL` (i.e. `assess_cooling_contraction` verdict `UNDER_ANNEALED_COOLING`: the melt density is right but the cell gained too little density on cooling — free volume frozen in). Do **NOT** `EXTEND` at 300 K (a vitrified glass cannot densify below Tg — that is why the original EXTEND was futile). Instead **re-melt and re-cool more slowly**, starting from the converged **melt** cell (`npt_production_out.data` at T_equil, NOT the 300 K cell):
+1. `generate_equilibration_workflow(data_file=<npt_production_out.data>, max_temp=T_anneal_high_K, ...)` with **more annealing cycles** (e.g. 5 → 8–10, NkepsuMbitou-style) AND a **slower cool** — increase the cooling-stage step count / reduce the K-per-stage so the cell relaxes free volume through Tg (target a cooling rate at/below the class default, not faster).
+2. Resubmit via `run_lammps_chain`, re-run BACKGROUND-WAIT, then re-run equil-check + `assess_cooling_contraction` on the new `npt_prod300_out.data`.
+3. Max 2 re-anneal attempts. If density still under-band after 2, the deficit is no longer cooling-limited → re-classify as `MELT_STAGE_DEFICIT` (force-field / melt-anneal) and record the evidence rather than looping.
+This is the *intended* re-melt (contrast the extend-mode warning below, where re-melting a cooled cell is an *accident*).
+
 **Chain droplets / vacuum voids:** Initial density too high. Rebuild at `density=0.05`.
 
 **"Out of range atoms — cannot compute PPPM" in npt_compress:** Switch `npt_compress` pair_style to `lj/cut/coul/cut`, increase neighbor skin 2.0 → 3.0 Å, reduce dt to 0.5 fs for that run only. Restore `lj/cut/coul/long` + kspace_style from `npt_pppm` onward.

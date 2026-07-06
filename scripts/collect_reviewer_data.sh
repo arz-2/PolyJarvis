@@ -7,8 +7,10 @@
 #
 # data/ is globally git-ignored (data/* plus *.dump *.data *.restart *.log), so
 # every target here is staged with `git add -f`. The 44 GB of trajectories
-# (*.dump), checkpoints (*.restart/*.rst) and LAMMPS step logs (*.log) are
-# deliberately LEFT OUT — those go to the planned Zenodo DOI archive.
+# (*.dump) and checkpoints (*.restart/*.rst) are deliberately LEFT OUT — those
+# go to the planned Zenodo DOI archive. Per-stage LAMMPS step logs (*.log) ARE
+# staged where they were retained locally (see the run-log-coverage note in
+# data/REVIEWER_DATA_README.md); missing logs are archive-only.
 #
 # Idempotent and re-runnable. Run from anywhere; it cd's to the repo root.
 # -----------------------------------------------------------------------------
@@ -87,7 +89,7 @@ for r in "${RUNS[@]}"; do
   # Input scripts, FF params, chain submit scripts, workflow/tool-call traces,
   # and final structures — all under lammps/.
   if [ -d "$d/lammps" ]; then
-    find_args=( -name '*.in' -o -name 'emc_build.params' -o -name '*.sh' -o -name '*.jsonl' )
+    find_args=( -name '*.in' -o -name 'emc_build.params' -o -name '*.sh' -o -name '*.jsonl' -o -name '*.log' )
     for n in "${STRUCT_NAMES[@]}"; do find_args+=( -o -name "$n" ); done
     find "$d/lammps" -type f \( "${find_args[@]}" \) -print0 \
       | xargs -0 -r git add -f --
