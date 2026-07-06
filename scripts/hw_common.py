@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -25,6 +26,17 @@ def load_rules() -> dict:
     """Parse guides/polymer_rules.json."""
     with open(RULES_PATH) as f:
         return json.load(f)
+
+
+def get_class_entry(rules: dict, polymer_class: str, warn_on_miss: bool = False) -> dict:
+    """Class entry from polymer_rules, falling back to global_defaults on an unknown class."""
+    entry = rules["classes"].get(polymer_class.upper())
+    if entry is None:
+        if warn_on_miss:
+            print(f"WARNING: class '{polymer_class}' not found in polymer_rules.json; "
+                  "using global_defaults", file=sys.stderr)
+        entry = rules["global_defaults"]
+    return entry
 
 
 def hardware_policy(rules: dict | None = None) -> dict:

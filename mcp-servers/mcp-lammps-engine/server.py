@@ -92,7 +92,7 @@ def _engine_launch(engine: str, n_gpu: int) -> tuple[str, str]:
     """Map an execution engine to (lmp binary, mpirun offload flags).
 
       gpu    → GPU package: pairwise forces on GPU, bonded/kspace/neigh on CPU (current default)
-      cpu    → no offload flags (CPU-only; required by compute born/matrix numdiff)
+      cpu    → no offload flags (CPU-only; selected when a caller passes use_gpu=False)
       kokkos → KOKKOS full-offload: -sf kk rewrites pair/bonded/kspace/neigh to /kk on the GPU
 
     n_gpu is the device count for this run (-pk gpu N / -k on g N)."""
@@ -448,8 +448,8 @@ def _lammps_run_background(
         # Capture wrapper stdout to a separate file so it never overwrites the LAMMPS
         # internal log (e.g. tg_sweep.log opened with 'log ... append' in the script).
         wrapper_stdout = f"{work_dir}/{run_id}_wrapper.stdout"
-        # use_gpu=False (e.g. compute born/matrix numdiff) forces the CPU engine regardless of the
-        # engine arg; otherwise honor engine (gpu | kokkos). _engine_launch picks binary + flags.
+        # use_gpu=False forces the CPU engine regardless of the engine arg; otherwise honor
+        # engine (gpu | kokkos). _engine_launch picks binary + flags.
         eff_engine = "cpu" if not use_gpu else engine
         lmp_bin, offload_flags = _engine_launch(eff_engine, n_gpu)
         if eff_engine == "cpu":
@@ -762,8 +762,7 @@ def run_lammps_script(
                           4 for large (>10k) or Tg sweeps.
         log_file:         Name of the stdout/stderr capture log (in work_dir).
         use_gpu:          If False, launch without -sf gpu/-pk gpu flags and hide GPUs
-                          via CUDA_VISIBLE_DEVICES=. Required for compute born/matrix
-                          numdiff, which displaces atoms in CPU arrays and is
+                          via CUDA_VISIBLE_DEVICES=. For CPU-only computes that are
                           incompatible with GPU device-side neighbor lists.
                           (use_gpu=False forces engine="cpu" regardless of engine.)
         engine:           Execution engine: "gpu" (default; GPU package, pairwise on GPU),

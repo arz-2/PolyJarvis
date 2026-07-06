@@ -890,7 +890,7 @@ class ScriptGenerator:
             data_file_override: If provided, use this path in the DATA_FILE field
                                 instead of self.data_file (useful for remote paths).
             velocity_seed:      If set, pin the `velocity all create` RNG seed for
-                                reproducible runs (used by the autonomy-evidence
+                                reproducible runs (used by the recovery
                                 benchmark). Default None ⇒ randomized per call,
                                 preserving existing behavior.
 
@@ -1295,10 +1295,6 @@ write_data tg_step_out.data
         # Random seeds for Langevin thermostats
         subs["SEED_HOT"]  = cfg.get("SEED_HOT")  or random.randint(10000, 999999)
         subs["SEED_COLD"] = cfg.get("SEED_COLD") or random.randint(10000, 999999)
-
-        # Legacy placeholder kept for backward compat (old nemd_thermal used these)
-        subs["NEMD_BIN_WIDTH"] = cfg.get("NEMD_BIN_WIDTH", round(box_len / n_slabs, 4) if box_len > 0 else 2.0)
-        subs["NEMD_HEAT_RATE"] = cfg.get("NEMD_HEAT_RATE", 0.0)
 
         # ── Uniaxial deformation specifics (npt_deform) ──────────────────────
         subs["STRAIN_RATE"]  = cfg.get("STRAIN_RATE",  1e-7)

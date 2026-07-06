@@ -67,7 +67,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hw_common import (load_rules, resolve_ff_family,  # shared rules/FF-family access
-                       host_matches, live_host)
+                       get_class_entry, host_matches, live_host)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
@@ -104,14 +104,6 @@ def load_worker_guide(stage: str) -> str:
         return ""
     path = REPO_ROOT / "guides" / filename
     return path.read_text() if path.exists() else f"[Guide not found: {filename}]"
-
-
-def get_class_entry(rules: dict, polymer_class: str) -> dict:
-    entry = rules["classes"].get(polymer_class.upper())
-    if entry is None:
-        print(f"WARNING: class '{polymer_class}' not found in polymer_rules.json; using global_defaults", file=sys.stderr)
-        entry = rules["global_defaults"]
-    return entry
 
 
 def load_plan(plan_path: str) -> dict:
@@ -999,21 +991,12 @@ def main():
     p.add_argument("--is_glassy", default="true")
     p.add_argument("--tg_k", type=float)
     p.add_argument("--tg_fit_quality")
-    p.add_argument("--born_log",
-                   help="DEPRECATED — Born+NVT removed 2026-06-21. Argument kept for CLI compatibility but ignored.")
-    p.add_argument("--born_matrix",
-                   help="DEPRECATED — Born+NVT removed 2026-06-21. Argument kept for CLI compatibility but ignored.")
-    p.add_argument("--born_n_atoms", type=int,
-                   help="DEPRECATED — Born+NVT removed 2026-06-21. Argument kept for CLI compatibility but ignored.")
     p.add_argument("--deform_log",
                    help="Path to npt_deform log (analyze-bm, glassy deform fallback)")
     p.add_argument("--murnaghan_logs",
                    help="JSON list of absolute log paths from murnaghan-worker (analyze-bm, rubbery+pressures)")
     p.add_argument("--d05",
                    help="equil_verdict from equil-checker RESULT: PASS|EXTEND|FAIL (run-summary stage)")
-    p.add_argument("--born_run_ns", type=float,
-                   help="DEPRECATED — Born+NVT removed 2026-06-21 (PCFF+PPPM virial incompatibility). "
-                        "Use --stage murnaghan. See guides/BM_ANALYSIS.md.")
     p.add_argument("--npt_prod_log")
     p.add_argument("--npt_prod_dump")
     p.add_argument("--ff")
@@ -1096,7 +1079,7 @@ def main():
 
     rules = load_rules()
     cross_track_rules = load_cross_track_rules()
-    cls = get_class_entry(rules, args.polymer_class)
+    cls = get_class_entry(rules, args.polymer_class, warn_on_miss=True)
 
     if args.plan:
         cls = apply_plan(cls, load_plan(args.plan), args)
