@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Error classifier for the autonomy-evidence benchmark (R1M1 / M11).
+Error classifier for the error-recovery benchmark.
 
 The live PolyJarvis pipeline has no programmatic error classifier — failures are
 matched against `.claude/commands/recover.md` by the LLM at runtime. This module
@@ -67,6 +67,9 @@ CATALOG = [
             r"|illegal .*_style|unrecognized .*style|"
             r"(pair|bond|angle|dihedral) coeffs are not set|"
             r"all pair coeffs are not set|"
+            # real LAMMPS runtime crash when class2 coeffs hit the wrong style (captured
+            # 2026-06-27): "ERROR: Incorrect args for bond coefficients"
+            r"incorrect args for (pair|bond|angle|dihedral|improper) coefficient|"
             # the real ScriptGenerator pre-flight rejection (not a fabricated log):
             r"ff flag mismatch|requires use_(pcff|trappe|opls)"
         ),
@@ -80,7 +83,14 @@ CATALOG = [
         # checking the two * atoms / lowering dp). A genuinely *unsupported* field
         # increment (e.g. PURA pcff missing n_2,hn) has NO scripted fix and must stay
         # inferred — so we deliberately do NOT match "increment not found" here.
-        "pattern": r"missing ff parameters|emc build.*missing parameters",
+        # Real build_cell validator message (captured 2026-06-27):
+        # "SMILES must have exactly 2 * connection points, found 3". This is the
+        # SMILES-attachment case (fixable). Distinct from F5's EMC field-apply abort,
+        # which is handled by the inferred sentinel below — do NOT add a generic
+        # "missing force field parameters" here or it would swallow F5.
+        "pattern": (r"missing ff parameters|emc build.*missing parameters|"
+                    r"exactly 2 \* connection points|exactly two \* connection points|"
+                    r"must have exactly .* \* connection"),
         "recover_md_line": 35,
         "recovery": "Verify exactly two * atoms; try dp: 15 if dp: 20 fails",
     },
@@ -108,8 +118,14 @@ CATALOG = [
     },
     {
         "error_class": "tg_fit_too_narrow",
-        "detect": "metric",  # extract_thermal recovery_hint: R2<0.80 or <4 bins
-        "pattern": None,
+        # extract_thermal recovery_hint: R2<0.80 or <4 bins. Real failure strings captured
+        # 2026-06-27 from extract_thermal on a too-narrow sweep — detect via log so the
+        # execute path's genuine extract_thermal output classifies.
+        "detect": "log",
+        "pattern": (r"bilinear_curvefit failed|"
+                    r"need at least 4 .*temperature bins|"
+                    r"only \d+ temperature bins? found|"
+                    r"check temperature range and data quality"),
         "recover_md_line": 32,
         "recovery": "Re-run sweep: T_start + 50 K, T_end - 50 K",
     },
@@ -150,6 +166,18 @@ CATALOG = [
     },
 ]
 
+# Inferred sentinels — genuine errors that have NO recover.md row by design. Checked
+# BEFORE the prescripted table so a real failure that is textually adjacent to a
+# prescripted row (F5's "Missing force field parameters" near F4's row) is never
+# misclassified as prescripted. These map to the Tier-3 cases the AGENT must reason
+# (F5 reroute-to-RadonPy, F6 rebuild) — captured from real runs 2026-06-27.
+INFERRED_PATTERNS = [
+    (r"increment pair \{.*\} not found|increment .* not found",
+     "emc_unsupported_increment"),          # F5: pcff lacks the increment — reroute builder
+    (r"incorrect format in .* section of data file|data file.*incorrect format",
+     "data_file_corruption"),               # F6: corrupted topology — rebuild from source
+]
+
 # The full set of pre-scripted error classes (membership = prescripted boundary).
 PRESCRIPTED_CLASSES = {row["error_class"] for row in CATALOG}
 
@@ -167,6 +195,18 @@ def classify_error(log_tail: str) -> dict:
     No match => error_class="unknown", prescripted=False (inferred recovery needed).
     """
     text = log_tail or ""
+    # Inferred sentinels first: a real error matching one of these is Tier-3 (no scripted
+    # fix) even if a prescripted pattern would also match — keeps F5/F6 honestly inferred.
+    for pattern, klass in INFERRED_PATTERNS:
+        if re.search(pattern, text, re.IGNORECASE):
+            return {
+                "error_class": "unknown",   # inferred boundary: not in PRESCRIPTED_CLASSES
+                "recover_md_line": None,
+                "prescripted": False,
+                "recovery": None,
+                "matched_pattern": pattern,
+                "inferred_class": klass,    # informational: which Tier-3 case this is
+            }
     for row in CATALOG:
         if row["detect"] != "log" or not row["pattern"]:
             continue

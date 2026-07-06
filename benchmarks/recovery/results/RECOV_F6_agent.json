@@ -1,0 +1,21 @@
+{
+  "arm": "agent",
+  "system": "RECOV_F6",
+  "polymer_class": "PACR",
+  "seed": null,
+  "interventions": 0,
+  "wall_clock_s": 0.0,
+  "terminal_state": "unknown",
+  "recovery_events": [
+    {
+      "fault": "truncated_data_file_atom_count_mismatch",
+      "prescripted": false,
+      "resolved": true,
+      "attempts": 1,
+      "note": "from RECOVERY tag"
+    }
+  ],
+  "stages_completed": [],
+  "smoke": false,
+  "notes": "parsed from run_log.md (self-reported; rules fixed a priori); wall_clock_s is sim-bound and excludes LLM latency"
+}

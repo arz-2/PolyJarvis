@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-"""
-Shared metrics schema for the autonomy-evidence benchmark (R1M1 / M7 / M11).
-
-Both arms (SCRIPT baseline and AGENT) and the recovery harness emit the same
-JSON shape so results are directly comparable. Process metrics only — human
-interventions, wall-clock, recovery events, terminal state — never accuracy
-(per the design: we claim orchestration/recovery, not improved numbers).
-"""
 from __future__ import annotations
 
 import json
@@ -24,7 +15,7 @@ class RecoveryEvent:
     fault: str                  # error_class / fault id
     prescripted: bool           # was the recovery in recover.md (Tier 1)?
     resolved: bool              # did the recovery succeed?
-    attempts: int = 1           # attempts incl. failures (R1M11 asks for this)
+    attempts: int = 1           # attempts incl. failures
     note: str = ""
 
 

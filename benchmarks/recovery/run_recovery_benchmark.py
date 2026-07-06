@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Error-recovery benchmark runner (R1M1 / M11).
+Error-recovery benchmark runner.
 
 Drives the fault catalog: inject each fault, classify the resulting signal, and
 (for pre-scripted faults) apply the recover.md fix and verify it resolves. Inferred
@@ -8,10 +8,10 @@ faults (generalization probes) have no scripted recovery and are recorded as
 "left for AGENT" — the agent resolves those at the full launch, not here.
 
 Reports an overall pre-scripted recovery success rate plus a pre-scripted-vs-inferred
-breakdown — exactly the accounting R1M11 asks for (incl. attempts/failures).
+breakdown (incl. attempts/failures).
 
 Usage:
-  python benchmarks/autonomy/run_recovery_benchmark.py --faults all --smoke
+  python benchmarks/recovery/run_recovery_benchmark.py --faults all --smoke
 """
 from __future__ import annotations
 
@@ -77,23 +77,42 @@ def main():
     p.add_argument("--faults", default="all", help="'all' or comma list of fault ids")
     p.add_argument("--smoke", action="store_true",
                    help="run the cheap injection/recovery surfaces only (no LAMMPS/EMC)")
+    p.add_argument("--execute", action="store_true",
+                   help="REAL path: launch the actual tool, capture the genuine error, "
+                        "recover, and verify (tiny runtime-generated cells). See fault_executors.py")
+    p.add_argument("--gpu", type=int, default=None,
+                   help="GPU id for --execute LAMMPS decks (default: CPU serial — no contention)")
     args = p.parse_args()
 
     sel = (None if args.faults == "all"
            else {f.strip() for f in args.faults.split(",")})
     faults = [f for f in CATALOG if sel is None or f.id in sel]
 
-    m = RunMetrics(arm="recovery", system="recovery_benchmark", smoke=args.smoke).start()
+    m = RunMetrics(arm="recovery", system="recovery_benchmark",
+                   smoke=(args.smoke and not args.execute)).start()
     per_fault = []
-    with tempfile.TemporaryDirectory() as td:
-        tmp = Path(td)
+    if args.execute:
+        from fault_executors import RealContext, execute_one
+        work = Path(tempfile.mkdtemp(prefix="recov_exec_"))
+        print(f"# --execute work dir: {work}", file=sys.stderr)
+        ctx = RealContext(work_dir=work, gpu_id=args.gpu)
         for fault in faults:
-            row = run_one(fault, tmp)
+            row = execute_one(fault, ctx)
             per_fault.append(row)
             m.add_recovery(RecoveryEvent(
                 fault=row["id"], prescripted=row["prescripted"],
                 resolved=row["recovery_resolved"], attempts=1,
                 note=row["recovery_note"]))
+    else:
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            for fault in faults:
+                row = run_one(fault, tmp)
+                per_fault.append(row)
+                m.add_recovery(RecoveryEvent(
+                    fault=row["id"], prescripted=row["prescripted"],
+                    resolved=row["recovery_resolved"], attempts=1,
+                    note=row["recovery_note"]))
 
     prescripted_events = [e for e in m.recovery_events if e.prescripted]
     inferred_events = [e for e in m.recovery_events if not e.prescripted]
@@ -113,6 +132,11 @@ def main():
         "all_triggered": all(r["triggered"] for r in per_fault),
     }
     report = {"summary": summary, "faults": per_fault, "metrics_file": str(out)}
+    report_path = (HERE / "results" /
+                   f"recovery_benchmark_{'execute' if args.execute else 'smoke'}.json")
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, indent=2))
+    report["report_file"] = str(report_path)
     print(json.dumps(report, indent=2))
 
     # Non-zero exit if any injection failed to fire or the classifier mislabeled.

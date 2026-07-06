@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fault catalog for the error-recovery benchmark (R1M1 / M11).
+Fault catalog for the error-recovery benchmark.
 
 Six deliberately-injected faults. Four have a pre-scripted recovery (a row in
 .claude/commands/recover.md, Tier 1); two are generalization probes with NO
