@@ -1,5 +1,5 @@
 # PolyJarvis MCP Tools Reference
-**Last updated:** June 18, 2026
+**Last updated:** July 6, 2026
 
 Quick index of all available MCP tools.
 
@@ -74,10 +74,11 @@ Quick index of all available MCP tools.
 | `extract_equilibrated_density` | async | Plateau density from NPT log |
 | `extract_thermal` | async | Tg, CTE (α_g, α_r), ΔCp from sweep log via bilinear density + enthalpy fits; optional structural diagnostics from per-T dump |
 | `extract_tg_multirate` | sync | Rate-extrapolated Tg from multiple cooling-rate runs; returns log-linear slope and VF Tg⁰ |
-| `extract_bulk_modulus` | async | Isothermal K from NPT volume fluctuations (rubbery path; Path C) |
-| `extract_bulk_modulus_murnaghan` | sync | Fits Murnaghan EOS to P vs V from a pressure series; returns B0, B0', V0 (rubbery path; Path B) |
-| `run_bulk_modulus_series` | async | Submits N NPT runs at each pressure in `pressures_atm`; returns chain_id + log_files list (used internally by murnaghan-worker for rubbery Murnaghan path) |
-| `extract_bulk_modulus_deform` | sync | Young's modulus and K from a uniaxial deformation log; recovery fallback or cross-check only |
+| `extract_bulk_modulus` | async | Isothermal K from NPT volume fluctuations (cross-check; rubbery no-pressures fallback) |
+| `extract_bulk_modulus_murnaghan` | sync | Fits Murnaghan EOS to P vs V from a pressure series; returns B0, B0', V0 (primary K path — glassy 300 K and rubbery T>Tg) |
+| `run_bulk_modulus_series` | async | Submits N NPT runs at each pressure in `pressures_atm`; returns chain_id + log_files list (used by murnaghan-worker) |
+| `extract_bulk_modulus_deform` | sync | Young's modulus and K from a 3-direction uniaxial deformation log; fallback when a Murnaghan fit fails acceptance |
+| `assess_cooling_contraction` | async | Volumetric contraction sanity check across the equilibration cooling stage |
 | `generate_run_summary` | sync | Assembles `run_summary.json` with all properties, validation status, and experimental comparison; call after all analysis tools complete |
 | `extract_end_to_end_vectors` | async | Per-chain R vectors |
 | `calculate_rdf` | async | g(r) for atom-type pairs |

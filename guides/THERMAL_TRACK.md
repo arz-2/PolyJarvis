@@ -73,9 +73,11 @@ On session restart mid-thermal-track: re-read this file before resuming.
     is_flat_rate_regime=True.
 
   Slope gate (GLASSY only): for glassy polymers, if result.slope_gate_pass == False (slope ≤ 0)
-    the per-rate data is contaminated. Do NOT write registry rows for any rate from this sweep.
-    Spawn /recover immediately (re-run from equil cell with a different seed). Max 2 attempts,
-    then UNRESOLVED.
+    the per-rate data is contaminated. This is a HARD STOP: do NOT proceed to the mechanical
+    track or run-summary until a sweep passes the gate. Do NOT write registry rows for any rate
+    from this sweep (discard the staged rows — nothing was committed, so no churn).
+    Spawn /recover immediately (re-run all 3 Tg sweeps from the same equil cell with a new
+    velocity seed). Max 2 attempts total, then write UNRESOLVED to run_log.md and stop.
     PEST slope-fragility (recovery ladder): PEST defaults are [25,50,100] K/ns; a budget-forced
     recovery may drop to [40,100]. If the Tg-vs-rate response is near-flat (|ΔTg| < 1 K over the
     rate span, e.g. PLA r40→r160 moved 0.2 K), a two-point fit's slope sign is noise-dominated and

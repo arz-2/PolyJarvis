@@ -41,6 +41,4 @@ one into the worker's prompt.
 | Guide | Content |
 |---|---|
 | `HARDWARE.md`, `HARDWARE_STUDY.md` | Engine/GPU/MPI policy and the study behind it |
-| `MULTI_MACHINE_WORKFLOW.md` | Two-machine revision integrator protocol (`scripts/integrate.py`) |
-| `RECOVERY_PLAYBOOK.md` | Failure diagnosis playbook backing the `/recover` command |
-| `TOOLS_REFERENCE.md` | MCP tool reference |
+| `RECOVERY_PLAYBOOK.md` | Failure-diagnosis playbook consulted by `/recover`. Generated + local-only (gitignored); regenerate via `python -m tools.runlog_miner --playbook -o guides/RECOVERY_PLAYBOOK.md` |

@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hw_common import load_rules            # shared rules loader (single source of truth)
+from hw_common import load_rules, get_class_entry  # shared rules access (single source of truth)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
@@ -48,10 +48,6 @@ SNAPSHOT_KEYS = [
     "K_deform_rate_inv_s", "K_deform_rate_slow_inv_s", "K_strain_max",
     "bm_pressures_atm", "ct_min_decay_melt",
 ]
-
-
-def get_class_entry(rules: dict, polymer_class: str) -> dict:
-    return rules["classes"].get(polymer_class.upper(), rules["global_defaults"])
 
 
 def _exp_tg_scalar(cls: dict):

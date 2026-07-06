@@ -28,12 +28,11 @@ Your full stage guide is inlined at the bottom of this prompt — read it before
 
 ```python
 check_equilibration_comprehensive(
-    equil_log=equil_log_path,        # 06_nvt_production.log — melt NVT
-    npt_log=npt_prod_log_path,       # 09_npt_prod300.log — 300 K NPT
-    dump_file=npt_prod_dump_path,
+    log_file=npt_prod_log_path,      # production NPT log — thermo/density gates
+    dump_file=melt_dump_path,        # melt NVT trajectory — structural gates (C(t)/MSD/Rg/R_ee)
     data_file=equil_data_path,
     backbone_types=backbone_types,
-    ct_min_decay=ct_min_decay_melt,  # class-specific; omit for rubbery (pass None)
+    ct_min_decay=ct_min_decay_melt,  # class-specific; omit when the prompt says null (advisory C(t))
     output_dir=output_dir,
     graphs_dir=graphs_dir,
 )
@@ -48,8 +47,8 @@ Record `overall_pass`. Copy `result["d05_markdown"]` verbatim for the RESULT blo
 ```python
 extract_equilibrated_density(
     log_file=npt_prod_log_path,
+    target_temp=npt_prod_temp_K,     # from the prompt — filters the plateau to the production T
     output_dir=output_dir,
-    graphs_dir=graphs_dir,
 )
 ```
 

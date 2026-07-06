@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Integrator helper for the two-machine PolyJarvis revision workflow.
 
-See guides/MULTI_MACHINE_WORKFLOW.md. Two modes:
+Two modes:
 
   * Guard-only (no --source-ref): scan the current checkout for foreign
     ``/home/<user>/...`` paths and (optionally) fix them. Cheap pre-commit check.
