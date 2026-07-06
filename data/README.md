@@ -1,19 +1,13 @@
-# Reviewer Data — Provenance for the Benchmark Systems
+# Data — Provenance for the Benchmark Systems
 
-Manuscript **ct-2026-00736q** (PolyJarvis: an orchestrated LLM agent for autonomous
-amorphous-homopolymer MD). This directory holds a curated, openly browsable subset of the
-simulation provenance for every benchmark replicate, in direct response to the reviewers'
-data-availability requirements (Reviewer #1 Major 12; Reviewer #2):
-
-> "…the central contribution depends on workflow traces, prompts, tool calls, decision logs,
-> input scripts, final structures, seeds, and analysis notebooks. These should be openly
-> available, at least for the benchmark systems… provenance is not supplementary; it is part
-> of the core scientific result."
+This directory holds a curated, openly browsable subset of the simulation provenance for
+every benchmark replicate: workflow traces, prompts, tool calls, decision logs, input
+scripts, final structures, seeds, and analysis outputs.
 
 The full simulation tree is ~44 GB (atomistic trajectories). To keep this repository
 browsable, **trajectories and checkpoints are NOT here** — they live in the archived release
-(see *Not in this repository* below). Everything a reviewer needs to inspect the agent's
-decisions, re-run the simulations, and verify the analysis **is** here.
+(see *Not in this repository* below). Everything needed to inspect the agent's decisions,
+re-run the simulations, and verify the analysis **is** here.
 
 ## Benchmark systems (36 replicate runs)
 
@@ -30,32 +24,41 @@ decisions, re-run the simulations, and verify the analysis **is** here.
 | `PEG1`–`PEG4` | Poly(ethylene glycol) | POXI | PCFF |
 
 Replicates differ by velocity/packing seed (recorded in each `run_log.md`) and, for some, by
-Tg cooling-rate ladder. Per the reviewers, replicates are reported as run-to-run spread, not
-best-of (Major 5/6).
+Tg cooling-rate ladder. Replicates are reported as run-to-run spread, not best-of.
 
 ## What is in each `data/<run>/`
 
-| Path | Contents | Reviewer ask |
-|---|---|---|
-| `run_log.md` | Per-run **decision log** (D-01…), recovery log, seeds, GPU/wall-time, results table | Major 11 (recovery), Major 12 |
-| `Task.txt` | Run task metadata | Major 12 |
-| `raw/*.json` | `run_plan.json` (agent decisions), `run_summary.json`, `equilibration_comprehensive.json` (Rg / MSD / density-homogeneity / C(t)), `equilibrated_density.json`, `tg_summary.json`, `tg_multirate_result.json`, `bulk_modulus*.json` (τ_eff, N_eff, block-SEM) | Major 9, 10, 12 |
-| `raw/*.csv` | `tg_density_bins*.csv` (**raw Tg-fit data**), `volume_timeseries.csv`, `stress_strain.csv` | Major 5/6, 12 |
-| `raw/*.md`, `raw/*.txt` | `d05_block.md` (convergence diagnostics), `equil_prompt.txt` (planner prompt) | Major 10, 12 |
-| `graphs/*.png` | Tg fits (incl. per-rate `tg_r*/`), volume-fluctuation, Murnaghan-EOS, Born-matrix plots | Major 5/6, 10 |
-| `lammps/**/*.in` | **LAMMPS input scripts** for every stage (minimize → npt → tg sweep → mechanical) | Major 12 |
-| `lammps/**/emc_build.params` | Force-field parameters (FF provenance) | Major 8, 12 |
-| `lammps/**/*.sh`, `lammps/**/*.jsonl` | Chain submit scripts + progress / tool-call traces | Major 11/12 (workflow traces) |
-| `lammps/**/*.log` | **Per-stage LAMMPS step logs** — committed for runs where they were retained (see *Log coverage* below) | Major 12 (raw output) |
-| `lammps/cell/cell.data` | Initial packed cell (starting structure) | Major 12 (structures) |
-| `lammps/**/npt_production_out.data`, `**/npt_prod300_out.data` | **Final equilibrated structures** (rubbery: `npt_production`; glassy: `npt_prod300`) | Major 12 (structures) |
+| Path | Contents |
+|---|---|
+| `run_log.md` | Per-run **decision log** (D-01…), recovery log, seeds, GPU/wall-time, results table |
+| `Task.txt` | Run task metadata |
+| `raw/*.json` | `run_plan.json` (agent decisions), `run_summary.json`, `equilibration_comprehensive.json` (Rg / MSD / density-homogeneity / C(t)), `equilibrated_density.json`, `tg_summary.json`, `tg_multirate_result.json`, `bulk_modulus*.json` (τ_eff, N_eff, block-SEM) |
+| `raw/*.csv` | `tg_density_bins*.csv` (**raw Tg-fit data**), `volume_timeseries.csv`, `stress_strain.csv` |
+| `raw/*.md`, `raw/*.txt` | `d05_block.md` (convergence diagnostics), `equil_prompt.txt` (planner prompt) |
+| `graphs/*.png` | Tg fits (incl. per-rate `tg_r*/`), volume-fluctuation, Murnaghan-EOS, Born-matrix plots |
+| `lammps/**/*.in` | **LAMMPS input scripts** for every stage (minimize → npt → tg sweep → mechanical) |
+| `lammps/**/emc_build.params` | Force-field parameters (FF provenance) |
+| `lammps/**/*.sh`, `lammps/**/*.jsonl` | Chain submit scripts + progress / tool-call traces |
+| `lammps/**/*.log` | **Per-stage LAMMPS step logs** — committed for runs where they were retained (see *Log coverage* below) |
+| `lammps/cell/cell.data` | Initial packed cell (starting structure) |
+| `lammps/**/npt_production_out.data`, `**/npt_prod300_out.data` | **Final equilibrated structures** (rubbery: `npt_production`; glassy: `npt_prod300`) |
 
-Regenerate this selection at any time with [`scripts/collect_reviewer_data.sh`](../scripts/collect_reviewer_data.sh).
+## Regenerating the selection and the derived analysis
+
+[`scripts/collect_data.sh`](../scripts/collect_data.sh) rebuilds this release end to end: it
+auto-discovers every `data/<run>/` directory, re-stages the provenance subset above, and then
+re-derives the paper's analysis artifacts from it — the `paper/csv/` tables (per-replicate Tg
+bins, bulk-modulus robustness, compute cost, structure diagnostics) and the derived figures.
+Analysis is script-driven throughout (`paper/gen_*.py`); there are no notebooks.
+
+Three csv families under `paper/csv/` are **source data** computed from the archived
+trajectories rather than regenerable outputs: `<family>_rdf.csv`,
+`density_homogeneity_300k.csv`, and `structure_diagnostics_300k_local.csv`.
 
 ## Not in this repository (in the archived release / DOI)
 
 To stay within GitHub size limits, the following are **excluded** here and deposited in the
-archived release cited in the manuscript's Data & Software Availability statement:
+archived release accompanying the manuscript:
 
 - Full atomistic **trajectories** (`*.dump`, ~44 GB),
 - Binary **restart/checkpoint** files (`*.restart`, `*.rst`),
@@ -91,7 +94,3 @@ These are part of the codebase, not under `data/`:
 - **Tool schemas** (typed MCP tools the agent calls) are defined by the MCP servers under
   `mcp-servers/`.
 - The orchestrator/worker architecture is documented in [`CLAUDE.md`](../CLAUDE.md).
-
-## Known gaps
-
-- The project is script-driven; there are no Jupyter **analysis notebooks** to deposit.

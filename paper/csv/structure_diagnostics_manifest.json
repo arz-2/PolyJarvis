@@ -43,13 +43,7 @@
     "cis-PBD3",
     "cis-PBD4"
   ],
-  "dropped": [
-    {
-      "run": "PROPSULFIDE_AGENT",
-      "reason": "stray dir, not a benchmark system",
-      "T": null
-    }
-  ],
+  "dropped": [],
   "energy_drift_artifact_threshold_pct": 5.0,
   "notes": {
     "C_inf": "dropped (populated 11/37, nonphysical); MSID slope used instead",

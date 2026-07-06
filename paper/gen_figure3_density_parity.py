@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Generate Figure 3: Density parity plot (predicted vs experimental)."""
 
+import os
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
+
+FIG_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'figures')
+os.makedirs(FIG_OUT, exist_ok=True)
 
 # Data from data/property_comparison.md (reconciled 9-polymer EMC/PCFF benchmark,
 # per-replicate density at 300 K; 4 replicates each).
@@ -53,6 +58,6 @@ ax.set_aspect('equal')
 ax.tick_params(labelsize=10)
 
 plt.tight_layout()
-plt.savefig('figures/figure4_density_parity.pdf', dpi=300, bbox_inches='tight')
-plt.savefig('figures/figure4_density_parity.png', dpi=300, bbox_inches='tight')
+plt.savefig(os.path.join(FIG_OUT, 'figure4_density_parity.pdf'), dpi=300, bbox_inches='tight')
+plt.savefig(os.path.join(FIG_OUT, 'figure4_density_parity.png'), dpi=300, bbox_inches='tight')
 print("Saved figure4_density_parity.pdf and .png")
