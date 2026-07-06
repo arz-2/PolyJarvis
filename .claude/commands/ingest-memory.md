@@ -121,9 +121,9 @@ python -m tools.runlog_miner --playbook -o guides/RECOVERY_PLAYBOOK.md
 ```
 
 The file carries a `do not edit by hand` header — it is fully generated, so the
-overwrite is safe. Stage it so it rides along in the Step 6 commit. (This is
-playbook-only; the miner's `--suggest`/`--diff` polymer_rules.json deltas are
-intentionally **not** auto-applied here — keep those a separate, reviewed step.)
+overwrite is safe. It is a local-only artifact (gitignored) — do not stage it.
+(This is playbook-only; the miner's `--suggest`/`--diff` polymer_rules.json deltas
+are intentionally **not** auto-applied here — keep those a separate, reviewed step.)
 
 ---
 

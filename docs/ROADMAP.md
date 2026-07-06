@@ -3,7 +3,7 @@
 ---
 
 ## Track C — EMC Validation (C5)
-**Classes implemented:** PCBN, PAMD, PKTN, PSFO, PIMD (PCFF) · PHAL (OPLS-AA 2024) · PHYC, PDIE, PSTR (TraPPE-UA)
+**Classes implemented:** PCBN, PAMD, PKTN, PSFO, PIMD, PSTR (PCFF) · PHAL (OPLS-AA 2024) · PHYC, PDIE (TraPPE-UA)
 
 ### C5 — Validation runs
 - [x] `PCBN`: BPA-PC — Tg=520 K ✓ (target 500–540 K), ρ=1.168 g/cm³ (−2.7%) · BPAPC1 · 2026-06-03
@@ -40,17 +40,6 @@
 ### E5 — WLF Tg correction (partial)
 - [ ] Add `tg_corrected_K` field using WLF correction when literature coefficients available
 - [ ] Document correction formula and source DOI in run_log
-
----
-
-## Track F — Simulation Completion Sentinels
-
-**Design:** Each LAMMPS stage writes `{stage}.complete` / `{stage}.failed` on exit. `emc_pipeline.py` writes `chain_complete.json` at chain end. Claude watches with `inotifywait` via Monitor — works with or without MCP server running.
-
-- [ ] Add sentinel file write to each LAMMPS template on clean exit
-- [ ] Add `chain_complete.json` / `chain_failed.json` to `emc_pipeline.py`
-- [ ] Update CLAUDE.md auto-continuation: show both `watch_run` (MCP) and `inotifywait` (fallback) patterns
-- [ ] Update EQUILIBRATION.md to document inotifywait Monitor pattern
 
 ---
 
@@ -115,7 +104,7 @@ RadonPy supports random, block, and blend cell construction but these are not ye
 
 ### H4 — Stage 1 guide updates (do after H1–H3 land)
 - [ ] Re-add tool sections to `MOLECULE_BUILDER.md` with working examples
-- [ ] Update `TOOLS_REFERENCE.md` Mol-Builder Server table
+- [ ] Update `docs/TOOLS_REFERENCE.md` Mol-Builder Server table
 - [ ] Add routing logic to molecule-builder agent for non-alternating copolymers
 
 ---
@@ -126,12 +115,9 @@ RadonPy supports random, block, and blend cell construction but these are not ye
 
 **Evidence (PE4 run, 2026-06-02):** B_dyn from single-point NPT volume fluctuations = 0.607 GPa; Murnaghan B0 from 5-point pressure series = 0.401 ± 0.005 GPa (R²=0.99995, B0'=10.7). Disagreement 34%. Root cause: (1) for soft polymer melts with large B0' (~10), the EOS is strongly nonlinear even at 1–1000 atm — linear P vs ln V fails (R²=0.968); (2) B_dyn is biased high by barostat damping (P_DAMP=1000 fs constrains volume fluctuations). The multi-pressure series adds ~20 min wall time for a 2400-atom system.
 
-**Status (2026-06-16):** Core tools implemented. Remaining: doc updates + RESULTS table field.
+**Status (2026-06-16):** Core tools shipped (`run_bulk_modulus_series`, `extract_bulk_modulus_murnaghan.py`, `bm_pressures_atm` for PHYC/PDIE). Remaining: doc updates + RESULTS table field.
 
-- [x] `run_bulk_modulus_series` in `mcp-lammps-engine/server.py` — generates N NPT scripts, submits as chain
-- [x] `extract_bulk_modulus_murnaghan.py` — Murnaghan EOS fit with R² check, linear fallback, bootstrap uncertainty
-- [x] `bm_pressures_atm` field set for PHYC and PDIE in `polymer_rules.json`
-- [ ] Update `TOOLS_REFERENCE.md`: replace B_dyn description with Murnaghan series protocol
+- [ ] Update `docs/TOOLS_REFERENCE.md`: replace B_dyn description with Murnaghan series protocol
 - [ ] Update `murnaghan-worker.md`: document Murnaghan as default for rubbery + bm_pressures_atm set
 - [ ] Add `B0_prime` field to RESULTS table in `data/TEMPLATE/run_log.md`
 
@@ -200,14 +186,8 @@ This is system-agnostic: a stiff glass (K ~ 4 GPa) automatically uses a wide pre
 
 The ratio α_rubber/α_glass ≈ 2–3 is a universal polymer physics result and serves as a built-in sanity check on the bilinear fit. Typical MD error: <15% for both branches.
 
-**Implementation plan:**
-- [x] Add `cte_glassy_per_K`, `cte_rubbery_per_K` fields to `extract_thermal` output JSON
-  - Computed from bilinear density fit slopes: `alpha = −slope / rho_mean_branch`
-  - `cte_ratio = cte_rubbery / cte_glassy` — flag if outside 1.5–5.0
+**Implementation plan** (shipped: CTE/ΔCp in `extract_thermal`, RESULTS rows, `PROPERTIES.md`, worker surfacing):
 - [ ] Add `experimental_cte_glass_1e-5_per_K` and `experimental_cte_rubber_1e-5_per_K` fields to polymer_rules.json for each class (source: VanKrevelen2009 Ch.5, Polymer Handbook)
-- [x] Add CTE/ΔCp rows to RESULTS table in `data/TEMPLATE/run_log.md`
-- [x] Update `PROPERTIES.md` with CTE section
-- [x] Update `tg-analysis-worker` agent definition to surface CTE/ΔCp fields from extract_thermal output
 
 **Artifact note:** Fast MD cooling rate shifts the Tg breakpoint but does not strongly bias branch slopes — CTE error is decoupled from the Tg offset artifact.
 
@@ -264,20 +244,11 @@ CED = E_pair / V          (J/cm³)
 
 **Confidence gate** (in `guides/decision_policy.json`): `confidence=high` → deterministic plan (defaults transcribed verbatim, critic auto-approves, worker prompts byte-identical to the legacy pipeline). `confidence=low/medium` or off-table polymer → reasoned plan (each decision carries evidence/confidence/alternatives; Critic enforces the policy; loop ≤2 rounds).
 
-### K0 — Phase 1: artifacts + policy + bridge **[done 2026-06-17]**
-- [x] `guides/decision_policy.json` — evaluation framework per decision type (modeled on `electrostatics_decision_guide`)
-- [x] `scripts/make_deterministic_plan.py` — transcribes class defaults into `run_plan.json`
-- [x] `scripts/gen_prompt.py --plan` — overlays the approved plan's `decided_params` onto class defaults; runtime paths stay in CLI flags
-- [x] `tests/test_plan_reproducibility.py` — asserts deterministic-plan prompts ≡ no-plan prompts for every class × stage (148 cases)
-
-### K1 — Phase 2: planner + critic agents + confidence gate **[done 2026-06-17]**
-- [x] `.claude/agents/planner.md`, `.claude/agents/critic.md`
-- [x] CLAUDE.md orchestrator steps 1–3 rewritten into Planner → Critic loop → execute approved plan; `--plan PLAN_PATH` threaded through steps 4–16
-
-### K2 — Phase 3: validator stage-gate + KB update **[done 2026-06-17]**
-- [x] CLAUDE.md "Validator stage-gate" — checks each stage result against `planned_stages[].success_criteria`; probe-vs-assumption conflict routes back to the planner
-- [x] `generate_run_summary.py --run_plan` — carries structured decisions + critique into `run_summary.json`; adds `run_plan` to the artifacts map
-- [x] `data/TEMPLATE/run_log.md` — PLAN pointer (path + mode + confidence + critic verdict) in header
+### K0–K2 **[done 2026-06-17]**
+Shipped: `guides/decision_policy.json`, `scripts/make_deterministic_plan.py`, `gen_prompt.py --plan`
+overlay, `tests/test_plan_reproducibility.py` (prompt-identity guard), planner/critic agents +
+CLAUDE.md Planner → Critic loop, validator stage-gate against `planned_stages[].success_criteria`,
+`generate_run_summary.py --run_plan`, and the run_log PLAN pointer.
 - [ ] Post-validation `confidence` field update via `/ingest-memory` (merges with Track D bookkeeping)
 
 ### K3 — Follow-ups (deferred)
@@ -286,43 +257,20 @@ CED = E_pair / V          (J/cm³)
 
 ---
 
-## Claude Command Patterns
-
-### C5 Validation — `/loop`
-```
-/loop Run C5 validation for all 5 PCFF classes in sequence (PCBN, PAMD, PKTN, PSFO, PIMD). For each: build cell via submit_emc_cell_job, run Stage 2 equilibration (all GPU), Stage 3 Tg sweep, Stage 4 analysis. Check MD Tg against ROADMAP targets. Update run_log.md in real time. Stop and report if any class fails its target window.
-```
-
-### Long LAMMPS Jobs — monitor via background task
-```python
-# Run in background, arm Monitor on stdout
-mpirun -np 4 lmp -pk gpu 4 -sf gpu -in stage.in > stage_stdout.log 2>&1
-tail -f stage_stdout.log | grep --line-buffered "STAGE COMPLETE\|FAILED\|Error\|Killed"
-```
-
-### MCP Server Code Review — `/ultrareview`
-`mcp-emc-server/server.py` and `smiles_to_emc.py` — thread safety, job-state edge cases, filename collision if two jobs share an output directory.
-
----
-
 ## Priority Order
 
 | Priority | Track | Status | Notes |
 |---|---|---|---|
-| **1** | C5 — Validation runs | **In progress** | BPAPC1 running; 4 PCFF cells + PVDF queued |
-| **2** | F — Simulation sentinels | Pending C5 | Unblocked; ~2h work; pays off every run after |
-| **3** | E2 — Literature search | Pending | Needed before expanding beyond known classes |
-| **4** | D — rules bookkeeping | Pending C5 | Confidence fields; do after C5 results |
-| **5** | E5 — WLF correction | → G4 | Merged into Track G; see G4 |
-| **6** | G0 — class_params schema | Pending | Schema first; no pipeline changes yet |
-| **7** | G1 — Literature scanning | Pending G0 | PVDF first; encode 6 classes in order |
-| **8** | E3 — Fast density screen | **Blocked** | Needs advisor input A1/A2 |
-| **9** | H — Advanced chain architectures | Pending | Random/block copoly + blends; unblocked |
-| **10** | I1 — Bulk modulus Murnaghan series | Partial | Tools done; doc updates + B0_prime field remain |
-| **10b** | I2-A — glassy BM method decision | Done | Murnaghan EOS adopted as the primary glassy path; deform fallback |
-| **10c** | I2-B/C — Adaptive pressure selection + R² extension | Pending I2-A | Removes all hardcoded bm_pressures_atm; makes sweep system-agnostic |
-| **11** | J1 — CTE + ΔCp from Tg sweep slopes | **Done** | CTE (α_g, α_r) and ΔCp implemented in extract_thermal; exp targets in polymer_rules.json pending |
-| **12** | J2 — Solubility parameter δ | Pending J1 | E_pair/V post-process on NPT log; validate on PMMA first |
-| **13** | J3 — Thermal conductivity λ | Pending J2 | New nvt_gk template + tc-worker; exp targets exist for PMMA/PSU/PEEK |
-| **—** | K — Planner/Critic architecture | **K0–K2 done** | Confidence-gated plan→critique→execute→validate; K3 follow-ups (probe wiring, e2e validation) deferred |
+| **1** | C5 — Validation runs | Partial | PCBN + PHAL validated; PKTN/PSFO since exercised at scale by the 36-run benchmark study; PAMD/PIMD cells queued |
+| **2** | E2 — Literature search | Pending | Needed before expanding beyond known classes (literature-grounding-worker covers the planning side) |
+| **3** | D — rules bookkeeping | Pending C5 | Confidence fields; do after C5 results |
+| **4** | G0 — class_params schema | Pending | Schema first; no pipeline changes yet |
+| **5** | G1 — Literature scanning | Pending G0 | PVDF first; encode 6 classes in order |
+| **6** | E3 — Fast density screen | **Blocked** | Needs advisor input A1/A2 |
+| **7** | H — Advanced chain architectures | Pending | Random/block copoly + blends; unblocked |
+| **8** | I1 — Murnaghan doc updates | Partial | Tools done; doc updates + B0_prime field remain |
+| **9** | I2-B/C — Adaptive pressure selection + R² extension | Pending | Removes all hardcoded bm_pressures_atm; makes sweep system-agnostic |
+| **10** | J2 — Solubility parameter δ | Pending | E_pair/V post-process on NPT log; validate on PMMA first |
+| **11** | J3 — Thermal conductivity λ | Pending J2 | New nvt_gk template + tc-worker; exp targets exist for PMMA/PSU/PEEK |
+| **—** | K3 — Planner/critic follow-ups | Deferred | Probe wiring (E2/E3) + end-to-end validation; K0–K2 shipped |
 | **—** | L — Future tracks (taxonomy) | Planned | Electrical (ε, dipole), Viscoelastic (E', E'', tan δ), Transport (D, permeability) — no workers yet |

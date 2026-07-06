@@ -3,7 +3,8 @@
 Clusters past ``Recovery`` incidents (parsed from ``run_log.md`` RECOVERIES) into a
 ``recover``-skill-compatible markdown table: a curated *symptom → root cause →
 action* taxonomy annotated with an empirical ``k/n`` success rate. Read-only — the
-emitted markdown is reviewed/committed to ``guides/RECOVERY_PLAYBOOK.md`` separately.
+emitted markdown is written to ``guides/RECOVERY_PLAYBOOK.md`` (a generated,
+gitignored local artifact) separately.
 """
 from __future__ import annotations
 

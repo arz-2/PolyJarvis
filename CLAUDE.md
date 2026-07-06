@@ -12,7 +12,6 @@ AI agent for autonomous polymer MD simulation. Given a SMILES string, runs the f
 | `guides/polymer_rules.json` | Per-class Tg ranges, density targets, DP defaults, annealing cycles |
 | `data/TEMPLATE/run_log.md` | Run log template — copy to `data/[RUN]/run_log.md` at task start |
 | `data/[RUN]/` | All run files: `run_log.md`, `lammps/`, `raw/`, `graphs/` (git-excluded) |
-| `guides/MULTI_MACHINE_WORKFLOW.md` | Two-machine revision integrator protocol (`scripts/integrate.py`) — how findings/fixes from both machines land in `main` |
 
 ---
 
@@ -65,72 +64,68 @@ The pipeline groups workers into **tracks** — campaigns that share a simulatio
 
 ```
 SETUP
-  Read CLAUDE.md at startup. At Phase B entry, Read guides/THERMAL_TRACK.md if tg requested and/or Read guides/MECHANICAL_TRACK.md if bulk_modulus requested. Never read worker guides (THERMAL_SWEEP.md, BM_ANALYSIS.md, etc.) directly — gen_prompt.py inlines those into worker prompts.
+  Read CLAUDE.md at startup. At Phase B entry, Read guides/THERMAL_TRACK.md (if tg requested)
+  and/or guides/MECHANICAL_TRACK.md (if bulk_modulus requested). Never read worker guides
+  (THERMAL_SWEEP.md, BM_ANALYSIS.md, etc.) directly — gen_prompt.py inlines those into worker prompts.
   Copy data/TEMPLATE/run_log.md → data/[RUN]/run_log.md
   classify_polymer(smiles) if class unknown → CLASS_ID. Check builder_status:
     `jq -r '.classes.CLASS_ID.builder_status // "supported"' guides/polymer_rules.json`
-    If result == "unsupported": write UNRESOLVED to run_log.md and stop.
-  Parse properties_requested from task TARGET_PROPERTIES field:
-    properties_requested = {"density", "tg", "bulk_modulus"}  # default: all three
-    If task says "all" or field absent → use full set. Otherwise normalize to lowercase set.
+    == "unsupported" → write UNRESOLVED to run_log.md and stop.
+  properties_requested = task TARGET_PROPERTIES normalized to a lowercase set;
+    "all" or field absent → {"density", "tg", "bulk_modulus"}.
     Write "Requested: {properties_requested}" to run_log.md metadata line.
   GROUND (off-table / low-medium confidence ONLY — skip for confidence=high so the deterministic,
   byte-identical plan path is untouched by web nondeterminism):
     `CONF=$(jq -r '.classes.CLASS_ID.confidence // "offtable"' guides/polymer_rules.json)`
-    (CONF=offtable when the class key is absent; also treat a classify_polymer "unknown" as offtable.)
+    (class key absent or classify_polymer "unknown" ⇒ offtable)
     If CONF in {low, medium, offtable}:
       Agent(subagent_type="literature-grounding-worker", description="⚪ Ground {polymer_name}",
           prompt="polymer_name: <canonical name>\npolymer_class: <CLASS_ID or offtable>\n"
                  "smiles: <SMILES>\nproperties_requested: <comma-joined>\nconfidence: <CONF>\n"
                  "output_path: data/<RUN>/raw/literature_grounding.json")
-        → parse RESULT → GROUNDING_PATH (grounding_path field). It is advisory planning evidence —
-          DOI-verified; never used as run-summary grading bounds (exp-lookup owns those in Phase C).
-      Then pass `grounding_path: GROUNDING_PATH` as an extra line in the planner prompt below.
+        → RESULT.grounding_path = GROUNDING_PATH. Advisory planning evidence only (DOI-verified);
+          never used as run-summary grading bounds (exp-lookup owns those in Phase C).
+      Pass `grounding_path: GROUNDING_PATH` as an extra line in the planner prompt below.
     If CONF=high: skip this step; do NOT pass grounding_path.
   PLAN — Agent(subagent_type="planner", description="🟡 Plan {polymer_name}",
       prompt="run_name: <RUN>\nsmiles: <SMILES>\npolymer_class: <CLASS_ID>\nproperties_requested: <comma-joined>\nwork_dir: data/<RUN>/lammps"
              + (off-table/low-medium: "\ngrounding_path: GROUNDING_PATH"))
-    → parse RESULT block → extract plan_path (PLAN_PATH), plan_mode, confidence, critique_status.
+    → RESULT → plan_path (PLAN_PATH), plan_mode, confidence, critique_status.
     Write D-00 (plan) pointer to run_log.md header: PLAN_PATH + plan_mode + confidence.
   CRITIC loop (max 2 rounds) — Agent(subagent_type="critic", description="🔴 Critique plan",
       prompt="run_plan_path: PLAN_PATH\ncritic_round: <N>")
-    → parse RESULT block:
-      status=approved  → proceed.
-      status=revise    → re-spawn planner with the critique findings; increment round; re-critique.
-      status=escalate  → write UNRESOLVED to run_log.md and stop.
-    Deterministic plans (confidence=high) return approved in round 1 with 0 findings — no loop.
-  Thread the approved plan. EVERY `gen_prompt.py` call MUST include `--plan PLAN_PATH` so the
-  plan's decided_params drive the worker prompts. Do NOT read polymer_rules.json manually — the
-  plan is the source of truth. Example:
+    → status=approved → proceed | revise → re-spawn planner with the findings, re-critique |
+      escalate → write UNRESOLVED to run_log.md and stop.
+    Deterministic plans (confidence=high) approve in round 1 with 0 findings — no loop.
+  Thread the approved plan: EVERY gen_prompt.py call MUST include `--plan PLAN_PATH` — the plan's
+  decided_params drive the worker prompts; never read polymer_rules.json manually:
     `python3 scripts/gen_prompt.py --stage <STAGE> --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH [--data_path ...]`
-  Read temperature regime from approved plan (before spawning any worker):
-    `T_workflow_K=$(jq -r '.decided_params.T_workflow_K // 600' PLAN_PATH)`
-    Write T_workflow_K to run_log.md header (alongside plan_path + confidence).
+  `T_workflow_K=$(jq -r '.decided_params.T_workflow_K // 600' PLAN_PATH)` → write to run_log.md
+    header (alongside plan_path + confidence).
   If "tg" not in properties_requested: glassy_hint = (T_workflow_K != 300.0)
-  Read hardware regime from approved plan (before any GPU stage):
-    `GPU_PER_RUN=$(jq -r '.decided_params.gpu_per_run // empty' PLAN_PATH)`  (empty ⇒ policy-derived, 1 GPU)
+  Hardware (before any GPU stage):
+    `GPU_PER_RUN=$(jq -r '.decided_params.gpu_per_run // empty' PLAN_PATH)` (empty ⇒ policy-derived, 1 GPU)
     When the plan pins a D-08_hardware override (gpu_per_run/engine/mpi_ranks in decided_params),
-    let `gen_prompt.py` thread it into the worker prompt — do NOT also pass `--gpu_ids`/`--mpi_ranks`
+    let gen_prompt.py thread it into the worker prompt — do NOT also pass --gpu_ids/--mpi_ranks
     (CLI wins and would shadow the plan). Claim the matching GPU count at submit time:
-    `scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}` → parse the JSON:
-    on success `{"claimed":[ids],...}` (use that list verbatim as the worker's gpu_ids); on
-    shortfall `{"error":...,"available":[…]}` with exit 1 (defer/retry, do not force). Release on
-    completion (`pick_gpu.py release --run <RUN>`). Write the chosen engine/gpu_per_run/mpi to
-    run_log.md (D-08 row).
+    `scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}` → on success
+    `{"claimed":[ids],...}` use that list verbatim as the worker's gpu_ids; on shortfall
+    (`{"error":...,"available":[…]}`, exit 1) defer/retry, do not force. Release on completion
+    (`pick_gpu.py release --run <RUN>`). Write engine/gpu_per_run/mpi to run_log.md (D-08 row).
 
 PHASE A — FOUNDATION (always)
 
   [Build]
   Agent(subagent_type="molecule-builder", description="🔵 Build {polymer_name} cell",
         prompt=<gen_prompt.py --stage build --plan PLAN_PATH>)
-    → parse RESULT → extract data_path, lammps_flags, emc_seed (integer or null)
+    → RESULT → data_path, lammps_flags, emc_seed (integer or null)
     → immediately write emc_seed to run_log.md header Seeds line (never log -1; log null if RadonPy path)
 
   [Equilibration]
   Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polymer_name}",
         prompt=<gen_prompt.py --stage equil --plan PLAN_PATH --data_path ...>)
-    → parse RESULT → extract chain_id, monitor_command, expected_equil_data, npt_tg_prep_data
-      npt_tg_prep_data is non-null for rubbery polymers (npt_melt at T_equil_K); null for glassy.
+    → RESULT → chain_id, monitor_command, expected_equil_data, npt_tg_prep_data
+      (npt_tg_prep_data non-null for rubbery polymers — npt_melt at T_equil_K; null for glassy)
   Write SIMULATION STATE to run_log.md (status=monitoring, + bg task id)
   *** BACKGROUND-WAIT — canonical wait pattern. Defined ONCE here; THERMAL_TRACK.md,
       MECHANICAL_TRACK.md, /recover reference it by name. Never block in-conversation. ***
@@ -145,39 +140,32 @@ PHASE A — FOUNDATION (always)
   [Equil-check gate]
   Agent(subagent_type="equilibration-checker", description="🟠 Equil check {polymer_name}",
         prompt=<gen_prompt.py --stage equil-check --plan PLAN_PATH --data_path npt_prod_data_path>)
-    → parse RESULT → extract equil_verdict, density_gcm3,
-        ct_decay_fraction, ct_tau_relax_ps,
+    → RESULT → equil_verdict, density_gcm3, ct_decay_fraction, ct_tau_relax_ps,
         end_to_end_r_mean_A, end_to_end_r_std_A, end_to_end_n_chains
       → write D-05 to run_log.md (populate Chain Structure Summary rows from these fields)
   If equil_verdict=EXTEND: re-spawn equilibration-worker in extend mode (prompt: mode=extend,
     extend_from_data=<npt_prod_data_path>, extend_ns=1–2, press/engine same, temp=npt_prod_temp_K
-    (300 K — the production temperature of the cell, NOT the melt T_equil/T_workflow; passing the
-    melt T would re-melt a cooled glassy cell)). It generates a single deterministic npt_extend stage
-    via generate_equilibration_workflow(extend_only=True) and submits it. Do NOT hand-write a
-    continuation .in. Re-run BACKGROUND-WAIT (launch the waiter, end your turn, resume on the
-    RUN_COMPLETE wakeup), then re-run equil-check on npt_extend_out.data (max 2 extensions).
+    — the 300 K production temperature of the cell, NOT the melt T_equil/T_workflow; the melt T
+    would re-melt a cooled glassy cell). The worker generates a single deterministic npt_extend
+    stage via generate_equilibration_workflow(extend_only=True) and submits it — do NOT hand-write
+    a continuation .in. Re-run BACKGROUND-WAIT, then re-run equil-check on npt_extend_out.data
+    (max 2 extensions).
   If equil_verdict=FAIL: write UNRESOLVED and stop
 
 PHASE B — TRACKS (property-conditional)
 
   [thermal track — if "tg" in properties_requested]
-  Read("guides/THERMAL_TRACK.md") now for the full multirate sweep + registry + is_glassy procedure.
-  On session restart mid-thermal-track: re-read guides/THERMAL_TRACK.md before resuming.
-
-  Slope-gate hard stop (after multirate analysis — read slope_gate_pass from tg_multirate_result.json):
-    Registry rows for this sweep are STAGED (not yet committed) until this gate — see
-    guides/THERMAL_TRACK.md "Multirate Tg registry" (deferred write). Rubbery sweeps run with
-    --regime rubbery, so slope_gate_pass is True by exemption (rubbery_regime_exemption=True) and
-    this hard stop does NOT fire for them — commit the staged rows and proceed.
-    if slope_gate_pass == False:   # glassy contamination only
-      DO NOT proceed to mechanical track or run-summary.
-      Discard the staged registry rows for this sweep (nothing was committed → no churn).
-      Spawn recovery: re-run all 3 Tg sweeps from the same equil cell with a new velocity seed.
-      Max 2 recovery attempts total; if both fail → write UNRESOLVED to run_log.md and stop.
+  Read("guides/THERMAL_TRACK.md") now — it owns the multirate sweep loop, the Tg registry
+  (deferred write), the slope-gate hard stop, and the is_glassy determination. Re-read it before
+  resuming after any mid-track session restart.
+  Slope-gate hard stop (glassy only; rubbery sweeps are exempt): if tg_multirate_result.json has
+  slope_gate_pass==False, do NOT proceed to the mechanical track or run-summary — follow the
+  track guide's recovery ladder (discard staged registry rows, reroll seed, max 2 attempts,
+  else UNRESOLVED).
 
   [mechanical track — if "bulk_modulus" in properties_requested]
-  Read("guides/MECHANICAL_TRACK.md") now for the Murnaghan + deform-fallback + BM extraction procedure.
-  On session restart mid-mechanical-track: re-read guides/MECHANICAL_TRACK.md before resuming.
+  Read("guides/MECHANICAL_TRACK.md") now — it owns the Murnaghan-primary + deform-fallback + BM
+  extraction procedure. Re-read it before resuming after any mid-track session restart.
 
 PHASE C — SUMMARY (always)
 
@@ -186,52 +174,45 @@ PHASE C — SUMMARY (always)
         prompt="polymer_name: <canonical name>\npolymer_class: <CLASS>\nT_sim_K: <300 or T_workflow>\n"
                "is_glassy: <from thermal track>\nproperties: <comma-joined>\n"
                "output_path: data/<RUN>/raw/exp_lookup.json")
-    → parse RESULT → exp_lookup_path, match_confidence, exp_{tg,density,K}_{min,max}.
-  # Thread these ranges into run-summary via the CLI overrides below. Do NOT hand-enter a tight
+    → RESULT → exp_lookup_path, match_confidence, exp_{tg,density,K}_{min,max}.
+  # Thread these ranges into run-summary via the CLI overrides below. NEVER hand-enter a tight
   # single floor (a too-tight 1.35 density floor caused a 0.07% false FAIL, PVC2). When
   # match_confidence=none or a field is null, OMIT that override — gen_prompt then falls back to
   # its DB lookup / polymer_rules median ±5% band, which is correctly wide.
 
-  # Before spawning run-summary-worker: verify the lammps-engine MCP server is live.
-  # In long sessions (>12 h) the MCP connection can drop silently. Do a minimal call
-  # (e.g. list_templates) — if it returns, proceed; if it hangs or errors, restart the
-  # MCP server before the Agent call.
-  # Determine tg_path and slope_gate_pass before spawning run-summary-worker — do NOT hand-derive
-  # the path (the PLA3 footgun); run the helper, which encodes the slowest/highest-rate convention:
-  #   eval "$(python3 scripts/select_tg_path.py --plan PLAN_PATH --multirate data/RUN/raw/tg_multirate_result.json)"
-  #   # → sets TG_PATH (slowest rate if gate passed, highest if failed) and SLOPE_GATE (true|false)
-  # Exp ranges: prefer the exp-lookup-worker RESULT (condition-matched). Thread each non-null field
-  # as a CLI override; omit nulls so gen_prompt falls back to its DB/polymer_rules ±5% band.
-  #   --exp_tg_min/--exp_tg_max        (from exp_tg_min_K / exp_tg_max_K)
-  #   --exp_density_min/--exp_density_max  (from exp_density_min_gcm3 / exp_density_max_gcm3)
-  #   --exp_K_min/--exp_K_max          (from exp_K_min_GPa / exp_K_max_GPa; else polymer_rules exp_K_GPa)
-  # NEVER hand-enter a single tight floor — that is what caused the PVC2 density false FAIL.
+  # Before spawning run-summary-worker:
+  # 1. Verify the lammps-engine MCP server is live (long sessions >12 h drop the connection
+  #    silently): a minimal call (e.g. list_templates) must return; if it hangs/errors, restart
+  #    the MCP server first.
+  # 2. Determine tg_path + slope_gate_pass with the helper — do NOT hand-derive the path (the
+  #    PLA3 footgun); the helper encodes the slowest/highest-rate convention:
+  #    eval "$(python3 scripts/select_tg_path.py --plan PLAN_PATH --multirate data/RUN/raw/tg_multirate_result.json)"
+  #    # → sets TG_PATH (slowest rate if gate passed, highest if failed) and SLOPE_GATE (true|false)
+  # 3. Exp ranges: thread each non-null exp-lookup field as a CLI override; omit nulls so
+  #    gen_prompt falls back to its DB/polymer_rules ±5% band:
+  #    --exp_tg_min/--exp_tg_max, --exp_density_min/--exp_density_max,
+  #    --exp_K_min/--exp_K_max (else polymer_rules exp_K_GPa).
   Agent(subagent_type="run-summary-worker", description="🟢 Run summary {polymer_name}",
         prompt=<gen_prompt.py --stage run-summary --plan PLAN_PATH
                --smiles ... --ff ... --tg_fit_quality ... --d05 equil_verdict
                --n_replicates <distinct replicates in the multirate registry>
-               --tg_path <TG_PATH (see above — slowest rate if slope_gate=True, highest rate if False)>
-               --slope_gate_pass <true|false from tg_multirate_result.json>
+               --tg_path <TG_PATH> --slope_gate_pass <SLOPE_GATE>
                [--exp_tg_min ... --exp_tg_max ...] [--exp_density_min ... --exp_density_max ...]
-               --exp_K_min <exp-lookup or polymer_rules exp_K_GPa.min> --exp_K_max <exp_K_GPa.max>>)
-    → parse RESULT → run_summary_path → write RESULTS to run_log.md
+               --exp_K_min ... --exp_K_max ...>)
+    → RESULT → run_summary_path → write RESULTS to run_log.md
     → if run_summary tg.primary_fit_invalid==True, flag the headline Tg as unreliable in run_log.md
       (the fit violated a hard physics constraint and no valid alternative existed).
 
   [Capture errors + improvements — to MEMORY ONLY, last action of the run]
   Before declaring the run done, promote pipeline-level lessons to memory as `feedback` entries
-  (per the # Memory rules) so /ingest-memory can act on them later:
-    1. Errors encountered during the run (symptom → root cause → fix/workaround).
-    2. Room-for-improvement / codebase friction (confusing/wrong guide, MCP-tool quirk,
-       missing/incorrect polymer_rules param, awkward worker contract).
-  Write these to the orchestrator's own auto-memory (`~/.claude/projects/<project-slug>/memory/` — the dir named in the # Memory system reminder)
-  and/or the relevant worker's canonical repo-root `.claude/agent-memory/<worker>/` dir (the absolute
-  path named in that worker's agent definition — NEVER resolved relative to a worker's cwd, NEVER a
-  `.claude/` created under a work_dir or data/<run>/ subdir) — these are the inputs
-  /ingest-memory consumes. Do NOT put any of this in run_log.md: the run log is for users to
-  interpret the simulation, not to fix the workflow. (RECOVERIES stays as-is — it documents what
-  happened to the simulation, per cross-track rule 1 — but no new improvement/error-capture content
-  is added to the run log.)
+  (per the # Memory rules) so /ingest-memory can act on them later: (1) errors encountered
+  (symptom → root cause → fix/workaround); (2) codebase friction (confusing/wrong guide, MCP-tool
+  quirk, missing/incorrect polymer_rules param, awkward worker contract).
+  Write them to the orchestrator's own auto-memory dir and/or the relevant worker's canonical
+  repo-root `.claude/agent-memory/<worker>/` dir (the absolute path named in that worker's agent
+  definition — never a `.claude/` created under a work_dir or data/<run>/ subdir); these are the
+  inputs /ingest-memory consumes. Do NOT put any of this in run_log.md — the run log is for users
+  to interpret the simulation, not to fix the workflow (RECOVERIES stays, per cross-track rule 1).
 ```
 
 ### Cross-run protocol
@@ -254,4 +235,3 @@ These rules are inlined into every worker prompt by `gen_prompt.py`. They apply 
 4. **Log the exact GPU claim label** — after any GPU claim (`pick_gpu.py claim --run <LABEL>`), copy the `run` field from the JSON response into the SIMULATION STATE table. Use that exact string verbatim at release (`pick_gpu.py release --run <LABEL>`). A label mismatch at release silently leaves the GPU stuck as claimed.
 5. **Log repo-relative run paths in memory** — when recording run artifacts or paths in any `.claude/agent-memory/**` file, write them repo-relative (`data/<run>/...`), never machine-absolute (`/home/<user>/...`). Keeps captures portable across the revision machines so integration needs no path sanitization. The memory file ITSELF must live only in the repo-root `.claude/agent-memory/<worker>/` dir (the absolute path in your agent definition) — never a `.claude/` created under a work_dir or data/<run>/ subdir.
 <!-- CROSS_STAGE_RULES_END -->
-

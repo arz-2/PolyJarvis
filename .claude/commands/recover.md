@@ -22,8 +22,8 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
 
 **5. Diagnose — consult the recovery playbook first, then the built-in taxonomy:**
 
-- **Read `guides/RECOVERY_PLAYBOOK.md`** (regenerated from past run_logs by `runlog_miner`). If a clustered signature matches this failure's symptom/error, prefer its **Recovery action** — those rows carry an empirical success rate (`k/n`) across past runs, so rank by it and skip low-`n` or low-success rows.
-- If no playbook row matches (or the playbook has no incidents yet), fall back to the built-in taxonomy below:
+- **Read `guides/RECOVERY_PLAYBOOK.md` if it exists** (a generated, local-only artifact — regenerate from past run_logs via `python -m tools.runlog_miner --playbook -o guides/RECOVERY_PLAYBOOK.md`). If a clustered signature matches this failure's symptom/error, prefer its **Recovery action** — those rows carry an empirical success rate (`k/n`) across past runs, so rank by it and skip low-`n` or low-success rows.
+- If the playbook is absent, no row matches, or it has no incidents yet, fall back to the built-in taxonomy below:
 
 | Error string / condition | Root cause | Recovery action |
 |---|---|---|
