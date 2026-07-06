@@ -10,7 +10,7 @@
 # (*.dump) and checkpoints (*.restart/*.rst) are deliberately LEFT OUT — those
 # go to the planned Zenodo DOI archive. Per-stage LAMMPS step logs (*.log) ARE
 # staged where they were retained locally (see the run-log-coverage note in
-# data/REVIEWER_DATA_README.md); missing logs are archive-only.
+# data/README.md); missing logs are archive-only.
 #
 # Idempotent and re-runnable. Run from anywhere; it cd's to the repo root.
 # -----------------------------------------------------------------------------

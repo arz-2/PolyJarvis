@@ -45,7 +45,7 @@ Below is a sample conversation between a user and the agent:
 
 ## Benchmark study
 
-The framework was validated on a **36-run replicate study: 9 polymers × 4 independent replicates** (PE, cis-PBD, PEG, PLA, PMMA, PS, PVC, PEEK, PSU), reporting density, T<sub>g</sub>, and bulk modulus against experimental ranges. The tracked subset of `data/` is the provenance release for that study — per-run logs, decision records, and raw analysis artifacts are indexed in [`data/REVIEWER_DATA_README.md`](data/REVIEWER_DATA_README.md).
+The framework was validated on a **36-run replicate study: 9 polymers × 4 independent replicates** (PE, cis-PBD, PEG, PLA, PMMA, PS, PVC, PEEK, PSU), reporting density, T<sub>g</sub>, and bulk modulus against experimental ranges. Per-run logs, decision records, and raw analysis artifacts for the study are indexed in [`data/README.md`](data/README.md).
 
 ---
 
@@ -58,15 +58,15 @@ The framework was validated on a **36-run replicate study: 9 polymers × 4 indep
 | `guides/` | **Agent prompts & machine-read config**, not human docs — worker guides inlined by `gen_prompt.py`, orchestrator track guides, `polymer_rules.json` / `decision_policy.json` (see [`guides/README.md`](guides/README.md)) |
 | `scripts/` | CLI/orchestration helpers — prompt generation, deterministic planning, GPU allocation, hardware calibration (see [`scripts/README.md`](scripts/README.md)) |
 | `mcp-servers/` | The three MCP servers: `mcp-mol-builder-server` (RadonPy), `mcp-emc-server` (EMC), `mcp-lammps-engine` (LAMMPS + analysis scripts + templates) |
-| `data/` | Per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`); mostly git-excluded — the tracked subset is the benchmark-study provenance release (see `data/REVIEWER_DATA_README.md`) |
-| `db/` | Experimental property database (`polymer_db.sqlite`, schema, query + ingest scripts; local only) |
+| `data/` | Per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`); the benchmark-study provenance release is indexed in [`data/README.md`](data/README.md) |
+| `db/` | Experimental property database (`polymer_db.sqlite`, schema, query + ingest scripts) |
 | `benchmarks/recovery/` | Error-recovery benchmark (see its README) |
 | `tests/`, `mcp-servers/*/tests/`, `benchmarks/recovery/tests/`, `tools/runlog_miner/tests/` | Test suites (root `pytest.ini`) |
 | `tools/runlog_miner/` | Run-log mining/reporting package |
 | `docs/` | Human-facing docs: `PROPERTIES.md` (what gets computed & how), `ROADMAP.md`, `TOOLS_REFERENCE.md` |
 | `figures/` | Output of `paper/gen_figure{1,2}*.py`; included by the manuscript |
 | `env/` | Conda environment YAMLs |
-| `paper/` | Manuscript sources (local) — the analysis data (`paper/csv/`) and figure generator scripts are tracked; `literature/` reference PDFs stay local |
+| `paper/` | Manuscript analysis data (`paper/csv/`) and the figure generator scripts |
 
 ---
 
@@ -75,10 +75,9 @@ The framework was validated on a **36-run replicate study: 9 polymers × 4 indep
 New to the repo? The fastest path to a first run:
 
 1. **Read [`guides/README.md`](guides/README.md)** — the navigation hub for the whole pipeline.
-2. **Complete [Setup](#setup) below** — build LAMMPS (GPU), create the conda envs, install EMC, configure `.mcp.json`.
-3. **Start the three MCP servers** (see [Starting the MCP Servers](#starting-the-mcp-servers)).
-4. **Calibrate once on a new machine:** run `/calibrate-hardware` (see [Hardware Calibration](#hardware-calibration-first-run-on-a-new-machine)).
-5. **Ask the agent in natural language** (see [Usage](#usage)) — copy `Task_TEMPLATE.txt`, fill in a polymer name + SMILES, and describe what you want.
+2. **Complete [Setup](#setup) below** — build LAMMPS (GPU), create the conda envs, install EMC, configure `.mcp.json` (Claude Code launches the three MCP servers from it automatically).
+3. **Calibrate once on a new machine:** run `/calibrate-hardware` (see [Hardware Calibration](#hardware-calibration-first-run-on-a-new-machine)).
+4. **Ask the agent in natural language** (see [Usage](#usage)) — copy `Task_TEMPLATE.txt`, fill in a polymer name + SMILES, and describe what you want.
 
 ---
 
@@ -132,26 +131,6 @@ LAMBDA_LAMMPS   = /home/<user>/lammps-install/bin/lmp
 CONDA_ENV       = mol-builder
 RADONPY_PATH    = /path/to/RadonPy
 ```
-
-### Starting the MCP Servers
-
-The servers are launched automatically by Claude Code via `.mcp.json`. To start them manually for debugging:
-
-```bash
-# mol-builder server
-/home/<user>/miniforge3/envs/mol-builder/bin/python \
-  PolyJarvis/mcp-servers/mcp-mol-builder-server/server.py
-
-# EMC server
-PolyJarvis/mcp-servers/.venv/bin/python \
-  PolyJarvis/mcp-servers/mcp-emc-server/server.py
-
-# LAMMPS engine server
-PolyJarvis/mcp-servers/.venv/bin/python \
-  PolyJarvis/mcp-servers/mcp-lammps-engine/server.py
-```
-
-See `PolyJarvis/.mcp.json` for the registered server configuration.
 
 ### Hardware Calibration (first run on a new machine)
 
