@@ -88,6 +88,10 @@ These runs executed under the repository's live working directory `data/<run>/` 
 archived here (`manuscript/data/<run>/`) afterwards, so repo-relative paths quoted inside run
 logs, chain scripts, and LAMMPS logs use the original `data/<run>/...` prefix.
 
+A local-only `archive/` directory (not committed) sits alongside the run dirs; it holds
+analysis summaries from superseded early exploratory runs that predate the 36-run benchmark
+and is not part of the study.
+
 ## Prompts, tool schemas, and the agent
 
 These are part of the codebase, not under `data/`:
