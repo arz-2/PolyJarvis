@@ -5,11 +5,16 @@ Reference range shown as a shaded box per polymer.
 Simulated individual runs as small dots, ensemble mean ± s.d. as large marker + error bar.
 """
 
+import os
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
+
+FIG_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'figures')
+os.makedirs(FIG_OUT, exist_ok=True)
 
 # Data from data/property_comparison.md (reconciled 9-polymer EMC/PCFF benchmark,
 # 2026-07-01 uniform gated-Murnaghan K update). Simulated K per replicate at 300 K
@@ -130,6 +135,6 @@ ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 
 plt.tight_layout()
-plt.savefig('figures/figure5_bulk_modulus.pdf', dpi=300, bbox_inches='tight')
-plt.savefig('figures/figure5_bulk_modulus.png', dpi=300, bbox_inches='tight')
+plt.savefig(os.path.join(FIG_OUT, 'figure5_bulk_modulus.pdf'), dpi=300, bbox_inches='tight')
+plt.savefig(os.path.join(FIG_OUT, 'figure5_bulk_modulus.png'), dpi=300, bbox_inches='tight')
 print("Saved figure5_bulk_modulus.pdf and .png")
