@@ -5,7 +5,8 @@ inject each cataloged fault, verify the injection fires a genuine runtime error,
 classifier labels it correctly, and (for pre-scripted faults) apply the documented fix and
 verify it resolves. Inferred faults (generalization probes) have no scripted recovery and are
 recorded as "left for AGENT" — the agent resolves those at the full launch (see
-`data/RECOV_F5_AGENT/`, `data/RECOV_F6_AGENT/`).
+the local
+`RECOV_F5_AGENT/`, `RECOV_F6_AGENT/` run dirs alongside this file).
 
 ## Run
 
