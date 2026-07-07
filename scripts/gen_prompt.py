@@ -590,7 +590,7 @@ def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     enthalpy_col = getattr(args, "enthalpy_col", None) or "Enthalpy"
     guide = load_worker_guide("analyze-tg")
     rate_line = (f"cooling_rate_K_per_ns: {selected_rate}  # tg_rate_index={args.tg_rate_index}; "
-                 f"report this (rate, Tg_K) pair to the multirate registry\n"
+                 f"record this (rate, Tg_K) pair — input to this run's multirate fit\n"
                  if selected_rate is not None else "")
     return f"""\
 tg_log_path:       {tg_log}
@@ -612,8 +612,9 @@ tasks:
 
 def analyze_tg_multirate_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Aggregate per-rate (rate, Tg_MD) pairs: log-linear + VF fit, extrapolated to the
-    DSC-equivalent rate. The orchestrator supplies --mr_rates / --mr_tg_values from the
-    cross-replicate registry; the worker runs the emitted command verbatim."""
+    DSC-equivalent rate. The orchestrator supplies --mr_rates / --mr_tg_values from this
+    run's per-rate analyze-tg results (fit_quality >= ACCEPTABLE); the worker runs the
+    emitted command verbatim."""
     output_dir = args.output_dir or f"{REPO_ROOT}/data/{args.run_name}/raw/"
     script = str(REPO_ROOT / "mcp-servers/mcp-lammps-engine"
                  / "analysis_scripts/extract_tg_multirate.py")
@@ -625,10 +626,12 @@ def analyze_tg_multirate_prompt(args, cls: dict, cross_track_rules: str) -> str:
     # regime exempts the slope-sign gate for rubbery polymers (T_workflow >> Tg): a negative
     # rate-dependence slope is scatter, not contamination, so no false-positive reroll.
     regime = _regime(args, cls)
+    rates_ph = rates or "<FILL: space-separated rates from this run's sweeps, e.g. 40 80 100>"
+    tg_vals_ph = tg_vals or "<FILL: matching Tg_MD values, same order>"
     command = (
         f"python3 {script} \\\n"
-        f"  --rates {rates or '<FILL: space-separated rates from registry, e.g. 40 160 400>'} \\\n"
-        f"  --tg_values {tg_vals or '<FILL: matching Tg_MD values from registry>'} \\\n"
+        f"  --rates {rates_ph} \\\n"
+        f"  --tg_values {tg_vals_ph} \\\n"
         f"  --slow_rate_ref {dsc_rate} \\\n"
         f"  --regime {regime} \\\n"
         f"  --polymer_name {polymer_name} \\\n"
@@ -640,8 +643,8 @@ run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 output_dir:        {output_dir}
 dsc_equiv_rate_K_per_ns: {dsc_rate}
-mr_rates:          {rates or '<FILL from registry>'}
-mr_tg_values:      {tg_vals or '<FILL from registry>'}
+mr_rates:          {rates or "<FILL: this run's per-rate results>"}
+mr_tg_values:      {tg_vals or "<FILL: this run's per-rate results>"}
 command: |
   {command}
 
@@ -873,7 +876,8 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
 
     _slope_gate = getattr(args, 'slope_gate_pass', None)
     _tg_path_label = (
-        "single-rate fallback (slope_gate=False; highest-rate folder)"
+        "single-rate fallback (slope_gate=False; class fallback rate — plan "
+        "tg_slope_gate_fallback, default highest)"
         if _slope_gate is False
         else "slowest-rate folder (slope_gate=True or N/A)"
     )
@@ -898,7 +902,7 @@ run_plan:          {run_plan}   # always pass to generate_run_summary --run_plan
 exp_tg_range:      {exp_tg}
 exp_density_range: {exp_density}
 exp_K_range:       {exp_K}
-n_replicates:      {_v(getattr(args, 'n_replicates', None), 'N/A')}   # distinct replicates in the multi-rate Tg registry; pass to generate_run_summary --n_replicates
+n_replicates:      {_v(getattr(args, 'n_replicates', None), 'N/A')}   # replicate count for this run (single-run multirate protocol: 1); pass to generate_run_summary --n_replicates
 tg_path:           {_v(getattr(args, 'tg_path', None), 'null')}   # explicit canonical tg_summary.json path ({_tg_path_label}); pass to generate_run_summary --tg_path
 slope_gate_pass:   {_v(_slope_gate, 'null')}   # False → single-rate fallback Tg; pass --tg_k with the fallback value
 output_dir:        {output_dir}
@@ -1028,11 +1032,12 @@ def main():
                    help="Index into tg_rates_K_per_ns list for multi-rate sweeps (0=slowest)")
     p.add_argument("--mr_rates",
                    help="analyze-tg-multirate: comma/space-separated cooling rates (K/ns) "
-                        "from the cross-replicate registry, e.g. '40,160,400'")
+                        "from this run's per-rate Tg results, e.g. '40,80,100'")
     p.add_argument("--mr_tg_values",
                    help="analyze-tg-multirate: matching Tg_MD values (K), same order as --mr_rates")
-    p.add_argument("--n_replicates", type=int,
-                   help="run-summary: number of distinct replicates in the multi-rate Tg registry")
+    p.add_argument("--n_replicates", type=int, default=1,
+                   help="run-summary: replicate count reported in results.tg.n_replicates "
+                        "(single-run protocol: 1)")
     p.add_argument("--K_strain_max", type=float,
                    help="Max engineering strain for uniaxial deformation")
     p.add_argument("--K_deform_rate_inv_s", type=float,

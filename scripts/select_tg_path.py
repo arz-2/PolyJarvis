@@ -4,9 +4,12 @@
 Replaces the inline shell the orchestrator used to hand-execute in CLAUDE.md Phase C
 (deriving TG_PATH by hand was the PLA3 footgun — feedback_run_summary_tg_mismatch.md).
 
-Convention (unchanged):
-  slope_gate_pass=True  -> slowest rate  (tg_rates[0])   — the trusted DSC-convention point
-  slope_gate_pass=False -> highest rate  (tg_rates[-1])  — least glassy-contaminated fallback
+Convention:
+  slope_gate_pass=True  -> slowest rate (tg_rates[0]) — the trusted DSC-convention point
+  slope_gate_pass=False -> the class fallback rate from decided_params.tg_slope_gate_fallback:
+    "highest_rate" (default) — least glassy-contaminated fallback
+    "slowest_rate" (rigid aromatics PKTN/PSFO) — most-equilibrated; fast rates cold-start
+    from the 300 K glass and invert the Tg-vs-rate trend
 
 Inputs:
   --plan       run_plan.json            (authoritative tg_rates_K_per_ns)
@@ -52,7 +55,16 @@ def main():
               file=sys.stderr)
         gate = True
 
-    rate = rates[-1] if gate is False else rates[0]   # highest if gate failed, else slowest
+    if gate is False:
+        fallback = plan.get("decided_params", {}).get("tg_slope_gate_fallback",
+                                                      "highest_rate")
+        if fallback not in ("highest_rate", "slowest_rate"):
+            print(f"WARNING: unknown tg_slope_gate_fallback {fallback!r} — "
+                  "using highest_rate", file=sys.stderr)
+            fallback = "highest_rate"
+        rate = rates[0] if fallback == "slowest_rate" else rates[-1]
+    else:
+        rate = rates[0]   # gate passed: slowest rate (DSC convention)
     raw_dir = os.path.dirname(os.path.abspath(args.multirate))
     tg_path = os.path.join(raw_dir, f"tg_r{_fmt_rate(rate)}", "tg_summary.json")
 

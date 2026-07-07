@@ -10,7 +10,6 @@ On session restart mid-thermal-track: re-read this file before resuming.
   Read multirate config from the plan:
     TG_RATES=$(jq -r '.decided_params.tg_rates_K_per_ns | @csv' PLAN_PATH)     # e.g. 25,50,100
     DSC_RATE=$(jq -r '.decided_params.dsc_equiv_rate_K_per_ns // 1.6667e-10' PLAN_PATH)
-  Read replicate N from run_log.md header ("Replicate: N of M").
 
   For idx, rate in enumerate(TG_RATES):                # idx = 0,1,2 → rates 25,50,100 K/ns
     [Tg sweep @ rate]
@@ -37,8 +36,8 @@ On session restart mid-thermal-track: re-read this file before resuming.
           prompt=<gen_prompt.py --stage analyze-tg --plan PLAN_PATH
                   --data_path {tg_log_path} --tg_rate_index {idx}>)
       → parse RESULT → Tg_K, Tg_fit_quality, Tg_r_squared, cooling_rate_K_per_ns
-    Append one row to the multirate registry (see registry section below):
-      replicate=N, rate, Tg_K, Tg_r_squared, Tg_fit_quality, run_name, timestamp_utc
+    Hold (rate, Tg_K, Tg_r_squared, Tg_fit_quality) in orchestrator state and the D-06
+      run_log row — inputs to the multirate fit below.
 
   # On a single-GPU host (e.g. PEG1, GPU 0 only) the three sweeps run SEQUENTIALLY → ~3× thermal
   # wall time (the 40 K/ns rate has 10× the steps of 400 K/ns and dominates). On a multi-GPU host
@@ -49,9 +48,9 @@ On session restart mid-thermal-track: re-read this file before resuming.
   # shortfall, never --allow-busy).
 
   [multirate extrapolation → DSC-equivalent Tg]
-  Build --mr_rates / --mr_tg_values from ALL registry rows for this polymer/class
-    (filter to fit_quality >= ACCEPTABLE; if < 2 rows survive, skip aggregation and fall back
-     to the single highest-rate Tg). Across replicates this list grows → the fit tightens.
+  Build --mr_rates / --mr_tg_values from THIS RUN's per-rate results
+    (filter to fit_quality >= ACCEPTABLE; if < 2 survive, skip aggregation and fall back
+     to the single highest-rate Tg).
   Agent(subagent_type="tg-analysis-worker", description="🟢 Multirate Tg {polymer_name}",
         prompt=<gen_prompt.py --stage analyze-tg-multirate --plan PLAN_PATH
                 --mr_rates <rates> --mr_tg_values <tgs>>)
@@ -68,34 +67,31 @@ On session restart mid-thermal-track: re-read this file before resuming.
     Rate-dependence of Tg is near-zero (|slope| < 1 K/decade) because the chain is already deep
     in the rubbery regime at T_workflow. The code detects this via is_flat_rate_regime=True and
     tg_method="flat_rate_mean". Report Tg_MD as the mean across rates with a note that this is a
-    rubbery-regime estimate, NOT a DSC-equivalent extrapolation. Registry rows are still written
-    — they are valid for cross-replicate averaging. Do NOT trigger /recover for low R² when
-    is_flat_rate_regime=True.
+    rubbery-regime estimate, NOT a DSC-equivalent extrapolation. Do NOT trigger /recover for low
+    R² when is_flat_rate_regime=True.
 
   Slope gate (GLASSY only): for glassy polymers, if result.slope_gate_pass == False (slope ≤ 0)
     the per-rate data is contaminated. This is a HARD STOP: do NOT proceed to the mechanical
-    track or run-summary until a sweep passes the gate. Do NOT write registry rows for any rate
-    from this sweep (discard the staged rows — nothing was committed, so no churn).
+    track or run-summary until a sweep passes the gate. Discard this sweep's per-rate results.
     Spawn /recover immediately (re-run all 3 Tg sweeps from the same equil cell with a new
     velocity seed). Max 2 attempts total, then write UNRESOLVED to run_log.md and stop.
-    PEST slope-fragility: slope-gate FAIL is the EXPECTED outcome for PLA/PEST — structural, not
-    seed noise (the stiff ester backbone delocalizes the transition at slow rates; every tested
-    rate set fails, [25,50,100] and [40,80,100] alike). Do NOT burn recovery attempts on rate
-    changes or rerolls; pre-commit to single_rate_fallback with the HIGHEST rate as headline Tg
-    (cleanest, least delocalized fit). The planner should name slope_fragility as the dominant
-    uncertainty, set plan_mode=reasoned, reduction_probe=none (no cheap fix exists).
-    Rigid-aromatic carve-out (PSFO/PKTN, Tg >> 300 K): slope-gate FAIL is likewise structural —
-    the staircase cold-starts from the 300 K glassy cell, so the highest-T plateaus
-    under-equilibrate at fast rates and INVERT the Tg-vs-rate trend (fast rate ⇒ spuriously low
-    Tg). Seed rerolls cannot fix this: skip /recover, use single_rate_fallback with the SLOWEST
-    (most-equilibrated) rate as headline Tg + a degeneracy caveat — the class exception to the
-    highest-rate fallback convention (thread that rate's tg_summary as --tg_path in Phase C).
+    Structural-fail exception (decided_params.tg_slope_gate_fallback set — PEST, PSFO, PKTN):
+    slope-gate FAIL is the EXPECTED outcome for these classes, not seed noise, and seed rerolls
+    cannot fix it — skip /recover entirely and use single_rate_fallback with the rate named by
+    the field; select_tg_path.py applies it in Phase C (no hand override). Physics:
+    - PEST (highest_rate): the stiff ester backbone delocalizes the transition at slow rates;
+      every tested rate set fails. Highest rate = cleanest, least delocalized fit.
+    - PSFO/PKTN (slowest_rate, Tg >> 300 K): the staircase cold-starts from the 300 K glassy
+      cell, so the highest-T plateaus under-equilibrate at fast rates and INVERT the
+      Tg-vs-rate trend (fast rate ⇒ spuriously low Tg). Slowest rate = most-equilibrated;
+      report with a degeneracy caveat.
     is_glassy still settles from exp Tg; the mechanical track may proceed in parallel.
   Rubbery exemption: gen_prompt passes `--regime rubbery` to extract_tg_multirate for rubbery
     polymers (T_workflow >> Tg). In that regime a negative slope is meaningless scatter (the
     per-rate "Tg" is an extrapolation artefact), NOT contamination — the tool returns
-    slope_gate_pass=True, tg_method="rubbery_flat_mean", rubbery_regime_exemption=True, and you
-    KEEP the registry rows. Do NOT /recover on slope sign for rubbery. Equilibration quality is
+    slope_gate_pass=True, tg_method="rubbery_flat_mean", rubbery_regime_exemption=True, and the
+    per-rate results remain valid inputs to the flat-rate mean. Do NOT /recover on slope sign
+    for rubbery. Equilibration quality is
     already guarded upstream by the equil-check require_rubbery carve-out (density SEM/CV); the
     slope-gate only guards glassy-Tg extrapolation, which the rubbery path never performs.
     VF caveat: a Vogel–Fulcher Tg0 fit needs ≥2 rate decades; our 3-rate sets span ~1 decade
@@ -106,7 +102,7 @@ On session restart mid-thermal-track: re-read this file before resuming.
   if "tg" in properties_requested:
     Tg_for_glassy = Tg_K at the HIGHEST screening rate (400 K/ns)  # protocol-fixed, reproducible (NOT most-equilibrated — that's the slowest rate; this is a stable is_glassy gate, see below)
     # Default: drive is_glassy off the highest-rate MD Tg, NOT tg_dsc_equiv_K — the extrapolated
-    # value shifts as replicates accumulate and could flip the mechanical-track branch mid-campaign.
+    # value carries wide slope uncertainty (~0.6-decade rate span) and is not a stable routing gate.
     # Exp-Tg fallback (degenerate fit): if the highest-rate fit is unreliable — fit_quality==POOR,
     # primary_fit_invalid==True (extract_thermal hard-constraint flag), the fit ABORTed, or the
     # multirate slope-gate failed (glassy) — an artefactual MD Tg must NOT decide routing. In that
@@ -126,24 +122,6 @@ On session restart mid-thermal-track: re-read this file before resuming.
 
 ---
 
-## Multirate Tg registry
-
-- **File:** `data/_tg_registry/<CLASS_ID>__<polymer_slug>.csv` (append-only; survives across runs). `<polymer_slug>` = filesystem-safe SMILES slug.
-- **Header:** `replicate,rate_K_per_ns,Tg_MD_K,r_squared,fit_quality,run_name,timestamp_utc`
-- **Write (deferred — commit only after the gate passes):** stage this replicate's 3 per-rate
-  rows (hold them in the orchestrator, do NOT append to the CSV yet). Run `analyze-tg-multirate`
-  over the committed rows + this replicate's staged rows, then:
-  - glassy + `slope_gate_pass==True` → **commit** the 3 staged rows (append to the CSV).
-  - glassy + `slope_gate_pass==False` → **discard** the staged rows (contaminated; reroll). Nothing
-    was appended, so there is no write-then-delete churn.
-  - rubbery (`rubbery_regime_exemption==True`) → **commit** the 3 staged rows (slope sign is not a
-    contamination signal in this regime).
-  This deferral replaces the old "append immediately, then delete on gate failure" flow.
-- **Read:** pass ALL committed rows for this polymer (filtered to `fit_quality >= ACCEPTABLE`) plus
-  this replicate's staged rows as `--mr_rates`/`--mr_tg_values` to `analyze-tg-multirate`. If < 2
-  rows survive, fall back to the single highest-rate Tg.
-
 ## Backlog
 
 - Melt-start Tg sweep for rigid aromatics (PSFO/PKTN): start the staircase from a melt cell (or prepend a ≥750 K NPT pre-equilibration) so the top plateaus don't cold-start from glass — root fix for the inverted Tg-vs-rate trend that makes the slope gate structurally unpassable for these classes.
-- `make_deterministic_plan.py` should flag slope_fragility for PEST and rigid-aromatic classes (plan_mode=reasoned, dominant_uncertainty=slope_fragility) instead of emitting a deterministic plan that predicts a passing slope gate.

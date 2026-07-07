@@ -40,7 +40,7 @@ Tg is measured **multirate**: one stepped cooling sweep is run per cooling rate,
 |-------|-------|
 | Tool | `extract_tg_multirate` |
 | Method | Fit Tg vs ln(cooling rate); extrapolate to `dsc_equiv_rate_K_per_ns` (~1.67e-10 K/ns) → headline DSC-equivalent Tg |
-| Registry | Per-rate rows accumulate (append-only) in `data/_tg_registry/<CLASS>__<slug>.csv`, so the fit tightens across replicates |
+| Inputs | This run's three per-rate (rate, Tg) pairs, filtered to fit_quality ≥ ACCEPTABLE (single-run protocol — no cross-run pooling) |
 | Slope gate (glassy) | Tg must rise with rate (slope > 0); a non-positive slope marks the per-rate data contaminated → re-run with a new seed |
 | Rubbery regime | When T_workflow ≫ Tg the rate-dependence is ~flat: `is_flat_rate_regime=True`, `tg_method=flat_rate_mean` reports the mean across rates (not an extrapolation), slope gate exempted |
 | Validation | `experimental_tg_K` from polymer_rules.json; MD Tg overestimates experiment by ~80–120 K (fast cooling rate artifact — Patrone 2016, Webb 2024) |

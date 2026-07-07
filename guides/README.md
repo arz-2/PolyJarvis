@@ -26,7 +26,7 @@ one into the worker's prompt.
 
 | Guide | Content |
 |---|---|
-| `THERMAL_TRACK.md` | Multirate Tg sweep procedure, Tg registry, slope gate, is_glassy |
+| `THERMAL_TRACK.md` | Multirate Tg sweep procedure, slope gate + per-class fallback, is_glassy |
 | `MECHANICAL_TRACK.md` | Murnaghan primary + deform fallback + BM extraction routing |
 
 ## 3. Machine-read config (JSON, not prose)

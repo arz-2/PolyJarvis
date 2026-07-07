@@ -111,3 +111,14 @@ def test_build_route_consistency(cid):
             f"{cid}: RadonPy runs a charge job → charge_method must be RESP/AM1-BCC, "
             f"got {e['charge_method']!r}"
         )
+
+
+def test_tg_slope_gate_fallback_valid():
+    """tg_slope_gate_fallback marks classes whose glassy slope gate fails
+    structurally; value names the headline-Tg rate on gate failure."""
+    expected = {"PEST": "highest_rate", "PKTN": "slowest_rate", "PSFO": "slowest_rate"}
+    found = {cid: c["tg_slope_gate_fallback"] for cid, c in CLASSES.items()
+             if "tg_slope_gate_fallback" in c}
+    assert found == expected
+    for cid in found:
+        assert isinstance(CLASSES[cid].get("_tg_slope_gate_note"), str), cid
