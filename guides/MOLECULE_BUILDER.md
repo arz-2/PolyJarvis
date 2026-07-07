@@ -16,7 +16,7 @@ Call `classify_polymer(smiles)` before anything else.
 
 ## Path A — EMC
 
-EMC builds the amorphous cell and assigns all FF parameters in one step — no conformer search, charge assignment, polymerization, or FF assignment needed. The force field is selected automatically from `polymer_class` — do not pass a `field` argument.
+EMC builds the cell and assigns all FF parameters in one step (no conformer search, charge, polymerization, or FF-assignment step). Force field is auto-selected from `polymer_class` — do not pass a `field` argument.
 
 **Class notes:**
 - PPHS: PCFF has P=N backbone types but no polyphosphazene-specific validation — flag results.
@@ -26,11 +26,8 @@ EMC builds the amorphous cell and assigns all FF parameters in one step — no c
 
 ```python
 import random
-# Use the pinned seed from the prompt (`emc_seed:`) when given — that is how replication
-# studies (guides/REVISION_PARAMS.md) reproduce the exact cell. Only draw a random seed
-# when the prompt's emc_seed is null. Prefer a specific integer (don't pass seed=-1, the
-# "pick random" sentinel); if -1 was used, read out["result"]["resolved_seed"] back and report
-# THAT integer — get_emc_job_output echoes the seed actually used. Never report -1.
+# Use the prompt's emc_seed when given (reproduces the exact cell); else draw a random
+# integer. Never pass seed=-1. get_emc_job_output echoes the seed actually used — report that.
 emc_seed = emc_seed_from_prompt if emc_seed_from_prompt is not None else random.randint(1, 999999)
 job = submit_emc_cell_job(
     smiles="...",
@@ -44,20 +41,15 @@ job = submit_emc_cell_job(
 )
 ```
 
-`nchains` sets the **exact** number of chains EMC builds (EMC "number" mode); always
-pass the `nchain` value from your prompt. `ntotal` is only a fallback used when
-`nchains<=0` — leave it unset.
+`nchains` sets the **exact** chain count (EMC "number" mode) — pass the prompt's `nchain`. Leave `ntotal` unset (fallback only when `nchains<=0`).
 
 Poll with `get_emc_job_status(job_id)` until `status == "completed"`, then:
 
 ```python
 out = get_emc_job_output(job_id)
-data_path    = out["result"]["data_path"]      # EMC always writes emc_build.data (NOT polymer.data
-                                               # / <output_name>.data) — take this path verbatim;
-                                               # never watch a hardcoded polymer.data (it never fires)
+data_path    = out["result"]["data_path"]      # EMC writes emc_build.data (not polymer.data) — use verbatim
 params_path  = out["result"]["params_path"]   # may be None
 lammps_flags = out["result"]["lammps_flags"]  # e.g. {"use_pcff": True, "use_opls": False}
-# emc_seed is the value you generated above — include it in your RESULT block
 ```
 
 **Output placement:** After the job completes, copy outputs into `{work_dir}/cell/`:
@@ -69,15 +61,6 @@ cp <params_path> {work_dir}/cell/emc_build.params   # skip if params_path is Non
 ```
 
 Report `data_path = {work_dir}/cell/cell.data` and `emc_params_path = {work_dir}/cell/emc_build.params` in the RESULT block.
-
-### Decision IDs for run_log.md
-
-| ID | Decision | Value |
-|---|---|---|
-| D-01 | Force field | auto-selected from polymer_class (see `lammps_flags` in output) |
-| D-02 | Charge method | bond-increment / library charges embedded in the EMC class-II FF (PCFF/OPLS/TraPPE) — no separate QM step |
-| D-03 | Electrostatics | pppm (all except PHYC/PDIE which use lj/cut) |
-| D-04 | System size | dp and nchain passed to submit_emc_cell_job |
 
 ---
 
@@ -126,15 +109,6 @@ save_molecule(ff_output,       "./checkpoints/03_polymer_ff.json",      format="
 save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="json")
 ```
 
-### Decision IDs for run_log.md
-
-| ID | Decision | Value |
-|---|---|---|
-| D-01 | Force field | from assign_forcefield call |
-| D-02 | Charge method | from submit_assign_charges_job params |
-| D-03 | Electrostatics | pppm |
-| D-04 | System size | dp and nchain from prompt |
-
 ---
 
 ## Common Failures
@@ -159,19 +133,15 @@ save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="
 
 ---
 
-**→ When `cell.data` is saved, return the RESULT block.**
-
-The RESULT block MUST include `emc_seed` — the orchestrator logs it to the run_log header immediately after parsing RESULT so the cell is reproducible for revision studies:
+**→ When `cell.data` is saved, return the RESULT block.** It MUST include `emc_seed` so the cell is reproducible.
 
 ```
 RESULT
 data_path:      data/<RUN>/lammps/cell/cell.data
 emc_params_path: data/<RUN>/lammps/cell/emc_build.params
 lammps_flags:   <as returned by get_emc_job_output result["lammps_flags"]>
-emc_seed:       <integer you passed to submit_emc_cell_job seed= / saved on mol-builder for RadonPy>
+emc_seed:       <EMC: integer passed to submit_emc_cell_job seed=; RadonPy: null>
 n_atoms:        <atom count from inspect_data_file or EMC output>
 ```
 
-For EMC path: `emc_seed` = the integer you generated/pinned at the top of the build.
-For RadonPy path: no EMC seed — set `emc_seed: null`.
-NEVER set `emc_seed: -1` — that was the old placeholder for "uncaptured" and means the cell is irreproducible.
+Never set `emc_seed: -1` (means irreproducible).

@@ -2182,8 +2182,8 @@ def _run_extract_thermal(
 @mcp.tool()
 def extract_thermal(
     log_file: str,
-    output_dir: Optional[str] = None,
-    graphs_dir: Optional[str] = None,
+    output_dir: str,
+    graphs_dir: str,
     initial_tg_guess: Optional[float] = None,
     equilibration_fraction: float = 0.5,
     temp_col: str = "Temp",
@@ -2451,8 +2451,8 @@ def check_equilibration_comprehensive(
     dump_file: str,
     data_file: str,
     backbone_types: list,
-    output_dir: Optional[str] = None,
-    graphs_dir: Optional[str] = None,
+    output_dir: str,
+    graphs_dir: str,
     skip_frames: int = 50,
     timestep_fs: float = 1.0,
     dump_every: int = 1000,
@@ -2678,7 +2678,7 @@ def assess_cooling_contraction(
 @mcp.tool()
 def extract_equilibrated_density(
     log_file: str,
-    output_dir: Optional[str] = None,
+    output_dir: str,
     eq_fraction: float = 0.5,
     target_temp: Optional[float] = None,
     temp_tolerance: float = 50.0,
@@ -2810,8 +2810,8 @@ def _run_extract_bulk_modulus(
 @mcp.tool()
 def extract_bulk_modulus(
     log_file: str,
-    output_dir: Optional[str] = None,
-    graphs_dir: Optional[str] = None,
+    output_dir: str,
+    graphs_dir: str,
     eq_fraction: float = 0.5,
     block_count: int = 5,
     vol_col: str = "Volume",
@@ -2946,8 +2946,8 @@ def _run_extract_bulk_modulus_deform(
 @mcp.tool()
 def extract_bulk_modulus_deform(
     log_file: str,
-    output_dir: Optional[str] = None,
-    graphs_dir: Optional[str] = None,
+    output_dir: str,
+    graphs_dir: str,
     strain_rate: float = 1e-7,
     strain_max: float = 0.03,
     timestep: float = 1.0,
@@ -3240,7 +3240,7 @@ def extract_bulk_modulus_murnaghan(
     log_files: list,
     pressures_atm: list,
     output_dir: str,
-    graphs_dir: Optional[str] = None,
+    graphs_dir: str,
     eq_fraction: float = 0.5,
 ) -> dict:
     """
@@ -3386,7 +3386,7 @@ def _run_generate_run_summary(
 def generate_run_summary(
     output_dir: str,
     run_name: str,
-    graphs_dir: Optional[str] = None,
+    graphs_dir: str,
     smiles: str = "",
     polymer_class: str = "",
     ff: str = "",
