@@ -27,13 +27,13 @@ count and config ladder auto-scale to the box (see detect_phys_cores). Pass
 
 Usage:
   # UA cell, plain NVT (lj/cut, no kspace)
-  scripts/benchmark_hardware.py --data manuscript/data/PE1/.../*.data --ff trappe
+  hardware/benchmark_hardware.py --data manuscript/data/PE1/.../*.data --ff trappe
 
   # PCFF cell, class2 + pppm
-  scripts/benchmark_hardware.py --data manuscript/data/PMMA1/.../*.data --ff pcff --pppm
+  hardware/benchmark_hardware.py --data manuscript/data/PMMA1/.../*.data --ff pcff --pppm
 
   # faithful deform/tg cost class via an existing input deck
-  scripts/benchmark_hardware.py --data <equil.data> --reuse-in <real_npt_deform.in> \
+  hardware/benchmark_hardware.py --data <equil.data> --reuse-in <real_npt_deform.in> \
       --label PSU1_deform
 """
 
@@ -54,7 +54,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 ENGINE = REPO / "mcp-servers" / "mcp-lammps-engine"
 sys.path.insert(0, str(ENGINE))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(REPO / "scripts"))  # hw_common lives with the runtime scripts
 # shared host/GPU probes (re-exported here so calibrate_hardware.py keeps using bh.detect_phys_cores / bh.gpu_status)
 from hw_common import detect_phys_cores, gpu_status
 

@@ -218,7 +218,7 @@ PHASE C — SUMMARY (always)
 ### Cross-run protocol
 
 Validate each worker result against `run_plan.json` `planned_stages[].success_criteria`; `/recover` if not met (max 2 attempts/worker), then write UNRESOLVED to run_log.md and stop.
-A probe result contradicting a plan assumption (wrong FF, D-08 mismatch) routes back to the planner (re-plan → re-critic); never let a worker improvise. For a planned `hardware_benchmark` probe: run `scripts/calibrate_hardware.py --cell <.data> --ff <fam>` politely before the affected GPU stage (idle-GPU + spare cores; never `--allow-busy`).
+A probe result contradicting a plan assumption (wrong FF, D-08 mismatch) routes back to the planner (re-plan → re-critic); never let a worker improvise. For a planned `hardware_benchmark` probe: run `hardware/calibrate_hardware.py --cell <.data> --ff <fam>` politely before the affected GPU stage (idle-GPU + spare cores; never `--allow-busy`).
 Session restart: read SIMULATION STATE table in run_log.md → find `status=monitoring` → `get_run_status(id)` → if still running, `watch_run(id)` → relaunch the waiter via BACKGROUND-WAIT (`Bash(command=monitor_command, run_in_background=true)`) and end your turn; if already completed, proceed. If in Phase B re-read the active track guide first.
 
 ---

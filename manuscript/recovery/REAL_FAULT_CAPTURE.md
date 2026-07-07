@@ -3,7 +3,7 @@
 Captured 2026-06-27 by firing each fault's REAL trigger on this machine (tiny runtime-generated
 PCFF cells; LAMMPS serial CPU + real EMC + real extract_thermal). These replace the fabricated /
 representative strings in fault_catalog.py. Base cell is generated at runtime (build_cell, pcff,
-PMMA `*CC(C)(C(=O)OC)*`) for portability — no dependence on the git-excluded data/CALIB_PCFF.
+PMMA `*CC(C)(C(=O)OC)*`) for portability — no dependence on the in-repo hardware/CALIB_PCFF cell.
 
 | Fault | Real trigger | Genuine error captured | Class / tier |
 |---|---|---|---|

@@ -10,7 +10,7 @@ The physical-core budget is read from guides/polymer_rules.json:hardware_policy.
 (the calibrated source of truth, kept in sync by calibrate_hardware.py), falling back to
 os.cpu_count() — so this scales to whatever box the clone runs on rather than a hardcoded value.
 
-Allocation policy (also in guides/HARDWARE.md):
+Allocation policy (also in hardware/HARDWARE.md):
   - Σ(mpi_ranks over all concurrent runs) ≤ phys_cores.
   - At most one GPU-heavy run per physical GPU.
   - A GPU is free if it is ~idle in nvidia-smi AND not claimed in the ledger.

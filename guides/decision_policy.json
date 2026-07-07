@@ -154,7 +154,7 @@
     },
     "hardware_benchmark": {
       "reduces": "hardware_optimum — the mpi/gpu config uncertainty for an off-table FF, an unusually sized cell, or a host whose hardware_policy is not cleanly benchmarked (values_are_benchmarked=false or host mismatch)",
-      "mechanism": "scripts/calibrate_hardware.py (wrapping scripts/benchmark_hardware.py) sweeps the mpi/gpu matrix on the built .data per template cost class, reports ns/day + Pair/Kspace/Neigh/Comm breakdown, names the winner, and writes directional_probe + by_forcefield (the latter only on a clean uncontended sweep). Runs politely around live runs (idle GPU + spare cores only, niced, sequential).",
+      "mechanism": "hardware/calibrate_hardware.py (wrapping hardware/benchmark_hardware.py) sweeps the mpi/gpu matrix on the built .data per template cost class, reports ns/day + Pair/Kspace/Neigh/Comm breakdown, names the winner, and writes directional_probe + by_forcefield (the latter only on a clean uncontended sweep). Runs politely around live runs (idle GPU + spare cores only, niced, sequential).",
       "cost": "minutes"
     }
   }

@@ -4,7 +4,7 @@ from pathlib import Path
 from script_generator import ScriptGenerator
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-CALIB_PCFF = REPO_ROOT / "data" / "CALIB_PCFF" / "emc_build.data"
+CALIB_PCFF = REPO_ROOT / "hardware" / "CALIB_PCFF" / "emc_build.data"
 
 
 def _vel_line(script: str):

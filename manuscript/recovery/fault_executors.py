@@ -10,7 +10,7 @@ prescripted recovery and verify it re-runs past the failure. The real strings we
 
 Design choices:
   - Portable: the base cells are generated at runtime via build_cell (no dependence on the
-    git-excluded data/CALIB_PCFF); the lmp binary is taken from $LAMBDA_LAMMPS (the same
+    in-repo hardware/CALIB_PCFF cell); the lmp binary is taken from $LAMBDA_LAMMPS (the same
     source the engine uses), falling back to a $USER-derived path then PATH.
   - CPU-serial: tiny cells run in seconds on one core, so no GPU claim and zero contention
     with concurrent GPU work. (A real LAMMPS runtime crash is the same on CPU or GPU.)

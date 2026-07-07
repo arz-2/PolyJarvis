@@ -1,6 +1,6 @@
 {
   "hardware_policy": {
-    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (scripts/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default: chosen so up to 4 runs fit in 32 cores (4 x mpi=4 = 16) — this is what gen_prompt derives. `mpi_single_run_hint` is the (faster) value to use only when the box is dedicated to one run; it is a provisional GUESS pending scripts/benchmark_hardware.py (see guides/HARDWARE.md), NOT yet benchmark-derived. NOTE: the per-run mpi/gpu values and the directional_probe timings below were measured on the PRIOR box (4x RTX 6000 24GB / i9-10980XE 18c), not this A800 box — only host/budget fields were updated; re-run benchmark_hardware.py on the A800s to retune. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
+    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (scripts/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default: chosen so up to 4 runs fit in 32 cores (4 x mpi=4 = 16) — this is what gen_prompt derives. `mpi_single_run_hint` is the (faster) value to use only when the box is dedicated to one run; it is a provisional GUESS pending hardware/benchmark_hardware.py (see hardware/HARDWARE.md), NOT yet benchmark-derived. NOTE: the per-run mpi/gpu values and the directional_probe timings below were measured on the PRIOR box (4x RTX 6000 24GB / i9-10980XE 18c), not this A800 box — only host/budget fields were updated; re-run benchmark_hardware.py on the A800s to retune. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
     "host": {
       "gpus": 4,
       "gpu_model": "Quadro RTX 6000 24GB",
@@ -13,7 +13,7 @@
       "kokkos_offload_study": {
         "date": "2026-06-20",
         "what": "KOKKOS full-offload arm (pair+class2 bonded+pppm+neigh on GPU via -sf kk -pk kokkos) vs the GPU-package baseline. Engine is wired as a selectable engine=\"kokkos\" end-to-end (server.py run tools, script_generator deck, gen_prompt). by_forcefield defaults intentionally UNCHANGED until the 40k-step accuracy parity passes.",
-        "cell": "data/CALIB_PCFF/emc_build.data",
+        "cell": "hardware/CALIB_PCFF/emc_build.data",
         "cell_atoms": 3020,
         "pcff_ns_per_day_mpi1_contended": {
           "A0_gpu_pkg_pppm_cpu_neigh_no": 5.82,
@@ -37,9 +37,9 @@
       "date": "2026-06-21",
       "mode": "revalidate — ran the shipped by_forcefield default per FF (no engine re-search) + run-0 parity vs CPU; records host-matched ns/day. Use --full for a fresh engine×config sweep on a drained box.",
       "cells": {
-        "pcff": "data/CALIB_PCFF/emc_build.data",
-        "opls": "data/CALIB_OPLS/emc_build.data",
-        "trappe": "data/CALIB_TRAPPE/emc_build.data"
+        "pcff": "hardware/CALIB_PCFF/emc_build.data",
+        "opls": "hardware/CALIB_OPLS/emc_build.data",
+        "trappe": "hardware/CALIB_TRAPPE/emc_build.data"
       },
       "cells_atoms": {
         "pcff": 3020,

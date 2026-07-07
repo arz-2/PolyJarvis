@@ -12,15 +12,15 @@ Flat by design: these paths are hard-wired into `CLAUDE.md`, the agent definitio
 | `select_tg_path.py` | Phase C helper: picks which per-rate `tg_summary` feeds run-summary (slowest rate if the multirate slope gate passed, highest if it failed). | Orchestrator (`CLAUDE.md` Phase C) |
 | `integrate.py` | Two-machine revision integrator: lands findings/fixes from both workstations into `main` via an isolated worktree merge with foreign-path guard + test gate (see its module docstring). | Orchestrator, multi-machine protocol |
 
-## Hardware cluster (shared lib: `hw_common.py`)
+## Hardware runtime (shared lib: `hw_common.py`)
 
 | Script | Purpose | Primary consumers |
 |---|---|---|
-| `hw_common.py` | Shared access to `hardware_policy` / `polymer_rules.json` engine defaults. | The four scripts below + `gen_prompt.py` |
+| `hw_common.py` | Shared access to `hardware_policy` / `polymer_rules.json` engine defaults. | `pick_gpu.py`, `gen_prompt.py`, `make_deterministic_plan.py`, the `hardware/` calibration toolchain |
 | `pick_gpu.py` | GPU claim/release ledger (`claim --run <LABEL> --need N` / `release`). One GPU-run per GPU across concurrent orchestrator sessions. | Orchestrator, all GPU stages |
-| `calibrate_hardware.py` | One-command host-match of per-FF engine defaults (`/calibrate-hardware` skill). | New-machine setup, `README.md` |
-| `benchmark_hardware.py` | MPI/GPU throughput benchmark backing calibration decisions. | `calibrate_hardware.py`, `guides/HARDWARE*.md` |
-| `bench_accuracy_diff.py` | Physics-parity check between engine arms (e.g. KOKKOS vs GPU package) before flipping a default. | `calibrate_hardware.py` |
+
+The calibration toolchain (`calibrate_hardware.py`, `benchmark_hardware.py`,
+`bench_accuracy_diff.py`) lives with the policy docs and calibration cells in `hardware/`.
 
 ## Analysis / one-offs
 
