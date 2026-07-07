@@ -155,13 +155,14 @@ PHASE A — FOUNDATION (always)
 PHASE B — TRACKS (property-conditional)
 
   [thermal track — if "tg" in properties_requested]
-  Read("guides/THERMAL_TRACK.md") now — it owns the multirate sweep loop, the Tg registry
-  (deferred write), the slope-gate hard stop, and the is_glassy determination. Re-read it before
+  Read("guides/THERMAL_TRACK.md") now — it owns the multirate sweep loop, the slope-gate hard
+  stop + per-class structural fallback, and the is_glassy determination. Re-read it before
   resuming after any mid-track session restart.
   Slope-gate hard stop (glassy only; rubbery sweeps are exempt): if tg_multirate_result.json has
   slope_gate_pass==False, do NOT proceed to the mechanical track or run-summary — follow the
-  track guide's recovery ladder (discard staged registry rows, reroll seed, max 2 attempts,
-  else UNRESOLVED).
+  track guide's recovery ladder (reroll seed, max 2 attempts, else UNRESOLVED). Exception: if
+  the plan marks the failure structural (decided_params.tg_slope_gate_fallback set), skip
+  /recover and use the single-rate fallback per the track guide.
 
   [mechanical track — if "bulk_modulus" in properties_requested]
   Read("guides/MECHANICAL_TRACK.md") now — it owns the Murnaghan-primary + deform-fallback + BM
@@ -187,7 +188,8 @@ PHASE C — SUMMARY (always)
   # 2. Determine tg_path + slope_gate_pass with the helper — do NOT hand-derive the path (the
   #    PLA3 footgun); the helper encodes the slowest/highest-rate convention:
   #    eval "$(python3 scripts/select_tg_path.py --plan PLAN_PATH --multirate data/RUN/raw/tg_multirate_result.json)"
-  #    # → sets TG_PATH (slowest rate if gate passed, highest if failed) and SLOPE_GATE (true|false)
+  #    # → sets TG_PATH (slowest rate if gate passed, else the plan's tg_slope_gate_fallback
+  #    #   rate, default highest) and SLOPE_GATE (true|false)
   # 3. Exp ranges: thread each non-null exp-lookup field as a CLI override; omit nulls so
   #    gen_prompt falls back to its DB/polymer_rules ±5% band:
   #    --exp_tg_min/--exp_tg_max, --exp_density_min/--exp_density_max,
@@ -195,7 +197,6 @@ PHASE C — SUMMARY (always)
   Agent(subagent_type="run-summary-worker", description="🟢 Run summary {polymer_name}",
         prompt=<gen_prompt.py --stage run-summary --plan PLAN_PATH
                --smiles ... --ff ... --tg_fit_quality ... --d05 equil_verdict
-               --n_replicates <distinct replicates in the multirate registry>
                --tg_path <TG_PATH> --slope_gate_pass <SLOPE_GATE>
                [--exp_tg_min ... --exp_tg_max ...] [--exp_density_min ... --exp_density_max ...]
                --exp_K_min ... --exp_K_max ...>)

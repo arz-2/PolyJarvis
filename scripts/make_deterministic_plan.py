@@ -44,7 +44,7 @@ SNAPSHOT_KEYS = [
     "T_equil_K", "annealing_T_high_K", "eq_annealing_cycles", "P_equil_atm",
     "t_equil_ns", "npt_prod_ns", "melt_npt_ns",
     "tg_t_high_K", "tg_t_low_K", "tg_t_step_K", "tg_steps_per_t", "tg_rates_K_per_ns",
-    "tg_min_steps_per_T",
+    "tg_min_steps_per_T", "tg_slope_gate_fallback",
     "K_deform_rate_inv_s", "K_deform_rate_slow_inv_s", "K_strain_max",
     "bm_pressures_atm", "ct_min_decay_melt",
 ]
@@ -140,8 +140,18 @@ def build_planned_stages(cls: dict, properties: set) -> list:
         # Multirate aggregation: log-linear Tg(Γ) fit across cooling rates,
         # extrapolated to the DSC-equivalent rate. Log-linear R² is the gate
         # (always reliable); VF is diagnostic only at <2 decades of span.
-        stages.append(_s("analyze-tg-multirate",
-                         {"loglinear_r_squared_min": 0.90, "n_rates_min": 2}))
+        # Classes carrying tg_slope_gate_fallback structurally fail the slope
+        # gate: the R² criterion applies only if the gate passes, and the
+        # headline Tg falls back to the named rate (select_tg_path.py).
+        slope_fb = cls.get("tg_slope_gate_fallback")
+        if slope_fb:
+            stages.append(_s("analyze-tg-multirate",
+                             {"loglinear_r_squared_min": 0.90, "n_rates_min": 2},
+                             fallback=f"single_rate_fallback:{slope_fb}",
+                             slope_gate_fail_expected=True))
+        else:
+            stages.append(_s("analyze-tg-multirate",
+                             {"loglinear_r_squared_min": 0.90, "n_rates_min": 2}))
     if "bulk_modulus" in properties:
         if glassy_hint:
             # Murnaghan-primary at 300 K; deform fallback. (Born+NVT removed 2026-06-21:
@@ -194,6 +204,16 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
     # cooling rate (10 K/min = 1.6667e-10 K/ns) that the multirate Tg fit extrapolates to.
     # Class entries may override via polymer_rules.json; otherwise this default applies.
     decided_params["dsc_equiv_rate_K_per_ns"] = cls.get("dsc_equiv_rate_K_per_ns", 1.6667e-10)
+    uncertainties = [
+        {"name": "ff_transferability",
+         "dominant": cls.get("confidence", "low") != "high",
+         "reduction_probe": "none"},
+    ]
+    if "tg" in properties and cls.get("tg_slope_gate_fallback"):
+        # Structural slope-gate fragility (PEST/PKTN/PSFO): the plan does not
+        # predict a passing gate; the fallback rate is in decided_params.
+        uncertainties.append({"name": "slope_fragility", "dominant": True,
+                              "reduction_probe": "none"})
     return {
         "schema_version": "1.0",
         "goal": f"Predict {', '.join(sorted(properties))} for {polymer_class.upper()}"
@@ -207,11 +227,7 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
         "assumptions": [
             "polymer_rules.json defaults are validated for this class (confidence-gated)",
         ],
-        "uncertainties": [
-            {"name": "ff_transferability",
-             "dominant": cls.get("confidence", "low") != "high",
-             "reduction_probe": "none"},
-        ],
+        "uncertainties": uncertainties,
         "decided_params": decided_params,
         "decisions": build_decisions(cls),
         "planned_stages": build_planned_stages(cls, properties),

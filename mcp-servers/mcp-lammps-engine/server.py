@@ -3440,8 +3440,8 @@ def generate_run_summary(
         exp_tg_min/max:   Experimental Tg range (K) for PASS/FAIL status.
         exp_density_min/max: Experimental density range (g/cm³).
         exp_K_min/max:    Experimental bulk modulus range (GPa).
-        n_replicates:     Distinct replicates in the multi-rate Tg registry (for the
-                          DSC-equivalent extrapolation reported in results.tg).
+        n_replicates:     Replicate count reported in results.tg.n_replicates
+                          (single-run protocol: 1).
         tg_path:          Explicit path to the canonical tg_summary.json (e.g.
                           tg_r40/tg_summary.json — the slowest-rate folder). When
                           supplied, skips rglob discovery; prevents alphabetical-order

@@ -1174,6 +1174,8 @@
         80,
         100
       ],
+      "tg_slope_gate_fallback": "highest_rate",
+      "_tg_slope_gate_note": "Slope-gate FAIL is structural for stiff ester backbones: the transition delocalizes at slow rates, so every tested rate set fails the b>0 gate. Headline Tg = HIGHEST rate (cleanest, least delocalized bilinear fit). Do not spend /recover attempts on seed rerolls or rate changes.",
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.15,
@@ -1853,6 +1855,8 @@
         50,
         100
       ],
+      "tg_slope_gate_fallback": "slowest_rate",
+      "_tg_slope_gate_note": "Slope-gate FAIL is structural for rigid aromatics: the staircase cold-starts from the 300 K glassy cell, so the highest-T plateaus under-equilibrate at fast rates and invert the Tg-vs-rate trend. Headline Tg = SLOWEST (most-equilibrated) rate + degeneracy caveat; seed rerolls cannot fix this. Root fix (backlog): melt-start sweep.",
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "bm_pressures_atm": [
@@ -1939,6 +1943,8 @@
         50,
         100
       ],
+      "tg_slope_gate_fallback": "slowest_rate",
+      "_tg_slope_gate_note": "Slope-gate FAIL is structural for rigid aromatics: the staircase cold-starts from the 300 K glassy cell, so the highest-T plateaus under-equilibrate at fast rates and invert the Tg-vs-rate trend. Headline Tg = SLOWEST (most-equilibrated) rate + degeneracy caveat; seed rerolls cannot fix this. Root fix (backlog): melt-start sweep.",
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
