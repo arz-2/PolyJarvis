@@ -19,8 +19,19 @@ from typing import Optional
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)          # strip instructional/example comments
 _SECTION = re.compile(r"^##\s+(.+?)\s*$", re.M)
 _DECISION_ROW = re.compile(r"^\|\s*D-0(\d)\b([^|]*)\|([^|]*)\|([^|]*)\|", re.M)
-_RECOVERY_HEAD = re.compile(r"^\[\s*Stage\b([^\]]*)\]\s*(.*)$", re.M)
-_KV = re.compile(r"^\s*(Diagnosis|Fix|Outcome)\s*:\s*(.*)$", re.I | re.M)
+# Two incident-heading styles coexist in the corpus: "[Stage 06] trigger" and
+# "### R-01 Title (date)".
+_RECOVERY_HEAD = re.compile(
+    r"^\[\s*Stage\b(?P<stage>[^\]]*)\]\s*(?P<trig>.*)$"
+    r"|^#{2,4}\s+(?P<rid>R-\d+)\b\s*(?P<title>.*)$",
+    re.M,
+)
+# Field lines appear bare ("Fix: ...") or as bold bullets with a qualifier
+# ("- **Fix (inline recovery):** ...", "- **Symptom / trigger:** ...").
+_KV = re.compile(
+    r"^\s*(?:[-*]\s*)?\*{0,2}(Diagnosis|Fix|Outcome|Symptom)\b[^:\n]*:\*{0,2}\s*(.*)$",
+    re.I | re.M,
+)
 _RESULT_ROW = re.compile(r"^\|\s*([^|]+?)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|", re.M)
 
 # class ids are all P + 3 uppercase letters (PCBN, PSTR, PHYC, ...); exclude the
@@ -157,11 +168,18 @@ def _parse_recoveries(body: str, rec: RunRecord) -> None:
     for i, m in enumerate(heads):
         end = heads[i + 1].start() if i + 1 < len(heads) else len(body)
         block = body[m.end():end]
-        kv = {k.lower(): v.strip() for k, v in _KV.findall(block)}
+        kv = {}
+        for k, v in _KV.findall(block):
+            key = "trigger" if k.lower() == "symptom" else k.lower()
+            kv.setdefault(key, v.strip())  # first occurrence wins
+        if m.group("stage") is not None:
+            stage, trigger = m.group("stage").strip(), m.group("trig").strip()
+        else:
+            stage, trigger = m.group("rid").strip(), m.group("title").strip()
         rec.recoveries.append(
             Recovery(
-                stage=m.group(1).strip(),
-                trigger=m.group(2).strip(),
+                stage=stage,
+                trigger=kv.get("trigger", trigger) or trigger,
                 diagnosis=kv.get("diagnosis", ""),
                 fix=kv.get("fix", ""),
                 outcome=kv.get("outcome", ""),

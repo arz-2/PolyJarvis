@@ -110,14 +110,15 @@ Apply the doc targets from this table:
 
 ## Step 5b — Refresh the recovery playbook
 
-Regenerate `guides/RECOVERY_PLAYBOOK.md` from the accumulated `data/*/run_log.md`
-corpus. `runlog_miner` clusters past RECOVERIES into a signature → diagnosis → fix
-table ranked by empirical success rate; the `recover` skill consults this **before**
-its built-in taxonomy, so a fresh distillation here closes the learning loop each
-time memories are ingested.
+Regenerate `guides/RECOVERY_PLAYBOOK.md` from the accumulated
+`manuscript/data/<RUN>/run_log.md` corpus (the consolidated benchmark runs; live runs
+still land in `data/` and join the corpus when consolidated). `runlog_miner` clusters
+past RECOVERIES into a signature → diagnosis → fix table ranked by empirical success
+rate; the `recover` skill consults this **before** its built-in taxonomy, so a fresh
+distillation here closes the learning loop each time memories are ingested.
 
 ```bash
-python -m tools.runlog_miner --playbook -o guides/RECOVERY_PLAYBOOK.md
+python -m tools.runlog_miner --playbook --data-dir manuscript/data -o guides/RECOVERY_PLAYBOOK.md
 ```
 
 The file carries a `do not edit by hand` header — it is fully generated, so the

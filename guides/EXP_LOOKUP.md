@@ -128,4 +128,12 @@ RESULT:
   action_needed: <what caller should do — typically fall back to polymer_rules.json>
 ```
 
-**`db/` is gitignored — local-only on the integrator machine.** Both `query_best_match.py` and `polymer_db.sqlite` live under the gitignored `db/` dir and are NOT synced to other machines (the DB is built from external scraped sources, not rebuildable on demand). If the script or DB is **absent** (`FileNotFoundError` / `No such file`), do **NOT** hard-fail the run — return `match_method: none` / `match_confidence: none` with all range fields `null`. The orchestrator treats that as "omit exp overrides → fall back to `polymer_rules.json` ±5% band" (CLAUDE.md Phase C), and the needed experimental values already live in `polymer_rules.json`. A missing DB degrades grading precision (wider band), never blocks the run.
+**`db/polymer_db.sqlite` is local-only (curated from copyrighted sources); the query/ingest code is tracked.** `query_best_match.py` ships with the repo, but the sqlite payload does not. If the DB is **absent** (`FileNotFoundError` / `No such file`), do **NOT** hard-fail the run — return `match_method: none` / `match_confidence: none` with all range fields `null`. The orchestrator treats that as "omit exp overrides → fall back to `polymer_rules.json` ±5% band" (CLAUDE.md Phase C), and the needed experimental values already live in `polymer_rules.json`. A missing DB degrades grading precision (wider band), never blocks the run.
+
+**Bulk-modulus rows mix K_S and K_T.** `get_bulk_modulus_data` returns a `method_caveat`: the DB has no measurement-method column, so ranges can mix adiabatic K_S (ultrasonic) with isothermal K_T; MD Murnaghan K is K_T. Check per-row `notes`, and when `polymer_rules.json` has a K_T-prioritized `exp_K_GPa` for the class, report the DB range with the caveat and recommend the polymer_rules range for the headline grade.
+
+## Backlog
+
+- Add a `method` column to `mechanical_measurements` (`db/schema.sql`) and tag rows K_S/K_T so `get_bulk_modulus_data` can filter instead of caveating.
+- Literature-grounding source methodology: paywall verification tiers (DOI resolve ≠ verified; ACS/Wiley/ScienceDirect are paywalled — check Yumpu handbook scans, Google Patents, arXiv/ChemRxiv before declaring no source) and a Polymer Data Handbook + Van Krevelen group-contribution fallback for niche polymers with no open bulk density.
+- Member-data candidates for polymer_rules: PAN (two-phase Tg — grade amorphous MD vs 358–380 K band, amorphous ρ 1.17–1.18), polychloroprene (amorphous band 1.18–1.27 g/cm³, crystalline 1.33 is a false-FAIL trap; Tg 228–233 K), PVP (Tg is MW-dependent, K12 378 K → K90 ~450 K; dry-condition values only, amorphous ρ 1.18).

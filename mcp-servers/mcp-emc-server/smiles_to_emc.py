@@ -196,8 +196,17 @@ def run_emc_build(build_emc: Path) -> Path:
     )
 
     if result.returncode != 0:
+        # A negative returncode is a signal kill (typically SIGSEGV when a monomer hits the
+        # wrong force field, e.g. chlorinated + trappe-ua/opls-aa) — there is no `Error:`
+        # line in the output, so tag it explicitly: a segfault on one field means "try the
+        # next field in the cascade", not "SMILES unbuildable".
+        kind = (
+            f"segfault (signal {-result.returncode})"
+            if result.returncode < 0
+            else f"exit {result.returncode}"
+        )
         raise RuntimeError(
-            f"EMC build failed (exit {result.returncode}):\n"
+            f"EMC build failed ({kind}):\n"
             f"{result.stdout}\n{result.stderr}"
         )
 

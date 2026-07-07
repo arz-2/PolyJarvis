@@ -78,11 +78,19 @@ On session restart mid-thermal-track: re-read this file before resuming.
     from this sweep (discard the staged rows — nothing was committed, so no churn).
     Spawn /recover immediately (re-run all 3 Tg sweeps from the same equil cell with a new
     velocity seed). Max 2 attempts total, then write UNRESOLVED to run_log.md and stop.
-    PEST slope-fragility (recovery ladder): PEST defaults are [25,50,100] K/ns; a budget-forced
-    recovery may drop to [40,100]. If the Tg-vs-rate response is near-flat (|ΔTg| < 1 K over the
-    rate span, e.g. PLA r40→r160 moved 0.2 K), a two-point fit's slope sign is noise-dominated and
-    can fail the slope gate with no retry budget left. The planner should name slope_fragility as
-    the dominant uncertainty, set plan_mode=reasoned, reduction_probe=none (no cheap fix exists).
+    PEST slope-fragility: slope-gate FAIL is the EXPECTED outcome for PLA/PEST — structural, not
+    seed noise (the stiff ester backbone delocalizes the transition at slow rates; every tested
+    rate set fails, [25,50,100] and [40,80,100] alike). Do NOT burn recovery attempts on rate
+    changes or rerolls; pre-commit to single_rate_fallback with the HIGHEST rate as headline Tg
+    (cleanest, least delocalized fit). The planner should name slope_fragility as the dominant
+    uncertainty, set plan_mode=reasoned, reduction_probe=none (no cheap fix exists).
+    Rigid-aromatic carve-out (PSFO/PKTN, Tg >> 300 K): slope-gate FAIL is likewise structural —
+    the staircase cold-starts from the 300 K glassy cell, so the highest-T plateaus
+    under-equilibrate at fast rates and INVERT the Tg-vs-rate trend (fast rate ⇒ spuriously low
+    Tg). Seed rerolls cannot fix this: skip /recover, use single_rate_fallback with the SLOWEST
+    (most-equilibrated) rate as headline Tg + a degeneracy caveat — the class exception to the
+    highest-rate fallback convention (thread that rate's tg_summary as --tg_path in Phase C).
+    is_glassy still settles from exp Tg; the mechanical track may proceed in parallel.
   Rubbery exemption: gen_prompt passes `--regime rubbery` to extract_tg_multirate for rubbery
     polymers (T_workflow >> Tg). In that regime a negative slope is meaningless scatter (the
     per-rate "Tg" is an extrapolation artefact), NOT contamination — the tool returns
@@ -134,3 +142,8 @@ On session restart mid-thermal-track: re-read this file before resuming.
 - **Read:** pass ALL committed rows for this polymer (filtered to `fit_quality >= ACCEPTABLE`) plus
   this replicate's staged rows as `--mr_rates`/`--mr_tg_values` to `analyze-tg-multirate`. If < 2
   rows survive, fall back to the single highest-rate Tg.
+
+## Backlog
+
+- Melt-start Tg sweep for rigid aromatics (PSFO/PKTN): start the staircase from a melt cell (or prepend a ≥750 K NPT pre-equilibration) so the top plateaus don't cold-start from glass — root fix for the inverted Tg-vs-rate trend that makes the slope gate structurally unpassable for these classes.
+- `make_deterministic_plan.py` should flag slope_fragility for PEST and rigid-aromatic classes (plan_mode=reasoned, dominant_uncertainty=slope_fragility) instead of emitting a deterministic plan that predicts a passing slope gate.

@@ -238,7 +238,7 @@ _OPLS_CLASSES   = {
     "PSIL",  # polysiloxanes (PDMS) — opls/2024/opls-aa has si4/o2 Si-O params; pcff missing {si,osi}
 }
 _TRAPPE_CLASSES = {"PHYC", "PDIE"}  # PSTR moved to _PCFF_CLASSES — PCFF preferred (see PSTR entry above)
-# PURA (polyurea): EMC build fails on pcff (missing {n_2,hn}) — remains on RadonPy
+# PURA (polyurea): EMC build fails on pcff (missing {na,c_2} amide-N increment) — remains on RadonPy
 
 def _select_field(polymer_class: str) -> str:
     if polymer_class in _PCFF_CLASSES:
@@ -375,7 +375,7 @@ mcp = FastMCP(
       PDIE  Polydienes           (e.g. PBD, PI)
 
     RadonPy only (EMC build fails):
-      PURA  Polyureas            — pcff missing {n_2,hn} increment
+      PURA  Polyureas            — pcff missing {na,c_2} amide-N increment
 
     The field is selected automatically from polymer_class — do not override it.
 
