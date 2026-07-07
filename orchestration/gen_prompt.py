@@ -3,7 +3,7 @@
 gen_prompt.py — Generate fully-formed worker prompts for PolyJarvis orchestrator.
 
 Usage:
-  python3 scripts/gen_prompt.py --stage <STAGE> [options]
+  python3 orchestration/gen_prompt.py --stage <STAGE> [options]
 
 Workers: build | equil | tg | deform | murnaghan | analyze-tg | equil-check | analyze-bm | run-summary
 
@@ -164,7 +164,7 @@ def resolve_hardware(args, cls: dict, rules: dict) -> None:
     them, so a run can never default to the mpi=1 anti-pattern. Explicit CLI values
     always win (keeps deterministic-plan output byte-identical — runtime wiring stays
     CLI-authoritative per apply_plan's contract). Specific gpu_ids remain runtime;
-    use scripts/pick_gpu.py to claim a non-colliding GPU at submit time."""
+    use orchestration/pick_gpu.py to claim a non-colliding GPU at submit time."""
     hp = rules.get("hardware_policy")
     if not hp:
         return
@@ -203,11 +203,11 @@ def resolve_hardware(args, cls: dict, rules: dict) -> None:
             args.gpu_ids = ""
         else:
             # emit gpu_per_run placeholder ids (e.g. "0,1" for a 2-GPU run); the orchestrator
-            # claims that many free GPUs via scripts/pick_gpu.py claim --need N at submit time.
+            # claims that many free GPUs via orchestration/pick_gpu.py claim --need N at submit time.
             n = max(1, int(pol.get("gpu_per_run", 1) or 1))
             args.gpu_ids = ",".join(str(i) for i in range(n))
         print(f"INFO: gpu_ids not given — derived \"{args.gpu_ids}\" from "
-              f"hardware_policy[{fam}]; claim free GPU(s) with scripts/pick_gpu.py",
+              f"hardware_policy[{fam}]; claim free GPU(s) with orchestration/pick_gpu.py",
               file=sys.stderr)
 
 
@@ -962,7 +962,7 @@ def main():
     p.add_argument("--gpu_ids", required=False, default=None,
                    help='Comma-separated GPU IDs, e.g. "0" or "0,1". '
                         'If omitted, derived from polymer_rules.json hardware_policy by FF '
-                        '("" for CPU engine). Claim a free GPU with scripts/pick_gpu.py.')
+                        '("" for CPU engine). Claim a free GPU with orchestration/pick_gpu.py.')
     p.add_argument("--mpi_ranks", type=int, required=False, default=None,
                    help="MPI processes per run. If omitted, derived from "
                         "hardware_policy by FF (never mpi=1 for PPPM classes).")

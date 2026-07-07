@@ -15,7 +15,7 @@ On session restart mid-mechanical-track: re-read this file before resuming.
   # glassy primary path only — launching before is_glassy is known wastes ~2–5 h if the
   # polymer is rubbery at 300 K (K_rubbery requires a different T and pressure range).
   if is_glassy or bm_pressures_atm is non-null in plan.decided_params:
-    Claim GPU: scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
+    Claim GPU: orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
     Agent(subagent_type="murnaghan-worker", description="🟠 Murnaghan BM {polymer_name}",
           prompt=<gen_prompt.py --stage murnaghan --plan PLAN_PATH
                   --data_path npt_prod300_data_path   # glassy: 300 K cell
@@ -28,7 +28,7 @@ On session restart mid-mechanical-track: re-read this file before resuming.
     BACKGROUND-WAIT (CLAUDE.md canonical pattern): Bash(command=monitor_command_murnaghan, run_in_background=true),
       then END YOUR TURN. Do NOT release the GPU or call get_run_status in this turn.
     # On the completion wakeup (next turn):
-    scripts/pick_gpu.py release --run <RUN>
+    orchestration/pick_gpu.py release --run <RUN>
     get_run_status → RUN_COMPLETE/completed → proceed to extraction;
       PROCESS_DEAD_NO_SENTINEL/failed → /recover
     # Check Murnaghan acceptance BEFORE extraction:
@@ -39,14 +39,14 @@ On session restart mid-mechanical-track: re-read this file before resuming.
     #   flags a vitrification discontinuity; report low-P points only. Smooth monotonic
     #   stiffening (ratio drifts, no jump) + R²>0.999 rules out a kink → trust full-range fit.
     Recovery if murnaghan fails (fit_converged=False OR B0_prime outside [4, 20]):
-      Claim GPU: scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
+      Claim GPU: orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
       Agent(subagent_type="deform-worker", description="🔵 Deform fallback {polymer_name}",
             prompt=<gen_prompt.py --stage deform --plan PLAN_PATH --data_path npt_prod300_data_path
                     --gpu_ids <claimed>>)
         → parse RESULT → extract run_id_deform, deform_log_path, monitor_command_deform
       Write SIMULATION STATE (status=monitoring, + bg task id)
       BACKGROUND-WAIT (CLAUDE.md canonical pattern): Bash(command=monitor_command_deform, run_in_background=true),
-        then END YOUR TURN. On the completion wakeup: scripts/pick_gpu.py release --run <RUN>
+        then END YOUR TURN. On the completion wakeup: orchestration/pick_gpu.py release --run <RUN>
   # else (rubbery + no pressures + bm_pressures_atm null): skip — fluctuation path, equil log already present
 
   # Key: for glassy Murnaghan always pass npt_prod300_data_path (300 K cell, not melt)

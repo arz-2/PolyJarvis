@@ -17,7 +17,7 @@ with the SAME schema but possibly-different decided_params and a non-trivial
 critique block. gen_prompt.py --plan consumes both identically.
 
 Usage:
-  python3 scripts/make_deterministic_plan.py \
+  python3 orchestration/make_deterministic_plan.py \
       --run_name PE7 --polymer_class PHYC \
       [--smiles "*CC*"] [--properties density,tg,bulk_modulus] \
       [--out PATH]        # default: data/<run_name>/raw/run_plan.json; "-" = stdout

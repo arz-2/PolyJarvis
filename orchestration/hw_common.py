@@ -7,8 +7,8 @@ way (and drift on — e.g. pick_gpu.py once hardcoded 18 cores after the box mov
 the polymer_rules.json loader, the hardware_policy accessor, physical-core detection, the
 nvidia-smi GPU probe, and FF-family resolution.
 
-stdlib only — importable by any scripts/<x>.py (scripts/ is on sys.path[0] when run as a
-CLI; benchmark_hardware.py / calibrate_hardware.py also insert scripts/ explicitly).
+stdlib only — importable by any orchestration/<x>.py (orchestration/ is on sys.path[0] when
+run as a CLI; benchmark_hardware.py / calibrate_hardware.py also insert orchestration/ explicitly).
 """
 from __future__ import annotations
 

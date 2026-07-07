@@ -4,7 +4,7 @@ This directory holds **prompts and config for the agent pipeline**, not human tu
 (human docs live in `docs/` and the root `README.md`). Four genres share the folder; the
 key distinction is *who consumes each file*:
 
-## 1. Worker guides — inlined into worker prompts by `scripts/gen_prompt.py`
+## 1. Worker guides — inlined into worker prompts by `orchestration/gen_prompt.py`
 
 Never `Read` these directly during a run; `gen_prompt.py --stage <STAGE>` embeds the right
 one into the worker's prompt.

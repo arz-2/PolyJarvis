@@ -54,7 +54,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 ENGINE = REPO / "mcp-servers" / "mcp-lammps-engine"
 sys.path.insert(0, str(ENGINE))
-sys.path.insert(0, str(REPO / "scripts"))  # hw_common lives with the runtime scripts
+sys.path.insert(0, str(REPO / "orchestration"))  # hw_common lives in orchestration/
 # shared host/GPU probes (re-exported here so calibrate_hardware.py keeps using bh.detect_phys_cores / bh.gpu_status)
 from hw_common import detect_phys_cores, gpu_status
 

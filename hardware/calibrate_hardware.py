@@ -41,10 +41,10 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
-SCRIPTS = REPO / "scripts"
+ORCH = REPO / "orchestration"
 RULES = REPO / "guides" / "polymer_rules.json"
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(SCRIPTS))         # hw_common lives with the runtime scripts
+sys.path.insert(0, str(ORCH))            # hw_common lives in orchestration/
 import benchmark_hardware as bh          # reuse politeness probes + detection + matrix
 import hw_common                         # live_host() for the host fingerprint
 

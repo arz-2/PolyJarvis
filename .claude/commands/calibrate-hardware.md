@@ -18,7 +18,7 @@ SKIPS configs that would contend. If the box is busy it records evidence but lea
 
 **1. Check current load before doing anything:**
 ```bash
-python3 scripts/pick_gpu.py status
+python3 orchestration/pick_gpu.py status
 nvidia-smi --query-gpu=index,utilization.gpu,memory.used --format=csv,noheader
 cat /proc/loadavg
 ```

@@ -1,4 +1,4 @@
-"""Behavioral tests for scripts/select_tg_path.py.
+"""Behavioral tests for orchestration/select_tg_path.py.
 
 The helper picks which per-rate tg_summary.json feeds run-summary: the slowest
 rate when the multirate slope gate passed, else the class fallback rate from
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "select_tg_path.py"
+SCRIPT = Path(__file__).resolve().parent.parent / "orchestration" / "select_tg_path.py"
 
 
 def _invoke(tmp_path, rates, gate, fallback=None):

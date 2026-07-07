@@ -12,7 +12,7 @@ PolyJarvis is a **stateful orchestrator driving a fleet of stateless specialist 
 
 **Orchestration layer.** A single long-lived Claude session (the *orchestrator*) holds all run state, recovery logic, and the approved plan. It never runs simulations itself; it spawns workers and routes their results. Workers are **stateless** — each gets a self-contained prompt and returns a structured RESULT block — so the orchestrator is the only stateful component and the sole point of recovery. [`CLAUDE.md`](CLAUDE.md) is its operating manual and the authoritative worker roster.
 
-**Agent layer (13 specialist workers).** Each worker has a fixed role, a model tier matched to task difficulty, and a canonical guide inlined into its prompt by `scripts/gen_prompt.py`:
+**Agent layer (13 specialist workers).** Each worker has a fixed role, a model tier matched to task difficulty, and a canonical guide inlined into its prompt by `orchestration/gen_prompt.py`:
 
 | Phase | Workers (model) |
 |-------|-----------------|
@@ -31,7 +31,7 @@ PolyJarvis is a **stateful orchestrator driving a fleet of stateless specialist 
 3. **Execute by track.** The **foundation** track always runs first (build → equilibrate → equil-check gate → density). The property-conditional tracks then run against the equilibrated cell: **thermal** (multi-rate T<sub>g</sub> sweeps → T<sub>g</sub>, CTE, ΔC<sub>p</sub>) and **mechanical** (Murnaghan pressure-series EOS as the primary bulk-modulus path, 3-direction uniaxial deformation as the fallback → K). Mechanical reads the glassy/rubbery regime from thermal.
 4. **Validate.** Every worker result is checked against the plan's `success_criteria`; failures trigger bounded recovery (max 2 attempts/worker) before the run is marked UNRESOLVED. A condition-matched experimental lookup supplies grading bounds before the final summary.
 
-The **`run_plan.json` is the single source of truth** — `scripts/gen_prompt.py` threads its `decided_params` into every worker prompt, so no worker improvises parameters and the whole run is reconstructable from the plan. What gets reported, and how each property is computed, is documented in [`docs/PROPERTIES.md`](docs/PROPERTIES.md).
+The **`run_plan.json` is the single source of truth** — `orchestration/gen_prompt.py` threads its `decided_params` into every worker prompt, so no worker improvises parameters and the whole run is reconstructable from the plan. What gets reported, and how each property is computed, is documented in [`docs/PROPERTIES.md`](docs/PROPERTIES.md).
 
 ### Inferred vs. inherited
 
@@ -56,7 +56,7 @@ The framework was validated on a **36-run replicate study: 9 polymers × 4 indep
 | `CLAUDE.md` | Orchestrator operating manual — the agent's workflow spec (start here to understand the pipeline) |
 | `.claude/` | Agent definitions (13 workers), hooks, slash commands, per-agent memory |
 | `guides/` | **Agent prompts & machine-read config**, not human docs — worker guides inlined by `gen_prompt.py`, orchestrator track guides, `polymer_rules.json` / `decision_policy.json` (see [`guides/README.md`](guides/README.md)) |
-| `scripts/` | CLI/orchestration helpers — prompt generation, deterministic planning, GPU allocation (see [`scripts/README.md`](scripts/README.md)) |
+| `orchestration/` | CLI/orchestration helpers — prompt generation, deterministic planning, GPU allocation (see [`orchestration/README.md`](orchestration/README.md)) |
 | `mcp-servers/` | The three MCP servers: `mcp-mol-builder-server` (RadonPy), `mcp-emc-server` (EMC), `mcp-lammps-engine` (LAMMPS + analysis scripts + templates) |
 | `data/` | Live pipeline working directory — per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`), run template |
 | `hardware/` | Hardware calibration — `/calibrate-hardware` toolchain (`calibrate_hardware.py`, `benchmark_hardware.py`, `bench_accuracy_diff.py`), the engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`), and the per-FF calibration cells (`CALIB_<FAM>/`) |
@@ -138,7 +138,7 @@ Each run's `engine`/`mpi`/`gpu` defaults come from `guides/polymer_rules.json:ha
 ```bash
 python3 hardware/calibrate_hardware.py --dry-run   # preview the polite plan per FF; writes nothing
 nice -n 19 python3 hardware/calibrate_hardware.py  # measure + write hardware_policy
-python3 scripts/pick_gpu.py status                 # verify: GPU allocation / spare-core view
+python3 orchestration/pick_gpu.py status                 # verify: GPU allocation / spare-core view
 ```
 
 Calibration is **polite by default** on a shared box: idle GPUs only, rank caps against measured CPU load, everything `nice`d — never use `--allow-busy`. The calibration cells ship in-repo (`hardware/CALIB_<FAM>/`). Re-run after any GPU/CPU change. Rationale, the per-FF lookup table, and the full-search mode are in [`hardware/HARDWARE.md`](hardware/HARDWARE.md) / [`hardware/HARDWARE_STUDY.md`](hardware/HARDWARE_STUDY.md); an agent can drive the whole procedure via the `/calibrate-hardware` slash-command.

@@ -9,7 +9,7 @@ mpi/gpu rules existed in agent memory but were never enforced at launch, so bad 
 `mpi=1` on PCFF ≈ 2.4 ns/day; UA on GPU `mpi=1`) launched and got fixed reactively via
 `/recover`. The fix: make config plan-driven per FF (`polymer_rules.json:hardware_policy` →
 `gen_prompt.py`), plus a benchmark harness (`hardware/benchmark_hardware.py`) and an allocation
-helper (`scripts/pick_gpu.py`).
+helper (`orchestration/pick_gpu.py`).
 
 ## Hardware
 - 4× NVIDIA Quadro RTX 6000 (24 GB, ids 0–3)

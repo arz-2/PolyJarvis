@@ -32,7 +32,7 @@ Check agent memory for class-specific planning lessons (FF caveats, off-table an
 
    **A. `confidence=high` → deterministic plan.** Do NOT re-reason a settled, cited decision. Run:
    ```
-   Bash: python3 scripts/make_deterministic_plan.py --run_name <run_name> \
+   Bash: python3 orchestration/make_deterministic_plan.py --run_name <run_name> \
          --polymer_class <CLASS> --smiles "<smiles>" --properties <props>
    ```
    This writes `data/<run_name>/raw/run_plan.json` with `plan_mode=deterministic` and an auto-approved critique. You are done — emit the RESULT block. Worker prompts will be byte-identical to the validated pipeline; the run will use fixed seeds from `guides/REVISION_PARAMS.md`.
@@ -41,7 +41,7 @@ Check agent memory for class-specific planning lessons (FF caveats, off-table an
    - Set `plan_mode: "reasoned"` and `critique.status: "proposed"`, `critique.rounds: 0`, `critique.findings: []`.
    - **Temperature estimation (off-table / confidence=low).** If the class is off-table (absent from `polymer_rules.json`) or `confidence=low`, run:
      ```
-     Bash: python3 scripts/estimate_tg_group_contribution.py --smiles "<smiles>" --output json
+     Bash: python3 orchestration/estimate_tg_group_contribution.py --smiles "<smiles>" --output json
      ```
      If the result has `confidence != "very_low"`, override these keys in `decided_params` with the script output: `T_equil_K`, `annealing_T_high_K`, `tg_t_high_K`, `tg_t_low_K`, `T_workflow_K`. Also set `decided_params.experimental_tg_K` to the estimated value and mark it as estimated in the `D-04_system_size` decision evidence (e.g. `{"claim": "Tg estimated via van Krevelen group contribution", "method": "van_krevelen_group_contribution", "value_K": <N>}`). Add a `dominant: true` uncertainty named `"temperature_parameters_estimated"` with `reduction_probe: "fast_density_screen"`.
      If `confidence="very_low"` (>30% unmatched groups), leave global_defaults unchanged and record `"temperature_parameters_unvalidated"` as the dominant uncertainty with `reduction_probe: "literature_anchor"`.
