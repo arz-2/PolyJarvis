@@ -1,0 +1,29 @@
+ITEM OPTIONS
+
+replace         true
+field           pcff
+density         0.500000
+ntotal          3000
+number          true
+
+ITEM END
+
+ITEM GROUPS
+
+repeat   *NC(=O)NCCCCCC*,1,repeat:2
+cap      *[H],1,repeat:1,1,repeat:2
+
+ITEM END
+
+ITEM CLUSTERS
+
+poly    alternate    2
+
+ITEM END
+
+ITEM POLYMERS
+
+poly
+100    repeat,5,cap,2
+
+ITEM END

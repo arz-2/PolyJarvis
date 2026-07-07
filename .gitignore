@@ -49,9 +49,6 @@ literature/
 manuscript/*
 !manuscript/csv/
 !manuscript/recovery/
-# the two agent-mode recovery run dirs stay local (simulation artifacts, like manuscript/data/ runs)
-manuscript/recovery/RECOV_F5_AGENT/
-manuscript/recovery/RECOV_F6_AGENT/
 !manuscript/collect_data.sh
 !manuscript/figures/
 manuscript/figures/*

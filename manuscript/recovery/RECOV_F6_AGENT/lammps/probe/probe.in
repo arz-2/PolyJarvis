@@ -1,0 +1,17 @@
+units real
+atom_style full
+boundary p p p
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+read_data /home/arz2/PolyJarvis/data/RECOV_F6_AGENT/cell/cell.data
+include /home/arz2/PolyJarvis/data/RECOV_F6_AGENT/cell/cell.params
+thermo 1
+run 0
+velocity all create 300.0 12345 mom yes rot yes
+fix 1 all nvt temp 300.0 300.0 100.0
+timestep 1.0
+run 20

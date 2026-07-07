@@ -1,0 +1,20 @@
+LAMMPS (22 Jul 2025 - Update 3)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread.
+  using 1 OpenMP thread(s) per MPI task
+units real
+atom_style full
+boundary p p p
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+read_data /home/arz2/PolyJarvis/data/RECOV_F6_AGENT/cell/cell.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (12.616813 12.616813 12.616813)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+ERROR: Incorrect format in Atoms section of data file: Bonds
+For more information see https://docs.lammps.org/err0002 (src/atom.cpp:1201)
+Last input line: read_data /home/arz2/PolyJarvis/data/RECOV_F6_AGENT/cell/cell.data
