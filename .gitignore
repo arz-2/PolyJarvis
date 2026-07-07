@@ -46,18 +46,27 @@ db/
 # ── Manuscript & internal planning docs (not for public repo) ─
 revision.md
 literature/
-# paper/ stays local EXCEPT the published analysis data (csv) and figure generators below
-paper/*
-!paper/csv/
-!paper/gen_figure3_density_parity.py
-!paper/gen_figure4_tg_curves.py
-!paper/gen_figure5_bulk_modulus.py
-!paper/gen_figure6_rdf.py
-!paper/gen_table_bulk_modulus_robustness.py
-!paper/gen_table_compute_cost.py
-!paper/gen_table_structure_diagnostics.py
-!paper/plot_rdf.py
-!paper/replot_from_tool.py
+# manuscript/ stays local EXCEPT the published subset below: benchmark provenance (data/),
+# analysis data (csv/), figure/table generators, the two manuscript figures, the recovery
+# benchmark, and the release rebuilder. New files under manuscript/data/ are ignored like the
+# old data/* — collect_data.sh stages the provenance subset with `git add -f`.
+manuscript/*
+!manuscript/csv/
+!manuscript/recovery/
+!manuscript/collect_data.sh
+!manuscript/figures/
+manuscript/figures/*
+!manuscript/figures/figure1_architecture.png
+!manuscript/figures/figure2_conversation.png
+!manuscript/gen_figure3_density_parity.py
+!manuscript/gen_figure4_tg_curves.py
+!manuscript/gen_figure5_bulk_modulus.py
+!manuscript/gen_figure6_rdf.py
+!manuscript/gen_table_bulk_modulus_robustness.py
+!manuscript/gen_table_compute_cost.py
+!manuscript/gen_table_structure_diagnostics.py
+!manuscript/plot_rdf.py
+!manuscript/replot_from_tool.py
 docs/LLM_CONTRIBUTION_PLAN.md
 docs/UI_PLAN.md
 guides/TODO_OWNER.md
