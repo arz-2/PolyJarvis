@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "mcp-servers" / "mcp-lammps-engine"))
 sys.path.insert(0, str(REPO_ROOT / "mcp-servers" / "mcp-emc-server"))
 
-CALIB_PCFF = REPO_ROOT / "data" / "CALIB_PCFF" / "emc_build.data"
+CALIB_PCFF = REPO_ROOT / "hardware" / "CALIB_PCFF" / "emc_build.data"
 
 # Minimal complete atom_style=full cell that passes validate_data_file(lj_cutoff=1.0).
 # Mirrors the engine's own CLEAN_DATA fixture (tests/test_data_file_utils.py) so F6's

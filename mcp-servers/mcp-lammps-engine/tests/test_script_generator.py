@@ -13,9 +13,9 @@ from script_generator import ScriptGenerator, _detect_ff_from_data_file
 
 # Absolute paths to committed CALIB data files (EMC-generated, all three FF types)
 _REPO = Path(__file__).resolve().parent.parent.parent.parent  # .../PolyJarvis
-PCFF_DATA   = _REPO / "data" / "CALIB_PCFF"   / "emc_build.data"
-TRAPPE_DATA = _REPO / "data" / "CALIB_TRAPPE" / "emc_build.data"
-OPLS_DATA   = _REPO / "data" / "CALIB_OPLS"   / "emc_build.data"
+PCFF_DATA   = _REPO / "hardware" / "CALIB_PCFF"   / "emc_build.data"
+TRAPPE_DATA = _REPO / "hardware" / "CALIB_TRAPPE" / "emc_build.data"
+OPLS_DATA   = _REPO / "hardware" / "CALIB_OPLS"   / "emc_build.data"
 
 # Minimal GAFF2-style RadonPy data file — has inline Pair Coeffs → detection returns {}
 GAFF2_DATA_CONTENT = """\

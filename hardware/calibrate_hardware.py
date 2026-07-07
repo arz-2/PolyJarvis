@@ -11,7 +11,7 @@ Two modes:
   --revalidate (DEFAULT) — confirm the SHIPPED by_forcefield default per FF on this host:
       run the exact engine/mpi/gpu the policy already ships (no engine re-search), gate it
       with a run-0 parity vs CPU (bench_accuracy_diff.py), and record host-matched ns/day.
-      Uses the in-repo data/CALIB_* cells when --cell is omitted. This is the fresh-clone
+      Uses the in-repo hardware/CALIB_* cells when --cell is omitted. This is the fresh-clone
       path: cheap, and it only confirms/measures — it does not re-decide engines.
   --full — fresh engine×config sweep per FF (the old matrix). Authoritative; needs explicit
       --cell/--ff pairs and ideally a drained box.
@@ -23,8 +23,8 @@ A partial/contended/parity-failing/kokkos-fell-back run records evidence but lea
 `values_are_benchmarked=false`. Re-run on an idle box for the authoritative flip.
 
 Usage:
-  scripts/calibrate_hardware.py [--dry-run]            # revalidate shipped defaults, in-repo cells
-  scripts/calibrate_hardware.py --full \\
+  hardware/calibrate_hardware.py [--dry-run]           # revalidate shipped defaults, in-repo cells
+  hardware/calibrate_hardware.py --full \\
       --cell /path/PCFF/cell.data --ff pcff \\
       --cell /path/UA/cell.data   --ff trappe          # fresh engine sweep
 """
@@ -40,9 +40,11 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+HERE = Path(__file__).resolve().parent
 SCRIPTS = REPO / "scripts"
 RULES = REPO / "guides" / "polymer_rules.json"
-sys.path.insert(0, str(SCRIPTS))
+sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(SCRIPTS))         # hw_common lives with the runtime scripts
 import benchmark_hardware as bh          # reuse politeness probes + detection + matrix
 import hw_common                         # live_host() for the host fingerprint
 
@@ -52,10 +54,10 @@ HEADROOM_FRAC = 0.25                     # leave >=25% of physical cores for oth
 # `/calibrate-hardware` needs no --cell args on a fresh clone. Missing entries are
 # skipped with a warning (e.g. a cell still pending an EMC build).
 CALIB_CELLS = {
-    "pcff":   REPO / "data" / "CALIB_PCFF"   / "emc_build.data",
-    "opls":   REPO / "data" / "CALIB_OPLS"   / "emc_build.data",
-    "trappe": REPO / "data" / "CALIB_TRAPPE" / "emc_build.data",
-    "gaff":   REPO / "data" / "CALIB_GAFF"   / "emc_build.data",
+    "pcff":   HERE / "CALIB_PCFF"   / "emc_build.data",
+    "opls":   HERE / "CALIB_OPLS"   / "emc_build.data",
+    "trappe": HERE / "CALIB_TRAPPE" / "emc_build.data",
+    "gaff":   HERE / "CALIB_GAFF"   / "emc_build.data",
 }
 PPPM_FOR = {"pcff": True, "opls": True, "gaff": True, "trappe": False}  # UA has no kspace
 
@@ -105,7 +107,7 @@ def benchmark_cell(cell: str, ff: str, pppm: bool, steps: int, st: dict,
                    only_names: list[str], dry: bool, allow_busy: bool) -> dict | None:
     label = f"calib_{ff}_{Path(cell).parent.name}"
     out_json = Path("/tmp/polyjarvis/bench") / label / "benchmark.json"
-    cmd = ["nice", "-n", "19", sys.executable, str(SCRIPTS / "benchmark_hardware.py"),
+    cmd = ["nice", "-n", "19", sys.executable, str(HERE / "benchmark_hardware.py"),
            "--data", cell, "--ff", ff, "--label", label,
            "--steps", str(steps), "--out", str(out_json),
            "--pppm" if pppm else "--no-pppm"]
@@ -267,7 +269,7 @@ def run_parity(cpu_log: Path, eng_log: Path, work: Path) -> dict:
     if not (cpu_log.exists() and eng_log.exists()):
         return {"verdict": "ERROR", "reason": "missing parity log(s)"}
     out = work / "parity.json"
-    subprocess.run([sys.executable, str(SCRIPTS / "bench_accuracy_diff.py"),
+    subprocess.run([sys.executable, str(HERE / "bench_accuracy_diff.py"),
                     "--baseline", f"CPU={cpu_log}", "--variant", f"ENGINE={eng_log}",
                     "--tail-frac", "1.0", "--out", str(out)],
                    check=False, capture_output=True, text=True)
@@ -404,7 +406,7 @@ def run_revalidate(args, host: dict) -> int:
         missing = [fam for fam, p in CALIB_CELLS.items() if not Path(p).exists()]
         if missing:
             print(f"   note: no in-repo cell yet for {missing} — skipping "
-                  f"(build + commit data/CALIB_<FAM>/emc_build.data to include)")
+                  f"(build + commit hardware/CALIB_<FAM>/emc_build.data to include)")
 
     kokkos_ok = bh.kokkos_binary_ok(LMP_KOKKOS)
     print("== PolyJarvis hardware revalidation (shipped per-FF defaults) ==")
@@ -506,7 +508,7 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--cell", action="append", default=[],
                     help="path to a built .data cell (repeatable, paired with --ff). "
-                         "Omit in --revalidate mode to use the in-repo data/CALIB_* cells.")
+                         "Omit in --revalidate mode to use the in-repo hardware/CALIB_* cells.")
     ap.add_argument("--ff", action="append", default=[],
                     choices=["pcff", "opls", "trappe", "gaff"],
                     help="force-field family for the matching --cell (repeatable)")

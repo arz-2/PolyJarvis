@@ -56,9 +56,10 @@ The framework was validated on a **36-run replicate study: 9 polymers × 4 indep
 | `CLAUDE.md` | Orchestrator operating manual — the agent's workflow spec (start here to understand the pipeline) |
 | `.claude/` | Agent definitions (13 workers), hooks, slash commands, per-agent memory |
 | `guides/` | **Agent prompts & machine-read config**, not human docs — worker guides inlined by `gen_prompt.py`, orchestrator track guides, `polymer_rules.json` / `decision_policy.json` (see [`guides/README.md`](guides/README.md)) |
-| `scripts/` | CLI/orchestration helpers — prompt generation, deterministic planning, GPU allocation, hardware calibration (see [`scripts/README.md`](scripts/README.md)) |
+| `scripts/` | CLI/orchestration helpers — prompt generation, deterministic planning, GPU allocation (see [`scripts/README.md`](scripts/README.md)) |
 | `mcp-servers/` | The three MCP servers: `mcp-mol-builder-server` (RadonPy), `mcp-emc-server` (EMC), `mcp-lammps-engine` (LAMMPS + analysis scripts + templates) |
-| `data/` | Live pipeline working directory — per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`), run template, calibration cells |
+| `data/` | Live pipeline working directory — per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`), run template |
+| `hardware/` | Hardware calibration — `/calibrate-hardware` toolchain (`calibrate_hardware.py`, `benchmark_hardware.py`, `bench_accuracy_diff.py`), the engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`), and the per-FF calibration cells (`CALIB_<FAM>/`) |
 | `db/` | Experimental property database (`polymer_db.sqlite`, schema, query + ingest scripts) |
 | `tests/`, `mcp-servers/*/tests/`, `tools/runlog_miner/tests/` | Test suites (root `pytest.ini`); the recovery-benchmark suite is run separately (`pytest manuscript/recovery/tests/`) |
 | `tools/runlog_miner/` | Run-log mining/reporting package |
@@ -135,12 +136,12 @@ RADONPY_PATH    = /path/to/RadonPy
 Each run's `engine`/`mpi`/`gpu` defaults come from `guides/polymer_rules.json:hardware_policy`, and the right engine choice is hardware-dependent — so after cloning onto new hardware, host-match the defaults once (runs still work on the shipped defaults until you do; they're just directional, not measured-for-you):
 
 ```bash
-python3 scripts/calibrate_hardware.py --dry-run    # preview the polite plan per FF; writes nothing
-nice -n 19 python3 scripts/calibrate_hardware.py   # measure + write hardware_policy
+python3 hardware/calibrate_hardware.py --dry-run   # preview the polite plan per FF; writes nothing
+nice -n 19 python3 hardware/calibrate_hardware.py  # measure + write hardware_policy
 python3 scripts/pick_gpu.py status                 # verify: GPU allocation / spare-core view
 ```
 
-Calibration is **polite by default** on a shared box: idle GPUs only, rank caps against measured CPU load, everything `nice`d — never use `--allow-busy`. The calibration cells ship in-repo (`data/CALIB_<FAM>/`). Re-run after any GPU/CPU change. Rationale, the per-FF lookup table, and the full-search mode are in [`guides/HARDWARE.md`](guides/HARDWARE.md) / [`guides/HARDWARE_STUDY.md`](guides/HARDWARE_STUDY.md); an agent can drive the whole procedure via the `/calibrate-hardware` slash-command.
+Calibration is **polite by default** on a shared box: idle GPUs only, rank caps against measured CPU load, everything `nice`d — never use `--allow-busy`. The calibration cells ship in-repo (`hardware/CALIB_<FAM>/`). Re-run after any GPU/CPU change. Rationale, the per-FF lookup table, and the full-search mode are in [`hardware/HARDWARE.md`](hardware/HARDWARE.md) / [`hardware/HARDWARE_STUDY.md`](hardware/HARDWARE_STUDY.md); an agent can drive the whole procedure via the `/calibrate-hardware` slash-command.
 
 ---
 

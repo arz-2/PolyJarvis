@@ -8,7 +8,7 @@ The revision screening runs were slow and wasting GPU. Investigation (2026-06-19
 mpi/gpu rules existed in agent memory but were never enforced at launch, so bad configs (e.g.
 `mpi=1` on PCFF ≈ 2.4 ns/day; UA on GPU `mpi=1`) launched and got fixed reactively via
 `/recover`. The fix: make config plan-driven per FF (`polymer_rules.json:hardware_policy` →
-`gen_prompt.py`), plus a benchmark harness (`scripts/benchmark_hardware.py`) and an allocation
+`gen_prompt.py`), plus a benchmark harness (`hardware/benchmark_hardware.py`) and an allocation
 helper (`scripts/pick_gpu.py`).
 
 ## Hardware
@@ -21,7 +21,7 @@ on the CPU). **Ranks, not GPUs, are the scarce resource.** Throughput governor f
 runs: **Σ mpi ≤ 18 physical cores**, ≤ 1 GPU-heavy run per GPU.
 
 ## Method
-`scripts/benchmark_hardware.py` runs a short (~2.5–3k step) LAMMPS run per config and parses
+`hardware/benchmark_hardware.py` runs a short (~2.5–3k step) LAMMPS run per config and parses
 `ns/day` + the MPI-task timing breakdown (Pair/Kspace/Neigh/Comm). GPU is driven purely from
 the command line (`-sf gpu -pk gpu N neigh no`) so the multi-GPU count `N` is honored (an
 in-file `package gpu 1` would silently override it). It is polite by default (idle GPU + spare

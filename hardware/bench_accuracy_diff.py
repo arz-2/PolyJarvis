@@ -16,7 +16,7 @@ Gates (vs baseline):
   pressure: |Δ⟨P⟩| within combined block-SEM (atm pressures are noisy; advisory)
 
 Usage:
-  scripts/bench_accuracy_diff.py \
+  hardware/bench_accuracy_diff.py \
       --baseline A0=/tmp/.../A0/npt.log \
       --variant  A1=/tmp/.../A1/npt.log \
       --variant  A2=/tmp/.../A2/npt.log \

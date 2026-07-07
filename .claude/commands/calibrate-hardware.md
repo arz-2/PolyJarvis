@@ -25,11 +25,11 @@ cat /proc/loadavg
 Note which GPUs are idle and how loaded the CPU is (loadavg ≫ core count ⇒ contended). If nothing is
 idle or the CPU is saturated, tell the user and defer — do not force it.
 
-**2. Cells come from the repo.** The four `data/CALIB_<FAM>/emc_build.{data,params}` cells are
-committed, so no build is needed for the FFs that have one. If `data/CALIB_OPLS/` or `data/CALIB_GAFF/`
+**2. Cells come from the repo.** The four `hardware/CALIB_<FAM>/emc_build.{data,params}` cells are
+committed, so no build is needed for the FFs that have one. If `hardware/CALIB_OPLS/` or `hardware/CALIB_GAFF/`
 is still missing, build it ONCE on an idle window via `submit_emc_cell_job` (poll
 `get_emc_job_status` → read `data_path` from `get_emc_job_output`), then copy
-`emc_build.{data,params}` into `data/CALIB_<FAM>/` and commit:
+`emc_build.{data,params}` into `hardware/CALIB_<FAM>/` and commit:
 - OPLS-AA: `submit_emc_cell_job(smiles="*CC(c1ccccc1)*", polymer_class="PHAL", dp=20, nchains=10)`
 - GAFF2: `submit_emc_cell_job(smiles=<a GAFF class SMILES>, polymer_class="PURA", dp=20, nchains=10)`
 The revalidator skips any FF whose cell is absent (and says so).
@@ -37,14 +37,14 @@ The revalidator skips any FF whose cell is absent (and says so).
 **3. Dry-run** to preview the polite plan per FF, the resolved shipped default, and KOKKOS
 availability (writes nothing):
 ```bash
-python3 scripts/calibrate_hardware.py --dry-run
+python3 hardware/calibrate_hardware.py --dry-run
 ```
 Report which FFs will run vs. skip (and why). If the KOKKOS binary is absent, `pcff`/`opls` will be
 shown falling back to `gpu/mpi4` — note that to the user.
 
 **4. Apply** (drop `--dry-run`) once the dry-run looks sane and the box is idle:
 ```bash
-nice -n 19 python3 scripts/calibrate_hardware.py
+nice -n 19 python3 hardware/calibrate_hardware.py
 ```
 Each FF runs its shipped default (timed → ns/day) plus a run-0 parity vs CPU; a clean uncontended
 pass with all parities PASS and no KOKKOS fallback sets `values_are_benchmarked=true`.
@@ -59,4 +59,4 @@ flipped to `true` (clean) or stayed `false` (and why — contended / parity / ko
 
 **Authoritative re-search (rare):** to re-derive the engine *winner* per FF (not just confirm the
 shipped choice) — e.g. on very different hardware — use `--full` with explicit cells on a drained box:
-`python3 scripts/calibrate_hardware.py --full --cell data/CALIB_PCFF/emc_build.data --ff pcff ...`.
+`python3 hardware/calibrate_hardware.py --full --cell hardware/CALIB_PCFF/emc_build.data --ff pcff ...`.
