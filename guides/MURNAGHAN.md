@@ -1,102 +1,71 @@
 # Murnaghan EOS Guide
 **Read when:** You are `murnaghan-worker` and need to submit the bulk modulus pressure series.
-**Scope:** Job submission only. Property extraction from the Murnaghan output is handled by `bulk-modulus-extractor` (`extract_bulk_modulus_murnaghan`).
+**Scope:** Job submission only. Property extraction is handled by `bulk-modulus-extractor` (`extract_bulk_modulus_murnaghan`).
 
 ---
 
 ## Rules
 
-### Rule A: Starting Structure Depends on Phase
+**Starting structure by phase** (do NOT swap):
+- Glassy (`is_glassy=True`): `npt_prod300_out.data` — the 300 K equilibrated cell (primary glassy K method).
+- Rubbery (`is_glassy=False`): `npt_production_out.data` — the melt NPT output at T_equil.
 
-- **Glassy path (`is_glassy=True`):** input is `npt_prod300_out.data` — the 300 K equilibrated structure. This is the primary glassy bulk modulus method (replaces Born+NVT, which is removed). Pressure range: the class `bm_pressures_atm` from your prompt when set; fall back to ±1000 atm symmetric (`[-1000, -500, 0, 500, 1000]`) when null. ±1000 is confirmed adequate for PACR/PSFO/PSTR/PVNL-class glasses; PEST/PKTN require their compression-biased class range (`[-1000, 0, 1500, 3000, 5000]` — ±1000 gives invalid B0′, and symmetric wide ranges cavitate the cell under −5000 atm tension). Each pressure point: 0.3–0.5 ns NPT at 300 K.
-- **Rubbery path (`is_glassy=False`):** input is `npt_production_out.data` — the melt NPT output at T_equil_K. Pressure range and npt_steps from `bm_pressures_atm` and `npt_steps` in your prompt.
+The orchestrator passes the correct cell as `equil_data_path`.
 
-Do NOT swap these: the glassy path needs the 300 K cell (chains in glassy state); the rubbery path needs the melt cell (volume larger, compressible).
+**When to submit:**
+- Glassy → always submit (the prompt's `### ASSERTION` reinforces this even if `bm_pressures_atm` is null).
+- Rubbery with `bm_pressures_atm` set → submit.
+- Rubbery with `bm_pressures_atm` null → return an all-null RESULT (fluctuation path, no job).
 
-### Rule B: This Path Now Runs for Both Glassy and Rubbery Polymers
+**Pressure range** comes from the prompt's `bm_pressures_atm` (± symmetric for typical glasses;
+PEST/PKTN and other stiff classes use a compression-biased range). On a `fit_converged=False`
+re-submit, widen the **compression** side (e.g. `[-1000, 0, 1500, 3000, 5000]`), never
+symmetrically — wide tension (< −5000 atm) cavitates the cell.
 
-- **Glassy (`is_glassy=True`):** always run this path. Born+NVT has been removed.
-- **Rubbery (`is_glassy=False`) with `bm_pressures_atm` set:** run this path (unchanged).
-- **Rubbery with `bm_pressures_atm` null:** return immediately with all-null RESULT — fluctuation path, no job needed.
+**`engine` is mandatory** — pass the prompt's value. PCFF/OPLS must run `engine="kokkos"` (full
+GPU offload); the GPU-package default leaves class2 bonded + PPPM on the CPU (~7.9× slower, the
+PSU1 failure mode).
 
-### Rule B1: Glassy Acceptance Gate
+**FF flags:** pass only the one true selector from `lammps_flags` (`use_pcff`/`use_opls`/`use_trappe`);
+the tool derives `use_pppm`/`LJ_CUTOFF`/`use_shake` internally.
 
-For glassy polymers, gate on `volume_equilibrated=True` at **each** pressure point after extraction. To first order ΔV/V ≈ ΔP/K, so 1000 atm (0.1013 GPa) gives ΔV/V ≈ **1.3–2.5%** for a glass with K ≈ 4–8 GPa (≈2.0% at K=5 GPa). If any point shows `volume_equilibrated=False`, report RESULT with `fit_quality: BORDERLINE` and note "pressure point N not equilibrated — consider narrowing pressure range to ±500 atm". Accept if B0_prime ∈ [4, 20]; flag BORDERLINE if outside.
-
-For very stiff polymers (K > 8 GPa), ΔV per 1000 atm step is smaller (~1.0–1.3%) and EOS curvature may be insufficient — the PEST/PKTN class ranges are compression-biased to 5000 atm for exactly this reason. If `fit_converged=False` on the ±1000 fallback range, widen compression-side (e.g. `[-1000, 0, 1500, 3000, 5000]`), not symmetrically. For typical glassy polymers (K ≈ 3–6 GPa, PVC/PMMA/PSU-class), ±1000 atm gives ΔV/V ≈ 1.7–3.4% — adequate curvature (r² ≥ 0.999 expected).
-
-### Rule C: `watch_run` Must Be Called as a Tool — Not the Placeholder String
-
-`run_bulk_modulus_series` returns a placeholder string like `"watch_run('chain_id')"` — **this is NOT the sentinel**. You must call `watch_run(chain_id)` as a real MCP tool call, then return its `monitor_command` to the orchestrator.
-
-### Rule D: Pass Explicit `gpu_ids`, `mpi`, and `engine`
-
-Do not accept `run_bulk_modulus_series` defaults. Always pass the values from your prompt:
-```python
-run_bulk_modulus_series(
-    ...
-    gpu_ids=gpu_ids,
-    mpi=mpi_ranks,
-    engine=engine,        # from prompt — "kokkos" for PCFF/OPLS, "gpu" for TraPPE
-)
-```
-**`engine` is mandatory.** PCFF/OPLS cells must run on `engine="kokkos"` (full GPU
-offload). If you omit it the tool defaults to the GPU package, which leaves the
-class2 bonded terms + PPPM on the CPU and runs ~7.9× slower (the PSU1 failure mode).
-
-### Rule E: `npt_steps` Per Pressure Point
-
-Default: 500,000 steps (0.5 ns at 1 fs) at `temp_K=300.0 K`.
-
-### Rule F: Pass the Force-Field Flags from `lammps_flags`
-
-Pass `use_trappe` / `use_pcff` / `use_opls` from your prompt's `lammps_flags` dict into `run_bulk_modulus_series`. The tool derives `use_pppm`/`LJ_CUTOFF`/`use_shake` internally — set only the one selector that is `true`.
+**`watch_run` is a tool call.** `run_bulk_modulus_series` returns a placeholder string like
+`"watch_run('chain_id')"` — that is NOT the sentinel. Call `watch_run(chain_id)` as a real MCP
+tool, then return its `monitor_command`.
 
 ---
 
-## Murnaghan Workflow
+## Workflow
 
 ```python
-# Glassy path: use npt_prod300_out.data; class bm_pressures_atm when set, ±1000 fallback
-# Rubbery path: use npt_production_out.data and bm_pressures_atm from prompt
-# (rubbery + null bm_pressures_atm never reaches here — Rule B returns all-null first)
 pressures = bm_pressures_atm if bm_pressures_atm else [-1000, -500, 0, 500, 1000]
-temp_K_run = 300.0  # always 300 K (glassy: equilibrated at 300 K; rubbery: 300 K reference)
 
 result = run_bulk_modulus_series(
     data_file=equil_data_path,   # npt_prod300_out.data (glassy) or npt_production_out.data (rubbery)
     work_dir=work_dir,           # .../mechanical/bm_series/
     pressures_atm=pressures,
-    temp_K=temp_K_run,
+    temp_K=temp_K,               # from prompt (300 K)
     run_name=run_name,
     gpu_ids=gpu_ids,
     mpi=mpi_ranks,
     npt_steps=npt_steps,         # from prompt (default 500000 = 0.5 ns at 1 fs)
-    use_trappe=lammps_flags["use_trappe"],   # Rule F — FF selector from prompt's lammps_flags
-    use_pcff=lammps_flags["use_pcff"],       # tool derives pppm/cutoff/shake internally
+    use_trappe=lammps_flags["use_trappe"],
+    use_pcff=lammps_flags["use_pcff"],
     use_opls=lammps_flags["use_opls"],
     engine=engine,
 )
-chain_id = result["chain_id"]
-log_files = result["log_files"]  # list of absolute paths, one per pressure
+chain_id  = result["chain_id"]
+log_files = result["log_files"]  # absolute paths, one per pressure
 
-w = watch_run(chain_id)           # MCP tool call — creates sentinel
-monitor_command = w["monitor_command"]
-
-# Return chain_id, log_files, and monitor_command to orchestrator — do NOT call Monitor.
+w = watch_run(chain_id)          # MCP tool call — creates sentinel
+# Return chain_id, log_files, w["monitor_command"] to the orchestrator — do NOT call Monitor.
 ```
 
 ---
 
 ## Recovery Notes
 
-**One pressure point fails / GPU OOM:** Reduce `npt_steps` to 200000 and re-submit.
+**One pressure point fails / GPU OOM / empty `log_files`:** reduce `npt_steps` to 200000 and re-submit (check `nvidia-smi`).
 
-**`run_bulk_modulus_series` returns empty `log_files`:** Check GPU memory with `nvidia-smi`. Re-submit with half `npt_steps`.
-
-**BACKGROUND-WAIT waiter never returns after watch_run:** Sentinel was not created. Most likely `watch_run` was called with the placeholder string instead of the real `chain_id`. Re-submit: `run_bulk_modulus_series` → `watch_run(chain_id)` (tool call).
-
-## Backlog
-
-- `run_bulk_modulus_series` should rmtree stale `bm_P*` subdirs when re-running with a different pressure set (orphaned dirs from a prior series can contaminate glob-based extraction — always pass explicit `log_files` to the extractor meanwhile).
-- Make the per-pressure-point trajectory `.dump` optional (default off): the Murnaghan extractor reads the log volume only, and the dumps cost ~180 MB/point.
+**BACKGROUND-WAIT never returns after watch_run:** sentinel not created — `watch_run` was likely
+called with the placeholder string, not the real `chain_id`. Re-run `watch_run(chain_id)` as a tool call.
