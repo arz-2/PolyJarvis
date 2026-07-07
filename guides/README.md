@@ -43,4 +43,5 @@ one into the worker's prompt.
 | `RECOVERY_PLAYBOOK.md` | Failure-diagnosis playbook consulted by `/recover`. Generated + local-only (gitignored); regenerate via `python -m tools.runlog_miner --playbook -o guides/RECOVERY_PLAYBOOK.md` |
 
 The engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`) live with the calibration
-toolchain and cells in [`hardware/`](../hardware/).
+toolchain and cells in [`hardware/`](../hardware/); they are machine-specific notes, local-only
+(gitignored) — rebuild them from `/calibrate-hardware` results on a new box.

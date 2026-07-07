@@ -69,6 +69,10 @@ guides/TODO_OWNER.md
 guides/ROADMAP.md
 guides/REVISION_PARAMS.md
 
+# ── Machine-specific hardware docs (benchmarks/policy for this box only) ──────
+hardware/HARDWARE.md
+hardware/HARDWARE_STUDY.md
+
 # ── Committed calibration-cell payload (must come last to win over *.data/*.log above) ──
 # Calibration cells (hardware/CALIB_<FAM>/) ship the small emc_build.{data,params} per FF so a
 # fresh clone can host-match engine defaults via /calibrate-hardware without an EMC build.
