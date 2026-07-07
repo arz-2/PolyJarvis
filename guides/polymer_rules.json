@@ -1101,7 +1101,8 @@
       "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
       "experimental_tg_K": {
         "PPS": 358,
-        "notes": "PPS (polyphenylene sulfide): ~85°C (358 K). Polythioethers generally 250-360 K."
+        "poly(propylene sulfide)": 228,
+        "notes": "PPS (polyphenylene sulfide): ~85°C (358 K). Aliphatic poly(propylene sulfide): 220-236 K consensus. Polythioethers generally 250-360 K."
       },
       "exp_E_GPa": {
         "PPS": 3.6,
@@ -1119,7 +1120,7 @@
         "PPS: MD Tg expected ~440-480 K after overestimation; upper sweep 600 K is safe.",
         "PPS is semi-crystalline above Tg — ensure amorphous cell construction. Rapid quench from 700 K helps suppress crystallization.",
         "Slow equilibration from rigid aryl-sulfide/sulfone backbone: 8 ns and 8 cycles required.",
-        "PTH (simple polythioether): more flexible than PPS; lower Tg (~250 K experimental).",
+        "Class schedule (T_equil 560 K, anneal 640 K, 8 cycles, density_initial 0.65) is curated for aromatic PPS. Aliphatic sp3 thioethers (e.g. poly(propylene sulfide): Tg 220-236 K, rho ~1.03 g/cm3) are RUBBERY at 300 K — planner must re-derive the schedule (T_workflow 300, T_equil ~450, ~3 cycles, density_initial ~0.50) and treat FF confidence as LOW (no aliphatic-thioether PCFF MD validation).",
         "Exp. RT density: PPS=1.35 g/cm³, PSU=1.30 g/cm³. Initial 0.65 g/cm³ = ~0.5x PPS density."
       ],
       "preferred_ff": "pcff",
@@ -1217,12 +1218,13 @@
       "K_deform_rate_slow_inv_s": 10000000.0,
       "melt_npt_ns": 1.0,
       "bm_pressures_atm": [
-        -5000,
-        -2500,
+        -1000,
         0,
-        2500,
+        1500,
+        3000,
         5000
-      ]
+      ],
+      "bm_pressures_note": "Stiff ester glass: +/-1000 atm gives B0_prime runaway (invalid fit); tension beyond -1000 atm cavitates the cell. Compression-biased range confirmed on 4/4 PLA replicates (B0_prime 6.1-11.4, r2>=0.9997)."
     },
     "PAMD": {
       "name": "Polyamide",
@@ -1853,6 +1855,14 @@
       ],
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
+      "bm_pressures_atm": [
+        -1000,
+        0,
+        1500,
+        3000,
+        5000
+      ],
+      "bm_pressures_note": "Stiff ketone glass: +/-1000 atm gives insufficient EOS curvature (B0_prime ~1, gate fail); compression-biased range confirmed (PEEK 2026: B0_prime=6.30, r2=0.9998, K=5.16 GPa). Tension capped at -1000 atm to avoid cavitation.",
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
       "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",

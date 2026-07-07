@@ -8,7 +8,7 @@
 
 ### Rule A: Starting Structure Depends on Phase
 
-- **Glassy path (`is_glassy=True`):** input is `npt_prod300_out.data` — the 300 K equilibrated structure. This is the primary glassy bulk modulus method (replaces Born+NVT, which is removed). Pressure range: ±1000 atm symmetric (e.g. `[-1000, -500, 0, 500, 1000]`). Each pressure point: 0.3–0.5 ns NPT at 300 K.
+- **Glassy path (`is_glassy=True`):** input is `npt_prod300_out.data` — the 300 K equilibrated structure. This is the primary glassy bulk modulus method (replaces Born+NVT, which is removed). Pressure range: the class `bm_pressures_atm` from your prompt when set; fall back to ±1000 atm symmetric (`[-1000, -500, 0, 500, 1000]`) when null. ±1000 is confirmed adequate for PACR/PSFO/PSTR/PVNL-class glasses; PEST/PKTN require their compression-biased class range (`[-1000, 0, 1500, 3000, 5000]` — ±1000 gives invalid B0′, and symmetric wide ranges cavitate the cell under −5000 atm tension). Each pressure point: 0.3–0.5 ns NPT at 300 K.
 - **Rubbery path (`is_glassy=False`):** input is `npt_production_out.data` — the melt NPT output at T_equil_K. Pressure range and npt_steps from `bm_pressures_atm` and `npt_steps` in your prompt.
 
 Do NOT swap these: the glassy path needs the 300 K cell (chains in glassy state); the rubbery path needs the melt cell (volume larger, compressible).
@@ -23,7 +23,7 @@ Do NOT swap these: the glassy path needs the 300 K cell (chains in glassy state)
 
 For glassy polymers, gate on `volume_equilibrated=True` at **each** pressure point after extraction. To first order ΔV/V ≈ ΔP/K, so 1000 atm (0.1013 GPa) gives ΔV/V ≈ **1.3–2.5%** for a glass with K ≈ 4–8 GPa (≈2.0% at K=5 GPa). If any point shows `volume_equilibrated=False`, report RESULT with `fit_quality: BORDERLINE` and note "pressure point N not equilibrated — consider narrowing pressure range to ±500 atm". Accept if B0_prime ∈ [4, 20]; flag BORDERLINE if outside.
 
-For very stiff polymers (K > 8 GPa, e.g. PEEK), ΔV per 1000 atm step is smaller (~1.0–1.3%) and EOS curvature may be insufficient. Widen to ±2000 atm if `fit_converged=False` at ±1000 atm. For typical glassy polymers (K ≈ 3–6 GPa, PVC/PMMA/PSU-class), ±1000 atm gives ΔV/V ≈ 1.7–3.4% — adequate curvature (r² ≥ 0.999 expected).
+For very stiff polymers (K > 8 GPa), ΔV per 1000 atm step is smaller (~1.0–1.3%) and EOS curvature may be insufficient — the PEST/PKTN class ranges are compression-biased to 5000 atm for exactly this reason. If `fit_converged=False` on the ±1000 fallback range, widen compression-side (e.g. `[-1000, 0, 1500, 3000, 5000]`), not symmetrically. For typical glassy polymers (K ≈ 3–6 GPa, PVC/PMMA/PSU-class), ±1000 atm gives ΔV/V ≈ 1.7–3.4% — adequate curvature (r² ≥ 0.999 expected).
 
 ### Rule C: `watch_run` Must Be Called as a Tool — Not the Placeholder String
 
@@ -57,9 +57,10 @@ Pass `use_trappe` / `use_pcff` / `use_opls` from your prompt's `lammps_flags` di
 ## Murnaghan Workflow
 
 ```python
-# Glassy path: use npt_prod300_out.data and ±1000 atm symmetric range
+# Glassy path: use npt_prod300_out.data; class bm_pressures_atm when set, ±1000 fallback
 # Rubbery path: use npt_production_out.data and bm_pressures_atm from prompt
-pressures = bm_pressures_atm if not is_glassy else [-1000, -500, 0, 500, 1000]
+# (rubbery + null bm_pressures_atm never reaches here — Rule B returns all-null first)
+pressures = bm_pressures_atm if bm_pressures_atm else [-1000, -500, 0, 500, 1000]
 temp_K_run = 300.0  # always 300 K (glassy: equilibrated at 300 K; rubbery: 300 K reference)
 
 result = run_bulk_modulus_series(
@@ -94,3 +95,8 @@ monitor_command = w["monitor_command"]
 **`run_bulk_modulus_series` returns empty `log_files`:** Check GPU memory with `nvidia-smi`. Re-submit with half `npt_steps`.
 
 **BACKGROUND-WAIT waiter never returns after watch_run:** Sentinel was not created. Most likely `watch_run` was called with the placeholder string instead of the real `chain_id`. Re-submit: `run_bulk_modulus_series` → `watch_run(chain_id)` (tool call).
+
+## Backlog
+
+- `run_bulk_modulus_series` should rmtree stale `bm_P*` subdirs when re-running with a different pressure set (orphaned dirs from a prior series can contaminate glob-based extraction — always pass explicit `log_files` to the extractor meanwhile).
+- Make the per-pressure-point trajectory `.dump` optional (default off): the Murnaghan extractor reads the log volume only, and the dumps cost ~180 MB/point.

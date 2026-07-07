@@ -62,13 +62,16 @@ def build_watch_command(
         '  local total name bar i\n'
         # grep -c already prints 0 (and exits 1) on zero matches, so use || true,
         # not || echo 0, which would make total="0\\n0" and break the arithmetic.
-        '  total=$(grep -c \'"status":"done"\' "$PROGRESS" 2>/dev/null || true)\n'
+        # The quote-optional pattern matches both progress writers: the chain writer emits
+        # quoted JSON, but the Tg-sweep deck's `shell echo` goes through LAMMPS's input
+        # parser, which strips the inner double quotes ({stage:T,status:done}).
+        '  total=$(grep -cE \'"?status"?:"?done"?\' "$PROGRESS" 2>/dev/null || true)\n'
         '  [ -z "$total" ] && total=0\n'
         '  while [ "$SEEN" -lt "$total" ]; do\n'
         '    SEEN=$((SEEN+1))\n'
         '    echo "$SEEN" > "$SEEN_FILE"\n'
-        '    name=$(grep \'"status":"done"\' "$PROGRESS" | sed -n "${SEEN}p"'
-        ' | sed -E \'s/.*"stage":"([^"]+)".*/\\1/\')\n'
+        '    name=$(grep -E \'"?status"?:"?done"?\' "$PROGRESS" | sed -n "${SEEN}p"'
+        ' | sed -E \'s/.*"?stage"?:"?([^",}]+)"?.*/\\1/\')\n'
         '    bar=""; i=0; while [ "$i" -lt "$NSTAGES" ]; do'
         ' if [ "$i" -lt "$SEEN" ]; then bar="$bar#"; else bar="$bar-"; fi; i=$((i+1)); done\n'
         '    echo "PROGRESS [$bar] $SEEN/$NSTAGES done: $name"\n'

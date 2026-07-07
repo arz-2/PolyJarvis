@@ -336,6 +336,15 @@ def get_bulk_modulus_data(
         "n_rows": len(rows),
         "T_K_ref": ref_T,
         "value_unit": order_of_magnitude,
+        # The schema has no measurement-method column, so rows can mix adiabatic K_S
+        # (ultrasonic) with isothermal K_T (static compression / Tait). MD Murnaghan K is
+        # K_T; grading against a K_S-inflated max is a false PASS. Consumers must check
+        # per-row `notes` and prefer the polymer_rules exp_K_GPa (K_T-prioritized) range
+        # for the headline grade when one exists.
+        "method_caveat": (
+            "rows may mix adiabatic K_S and isothermal K_T (no method column); MD reports "
+            "K_T — cross-check row notes and prefer polymer_rules exp_K_GPa when set"
+        ),
         "rows": rows,
     }
 

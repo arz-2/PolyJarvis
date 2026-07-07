@@ -1072,7 +1072,9 @@ write_data tg_step_out.data
         subs = {}
 
         # ── File paths ────────────────────────────────────────────────────
-        subs["DATA_FILE"]        = data_file
+        # read_data resolves against the run work_dir, not the caller's cwd — a relative
+        # data_file fails at LAMMPS startup, so anchor it here.
+        subs["DATA_FILE"]        = os.path.abspath(data_file)
         subs["LOG_FILE"]         = cfg.get("LOG_FILE", f"{template_name}.log")
         subs["LOG_APPEND"]       = "append" if cfg.get("LOG_APPEND", False) else ""
         subs["DUMP_FILE"]        = cfg.get("DUMP_FILE", f"{template_name}.dump")

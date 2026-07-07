@@ -95,6 +95,12 @@ This is the *intended* re-melt (contrast the extend-mode warning below, where re
 
 **"Out of range atoms — cannot compute PPPM" in npt_compress:** Switch `npt_compress` pair_style to `lj/cut/coul/cut`, increase neighbor skin 2.0 → 3.0 Å, reduce dt to 0.5 fs for that run only. Restore `lj/cut/coul/long` + kspace_style from `npt_pppm` onward.
 
+**Same PPPM error at `nvt_softheat` step 0→1 with minimize completed:** a localized EMC pack overlap unique to that seed (soft class2 9-6 core lets near-coincident atoms through minimization; post-minimize Press/E_vdwl strongly positive). Rebuild the cell with a fresh EMC seed — no deck surgery, no extra minimize. If a second seed also fails at softheat, drop `density_initial` 0.6 → 0.5 before any deck edits.
+
 **Extend run returns 7 stages instead of 1:** `generate_equilibration_workflow(extend_only=True)` must yield `n_stages==1` with `run_order==["npt_extend"]` — verify this before submitting. A full 7-stage chain means the live MCP server is running stale code (pre-`extend_only`); request an orchestrator-level server restart. Do NOT submit (the chain's `nvt_softheat` 300→600 K re-melts a cooled glassy cell) and do NOT hand-write a `.in`.
 
-**Disk-full I/O error mid-chain (e.g. restart write fails):** completed stages' `_out.data` stay intact. Free disk, then delete only the failed stage's partial outputs, regenerate the full workflow with identical params, slice the stage list to resume at the failed stage, and resubmit via `run_lammps_chain`. Do NOT restart from stage 0 (PEEK3 2026-06-24: recovered stages 4–9 only).
+**Disk-full I/O error mid-chain (e.g. restart write fails):** completed stages' `_out.data` stay intact. Free disk, then delete only the failed stage's partial outputs, regenerate the full workflow with identical params, slice the stage list to resume at the failed stage, and resubmit via `run_lammps_chain`. Do NOT restart from stage 0 (PEEK3 2026-06-24: recovered stages 4–9 only). Prevention: when free disk is <60 GB, strip the `dump`/`undump`/`write_dump` lines from the production stages' `.in` before submitting — nothing downstream reads `npt_prod300.dump` (equil-check uses the log + `nvt_production.dump`; the mechanical track uses `_out.data`).
+
+## Backlog
+
+- `generate_equilibration_workflow` should accept a `disable_prod_dump` flag so production stages write only thermo + final `.data` (the manual dump-line strip above becomes unnecessary).

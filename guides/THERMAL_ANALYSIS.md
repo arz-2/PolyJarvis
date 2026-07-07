@@ -55,7 +55,7 @@ If `dCp_status` contains "skipped (column 'Enthalpy' not in log)" — report N/A
 - `fit_quality` POOR or R² < 0.90
 - `Tg_K` and `Tg_alternative_K` disagree by >20 K
 - Tg outside ±50 K of experimental
-- **Delocalized transition:** when `tg_uncertainty_K ≈ transition_width_c_K` and both >150 K, a high r²/EXCELLENT fit can mask a spurious primary Tg fit to under-equilibrated high-T plateaus (PLA2 r100: primary 516 K vs alternative 379 K matching the density slope). Cross-check the density slope; if the primary is >80 K from exp, flag it SUSPECT, set verdict WARNING, and recommend the alternative + fresh equilibration.
+- **Delocalized transition:** when `tg_uncertainty_K ≈ transition_width_c_K` and both >150 K, a high r²/EXCELLENT fit can mask a spurious primary Tg fit to under-equilibrated high-T plateaus (PLA2 r100: primary 516 K vs alternative 379 K matching the density slope). Also check `relaxation_metrics`: high-T plateaus with `n_eff < 5` + `relax_warning=true` indicate the same contamination even when plateau detection passes. Cross-check the density slope; if the primary is >80 K from exp — or >50 K above exp with the alternative closer — flag it SUSPECT, set verdict WARNING, and recommend the alternative + fresh equilibration.
 
 ---
 

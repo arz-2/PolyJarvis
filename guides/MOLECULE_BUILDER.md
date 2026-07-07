@@ -153,6 +153,10 @@ save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="
 
 **`classify_polymer` returns PHAL for PVC (`*CC(Cl)*`):** False flag — PVC is PVNL/PCFF (C–Cl is not PTFE-family). Build with the class specified in the approved plan; log the PHAL divergence in D-01.
 
+**EMC stalls/fails on amide-N monomers (pcff lacks the amide/lactam/urea N→carbonyl increment, `{na,c_2}`):** rescue ladder — primary amide (e.g. polyacrylamide) → OPLS-AA; secondary amide / lactam / urea (e.g. PNIPAM, PVP, PURA) → RadonPy/GAFF2.
+
+**EMC dies with a negative exit code (`segfault (signal N)`, no `Error:` line):** monomer/field mismatch (typical: chlorinated monomer on trappe-ua/opls-aa), not an unbuildable SMILES — continue the field cascade (pcff next).
+
 ---
 
 **→ When `cell.data` is saved, return the RESULT block.**
