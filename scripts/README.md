@@ -27,4 +27,5 @@ Flat by design: these paths are hard-wired into `CLAUDE.md`, the agent definitio
 | Script | Purpose | Primary consumers |
 |---|---|---|
 | `estimate_tg_group_contribution.py` | Motif-based group-contribution Tg estimate used as planning evidence for off-table polymers. | `planner` agent |
-| `collect_data.sh` | Rebuilds the benchmark data release: auto-discovers every `data/<run>/`, git-adds the provenance subset listed in `data/README.md`, then regenerates the `paper/csv/` tables + derived figures from it. Paper tooling, not part of the simulation pipeline. | Manual |
+
+The benchmark data-release rebuilder lives with the manuscript material: `manuscript/collect_data.sh`.

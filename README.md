@@ -2,7 +2,7 @@
 
 **PolyJarvis** is an AI-driven framework for autonomous polymer property prediction via all-atom molecular dynamics simulation. A researcher describes a polymer system in natural language; a stateful LLM orchestrator (Claude) then handles the entire workflow — from SMILES string to computed material properties — by planning the run, spawning specialist sub-agents for each stage, and driving three MCP servers (molecular construction via EMC/RadonPy, plus local GPU simulation and analysis) end to end.
 
-![PolyJarvis Architecture](figures/figure1_architecture.png)
+![PolyJarvis Architecture](manuscript/figures/figure1_architecture.png)
 
 ---
 
@@ -39,13 +39,13 @@ The **`run_plan.json` is the single source of truth** — `scripts/gen_prompt.py
 - **LLM-inferred at runtime**: off-table planning, critic adjudication, error root-causing and recovery routing, and adaptive extensions (equilibration EXTEND, T<sub>g</sub> slope-gate recovery).
 
 Below is a sample conversation between a user and the agent:
-![Conversation](figures/figure2_conversation.png)
+![Conversation](manuscript/figures/figure2_conversation.png)
 
 ---
 
 ## Benchmark study
 
-The framework was validated on a **36-run replicate study: 9 polymers × 4 independent replicates** (PE, cis-PBD, PEG, PLA, PMMA, PS, PVC, PEEK, PSU), reporting density, T<sub>g</sub>, and bulk modulus against experimental ranges. Per-run logs, decision records, and raw analysis artifacts for the study are indexed in [`data/README.md`](data/README.md).
+The framework was validated on a **36-run replicate study: 9 polymers × 4 independent replicates** (PE, cis-PBD, PEG, PLA, PMMA, PS, PVC, PEEK, PSU), reporting density, T<sub>g</sub>, and bulk modulus against experimental ranges. All manuscript-related material — the replicate-run provenance, analysis csv/figures and their generators, and the error-recovery benchmark — is consolidated under [`manuscript/`](manuscript/); the run provenance is indexed in [`manuscript/data/README.md`](manuscript/data/README.md).
 
 ---
 
@@ -58,15 +58,13 @@ The framework was validated on a **36-run replicate study: 9 polymers × 4 indep
 | `guides/` | **Agent prompts & machine-read config**, not human docs — worker guides inlined by `gen_prompt.py`, orchestrator track guides, `polymer_rules.json` / `decision_policy.json` (see [`guides/README.md`](guides/README.md)) |
 | `scripts/` | CLI/orchestration helpers — prompt generation, deterministic planning, GPU allocation, hardware calibration (see [`scripts/README.md`](scripts/README.md)) |
 | `mcp-servers/` | The three MCP servers: `mcp-mol-builder-server` (RadonPy), `mcp-emc-server` (EMC), `mcp-lammps-engine` (LAMMPS + analysis scripts + templates) |
-| `data/` | Per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`); the benchmark-study provenance release is indexed in [`data/README.md`](data/README.md) |
+| `data/` | Live pipeline working directory — per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`), run template, calibration cells |
 | `db/` | Experimental property database (`polymer_db.sqlite`, schema, query + ingest scripts) |
-| `benchmarks/recovery/` | Error-recovery benchmark (see its README) |
-| `tests/`, `mcp-servers/*/tests/`, `benchmarks/recovery/tests/`, `tools/runlog_miner/tests/` | Test suites (root `pytest.ini`) |
+| `tests/`, `mcp-servers/*/tests/`, `tools/runlog_miner/tests/` | Test suites (root `pytest.ini`); the recovery-benchmark suite is run separately (`pytest manuscript/recovery/tests/`) |
 | `tools/runlog_miner/` | Run-log mining/reporting package |
 | `docs/` | Human-facing docs: `PROPERTIES.md` (what gets computed & how), `ROADMAP.md`, `TOOLS_REFERENCE.md` |
-| `figures/` | Output of `paper/gen_figure{1,2}*.py`; included by the manuscript |
 | `env/` | Conda environment YAMLs |
-| `paper/` | Manuscript analysis data (`paper/csv/`) and the figure generator scripts |
+| `manuscript/` | Everything paper-related: benchmark-run provenance (`data/`, see [`manuscript/data/README.md`](manuscript/data/README.md)), analysis tables (`csv/`), figures + generator scripts, the error-recovery benchmark (`recovery/`), and the data-release rebuilder (`collect_data.sh`) |
 
 ---
 
