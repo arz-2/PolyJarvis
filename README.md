@@ -35,7 +35,7 @@ The **`run_plan.json` is the single source of truth** — `orchestration/gen_pro
 
 ### Inferred vs. inherited
 
-- **Inherited / encoded** (in `guides/polymer_rules.json`, `guides/decision_policy.json`, stage guides): per-class T<sub>g</sub>/density targets, DP defaults, force-field family rules, SMILES conventions, equilibration templates. On the high-confidence path these drive a fully deterministic plan.
+- **Inherited / encoded** (in `guides/polymer_rules.json`, `orchestration/decision_policy.json`, stage guides): per-class T<sub>g</sub>/density targets, DP defaults, force-field family rules, SMILES conventions, equilibration templates. On the high-confidence path these drive a fully deterministic plan.
 - **LLM-inferred at runtime**: off-table planning, critic adjudication, error root-causing and recovery routing, and adaptive extensions (equilibration EXTEND, T<sub>g</sub> slope-gate recovery).
 
 Below is a sample conversation between a user and the agent:
@@ -55,8 +55,8 @@ The framework was validated on a **36-run replicate study: 9 polymers × 4 indep
 |---|---|
 | `CLAUDE.md` | Orchestrator operating manual — the agent's workflow spec (start here to understand the pipeline) |
 | `.claude/` | Agent definitions (13 workers), hooks, slash commands, per-agent memory |
-| `guides/` | **Agent prompts & machine-read config**, not human docs — worker guides inlined by `gen_prompt.py`, orchestrator track guides, `polymer_rules.json` / `decision_policy.json` (see [`guides/README.md`](guides/README.md)) |
-| `orchestration/` | CLI/orchestration helpers — prompt generation, deterministic planning, GPU allocation (see [`orchestration/README.md`](orchestration/README.md)) |
+| `guides/` | **Agent prompts & machine-read config**, not human docs — worker guides inlined by `gen_prompt.py`, `polymer_rules.json` (see [`guides/README.md`](guides/README.md)) |
+| `orchestration/` | CLI/orchestration helpers + orchestrator-read docs — prompt generation, deterministic planning, GPU allocation, phase/track guides (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`, `SUMMARY.md`), `decision_policy.json` (see [`orchestration/README.md`](orchestration/README.md)) |
 | `mcp-servers/` | The three MCP servers: `mcp-mol-builder-server` (RadonPy), `mcp-emc-server` (EMC), `mcp-lammps-engine` (LAMMPS + analysis scripts + templates) |
 | `data/` | Live pipeline working directory — per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`), run template |
 | `hardware/` | Hardware calibration — `/calibrate-hardware` toolchain (`calibrate_hardware.py`, `benchmark_hardware.py`, `bench_accuracy_diff.py`) and the per-FF calibration cells (`CALIB_<FAM>/`); the engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`) are machine-specific and local-only (gitignored) |

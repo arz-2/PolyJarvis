@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'LOG: classify_polymer done — the result includes preferred_ff, preferred_builder, ff_confidence, ff_justification, and ff_justification_doi fields. Write these directly to D-01 in run_log.md without asking the user — no manual FF choice needed for known classes. For ff_confidence=low or unknown class, escalate to E2 literature search. Also fill D-02 (charges) and D-03 (electrostatics) from the classify_polymer result.'"
+            "command": "echo 'LOG: classify_polymer done — the result includes preferred_ff, preferred_builder, ff_confidence, ff_justification, and ff_justification_doi fields. Write these directly to D-01 in run_log.md without asking the user — no manual FF choice needed for known classes. For ff_confidence=low or unknown class, escalate to E2 literature search. Also fill D-02 (charges) and D-03 (electrostatics) from the classify_polymer result. Phase A entry (before spawning molecule-builder): Read(orchestration/FOUNDATION.md).'"
           }
         ]
       },
@@ -213,7 +213,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'ROUTING: status=completed/done → proceed to next stage; status=failed/error → /recover (do not retry ad-hoc). IF this get_run_status completes the EQUIL chain and a track is still pending → entering Phase B: Read(guides/THERMAL_TRACK.md) if tg requested and/or Read(guides/MECHANICAL_TRACK.md) if bulk_modulus requested before spawning workers. (Fires on every poll — apply only when it actually closes a stage.)'"
+            "command": "echo 'ROUTING: status=completed/done → proceed to next stage; status=failed/error → /recover (do not retry ad-hoc). Phase-entry reads (before spawning that phase workers): IF this get_run_status completes the EQUIL chain and a track is still pending → entering Phase B: Read(orchestration/THERMAL_TRACK.md) if tg requested and/or Read(orchestration/MECHANICAL_TRACK.md) if bulk_modulus requested; entering Phase C: Read(orchestration/SUMMARY.md). (Fires on every poll — apply only when it actually closes a stage.)'"
           }
         ]
       }

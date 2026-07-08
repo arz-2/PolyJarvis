@@ -22,19 +22,18 @@ one into the worker's prompt.
 | `REVISION_PARAMS.md` | Fixed seeds/params for replication runs (inlined into several stages; local-only, gitignored) |
 | `EXP_LOOKUP.md` | exp-lookup background. **Currently not wired in** — the orchestrator composes the exp-lookup prompt inline (CLAUDE.md Phase C) |
 
-## 2. Track guides — Read by the orchestrator at Phase B
+## 2. Orchestrator-read guides — moved to `orchestration/`
 
-| Guide | Content |
-|---|---|
-| `THERMAL_TRACK.md` | Multirate Tg sweep procedure, slope gate + per-class fallback, is_glassy |
-| `MECHANICAL_TRACK.md` | Murnaghan primary + deform fallback + BM extraction routing |
+The orchestrator phase/track guides (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`,
+`SUMMARY.md`) and the planner/critic `decision_policy.json` now live alongside the orchestration
+code in [`orchestration/`](../orchestration/README.md) — the orchestrator `Read`s them on phase
+entry.
 
 ## 3. Machine-read config (JSON, not prose)
 
 | File | Content | Consumers |
 |---|---|---|
 | `polymer_rules.json` | Per-class FF/Tg ranges, density targets, DP defaults, annealing cycles, engine defaults, exp bounds. The largest and most load-bearing file here. | `gen_prompt.py`, `make_deterministic_plan.py`, hardware scripts, orchestrator `jq` calls |
-| `decision_policy.json` | Evaluation framework the planner/critic reason against | `planner`/`critic` agents, `make_deterministic_plan.py` |
 
 ## 4. Ops / workflow docs (human- and orchestrator-read)
 
