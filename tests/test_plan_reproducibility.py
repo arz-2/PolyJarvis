@@ -25,8 +25,8 @@ CLASSES = sorted(RULES["classes"].keys())
 STAGES = ["build", "equil", "tg", "deform", "murnaghan",
           "analyze-tg", "equil-check", "analyze-bm", "run-summary"]
 
-GEN_PROMPT = REPO_ROOT / "scripts" / "gen_prompt.py"
-MAKE_PLAN = REPO_ROOT / "scripts" / "make_deterministic_plan.py"
+GEN_PROMPT = REPO_ROOT / "orchestration" / "gen_prompt.py"
+MAKE_PLAN = REPO_ROOT / "orchestration" / "make_deterministic_plan.py"
 
 
 def _run(cmd):

@@ -13,7 +13,7 @@ On session restart mid-thermal-track: re-read this file before resuming.
 
   For idx, rate in enumerate(TG_RATES):                # idx = 0,1,2 → rates 25,50,100 K/ns
     [Tg sweep @ rate]
-    Claim GPU(s): scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
+    Claim GPU(s): orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
       → on shortfall (exit 1) defer/retry; NEVER --allow-busy on the shared box.
     # Starting cell routing (Option C):
     #   Rubbery (npt_tg_prep_data non-null from equil RESULT): --tg_start_data $npt_tg_prep_data
@@ -27,7 +27,7 @@ On session restart mid-thermal-track: re-read this file before resuming.
     BACKGROUND-WAIT (CLAUDE.md canonical pattern): Bash(command=monitor_command, run_in_background=true),
       then END YOUR TURN. Do NOT release the GPU or call get_run_status in this turn.
     # On the completion wakeup (next turn):
-    scripts/pick_gpu.py release --run <RUN>
+    orchestration/pick_gpu.py release --run <RUN>
     get_run_status(run_id) → RUN_COMPLETE/completed → proceed;
       PROCESS_DEAD_NO_SENTINEL/failed → /recover (max 2/worker)
 

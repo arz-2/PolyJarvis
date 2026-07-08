@@ -11,9 +11,9 @@ is to distinguish rubbery (Tg<300 K) from glassy and to bracket the Tg sweep ran
 Always report confidence=low — this is NOT a substitute for measured Tg.
 
 Usage:
-  python3 scripts/estimate_tg_group_contribution.py --smiles "*CC(C)(C(=O)OC)*"
-  python3 scripts/estimate_tg_group_contribution.py --smiles "*CC*" --output text
-  python3 scripts/estimate_tg_group_contribution.py --run-regressions
+  python3 orchestration/estimate_tg_group_contribution.py --smiles "*CC(C)(C(=O)OC)*"
+  python3 orchestration/estimate_tg_group_contribution.py --smiles "*CC*" --output text
+  python3 orchestration/estimate_tg_group_contribution.py --run-regressions
 """
 
 import argparse

@@ -245,7 +245,7 @@ CED = E_pair / V          (J/cm³)
 **Confidence gate** (in `guides/decision_policy.json`): `confidence=high` → deterministic plan (defaults transcribed verbatim, critic auto-approves, worker prompts byte-identical to the legacy pipeline). `confidence=low/medium` or off-table polymer → reasoned plan (each decision carries evidence/confidence/alternatives; Critic enforces the policy; loop ≤2 rounds).
 
 ### K0–K2 **[done 2026-06-17]**
-Shipped: `guides/decision_policy.json`, `scripts/make_deterministic_plan.py`, `gen_prompt.py --plan`
+Shipped: `guides/decision_policy.json`, `orchestration/make_deterministic_plan.py`, `gen_prompt.py --plan`
 overlay, `tests/test_plan_reproducibility.py` (prompt-identity guard), planner/critic agents +
 CLAUDE.md Planner → Critic loop, validator stage-gate against `planned_stages[].success_criteria`,
 `generate_run_summary.py --run_plan`, and the run_log PLAN pointer.

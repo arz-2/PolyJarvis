@@ -12,6 +12,13 @@ AI agent for autonomous polymer MD simulation. Given a SMILES string, runs the f
 | `guides/polymer_rules.json` | Per-class Tg ranges, density targets, DP defaults, annealing cycles |
 | `data/TEMPLATE/run_log.md` | Run log template — copy to `data/[RUN]/run_log.md` at task start |
 | `data/[RUN]/` | All run files: `run_log.md`, `lammps/`, `raw/`, `graphs/` (git-excluded) |
+| `.understand-anything/knowledge-graph.json` | Codebase map (core system, git-excluded). **Query it before file-walking** — see Understanding the Codebase below |
+
+---
+
+## Understanding the Codebase
+
+Before hunting file-to-file, consult the knowledge graph at `.understand-anything/knowledge-graph.json` (built by `/understand`; covers orchestration/, mcp-servers/, db/, guides/, `.claude/` agent+command defs — NOT tools/, tests/, hardware/, manuscript/, docs/). Workflow: **task → layer → file nodes → summaries → read only the 2–4 that matter.** It's plain JSON (`nodes` = `id/type/name/summary/tags`; `edges` = `source/target/type`) so `jq`/`node` it directly, or use `/understand-chat`, `/understand-explain <file>`, `/understand-diff`. Rank files by edge degree to find the hubs (e.g. `mcp-lammps-engine/server.py`, `orchestration/gen_prompt.py`, `hw_common.py`). Caveats: it's a snapshot (re-run `/understand` after commits — incremental is fast) and a **map, not ground truth** — Python lazy/function-local imports are under-captured, so verify against the file. For out-of-scope dirs, fall back to normal search.
 
 ---
 
@@ -99,7 +106,7 @@ SETUP
     Deterministic plans (confidence=high) approve in round 1 with 0 findings — no loop.
   Thread the approved plan: EVERY gen_prompt.py call MUST include `--plan PLAN_PATH` — the plan's
   decided_params drive the worker prompts; never read polymer_rules.json manually:
-    `python3 scripts/gen_prompt.py --stage <STAGE> --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH [--data_path ...]`
+    `python3 orchestration/gen_prompt.py --stage <STAGE> --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH [--data_path ...]`
   `T_workflow_K=$(jq -r '.decided_params.T_workflow_K // 600' PLAN_PATH)` → write to run_log.md
     header (alongside plan_path + confidence).
   If "tg" not in properties_requested: glassy_hint = (T_workflow_K != 300.0)
@@ -108,7 +115,7 @@ SETUP
     When the plan pins a D-08_hardware override (gpu_per_run/engine/mpi_ranks in decided_params),
     let gen_prompt.py thread it into the worker prompt — do NOT also pass --gpu_ids/--mpi_ranks
     (CLI wins and would shadow the plan). Claim the matching GPU count at submit time:
-    `scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}` → on success
+    `orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}` → on success
     `{"claimed":[ids],...}` use that list verbatim as the worker's gpu_ids; on shortfall
     (`{"error":...,"available":[…]}`, exit 1) defer/retry, do not force. Release on completion
     (`pick_gpu.py release --run <RUN>`). Write engine/gpu_per_run/mpi to run_log.md (D-08 row).
@@ -187,7 +194,7 @@ PHASE C — SUMMARY (always)
   #    the MCP server first.
   # 2. Determine tg_path + slope_gate_pass with the helper — do NOT hand-derive the path (the
   #    PLA3 footgun); the helper encodes the slowest/highest-rate convention:
-  #    eval "$(python3 scripts/select_tg_path.py --plan PLAN_PATH --multirate data/RUN/raw/tg_multirate_result.json)"
+  #    eval "$(python3 orchestration/select_tg_path.py --plan PLAN_PATH --multirate data/RUN/raw/tg_multirate_result.json)"
   #    # → sets TG_PATH (slowest rate if gate passed, else the plan's tg_slope_gate_fallback
   #    #   rate, default highest) and SLOPE_GATE (true|false)
   # 3. Exp ranges: thread each non-null exp-lookup field as a CLI override; omit nulls so

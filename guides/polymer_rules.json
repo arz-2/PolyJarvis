@@ -1,12 +1,12 @@
 {
   "hardware_policy": {
-    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (scripts/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default: chosen so up to 4 runs fit in 32 cores (4 x mpi=4 = 16) — this is what gen_prompt derives. `mpi_single_run_hint` is the (faster) value to use only when the box is dedicated to one run; it is a provisional GUESS pending hardware/benchmark_hardware.py (see hardware/HARDWARE.md), NOT yet benchmark-derived. NOTE: the per-run mpi/gpu values and the directional_probe timings below were measured on the PRIOR box (4x RTX 6000 24GB / i9-10980XE 18c), not this A800 box — only host/budget fields were updated; re-run benchmark_hardware.py on the A800s to retune. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
+    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (orchestration/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default: chosen so up to 4 runs fit in 32 cores (4 x mpi=4 = 16) — this is what gen_prompt derives. `mpi_single_run_hint` is the (faster) value to use only when the box is dedicated to one run; it is a provisional GUESS pending hardware/benchmark_hardware.py (see hardware/HARDWARE.md), NOT yet benchmark-derived. NOTE: the per-run mpi/gpu values and the directional_probe timings below were measured on the PRIOR box (4x RTX 6000 24GB / i9-10980XE 18c), not this A800 box — only host/budget fields were updated; re-run benchmark_hardware.py on the A800s to retune. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
     "host": {
       "gpus": 4,
       "gpu_model": "Quadro RTX 6000 24GB",
       "phys_cores": 18
     },
-    "concurrency_rule": "Sum of mpi over all concurrent runs <= 18 physical cores; at most one GPU-heavy run per physical GPU. At the default mpi=4 this permits 4 concurrent runs (16 ranks). Raise mpi toward mpi_single_run_hint only when fewer runs share the box; check with `scripts/pick_gpu.py budget --mpi N` before launch.",
+    "concurrency_rule": "Sum of mpi over all concurrent runs <= 18 physical cores; at most one GPU-heavy run per physical GPU. At the default mpi=4 this permits 4 concurrent runs (16 ranks). Raise mpi toward mpi_single_run_hint only when fewer runs share the box; check with `orchestration/pick_gpu.py budget --mpi N` before launch.",
     "min_mpi_for_pppm": 4,
     "values_are_benchmarked": false,
     "directional_probe": {

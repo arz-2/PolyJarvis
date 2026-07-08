@@ -1,6 +1,8 @@
 # ── Claude Code (machine-specific, use .mcp.json.example as template) ─────────
 .mcp.json
 .claude/settings.local.json
+# understand-anything knowledge graph — machine-local, rebuildable via /understand
+.understand-anything/
 
 # ── Secrets ───────────────────────────────────────────────────────────────────
 .env
