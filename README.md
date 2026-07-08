@@ -59,7 +59,7 @@ The framework was validated on a **36-run replicate study: 9 polymers × 4 indep
 | `orchestration/` | CLI/orchestration helpers — prompt generation, deterministic planning, GPU allocation (see [`orchestration/README.md`](orchestration/README.md)) |
 | `mcp-servers/` | The three MCP servers: `mcp-mol-builder-server` (RadonPy), `mcp-emc-server` (EMC), `mcp-lammps-engine` (LAMMPS + analysis scripts + templates) |
 | `data/` | Live pipeline working directory — per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`), run template |
-| `hardware/` | Hardware calibration — `/calibrate-hardware` toolchain (`calibrate_hardware.py`, `benchmark_hardware.py`, `bench_accuracy_diff.py`), the engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`), and the per-FF calibration cells (`CALIB_<FAM>/`) |
+| `hardware/` | Hardware calibration — `/calibrate-hardware` toolchain (`calibrate_hardware.py`, `benchmark_hardware.py`, `bench_accuracy_diff.py`) and the per-FF calibration cells (`CALIB_<FAM>/`); the engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`) are machine-specific and local-only (gitignored) |
 | `db/` | Experimental property database (`polymer_db.sqlite`, schema, query + ingest scripts) |
 | `tests/`, `mcp-servers/*/tests/`, `tools/runlog_miner/tests/` | Test suites (root `pytest.ini`); the recovery-benchmark suite is run separately (`pytest manuscript/recovery/tests/`) |
 | `tools/runlog_miner/` | Run-log mining/reporting package |
@@ -141,7 +141,7 @@ nice -n 19 python3 hardware/calibrate_hardware.py  # measure + write hardware_po
 python3 orchestration/pick_gpu.py status                 # verify: GPU allocation / spare-core view
 ```
 
-Calibration is **polite by default** on a shared box: idle GPUs only, rank caps against measured CPU load, everything `nice`d — never use `--allow-busy`. The calibration cells ship in-repo (`hardware/CALIB_<FAM>/`). Re-run after any GPU/CPU change. Rationale, the per-FF lookup table, and the full-search mode are in [`hardware/HARDWARE.md`](hardware/HARDWARE.md) / [`hardware/HARDWARE_STUDY.md`](hardware/HARDWARE_STUDY.md); an agent can drive the whole procedure via the `/calibrate-hardware` slash-command.
+Calibration is **polite by default** on a shared box: idle GPUs only, rank caps against measured CPU load, everything `nice`d — never use `--allow-busy`. The calibration cells ship in-repo (`hardware/CALIB_<FAM>/`). Re-run after any GPU/CPU change. Measured results and the per-FF lookup table are kept in machine-specific notes (`hardware/HARDWARE.md`, `hardware/HARDWARE_STUDY.md`; local-only, gitignored). An agent can drive the whole procedure via the `/calibrate-hardware` slash-command.
 
 ---
 
