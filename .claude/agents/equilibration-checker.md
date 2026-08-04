@@ -6,6 +6,7 @@ tools:
   - Bash
   - mcp__mcp-lammps-engine__check_equilibration_comprehensive
   - mcp__mcp-lammps-engine__extract_equilibrated_density
+  - mcp__mcp-lammps-engine__enforce_equilibration_gate
   - Write
   - Edit
 model: haiku
@@ -67,11 +68,27 @@ For rubbery classes (`ct_min_decay=None`): set `ct_decay_fraction` and `ct_tau_r
 
 Histogram PNG is auto-saved to `graphs_dir/end_to_end_distribution.png` by the tool.
 
-### Verdict mapping
+### Step 3: mechanized verdict (`enforce_equilibration_gate` MCP tool)
 
-- `overall_pass=True` → `equil_verdict=PASS`
-- `overall_pass=False`, failing gate is density or energy convergence → `equil_verdict=EXTEND` (orchestrator extends chain and re-runs BACKGROUND-WAIT)
-- `overall_pass=False`, failing gate is hard structural failure (box collapse, charge imbalance) → `equil_verdict=FAIL` (orchestrator writes UNRESOLVED)
+After Steps 1–2, call `mcp__mcp-lammps-engine__enforce_equilibration_gate` with the args given in
+the prompt (search "MECHANIZED GATE"). **One call — it internally runs the
+`assess_cooling_contraction` density-value-binding probe itself when needed and returns the final
+verdict directly; you never see or act on an intermediate `needs_probe` state.** Its `verdict`
+field is `equil_verdict` directly — do not re-derive PASS/EXTEND/FAIL/STRUCTURAL_FAIL from the raw
+numbers yourself. Full routing detail is in the EQUIL_CHECK guide inlined below. Quick reference:
+
+- `PASS` → `equil_verdict=PASS`
+- `EXTEND` → `equil_verdict=EXTEND` (orchestrator extends chain and re-runs BACKGROUND-WAIT) — only
+  density/energy drift or block-SEM failed, genuinely not-yet-converged
+- `STRUCTURAL_FAIL` → `equil_verdict=STRUCTURAL_FAIL` (orchestrator routes to the specific recovery
+  ladder named in the `remedy` field — see FOUNDATION.md — NOT a blind EXTEND, NOT UNRESOLVED). The
+  cell converged to the *wrong* density/homogeneity, not merely an unconverged one.
+- `FAIL` → `equil_verdict=FAIL` (orchestrator writes UNRESOLVED) — hard structural failure (box
+  collapse, charge imbalance, dead cell) or unclassifiable binding-gate failure
+
+(`orchestration/enforce_gate.py --live` still exists as the underlying, Bash-callable CLI — kept
+for retrospective/offline auditing of already-completed runs, e.g. `manuscript_v2/revision.md`'s
+36-run audit — but the live pipeline calls the MCP tool, not the script, directly.)
 
 **Do NOT call `generate_run_summary`.** That is run-summary-worker's job.
 
@@ -82,7 +99,9 @@ End your final message with this exact block (no trailing text):
 ```
 RESULT:
   run_name: <run_name>
-  equil_verdict: PASS | EXTEND | FAIL
+  equil_verdict: PASS | EXTEND | STRUCTURAL_FAIL | FAIL
+  structural_fail_remedy: <remedy field from enforce_gate.py, e.g. re_melt_slow_recool | heavy_melt_anneal_probe — omit unless equil_verdict=STRUCTURAL_FAIL>
+  structural_fail_remedy_confidence: <high | low — from remedy_confidence field; low means the melt/cooling split (UNDER_ANNEALED_COOLING vs MELT_STAGE_DEFICIT) rests on an unreliable alpha-extrapolation (cooling span >300K) — treat the remedy as a starting hypothesis, not firm; omit unless equil_verdict=STRUCTURAL_FAIL>
   equilibrated: true | false
   density_gcm3: <value or N/A>
   density_SEM: <value or N/A>

@@ -249,6 +249,38 @@ def _exp_tg_range(cls: dict, run_name: str | None = None) -> list:
     return ["<exp_tg_min>", "<exp_tg_max>"]
 
 
+def _exp_tg_point(cls: dict, run_name: str | None = None):
+    """Point exp_tg_K value (not a ±20 band) for assess_cooling_contraction's tg_K arg.
+    Mirrors _exp_tg_range's member-resolution logic (fixes the class-mean-averaging bug
+    for multi-member classes — see memory feedback_genprompt_exp_tg_avg_bug.md)."""
+    tg = cls.get("experimental_tg_K")
+    if isinstance(tg, dict):
+        if run_name:
+            for key, val in tg.items():
+                if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
+                    return val
+        vals = sorted(v for v in tg.values() if isinstance(v, (int, float)))
+        return vals[len(vals) // 2] if vals else None
+    if isinstance(tg, (int, float)):
+        return tg
+    return None
+
+
+def _exp_density_point(cls: dict, run_name: str | None = None):
+    """Point exp_density_gcm3 value (not a ±5% band) for assess_cooling_contraction."""
+    exp = cls.get("experimental_density_gcm3")
+    if isinstance(exp, dict):
+        if run_name:
+            for key, val in exp.items():
+                if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
+                    return val
+        vals = sorted(v for v in exp.values() if isinstance(v, (int, float)))
+        return vals[len(vals) // 2] if vals else None
+    if isinstance(exp, (int, float)):
+        return exp
+    return None
+
+
 def _exp_K_range(cls: dict) -> list:
     exp = cls.get("exp_K_GPa")
     if isinstance(exp, dict) and "min" in exp and "max" in exp:
@@ -683,6 +715,13 @@ def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
     npt_log = args.npt_prod_log or f"{lammps_base}/equil/{prod}/{prod}.log"
     npt_data = args.data_path or f"{lammps_base}/equil/{prod}/{prod}_out.data"
     melt_dump = args.npt_prod_dump or f"{lammps_base}/equil/nvt_production/nvt_production.dump"
+    # For the mechanized gate's density_value_binding check (glassy only): glass_data is npt_data
+    # above; melt_data is the pre-cool NPT stage (npt_production_out.data), present in both the
+    # 7-run rubbery chain (= npt_data itself there) and the 9-run glassy chain (a distinct earlier
+    # stage than npt_prod300).
+    melt_data_path = f"{lammps_base}/equil/npt_production/npt_production_out.data"
+    exp_tg_point = _exp_tg_point(cls, args.run_name)
+    exp_density_point = _exp_density_point(cls, args.run_name)
 
     # is_glassy and dp enable the require_glassy carve-out in the checker:
     # when is_glassy=True AND dp>=30, chain C(t)/end-to-end diffusion gates are advisory only
@@ -720,6 +759,32 @@ tasks:
 ### It contains the real Rg/MSD/density/C(t)/R_ee values. Leaving any [X ± Y] / [X]% /
 ### [PASS / FAIL] placeholder in run_log.md is a FAILURE of this equil-check step — the tool
 ### already fills every field, so there is no reason to leave a placeholder.
+
+### MECHANIZED GATE (Step 3, replaces your own PASS/EXTEND/FAIL judgment — see EQUIL_CHECK guide):
+### after Steps 1-2 write their JSON to output_dir, call the MCP tool
+### mcp__mcp-lammps-engine__enforce_equilibration_gate with:
+###   comprehensive_json = {output_dir}equilibration_comprehensive.json
+###   regime              = {regime}
+###   dp                  = {dp_val if dp_val is not None else 'null'}
+###   ct_gate_reliable    = {str(cls.get('ct_gate_reliable', True)).lower()}
+###   exp_density_gcm3    = {exp_density_point if exp_density_point is not None else 'null'}
+###   tg_K                = {exp_tg_point if exp_tg_point is not None else 'null'}
+###   t_equil_K           = {T_workflow}
+###   glass_data          = {npt_data}
+###   melt_data           = {melt_data_path}
+###   out_dir             = {output_dir}
+###   alpha_glass_per_K   = {cls.get('alpha_glass_per_K', 'null')}
+###   alpha_melt_per_K    = {cls.get('alpha_melt_per_K', 'null')}
+### alpha_glass_per_K/alpha_melt_per_K are curated per-class values (polymer_rules.json) or,
+### for off-table/low-medium-confidence classes, planner-sourced from literature_grounding.json's
+### CTE evidence — collected once at plan time, never searched live inside this gate. null means
+### no class- or grounding-specific value exists; the tool falls back to its own generic default
+### (2.5e-4 / 6.0e-4 per K) and the density_value_binding diagnosis is generic-CTE quality.
+### One call — it runs assess_cooling_contraction internally when needed and returns the final
+### verdict directly (no needs_probe round-trip). Use its "verdict" field (PASS | EXTEND |
+### STRUCTURAL_FAIL | FAIL) as equil_verdict directly. Do NOT override it with your own reading
+### of the numbers. (orchestration/enforce_gate.py --live is the same logic as a Bash-callable
+### CLI, kept for retrospective/offline auditing — not used by this live prompt.)
 
 --- Worker Guide (EQUIL_CHECK) ---
 {guide}

@@ -1786,14 +1786,19 @@ def generate_equilibration_workflow(
 # progress through run_manager — poll with get_run_status() / get_run_output().
 
 def _parse_json_from_stdout(stdout: str, stderr: str) -> dict:
-    """Scan stdout bottom-up for the first valid JSON line. Returns error dict on failure."""
-    for line in reversed(stdout.strip().splitlines()):
-        line = line.strip()
-        if line.startswith("{"):
-            try:
-                return json.loads(line)
-            except json.JSONDecodeError:
-                continue
+    """Scan stdout bottom-up for valid JSON — a single line (compact json.dumps) or a
+    pretty-printed multi-line block (json.dumps(..., indent=N), e.g. assess_cooling_contraction.py).
+    Tries every '{' from the last occurrence backward, parsing from there to end-of-string, so a
+    pretty-printed block at the end of stdout (the common case) is found even though its opening
+    line alone isn't valid JSON. Returns error dict on failure."""
+    text = stdout.strip()
+    idx = text.rfind("{")
+    while idx != -1:
+        candidate = text[idx:]
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            idx = text.rfind("{", 0, idx)
     return {"status": "failed", "error": "No JSON found in stdout",
             "stdout": stdout, "stderr": stderr}
 
@@ -2673,6 +2678,116 @@ def assess_cooling_contraction(
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
     return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def enforce_equilibration_gate(
+    comprehensive_json: str,
+    regime: str,
+    dp: Optional[float] = None,
+    ct_gate_reliable: bool = True,
+    exp_density_gcm3: Optional[float] = None,
+    tg_K: Optional[float] = None,
+    t_equil_K: Optional[float] = None,
+    glass_data: Optional[str] = None,
+    melt_data: Optional[str] = None,
+    out_dir: Optional[str] = None,
+    alpha_glass_per_K: Optional[float] = None,
+    alpha_melt_per_K: Optional[float] = None,
+) -> dict:
+    """
+    Mechanized equilibration gate verdict — replaces prose PASS/EXTEND/FAIL judgment with a
+    programmatic cross-check of check_equilibration_comprehensive's per-gate results against
+    decision_policy.json's require_glassy / require_rubbery clauses, plus density_value_binding
+    (a glassy 300K density >5% below experiment requires an assess_cooling_contraction diagnosis
+    before any verdict — a check overall_pass never performs on its own, since it only tests that
+    density stopped moving, not that it stopped at the right value).
+
+    Single-call: if density_value_binding is triggered and no cached diagnosis exists at
+    <out_dir>/cooling_contraction.json, this calls assess_cooling_contraction.py internally
+    (same script the assess_cooling_contraction tool wraps) and saves the result itself —
+    no round-trip back to the caller required, unlike enforce_gate.py's --live CLI mode (which
+    this wraps and is kept for retrospective/offline auditing of completed runs).
+
+    Args:
+        comprehensive_json: Path to check_equilibration_comprehensive's saved JSON output.
+        regime:             "glassy" or "rubbery" (T_workflow_K > 300 → glassy).
+        dp:                 Degree of polymerization (drives the require_glassy DP≥30 carve-out).
+        ct_gate_reliable:   False for aromatic-backbone classes (PSFO/PKTN) — C(t) is
+                            structurally undefined there regardless of DP.
+        exp_density_gcm3:   Point experimental density (g/cm³) for this polymer member.
+        tg_K:               Point experimental Tg (K) for this polymer member.
+        t_equil_K:          Melt/equilibration temperature (T_workflow_K).
+        glass_data:         npt_prod300_out.data (glass at 300K) — required only if
+                            density_value_binding needs to run assess_cooling_contraction.
+        melt_data:          npt_production_out.data (melt at T_equil) — same condition.
+        out_dir:            Run's raw/ output directory — cooling_contraction.json is cached
+                            here so repeat calls (e.g. after an EXTEND) don't re-run the probe.
+        alpha_glass_per_K:  Class- or literature-grounding-sourced volumetric thermal-expansion
+                            coeff below Tg, from decided_params.alpha_glass_per_K (set at plan
+                            time — this tool never searches for it live). None falls back to
+                            assess_cooling_contraction.py's generic default (2.5e-4/K).
+        alpha_melt_per_K:   Same, above Tg (decided_params.alpha_melt_per_K). None falls back to
+                            the generic default (6.0e-4/K).
+
+    Returns:
+        dict: regime, applicable_clause, binding_gates, advisory_gates, density_gap_pct,
+        density_value_binding, failing_binding_gates, verdict (PASS | EXTEND |
+        STRUCTURAL_FAIL | FAIL), remedy (set only for STRUCTURAL_FAIL — e.g.
+        re_melt_slow_recool | heavy_melt_anneal_probe | a melt-mixing extension note).
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    orchestration_dir = str(repo_root / "orchestration")
+    if orchestration_dir not in sys.path:
+        sys.path.insert(0, orchestration_dir)
+    import enforce_gate
+
+    class _LiveArgs:
+        pass
+
+    live_args = _LiveArgs()
+    live_args.comprehensive_json = comprehensive_json
+    live_args.regime = regime
+    live_args.dp = dp
+    live_args.ct_gate_reliable = ct_gate_reliable
+    live_args.exp_density_gcm3 = exp_density_gcm3
+    live_args.tg_k = tg_K
+    live_args.t_equil_k = t_equil_K
+    live_args.glass_data = glass_data
+    live_args.melt_data = melt_data
+    live_args.out_dir = out_dir
+    live_args.alpha_glass_per_k = alpha_glass_per_K
+    live_args.alpha_melt_per_k = alpha_melt_per_K
+
+    result = enforce_gate.enforce_live(live_args)
+
+    if result.get("needs_probe"):
+        cc_args = result["assess_cooling_contraction_args"]
+        parts = [f"python {MDA_SCRIPTS_DIR}/assess_cooling_contraction.py",
+                 f"--glass_data {cc_args['glass_data']}",
+                 f"--exp_density_gcm3 {cc_args['exp_density_gcm3']}",
+                 f"--tg_K {cc_args['tg_K']}",
+                 f"--t_equil_K {cc_args['t_equil_K']}"]
+        if cc_args.get("melt_data"):
+            parts.append(f"--melt_data {cc_args['melt_data']}")
+        if cc_args.get("alpha_glass") is not None:
+            parts.append(f"--alpha_glass {cc_args['alpha_glass']}")
+        if cc_args.get("alpha_melt") is not None:
+            parts.append(f"--alpha_melt {cc_args['alpha_melt']}")
+        command = " ".join(parts)
+        logger.info(f"enforce_equilibration_gate: auto-running density_value_binding probe: {command}")
+        stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=600)
+        cooling_result = _parse_json_from_stdout(stdout, stderr)
+        if cooling_result.get("status") == "failed":
+            return {"status": "failed",
+                    "error": "assess_cooling_contraction probe failed inside enforce_equilibration_gate",
+                    "detail": cooling_result}
+        save_path = Path(result["save_result_to"])
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        save_path.write_text(json.dumps(cooling_result, indent=2))
+        result = enforce_gate.enforce_live(live_args)  # re-run now that the cache exists
+
+    return result
 
 
 @mcp.tool()
