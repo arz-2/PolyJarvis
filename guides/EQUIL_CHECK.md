@@ -57,44 +57,51 @@ Primary output: `plateau_density_mean` ± `plateau_density_std`. Verify `plateau
 starts after the compression ramp. Density passes within ±5% of experimental; **below −5% is
 BINDING, not a soft warning.**
 
-### Convergence ≠ correctness — under-anneal check before accepting a low density
+### Step 3: MECHANIZED VERDICT — `enforce_equilibration_gate` MCP tool (replaces your own PASS/EXTEND/FAIL judgment)
 
-A converged density proves the cell stopped moving, not that it stopped at the right value: an
-under-annealed glass converges perfectly at a too-low density (free volume frozen in on
-cooling). So when a glassy 300 K density is below −5%, decompose melt vs cooling before any verdict:
+The exact tool call args are already filled in for you in the prompt above (search "MECHANIZED
+GATE"). Call it after Steps 1–2 write their JSON. **Use its `verdict` field directly — do not
+re-derive PASS/EXTEND/FAIL from the raw numbers yourself.** This exists precisely because worker
+prose judgment on this step let 8 genuine violations (PMMA1, PS1–4, PEEK1–4) get narrated as
+"PASS (known PCFF bias)" four separate times before anyone mechanically checked
+`density_value_binding` — see `manuscript_v2/revision.md` section B.
 
-```
-assess_cooling_contraction(
-    melt_data  = <npt_production_out.data>,   # melt at T_equil
-    glass_data = <npt_prod300_out.data>,      # glass at 300 K
-    exp_density_gcm3 = <class exp density>, tg_K = <Tg>, t_equil_K = <T_workflow>)
-```
-Route on `verdict`:
-- **`UNDER_ANNEALED_COOLING`** (melt OK, under-contracted on cooling) → return `RE-ANNEAL` (re-melt + slow re-cool, see EQUILIBRATION.md). Do NOT `EXTEND` at 300 K, do NOT accept as FF bias — it's fixable.
-- **`MELT_STAGE_DEFICIT`** (melt already low, or rubbery) → FF underbinding or melt-stage under-annealing. Accept as "FF bias" ONLY with the `assess_cooling_contraction` evidence pasted into D-05 and flagged unresolved.
-- **`extrapolation_reliable=False`** (cooling span >300 K, e.g. PEEK) → split is indicative only; prefer `RE-ANNEAL`, lean on absolute glass-vs-exp density.
+The tool is a single call: if it finds glassy density >5% below experiment and no cached
+diagnosis, it runs `assess_cooling_contraction` **internally** and returns the final verdict
+directly — you will never see or need to act on an intermediate probe state.
+
+**The four possible verdicts:**
+- **`PASS`** → `equil_verdict=PASS`. (Includes carve-out passes — advisory-only gates failing under
+  `require_glassy`/`require_rubbery` do not block.)
+- **`EXTEND`** → `equil_verdict=EXTEND`. Only density/energy drift or block-SEM failed — genuinely
+  not-yet-converged, more NPT at the same T can fix it.
+- **`STRUCTURAL_FAIL`** → `equil_verdict=STRUCTURAL_FAIL` (see FOUNDATION.md for orchestrator
+  routing). The cell converged to the *wrong* value, not merely an unconverged one — `EXTEND`
+  cannot fix this (a glass cannot densify below Tg). Check the `remedy` field:
+  - `re_melt_slow_recool` (from `UNDER_ANNEALED_COOLING`) — melt was fine, cooling ramp too fast.
+  - `heavy_melt_anneal_probe` (from `MELT_STAGE_DEFICIT`) — melt itself deficient; re-cooling
+    slower will NOT help. Root cause (FF underbinding vs. melt under-annealing) needs the probe.
+  - melt-mixing remedy (density_homogeneity failing with density otherwise in-band) — extend
+    melt-stage dwell (`melt_npt_steps`/`t_equil_ns`), not the cooling ramp.
+- **`FAIL`** → `equil_verdict=FAIL`. Box collapse, charge imbalance, dead cell (C(t) exactly 0%),
+  or any binding-gate failure the mechanized script can't classify into the above. (C(t)
+  decaying-but-incomplete is reptation-limited, not a FAIL — the script already treats it as
+  advisory under the applicable carve-out; you should never see it in `failing_binding_gates`.)
 
 ---
 
-## Verdict routing (Common Failures)
+## Non-mechanized judgment calls still yours to make
 
-**`overall_pass=False`:**
-- Density still drifting / energy not plateaued → `EXTEND` (more NPT at the SAME T).
-- Converged but glassy density below −5% → NOT `EXTEND`; run `assess_cooling_contraction` → `RE-ANNEAL` for `UNDER_ANNEALED_COOLING`. Symptom: SEM tiny AND ~5–7% low AND MSD kinetic-trap flagged.
-- Box collapse / charge imbalance / C(t) exactly 0% (dead cell) → `FAIL`. (C(t) decaying-but-incomplete is reptation-limited, not a FAIL — see carve-outs.)
-
-**Blocked SOLELY by chain-diffusion/reptation metrics** (C(t) decay, MSD, τ_relax, MSID slope,
-Rg CV): NOT a FAIL, NOT an EXTEND — unreachable in MD at finite DP, and EXTEND cannot move them.
-- Glassy DP≥30 (`is_glassy`, e.g. PKTN/PEEK): per `require_glassy`, gate on the STRUCTURAL set only (density plateau in range, homogeneity CV<0.25, P2<0.10, thermo drift/SEM). Flag the dynamic-relaxation lower-bound caveat (Tg over-estimate, K low).
-- Rubbery (`regime: rubbery`, e.g. PHYC/PDIE/POXI): per `require_rubbery`, gate ONLY on density block-SEM<2% AND homogeneity CV<25% AND energy drift/SEM. Return `PASS` even with `overall_pass=False`.
+These aren't covered by `enforce_gate.py` (they concern the density/homogeneity NUMBERS it reads,
+not the verdict logic) — use judgment here, same as before:
 
 **`extract_equilibrated_density` returns <0.5 g/cm³:** log likely contains the compression ramp — verify `plateau_step_range` after the ramp; raise `eq_fraction` to 0.7.
 
 **Marginal density-homogeneity CV in [24.5%, 25.5%] on a small DP<30 aromatic cell:**
-Poisson-limited finite-size noise, not underpacking. Route `EXTEND` (not FAIL) when density
-SEM<0.5% and drift p significant; FAIL only if SEM>1% or drift p>0.05. A co-marginal Rg
-chain-chain CV (~36%) on the same small cell is the same finite-size noise — treat as
-marginal→EXTEND, never a standalone FAIL.
+Poisson-limited finite-size noise, not underpacking — the mechanized script will call this a
+binding failure (CV≥25% is CV≥25%); if you believe it's Poisson-limited, route as you would an
+EXTEND-eligible case manually and note the override explicitly in D-05, don't silently accept.
+A co-marginal Rg chain-chain CV (~36%) on the same small cell is the same finite-size noise.
 
 **`check_equilibration_comprehensive` hangs on a large dump (>~1 GB / >1000 frames):**
 trajectory I/O can time out. Do NOT block the verdict: rely on `extract_equilibrated_density`

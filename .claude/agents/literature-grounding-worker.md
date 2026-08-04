@@ -32,8 +32,29 @@ Check agent memory for source-vetting quirks and class-specific literature notes
 | `system_size` | D-04 | Typical degree of polymerization (`dp_typical`) and chain count (`nchain`) for converged Tg (Fox–Flory plateau) / modulus (entanglement MW) |
 | `density_target_gcm3` | (cell sanity) | Experimental amorphous density and the temperature it was measured at |
 | `tg_target_K` | (thermal window) | Experimental Tg range, to bracket the sweep window |
+| `cte_glass_melt` | equilibration-checker's `density_value_binding` gate | Volumetric thermal-expansion coeff below Tg (`alpha_glass_per_K`) and above Tg (`alpha_melt_per_K`) |
 
-Only ground the fields relevant to `properties_requested` plus `forcefield`/`electrostatics`/`system_size` (always useful for the build). Skip `tg_target_K` if `tg` not requested; skip `density_target_gcm3` only if neither density nor the cell build needs it (in practice always include it — it sanity-checks every run).
+Only ground the fields relevant to `properties_requested` plus `forcefield`/`electrostatics`/`system_size` (always useful for the build). Skip `tg_target_K` if `tg` not requested; skip `density_target_gcm3` only if neither density nor the cell build needs it (in practice always include it — it sanity-checks every run). Ground `cte_glass_melt` whenever the polymer's Tg is expected to sit below any planned equilibration temperature (i.e. the run passes through a glassy region) — it feeds a downstream gate diagnosis, not a build decision, so it's lower priority than FF/electrostatics/system_size.
+
+### `cte_glass_melt`: check the local DB before searching
+
+Unlike the other fields, this one has a **local, pre-vetted source that isn't a live search** — `db/polymer_db.sqlite`'s `density_equations` table holds Mark 2007 handbook density-vs-temperature equations (phase-tagged `glass`/`melt`, with `py_expr` directly `eval()`-able). Check it FIRST, before any `WebSearch` call:
+
+```bash
+python3 -c "
+import sqlite3, math
+con = sqlite3.connect('db/polymer_db.sqlite'); con.row_factory = sqlite3.Row
+cur = con.cursor()
+cur.execute('''SELECT p.name, de.phase, de.py_expr, de.t_min_C, de.t_max_C
+               FROM density_equations de JOIN polymers p ON p.id = de.polymer_id
+               WHERE p.name LIKE ?''', ('%<polymer name or close synonym>%',))
+for r in cur.fetchall(): print(dict(r))
+"
+```
+
+`poly_class` is NOT populated in this DB (all NULL — a known gap) — match by `name` (try the common name, e.g. "Polystyrene", "Poly(methylmethacrylate)"; handbook naming is inconsistent, so try a couple of synonyms). If a `glass` and/or `melt` row covers this polymer, derive `alpha_glass_per_K`/`alpha_melt_per_K` via central finite difference: `alpha_V(T) = -(1/rho(T)) * drho/dT`, evaluated at ~300 K for `glass` and near the planned equilibration temperature for `melt` (clamp to the equation's own `[t_min_C, t_max_C]` range rather than extrapolating far outside it — note in `sources[].claim` if you had to clamp). Cite it as `trust_tier: "handbook"`, `source: "Mark 2007 (db/polymer_db.sqlite density_equations)"` — this counts as verified without a WebFetch DOI check, since it's already a curated, in-repo table.
+
+**Only fall back to a live `WebSearch`** (same verify-before-citing discipline as the other fields) if the DB has no `density_equations` row for this polymer or a close analog. A `confidence: "low"`/`null` result for `cte_glass_melt` is fine either way — the gate just falls back to its own generic default (2.5e-4 / 6.0e-4 per K). Never spend more than one search round on this field; it's advisory to a diagnostic, not load-bearing for the build.
 
 ## Procedure
 
@@ -64,6 +85,7 @@ Only ground the fields relevant to `properties_requested` plus `forcefield`/`ele
   "system_size":    {"dp_typical": <int|null>, "nchain": <int|null>, "confidence": "...", "sources": [ ... ]},
   "density_target_gcm3": {"range": [<min>, <max>] , "T_K": <int|null>, "confidence": "...", "sources": [ ... ]},
   "tg_target_K":         {"range": [<min>, <max>], "confidence": "...", "sources": [ ... ]},
+  "cte_glass_melt":      {"alpha_glass_per_K": <float|null>, "alpha_melt_per_K": <float|null>, "confidence": "...", "sources": [ ... ]},
   "dominant_uncertainty": "<short phrase>",
   "notes": "<one or two sentences on the key judgement call>"
 }

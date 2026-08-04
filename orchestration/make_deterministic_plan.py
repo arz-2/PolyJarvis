@@ -47,6 +47,7 @@ SNAPSHOT_KEYS = [
     "tg_min_steps_per_T", "tg_slope_gate_fallback",
     "K_deform_rate_inv_s", "K_deform_rate_slow_inv_s", "K_strain_max",
     "bm_pressures_atm", "ct_min_decay_melt",
+    "alpha_glass_per_K", "alpha_melt_per_K",
 ]
 
 
