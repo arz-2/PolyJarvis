@@ -240,16 +240,109 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
     }
 
 
+def _recovery_summary(run_plan_path: Path) -> str:
+    """Best-effort one-line summary of what was diagnosed, from the sibling run_log.md's
+    RECOVERY blocks (data/<run>/raw/run_plan.json -> data/<run>/run_log.md). Empty string
+    if the log is absent or has no RECOVERY blocks -- this is a provenance nicety, not
+    load-bearing, so failures here must never block the lock itself."""
+    try:
+        run_log = run_plan_path.parents[1] / "run_log.md"
+        if not run_log.exists():
+            return ""
+        text = run_log.read_text(errors="ignore")
+        headers = [ln.strip("# ").strip() for ln in text.splitlines()
+                   if ln.strip().startswith("## RECOVERY")]
+        if not headers:
+            return ""
+        return f"{len(headers)} recovery block(s) logged ({'; '.join(headers[:3])}{'...' if len(headers) > 3 else ''})"
+    except OSError:
+        return ""
+
+
+def lock_from(run_plan_path: Path, polymer_class: str, rules_path: Path) -> dict:
+    """--lock-from: patch guides/polymer_rules.json's class entry with a finished, fully-PASSed
+    reasoned run's decided_params, and flip confidence -> high so every subsequent run of this
+    class takes the deterministic (script-only) path.
+
+    Only ever writes SNAPSHOT_KEYS fields (the same list make_plan() reads), `confidence`, and
+    one provenance note field (_protocol_locked_note) -- DOI citations, experimental_* targets,
+    and every other hand-curated field in the class entry are left untouched.
+    """
+    plan = json.loads(run_plan_path.read_text())
+    if plan.get("plan_mode") != "reasoned":
+        raise SystemExit(
+            f"--lock-from refuses: {run_plan_path} has plan_mode={plan.get('plan_mode')!r}, "
+            "not 'reasoned' -- locking only comes from a diagnosed-and-perfected run, "
+            "never from replaying a replay.")
+    plan_class = (plan.get("polymer_class") or "").upper()
+    if plan_class and plan_class != polymer_class.upper():
+        raise SystemExit(
+            f"--lock-from refuses: {run_plan_path} is polymer_class={plan_class!r}, "
+            f"not the requested {polymer_class.upper()!r}.")
+
+    rules = json.loads(rules_path.read_text())
+    cls_entry = rules["classes"].get(polymer_class.upper())
+    if cls_entry is None:
+        raise SystemExit(f"--lock-from refuses: class {polymer_class.upper()!r} not found in "
+                          f"{rules_path} -- create the class entry before locking a protocol.")
+
+    finished_params = plan.get("decided_params", {})
+    changes = {}
+    for k in SNAPSHOT_KEYS:
+        if k not in finished_params:
+            continue
+        new_val = finished_params[k]
+        old_val = cls_entry.get(k)
+        if old_val != new_val:
+            changes[k] = {"was": old_val, "now": new_val}
+            cls_entry[k] = new_val
+
+    old_confidence = cls_entry.get("confidence")
+    if old_confidence != "high":
+        changes["confidence"] = {"was": old_confidence, "now": "high"}
+    cls_entry["confidence"] = "high"
+
+    source_run = plan.get("run_name", "unknown")
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    summary = _recovery_summary(run_plan_path)
+    note = f"Locked {date} from {source_run} (prior confidence: {old_confidence})."
+    if summary:
+        note += f" {summary}."
+    if not changes:
+        note += " No decided_params diverged from prior class defaults."
+    cls_entry["_protocol_locked_note"] = note
+
+    rules_path.write_text(json.dumps(rules, indent=2) + "\n")
+    return {"status": "locked", "polymer_class": polymer_class.upper(),
+            "source_run": source_run, "rules_path": str(rules_path),
+            "changes": changes, "note": note}
+
+
 def main():
     p = argparse.ArgumentParser(description="Emit a deterministic run_plan.json.")
-    p.add_argument("--run_name", required=True)
+    p.add_argument("--run_name")
     p.add_argument("--polymer_class", required=True)
     p.add_argument("--smiles", default=None)
     p.add_argument("--properties", default="all",
                    help="Comma-separated: density,tg,bulk_modulus or 'all'")
     p.add_argument("--out", default=None,
                    help="Output path; default data/<run_name>/raw/run_plan.json; '-' = stdout")
+    p.add_argument("--lock-from", default=None, metavar="RUN_PLAN_JSON",
+                   help="Patch guides/polymer_rules.json's class entry from a finished, "
+                        "fully-PASSed reasoned run's decided_params and flip confidence to "
+                        "high, instead of generating a new plan. See lock_from().")
+    p.add_argument("--rules-path", default=str(RULES_PATH),
+                   help="polymer_rules.json to read/patch (default: guides/polymer_rules.json). "
+                        "Override for --lock-from dry-runs against a scratch copy.")
     args = p.parse_args()
+
+    if args.lock_from:
+        result = lock_from(Path(args.lock_from), args.polymer_class, Path(args.rules_path))
+        print(json.dumps(result, indent=2))
+        return
+
+    if not args.run_name:
+        p.error("--run_name required unless --lock-from is given")
 
     props_str = args.properties.strip().lower()
     properties = ({"density", "tg", "bulk_modulus"} if props_str == "all"

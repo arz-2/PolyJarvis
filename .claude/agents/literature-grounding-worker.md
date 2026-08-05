@@ -70,7 +70,28 @@ for r in cur.fetchall(): print(dict(r))
 
 6. **Name the `dominant_uncertainty`** — the field where weak/absent evidence most threatens the run (e.g. "no class-specific FF validation found").
 
-**Do not** call any simulation tool, query `polymer_db.sqlite` / `query_best_match.py` (that is the post-sim exp-lookup worker's job — your output is for *planning targets*, never for run-summary grading bounds), or write any file other than `output_path`.
+7. **If `polymer_class` is absent from `polymer_rules.json`, author a new class entry** (this is the *only* exception to "never write any file other than `output_path`" below):
+   `Bash: jq --arg c "$POLYMER_CLASS" '.classes[$c]' guides/polymer_rules.json` — if `null`,
+   the class genuinely has no entry yet (distinct from `confidence: "low"`, which means an
+   entry exists but is unvalidated). Append one, populated from this run's grounding fields
+   plus the DB (`density_equations`/`tg_measurements`/`mechanical_measurements` — same
+   `db/polymer_db.sqlite` lookup already used for `cte_glass_melt`) where available:
+   `preferred_ff`/`electrostatics` from `forcefield`/`electrostatics`, `dp_typical`/`nchain`
+   from `system_size`, `experimental_density_gcm3`/`experimental_tg_K` from
+   `density_target_gcm3`/`tg_target_K`. Set `"confidence": "low"` (a freshly-authored entry is
+   unvalidated until a real run completes and locks it — see
+   `orchestration/make_deterministic_plan.py --lock-from`) and add a one-line
+   `"_entry_created_note"`: "Auto-created from literature grounding, run <RUN_NAME>, <date> —
+   unvalidated until a full run completes." **Guard rail: only ever add a class key that does
+   not already exist — never modify an existing class entry's fields.** If the class already
+   has an entry (even `confidence: "low"`), skip this step entirely; that entry's fields are
+   the planner's to revise, not yours to overwrite.
+
+**Do not** call any simulation tool, query `polymer_db.sqlite` for anything beyond the read-only
+lookups this file specifies (`cte_glass_melt`, step 7's entry-creation fields — never
+`query_best_match.py`, which is the post-sim exp-lookup worker's job and never feeds planning
+targets), or write any file other than `output_path` and, narrowly, a brand-new
+`polymer_rules.json` class entry per step 7.
 
 ## Output JSON schema
 
@@ -116,6 +137,7 @@ RESULT:
   tg_target_K: <[min,max] or null>
   n_verified_sources: <integer total across all fields>
   dominant_uncertainty: <short phrase>
+  polymer_rules_entry_created: <true|false — true only if step 7 appended a brand-new class entry>
   notes: <one sentence; "no verified literature found — planner should use rules defaults" if empty>
 ```
 

@@ -17,7 +17,7 @@
     "gate_direction": "The plan_mode↔confidence gate is ASYMMETRIC. Only `deterministic` on a non-high/off-table class is a bypass that the Critic must ESCALATE (it claims settled defaults the class has not validated). `reasoned` on a high-confidence class is the SAFE direction — never escalate it; it subjects every decision to full step-3 enforcement instead of fast-path auto-approve. A budget-forced deviation to a non-default ladder on a high class (e.g. PEST [25,50,100] infeasible in a 9.5h wall-clock budget) is exactly what reasoned mode exists for.",
     "high": {
       "plan_mode": "deterministic",
-      "behavior": "Planner transcribes polymer_rules.json defaults verbatim into run_plan.json decided_params (a subset of class keys with identical values). Critic auto-approves (trivial pass, 0 reasoning rounds). Worker prompts are byte-identical to the pre-architecture pipeline. Use fixed seeds from guides/REVISION_PARAMS.md.",
+      "behavior": "Planner transcribes polymer_rules.json defaults verbatim into run_plan.json decided_params (a subset of class keys with identical values). Critic auto-approves (trivial pass, 0 reasoning rounds). Worker prompts are byte-identical to the pre-architecture pipeline. The orchestrator's PLAN step skips the planner/critic agents entirely for confidence=high and calls make_deterministic_plan.py directly (CLAUDE.md). emc_seed/velocity_seed are never pinned in polymer_rules.json — left null so the tool draws an independent random seed per run, logged post-submission (cross-track rule 2).",
       "rationale": "These classes are validated; reproducibility outranks re-derivation. Do not re-reason a settled, cited decision."
     },
     "medium_low_or_offtable": {

@@ -50,6 +50,38 @@ Agent(subagent_type="run-summary-worker", description="🟢 Run summary {polymer
     (the fit violated a hard physics constraint and no valid alternative existed).
 ```
 
+## [Campaign hooks — after run-summary, before memory capture]
+
+Two plain-Bash steps (no agent), only relevant when this run is part of the two-speed campaign
+workflow (`.claude/plans/generic-beaming-mitten.md`); harmless no-ops otherwise.
+
+1. **Lock the protocol, if this run just validated it.**
+   `jq -r '.plan_mode' data/<RUN>/raw/run_plan.json` — only proceed if `"reasoned"` (a
+   `deterministic` run is already a locked replay; nothing to lock). Then check every
+   requested property PASSed: `jq -r '[.results[] | .status] | all(. == "PASS")'
+   data/<RUN>/raw/run_summary.json` (check only the `results.<prop>` blocks for
+   `properties_requested`, not properties this run didn't request/report). If `true`:
+   ```
+   python3 orchestration/make_deterministic_plan.py --polymer_class <CLASS> \
+     --lock-from data/<RUN>/raw/run_plan.json
+   ```
+   Write the printed `changes`/`note` to `run_log.md` (a new `## PROTOCOL LOCKED` block — what
+   changed vs. the prior class defaults and why, same evidence a RECOVERY block would cite). If
+   not all requested properties PASSed, do **not** lock — this run's protocol isn't perfected
+   yet; continue diagnosing per `/recover`'s `plan_mode=="reasoned"` ladder instead.
+
+2. **Aggregate, if this was the last replicate of a class's campaign set.** When the
+   orchestrator's task input names a full replicate set (e.g. 4 run names for a class) and this
+   run is the last one to complete:
+   ```
+   python3 orchestration/aggregate_replicates.py --polymer_class <CLASS> \
+     --run_names <RUN1,RUN2,RUN3,RUN4>
+   ```
+   → `data/<CLASS>_campaign_summary.json`. Write the mean±SD summary to `run_log.md`. Skip if
+   any replicate in the set hasn't finished yet — the script only needs the ones that exist,
+   but a premature aggregate (missing values silently treated as "runs_missing_value") is
+   misleading if reported as final.
+
 ## [Capture errors + improvements — to MEMORY ONLY, last action of the run]
 
 Before declaring the run done, promote pipeline-level lessons to memory as `feedback` entries (per

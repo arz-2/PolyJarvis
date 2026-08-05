@@ -49,6 +49,14 @@ SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a fie
   properties_requested = task TARGET_PROPERTIES lowercased set; "all"/absent → {density,tg,bulk_modulus}.
     Write "Requested: {properties_requested}" to run_log.md.
 
+  NOVELTY GATE (system-probe prerequisite, `orchestration/FOUNDATION.md`'s `[System probe]`):
+    CANONICAL_SMILES=`python3 orchestration/canon_smiles.py "<smiles>"` (prints
+      `{"canonical_smiles": "..."}`; on error, treat as IS_NOVEL=true and proceed without a
+      probe — a bad canonicalization should never block the run).
+    IS_NOVEL=`jq --arg s "$CANONICAL_SMILES" 'has($s) | not' guides/system_characterization_cache.json
+      2>/dev/null` (file absent ⇒ IS_NOVEL=true).
+    Write CANONICAL_SMILES + IS_NOVEL to run_log.md header.
+
   GROUND (off-table / low-medium confidence ONLY — skip for confidence=high so the deterministic,
     byte-identical plan path stays untouched by web nondeterminism):
     CONF=`jq -r '.classes.CLASS_ID.confidence // "offtable"' guides/polymer_rules.json`
@@ -61,15 +69,26 @@ SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a fie
       Pass grounding_path: GROUNDING_PATH as an extra planner input.
     If CONF=high: skip; do NOT pass grounding_path.
 
-  PLAN  🟡 planner ← run_name, smiles, polymer_class, properties_requested,
-    work_dir=data/<RUN>/lammps [, grounding_path]
-    → plan_path (PLAN_PATH), plan_mode, confidence, critique_status.
-    Write D-00 pointer to run_log.md header: PLAN_PATH + plan_mode + confidence.
+  PLAN
+    If CONF=high: **script-only shortcut, no agent spawn** — this class's protocol is already
+      validated (confidence only reaches high via `make_deterministic_plan.py --lock-from`,
+      i.e. a prior reasoned run that fully PASSed). Run directly, same as `pick_gpu.py`/
+      `gen_prompt.py`:
+      `python3 orchestration/make_deterministic_plan.py --run_name <RUN> --polymer_class <CLASS>
+      --smiles "<smiles>" --properties <props>` → PLAN_PATH (prints run_plan/plan_mode/
+      confidence). Write the D-00 pointer to run_log.md from that output. Skip CRITIC entirely
+      (an unchanged confidence=high plan is trivially auto-approved — see
+      `decision_policy.json:confidence_gate.high`; the planner agent's own confidence=high
+      branch does nothing but this same script call). Proceed to "Thread the approved plan".
+    Else (CONF in {low, medium, offtable}):
+      🟡 planner ← run_name, smiles, polymer_class, properties_requested,
+        work_dir=data/<RUN>/lammps [, grounding_path]
+        → plan_path (PLAN_PATH), plan_mode, confidence, critique_status.
+        Write D-00 pointer to run_log.md header: PLAN_PATH + plan_mode + confidence.
 
-  CRITIC loop (max 2 rounds)  🔴 critic ← run_plan_path=PLAN_PATH, critic_round=N
-    → approved → proceed | revise → re-spawn planner with the findings, re-critique |
-      escalate → write UNRESOLVED to run_log.md and stop.
-    Deterministic plans (confidence=high) approve in round 1 with 0 findings — no loop.
+      CRITIC loop (max 2 rounds)  🔴 critic ← run_plan_path=PLAN_PATH, critic_round=N
+        → approved → proceed | revise → re-spawn planner with the findings, re-critique |
+          escalate → write UNRESOLVED to run_log.md and stop.
 
   Thread the approved plan: EVERY gen_prompt.py call MUST include --plan PLAN_PATH (its
     decided_params drive the worker prompts; never read polymer_rules.json manually):
@@ -129,7 +148,7 @@ Inlined into every worker prompt by `gen_prompt.py`; apply regardless of worker 
 
 0. **GPU is used for ALL simulation runs** — always pass explicit `gpu_ids` and `mpi`; never leave them unset or default.
 1. **Fill `run_log.md` in real time** — each DECISION row when made, each RECOVERY block immediately after resolving an error; never reconstruct at the end.
-2. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, SEED_COLD in the run_log header. Replication studies: fixed seeds from `guides/REVISION_PARAMS.md`. Exploratory runs: read seeds back from job output and log them immediately after submission.
+2. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, SEED_COLD in the run_log header. `emc_seed`/`velocity_seed` are never pinned in `polymer_rules.json` (each replicate needs an independent draw, not a shared fixed one) — leave them unset in `decided_params` so the tool draws and reports a random seed, then read it back from job output and log it immediately after submission. Applies uniformly to replicate-1 and replicate-2+ runs alike.
 3. **Check for existing writers before killing any process** — run `lsof | grep <log_filename>`; if another writer is present (concurrent session), do NOT launch, coordinate via the user (a double-launch corrupts the shared log). Backstop: `run_lammps_script`/`run_lammps_chain`/`run_bulk_modulus_series` refuse to launch when a live process holds the target log open (`status=error`, `conflicting_writers`) — kill the stale writer then resubmit; pass `allow_concurrent_writer=True` only after confirming it's stale. The backstop is a safety net, not a substitute for the manual check.
 4. **Log the exact GPU claim label** — copy the `run` field from `pick_gpu.py claim`'s JSON into the SIMULATION STATE table and use it verbatim at release. A label mismatch silently leaves the GPU stuck as claimed.
 5. **Log repo-relative run paths in memory** — in any `.claude/agent-memory/**` file write `data/<run>/...`, never `/home/<user>/...` (keeps captures portable). The memory file itself lives ONLY in the repo-root `.claude/agent-memory/<worker>/` dir (the absolute path in the worker's agent definition) — never a `.claude/` under a work_dir or `data/<run>/` subdir.

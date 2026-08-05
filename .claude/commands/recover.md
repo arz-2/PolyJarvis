@@ -12,6 +12,22 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
 
 **2. Read the SIMULATION STATE table** from that run_log.md. Identify the row with status `monitoring` or `failed` and note the `chain_id` / `run_id`.
 
+**2b. Read the attempt ladder for this run:** `jq -r '.plan_mode' data/<RUN>/raw/run_plan.json`.
+- **`reasoned`** — this run is establishing or re-establishing a protocol (grounded/reasoned
+  plan, not yet locked via `make_deterministic_plan.py --lock-from`). Max attempts = **5**, and
+  protocol-level changes are sanctioned as ladder rungs, not just parameter tweaks — see the
+  escalation ladder below.
+- **`deterministic`** — this run is replaying an already-locked protocol (confidence=high,
+  possibly a replicate-2+ of a campaign). Max attempts = **2**, and only EXTEND-type recovery
+  (parameter tweaks that never touch `decided_params`, e.g. re-running longer at 300K) may
+  auto-apply. Any recovery that would change `decided_params` (a different FF, a different
+  cooling rate, a different pressure range) must **stop immediately, write the finding to
+  run_log.md, and surface for human review** instead of applying it — changing the protocol on
+  a locked replicate breaks the fixed-protocol-across-replicates invariant the whole campaign
+  depends on. Do not spend an attempt trying it.
+- Missing/unreadable `run_plan.json`: fall back to the deterministic rule (max 2, no
+  protocol-level changes) — the conservative default.
+
 **3. Get actual status:**
 - For a LAMMPS chain: `get_run_status(chain_id)`
 - For a RadonPy/EMC job: `get_job_status(job_id)`
@@ -44,16 +60,29 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
 | K = negative or density at melt value (~0.8–0.9 g/cm³) for a glassy polymer | deform-worker received `npt_production` (melt) data instead of `npt_prod300` (300 K) data | Verify `equil_data_path` is `npt_prod300_out.data`; if `npt_prod300` missing, run the cool+prod 300 K phase first; re-spawn deform-worker |
 | `extract_thermal` returns "fewer than 4 temperature bins" after partial sweep kill | Sweep killed before sufficient T coverage | If ≥ 60% of planned T points completed AND both glassy+rubbery slopes present, attempt `extract_thermal`; if fit_quality ≥ ACCEPTABLE accept; else restart full sweep |
 
+**`plan_mode=="reasoned"` escalation ladder** (per §2b): a `STRUCTURAL_FAIL` verdict from
+`enforce_equilibration_gate` (see `structural_fail_remedy`/`structural_fail_remedy_confidence`
+in the equilibration-checker's RESULT block) isn't a log-grep match, so it isn't in the taxonomy
+table above — escalate through these rungs in order, spending one attempt each:
+1. The named `structural_fail_remedy` (`re_melt_slow_recool` / `heavy_melt_anneal_probe`) —
+   these are parameter-level (cooling schedule, anneal cycles), not a full re-plan.
+2. If the remedy doesn't resolve it (or `structural_fail_remedy_confidence=low` and it fails
+   once), the taxonomy-table fix most consistent with the symptom.
+3. A full re-plan with a different force field — routes back through the planner per
+   `CLAUDE.md`'s "probe result contradicting a plan assumption" cross-run protocol (re-plan →
+   re-critic); counts as one ladder rung, not a restart of the count.
+Only after all rungs are exhausted at attempt 5 does UNRESOLVED apply (see Max attempts rule).
+
 **6. Output a recovery plan in this format:**
 ```
 RECOVERY PLAN
   Stage:        <molecule-builder | equilibration | tg-sweep | murnaghan-worker | deform-worker | bulk-modulus-extractor | phase-2>
   Failure:      <exact error string or condition from log>
-  Root cause:   <diagnosis from taxonomy above>
+  Root cause:   <diagnosis from taxonomy above, or structural_fail_remedy for STRUCTURAL_FAIL>
   Action:       <parameter change or step to re-run>
   Worker:       <subagent_type to re-spawn>
   Params changed: <field: old → new>
-  Attempt:      <1 or 2 of max 2>
+  Attempt:      <N of max 5 (plan_mode=reasoned) | N of max 2 (plan_mode=deterministic)>
 ```
 
 **7. Write a RECOVERY block to run_log.md immediately** (before re-spawning anything):
@@ -65,7 +94,14 @@ RECOVERY PLAN
 - **Outcome:** pending
 ```
 
-**Max attempts rule:** After 2 recovery attempts at any stage, write `UNRESOLVED` as the outcome and stop. Do not attempt a third retry without human review.
+**Max attempts rule:** the cap is read from `plan_mode` (§2b):
+- `plan_mode=="reasoned"` — after **5** recovery attempts spanning the escalation ladder above
+  without a clean PASS, stop and write a checkpoint note to run_log.md asking the user to
+  review, instead of silently writing `UNRESOLVED`.
+- `plan_mode=="deterministic"`, or `run_plan.json` missing/unreadable (conservative default) —
+  after **2** attempts (EXTEND-type only; any `STRUCTURAL_FAIL` stops immediately at attempt 1
+  per §2b, it is never auto-applied), write `UNRESOLVED` and stop.
+Do not attempt a retry beyond the applicable cap without human review.
 
 ---
 
