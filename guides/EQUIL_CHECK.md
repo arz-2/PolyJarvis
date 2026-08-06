@@ -7,7 +7,12 @@
 ## Tool: `inspect_data_file` → `backbone_types`
 
 `backbone_types` is **REQUIRED** for `check_equilibration_comprehensive` — do not guess. Call
-`inspect_data_file(data_file=equil_data_path)`: `info.atom_type_names` gives each type's FF label
+`inspect_data_file` on the **original pre-simulation `.data` file** (the one EMC/RadonPy wrote,
+e.g. the D-00 build result's `data_path` in `run_log.md`) — **never** a `write_data` output like
+`equil_data_path`/`npt_prod_data_path`: `write_data` strips the `Masses` section's `# <name>`
+comments `atom_type_names` is parsed from, so calling it on a post-simulation file silently
+returns no usable names. Atom types are invariant through a run, so the original file's mapping
+is still valid. `info.atom_type_names` gives each type's FF label
 (e.g. `c`, `c1`, `c_1`, `hc`, `o_1`, `o_2`) and `info.h_type_ids` already excludes hydrogens. Pick
 the heavy types that continue the polymer backbone; if a side-group heavy (e.g. a carbonyl O)
 could be confused with a backbone one, cross-check with `awk '/^Bonds/,/^Angles/' file.data` —

@@ -49,10 +49,12 @@ SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a fie
   properties_requested = task TARGET_PROPERTIES lowercased set; "all"/absent → {density,tg,bulk_modulus}.
     Write "Requested: {properties_requested}" to run_log.md.
 
-  NOVELTY GATE (system-probe prerequisite, `orchestration/FOUNDATION.md`'s `[System probe]`):
+  NOVELTY GATE (decides whether this SMILES has a cached characterization to reuse — see REUSE
+    CACHED CHARACTERIZATION below and `orchestration/FOUNDATION.md`'s `[Equilibration]` mandatory
+    refine step, which is what populates the cache for `IS_NOVEL=true` runs):
     CANONICAL_SMILES=`python3 orchestration/canon_smiles.py "<smiles>"` (prints
-      `{"canonical_smiles": "..."}`; on error, treat as IS_NOVEL=true and proceed without a
-      probe — a bad canonicalization should never block the run).
+      `{"canonical_smiles": "..."}`; on error, treat as IS_NOVEL=true and proceed — a bad
+      canonicalization should never block the run).
     IS_NOVEL=`jq --arg s "$CANONICAL_SMILES" 'has($s) | not' guides/system_characterization_cache.json
       2>/dev/null` (file absent ⇒ IS_NOVEL=true).
     Write CANONICAL_SMILES + IS_NOVEL to run_log.md header.
@@ -80,10 +82,6 @@ SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a fie
       (an unchanged confidence=high plan is trivially auto-approved — see
       `decision_policy.json:confidence_gate.high`; the planner agent's own confidence=high
       branch does nothing but this same script call). Proceed to "Thread the approved plan".
-      This skip is pre-Phase-A only — if `IS_NOVEL=true`, `FOUNDATION.md`'s
-      `[Post-probe critic review]` still runs after `[System probe]`, before `[Equilibration]`,
-      regardless of confidence (a validated class doesn't validate this specific SMILES's
-      probe-measured behavior).
     Else (CONF in {low, medium, offtable}):
       🟡 planner ← run_name, smiles, polymer_class, properties_requested,
         work_dir=data/<RUN>/lammps [, grounding_path]
@@ -95,13 +93,14 @@ SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a fie
           escalate → write UNRESOLVED to run_log.md and stop.
 
   REUSE CACHED CHARACTERIZATION (if `IS_NOVEL=false` — applies to BOTH branches above, since a
-    class's confidence and a specific SMILES's prior probe measurement are orthogonal signals):
+    class's confidence and a specific SMILES's prior characterization are orthogonal signals):
     `python3 orchestration/apply_cached_characterization.py --run_plan PLAN_PATH
     --canonical_smiles "$CANONICAL_SMILES"` → patches PLAN_PATH's decided_params in place with
     every non-null derived_* field from the cached entry (skip if `{"applied": false, ...}` — no
     usable cache entry, proceed with class/plan defaults exactly as before). This is what makes
-    `IS_NOVEL=false` mean "reuse the earlier measurement," not merely "skip re-probing." If
-    `IS_NOVEL=true`, skip this step entirely — `[System probe]` measures fresh instead.
+    `IS_NOVEL=false` mean "reuse the earlier measurement." If `IS_NOVEL=true`, skip this step
+    entirely — there is nothing to reuse yet; `FOUNDATION.md`'s `[Equilibration]` mandatory
+    refine step measures this SMILES for the first time from its own equilibration chain instead.
 
   Thread the approved plan: EVERY gen_prompt.py call MUST include --plan PLAN_PATH (its
     decided_params drive the worker prompts; never read polymer_rules.json manually):
@@ -144,7 +143,9 @@ DETERMINISTIC-PATH BRANCH (`plan_mode=="deterministic"` — read once, before Ph
 
 PHASE A — FOUNDATION (always, reasoned path only — see the branch above for deterministic)
   Read orchestration/FOUNDATION.md — build → equilibration (BACKGROUND-WAIT) → equil-check gate
-  (density, D-05) + EXTEND branch. Re-read after any mid-phase session restart.
+  (density, D-05) + EXTEND branch. If IS_NOVEL=true, its `[Equilibration]` section's mandatory
+  post-PASS refine step is how this SMILES gets characterized. Re-read after any mid-phase
+  session restart.
 
 PHASE B — TRACKS (property-conditional, reasoned path only — see the branch above for deterministic)
   thermal (if "tg"): Read orchestration/THERMAL_TRACK.md — owns the multirate sweep loop, the

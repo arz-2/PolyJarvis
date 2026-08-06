@@ -1,27 +1,31 @@
 ---
 name: project-cache-writes-zero-value-entries-on-probe-failure
-description: system_characterization_cache.json step 6 is unconditional, so a fully-failed probe (both reliability gates false) still writes a cache entry, silently disabling future probes for that SMILES via the bare key-existence novelty gate
+description: RESOLVED (2026-08-06) — the cache write is gated on at least one reliability flag being true; a fully-unreliable characterization writes nothing. Originally proven on the (now-removed) pre-equilibration probe; the same gate is what refine_from_equil relies on today, since it's the only characterization path left.
 metadata:
   type: project
 ---
 
-`analyze_probe` step 6 says write the cache entry unconditionally (it's not a tool-failure case —
-the analysis itself completed cleanly, it just measured nothing usable). But
-`CLAUDE.md`'s novelty gate (`IS_NOVEL = jq --arg s "$CANONICAL_SMILES" 'has($s) | not'
-guides/system_characterization_cache.json`) is a bare key-existence check, not a quality check.
+**Status: fixed, and now the only path.** `system-probe-worker` and `system-probe-analyzer`'s
+`analyze_probe` task (the pre-equilibration probe) were removed — `refine_from_equil` against the
+real equilibration chain's own stationary hold is now the sole characterization mechanism. The
+reliability-gated cache write this memory tracks is unchanged: write/update
+`guides/system_characterization_cache.json[canonical_smiles]` **only if at least one of
+`tau_relax_reliable`/`K0_reliable` is true**; if both are false, leave the key absent (or, if an
+entry already exists from an earlier reliable characterization, leave it untouched).
 
-**Why this matters:** the first PVDF1 probe (`*CC(*)(F)F`, PHAL) failed both `probe_tau_relax_reliable`
-and `probe_K0_reliable` (see [[feedback-npt-pppm-decompression-ramp-breaks-probe]] — root cause was
-a decompression-ramp probe stage, not a bad SMILES). Per protocol we still wrote the cache entry
-with all `derived_*` fields null/false. Any future PVDF run will now read `IS_NOVEL=false` and skip
-the system probe entirely — meaning the probe-protocol bug will silently persist forever for this
-SMILES, since nothing will trigger a re-probe once cached.
+**Original problem (PVDF1, `*CC(*)(F)F`, PHAL, probe-era):** the write was unconditional, so a
+probe that failed both reliability gates for a structural reason still wrote a cache entry with
+all `derived_*` fields null. Any future run of that exact SMILES would read `IS_NOVEL=false` off
+the bare key-existence novelty gate and skip characterization forever, silently inheriting the
+all-null result.
 
-**How to apply:** when writing a cache entry after a fully-failed probe (both reliability gates
-false), always add an explicit `"note"` field flagging that a re-probe is warranted once the probe
-protocol is fixed, and say so plainly in the run_log and RESULT block — don't let the orchestrator
-read a cache hit as "already characterized, nothing to do." Consider recommending (to whoever owns
-the cache-consumption logic, not this agent) that the novelty gate check for at least one
-`derived_*` field being non-null before treating a SMILES as "already characterized" — but that is
-a change outside this agent's scope; for now, the mitigation is loud logging, not silently skipping
-the cache write (step 6 is unconditional and should stay that way per current instructions).
+**First clean exercise of the fix (PMMA_PROBETEST1, `*CC(*)(C)C(=O)OC`, PACR, 2026-08-06,
+probe-era):** the probe failed both gates again (`decay_fraction_at_end=0.077 < 0.15`; `K0
+sem/mean=18.7% > 15%`) from a genuinely short window on a genuinely stationary hold. Confirmed
+`guides/system_characterization_cache.json` was left untouched (no key written for this SMILES).
+
+**How to apply going forward:** trust that the gate exists and works — no need to re-verify it
+every run. Still worth doing per-run: write a loud `cache_write.performed=false` note in
+`system_characterization.json` and the run_log D-09 row explaining *why* nothing was cached, so a
+human/grading pass understands this SMILES is still effectively uncharacterized rather than
+silently "already characterized."

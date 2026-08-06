@@ -26,15 +26,16 @@ Scope of this version: EMC build path only (18 of ~19 supported classes). PURA (
 RadonPy-only class) is out of scope for now — do_build() raises a clear error rather than
 attempting it; see the deferred build_via_radonpy.py cross-interpreter driver in the plan.
 
-Two-phase invocation, split at the system-probe boundary:
+Two-phase invocation, split at the mandatory-refine boundary:
   IS_NOVEL=false (the common replicate-2+ case): one invocation, `--phase full` (default),
     runs build through run-summary end to end.
-  IS_NOVEL=true: a plain script cannot spawn Agent(...), so the system-probe-worker /
-    system-probe-analyzer / post-probe-critic agent trio (FOUNDATION.md's `[System probe]` /
-    `[Post-probe critic review]`, unchanged) must still run inside the live orchestrator
-    session. Invoke with `--phase build_only` first (submits the build, stops), let the
-    orchestrator run the probe detour against the resulting .data file, then re-invoke with
-    `--resume-from equil` once decided_params is probe-patched and critic-approved.
+  IS_NOVEL=true: Build through Equil-check-PASS needs no agent judgment (do_equil_and_check()
+    already runs its own headless EXTEND loop), but a plain script can't spawn Agent(...), and
+    system-probe-analyzer's post-PASS characterization (FOUNDATION.md's `[Equilibration]`
+    mandatory refine step) is exactly that. So invoke with `--phase equil` first (runs Build
+    through Equil-check to PASS, stops), let the orchestrator spawn system-probe-analyzer against
+    the resulting equilibration hold, then re-invoke with `--resume-from thermal` once
+    decided_params is characterization-patched (or left at class defaults, if unreliable).
 
 Resumability: data/<RUN>/raw/executor_state.json tracks per-stage status, so a crash (reboot,
 OOM-killed wrapper) doesn't discard hours of completed work — `--resume-from` (or just
@@ -49,7 +50,7 @@ never auto-changing a protocol that's supposed to be identical across replicates
 Usage:
   <repo>/mcp-servers/.venv/bin/python orchestration/run_deterministic_replicate.py \\
       --run_name RUN --polymer_class CLASS --plan data/RUN/raw/run_plan.json \\
-      [--phase full|build_only] [--resume-from STAGE] [--dry-run] [--properties density,tg,bulk_modulus]
+      [--phase full|equil] [--resume-from STAGE] [--dry-run] [--properties density,tg,bulk_modulus]
 
   (Invoking via a different interpreter is fine — the script re-execs itself under the venv
   python needed for fastmcp/numpy/scipy/MDAnalysis before importing the MCP servers.)
@@ -97,17 +98,29 @@ def _mcp_env(server_key: str) -> dict:
 def _load_server_module(name: str, path: Path, cwd: Path, extra_env: dict):
     """Import a standalone MCP server.py as a plain module. `name` must be unique per call
     since both mcp-lammps-engine/server.py and mcp-emc-server/server.py are literally both
-    named server.py — a naive `import server` would collide."""
+    named server.py — a naive `import server` would collide.
+
+    `cwd` must also be pushed onto sys.path: server.py does bare sibling imports (e.g.
+    `from smiles_to_emc import build_cell`) that only resolve via sys.path, not cwd. This is
+    easy to miss under an interactive `python -c`/REPL session, where sys.path[0]=='' tracks
+    os.getcwd() dynamically and masks the gap — but a real script invocation's sys.path[0] is
+    the *script's own* directory, so the chdir alone is not enough there."""
     old_cwd, old_env = os.getcwd(), dict(os.environ)
+    cwd_str = str(cwd)
+    path_inserted = cwd_str not in sys.path
     try:
         os.chdir(cwd)
         os.environ.update(extra_env)
+        if path_inserted:
+            sys.path.insert(0, cwd_str)
         spec = importlib.util.spec_from_file_location(name, str(path))
         mod = importlib.util.module_from_spec(spec)
         sys.modules[name] = mod
         spec.loader.exec_module(mod)
         return mod
     finally:
+        if path_inserted:
+            sys.path.remove(cwd_str)
         os.chdir(old_cwd)
         os.environ.clear()
         os.environ.update(old_env)
@@ -214,6 +227,29 @@ def wait_for_run(lammps, run_id: str, label: str) -> dict:
         time.sleep(POLL_SECONDS)
 
 
+def wait_for_analysis(lammps, submit_result: dict, label: str, poll_seconds: float = 2,
+                       timeout_s: float = 1800) -> dict:
+    """Poll get_run_status() for a non-chain analysis tool's background thread to finish, then
+    return its result dict. check_equilibration_comprehensive/extract_equilibrated_density/
+    extract_thermal/extract_bulk_modulus* all launch a background thread and return
+    {"status": "submitted", "run_id": ...} immediately -- reading fields off that return value
+    directly (as every call site here used to) reads an unfinished result."""
+    if submit_result.get("run_id") is None:
+        return submit_result  # already synchronous / an immediate error -- nothing to poll
+    run_id = submit_result["run_id"]
+    t0 = time.time()
+    while True:
+        status = lammps.get_run_status(run_id)
+        st = status.get("status")
+        if st == "completed":
+            return status.get("result", status)
+        if st == "failed":
+            raise SystemExit(f"{label} analysis failed: {status}")
+        if time.time() - t0 > timeout_s:
+            raise SystemExit(f"{label} analysis timed out after {timeout_s}s: {status}")
+        time.sleep(poll_seconds)
+
+
 # ─── run_log.md writing (minimal but covers what enforce_gate.py's retrospective ─────
 # lint checks: the Seeds line and a non-placeholder D-05 block) ────────────────
 
@@ -298,10 +334,16 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
     cell_dir.mkdir(parents=True, exist_ok=True)
     dest_data = cell_dir / "cell.data"
     shutil.copy(out["data_path"], dest_data)
+    # get_emc_job_output's result has no "params_path" key (only "output_dir") -- EMC always
+    # writes the coefficients file as "emc_build.params" (fixed filename, independent of
+    # output_name -- see smiles_to_emc.py's "'emc_build' never collides with the cluster name"
+    # comment) inside output_dir. molecule-builder.md's agent-driven path locates it the same
+    # way. PCFF/OPLS-AA builds store all Pair/Bond/Angle/... Coeffs here, not inline in .data.
     dest_params = None
-    if out.get("params_path"):
+    src_params_matches = sorted(Path(out["output_dir"]).glob("*.params"))
+    if src_params_matches:
         dest_params = cell_dir / "emc_build.params"
-        shutil.copy(out["params_path"], dest_params)
+        shutil.copy(src_params_matches[0], dest_params)
 
     info = lammps.inspect_data_file(data_file=str(dest_data))
 
@@ -310,7 +352,7 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
         "emc_params_path": str(dest_params) if dest_params else None,
         "emc_seed": emc_seed,
         "lammps_flags": out["lammps_flags"],
-        "n_atoms": info.get("n_atoms"),
+        "n_atoms": info.get("info", {}).get("n_atoms"),
     }
     state.mark("build", "done", result=result)
     log_seed(run_log_path, "EMC", emc_seed)
@@ -353,7 +395,17 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
     return {"chain_id": chain["chain_id"], "workflow": workflow}
 
 
+def _stage_dump_path(stage: dict) -> str:
+    return f"{stage['work_dir']}/{stage['params']['DUMP_FILE']}"
+
+
 def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_path: Path) -> dict:
+    # Captured before args.data_path gets reassigned to the equilibration chain's own output
+    # below — the original pre-simulation .data file is the only one whose Masses section still
+    # has the "# <name>" comments inspect_data_file's atom_type_names parsing needs; a write_data
+    # output (which npt_prod_data_path always is) has stripped them.
+    build_data_path = args.data_path
+
     gpu_per_run = cls.get("gpu_per_run") or 1
     with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
         args.gpu_ids = gpu_ids
@@ -365,11 +417,12 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
 
     workflow = submission["workflow"]
     # Glassy (9-run chain, add_300k_production default True): the server exposes the terminal
-    # npt_prod300 stage's output directly as npt_prod300_data. Rubbery (7-run chain, no
-    # npt_prod300 stage): the terminal stage is npt_production itself — stages[-1]["output_data"]
-    # (no generic top-level "..._data" key exists for this case, per generate_equilibration_
+    # npt_prod300 stage's output directly as npt_prod300_data/_dump. Rubbery (7-run chain, no
+    # npt_prod300 stage): the terminal stage is npt_production itself — stages[-1] (no generic
+    # top-level "..._data"/"..._dump" key exists for this case, per generate_equilibration_
     # workflow's own return-shape logic in server.py).
     npt_prod_data_path = workflow.get("npt_prod300_data") or workflow["stages"][-1]["output_data"]
+    npt_prod_dump_path = workflow.get("npt_prod300_dump") or _stage_dump_path(workflow["stages"][-1])
 
     attempts = 0
     while True:
@@ -377,17 +430,34 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
         p = resolve_stage_params("equil-check", args, cls)
         backbone_types = args.backbone_types
         if backbone_types is None:
-            info = lammps.inspect_data_file(data_file=p["npt_prod_data_path"])
-            backbone_types = info.get("backbone_types") or []
+            # inspect_data_file only for diagnostics attached to the halt below — atom names
+            # alone (e.g. "c"/"c1") don't determine which types are backbone vs. pendant branch
+            # for a branched-backbone class (confirmed live: PACR/PMMA shares generic aliphatic
+            # carbon types between CH2 backbone atoms and pendant methyl branches), so this is
+            # never auto-derived into a backbone_types list — only ever an explicit
+            # decided_params/CLI value, reviewed like any other protocol-lock decision.
+            diag = lammps.inspect_data_file(data_file=build_data_path)
+            state.halt("equil_check", "BACKBONE_TYPES_UNRESOLVED", {
+                "reason": "decided_params has no backbone_types for this class and none may be "
+                          "auto-derived (atom-name-only lookup cannot distinguish backbone from "
+                          "pendant-branch atoms sharing the same type ID)",
+                "atom_type_names": diag.get("info", {}).get("atom_type_names"),
+                "build_data_path": build_data_path,
+            })
+            log_recovery(run_log_path, "equilibration", attempts, "backbone_types unresolved",
+                        "none — requires human/agent review of atom_type_names to populate "
+                        "decided_params.backbone_types for this class",
+                        "UNRESOLVED — human review")
+            return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED"}
 
-        comp = lammps.check_equilibration_comprehensive(
+        comp = wait_for_analysis(lammps, lammps.check_equilibration_comprehensive(
             log_file=p["npt_prod_log_path"], dump_file=p["melt_dump_path"],
             data_file=p["npt_prod_data_path"], backbone_types=backbone_types,
             ct_min_decay=p["ct_min_decay_melt"], output_dir=p["output_dir"], graphs_dir=p["graphs_dir"],
-        )
-        density = lammps.extract_equilibrated_density(
+        ), "equil-check comprehensive")
+        density = wait_for_analysis(lammps, lammps.extract_equilibrated_density(
             log_file=p["npt_prod_log_path"], target_temp=p["npt_prod_temp_K"], output_dir=p["output_dir"],
-        )
+        ), "equil-check density")
         comprehensive_json = str(Path(p["output_dir"]) / "equilibration_comprehensive.json")
         verdict = lammps.enforce_equilibration_gate(
             comprehensive_json=comprehensive_json, regime=p["regime"], dp=p["dp"],
@@ -403,7 +473,8 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
 
         if equil_verdict == "PASS":
             result = {"equil_verdict": "PASS", "npt_prod_data_path": p["npt_prod_data_path"],
-                      "npt_prod_log_path": p["npt_prod_log_path"], "density_gcm3": density.get("plateau_density_mean")}
+                      "npt_prod_log_path": p["npt_prod_log_path"], "npt_prod_dump_path": npt_prod_dump_path,
+                      "density_gcm3": density.get("plateau_density_mean")}
             state.mark("equil_check", "done", result=result)
             return result
 
@@ -414,17 +485,24 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
                 log_recovery(run_log_path, "equilibration", attempts, "EXTEND verdict",
                             "exceeded max EXTEND attempts (deterministic cap=2)", "UNRESOLVED — human review")
                 return {"halted": True, "reason": "EXTEND_EXHAUSTED"}
+            # A measured relaxation signal from this run's own data beats a blind flat guess —
+            # tau_relax_ps comes from comp's KWW fit (same field system-probe-analyzer reads).
+            tau_relax_ps = (((comp or {}).get("chain") or {}).get("ct") or {}).get("tau_relax_ps")
+            extend_ns = 1.5
+            if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
+                extend_ns = max(1.5, round(1.5 * tau_relax_ps / 1000, 2))
             log_recovery(run_log_path, "equilibration", attempts, "equil_verdict=EXTEND",
-                        f"npt_extend +{1.5} ns at {p['npt_prod_temp_K']} K", "pending")
+                        f"npt_extend +{extend_ns} ns at {p['npt_prod_temp_K']} K", "pending")
             with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
                 args.gpu_ids = gpu_ids
                 submission = _submit_equil_chain(args, cls, lammps, extend_from_data=p["npt_prod_data_path"],
-                                                 extend_temp=p["npt_prod_temp_K"])
+                                                 extend_temp=p["npt_prod_temp_K"], extend_ns=extend_ns)
                 ext_result = wait_for_run(lammps, submission["chain_id"], "equilibration EXTEND")
             if ext_result.get("status") != "completed":
                 state.mark("equil_check", "failed", result=ext_result)
                 raise SystemExit(f"EXTEND chain did not complete: {ext_result}")
             npt_prod_data_path = submission["workflow"]["stages"][0]["output_data"]
+            npt_prod_dump_path = _stage_dump_path(submission["workflow"]["stages"][0])
             continue
 
         # STRUCTURAL_FAIL or FAIL — plan_mode=="deterministic" NEVER auto-applies a protocol
@@ -468,10 +546,10 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
             raise SystemExit(f"Tg sweep (rate={rate}) did not complete: {result}")
 
         ap = resolve_stage_params("analyze-tg", args, cls)
-        thermal = lammps.extract_thermal(
+        thermal = wait_for_analysis(lammps, lammps.extract_thermal(
             log_file=ap["tg_log_path"], tg_data_file=ap["tg_data_file"],
             enthalpy_col=ap["enthalpy_col"], output_dir=ap["output_dir"], graphs_dir=ap["graphs_dir"],
-        )
+        ), f"tg analysis rate={rate}")
         per_rate.append({"rate": rate, "Tg_K": thermal.get("Tg_K"),
                          "fit_quality": thermal.get("fit_quality"), "r_squared": thermal.get("r_squared")})
 
@@ -550,8 +628,9 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
     if not (is_glassy or p["bm_pressures_atm"]):
         # rubbery + no pressures — fluctuation path, no submission
         bp = resolve_stage_params("analyze-bm", args, cls)
-        bm = lammps.extract_bulk_modulus(log_file=bp["npt_prod_log_path"], output_dir=bp["output_dir"],
-                                         graphs_dir=bp["graphs_dir"])
+        bm = wait_for_analysis(lammps, lammps.extract_bulk_modulus(
+            log_file=bp["npt_prod_log_path"], output_dir=bp["output_dir"], graphs_dir=bp["graphs_dir"],
+        ), "bulk modulus (fluctuation)")
         result = {"method": "fluctuation", "bulk_modulus_GPa": bm.get("bulk_modulus_GPa")}
         state.mark("mechanical", "done", result=result)
         return result
@@ -573,10 +652,10 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
         raise SystemExit(f"Murnaghan series did not complete: {m_result}")
 
     bp = resolve_stage_params("analyze-bm", args, cls)
-    murn = lammps.extract_bulk_modulus_murnaghan(
+    murn = wait_for_analysis(lammps, lammps.extract_bulk_modulus_murnaghan(
         log_files=series["log_files"], pressures_atm=series["pressures_atm"],
         output_dir=bp["output_dir"], graphs_dir=bp["graphs_dir"],
-    )
+    ), "bulk modulus (murnaghan)")
     accepted = murn.get("fit_converged") and 4 <= (murn.get("B0_prime") or 0) <= 20
 
     if accepted:
@@ -611,11 +690,11 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
                 slow_log = slow["log_path"]
 
     bp = resolve_stage_params("analyze-bm", args, cls)
-    deform_extract = lammps.extract_bulk_modulus_deform(
+    deform_extract = wait_for_analysis(lammps, lammps.extract_bulk_modulus_deform(
         log_file=primary["log_path"], output_dir=bp["output_dir"], graphs_dir=bp["graphs_dir"],
         strain_rate=bp["strain_rate_per_fs"], strain_max=bp["K_strain_max"],
         **({"log_file_2": slow_log, "strain_rate_2": bp["strain_rate_slow_per_fs"]} if slow_log else {}),
-    )
+    ), "bulk modulus (deform)")
     result = {"method": "deformation", "bulk_modulus_GPa": deform_extract.get("bulk_modulus_GPa"),
              "shear_modulus_GPa": deform_extract.get("shear_modulus_GPa"),
              "youngs_modulus_GPa": deform_extract.get("youngs_modulus_GPa")}
@@ -706,10 +785,11 @@ def main():
     ap.add_argument("--run_name", required=True)
     ap.add_argument("--polymer_class", required=True)
     ap.add_argument("--plan", required=True, help="Path to run_plan.json")
-    ap.add_argument("--phase", choices=["full", "build_only"], default="full",
-                    help="'build_only' stops after Build for the IS_NOVEL=true system-probe "
-                         "agent detour; 'full' (default) runs everything from the first "
-                         "non-done stage in executor_state.json onward.")
+    ap.add_argument("--phase", choices=["full", "equil"], default="full",
+                    help="'equil' stops after Equil-check PASS for the IS_NOVEL=true mandatory "
+                         "characterization hand-off to the live orchestrator session (a plain "
+                         "script can't spawn system-probe-analyzer); 'full' (default) runs "
+                         "everything from the first non-done stage in executor_state.json onward.")
     ap.add_argument("--resume-from", default=None,
                     help="Informational — resumption is actually driven by executor_state.json; "
                          "this just asserts which stage you expect to resume from.")
@@ -763,10 +843,6 @@ def main():
     args.data_path = build_result["data_path"]
     args.n_atoms = build_result.get("n_atoms")
 
-    if args_cli.phase == "build_only":
-        print(json.dumps({"status": "build_only_complete", **build_result}))
-        return
-
     if not state.is_done("equil_check"):
         equil_result = do_equil_and_check(state, args, cls, lammps, run_log_path)
         if equil_result.get("halted"):
@@ -775,6 +851,10 @@ def main():
     else:
         equil_result = state.stage("equil_check")["result"]
     args.data_path = equil_result["npt_prod_data_path"]
+
+    if args_cli.phase == "equil":
+        print(json.dumps({"status": "equil_complete", **equil_result}))
+        return
 
     thermal_result = None
     is_glassy = None

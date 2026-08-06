@@ -6,29 +6,17 @@ Read this instead of `FOUNDATION.md`/`THERMAL_TRACK.md`/`MECHANICAL_TRACK.md` fo
 is unchanged either way; the executor produces the same `raw/*.json` artifacts those steps already
 consume.
 
-**Why this exists:** every execution-stage worker (molecule-builder, equilibration-worker,
-equilibration-checker, tg-sweep-worker, tg-analysis-worker, murnaghan-worker, deform-worker,
-bulk-modulus-extractor, exp-lookup-worker, run-summary-worker) used to spawn as a full Claude
-subagent every single run, confidence=high or not — its prompt was byte-identical every time and
-it made no real judgment call. `orchestration/run_deterministic_replicate.py` replaces that
-~10-agent-spawn chain with one plain Python process that calls the same underlying MCP-server
-functions directly (verified safe: FastMCP's `@mcp.tool()` returns the original function
-unchanged; `mcp-lammps-engine/tests/test_watch_run.py` already imports `server.py` directly as
-precedent). It consumes `orchestration/gen_prompt.py`'s `resolve_stage_params()` — the same
-per-stage parameter resolution the agent-prompt text path uses — so a routing bug fix in
-`gen_prompt.py` can never silently diverge between the two paths.
+## Invocation — one or two phases, split at the mandatory-refine boundary
 
-## Invocation — one or two phases, split at the system-probe boundary
+A plain script cannot spawn `Agent(...)`. `system-probe-analyzer`'s mandatory post-PASS
+characterization (`FOUNDATION.md`'s `[Equilibration]` section) must still run inside the live
+orchestrator session when this SMILES is novel — Build through Equil-check-PASS itself needs no
+agent judgment (`do_equil_and_check()` runs its own EXTEND loop headlessly), so the split point
+moves to *after* the equilibration chain PASSes, not before Build. The Novelty Gate (`CLAUDE.md`
+SETUP) already determines `IS_NOVEL` before Phase A starts, so the split point is known up front:
 
-A plain script cannot spawn `Agent(...)`. The system-probe agent trio
-(`system-probe-worker`/`system-probe-analyzer`/post-probe `critic`) must still run inside the live
-orchestrator session when this SMILES is novel — `FOUNDATION.md`'s `[System probe]` and
-`[Post-probe critic review]` sections govern that, **unchanged**, regardless of confidence. The
-Novelty Gate (`CLAUDE.md` SETUP) already determines `IS_NOVEL` before Phase A starts, so the split
-point is known up front:
-
-- **`IS_NOVEL=false`** (the common replicate-2+ case — this exact SMILES was already probed on an
-  earlier run): one invocation, end to end.
+- **`IS_NOVEL=false`** (the common replicate-2+ case — this exact SMILES already has a cached
+  characterization from an earlier run): one invocation, end to end.
   ```
   <repo>/mcp-servers/.venv/bin/python orchestration/run_deterministic_replicate.py \
       --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH
@@ -41,19 +29,24 @@ point is known up front:
   down from ~10.
 
 - **`IS_NOVEL=true`**: two invocations.
-  1. `--phase build_only` — submits the build, stops, prints `{"status": "build_only_complete",
-     "data_path": ..., "n_atoms": ...}`. BACKGROUND-WAIT on this (short) invocation.
-  2. Run `FOUNDATION.md`'s `[System probe]` → `[Post-probe critic review]` exactly as documented
-     there, against the `data_path` from step 1's output — no changes to that agent sequence.
-  3. Once the post-probe critic approves (`decided_params` is now probe-patched in `PLAN_PATH`),
-     re-invoke: `... run_deterministic_replicate.py --run_name <RUN> --polymer_class <CLASS>
-     --plan PLAN_PATH --resume-from equil` — `executor_state.json` already has `build` marked
-     `done`, so this picks up at Equilibration. BACKGROUND-WAIT on this second, longer invocation.
-
-  `FOUNDATION.md`'s optional `refine_from_equil` re-probe (a third, optional probe-analyzer
-  re-spawn after equil-check PASSes, upgrading BM-sensitive knobs from the real chain's longer
-  hold) is **not supported on this path** — it would need a third phase split for marginal value.
-  Skip it for `plan_mode=="deterministic"` runs; it remains available on the reasoned path.
+  1. `--phase equil` — runs Build → Equilibration → Equil-check (including its own EXTEND loop,
+     up to the deterministic cap) and stops once `equil_verdict=PASS` (or halts on
+     STRUCTURAL_FAIL/FAIL/EXTEND_EXHAUSTED, per the Halt contract below — same as any other
+     stage). Prints `{"status": "equil_complete", "npt_prod_data_path": ...,
+     "npt_prod_log_path": ..., "npt_prod_dump_path": ..., "density_gcm3": ...}` on success.
+     BACKGROUND-WAIT on this invocation (the long one — it now includes the full equilibration
+     chain, not just Build).
+  2. Spawn `system-probe-analyzer` exactly as `FOUNDATION.md`'s `[Equilibration]` mandatory
+     refine step documents, reading the paths from step 1's printed output plus `data_path` from
+     `executor_state.json`'s `build` stage result (for `inspect_data_file`'s `backbone_types`
+     lookup — the original pre-simulation `.data` file, never a `write_data` output). No critic
+     step follows — `refine_from_equil` was never critiqued (mechanical-track knobs only,
+     narrowly-scoped numeric refinement of an already-approved plan).
+  3. Re-invoke: `... run_deterministic_replicate.py --run_name <RUN> --polymer_class <CLASS>
+     --plan PLAN_PATH --resume-from thermal` — `executor_state.json` already has `build` and
+     `equil_check` marked `done`, so this picks up at Phase B with whatever
+     `bm_pressures_atm`/`K_deform_rate_inv_s` the characterization step patched into `PLAN_PATH`
+     (or left at class defaults, if unreliable). BACKGROUND-WAIT on this second invocation.
 
 ## Resumability
 

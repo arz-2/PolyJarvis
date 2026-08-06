@@ -156,11 +156,6 @@
       "reduces": "hardware_optimum — the mpi/gpu config uncertainty for an off-table FF, an unusually sized cell, or a host whose hardware_policy is not cleanly benchmarked (values_are_benchmarked=false or host mismatch)",
       "mechanism": "hardware/calibrate_hardware.py (wrapping hardware/benchmark_hardware.py) sweeps the mpi/gpu matrix on the built .data per template cost class, reports ns/day + Pair/Kspace/Neigh/Comm breakdown, names the winner, and writes directional_probe + by_forcefield (the latter only on a clean uncontended sweep). Runs politely around live runs (idle GPU + spare cores only, niced, sequential).",
       "cost": "minutes"
-    },
-    "system_probe": {
-      "reduces": "system_size timing-knob uncertainty (t_equil_ns, eq_annealing_cycles, ct_min_decay_melt, bm_pressures_atm, K_deform_rate_inv_s) for a SMILES never simulated before — measured instead of guessed from class defaults",
-      "mechanism": "system-probe-worker + system-probe-analyzer: a ramp-then-hold two-chain sequence (a truncated 4-stage ramp chain reaches a hot/decompressed state, then a single genuine ~400 ps stationary NPT hold is appended off its real output via extend_only=True) measures this specific SMILES's actual chain relaxation time and derives protocol-timing knobs from it, patching decided_params in place and caching to guides/system_characterization_cache.json[canonical_smiles] — only when at least one measurement was reliable, so a fully-failed probe doesn't permanently poison future runs of this exact SMILES. Gated on IS_NOVEL=true (CLAUDE.md's Novelty Gate), independent of plan_mode/confidence — fires unconditionally at the orchestrator level, not planner-scheduled.",
-      "cost": "~400ps stationary hold + short ramp chain, minutes, two BACKGROUND-WAIT round-trips"
     }
   }
 }
