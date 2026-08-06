@@ -571,6 +571,7 @@ def deform_prompt(args, cls: dict, cross_track_rules: str) -> str:
     is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
     guide = load_worker_guide("deform")
     return f"""\
+deform_rate_mode:  {args.deform_rate_mode}
 equil_data_path:   {_v(args.data_path)}
 lammps_flags:      {json.dumps(flags)}
 polymer_class:     {args.polymer_class.upper()}
@@ -849,18 +850,25 @@ def analyze_bm_prompt(args, cls: dict, cross_track_rules: str) -> str:
     # Deform extraction params
     strain_rate_per_fs = cls.get("K_deform_rate_inv_s", 1e8) * 1e-15
     K_strain_max = cls.get("K_strain_max", 0.03)
+    K_deform_rate_slow_inv_s = cls.get("K_deform_rate_slow_inv_s", None)
+    strain_rate_slow_per_fs = (
+        K_deform_rate_slow_inv_s * 1e-15 if K_deform_rate_slow_inv_s is not None else None
+    )
 
     deform_log_line   = f"deform_log_path:     {args.deform_log}" if getattr(args, 'deform_log', None) else "deform_log_path:     null"
+    deform_log_slow_line = f"deform_log_path_slow: {args.deform_log_slow}" if getattr(args, 'deform_log_slow', None) else "deform_log_path_slow: null"
     murnaghan_line    = f"murnaghan_log_files: {args.murnaghan_logs}" if getattr(args, 'murnaghan_logs', None) else "murnaghan_log_files: null"
 
     guide = load_worker_guide("analyze-bm")
     return f"""\
 {deform_log_line}
+{deform_log_slow_line}
 {murnaghan_line}
 npt_prod_log_path: {npt_log}
 bm_pressures_atm:  {bm_pressures_atm}
 exp_K_range:       {exp_K}
 strain_rate_per_fs: {strain_rate_per_fs:.2e}
+strain_rate_slow_per_fs: {f"{strain_rate_slow_per_fs:.2e}" if strain_rate_slow_per_fs is not None else "null"}
 K_strain_max:      {K_strain_max}
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
@@ -1061,7 +1069,13 @@ def main():
     p.add_argument("--tg_k", type=float)
     p.add_argument("--tg_fit_quality")
     p.add_argument("--deform_log",
-                   help="Path to npt_deform log (analyze-bm, glassy deform fallback)")
+                   help="Path to npt_deform log, primary rate (analyze-bm, glassy deform fallback)")
+    p.add_argument("--deform_log_slow",
+                   help="Path to npt_deform log, slow rate (analyze-bm; enables rate-sensitivity "
+                        "check in extract_bulk_modulus_deform). Omit if the slow-rate run wasn't submitted.")
+    p.add_argument("--deform_rate_mode", default="primary", choices=["primary", "slow"],
+                   help="deform stage: primary (calibrated rate, default) or slow (~10x lower rate, "
+                        "orchestrator's second sequential spawn for the rate-sensitivity check).")
     p.add_argument("--murnaghan_logs",
                    help="JSON list of absolute log paths from murnaghan-worker (analyze-bm, rubbery+pressures)")
     p.add_argument("--d05",

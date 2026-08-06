@@ -3,9 +3,7 @@
 **Scope:** Extraction only — 3 routing paths. No simulation submission, no Monitor calls, no `generate_run_summary`.
 
 `output_dir`/`graphs_dir` are required on every extraction tool and provided in your prompt — pass
-them verbatim. **Distinct `output_dir` per parallel deform call** (each x/y/z direction or rate):
-two calls sharing one `output_dir` silently overwrite `bulk_modulus_deform.json` +
-`stress_strain.csv` — use `.../raw/deform_x/`, `.../deform_y/`, … (match `graphs_dir`).
+them verbatim.
 
 ---
 
@@ -19,12 +17,12 @@ Inspect which inputs are non-null in your prompt:
 | `deform_log_path` non-null | `extract_bulk_modulus_deform` | `deformation` | `bulk_modulus_deform.json` |
 | all null | `extract_bulk_modulus` | `fluctuation` | `bulk_modulus.json` |
 
-- **Glassy (`is_glassy=True`):** Murnaghan at 300 K is primary; 3-direction deform is the fallback when Murnaghan fails (`fit_converged=False` or `B0_prime` outside [4, 20]).
+- **Glassy (`is_glassy=True`):** Murnaghan at 300 K is primary; single-direction deform (with a paired slow-rate rate-sensitivity check, when `deform_log_path_slow` is present) is the fallback when Murnaghan fails (`fit_converged=False` or `B0_prime` outside [4, 20]).
 - **Rubbery (`is_glassy=False`):** Murnaghan at T>Tg is primary (rubbery classes ship `bm_pressures_atm`). Volume fluctuation overestimates rubbery K (~+70%) — keep it only as the diagnostic B_dyn cross-check, never the reported K when Murnaghan is present. The pure-fluctuation (all-null) path applies only to a rubbery class with no `bm_pressures_atm`.
 
 **Interpretation:**
 - PDIE / rubbery Murnaghan: `B0′` 7–10 is normal for polydienes; `B_def` R²≈0 is expected for soft rubber (P vs ln V nonlinear at this scale), not an anomaly — `warning_bdef_unreliable` is standard.
-- Deform inverted rate ordering (fast-rate K < slow-rate K): thermal noise dominates the small-strain fit at 10× rate. Trust the slow run; flag if `isotropy_delta` > 10%.
+- Deform rate-sensitivity WARNING (`K` differs >10% between rates): trust the slow-rate fit if `fit_r2_C11_rate2 ≥ 0.90` — the tool already auto-substitutes it into `K_GPa`/`method` when so (`method: "uniaxial_deformation_slow_rate"`); just surface the flag, don't re-derive it.
 
 ---
 
@@ -39,19 +37,23 @@ extract_bulk_modulus_deform(
     strain_start=0.002,               # skip initial transient
     output_dir=output_dir,
     graphs_dir=graphs_dir,
+    # rate-sensitivity check — only when the orchestrator ran the paired slow-rate leg:
+    log_file_2=deform_log_path_slow,      # None if not present
+    strain_rate_2=strain_rate_slow_per_fs,  # None if not present
 )
 ```
 
 **Result fields:** `C11_GPa`, `C12_GPa`, `K_GPa`, `G_GPa`, `E_GPa`, `nu_Poisson`, `fit_r2_C11`,
-`fit_r2_C12_yy`, `isotropy_delta_pct`, `avg_window_frames`, `stress_strain_csv`, `summary_json`.
+`fit_r2_C12_yy`, `isotropy_delta_pct`, `avg_window_frames`, `stress_strain_csv`, `summary_json`,
+`rate_sensitivity` (present only when `log_file_2` was passed — see Interpretation above).
 - `avg_window_frames` (default 2000): R² is on the smoothed stress series — correct, since raw thermal noise (~0.2 GPa) swamps the elastic signal (~0.09 GPa at 3% strain). Judge quality by `isotropy_delta_pct` + physical plausibility of K/G/E, not raw R².
 
 **Acceptance:**
 - `fit_r2_C11` and `fit_r2_C12_yy` ≥ 0.90; K > 0.
-- `isotropy_delta_pct` < 20% — **hard gate**. If ≥ 20%, flag K BORDERLINE. For 3-direction deform, check cross-direction `K_std/K_mean` < 20% instead.
-- **G<0 in y/z is NOT a hard failure.** On small amorphous cells C11<C12 in some directions → negative shear G, but K=(C11+2C12)/3 averages transverse stresses and stays robust. Report K_mean as `bulk_modulus_GPa` if cross-direction K_std/K_mean<20% and all fit_r²≥0.90; report G and E from the x-direction only, and note "G<0 y/z — small-cell anisotropy; K_mean robust." (The tool's per-direction `isotropy_delta_pct` — C12_yy vs C12_zz within one direction — is a DIFFERENT metric from cross-direction K spread; check the latter manually.)
+- `isotropy_delta_pct` < 20% — **hard gate** (C12_yy vs C12_zz within this single run). If ≥ 20%, flag K BORDERLINE.
+- **G<0 in y/z is NOT a hard failure.** On small amorphous cells C11<C12 in some directions → negative shear G, but K=(C11+2C12)/3 averages transverse stresses and stays robust. Report K as `bulk_modulus_GPa` if `isotropy_delta_pct<20%` and both fit_r²≥0.90; report G and E as-is, noting "G<0 — small-cell anisotropy; K robust."
 
-**Report:** `fit_r2_C11`, `fit_r2_C12_yy`, `isotropy_delta_pct`, `avg_window_frames`. If `isotropy_delta_pct` ≥ 20%, add WARNING "K BORDERLINE — anisotropy exceeds 20%; Murnaghan should have been primary".
+**Report:** `fit_r2_C11`, `fit_r2_C12_yy`, `isotropy_delta_pct`, `avg_window_frames`, and (if present) `rate_sensitivity.verdict`. If `isotropy_delta_pct` ≥ 20%, add WARNING "K BORDERLINE — anisotropy exceeds 20%; Murnaghan should have been primary".
 
 ---
 
@@ -111,6 +113,6 @@ extract_bulk_modulus(
 
 **`extract_bulk_modulus_murnaghan` B0_prime outside [4, 20]:** pressure range too wide (glass yielding) or too narrow (curvature not captured). Route to deform fallback.
 
-**`extract_bulk_modulus_deform` fit_r2 < 0.90:** noisy stress-strain — check THERMO_FREQ ≤ 100; strain rate may be too high (try the slow-rate comparison if `K_deform_rate_slow_inv_s` is set).
+**`extract_bulk_modulus_deform` fit_r2 < 0.90:** noisy stress-strain — check THERMO_FREQ ≤ 100. If `rate_sensitivity` is present and `verdict=WARNING`, the primary rate is likely too high — the tool already prefers the slow-rate fit when its own R² clears 0.90.
 
-**`extract_bulk_modulus_deform` isotropy_delta_pct ≥ 20%:** too small / not isotropic. 3-direction: acceptable if K_std/K_mean < 20%. Single-direction: BORDERLINE — Murnaghan should have been primary.
+**`extract_bulk_modulus_deform` isotropy_delta_pct ≥ 20%:** too small / not isotropic — BORDERLINE, Murnaghan should have been primary.

@@ -33,7 +33,7 @@ Default mode is multi-agent: the orchestrator (this session) spawns stateless sp
 | 🟣 `tg-sweep-worker` | thermal | equil `.data` → submitted Tg sweep run |
 | 🟢 `tg-analysis-worker` | thermal | Tg sweep log → Tg_K, CTE (α_g, α_r), ΔCp |
 | 🟠 `murnaghan-worker` | mechanical (primary) | equil `.data` → Murnaghan pressure series (glassy 300 K; rubbery T>Tg) |
-| 🔵 `deform-worker` | mechanical (fallback) | NPT `.data` → 3-direction uniaxial deformation run |
+| 🔵 `deform-worker` | mechanical (fallback) | NPT `.data` → uniaxial deformation run (primary + paired slow-rate sensitivity check) |
 | 🟢 `bulk-modulus-extractor` | mechanical | Murnaghan/deform/fluctuation logs → bulk_modulus_GPa |
 | 🟢 `exp-lookup-worker` | summary | polymer name/class → condition-matched exp ranges (Tg/density/K) |
 | 🟢 `run-summary-worker` | summary | all output JSONs → `run_summary.json` |
@@ -80,6 +80,10 @@ SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a fie
       (an unchanged confidence=high plan is trivially auto-approved — see
       `decision_policy.json:confidence_gate.high`; the planner agent's own confidence=high
       branch does nothing but this same script call). Proceed to "Thread the approved plan".
+      This skip is pre-Phase-A only — if `IS_NOVEL=true`, `FOUNDATION.md`'s
+      `[Post-probe critic review]` still runs after `[System probe]`, before `[Equilibration]`,
+      regardless of confidence (a validated class doesn't validate this specific SMILES's
+      probe-measured behavior).
     Else (CONF in {low, medium, offtable}):
       🟡 planner ← run_name, smiles, polymer_class, properties_requested,
         work_dir=data/<RUN>/lammps [, grounding_path]

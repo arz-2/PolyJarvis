@@ -1,0 +1,101 @@
+{
+  "summary": {
+    "n_faults": 6,
+    "n_prescripted": 4,
+    "n_inferred": 2,
+    "prescripted_recovery_success_rate": 1.0,
+    "inferred_left_for_agent": [
+      "F5_emc_unsupported_increment",
+      "F6_data_file_corruption"
+    ],
+    "classifier_failures": [],
+    "all_triggered": true
+  },
+  "faults": [
+    {
+      "id": "F1_pppm_out_of_range",
+      "description": "PPPM out of range in npt_compress",
+      "signal_kind": "log",
+      "signal": "ERROR: Out of range atoms - cannot compute PPPM (src/KSPACE/pppm.cpp:1934)",
+      "triggered": true,
+      "expected_error_class": "pppm_out_of_range",
+      "classifier_error_class": "pppm_out_of_range",
+      "classifier_ok": true,
+      "prescripted": true,
+      "recover_md_line": 39,
+      "recovery_resolved": true,
+      "recovery_note": "recover.md fix applied and verified"
+    },
+    {
+      "id": "F2_ff_style_mismatch",
+      "description": "Missing/contradictory FF flag",
+      "signal_kind": "log",
+      "signal": "ERROR: FF flag mismatch: caller set use_pcff=False but 'emc_build.data' requires use_pcff=True. Pass the matching FF flag or remove the override.",
+      "triggered": true,
+      "expected_error_class": "ff_style_mismatch",
+      "classifier_error_class": "ff_style_mismatch",
+      "classifier_ok": true,
+      "prescripted": true,
+      "recover_md_line": 36,
+      "recovery_resolved": true,
+      "recovery_note": "recover.md fix applied and verified"
+    },
+    {
+      "id": "F3_tg_fit_too_narrow",
+      "description": "Tg sweep <4 temperature bins",
+      "signal_kind": "metric",
+      "signal": "Tg sweep produced 3 temperature bins (<4)",
+      "triggered": true,
+      "expected_error_class": "tg_fit_too_narrow",
+      "classifier_error_class": "tg_fit_too_narrow",
+      "classifier_ok": true,
+      "prescripted": true,
+      "recover_md_line": 32,
+      "recovery_resolved": true,
+      "recovery_note": "recover.md fix applied and verified"
+    },
+    {
+      "id": "F4_emc_bad_smiles",
+      "description": "EMC build, wrong * count",
+      "signal_kind": "reject",
+      "signal": "EMC build rejected SMILES: SMILES must have exactly 2 * connection points, found 3: '*CC*C*'",
+      "triggered": true,
+      "expected_error_class": "missing_ff_parameters",
+      "classifier_error_class": "missing_ff_parameters",
+      "classifier_ok": true,
+      "prescripted": true,
+      "recover_md_line": 35,
+      "recovery_resolved": true,
+      "recovery_note": "recover.md fix applied and verified"
+    },
+    {
+      "id": "F5_emc_unsupported_increment",
+      "description": "EMC unsupported increment (PURA)",
+      "signal_kind": "log",
+      "signal": "EMC field error: increment 'n_2,hn' not found in pcff field (PURA urea N-H)",
+      "triggered": true,
+      "expected_error_class": "unknown",
+      "classifier_error_class": "unknown",
+      "classifier_ok": true,
+      "prescripted": false,
+      "recover_md_line": null,
+      "recovery_resolved": false,
+      "recovery_note": "no scripted recovery (inferred \u2014 AGENT resolves at launch)"
+    },
+    {
+      "id": "F6_data_file_corruption",
+      "description": "Data-file topology mismatch (incomplete force field)",
+      "signal_kind": "reject",
+      "signal": "data-file validation failed (clean passes, corrupted rejected): 'Pair Coeffs' has 1 entries but header says 2 types \u2014 force field is incomplete",
+      "triggered": true,
+      "expected_error_class": "unknown",
+      "classifier_error_class": "unknown",
+      "classifier_ok": true,
+      "prescripted": false,
+      "recover_md_line": null,
+      "recovery_resolved": false,
+      "recovery_note": "no scripted recovery (inferred \u2014 AGENT resolves at launch)"
+    }
+  ],
+  "metrics_file": "/home/arz2/PolyJarvis/benchmarks/recovery/results/recovery_benchmark_recovery.json"
+}

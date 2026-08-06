@@ -80,7 +80,7 @@ unfix nvt_eq
 
 # ── Phase 2: Uniaxial deformation ──────────────────────────────────────────
 # fix deform {DEFORM_DIR} erate: engineering strain rate in 1/fs (LAMMPS real units).
-# DEFORM_DIR: x (default), y, or z — run all 3 sequentially and average K for reliability.
+# DEFORM_DIR: x (default) — single direction; isotropy is checked from this run's own Pyy/Pzz.
 # NVT thermostat — no barostat; the other two box dimensions stay fixed.
 # "remap v" rescales velocities with the deforming cell (maintains
 # thermostat accuracy at large strains; required for SHAKE compatibility).

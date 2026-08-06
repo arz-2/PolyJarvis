@@ -105,6 +105,12 @@ def _name_variants(polymer_name: str) -> list[str]:
     return variants
 
 
+def _normalize_loose(name: str) -> str:
+    """Alnum-only lowercase key — catches spacing/punctuation splits ("vinyl chloride" vs
+    "vinylchloride") that exact/LIKE matching misses."""
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
 def find_polymer_ids(
     conn: sqlite3.Connection,
     polymer_name: str | None,
@@ -136,6 +142,15 @@ def find_polymer_ids(
                 if r["id"] not in seen and not _is_copolymer_name(r["name"]):
                     seen.add(r["id"])
                     ids.append(r["id"])
+
+        # Loose-normalized pass — merges DB entries split by spacing/punctuation only.
+        target = _normalize_loose(polymer_name)
+        for r in conn.execute("SELECT id, name FROM polymers").fetchall():
+            if (r["id"] not in seen and not _is_copolymer_name(r["name"])
+                    and _normalize_loose(r["name"]) == target):
+                seen.add(r["id"])
+                ids.append(r["id"])
+
         if ids:
             return ids, "name_match", "high"
 
@@ -349,6 +364,51 @@ def get_bulk_modulus_data(
     }
 
 
+def get_density_equations_data(conn: sqlite3.Connection, polymer_ids: list[int]) -> dict | None:
+    """
+    All piecewise density(T) fits for this polymer (every phase/T-range on file), not just the
+    one point-evaluated at T_sim_K inside get_density_data(). Differentiating py_expr gives
+    volumetric CTE: alpha_V = -(1/rho)(drho/dT). See polymer_rules.json's alpha_glass_per_K
+    entries (e.g. PVNL, PKTN) for worked examples of this derivation and its caveats
+    (extrapolation reliability, missing glass-phase equations).
+    """
+    ph = _placeholders(polymer_ids)
+    rows = conn.execute(
+        f"""SELECT de.equation, de.py_expr, de.t_min_C, de.t_max_C, de.phase, de.tg_C,
+                   de.notes, s.key AS source_key
+            FROM density_equations de
+            LEFT JOIN sources s ON s.id = de.source_id
+            WHERE de.polymer_id IN ({ph})
+            ORDER BY de.phase, de.t_min_C""",
+        polymer_ids,
+    ).fetchall()
+    if not rows:
+        return None
+    return {"n_rows": len(rows), "rows": [dict(r) for r in rows]}
+
+
+def get_thermal_conductivity_data(conn: sqlite3.Connection, polymer_ids: list[int]) -> dict | None:
+    ph = _placeholders(polymer_ids)
+    rows = conn.execute(
+        f"""SELECT tc.k_WmK, tc.T_K, tc.phase, tc.notes, s.key AS source_key
+            FROM thermal_conductivity_measurements tc
+            LEFT JOIN sources s ON s.id = tc.source_id
+            WHERE tc.polymer_id IN ({ph}) AND tc.k_WmK IS NOT NULL
+            ORDER BY tc.T_K""",
+        polymer_ids,
+    ).fetchall()
+    if not rows:
+        return None
+    rows = [dict(r) for r in rows]
+    values = [r["k_WmK"] for r in rows]
+    return {
+        "agg_median_WmK": round(statistics.median(values), 4),
+        "agg_range_WmK": [round(min(values), 4), round(max(values), 4)],
+        "n_rows": len(rows),
+        "rows": rows,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Query polymer_db for best experimental match")
     parser.add_argument("--polymer_name", default=None, help="Canonical polymer name for DB lookup")
@@ -411,11 +471,20 @@ def main() -> None:
         density = get_density_data(conn, polymer_ids, args.T_sim_K)
         if density:
             result["density"] = density
+        density_eqs = get_density_equations_data(conn, polymer_ids)
+        if density_eqs:
+            result["density_equations"] = density_eqs
 
     if "bulk_modulus" in props:
         bm = get_bulk_modulus_data(conn, polymer_ids, is_glassy)
         if bm:
             result["bulk_modulus"] = bm
+
+    # Supplementary — always included when present, regardless of --properties (cheap, and not
+    # gated behind a requestable property since properties_requested never includes it).
+    tc = get_thermal_conductivity_data(conn, polymer_ids)
+    if tc:
+        result["thermal_conductivity"] = tc
 
     with open(args.output_path, "w") as f:
         json.dump(result, f, indent=2, default=str)
@@ -435,6 +504,12 @@ def main() -> None:
         bm = result["bulk_modulus"]
         print(f"  K: {bm['agg_range_GPa']} GPa  median={bm['agg_median_GPa']} GPa  "
               f"n={bm['n_rows']}")
+    if "density_equations" in result:
+        print(f"  density_equations: {result['density_equations']['n_rows']} row(s) "
+              f"(raw density(T) fits, all phases — not evaluated; derive CTE if needed)")
+    if "thermal_conductivity" in result:
+        tc = result["thermal_conductivity"]
+        print(f"  thermal_conductivity: {tc['agg_range_WmK']} W/m·K  n={tc['n_rows']}")
 
 
 if __name__ == "__main__":

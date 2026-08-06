@@ -39,10 +39,12 @@ workflow = generate_equilibration_workflow(
 )
 ```
 
-`temp` selects the chain: `≤ 300.0` (rubbery) → 7-run chain ending at `npt_production`;
-`> 300.0` (glassy) → 9-run chain (`npt_cool300` + `npt_prod300` auto-appended). Use the
-return dict keys (`npt_production_dir`, `npt_prod300_data`, …) as downstream paths — never
-construct paths manually.
+`temp` (= `T_workflow_K` from the prompt, already resolved upstream from `exp_Tg_K` — pass it
+through as-is, don't re-derive it) selects the chain: `≤ 300.0` (rubbery) → 7-run chain ending
+at `npt_production` (this stage is the density/bulk-modulus source); `> 300.0` (glassy) → 9-run
+chain (`npt_cool300` + `npt_prod300` auto-appended, with `npt_prod300` as the density/deformation
+source — no separate cooling phase needed). Use the return dict keys (`npt_production_dir`,
+`npt_prod300_data`, …) as downstream paths — never construct paths manually.
 
 When `add_melt_npt=True` (rubbery), the return dict also has `npt_tg_prep_data` (path to
 `npt_melt_out.data`, isothermal NPT at `T_equil_K`) — the Tg-sweep starting cell. Do NOT use
@@ -63,6 +65,35 @@ result = run_lammps_chain(
 w = watch_run(result["chain_id"])
 # Return chain_id and w["monitor_command"] to orchestrator — do not call Monitor.
 ```
+
+---
+
+## Extend mode (`mode: extend`)
+
+Triggered when the prompt sets `mode: extend` (with `extend_from_data: <last NPT _out.data>` and
+optional `extend_ns: <1-2>`). Do NOT hand-write a continuation `.in` — generate it
+deterministically with the same tool, `extend_only=True`:
+
+```python
+info = inspect_data_file(data_file=extend_from_data)   # sanity-check the equilibrated cell
+workflow = generate_equilibration_workflow(
+    data_file=extend_from_data,
+    work_dir_base=work_dir,
+    use_pcff=..., use_opls=..., use_trappe=...,
+    temp=npt_prod_temp_K,   # production temp of the cell being extended = 300 K for BOTH regimes
+                             # (glassy cooled to 300; rubbery produced at 300) — NOT
+                             # T_equil_K/T_workflow_K, which would re-melt the cooled cell.
+    press=<same as original run>,
+    engine=<same as original run>,
+    extend_only=True,
+    extend_steps=int(extend_ns * 1e6 / dt_fs),
+)   # → a single `npt_extend` stage
+result = run_lammps_chain(stages=workflow["stages"], gpu_ids=gpu_ids, mpi=mpi_ranks, engine=engine)
+w = watch_run(result["chain_id"])
+```
+
+Return the standard RESULT block with `npt_prod_data_path` =
+`workflow["npt_production_dir"]/npt_extend_out.data` (the orchestrator re-runs equil-check on it).
 
 ---
 
@@ -98,5 +129,9 @@ and record the evidence rather than looping.
 **Disk-full mid-chain:** completed stages' `_out.data` stay intact. Free disk, delete only the
 failed stage's partial outputs, regenerate the workflow with identical params, slice the stage
 list to resume at the failed stage, resubmit. Do NOT restart from stage 0. Prevention: when
-free disk <60 GB, strip `dump`/`undump`/`write_dump` from the production stages' `.in` (nothing
-downstream reads `npt_prod300.dump`).
+free disk <60 GB, strip `dump`/`undump`/`write_dump` from the production stages' `.in` — but
+**not** from `npt_prod300`/`npt_production` if `tg`/`bulk_modulus` was requested and IS_NOVEL was
+true for this run: `system-probe-analyzer`'s `task=refine_from_equil` now reads
+`npt_prod300.dump`/`npt_production.dump` (via `npt_prod_dump_path`) to refine bulk-modulus
+timing knobs from the real chain's own stationary hold — stripping it silently disables that
+refinement pass rather than erroring.

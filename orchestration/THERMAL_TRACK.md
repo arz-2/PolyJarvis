@@ -100,7 +100,7 @@ On session restart mid-thermal-track: re-read this file before resuming.
 
   [is_glassy determination]
   if "tg" in properties_requested:
-    Tg_for_glassy = Tg_K at the HIGHEST screening rate (400 K/ns)  # protocol-fixed, reproducible (NOT most-equilibrated — that's the slowest rate; this is a stable is_glassy gate, see below)
+    Tg_for_glassy = Tg_K at the HIGHEST screening rate (the fastest configured rate in tg_rates_K_per_ns)  # protocol-fixed, reproducible (NOT most-equilibrated — that's the slowest rate; this is a stable is_glassy gate, see below)
     # Default: drive is_glassy off the highest-rate MD Tg, NOT tg_dsc_equiv_K — the extrapolated
     # value carries wide slope uncertainty (~0.6-decade rate span) and is not a stable routing gate.
     # Exp-Tg fallback (degenerate fit): if the highest-rate fit is unreliable — fit_quality==POOR,

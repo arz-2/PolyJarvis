@@ -42,11 +42,30 @@ On session restart mid-mechanical-track: re-read this file before resuming.
       Claim GPU: orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
       Agent(subagent_type="deform-worker", description="🔵 Deform fallback {polymer_name}",
             prompt=<gen_prompt.py --stage deform --plan PLAN_PATH --data_path npt_prod300_data_path
-                    --gpu_ids <claimed>>)
+                    --deform_rate_mode primary --gpu_ids <claimed>>)
         → parse RESULT → extract run_id_deform, deform_log_path, monitor_command_deform
       Write SIMULATION STATE (status=monitoring, + bg task id)
       BACKGROUND-WAIT (CLAUDE.md canonical pattern): Bash(command=monitor_command_deform, run_in_background=true),
         then END YOUR TURN. On the completion wakeup: orchestration/pick_gpu.py release --run <RUN>
+
+      Rate-sensitivity check — always spawn; deform-worker no-ops (null deform_log_path_slow) if
+      the class has no `K_deform_rate_slow_inv_s`, so no orchestrator-side pre-check is needed:
+        Claim GPU: orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
+        Agent(subagent_type="deform-worker", description="🔵 Deform rate-check {polymer_name}",
+              prompt=<gen_prompt.py --stage deform --plan PLAN_PATH --data_path npt_prod300_data_path
+                      --deform_rate_mode slow --gpu_ids <claimed>>)
+          → parse RESULT → extract deform_log_path_slow, monitor_command_deform_slow
+        If `monitor_command_deform_slow` is null (no-op — class has no slow rate defined):
+          orchestration/pick_gpu.py release --run <RUN> immediately, proceed to extraction with
+          deform_log_path_slow=null (no BACKGROUND-WAIT — nothing was submitted).
+        Else:
+          Write SIMULATION STATE (status=monitoring, + bg task id)
+          BACKGROUND-WAIT: Bash(command=monitor_command_deform_slow, run_in_background=true),
+            then END YOUR TURN. On the completion wakeup: orchestration/pick_gpu.py release --run <RUN>
+      # Sequential, not concurrent — matches the single-watcher BACKGROUND-WAIT contract (one
+      # Bash run_in_background waiter per turn) and keeps the fallback's GPU claim window narrow.
+      # If the slow run's chain fails, proceed to extraction with deform_log_path_slow=null
+      # (primary-rate K only, no rate-sensitivity check) rather than blocking the whole track on it.
   # else (rubbery + no pressures + bm_pressures_atm null): skip — fluctuation path, equil log already present
 
   # Key: for glassy Murnaghan always pass npt_prod300_data_path (300 K cell, not melt)
@@ -54,6 +73,7 @@ On session restart mid-mechanical-track: re-read this file before resuming.
   Agent(subagent_type="bulk-modulus-extractor", description="🟢 Extract BM {polymer_name}",
         prompt=<gen_prompt.py --stage analyze-bm --plan PLAN_PATH
                [--deform_log deform_log_path]                                                     # deform fallback only
+               [--deform_log_slow deform_log_path_slow]                                           # deform fallback, rate-check leg only
                [--murnaghan_logs '<JSON list of log_files>']                                      # Murnaghan path (primary)
                --npt_prod_log npt_prod_log_path>)                                                 # fluctuation cross-check (always passed)
     → parse RESULT → extract bulk_modulus_GPa, bulk_modulus_method → write D-07 to run_log.md

@@ -397,8 +397,8 @@ TEMPLATE_DEFAULTS = {
         # STRAIN_RATE in 1/fs (LAMMPS real units).
         # K_deform_rate_inv_s = 1e8 s^-1 → 1e-7 /fs.
         "STRAIN_RATE":      1e-7,
-        # DEFORM_DIR: deformation direction — x (default), y, or z.
-        # Run all 3 sequentially and average K for reliable isotropic estimate.
+        # DEFORM_DIR: deformation direction — x (default). Single direction; isotropy is
+        # checked from this run's own Pyy/Pzz, not from separate y/z direction runs.
         "DEFORM_DIR":       "x",
         # N_STEPS = STRAIN_MAX / (STRAIN_RATE * TIMESTEP)
         # = 0.03 / (1e-7 * 1.0) = 300000 steps for 3% strain at 1e8 s^-1, 1 fs dt

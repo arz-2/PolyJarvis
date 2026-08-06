@@ -8,11 +8,12 @@
 ### C5 — Validation runs
 - [x] `PCBN`: BPA-PC — Tg=520 K ✓ (target 500–540 K), ρ=1.168 g/cm³ (−2.7%) · BPAPC1 · 2026-06-03
 - [ ] `PAMD`: Nylon-6 — exp Tg ~323 K, target MD Tg 400–440 K · cell ready (bb10f693, 3056 atoms)
-- [ ] `PKTN`: PEEK — exp Tg ~418 K, target MD Tg 500–540 K · cell ready (6fe5d5d2, 2728 atoms)
-- [ ] `PSFO`: PSU (Udel) — exp Tg ~463 K, target MD Tg 540–580 K · cell ready (3b9b6641, 3246 atoms)
+- [x] `PKTN`: PEEK — Tg_MD=532.7 K ✓ (exp ~418 K), ρ=1.193 g/cm³ (−5.5%) · PEEK1–4 · 36-run study
+- [x] `PSFO`: PSU (Udel) — Tg=499.7 K ✓ (exp ~463 K), ρ=1.187 g/cm³ (−4.3%), K=4.43 GPa · PSU1–4 · 36-run study
 - [ ] `PIMD`: PMDA-ODA (Kapton) — exp Tg ~633 K, target MD Tg 730–810 K · cell ready (0ef810b0, 2946 atoms)
 - [x] `PHAL`: PVDF OPLS-AA — Tg=330 K ✓ (target 310–350 K), ρ(300K)=1.528 g/cm³ (−14.2%, worse than GAFF2) · PVDF2 · 2026-06-03 · needs Byutner2000 F params (Track G1)
 - [ ] Update `confidence` fields in `polymer_rules.json` after each run
+  - ⚠ Inconsistency: `PIMD` and `PKTN` already carry `confidence: high` in `polymer_rules.json`, but PIMD is unrun and PKTN was only validated post-hoc via the 36-run study — reconcile under Track D.
 
 ---
 
@@ -27,6 +28,12 @@
 ## Track E — Intelligent FF Selection & Literature Anchoring
 
 ### E2 — Literature search for novel / unclassified polymers
+**Superseded (planning side):** the `literature-grounding-worker` agent now covers E2's *intent* —
+for off-table / low-medium-confidence polymers it does DOI-verified web search and writes
+`literature_grounding.json` (force field, ρ_target, Tg_target, DOIs) that feeds the planner. The
+items below are the specific artifacts from the original E2 design that were *not* built that way
+(Semantic Scholar API instead of generic web search; a `search_ff_literature` tool rather than an
+agent; the three run_log artifacts). Keep only if a tool-based path is still wanted.
 - [ ] Implement `search_ff_literature(smiles, polymer_name)` using Semantic Scholar API
 - [ ] Add `LIT-01` row to run_log.md template
 - [ ] Add `lit_anchor` block: ρ_target, Tg_target, reference FF, DOI
@@ -84,17 +91,17 @@
 
 ## Track H — Advanced Chain Architectures
 
-RadonPy supports random, block, and blend cell construction but these are not yet exposed as MCP tools. The alternating copolymer path (`submit_copolymerize_job`) is the only implemented copolymer route.
+RadonPy supports random, block, and blend cell construction. **Update:** the single
+`submit_copolymerize_job` tool already dispatches all three chain sequences via its
+`copoly_type: Literal["random","alternating","block"]` param (mol-builder `server.py:426,727`) —
+so H1 (random) and H2 (block) are functionally shipped, not separate tools. What genuinely remains
+is H3 (polymer *blend* / mixture cells — distinct from copolymer chains) and the H4 guide/agent docs.
 
 ### H1 — Statistical copolymers
-- [ ] Implement `submit_random_copolymerize_job(mol_files, ratio, degree_of_polymerization, ratio_type, tacticity)`
-  - `ratio` auto-normalised; `ratio_type='exact'` enforces composition, `'choice'` is probabilistic
-  - Wraps `poly.polymerize_rw` with a random sequence generator
+- [x] Random copolymers — shipped via `submit_copolymerize_job(copoly_type="random", ratios=…, tacticity=…)` (`server.py:435-438`). No separate `submit_random_copolymerize_job` tool; `ratios` + `copoly_type` cover the intent (the original `ratio_type='exact'/'choice'` distinction was not carried over).
 
 ### H2 — Block copolymers
-- [ ] Implement `submit_block_copolymerize_job(mol_files, block_lengths, tacticity)`
-  - `mol_files` and `block_lengths` are parallel arrays
-  - ABA triblock: pass same monomer file twice with two entries in `block_lengths`
+- [x] Block copolymers — shipped via `submit_copolymerize_job(copoly_type="block", …)` (`server.py:439-443`, returns `block_lengths`). No separate `submit_block_copolymerize_job` tool.
 
 ### H3 — Polymer blends / mixture cells
 - [ ] Implement `submit_generate_mixture_cell_job(mol_files, chains_per_component, density, temperature)`
@@ -104,7 +111,7 @@ RadonPy supports random, block, and blend cell construction but these are not ye
 
 ### H4 — Stage 1 guide updates (do after H1–H3 land)
 - [ ] Re-add tool sections to `MOLECULE_BUILDER.md` with working examples
-- [ ] Update `docs/TOOLS_REFERENCE.md` Mol-Builder Server table
+- [x] Update `docs/TOOLS_REFERENCE.md` Mol-Builder Server table — done (`TOOLS_REFERENCE.md:22` lists "alternating/random/block")
 - [ ] Add routing logic to molecule-builder agent for non-alternating copolymers
 
 ---
@@ -117,9 +124,9 @@ RadonPy supports random, block, and blend cell construction but these are not ye
 
 **Status (2026-06-16):** Core tools shipped (`run_bulk_modulus_series`, `extract_bulk_modulus_murnaghan.py`, `bm_pressures_atm` for PHYC/PDIE). Remaining: doc updates + RESULTS table field.
 
-- [ ] Update `docs/TOOLS_REFERENCE.md`: replace B_dyn description with Murnaghan series protocol
-- [ ] Update `murnaghan-worker.md`: document Murnaghan as default for rubbery + bm_pressures_atm set
-- [ ] Add `B0_prime` field to RESULTS table in `data/TEMPLATE/run_log.md`
+- [x] Update `docs/TOOLS_REFERENCE.md`: replace B_dyn description with Murnaghan series protocol — done (`TOOLS_REFERENCE.md:77-80`)
+- [x] Update `murnaghan-worker.md`: document Murnaghan as default for rubbery + bm_pressures_atm set — done (`.claude/agents/murnaghan-worker.md:3,30,44`)
+- [x] Add `B0_prime` field to RESULTS table in `data/TEMPLATE/run_log.md` — done (`run_log.md:101`, `B0'` row)
 
 ---
 
@@ -127,7 +134,10 @@ RadonPy supports random, block, and blend cell construction but these are not ye
 
 **Update (2026-06-24):** The unification question below is resolved — Murnaghan EOS is the primary path for **both** glassy (NPT compression at 300 K) and rubbery (T>Tg) polymers, with 3-direction uniaxial deformation as the fallback when a Murnaghan fit fails acceptance. The remaining live work is the adaptive pressure-range selection (I2-B/C/E).
 
-**Context (2026-06-16):** Method routing is class-specific: only PHYC and PDIE have `bm_pressures_atm` set. The pressure ranges are hardcoded guesses, not derived from the polymer's stiffness. This is the current gap.
+**Context (2026-06-16; updated 2026-07-07):** Method routing is class-specific via hardcoded
+`bm_pressures_atm` lists. These have since grown from the original 2 classes to **7**: PHYC, PDIE,
+PVNL, POXI, PEST, PKTN, PSIL (`guides/polymer_rules.json`). The ranges are hardcoded guesses, not
+derived from the polymer's stiffness. This is the current gap.
 
 **Method assessment:**
 
@@ -167,7 +177,7 @@ This is system-agnostic: a stiff glass (K ~ 4 GPa) automatically uses a wide pre
 - [ ] **I2-B — Adaptive pressure selection in `murnaghan-worker`**: replace per-class `bm_pressures_atm` lookup with pilot-based range computation (2 pilot points → K_rough → 5-point sweep). Keyed to `exp_K_GPa` from `polymer_rules.json`; falls back to 500-atm pilot if field absent.
 - [ ] **I2-C — R²-based extension loop**: add `max_extensions=2` loop to `murnaghan-worker` that appends outer pressure points if Murnaghan R² < 0.999.
 - [x] **I2-D — Glassy fallback**: 3-direction uniaxial deformation is the glassy fallback, invoked when a Murnaghan fit fails acceptance (`fit_converged=False` or `B0_prime` outside [4, 20]).
-- [ ] **I2-E — Remove hardcoded `bm_pressures_atm`** from polymer_rules.json once I2-B is live (PHYC and PDIE). Keep `exp_K_GPa` — that drives the adaptive range.
+- [ ] **I2-E — Remove hardcoded `bm_pressures_atm`** from polymer_rules.json once I2-B is live (now 7 classes: PHYC, PDIE, PVNL, POXI, PEST, PKTN, PSIL). Keep `exp_K_GPa` — that drives the adaptive range.
 
 **Decision gate:** I2-B/C/E (adaptive pressure selection) are the remaining live work.
 
@@ -261,14 +271,14 @@ CLAUDE.md Planner → Critic loop, validator stage-gate against `planned_stages[
 
 | Priority | Track | Status | Notes |
 |---|---|---|---|
-| **1** | C5 — Validation runs | Partial | PCBN + PHAL validated; PKTN/PSFO since exercised at scale by the 36-run benchmark study; PAMD/PIMD cells queued |
+| **1** | C5 — Validation runs | Partial | PCBN, PHAL, PKTN (PEEK), PSFO (PSU) validated (last two via the 36-run benchmark study); only PAMD (Nylon-6) + PIMD (Kapton) cells remain queued |
 | **2** | E2 — Literature search | Pending | Needed before expanding beyond known classes (literature-grounding-worker covers the planning side) |
 | **3** | D — rules bookkeeping | Pending C5 | Confidence fields; do after C5 results |
 | **4** | G0 — class_params schema | Pending | Schema first; no pipeline changes yet |
 | **5** | G1 — Literature scanning | Pending G0 | PVDF first; encode 6 classes in order |
 | **6** | E3 — Fast density screen | **Blocked** | Needs advisor input A1/A2 |
-| **7** | H — Advanced chain architectures | Pending | Random/block copoly + blends; unblocked |
-| **8** | I1 — Murnaghan doc updates | Partial | Tools done; doc updates + B0_prime field remain |
+| **7** | H — Advanced chain architectures | Partial | Random/block copoly shipped via `copoly_type`; only H3 blends + H4 guide/agent docs remain |
+| **8** | I1 — Murnaghan doc updates | Done | Tools + all doc updates + B0_prime field shipped |
 | **9** | I2-B/C — Adaptive pressure selection + R² extension | Pending | Removes all hardcoded bm_pressures_atm; makes sweep system-agnostic |
 | **10** | J2 — Solubility parameter δ | Pending | E_pair/V post-process on NPT log; validate on PMMA first |
 | **11** | J3 — Thermal conductivity λ | Pending J2 | New nvt_gk template + tc-worker; exp targets exist for PMMA/PSU/PEEK |

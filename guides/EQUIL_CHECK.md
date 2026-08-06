@@ -4,16 +4,21 @@
 
 ---
 
+## Tool: `inspect_data_file` → `backbone_types`
+
+`backbone_types` is **REQUIRED** for `check_equilibration_comprehensive` — do not guess. Call
+`inspect_data_file(data_file=equil_data_path)`: `info.atom_type_names` gives each type's FF label
+(e.g. `c`, `c1`, `c_1`, `hc`, `o_1`, `o_2`) and `info.h_type_ids` already excludes hydrogens. Pick
+the heavy types that continue the polymer backbone; if a side-group heavy (e.g. a carbonyl O)
+could be confused with a backbone one, cross-check with `awk '/^Bonds/,/^Angles/' file.data` —
+backbone types appear in chain-continuing bonds. E.g. PEEK = `[1,2,5]` (aromatic C + ether O);
+type names starting with `h` are never backbone.
+
+---
+
 ## Tool: `check_equilibration_comprehensive`
 
 Returns `overall_pass` and a ready-to-paste `d05_markdown` block.
-
-`backbone_types` is **REQUIRED** — do not guess, and your toolset has no `inspect_data_file`.
-Extract from the `.data` file with Bash: read the **Masses** section
-(`awk '/^Masses/,/^Atoms/' file.data`), pick heavy backbone atoms (C≈12, O≈16, N≈14), never
-hydrogens (mass 1.008); cross-check the Bonds section (backbone types appear in
-chain-continuing bonds) when side-group heavies (e.g. carbonyl O) could be confused with
-backbone ones. E.g. PEEK = `[1,2,5]` (aromatic C + ether O); `[3,4]` are H → degenerate R_ee/P2.
 
 **Call signature:**
 ```python
@@ -36,7 +41,7 @@ check_equilibration_comprehensive(**kwargs)
 - `result["chain"]["ct"]["decay_fraction_at_end"]` → `ct_decay_fraction`
 - `result["chain"]["ct"]["tau_relax_ps"]` → `ct_tau_relax_ps`
 - `result["chain"]["ree"]["mean_R_ee_A"|"std_R_ee_A"|"n_chains"]` → `end_to_end_r_mean_A` / `_std_A` / `_n_chains`
-- C(t)/MSD/R_ee are computed on the melt dump in both phases, so `ct_decay_fraction`/`ct_tau_relax_ps` are always populated.
+- C(t)/MSD/R_ee are computed on the melt dump regardless of `ct_min_decay`, so `ct_decay_fraction`/`ct_tau_relax_ps` are always populated — report the actual values even when `ct_min_decay_melt` was null (advisory-only, not N/A).
 
 For PHYC (PE): include `ct_decayed` + `tau_relax_ps` in the RESULT block even on passes.
 
@@ -57,18 +62,12 @@ Primary output: `plateau_density_mean` ± `plateau_density_std`. Verify `plateau
 starts after the compression ramp. Density passes within ±5% of experimental; **below −5% is
 BINDING, not a soft warning.**
 
-### Step 3: MECHANIZED VERDICT — `enforce_equilibration_gate` MCP tool (replaces your own PASS/EXTEND/FAIL judgment)
+## Tool: `enforce_equilibration_gate` — mechanized verdict
 
-The exact tool call args are already filled in for you in the prompt above (search "MECHANIZED
-GATE"). Call it after Steps 1–2 write their JSON. **Use its `verdict` field directly — do not
-re-derive PASS/EXTEND/FAIL from the raw numbers yourself.** This exists precisely because worker
-prose judgment on this step let 8 genuine violations (PMMA1, PS1–4, PEEK1–4) get narrated as
-"PASS (known PCFF bias)" four separate times before anyone mechanically checked
-`density_value_binding` — see `manuscript_v2/revision.md` section B.
-
-The tool is a single call: if it finds glassy density >5% below experiment and no cached
-diagnosis, it runs `assess_cooling_contraction` **internally** and returns the final verdict
-directly — you will never see or need to act on an intermediate probe state.
+Call args are filled in above (search "MECHANIZED GATE"). Call it after the equilibration check
+and density extraction write their JSON. **Use its `verdict` field directly — do not re-derive
+PASS/EXTEND/FAIL from the raw numbers yourself** (worker prose judgment on this step previously
+narrated real violations as false passes — see `manuscript_v2/revision.md` section B).
 
 **The four possible verdicts:**
 - **`PASS`** → `equil_verdict=PASS`. (Includes carve-out passes — advisory-only gates failing under
@@ -92,8 +91,8 @@ directly — you will never see or need to act on an intermediate probe state.
 
 ## Non-mechanized judgment calls still yours to make
 
-These aren't covered by `enforce_gate.py` (they concern the density/homogeneity NUMBERS it reads,
-not the verdict logic) — use judgment here, same as before:
+These aren't covered by `enforce_equilibration_gate` (they concern the density/homogeneity NUMBERS
+it reads, not the verdict logic) — use judgment here, same as before:
 
 **`extract_equilibrated_density` returns <0.5 g/cm³:** log likely contains the compression ramp — verify `plateau_step_range` after the ramp; raise `eq_fraction` to 0.7.
 

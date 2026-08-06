@@ -34,7 +34,7 @@
       "evaluate": ["forcefield_cost_structure", "atom_count", "concurrent_load", "benchmark_evidence", "cell_size_vs_benchmark_cell", "host_match"],
       "require": [
         "mpi>=4 for any PPPM/charged class2 system ON THE GPU PACKAGE (engine=gpu): mpi=1 starves kspace ~75x there — never launch it. This does NOT apply to engine=kokkos, where kspace is GPU-resident and mpi=1 IS the correct PCFF/OPLS default (by_forcefield.pcff). Only flag mpi=1 when engine=gpu.",
-        "UA classes (TraPPE: PHYC/PDIE/PSTR) route to GPU package with `neigh yes`, mpi=1, 1 GPU/run (neighbor build is ~71% of the loop and offloads to the GPU; script_generator emits `neigh yes` automatically for use_trappe). This is 3.7x vs CPU mpi=4 and beats KOKKOS on small UA cells (run-0 parity PASS 2026-06-20). NOT pair-only GPU (neigh on CPU ties CPU) and NOT CPU mpi=4 (the old default).",
+        "UA classes (TraPPE: PHYC/PDIE) route to GPU package with `neigh yes`, mpi=1, 1 GPU/run (neighbor build is ~71% of the loop and offloads to the GPU; script_generator emits `neigh yes` automatically for use_trappe). This is 3.7x vs CPU mpi=4 and beats KOKKOS on small UA cells (run-0 parity PASS 2026-06-20). NOT pair-only GPU (neigh on CPU ties CPU) and NOT CPU mpi=4 (the old default). PSTR (Polystyrenics) is PCFF, not TraPPE-UA — do not include it here.",
         "small (<10k-atom) cells use 1 GPU per run, not 4 (comm overhead, GPU underfill)",
         "Sum of mpi across concurrent runs <= 18 physical cores (one GPU-heavy run per GPU)",
         "a multi-GPU pin (gpu_per_run>=2) requires BOTH an estimated cell >~10k atoms AND benchmark support (directional_probe.recommended_by_ff[fam].gpu>=2 on a matching host); otherwise use 1 GPU",
@@ -112,7 +112,7 @@
       "evidence_required": true,
       "evaluate": ["phase_glassy_vs_rubbery", "method_physics_validity", "gpu_vs_cpu", "rate_artifact"],
       "require": [
-        "glassy bulk_modulus via Murnaghan NPT compression at 300 K (primary — symmetric, cell-size independent; Wu 2019 Comput. Mater. Sci. validated); 3-direction uniaxial deformation fallback if Murnaghan fails (fit_converged=False or B0_prime outside [4, 20]); Born+NVT REMOVED (PCFF+PPPM virial incompatibility — K_Born 8-15x too high, Var(P) ~10^7x too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1 2026-06-21; see BM_ANALYSIS.md)",
+        "glassy bulk_modulus via Murnaghan NPT compression at 300 K (primary — symmetric, cell-size independent; Wu 2019 Comput. Mater. Sci. validated); uniaxial deformation fallback if Murnaghan fails (fit_converged=False or B0_prime outside [4, 20]), paired with a slower-rate rate-sensitivity check; Born+NVT REMOVED (PCFF+PPPM virial incompatibility — K_Born 8-15x too high, Var(P) ~10^7x too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1 2026-06-21; see BM_ANALYSIS.md)",
         "rubbery bulk_modulus via Murnaghan EOS sweep at T>Tg (unchanged); volume fluctuation is cross-check only",
         "is_glassy from measured Tg>300K when tg requested, else from experimental_tg_K glassy_hint",
         "for a multi-member class (experimental_tg_K is an OBJECT keyed by member name, e.g. PVNL {PVA:303,PVC:354,PVAc:304}; also PACR, POXI), the planner MUST resolve which member the SMILES is (by substituent — PVNL: *CC(Cl)*=PVC, *CC(O)*=PVA, *CC(OC(C)=O)*=PVAc) and pin THAT member's exp Tg/density/K in the D-04 evidence and assumptions[]. Drive is_glassy off the pinned exp Tg, never the noisy MD Tg — otherwise is_glassy/grading use the wrong target"
@@ -156,6 +156,11 @@
       "reduces": "hardware_optimum — the mpi/gpu config uncertainty for an off-table FF, an unusually sized cell, or a host whose hardware_policy is not cleanly benchmarked (values_are_benchmarked=false or host mismatch)",
       "mechanism": "hardware/calibrate_hardware.py (wrapping hardware/benchmark_hardware.py) sweeps the mpi/gpu matrix on the built .data per template cost class, reports ns/day + Pair/Kspace/Neigh/Comm breakdown, names the winner, and writes directional_probe + by_forcefield (the latter only on a clean uncontended sweep). Runs politely around live runs (idle GPU + spare cores only, niced, sequential).",
       "cost": "minutes"
+    },
+    "system_probe": {
+      "reduces": "system_size timing-knob uncertainty (t_equil_ns, eq_annealing_cycles, ct_min_decay_melt, bm_pressures_atm, K_deform_rate_inv_s) for a SMILES never simulated before — measured instead of guessed from class defaults",
+      "mechanism": "system-probe-worker + system-probe-analyzer: a ramp-then-hold two-chain sequence (a truncated 4-stage ramp chain reaches a hot/decompressed state, then a single genuine ~400 ps stationary NPT hold is appended off its real output via extend_only=True) measures this specific SMILES's actual chain relaxation time and derives protocol-timing knobs from it, patching decided_params in place and caching to guides/system_characterization_cache.json[canonical_smiles] — only when at least one measurement was reliable, so a fully-failed probe doesn't permanently poison future runs of this exact SMILES. Gated on IS_NOVEL=true (CLAUDE.md's Novelty Gate), independent of plan_mode/confidence — fires unconditionally at the orchestrator level, not planner-scheduled.",
+      "cost": "~400ps stationary hold + short ramp chain, minutes, two BACKGROUND-WAIT round-trips"
     }
   }
 }
