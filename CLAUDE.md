@@ -94,6 +94,15 @@ SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a fie
         → approved → proceed | revise → re-spawn planner with the findings, re-critique |
           escalate → write UNRESOLVED to run_log.md and stop.
 
+  REUSE CACHED CHARACTERIZATION (if `IS_NOVEL=false` — applies to BOTH branches above, since a
+    class's confidence and a specific SMILES's prior probe measurement are orthogonal signals):
+    `python3 orchestration/apply_cached_characterization.py --run_plan PLAN_PATH
+    --canonical_smiles "$CANONICAL_SMILES"` → patches PLAN_PATH's decided_params in place with
+    every non-null derived_* field from the cached entry (skip if `{"applied": false, ...}` — no
+    usable cache entry, proceed with class/plan defaults exactly as before). This is what makes
+    `IS_NOVEL=false` mean "reuse the earlier measurement," not merely "skip re-probing." If
+    `IS_NOVEL=true`, skip this step entirely — `[System probe]` measures fresh instead.
+
   Thread the approved plan: EVERY gen_prompt.py call MUST include --plan PLAN_PATH (its
     decided_params drive the worker prompts; never read polymer_rules.json manually):
     `python3 orchestration/gen_prompt.py --stage <STAGE> --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH [--data_path ...]`
@@ -121,11 +130,23 @@ BACKGROUND-WAIT  (canonical wait pattern — FOUNDATION/THERMAL/MECHANICAL guide
     PROCESS_DEAD_NO_SENTINEL (3) → FAILED → /recover (max 2/worker)
     killed / no terminal line    → relaunch the SAME waiter (lossless; SEEN dedups progress)
 
-PHASE A — FOUNDATION (always)
+DETERMINISTIC-PATH BRANCH (`plan_mode=="deterministic"` — read once, before Phase A):
+  Read orchestration/DETERMINISTIC_REPLICATE.md instead of FOUNDATION.md/THERMAL_TRACK.md/
+  MECHANICAL_TRACK.md for Phase A/B. It owns its own GPU claim/release internally (the script
+  wraps every submission in pick_gpu.py claim/release itself — do NOT also claim at the
+  orchestrator level per the Hardware section above for this path) and its own BACKGROUND-WAIT
+  invocations (one or two, per the IS_NOVEL split it documents) — the canonical BACKGROUND-WAIT
+  pattern above still applies to launching/waiting on the *script itself*, just not per LAMMPS
+  stage. Phase C (below) is unchanged either way — the script produces the same raw/*.json
+  artifacts SUMMARY.md already consumes. Skip straight to PHASE C once the script reports
+  `{"status": "complete", ...}`.
+  Else (`plan_mode=="reasoned"`): Phase A/B below apply unchanged, exactly as today.
+
+PHASE A — FOUNDATION (always, reasoned path only — see the branch above for deterministic)
   Read orchestration/FOUNDATION.md — build → equilibration (BACKGROUND-WAIT) → equil-check gate
   (density, D-05) + EXTEND branch. Re-read after any mid-phase session restart.
 
-PHASE B — TRACKS (property-conditional)
+PHASE B — TRACKS (property-conditional, reasoned path only — see the branch above for deterministic)
   thermal (if "tg"): Read orchestration/THERMAL_TRACK.md — owns the multirate sweep loop, the
     slope-gate hard stop + per-class structural fallback, and is_glassy. Gating consequence: if
     tg_multirate_result.json slope_gate_pass==False (glassy only; rubbery exempt), do NOT proceed

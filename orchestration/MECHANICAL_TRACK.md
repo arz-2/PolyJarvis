@@ -1,5 +1,9 @@
 # Mechanical Track — Orchestrator Guide (Phase B)
 
+This guide governs the `reasoned` path. For `plan_mode=="deterministic"` Phase B execution, see
+`orchestration/DETERMINISTIC_REPLICATE.md` (its scripted executor runs this same Murnaghan-primary
+/ deform-fallback / BM-extraction logic directly, no agent spawns).
+
 Loaded on-demand by the orchestrator at Phase B entry when "bulk_modulus" in properties_requested.
 On session restart mid-mechanical-track: re-read this file before resuming.
 

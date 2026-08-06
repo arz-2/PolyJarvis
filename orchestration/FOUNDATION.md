@@ -1,5 +1,9 @@
 # FOUNDATION track guide (Phase A) — orchestrator-read
 
+This guide governs the `reasoned` path (`confidence` in {low, medium, offtable}) and the
+`IS_NOVEL=true` system-probe detour inside the `deterministic` path. For `plan_mode=="deterministic"`
+Phase A execution otherwise, see `orchestration/DETERMINISTIC_REPLICATE.md`.
+
 Read this at **Phase A entry**, before spawning the build/equil workers. Foundation always runs
 and feeds every downstream track; density comes from the equil-check gate. All worker prompts are
 generated with `gen_prompt.py --stage <STAGE> --plan PLAN_PATH [--data_path ...]` — never read

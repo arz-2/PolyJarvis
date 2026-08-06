@@ -337,27 +337,48 @@ def _exp_density_range(cls: dict) -> list:
 
 # ─── Stage prompt builders ────────────────────────────────────────────────────
 
+def _resolve_build_params(args, cls: dict) -> dict:
+    """Resolved values for the build stage — consumed by build_prompt's text template and,
+    identically, by run_deterministic_replicate.py's scripted molecule-builder call."""
+    return {
+        "smiles": args.smiles,
+        "work_dir": args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps",
+        "preferred_builder": cls.get('preferred_builder', 'emc'),
+        "preferred_ff": cls.get('preferred_ff', 'gaff2_mod'),
+        "dp": args.dp or cls.get('dp_typical', 50),
+        "nchain": args.nchain or cls.get('nchain', 10),
+        "density_initial_gcm3": _pick(args.density_initial, cls, 'density_initial_gcm3', 0.6),
+        "emc_seed": args.emc_seed if getattr(args, 'emc_seed', None) is not None else None,
+        "charge_method": cls.get('charge_method', 'am1bcc').lower(),
+        "electrostatics": cls.get('electrostatics', 'pppm'),
+        "cutoff_A": cls.get('cutoff_A', 12.0),
+        "dt_fs": cls.get('dt_fs', 1.0),
+        "phal_patch": args.polymer_class.upper() == 'PHAL',
+        "lammps_flags": _lammps_flags(args.lammps_flags, cls),
+        "ff_confidence": cls.get('confidence', 'low'),
+    }
+
+
 def build_prompt(args, cls: dict, cross_track_rules: str) -> str:
-    flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps"
+    p = _resolve_build_params(args, cls)
     guide = load_worker_guide("build")
     return f"""\
-smiles:            {_v(args.smiles)}
+smiles:            {_v(p['smiles'])}
 run_name:          {args.run_name}
-work_dir:          {work_dir}/cell
+work_dir:          {p['work_dir']}/cell
 polymer_class:     {args.polymer_class.upper()}
-preferred_builder: {cls.get('preferred_builder', 'emc')}
-preferred_ff:      {cls.get('preferred_ff', 'gaff2_mod')}
-dp:                {args.dp or cls.get('dp_typical', 50)}
-nchain:            {args.nchain or cls.get('nchain', 10)}
-density_initial:   {_pick(args.density_initial, cls, 'density_initial_gcm3', 0.6)}
-emc_seed:          {args.emc_seed if getattr(args, 'emc_seed', None) is not None else 'null'}   # null = builder draws + reports a random seed
-charge_method:     {cls.get('charge_method', 'am1bcc').lower()}
-electrostatics:    {cls.get('electrostatics', 'pppm')}
-cutoff_A:          {cls.get('cutoff_A', 12.0)}
-dt_fs:             {cls.get('dt_fs', 1.0)}
-phal_patch:        {str(args.polymer_class.upper() == 'PHAL').lower()}
-ff_confidence:     {cls.get('confidence', 'low')}
+preferred_builder: {p['preferred_builder']}
+preferred_ff:      {p['preferred_ff']}
+dp:                {p['dp']}
+nchain:            {p['nchain']}
+density_initial:   {p['density_initial_gcm3']}
+emc_seed:          {p['emc_seed'] if p['emc_seed'] is not None else 'null'}   # null = builder draws + reports a random seed
+charge_method:     {p['charge_method']}
+electrostatics:    {p['electrostatics']}
+cutoff_A:          {p['cutoff_A']}
+dt_fs:             {p['dt_fs']}
+phal_patch:        {str(p['phal_patch']).lower()}
+ff_confidence:     {p['ff_confidence']}
 
 --- Worker Guide (MOLECULE_BUILDER) ---
 {guide}
@@ -408,59 +429,84 @@ def _regime(args, cls: dict) -> str:
     return "rubbery" if _resolve_t_workflow(args, cls) <= 300.0 else "glassy"
 
 
-def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
-    flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/equil"
-    guide = load_worker_guide("equil")
+def _resolve_equil_params(args, cls: dict) -> dict:
+    """Resolved values for the equilibration stage — consumed by equil_prompt's text template
+    and, identically, by run_deterministic_replicate.py's scripted equilibration-chain call."""
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
     T_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
-    T_anneal = _pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0)
     npt_prod_ns_val = _pick(args.npt_prod_ns, cls, 'npt_prod_ns', None)
-    if npt_prod_ns_val is not None:
-        npt_prod_steps = int(npt_prod_ns_val * 1e6 / dt)
-        npt_prod_line = (
-            f"t_npt_prod_ns:     {npt_prod_ns_val}\n"
-            f"npt_prod_steps:    {npt_prod_steps}  # pass as npt_prod_steps="
-        )
-    else:
-        npt_prod_line = "t_npt_prod_ns:     null  # auto-sized by atom count"
+    npt_prod_steps = int(npt_prod_ns_val * 1e6 / dt) if npt_prod_ns_val is not None else None
     T_workflow = _resolve_t_workflow(args, cls)
     add_melt_npt = getattr(args, 'add_melt_npt', False) or (T_workflow <= 300.0)
     melt_npt_ns_val = _pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None
-    if add_melt_npt and melt_npt_ns_val is not None:
-        melt_npt_steps = int(melt_npt_ns_val * 1e6 / dt)
-        melt_npt_line = (
-            f"add_melt_npt:      true\n"
-            f"t_equil_K:         {T_equil}\n"
-            f"melt_npt_ns:       {melt_npt_ns_val}\n"
-            f"melt_npt_steps:    {melt_npt_steps}  # pass as melt_npt_steps="
+    melt_npt_steps = (int(melt_npt_ns_val * 1e6 / dt)
+                       if (add_melt_npt and melt_npt_ns_val is not None) else None)
+    return {
+        "data_path": args.data_path,
+        "lammps_flags": _lammps_flags(args.lammps_flags, cls),
+        "work_dir": args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/equil",
+        "dt_fs": dt,
+        "T_equil_K": T_equil,
+        "T_anneal_high_K": _pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0),
+        "T_workflow_K": T_workflow,
+        "P_equil_atm": cls.get('P_equil_atm', 1.0),
+        "t_equil_ns": cls.get('t_equil_ns', 5.0),
+        "anneal_cycles": cls.get('eq_annealing_cycles', 5),
+        "npt_prod_ns": npt_prod_ns_val,
+        "npt_prod_steps": npt_prod_steps,
+        "add_melt_npt": add_melt_npt,
+        "melt_npt_ns": melt_npt_ns_val,
+        "melt_npt_steps": melt_npt_steps,
+        "gpu_ids": args.gpu_ids,
+        "mpi_ranks": args.mpi_ranks,
+        "engine": args.engine,
+        "velocity_seed": getattr(args, 'velocity_seed', None),
+    }
+
+
+def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    p = _resolve_equil_params(args, cls)
+    guide = load_worker_guide("equil")
+    if p["npt_prod_ns"] is not None:
+        npt_prod_line = (
+            f"t_npt_prod_ns:     {p['npt_prod_ns']}\n"
+            f"npt_prod_steps:    {p['npt_prod_steps']}  # pass as npt_prod_steps="
         )
-    elif add_melt_npt:
+    else:
+        npt_prod_line = "t_npt_prod_ns:     null  # auto-sized by atom count"
+    if p["add_melt_npt"] and p["melt_npt_ns"] is not None:
         melt_npt_line = (
             f"add_melt_npt:      true\n"
-            f"t_equil_K:         {T_equil}"
+            f"t_equil_K:         {p['T_equil_K']}\n"
+            f"melt_npt_ns:       {p['melt_npt_ns']}\n"
+            f"melt_npt_steps:    {p['melt_npt_steps']}  # pass as melt_npt_steps="
+        )
+    elif p["add_melt_npt"]:
+        melt_npt_line = (
+            f"add_melt_npt:      true\n"
+            f"t_equil_K:         {p['T_equil_K']}"
         )
     else:
         melt_npt_line = "add_melt_npt:      false"
     return f"""\
-data_path:         {_v(args.data_path)}
-lammps_flags:      {json.dumps(flags)}
+data_path:         {_v(p['data_path'])}
+lammps_flags:      {json.dumps(p['lammps_flags'])}
 run_name:          {args.run_name}
-work_dir:          {work_dir}
+work_dir:          {p['work_dir']}
 polymer_class:     {args.polymer_class.upper()}
-T_equil_K:         {T_equil}
-T_workflow_K:      {T_workflow}   # pass as temp=
-P_equil_atm:       {cls.get('P_equil_atm', 1.0)}
-t_equil_ns:        {cls.get('t_equil_ns', 5.0)}
-T_anneal_high_K:   {T_anneal}
-anneal_cycles:     {cls.get('eq_annealing_cycles', 5)}
-dt_fs:             {dt}
+T_equil_K:         {p['T_equil_K']}
+T_workflow_K:      {p['T_workflow_K']}   # pass as temp=
+P_equil_atm:       {p['P_equil_atm']}
+t_equil_ns:        {p['t_equil_ns']}
+T_anneal_high_K:   {p['T_anneal_high_K']}
+anneal_cycles:     {p['anneal_cycles']}
+dt_fs:             {p['dt_fs']}
 {npt_prod_line}
 {melt_npt_line}
-gpu_ids:           "{args.gpu_ids}"
-mpi_ranks:         {args.mpi_ranks}
-engine:            "{args.engine}"
-velocity_seed:     {args.velocity_seed if getattr(args, 'velocity_seed', None) is not None else 'null'}   # null = random; pin for reproducible trajectory
+gpu_ids:           "{p['gpu_ids']}"
+mpi_ranks:         {p['mpi_ranks']}
+engine:            "{p['engine']}"
+velocity_seed:     {p['velocity_seed'] if p['velocity_seed'] is not None else 'null'}   # null = random; pin for reproducible trajectory
 
 --- Worker Guide (EQUILIBRATION) ---
 {guide}
@@ -481,80 +527,102 @@ def _resolve_tg_rate(args, cls: dict):
     return None, ""
 
 
-def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
-    flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/thermal"
-    guide = load_worker_guide("tg")
+def _resolve_tg_params(args, cls: dict) -> dict:
+    """Resolved values for a single-rate Tg sweep stage — consumed by tg_prompt's text
+    template and, identically, by run_deterministic_replicate.py's scripted Tg-sweep call."""
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
-
-    # Multi-rate support: pick the rate at tg_rate_index if provided
     tg_rates = cls.get('tg_rates_K_per_ns', [])
     rate_idx = getattr(args, 'tg_rate_index', None)
     selected_rate, rate_suffix = _resolve_tg_rate(args, cls)
-    tg_floor_warning = ""
+    t_step = _pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)
+    floor = cls.get('tg_min_steps_per_T', 200000)
     if selected_rate is not None:
-        # Compute n_steps_per_t for this rate: rate = T_step / (n_steps * dt * 1e-6)
-        t_step = _pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)
-        n_steps_for_rate = int(t_step / (selected_rate * dt * 1e-6))
-        n_steps_per_t = n_steps_for_rate
-        rate_line = (
-            f"tg_rate_index:     {rate_idx}  # rate {selected_rate} K/ns\n"
-            f"  cooling_rate:    {selected_rate}"
-        )
+        # rate = T_step / (n_steps * dt * 1e-6)
+        n_steps_per_t = int(t_step / (selected_rate * dt * 1e-6))
+    else:
+        n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
+    work_dir = args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/thermal"
+    return {
+        "lammps_flags": _lammps_flags(args.lammps_flags, cls),
+        "work_dir": work_dir,
+        "dt_fs": dt,
+        "tg_rates_K_per_ns": tg_rates,
+        "tg_rate_index": rate_idx,
+        "selected_rate_K_per_ns": selected_rate,
+        # Per-rate output dir so concurrent/sequential multi-rate sweeps don't collide on
+        # one tg_sweep/tg_sweep.log. Single-rate path keeps the legacy "tg_sweep" dir.
+        "tg_sweep_dir": f"{work_dir}/tg_sweep{rate_suffix}",
+        "T_start_K": _pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600),
+        "T_end_K": _pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200),
+        "T_step_K": t_step,
+        "n_steps_per_t": n_steps_per_t,
+        "tg_min_steps_per_T": floor,
         # Backstop only — the plan-time feasibility filter should have rejected an infeasible
-        # rate. Warn (never block) if this multirate point undershoots the per-T steps floor:
-        # too few ps/T collapses the bilinear Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400).
-        floor = cls.get('tg_min_steps_per_T', 200000)
-        if n_steps_per_t < floor:
-            ps = n_steps_per_t * dt * 1e-3
+        # rate. Never blocking, just flagging: too few ps/T collapses the bilinear Tg fit
+        # (cis-PBD2 r400=50ps, PEEK2 r160/r400).
+        "below_steps_floor": selected_rate is not None and n_steps_per_t < floor,
+        # Rubbery: equil_data_path = npt_tg_prep_data (npt_melt at T_equil_K); Glassy:
+        # npt_prod300_out.data. Orchestrator passes the correct cell via --tg_start_data
+        # (rubbery) or --data_path (glassy).
+        "equil_data_path": getattr(args, 'tg_start_data', None) or args.data_path,
+        "gpu_ids": args.gpu_ids,
+        "mpi_ranks": args.mpi_ranks,
+        "engine": args.engine,
+        "velocity_seed": getattr(args, 'velocity_seed', None),
+    }
+
+
+def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    p = _resolve_tg_params(args, cls)
+    guide = load_worker_guide("tg")
+    tg_floor_warning = ""
+    if p["selected_rate_K_per_ns"] is not None:
+        rate_line = (
+            f"tg_rate_index:     {p['tg_rate_index']}  # rate {p['selected_rate_K_per_ns']} K/ns\n"
+            f"  cooling_rate:    {p['selected_rate_K_per_ns']}"
+        )
+        if p["below_steps_floor"]:
+            ps = p["n_steps_per_t"] * p["dt_fs"] * 1e-3
             tg_floor_warning = (
-                f"⚠ WARNING: rate {selected_rate} K/ns → {n_steps_per_t} steps/T = {ps:.0f} ps/T, "
-                f"BELOW tg_min_steps_per_T={floor} ({floor * dt * 1e-3:.0f} ps). Bilinear Tg fit "
+                f"⚠ WARNING: rate {p['selected_rate_K_per_ns']} K/ns → {p['n_steps_per_t']} steps/T = {ps:.0f} ps/T, "
+                f"BELOW tg_min_steps_per_T={p['tg_min_steps_per_T']} ({p['tg_min_steps_per_T'] * p['dt_fs'] * 1e-3:.0f} ps). Bilinear Tg fit "
                 f"likely DEGENERATE (cis-PBD2/PEEK2 failure mode). This rate is infeasible for "
-                f"tg_t_step_K={t_step}, dt={dt}fs — the slope gate is the backstop; do NOT report "
+                f"tg_t_step_K={p['T_step_K']}, dt={p['dt_fs']}fs — the slope gate is the backstop; do NOT report "
                 f"this rate's Tg as primary.\n\n"
             )
     else:
-        n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
         rate_line = f"tg_rate_index:     null  # standard single-rate run"
-        if tg_rates:
-            rate_line += f"\n  all_rates_K_per_ns: {tg_rates}  # use --tg_rate_index N for multi-rate"
+        if p["tg_rates_K_per_ns"]:
+            rate_line += f"\n  all_rates_K_per_ns: {p['tg_rates_K_per_ns']}  # use --tg_rate_index N for multi-rate"
 
-    # Per-rate output dir so concurrent/sequential multi-rate sweeps don't collide on
-    # one tg_sweep/tg_sweep.log. Single-rate path keeps the legacy "tg_sweep" dir.
-    tg_sweep_dir = f"{work_dir}/tg_sweep{rate_suffix}"
-    # Rubbery: equil_data_path = npt_tg_prep_data (npt_melt at T_equil_K)
-    # Glassy:  equil_data_path = npt_prod300_out.data
-    # Orchestrator passes the correct cell via --tg_start_data (rubbery) or --data_path (glassy)
-    _tg_cell = getattr(args, 'tg_start_data', None) or args.data_path
     return f"""\
-{tg_floor_warning}equil_data_path:   {_v(_tg_cell)}
-lammps_flags:      {json.dumps(flags)}
+{tg_floor_warning}equil_data_path:   {_v(p['equil_data_path'])}
+lammps_flags:      {json.dumps(p['lammps_flags'])}
 polymer_class:     {args.polymer_class.upper()}
 run_name:          {args.run_name}
-work_dir:          {work_dir}
-tg_sweep_dir:      {tg_sweep_dir}
+work_dir:          {p['work_dir']}
+tg_sweep_dir:      {p['tg_sweep_dir']}
 tg_params:
-  T_start:         {_pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600)}
-  T_end:           {_pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200)}
-  T_step:          {_pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)}
-  n_steps_per_t:   {n_steps_per_t}
+  T_start:         {p['T_start_K']}
+  T_end:           {p['T_end_K']}
+  T_step:          {p['T_step_K']}
+  n_steps_per_t:   {p['n_steps_per_t']}
 {rate_line}
-dt_fs:             {dt}
-gpu_ids:           "{args.gpu_ids}"
-mpi_ranks:         {args.mpi_ranks}
-engine:            "{args.engine}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
-velocity_seed:     {args.velocity_seed if getattr(args, 'velocity_seed', None) is not None else 'null'}   # null = random; pin for reproducible/recovery trajectory
+dt_fs:             {p['dt_fs']}
+gpu_ids:           "{p['gpu_ids']}"
+mpi_ranks:         {p['mpi_ranks']}
+engine:            "{p['engine']}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
+velocity_seed:     {p['velocity_seed'] if p['velocity_seed'] is not None else 'null'}   # null = random; pin for reproducible/recovery trajectory
 per_t_dump:
   enabled:         true
-  file:            {tg_sweep_dir}/per_t_structs.dump   # one final frame per T step
+  file:            {p['tg_sweep_dir']}/per_t_structs.dump   # one final frame per T step
   param_key:       WRITE_PER_T_DUMP=True, PER_T_DUMP_FILE=per_t_structs.dump
   note:            Pass these in generate_script params alongside T_START/T_END/etc.
 generate_script:
   template_name:   npt_tg_step   # REQUIRED — the multi-temperature cooling staircase.
   WARNING:         NEVER use template "npt" for a Tg sweep — it renders a single-temperature
                    NPT (no cooling, no per-T dump) and is an invalid sweep.
-  required_params: T_START={_pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600)}, T_END={_pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200)}, T_STEP={_pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)} (map from tg_params above).
+  required_params: T_START={p['T_start_K']}, T_END={p['T_end_K']}, T_STEP={p['T_step_K']} (map from tg_params above).
                    generate_script RAISES if T_END/T_STEP are missing — verify the rendered .in
                    has a `variable temps index ...` loop before submitting.
 
@@ -565,26 +633,43 @@ generate_script:
 """
 
 
+def _resolve_deform_params(args, cls: dict) -> dict:
+    """Resolved values for the deform stage — consumed by deform_prompt's text template and,
+    identically, by run_deterministic_replicate.py's scripted deform-fallback call."""
+    return {
+        "deform_rate_mode": args.deform_rate_mode,
+        "equil_data_path": args.data_path,
+        "lammps_flags": _lammps_flags(args.lammps_flags, cls),
+        "work_dir": args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/mechanical",
+        "is_glassy": args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True,
+        "K_deform_rate_inv_s": _pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 1e8),
+        "K_deform_rate_slow_inv_s": cls.get('K_deform_rate_slow_inv_s', 'null'),
+        "K_strain_max": _pick(args.K_strain_max, cls, 'K_strain_max', 0.03),
+        "dt_fs": _pick(args.dt_fs, cls, 'dt_fs', 1.0),
+        "gpu_ids": args.gpu_ids,
+        "mpi_ranks": args.mpi_ranks,
+        "engine": args.engine,
+    }
+
+
 def deform_prompt(args, cls: dict, cross_track_rules: str) -> str:
-    flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/mechanical"
-    is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True
+    p = _resolve_deform_params(args, cls)
     guide = load_worker_guide("deform")
     return f"""\
-deform_rate_mode:  {args.deform_rate_mode}
-equil_data_path:   {_v(args.data_path)}
-lammps_flags:      {json.dumps(flags)}
+deform_rate_mode:  {p['deform_rate_mode']}
+equil_data_path:   {_v(p['equil_data_path'])}
+lammps_flags:      {json.dumps(p['lammps_flags'])}
 polymer_class:     {args.polymer_class.upper()}
 run_name:          {args.run_name}
-work_dir:          {work_dir}
-is_glassy:         {str(is_glassy).lower()}
-K_deform_rate_inv_s: {_pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 1e8)}
-K_deform_rate_slow_inv_s: {cls.get('K_deform_rate_slow_inv_s', 'null')}
-K_strain_max:      {_pick(args.K_strain_max, cls, 'K_strain_max', 0.03)}
-dt_fs:             {_pick(args.dt_fs, cls, 'dt_fs', 1.0)}
-gpu_ids:           "{args.gpu_ids}"
-mpi_ranks:         {args.mpi_ranks}
-engine:            "{args.engine}"
+work_dir:          {p['work_dir']}
+is_glassy:         {str(p['is_glassy']).lower()}
+K_deform_rate_inv_s: {p['K_deform_rate_inv_s']}
+K_deform_rate_slow_inv_s: {p['K_deform_rate_slow_inv_s']}
+K_strain_max:      {p['K_strain_max']}
+dt_fs:             {p['dt_fs']}
+gpu_ids:           "{p['gpu_ids']}"
+mpi_ranks:         {p['mpi_ranks']}
+engine:            "{p['engine']}"
 
 --- Worker Guide (DEFORM) ---
 {guide}
@@ -602,7 +687,10 @@ def born_prompt(args, cls: dict, cross_track_rules: str) -> str:
     )
 
 
-def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def _resolve_analyze_tg_params(args, cls: dict) -> dict:
+    """Resolved values for the per-rate Tg analysis stage — consumed by analyze_tg_prompt's
+    text template and, identically, by run_deterministic_replicate.py's scripted extract_thermal
+    call."""
     selected_rate, rate_suffix = _resolve_tg_rate(args, cls)
     # Per-rate analysis dir so the three tg_summary.json files don't overwrite each other.
     # Single-rate (no --tg_rate_index) keeps the legacy raw/ output → reproducibility preserved.
@@ -620,19 +708,31 @@ def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
     else:
         default_equil_data = f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
     equil_data = args.equil_data_path or default_equil_data
-    enthalpy_col = getattr(args, "enthalpy_col", None) or "Enthalpy"
+    return {
+        "selected_rate_K_per_ns": selected_rate,
+        "tg_rate_index": args.tg_rate_index,
+        "tg_log_path": tg_log,
+        "tg_data_file": equil_data,
+        "enthalpy_col": getattr(args, "enthalpy_col", None) or "Enthalpy",
+        "output_dir": output_dir,
+        "graphs_dir": graphs_dir,
+    }
+
+
+def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    p = _resolve_analyze_tg_params(args, cls)
     guide = load_worker_guide("analyze-tg")
-    rate_line = (f"cooling_rate_K_per_ns: {selected_rate}  # tg_rate_index={args.tg_rate_index}; "
+    rate_line = (f"cooling_rate_K_per_ns: {p['selected_rate_K_per_ns']}  # tg_rate_index={p['tg_rate_index']}; "
                  f"record this (rate, Tg_K) pair — input to this run's multirate fit\n"
-                 if selected_rate is not None else "")
+                 if p['selected_rate_K_per_ns'] is not None else "")
     return f"""\
-tg_log_path:       {tg_log}
-tg_data_file:      {equil_data}    # required for ΔCp mass normalisation
-enthalpy_col:      {enthalpy_col}
+tg_log_path:       {p['tg_log_path']}
+tg_data_file:      {p['tg_data_file']}    # required for ΔCp mass normalisation
+enthalpy_col:      {p['enthalpy_col']}
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
-{rate_line}output_dir:        {output_dir}
-graphs_dir:        {graphs_dir}
+{rate_line}output_dir:        {p['output_dir']}
+graphs_dir:        {p['graphs_dir']}
 tasks:
   - extract_thermal
 
@@ -643,41 +743,53 @@ tasks:
 """
 
 
+def _resolve_analyze_tg_multirate_params(args, cls: dict) -> dict:
+    """Resolved values for the multirate Tg aggregation stage — consumed by
+    analyze_tg_multirate_prompt's text template and, identically, by
+    run_deterministic_replicate.py's scripted extract_tg_multirate.py call."""
+    output_dir = args.output_dir or f"{REPO_ROOT}/data/{args.run_name}/raw/"
+    script = str(REPO_ROOT / "mcp-servers/mcp-lammps-engine"
+                 / "analysis_scripts/extract_tg_multirate.py")
+    return {
+        "output_dir": output_dir,
+        "script": script,
+        "dsc_equiv_rate_K_per_ns": cls.get("dsc_equiv_rate_K_per_ns", 1.6667e-10),
+        "mr_rates": (args.mr_rates or "").replace(",", " ").strip(),
+        "mr_tg_values": (args.mr_tg_values or "").replace(",", " ").strip(),
+        "polymer_name": args.run_name,
+        # regime exempts the slope-sign gate for rubbery polymers (T_workflow >> Tg): a
+        # negative rate-dependence slope is scatter, not contamination, so no false-positive
+        # reroll.
+        "regime": _regime(args, cls),
+    }
+
+
 def analyze_tg_multirate_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Aggregate per-rate (rate, Tg_MD) pairs: log-linear + VF fit, extrapolated to the
     DSC-equivalent rate. The orchestrator supplies --mr_rates / --mr_tg_values from this
     run's per-rate analyze-tg results (fit_quality >= ACCEPTABLE); the worker runs the
     emitted command verbatim."""
-    output_dir = args.output_dir or f"{REPO_ROOT}/data/{args.run_name}/raw/"
-    script = str(REPO_ROOT / "mcp-servers/mcp-lammps-engine"
-                 / "analysis_scripts/extract_tg_multirate.py")
-    dsc_rate = cls.get("dsc_equiv_rate_K_per_ns", 1.6667e-10)
+    p = _resolve_analyze_tg_multirate_params(args, cls)
     guide = load_worker_guide("analyze-tg-multirate")
-    rates = (args.mr_rates or "").replace(",", " ").strip()
-    tg_vals = (args.mr_tg_values or "").replace(",", " ").strip()
-    polymer_name = args.run_name
-    # regime exempts the slope-sign gate for rubbery polymers (T_workflow >> Tg): a negative
-    # rate-dependence slope is scatter, not contamination, so no false-positive reroll.
-    regime = _regime(args, cls)
-    rates_ph = rates or "<FILL: space-separated rates from this run's sweeps, e.g. 40 80 100>"
-    tg_vals_ph = tg_vals or "<FILL: matching Tg_MD values, same order>"
+    rates_ph = p["mr_rates"] or "<FILL: space-separated rates from this run's sweeps, e.g. 40 80 100>"
+    tg_vals_ph = p["mr_tg_values"] or "<FILL: matching Tg_MD values, same order>"
     command = (
-        f"python3 {script} \\\n"
+        f"python3 {p['script']} \\\n"
         f"  --rates {rates_ph} \\\n"
         f"  --tg_values {tg_vals_ph} \\\n"
-        f"  --slow_rate_ref {dsc_rate} \\\n"
-        f"  --regime {regime} \\\n"
-        f"  --polymer_name {polymer_name} \\\n"
-        f"  --output_dir {output_dir}"
+        f"  --slow_rate_ref {p['dsc_equiv_rate_K_per_ns']} \\\n"
+        f"  --regime {p['regime']} \\\n"
+        f"  --polymer_name {p['polymer_name']} \\\n"
+        f"  --output_dir {p['output_dir']}"
     )
     return f"""\
 task:              extract_tg_multirate
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
-output_dir:        {output_dir}
-dsc_equiv_rate_K_per_ns: {dsc_rate}
-mr_rates:          {rates or "<FILL: this run's per-rate results>"}
-mr_tg_values:      {tg_vals or "<FILL: this run's per-rate results>"}
+output_dir:        {p['output_dir']}
+dsc_equiv_rate_K_per_ns: {p['dsc_equiv_rate_K_per_ns']}
+mr_rates:          {p['mr_rates'] or "<FILL: this run's per-rate results>"}
+mr_tg_values:      {p['mr_tg_values'] or "<FILL: this run's per-rate results>"}
 command: |
   {command}
 
@@ -688,11 +800,13 @@ command: |
 """
 
 
-def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
-    """Prompt for equilibration-checker (equil-check gate — equil check + density)."""
+def _resolve_equil_check_params(args, cls: dict) -> dict:
+    """Resolved values for the equil-check gate stage — consumed by equil_check_prompt's text
+    template and, identically, by run_deterministic_replicate.py's scripted
+    check_equilibration_comprehensive / extract_equilibrated_density / enforce_equilibration_gate
+    calls."""
     output_dir = args.output_dir or f"{REPO_ROOT}/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
-    exp_density = _exp_density_range(cls)
     # Aromatic main-chain classes (ct_gate_reliable=false) cannot have their backbone path defined
     # by atom-type selection, so C(t)/C∞ are unreliable — do NOT arm the hard gate (null = advisory).
     ct_decay = cls.get("ct_min_decay_melt", 0.10) if cls.get("ct_gate_reliable", True) else None
@@ -713,50 +827,68 @@ def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
         prod, npt_prod_temp = "npt_production", T_workflow
     else:
         prod, npt_prod_temp = "npt_prod300", 300.0
-    npt_log = args.npt_prod_log or f"{lammps_base}/equil/{prod}/{prod}.log"
-    npt_data = args.data_path or f"{lammps_base}/equil/{prod}/{prod}_out.data"
-    melt_dump = args.npt_prod_dump or f"{lammps_base}/equil/nvt_production/nvt_production.dump"
     # For the mechanized gate's density_value_binding check (glassy only): glass_data is npt_data
-    # above; melt_data is the pre-cool NPT stage (npt_production_out.data), present in both the
+    # below; melt_data is the pre-cool NPT stage (npt_production_out.data), present in both the
     # 7-run rubbery chain (= npt_data itself there) and the 9-run glassy chain (a distinct earlier
     # stage than npt_prod300).
-    melt_data_path = f"{lammps_base}/equil/npt_production/npt_production_out.data"
-    exp_tg_point = _exp_tg_point(cls, args.run_name)
-    exp_density_point = _exp_density_point(cls, args.run_name)
+    return {
+        "output_dir": output_dir,
+        "graphs_dir": graphs_dir,
+        "exp_density_range": _exp_density_range(cls),
+        "ct_min_decay_melt": ct_decay,
+        "npt_prod_log_path": args.npt_prod_log or f"{lammps_base}/equil/{prod}/{prod}.log",
+        "npt_prod_data_path": args.data_path or f"{lammps_base}/equil/{prod}/{prod}_out.data",
+        "melt_dump_path": args.npt_prod_dump or f"{lammps_base}/equil/nvt_production/nvt_production.dump",
+        "melt_data_path": f"{lammps_base}/equil/npt_production/npt_production_out.data",
+        "npt_prod_temp_K": npt_prod_temp,
+        "T_workflow_K": T_workflow,
+        "exp_tg_point_K": _exp_tg_point(cls, args.run_name),
+        "exp_density_point_gcm3": _exp_density_point(cls, args.run_name),
+        # is_glassy and dp enable the require_glassy carve-out in the checker: when is_glassy=True
+        # AND dp>=30, chain C(t)/end-to-end diffusion gates are advisory only (gate on density
+        # SEM/CV/P2 exclusively). Derived from T_workflow so no explicit CLI flag needed.
+        "is_glassy": T_workflow > 300,
+        # regime oracle drives the require_rubbery carve-out (decision_policy.json): a rubbery
+        # polymer (produced above Tg) has is_glassy=False, so require_glassy does NOT apply — but
+        # its terminal chain-reptation metrics are unreachable at finite DP, so C(t)/MSD/Rg/τ_relax
+        # must be advisory and the gate keys on density block-SEM + homogeneity + energy only.
+        "regime": _regime(args, cls),
+        "dp": getattr(args, 'dp', None) or cls.get('dp_typical'),
+        "ct_gate_reliable": cls.get('ct_gate_reliable', True),
+        # NB: cls.get(key, 'null') — the string 'null' is the default only when the key is
+        # ABSENT; preserved verbatim (not is-not-None-coalesced) to match the pre-refactor prompt
+        # text byte-for-byte.
+        "alpha_glass_per_K": cls.get('alpha_glass_per_K', 'null'),
+        "alpha_melt_per_K": cls.get('alpha_melt_per_K', 'null'),
+        "backbone_types": args.backbone_types,
+    }
 
-    # is_glassy and dp enable the require_glassy carve-out in the checker:
-    # when is_glassy=True AND dp>=30, chain C(t)/end-to-end diffusion gates are advisory only
-    # (gate on density SEM/CV/P2 exclusively). Derived from T_workflow so no explicit CLI flag needed.
-    is_glassy_equil = T_workflow > 300
-    # regime oracle drives the require_rubbery carve-out (decision_policy.json): a rubbery polymer
-    # (produced above Tg) has is_glassy=False, so require_glassy does NOT apply — but its terminal
-    # chain-reptation metrics are unreachable at finite DP, so C(t)/MSD/Rg/τ_relax must be advisory
-    # and the gate keys on density block-SEM + homogeneity + energy only. Without this line the
-    # checker hard-gates reptation metrics on rubbery melts → unfixable EXTEND (PE/PBD/PEG).
-    regime = _regime(args, cls)
-    dp_val = getattr(args, 'dp', None) or cls.get('dp_typical')
+
+def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    """Prompt for equilibration-checker (equil-check gate — equil check + density)."""
+    p = _resolve_equil_check_params(args, cls)
     guide = load_worker_guide("equil-check")
     return f"""\
-npt_prod_log_path: {npt_log}
-melt_dump_path:    {melt_dump}
-npt_prod_temp_K:   {npt_prod_temp}   # target_temp= for extract_equilibrated_density
-equil_data_path:   {npt_data}
+npt_prod_log_path: {p['npt_prod_log_path']}
+melt_dump_path:    {p['melt_dump_path']}
+npt_prod_temp_K:   {p['npt_prod_temp_K']}   # target_temp= for extract_equilibrated_density
+equil_data_path:   {p['npt_prod_data_path']}
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
-backbone_types:    {args.backbone_types or '<FILL from inspect_data_file>'}
-ct_min_decay_melt: {ct_decay if ct_decay is not None else 'null'}   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
-is_glassy:         {str(is_glassy_equil).lower()}   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
-regime:            {regime}   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<2% AND density-homogeneity CV<25% AND energy drift/SEM; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
-dp:                {dp_val if dp_val is not None else 'null'}   # DP≥30 required for require_glassy carve-out to apply. NOTE: a class with ct_gate_reliable=false (aromatic main chain) already has ct_min_decay=null above, so its melt-diffusion C(t) gate is suppressed INDEPENDENT of DP — a DP<30 aromatic cell still passes equil on the structural gates (density/SEM/CV/P2/Rg). The DP≥30 clause only bites classes that would otherwise arm ct_min_decay.
-exp_density_range: {exp_density}
-output_dir:        {output_dir}
-graphs_dir:        {graphs_dir}
+backbone_types:    {p['backbone_types'] or '<FILL from inspect_data_file>'}
+ct_min_decay_melt: {p['ct_min_decay_melt'] if p['ct_min_decay_melt'] is not None else 'null'}   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
+is_glassy:         {str(p['is_glassy']).lower()}   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
+regime:            {p['regime']}   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<2% AND density-homogeneity CV<25% AND energy drift/SEM; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
+dp:                {p['dp'] if p['dp'] is not None else 'null'}   # DP≥30 required for require_glassy carve-out to apply. NOTE: a class with ct_gate_reliable=false (aromatic main chain) already has ct_min_decay=null above, so its melt-diffusion C(t) gate is suppressed INDEPENDENT of DP — a DP<30 aromatic cell still passes equil on the structural gates (density/SEM/CV/P2/Rg). The DP≥30 clause only bites classes that would otherwise arm ct_min_decay.
+exp_density_range: {p['exp_density_range']}
+output_dir:        {p['output_dir']}
+graphs_dir:        {p['graphs_dir']}
 tasks:
   - check_equilibration_comprehensive
   - extract_equilibrated_density
 
 ### D-05 REQUIREMENT (PEEK2 I-04): paste result["d05_markdown"] (also written to
-### {output_dir}d05_block.md) VERBATIM into the run_log.md D-05 CONVERGENCE DETAIL section.
+### {p['output_dir']}d05_block.md) VERBATIM into the run_log.md D-05 CONVERGENCE DETAIL section.
 ### It contains the real Rg/MSD/density/C(t)/R_ee values. Leaving any [X ± Y] / [X]% /
 ### [PASS / FAIL] placeholder in run_log.md is a FAILURE of this equil-check step — the tool
 ### already fills every field, so there is no reason to leave a placeholder.
@@ -764,18 +896,18 @@ tasks:
 ### MECHANIZED GATE (Step 3, replaces your own PASS/EXTEND/FAIL judgment — see EQUIL_CHECK guide):
 ### after Steps 1-2 write their JSON to output_dir, call the MCP tool
 ### mcp__mcp-lammps-engine__enforce_equilibration_gate with:
-###   comprehensive_json = {output_dir}equilibration_comprehensive.json
-###   regime              = {regime}
-###   dp                  = {dp_val if dp_val is not None else 'null'}
-###   ct_gate_reliable    = {str(cls.get('ct_gate_reliable', True)).lower()}
-###   exp_density_gcm3    = {exp_density_point if exp_density_point is not None else 'null'}
-###   tg_K                = {exp_tg_point if exp_tg_point is not None else 'null'}
-###   t_equil_K           = {T_workflow}
-###   glass_data          = {npt_data}
-###   melt_data           = {melt_data_path}
-###   out_dir             = {output_dir}
-###   alpha_glass_per_K   = {cls.get('alpha_glass_per_K', 'null')}
-###   alpha_melt_per_K    = {cls.get('alpha_melt_per_K', 'null')}
+###   comprehensive_json = {p['output_dir']}equilibration_comprehensive.json
+###   regime              = {p['regime']}
+###   dp                  = {p['dp'] if p['dp'] is not None else 'null'}
+###   ct_gate_reliable    = {str(p['ct_gate_reliable']).lower()}
+###   exp_density_gcm3    = {p['exp_density_point_gcm3'] if p['exp_density_point_gcm3'] is not None else 'null'}
+###   tg_K                = {p['exp_tg_point_K'] if p['exp_tg_point_K'] is not None else 'null'}
+###   t_equil_K           = {p['T_workflow_K']}
+###   glass_data          = {p['npt_prod_data_path']}
+###   melt_data           = {p['melt_data_path']}
+###   out_dir             = {p['output_dir']}
+###   alpha_glass_per_K   = {p['alpha_glass_per_K']}
+###   alpha_melt_per_K    = {p['alpha_melt_per_K']}
 ### alpha_glass_per_K/alpha_melt_per_K are curated per-class values (polymer_rules.json) or,
 ### for off-table/low-medium-confidence classes, planner-sourced from literature_grounding.json's
 ### CTE evidence — collected once at plan time, never searched live inside this gate. null means
@@ -794,15 +926,29 @@ tasks:
 """
 
 
+def _resolve_murnaghan_params(args, cls: dict) -> dict:
+    """Resolved values for the Murnaghan BM stage — consumed by murnaghan_prompt's text
+    template and, identically, by run_deterministic_replicate.py's scripted
+    run_bulk_modulus_series call."""
+    lammps_base = f"{REPO_ROOT}/data/{args.run_name}/lammps"
+    return {
+        "lammps_flags": _lammps_flags(args.lammps_flags, cls),
+        "work_dir": args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/mechanical",
+        "is_glassy": args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else False,
+        "bm_pressures_atm": cls.get("bm_pressures_atm", None),
+        "dt_fs": _pick(args.dt_fs, cls, "dt_fs", 1.0),
+        "equil_data_path": args.data_path or f"{lammps_base}/equil/npt_production/npt_production_out.data",
+        "temp_K": 300.0,
+        "npt_steps": 500000,
+        "gpu_ids": args.gpu_ids,
+        "mpi_ranks": args.mpi_ranks,
+        "engine": args.engine,
+    }
+
+
 def murnaghan_prompt(args, cls: dict, cross_track_rules: str) -> str:
     """Prompt for murnaghan-worker (rubbery BM pressure series submission)."""
-    flags = _lammps_flags(args.lammps_flags, cls)
-    work_dir = args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/mechanical"
-    is_glassy = args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else False
-    bm_pressures_atm = cls.get("bm_pressures_atm", None)
-    dt = _pick(args.dt_fs, cls, "dt_fs", 1.0)
-    lammps_base = f"{REPO_ROOT}/data/{args.run_name}/lammps"
-    equil_data = args.data_path or f"{lammps_base}/equil/npt_production/npt_production_out.data"
+    p = _resolve_murnaghan_params(args, cls)
     guide = load_worker_guide("murnaghan")
     # Glassy polymers ALWAYS submit. The guide's Rule B rubbery null-return guard has been
     # mis-applied to glassy cells when Tg metadata was degraded (POOR fits / single-rate
@@ -812,21 +958,21 @@ def murnaghan_prompt(args, cls: dict, cross_track_rules: str) -> str:
         "### ASSERTION (overrides guide Rule B): is_glassy=true → SUBMIT the Murnaghan series "
         "NOW, regardless of bm_pressures_atm being null. The rubbery null-return guard does NOT "
         "apply to glassy cells. Do not return an all-null RESULT.\n\n"
-    ) if is_glassy else ""
+    ) if p["is_glassy"] else ""
     return f"""\
-{glassy_assertion}equil_data_path:   {equil_data}
-lammps_flags:      {flags}
+{glassy_assertion}equil_data_path:   {p['equil_data_path']}
+lammps_flags:      {p['lammps_flags']}
 polymer_class:     {args.polymer_class.upper()}
 run_name:          {args.run_name}
-work_dir:          {work_dir}/bm_series
-is_glassy:         {str(is_glassy).lower()}
-bm_pressures_atm:  {bm_pressures_atm}
-temp_K:            300.0
-npt_steps:         500000
-dt_fs:             {dt}
-gpu_ids:           "{args.gpu_ids}"
-mpi_ranks:         {args.mpi_ranks}
-engine:            "{args.engine}"
+work_dir:          {p['work_dir']}/bm_series
+is_glassy:         {str(p['is_glassy']).lower()}
+bm_pressures_atm:  {p['bm_pressures_atm']}
+temp_K:            {p['temp_K']}
+npt_steps:         {p['npt_steps']}
+dt_fs:             {p['dt_fs']}
+gpu_ids:           "{p['gpu_ids']}"
+mpi_ranks:         {p['mpi_ranks']}
+engine:            "{p['engine']}"
 
 --- Worker Guide (MURNAGHAN) ---
 {guide}
@@ -835,45 +981,60 @@ engine:            "{args.engine}"
 """
 
 
-def analyze_bm_prompt(args, cls: dict, cross_track_rules: str) -> str:
-    """Prompt for bulk-modulus-extractor (BM extraction, all four routing paths)."""
+def _resolve_analyze_bm_params(args, cls: dict) -> dict:
+    """Resolved values for the BM extraction stage — consumed by analyze_bm_prompt's text
+    template and, identically, by run_deterministic_replicate.py's scripted
+    extract_bulk_modulus{,_murnaghan,_deform} call."""
     output_dir = args.output_dir or f"{REPO_ROOT}/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
     lammps_base = f"{REPO_ROOT}/data/{args.run_name}/lammps"
-    npt_log = args.npt_prod_log or f"{lammps_base}/equil/npt_prod300/npt_prod300.log"
     _k_from_cls = _exp_K_range(cls)
     exp_K = [
         args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0],
         args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1],
     ]
-    bm_pressures_atm = cls.get("bm_pressures_atm", None)
-    # Deform extraction params
-    strain_rate_per_fs = cls.get("K_deform_rate_inv_s", 1e8) * 1e-15
-    K_strain_max = cls.get("K_strain_max", 0.03)
     K_deform_rate_slow_inv_s = cls.get("K_deform_rate_slow_inv_s", None)
-    strain_rate_slow_per_fs = (
-        K_deform_rate_slow_inv_s * 1e-15 if K_deform_rate_slow_inv_s is not None else None
-    )
+    return {
+        "output_dir": output_dir,
+        "graphs_dir": graphs_dir,
+        "npt_prod_log_path": args.npt_prod_log or f"{lammps_base}/equil/npt_prod300/npt_prod300.log",
+        "exp_K_range": exp_K,
+        "bm_pressures_atm": cls.get("bm_pressures_atm", None),
+        "strain_rate_per_fs": cls.get("K_deform_rate_inv_s", 1e8) * 1e-15,
+        "strain_rate_slow_per_fs": (K_deform_rate_slow_inv_s * 1e-15
+                                     if K_deform_rate_slow_inv_s is not None else None),
+        "K_strain_max": cls.get("K_strain_max", 0.03),
+        "deform_log_path": getattr(args, 'deform_log', None),
+        "deform_log_path_slow": getattr(args, 'deform_log_slow', None),
+        "murnaghan_log_files": getattr(args, 'murnaghan_logs', None),
+    }
 
-    deform_log_line   = f"deform_log_path:     {args.deform_log}" if getattr(args, 'deform_log', None) else "deform_log_path:     null"
-    deform_log_slow_line = f"deform_log_path_slow: {args.deform_log_slow}" if getattr(args, 'deform_log_slow', None) else "deform_log_path_slow: null"
-    murnaghan_line    = f"murnaghan_log_files: {args.murnaghan_logs}" if getattr(args, 'murnaghan_logs', None) else "murnaghan_log_files: null"
+
+def analyze_bm_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    """Prompt for bulk-modulus-extractor (BM extraction, all four routing paths)."""
+    p = _resolve_analyze_bm_params(args, cls)
+    deform_log_line = (f"deform_log_path:     {p['deform_log_path']}"
+                        if p['deform_log_path'] else "deform_log_path:     null")
+    deform_log_slow_line = (f"deform_log_path_slow: {p['deform_log_path_slow']}"
+                             if p['deform_log_path_slow'] else "deform_log_path_slow: null")
+    murnaghan_line = (f"murnaghan_log_files: {p['murnaghan_log_files']}"
+                       if p['murnaghan_log_files'] else "murnaghan_log_files: null")
 
     guide = load_worker_guide("analyze-bm")
     return f"""\
 {deform_log_line}
 {deform_log_slow_line}
 {murnaghan_line}
-npt_prod_log_path: {npt_log}
-bm_pressures_atm:  {bm_pressures_atm}
-exp_K_range:       {exp_K}
-strain_rate_per_fs: {strain_rate_per_fs:.2e}
-strain_rate_slow_per_fs: {f"{strain_rate_slow_per_fs:.2e}" if strain_rate_slow_per_fs is not None else "null"}
-K_strain_max:      {K_strain_max}
+npt_prod_log_path: {p['npt_prod_log_path']}
+bm_pressures_atm:  {p['bm_pressures_atm']}
+exp_K_range:       {p['exp_K_range']}
+strain_rate_per_fs: {p['strain_rate_per_fs']:.2e}
+strain_rate_slow_per_fs: {f"{p['strain_rate_slow_per_fs']:.2e}" if p['strain_rate_slow_per_fs'] is not None else "null"}
+K_strain_max:      {p['K_strain_max']}
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
-output_dir:        {output_dir}
-graphs_dir:        {graphs_dir}
+output_dir:        {p['output_dir']}
+graphs_dir:        {p['graphs_dir']}
 
 --- Worker Guide (BM_ANALYSIS) ---
 {guide}
@@ -882,15 +1043,16 @@ graphs_dir:        {graphs_dir}
 """
 
 
-def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
-    """Prompt for run-summary-worker (always-terminal, calls generate_run_summary).
+def _resolve_run_summary_params(args, cls: dict) -> dict:
+    """Resolved values for the run-summary stage — consumed by run_summary_prompt's text
+    template and, identically, by run_deterministic_replicate.py's scripted
+    generate_run_summary call.
 
-    Threads run metadata and per-decision strings through to generate_run_summary so
-    run_summary.json is fully populated. Every field is derived from CLI flags + the
-    (plan-overlaid) class defaults + the deterministic output_dir convention — NOT from the
-    plan's decisions[] list or the --plan path — so a deterministic plan still produces
-    byte-identical output to the no-plan path (enforced by tests/test_plan_reproducibility.py).
-    The plan provenance is carried by reading raw/run_plan.json (the convention path below).
+    Every field is derived from CLI flags + the (plan-overlaid) class defaults + the
+    deterministic output_dir convention — NOT from the plan's decisions[] list or the --plan
+    path — so a deterministic plan still produces byte-identical output to the no-plan path
+    (enforced by tests/test_plan_reproducibility.py). The plan provenance is carried by reading
+    raw/run_plan.json (the convention path below).
     """
     output_dir = args.output_dir or f"{REPO_ROOT}/data/{args.run_name}/raw/"
     graphs_dir = output_dir.replace("/raw/", "/graphs/").replace("/raw", "/graphs")
@@ -948,38 +1110,61 @@ def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
     d04 = args.d04 or (f"DP={dp}, {nchain} chains" if dp and nchain else None)
 
     _slope_gate = getattr(args, 'slope_gate_pass', None)
-    _tg_path_label = (
+    tg_path_label = (
         "single-rate fallback (slope_gate=False; class fallback rate — plan "
         "tg_slope_gate_fallback, default highest)"
         if _slope_gate is False
         else "slowest-rate folder (slope_gate=True or N/A)"
     )
+    return {
+        "output_dir": output_dir,
+        "graphs_dir": graphs_dir,
+        "run_plan": run_plan,
+        "exp_tg_range": exp_tg,
+        "exp_density_range": exp_density,
+        "exp_K_range": exp_K,
+        "dp": dp,
+        "nchain": nchain,
+        "charge_method": charge_method,
+        "ff": ff,
+        "d01_ff": d01,
+        "d02_charges": d02,
+        "d03_electrostatics": d03,
+        "d04_system_size": d04,
+        "slope_gate_pass": _slope_gate,
+        "tg_path_label": tg_path_label,
+    }
+
+
+def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
+    """Prompt for run-summary-worker (always-terminal, calls generate_run_summary)."""
+    p = _resolve_run_summary_params(args, cls)
     return f"""\
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 smiles:            {_v(args.smiles)}
-ff:                {ff}
-charge_method:     {_v(charge_method, 'null')}
-dp:                {_v(dp, 'null')}
-n_chains:          {_v(nchain, 'null')}
+ff:                {p['ff']}
+charge_method:     {_v(p['charge_method'], 'null')}
+dp:                {_v(p['dp'], 'null')}
+n_chains:          {_v(p['nchain'], 'null')}
 n_atoms:           {_v(getattr(args, 'n_atoms', None), 'null')}
 date_start:        {_v(args.date_start, 'null')}
 date_end:          {_v(args.date_end, 'null')}
-d01_ff:            {_v(d01, 'null')}
-d02_charges:       {_v(d02, 'null')}
-d03_electrostatics: {_v(d03, 'null')}
-d04_system_size:   {_v(d04, 'null')}
+d01_ff:            {_v(p['d01_ff'], 'null')}
+d02_charges:       {_v(p['d02_charges'], 'null')}
+d03_electrostatics: {_v(p['d03_electrostatics'], 'null')}
+d04_system_size:   {_v(p['d04_system_size'], 'null')}
 d05_verdict:       {args.d05 or '<FILL from equil-checker RESULT>'}
 d06_tg_fit_quality: {_v(args.tg_fit_quality, 'N/A (not requested)')}
-run_plan:          {run_plan}   # always pass to generate_run_summary --run_plan (skip if file absent)
-exp_tg_range:      {exp_tg}
-exp_density_range: {exp_density}
-exp_K_range:       {exp_K}
+run_plan:          {p['run_plan']}   # always pass to generate_run_summary --run_plan (skip if file absent)
+exp_tg_range:      {p['exp_tg_range']}
+exp_density_range: {p['exp_density_range']}
+exp_K_range:       {p['exp_K_range']}
 n_replicates:      {_v(getattr(args, 'n_replicates', None), 'N/A')}   # replicate count for this run (single-run multirate protocol: 1); pass to generate_run_summary --n_replicates
-tg_path:           {_v(getattr(args, 'tg_path', None), 'null')}   # explicit canonical tg_summary.json path ({_tg_path_label}); pass to generate_run_summary --tg_path
-slope_gate_pass:   {_v(_slope_gate, 'null')}   # False → single-rate fallback Tg; pass --tg_k with the fallback value
-output_dir:        {output_dir}
-graphs_dir:        {graphs_dir}
+tg_path:           {_v(getattr(args, 'tg_path', None), 'null')}   # explicit canonical tg_summary.json path ({p['tg_path_label']}); pass to generate_run_summary --tg_path
+slope_gate_pass:   {_v(p['slope_gate_pass'], 'null')}   # False → single-rate fallback Tg; pass --tg_k with the fallback value
+output_dir:        {p['output_dir']}
+graphs_dir:        {p['graphs_dir']}
 
 Forward every field above to generate_run_summary as its matching --flag (dp→--dp,
 n_chains→--n_chains, n_atoms→--n_atoms, charge_method→--charge_method, date_start→--date_start,
@@ -988,8 +1173,36 @@ run_plan→--run_plan). Skip any field whose value is `null`.
 
 # generate_run_summary returns {{"status":"submitted","run_id":...}} but it completes IN-PROCESS in
 # seconds — do NOT poll with get_run_status (you have no such tool). After the call, Read
-# {output_dir}run_summary.json directly and parse it.
+# {p['output_dir']}run_summary.json directly and parse it.
 """
+
+
+_STAGE_RESOLVERS = {
+    "build":                _resolve_build_params,
+    "equil":                _resolve_equil_params,
+    "tg":                   _resolve_tg_params,
+    "deform":                _resolve_deform_params,
+    "analyze-tg":           _resolve_analyze_tg_params,
+    "analyze-tg-multirate": _resolve_analyze_tg_multirate_params,
+    "equil-check":          _resolve_equil_check_params,
+    "murnaghan":            _resolve_murnaghan_params,
+    "analyze-bm":           _resolve_analyze_bm_params,
+    "run-summary":          _resolve_run_summary_params,
+    # "born" has no resolver — the stage is removed; born_prompt raises directly.
+}
+
+
+def resolve_stage_params(stage: str, args, cls: dict) -> dict:
+    """Resolve a stage's routing/physics decisions into a plain dict of concrete values —
+    the single source of truth consumed by both this file's text-prompt builders (unchanged
+    behavior; tests/test_plan_reproducibility.py enforces byte-identity with the pre-refactor
+    output) and orchestration/run_deterministic_replicate.py's scripted MCP-call path, so a
+    routing bug fix here can never silently diverge between the two."""
+    resolver = _STAGE_RESOLVERS.get(stage)
+    if resolver is None:
+        raise ValueError(f"resolve_stage_params: no resolver for stage {stage!r} "
+                          f"(valid: {sorted(_STAGE_RESOLVERS)})")
+    return resolver(args, cls)
 
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────

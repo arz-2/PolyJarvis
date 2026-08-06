@@ -52,8 +52,8 @@ Agent(subagent_type="run-summary-worker", description="🟢 Run summary {polymer
 
 ## [Campaign hooks — after run-summary, before memory capture]
 
-Two plain-Bash steps (no agent), only relevant when this run is part of the two-speed campaign
-workflow (`.claude/plans/generic-beaming-mitten.md`); harmless no-ops otherwise.
+Only relevant when this run is part of the two-speed campaign workflow
+(`.claude/plans/generic-beaming-mitten.md`); harmless no-ops otherwise.
 
 1. **Lock the protocol, if this run just validated it.**
    `jq -r '.plan_mode' data/<RUN>/raw/run_plan.json` — only proceed if `"reasoned"` (a
@@ -62,13 +62,19 @@ workflow (`.claude/plans/generic-beaming-mitten.md`); harmless no-ops otherwise.
    data/<RUN>/raw/run_summary.json` (check only the `results.<prop>` blocks for
    `properties_requested`, not properties this run didn't request/report). If `true`:
    ```
-   python3 orchestration/make_deterministic_plan.py --polymer_class <CLASS> \
-     --lock-from data/<RUN>/raw/run_plan.json
+   Agent(subagent_type="protocol-locker", description="🔴 Lock protocol {polymer_class}",
+         prompt="run_plan_path: data/<RUN>/raw/run_plan.json\npolymer_class: <CLASS>\n"
+                "run_log_path: data/<RUN>/run_log.md")
+     → RESULT → status: locked | refused, changes, note_written
    ```
-   Write the printed `changes`/`note` to `run_log.md` (a new `## PROTOCOL LOCKED` block — what
-   changed vs. the prior class defaults and why, same evidence a RECOVERY block would cite). If
-   not all requested properties PASSed, do **not** lock — this run's protocol isn't perfected
-   yet; continue diagnosing per `/recover`'s `plan_mode=="reasoned"` ladder instead.
+   It re-derives the same gate itself (never trust the caller), runs
+   `make_deterministic_plan.py --lock-from` as its mechanical backbone (identical patch to what
+   was previously called directly here), then replaces the script's auto-generated one-liner
+   with a curated write-up of what changed and why, read from this run's `decisions[]` +
+   `RECOVERY` blocks. Write its `changes`/note to `run_log.md` (a new `## PROTOCOL LOCKED`
+   block). If not all requested properties PASSed, do **not** spawn it — this run's protocol
+   isn't perfected yet; continue diagnosing per `/recover`'s `plan_mode=="reasoned"` ladder
+   instead.
 
 2. **Aggregate, if this was the last replicate of a class's campaign set.** When the
    orchestrator's task input names a full replicate set (e.g. 4 run names for a class) and this

@@ -1,5 +1,9 @@
 # Thermal Track — Orchestrator Guide (Phase B)
 
+This guide governs the `reasoned` path. For `plan_mode=="deterministic"` Phase B execution, see
+`orchestration/DETERMINISTIC_REPLICATE.md` (its scripted executor runs this same multirate-loop /
+slope-gate / is_glassy logic directly, no agent spawns).
+
 Loaded on-demand by the orchestrator at Phase B entry when "tg" in properties_requested.
 On session restart mid-thermal-track: re-read this file before resuming.
 
