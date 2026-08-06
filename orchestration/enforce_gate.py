@@ -18,11 +18,20 @@ from pathlib import Path
 
 BINDING_GLASSY = {"density_drift", "density_sem", "energy_drift", "energy_sem",
                    "density_in_band", "density_homogeneity", "p2"}
-ADVISORY_GLASSY = {"ct", "rg", "msid_gaussian_pass", "kinetic_trap_flag"}
+ADVISORY_GLASSY = {"ct", "rg", "msid_gaussian", "msd_not_trapped"}
 
 BINDING_RUBBERY = {"density_sem", "density_homogeneity", "energy_drift", "energy_sem"}
-ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian_pass", "kinetic_trap_flag", "density_drift"}
+ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_drift"}
 # density_drift isn't in require_rubbery's binding text (density_sem is); treated advisory here.
+
+# MSD diffusivity metrics are advisory everywhere, unconditionally -- decision_policy.json's
+# rationale_glassy/rationale_rubbery (2026-06-20, user-authorized, PVC1 route-back) documents
+# that melt self-diffusion is physically unattainable within MD timescales for glassy DP>=30 /
+# aromatic-backbone classes and for rubbery polymers generally, so binding on it would make
+# overall_pass unsatisfiable by construction. classify()'s plain-require branch defaults every
+# gates key to binding; this carve-out is applied there too, explicitly -- not decided as a
+# side effect of dict membership.
+ALWAYS_ADVISORY = {"msd_not_trapped", "msid_gaussian"}
 
 D05_PLACEHOLDER_RE = re.compile(r"\[PASS\s*/\s*EXTEND[×x]N\s*/\s*ESCALATE\]", re.IGNORECASE)
 
@@ -68,9 +77,23 @@ def classify(gates: dict, regime: str, dp_typical, ct_gate_reliable):
         clause = "require (plain, no carve-out)"
         binding_set, advisory_set = set(gates.keys()), set()
 
+    binding_set = binding_set - ALWAYS_ADVISORY
+    advisory_set = advisory_set | ALWAYS_ADVISORY
+
     binding_results = {k: v for k, v in gates.items() if k in binding_set and v is not None}
     advisory_results = {k: v for k, v in gates.items() if k in advisory_set and v is not None}
     return clause, binding_results, advisory_results
+
+
+def msd_msid_gates(chain: dict) -> dict:
+    """Pass-polarity gate entries for the MSD kinetic-trap flag and the MSID Gaussian-chain
+    check, computed by check_equilibration_comprehensive.py at chain.msd / chain.msid but
+    never previously read by enforce_gate.py -- always advisory (see ALWAYS_ADVISORY)."""
+    msd = chain.get("msd", {})
+    msid = chain.get("msid", {})
+    msd_not_trapped = (not msd["kinetic_trap_flag"]) if "kinetic_trap_flag" in msd else None
+    msid_gaussian = msid.get("gaussian_pass") if msid.get("available") else None
+    return {"msd_not_trapped": msd_not_trapped, "msid_gaussian": msid_gaussian}
 
 
 # Gates that a 300K EXTEND can actually fix (not-yet-converged, not structurally wrong).
@@ -119,6 +142,7 @@ def enforce(run_name, repo_root: Path):
         "ct": chain.get("ct", {}).get("pass"),
         "p2": spatial.get("p2", {}).get("pass"),
         "density_homogeneity": spatial.get("density_homogeneity", {}).get("pass"),
+        **msd_msid_gates(chain),
     }
 
     # --- density-in-band (density_value_binding target) ---
@@ -216,6 +240,7 @@ def enforce_live(args) -> dict:
         "ct": chain.get("ct", {}).get("pass"),
         "p2": spatial.get("p2", {}).get("pass"),
         "density_homogeneity": spatial.get("density_homogeneity", {}).get("pass"),
+        **msd_msid_gates(chain),
     }
 
     regime = args.regime
