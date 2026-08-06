@@ -19,9 +19,14 @@ entry, or the entry (defensively) carries no usable derived fields, this is a no
 decided_params untouched.
 
 Called once per run from CLAUDE.md's PLAN section, right after plan generation, whenever the
-Novelty Gate found IS_NOVEL=false -- applies uniformly to both the confidence=high (deterministic)
-and reasoned branches, since a class's confidence and a specific SMILES's characterization are
-orthogonal signals (decision_policy.json:uncertainty_reduction_probes.system_probe).
+Novelty Gate found IS_NOVEL=false -- applies REGARDLESS of the plan's plan_mode/confidence
+(validated vs. novel), since "characterized" (this script's trigger -- Phase-A timing knobs
+measured, guides/system_characterization_cache.json[canonical_smiles].derived_*) and "validated"
+(the plan_mode gate -- protocol_validated, stamped only after Phase-C all-PASS) are two
+independent flags on the same cache entry, not one signal split across two branches. A SMILES
+can be characterized-but-not-yet-validated (still lands in a reasoned plan here) or validated for
+a different property set than requested (still reasoned for the new property, but still reuses
+its old timing knobs) -- see decision_policy.json:confidence_gate.
 
 Usage:
   python3 orchestration/apply_cached_characterization.py \

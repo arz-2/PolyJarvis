@@ -24,8 +24,8 @@ Default mode is multi-agent: the orchestrator (this session) spawns stateless sp
 
 | Worker (color) | Track | Role |
 |------|------|------|
-| ⚪ `literature-grounding-worker` | setup | off-table / low-medium confidence only — SMILES+class → DOI-verified `literature_grounding.json` feeding the planner |
-| 🟡 `planner` | setup | goal + class → `run_plan.json` (deterministic if confidence=high; reasoned otherwise) |
+| ⚪ `literature-grounding-worker` | setup | whenever this exact SMILES is not yet protocol_validated (novel) — SMILES+class → DOI-verified `literature_grounding.json` feeding the planner |
+| 🟡 `planner` | setup | goal + class → `run_plan.json` (deterministic if this exact SMILES is protocol_validated for the requested properties; reasoned otherwise) |
 | 🔴 `critic` | setup | proposed `run_plan.json` → approved \| revise \| escalate |
 | 🔵 `molecule-builder` | foundation | SMILES → `.data` file (EMC or RadonPy) |
 | 🟠 `equilibration-worker` | foundation | `.data` → submitted equilibration chain |
@@ -49,9 +49,13 @@ SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a fie
   properties_requested = task TARGET_PROPERTIES lowercased set; "all"/absent → {density,tg,bulk_modulus}.
     Write "Requested: {properties_requested}" to run_log.md.
 
-  NOVELTY GATE (decides whether this SMILES has a cached characterization to reuse — see REUSE
-    CACHED CHARACTERIZATION below and `orchestration/FOUNDATION.md`'s `[Equilibration]` mandatory
-    refine step, which is what populates the cache for `IS_NOVEL=true` runs):
+  NOVELTY GATE (decides whether this SMILES has a *characterized* cache entry to reuse for
+    timing knobs — see REUSE CACHED CHARACTERIZATION below and `orchestration/FOUNDATION.md`'s
+    `[Equilibration]` mandatory refine step, which is what populates the cache for
+    `IS_NOVEL=true` runs). This is independent of whether the SMILES is *validated* (below) —
+    a SMILES can be characterized (Phase-A timing knobs measured) without yet being validated
+    (Phase-C all-PASS), and vice versa is impossible but the two checks stay separate because
+    they gate different things (timing-knob reuse vs. plan_mode):
     CANONICAL_SMILES=`python3 orchestration/canon_smiles.py "<smiles>"` (prints
       `{"canonical_smiles": "..."}`; on error, treat as IS_NOVEL=true and proceed — a bad
       canonicalization should never block the run).
@@ -59,30 +63,47 @@ SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a fie
       2>/dev/null` (file absent ⇒ IS_NOVEL=true).
     Write CANONICAL_SMILES + IS_NOVEL to run_log.md header.
 
-  GROUND (off-table / low-medium confidence ONLY — skip for confidence=high so the deterministic,
-    byte-identical plan path stays untouched by web nondeterminism):
-    CONF=`jq -r '.classes.CLASS_ID.confidence // "offtable"' guides/polymer_rules.json`
-      (class key absent or classify "unknown" ⇒ offtable)
-    If CONF in {low, medium, offtable}:
+  VALIDATION GATE (decides plan_mode — gates per EXACT canonical SMILES, never per polymer
+    class; a class having many validated siblings says nothing about a molecule nobody has run).
+    PROPS_CSV = properties_requested joined with commas (same convention `--properties <props>`
+    already uses below), e.g. `"density,tg,bulk_modulus"`:
+    SYSTEM_CONFIDENCE=`jq -r --arg s "$CANONICAL_SMILES" --arg props "$PROPS_CSV" '
+      ($props | split(",")) as $requested
+      | (.[$s] // {"protocol_validated": false, "validated_properties": []}) as $e
+      | if ($e.protocol_validated == true)
+           and ($requested | all(. as $p | ($e.validated_properties // []) | index($p) != null))
+        then "validated" else "novel" end
+    ' guides/system_characterization_cache.json 2>/dev/null || echo novel`
+      (file absent, key absent, or jq error ⇒ "novel" — never let a lookup failure silently
+      grant the fast path). Write SYSTEM_CONFIDENCE to run_log.md header alongside
+      CANONICAL_SMILES/IS_NOVEL.
+
+  GROUND (whenever SYSTEM_CONFIDENCE=novel — skip only when validated, so the deterministic,
+    byte-identical plan path stays untouched by web nondeterminism). This now fires for every
+    novel molecule, including one in an otherwise well-trodden class — a real cost increase
+    (more WebSearch calls) versus the old class-confidence-gated trigger, and the correct plain
+    translation of "ground whenever the plan will be reasoned":
+    If SYSTEM_CONFIDENCE=novel:
       ⚪ literature-grounding-worker ← polymer_name, polymer_class(or offtable), smiles,
-        properties_requested, confidence=CONF, output_path=data/<RUN>/raw/literature_grounding.json
+        properties_requested, output_path=data/<RUN>/raw/literature_grounding.json
         → RESULT.grounding_path = GROUNDING_PATH  (advisory planning evidence only, DOI-verified;
           NEVER used as run-summary grading bounds — exp-lookup owns those in Phase C).
       Pass grounding_path: GROUNDING_PATH as an extra planner input.
-    If CONF=high: skip; do NOT pass grounding_path.
+    If SYSTEM_CONFIDENCE=validated: skip; do NOT pass grounding_path.
 
   PLAN
-    If CONF=high: **script-only shortcut, no agent spawn** — this class's protocol is already
-      validated (confidence only reaches high via `make_deterministic_plan.py --lock-from`,
-      i.e. a prior reasoned run that fully PASSed). Run directly, same as `pick_gpu.py`/
-      `gen_prompt.py`:
+    If SYSTEM_CONFIDENCE=validated: **script-only shortcut, no agent spawn** — this exact
+      molecule's protocol is already validated (stamped by `protocol-locker`'s
+      `system_characterization_cache.json[canonical_smiles].protocol_validated`, set only after
+      an earlier reasoned run of this exact SMILES fully PASSed every property it requested).
+      Run directly, same as `pick_gpu.py`/`gen_prompt.py`:
       `python3 orchestration/make_deterministic_plan.py --run_name <RUN> --polymer_class <CLASS>
       --smiles "<smiles>" --properties <props>` → PLAN_PATH (prints run_plan/plan_mode/
       confidence). Write the D-00 pointer to run_log.md from that output. Skip CRITIC entirely
-      (an unchanged confidence=high plan is trivially auto-approved — see
-      `decision_policy.json:confidence_gate.high`; the planner agent's own confidence=high
-      branch does nothing but this same script call). Proceed to "Thread the approved plan".
-    Else (CONF in {low, medium, offtable}):
+      (an unchanged validated plan is trivially auto-approved — see
+      `decision_policy.json:confidence_gate.validated`; the planner agent's own validated branch
+      does nothing but this same script call). Proceed to "Thread the approved plan".
+    Else (SYSTEM_CONFIDENCE=novel):
       🟡 planner ← run_name, smiles, polymer_class, properties_requested,
         work_dir=data/<RUN>/lammps [, grounding_path]
         → plan_path (PLAN_PATH), plan_mode, confidence, critique_status.
@@ -92,8 +113,12 @@ SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a fie
         → approved → proceed | revise → re-spawn planner with the findings, re-critique |
           escalate → write UNRESOLVED to run_log.md and stop.
 
-  REUSE CACHED CHARACTERIZATION (if `IS_NOVEL=false` — applies to BOTH branches above, since a
-    class's confidence and a specific SMILES's prior characterization are orthogonal signals):
+  REUSE CACHED CHARACTERIZATION (if `IS_NOVEL=false` — applies REGARDLESS of SYSTEM_CONFIDENCE,
+    since "characterized" and "validated" are two independent flags on the same cache entry, not
+    one signal split across two branches: a SMILES can be characterized-but-not-yet-validated
+    [Phase-A timing knobs measured, Phase-C never reached all-PASS] and still land in a
+    `reasoned` plan here, or validated-for-different-properties and still reuse its old timing
+    knobs while going reasoned for the newly-requested property):
     `python3 orchestration/apply_cached_characterization.py --run_plan PLAN_PATH
     --canonical_smiles "$CANONICAL_SMILES"` → patches PLAN_PATH's decided_params in place with
     every non-null derived_* field from the cached entry (skip if `{"applied": false, ...}` — no

@@ -17,8 +17,9 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
   plan, not yet locked via `make_deterministic_plan.py --lock-from`). Max attempts = **5**, and
   protocol-level changes are sanctioned as ladder rungs, not just parameter tweaks — see the
   escalation ladder below.
-- **`deterministic`** — this run is replaying an already-locked protocol (confidence=high,
-  possibly a replicate-2+ of a campaign). Max attempts = **2**, and only EXTEND-type recovery
+- **`deterministic`** — this run is replaying an already-locked protocol (this exact canonical
+  SMILES is `protocol_validated`, possibly a replicate-2+ of a campaign). Max attempts = **2**,
+  and only EXTEND-type recovery
   (parameter tweaks that never touch `decided_params`, e.g. re-running longer at 300K) may
   auto-apply. Any recovery that would change `decided_params` (a different FF, a different
   cooling rate, a different pressure range) must **stop immediately, write the finding to
@@ -64,8 +65,14 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
 `enforce_equilibration_gate` (see `structural_fail_remedy`/`structural_fail_remedy_confidence`
 in the equilibration-checker's RESULT block) isn't a log-grep match, so it isn't in the taxonomy
 table above — escalate through these rungs in order, spending one attempt each:
-1. The named `structural_fail_remedy` (`re_melt_slow_recool` / `heavy_melt_anneal_probe`) —
-   these are parameter-level (cooling schedule, anneal cycles), not a full re-plan.
+1. The named `structural_fail_remedy`:
+   - `re_melt_slow_recool` — parameter-level, not a full re-plan: re-melt from the converged
+     melt cell with `npt_cool_steps`/`npt_cool300_steps` overridden to 2×/4× baseline across
+     the 2 attempts (`guides/EQUILIBRATION.md`'s RE-ANNEAL section has the exact formula).
+   - `heavy_melt_anneal_probe` — no mechanized implementation exists yet (see
+     `guides/EQUILIBRATION.md`/`polymer_rules.json`'s NkepsuMbitou-2025 provenance notes);
+     treat as a diagnostic investigation, not a parameter to set, and escalate to rung 3 if
+     the melt deficit doesn't resolve.
 2. If the remedy doesn't resolve it (or `structural_fail_remedy_confidence=low` and it fails
    once), the taxonomy-table fix most consistent with the symptom.
 3. A full re-plan with a different force field — routes back through the planner per

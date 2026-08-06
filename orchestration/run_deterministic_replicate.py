@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-run_deterministic_replicate.py — scripted execution of a confidence=="high" replicate.
+run_deterministic_replicate.py — scripted execution of a replicate whose exact canonical SMILES
+is already protocol_validated in guides/system_characterization_cache.json (plan_mode=="deterministic").
 
 For a validated protocol (plan_mode=="deterministic"), every execution-stage worker
 (molecule-builder, equilibration-worker, equilibration-checker, tg-sweep-worker,
@@ -373,6 +374,7 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             use_opls=flags["use_opls"], npt_prod_steps=p["npt_prod_steps"],
             add_melt_npt=p["add_melt_npt"], t_equil_K=p["T_equil_K"] if p["add_melt_npt"] else None,
             melt_npt_steps=p["melt_npt_steps"], engine=p["engine"], velocity_seed=p["velocity_seed"],
+            npt_cool_steps=p["npt_cool_steps"], npt_cool300_steps=p["npt_cool300_steps"],
         )
     else:
         dt = p["dt_fs"]
@@ -781,7 +783,7 @@ def _print_dry_run(args, cls: dict, properties: set):
 # ─── Main ───────────────────────────────────────────────────────────────────
 
 def main():
-    ap = argparse.ArgumentParser(description="Scripted execution of a confidence=='high' PolyJarvis replicate.")
+    ap = argparse.ArgumentParser(description="Scripted execution of a protocol_validated PolyJarvis replicate.")
     ap.add_argument("--run_name", required=True)
     ap.add_argument("--polymer_class", required=True)
     ap.add_argument("--plan", required=True, help="Path to run_plan.json")

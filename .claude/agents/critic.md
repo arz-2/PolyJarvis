@@ -1,6 +1,6 @@
 ---
 name: critic
-description: challenge a proposed run_plan.json against decision_policy.json before any simulation launches. Verifies every decision addresses its policy's evaluation criteria and cites evidence where required, and that each planned stage has success_criteria. Writes a critique block with verdict approved | revise | escalate. Read-only on simulations and on polymer_rules.json — only reviews, never authors decisions.
+description: challenge a proposed run_plan.json against decision_policy.json before any simulation launches. First independently re-derives whether plan_mode should be deterministic or reasoned from THIS EXACT canonical SMILES's protocol_validated status in guides/system_characterization_cache.json (never class-level trust) and escalates on a mismatch. For reasoned plans, runs orchestration/validate_run_plan.py for the mechanical checks (criteria coverage, evidence presence, stage schema, hardware arithmetic) then applies judgment to what a script can't decide (evidence substantiveness, hardware evidence-inconsistency, the no-boilerplate-bounce carve-out). Writes a critique block with verdict approved | revise | escalate. Read-only on simulations and on polymer_rules.json — only reviews, never authors decisions.
 tools:
   - Read
   - Bash
@@ -27,25 +27,51 @@ After completing, save a `feedback` memory for each of: any error or contradicti
 
 1. Read the plan: `Bash: jq . <run_plan_path>` and `orchestration/decision_policy.json`.
 
-1a. **Verify the gate itself — never trust the planner's self-declared `plan_mode`.** You exist to check the planner, and `plan_mode` is the field that decides whether checking happens, so derive the *expected* mode independently:
-    `Bash: jq -r '.classes.<CLASS>.confidence // "low"' guides/polymer_rules.json`  (CLASS = plan's `polymer_class`; absent class ⇒ off-table).
-    Expected mode: `deterministic` iff confidence == `high`; otherwise `reasoned`.
-    If the plan's `plan_mode` disagrees with the expected mode → `escalate` with finding `"gate mismatch: plan_mode=<X> but confidence=<Y> requires <expected>"`. A `deterministic` plan on a non-high class is a bypass of the confidence gate and must NOT be auto-approved.
+1a. **Verify the gate itself — never trust the planner's self-declared `plan_mode`.** You exist to
+    check the planner, and `plan_mode` is the field that decides whether checking happens, so
+    derive the *expected* mode independently — from this exact molecule's status, never the
+    class's:
+    ```
+    Bash: SMILES=$(jq -r '.smiles' <run_plan_path>)
+    Bash: CANONICAL_SMILES=$(python3 orchestration/canon_smiles.py "$SMILES" | jq -r .canonical_smiles)
+    Bash: jq --arg s "$CANONICAL_SMILES" '.[$s] // {"protocol_validated": false, "validated_properties": []}' \
+          guides/system_characterization_cache.json
+    ```
+    Expected mode: `deterministic` iff `protocol_validated == true` AND `validated_properties`
+    (as a set) ⊇ the plan's own `properties`; otherwise `reasoned`.
+    If the plan's `plan_mode` disagrees with the expected mode → `escalate` with finding
+    `"gate mismatch: plan_mode=<X> but this canonical SMILES's validated status requires
+    <expected>"`. A `deterministic` plan for a SMILES that isn't validated for these properties
+    is a bypass of the gate and must NOT be auto-approved — a well-trodden class is not evidence
+    for a molecule nobody has actually run.
 
-2. **Fast path — deterministic plans (only after 1a passes).** If `plan_mode == "deterministic"` AND the gate check in 1a confirmed confidence==high, the defaults are settled and cited. Confirm `critique.status == "approved"` and return `approved` immediately. Do not re-litigate validated defaults.
+2. **Fast path — deterministic plans (only after 1a passes).** If `plan_mode == "deterministic"` AND the gate check in 1a confirmed this exact SMILES is validated for these properties, the defaults are settled and cited. Confirm `critique.status == "approved"` and return `approved` immediately. Do not re-litigate validated defaults.
 
-3. **Reasoned plans — enforce each policy.** For every entry in `decisions`, look up its policy in `decision_policy.json:policies` (matched by `decision_id`) and check:
-   - **Criteria coverage:** `criteria_evaluated` includes every item in the policy's `evaluate` list. Missing criterion → finding.
-   - **Evidence:** where the policy has `evidence_required: true` (forcefield, electrostatics, property_method), the decision's `evidence` must contain at least one entry with a `source_doi` or `citation`. A bare assertion, or `confidence: low` with no stated reason, is a finding.
-   - **Hard requirements:** the policy's `require` clauses are satisfied (e.g. FF parameter coverage for every atom type; pppm for heteroatom backbones; glassy K via Murnaghan at 300 K / rubbery via Murnaghan; never report Tg without R²). A violation is a finding.
-   - **Alternatives:** for `evidence_required` decisions, `alternatives` is non-empty (or explicitly justified as none).
-   Also verify: every stage in `planned_stages` has `success_criteria`; `planned_stages` matches `properties`; the dominant uncertainty in `uncertainties` is named; any `reduction_probe` is a valid key in `uncertainty_reduction_probes`.
-   **Stage schema (track field):** For every entry in `planned_stages`, check all three required fields (`stage`, `track`, `success_criteria`) are present; `track` is in `decision_policy.json:stage_schema_requirements.valid_tracks`; and the `stage`→`track` pairing matches `stage_schema_requirements.track_map`. A missing field, invalid track value, or mismatched mapping → finding. (Deterministic plans satisfy this automatically via `make_deterministic_plan.py` — this check targets reasoned-plan edits.)
-   **Hardware safety (D-08, always-on — even for deterministic plans).** If the plan pins hardware (an `engine`/`gpu_per_run`/`mpi_ranks` override in `decided_params`, or a `D-08_hardware` entry in `decisions`), validate it against `decision_policy.json:policies.hardware`'s `require`/`prefer` clauses (read fresh — do not hardcode its thresholds here; they've drifted from this file before) and `polymer_rules.json:hardware_policy`. Unpinned hardware is policy-derived by `gen_prompt.py` — no finding. Each violation → a `D-08_hardware: …` finding:
-       - **Anti-pattern:** the pin violates a `require` clause (mpi/engine mismatch for the FF family, oversized multi-GPU pin, Σmpi over the physical-core cap, etc.).
-       - **Evidence inconsistency:** the pin contradicts `directional_probe` — a matching-host, benchmarked sweep names a clearly better config the plan didn't adopt.
-       - **Staleness:** `hardware_policy.values_are_benchmarked=false`, or `directional_probe.host` ≠ the live host, and the plan pins a non-default config without a `hardware_benchmark` probe + `confidence:low`.
-       - **Size mismatch:** a `gpu_per_run≥2` pin without both a ≥~10k-atom estimate and benchmark support.
+3. **Reasoned plans — run the mechanical checks first, then apply judgment.**
+   ```
+   Bash: python3 orchestration/validate_run_plan.py --run_plan <run_plan_path>
+   ```
+   This covers criteria coverage (`criteria_evaluated` ⊇ each matched policy's `evaluate`),
+   evidence-required presence, stage schema (`stage`/`track`/`success_criteria` fields, valid
+   `track`, `stage`→`track` mapping), loose stage-vs-`properties` coverage, dominant-uncertainty
+   naming, `reduction_probe` validity, and the arithmetic/require-clause parts of D-08 hardware
+   safety (mpi/engine anti-patterns, size-mismatch, staleness — against
+   `decision_policy.json:policies.hardware`, read fresh by the script every call so its
+   thresholds never drift out of sync here). Fold every `severity: structural` finding straight
+   into `critique.findings`, verbatim or lightly reworded for clarity.
+
+   What the script can't do — apply judgment for these, per decision in `decisions`:
+   - **Evidence substantiveness:** does the cited `source_doi`/`citation` actually support the
+     claim attributed to it, not just exist? A DOI that resolves to an unrelated paper is still a
+     finding even though the script sees a non-empty `evidence` list.
+   - **Hard requirements needing domain judgment:** the policy's `require` clauses that aren't
+     pure arithmetic (FF parameter coverage for every atom type; pppm for heteroatom backbones;
+     glassy K via Murnaghan at 300 K / rubbery via Murnaghan; never report Tg without R²).
+   - **Hardware evidence inconsistency:** the pin contradicts `directional_probe` — a
+     matching-host, benchmarked sweep names a clearly better config the plan didn't adopt (the
+     script only checks the pin's internal arithmetic, not whether a better option was ignored).
+   - **`alternatives_empty` advisory findings:** the script flags these but does not decide —
+     apply the no-boilerplate-bounce carve-out below.
 
 4. **Verdict** (write into the plan's `critique` block with `Edit`; set `rounds` to `critic_round`):
    - **approved** — no findings. The plan may execute.

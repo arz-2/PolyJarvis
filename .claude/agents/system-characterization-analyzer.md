@@ -144,6 +144,12 @@ could have afforded.
        `derived_*` fields are still null and a future characterization on this same SMILES could
        still improve them) — else `false`.
      - `note: <string>` (optional) — free text on what's missing/why, if `reprobe_recommended`.
+   - **Ownership boundary:** this entry also carries `protocol_validated`/`validated_properties`/
+     `validated_run_name`/`validated_at` fields, but those are owned by `protocol-locker.md`, not
+     you — it stamps them separately, once, after Phase C confirms an all-PASS reasoned run.
+     Never write or touch those fields here; this step's own write is the `characterized` half of
+     the entry only (Phase-A timing knobs), which is a weaker, independent bar from `validated`
+     (Phase-C grading) — the plan_mode gate reads `validated`, never this step's output alone.
 
 7. **Log a `run_log.md` note** — which knobs were derived, which fell back to class
    defaults and why (cite the specific reliability check that failed, if any).

@@ -44,6 +44,10 @@ Physics knob overrides (all optional; defaults from polymer_rules.json):
   --npt_prod_ns FLOAT     NPT production time in ns (equil). Auto-sized by
                           atom count when omitted. Converted to npt_prod_steps and
                           passed to generate_equilibration_workflow.
+  --npt_cool_steps INT    Override npt_cool step count (default: atom-count tier).
+                          re_melt_slow_recool lever — larger = slower cool ramp.
+  --npt_cool300_steps INT Override npt_cool300 step count (default: ~1ns, glassy only).
+                          re_melt_slow_recool lever — larger = slower cool to 300K.
   --T_equil_K FLOAT       Equilibration temperature — maps to temp= in generate_equilibration_workflow
   --T_anneal_high_K FLOAT Peak annealing temperature — maps to max_temp=
   --tg_t_high_K FLOAT     Tg sweep start temperature (K)
@@ -355,7 +359,7 @@ def _resolve_build_params(args, cls: dict) -> dict:
         "dt_fs": cls.get('dt_fs', 1.0),
         "phal_patch": args.polymer_class.upper() == 'PHAL',
         "lammps_flags": _lammps_flags(args.lammps_flags, cls),
-        "ff_confidence": cls.get('confidence', 'low'),
+        "ff_confidence": "cited" if cls.get('ff_justification_doi') else "uncited",
     }
 
 
@@ -451,7 +455,8 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         "T_workflow_K": T_workflow,
         "P_equil_atm": cls.get('P_equil_atm', 1.0),
         "t_equil_ns": cls.get('t_equil_ns', 5.0),
-        "anneal_cycles": cls.get('eq_annealing_cycles', 5),
+        "npt_cool_steps": _pick(getattr(args, 'npt_cool_steps', None), cls, 'npt_cool_steps', None),
+        "npt_cool300_steps": _pick(getattr(args, 'npt_cool300_steps', None), cls, 'npt_cool300_steps', None),
         "npt_prod_ns": npt_prod_ns_val,
         "npt_prod_steps": npt_prod_steps,
         "add_melt_npt": add_melt_npt,
@@ -488,6 +493,10 @@ def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
         )
     else:
         melt_npt_line = "add_melt_npt:      false"
+    cool_steps_line = (
+        f"npt_cool_steps:    {p['npt_cool_steps']}  # pass as npt_cool_steps= — override, null = atom-count-tier default\n"
+        f"npt_cool300_steps: {p['npt_cool300_steps']}  # pass as npt_cool300_steps= — override, null = ~1ns default"
+    )
     return f"""\
 data_path:         {_v(p['data_path'])}
 lammps_flags:      {json.dumps(p['lammps_flags'])}
@@ -499,7 +508,7 @@ T_workflow_K:      {p['T_workflow_K']}   # pass as temp=
 P_equil_atm:       {p['P_equil_atm']}
 t_equil_ns:        {p['t_equil_ns']}
 T_anneal_high_K:   {p['T_anneal_high_K']}
-anneal_cycles:     {p['anneal_cycles']}
+{cool_steps_line}
 dt_fs:             {p['dt_fs']}
 {npt_prod_line}
 {melt_npt_line}
@@ -1306,6 +1315,12 @@ def main():
     # Physics knob overrides (all optional; default None → falls back to polymer_rules.json)
     p.add_argument("--npt_prod_ns", type=float,
                    help="NPT production time (ns); auto-sized by atom count if omitted")
+    p.add_argument("--npt_cool_steps", type=int,
+                   help="Override npt_cool stage step count (default: atom-count tier). "
+                        "re_melt_slow_recool recovery lever — larger = slower cool ramp")
+    p.add_argument("--npt_cool300_steps", type=int,
+                   help="Override npt_cool300 stage step count (default: ~1ns, glassy only). "
+                        "re_melt_slow_recool recovery lever — larger = slower cool to 300K")
     p.add_argument("--add_melt_npt", action="store_true", default=False,
                    help="Inject 05b melt isothermal NPT stage for rubbery classes (FF validation only)")
     p.add_argument("--T_equil_K", type=float,

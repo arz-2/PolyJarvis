@@ -27,7 +27,12 @@ from run_deterministic_replicate import (  # noqa: E402
 )
 
 RULES = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
-HIGH_CONF_CLASSES = sorted(c for c, v in RULES["classes"].items() if v.get("confidence") == "high")
+# make_deterministic_plan.py/run_deterministic_replicate.py work uniformly for any class
+# regardless of any per-SMILES validated status (that's an orchestrator-level gate, not a
+# script-level one) -- the scripted path's only real scope restriction is the EMC-build-only
+# limit DETERMINISTIC_REPLICATE.md documents (PURA is RadonPy-only, not yet supported here).
+SCRIPTED_PATH_CLASSES = sorted(c for c, v in RULES["classes"].items()
+                               if v.get("preferred_builder", "emc") == "emc")
 
 EXECUTOR = REPO_ROOT / "orchestration" / "run_deterministic_replicate.py"
 MAKE_PLAN = REPO_ROOT / "orchestration" / "make_deterministic_plan.py"
@@ -47,23 +52,23 @@ def _normalize(d):
 
 @pytest.fixture(scope="module")
 def plan_files(tmp_path_factory):
-    """One deterministic run_plan.json per confidence=='high' class."""
+    """One deterministic run_plan.json per EMC-build (scripted-path-eligible) class."""
     d = tmp_path_factory.mktemp("plans")
     paths = {}
-    for cls in HIGH_CONF_CLASSES:
+    for cls in SCRIPTED_PATH_CLASSES:
         out = d / f"{cls}.json"
         _run([str(MAKE_PLAN), "--run_name", f"DRT_{cls}", "--polymer_class", cls, "--out", str(out)])
         paths[cls] = out
     return paths
 
 
-def test_confidence_high_classes_nonempty():
-    """Sanity: this test file's whole point is moot if polymer_rules.json has no confidence=high
+def test_scripted_path_classes_nonempty():
+    """Sanity: this test file's whole point is moot if polymer_rules.json has no EMC-build
     classes yet -- fail loudly rather than silently parametrizing over an empty list."""
-    assert HIGH_CONF_CLASSES, "no confidence=='high' classes found in guides/polymer_rules.json"
+    assert SCRIPTED_PATH_CLASSES, "no EMC-build classes found in guides/polymer_rules.json"
 
 
-@pytest.mark.parametrize("cls", HIGH_CONF_CLASSES)
+@pytest.mark.parametrize("cls", SCRIPTED_PATH_CLASSES)
 def test_dry_run_matches_resolve_stage_params(cls, plan_files):
     plan_path = plan_files[cls]
     r = subprocess.run(
@@ -91,7 +96,7 @@ def test_dry_run_matches_resolve_stage_params(cls, plan_files):
             f"{cls}/{stage}: --dry-run output diverges from a direct resolve_stage_params() call")
 
 
-@pytest.mark.parametrize("cls", HIGH_CONF_CLASSES)
+@pytest.mark.parametrize("cls", SCRIPTED_PATH_CLASSES)
 def test_dry_run_covers_expected_stages(cls, plan_files):
     """Every deterministic-plan class dry-runs at least the always-on stages, plus tg/mechanical
     stages iff the plan's properties include them -- catches a stage silently dropped from the
@@ -217,10 +222,10 @@ class _FakeEquilLammps:
 
 @pytest.fixture
 def equil_check_args_cls():
-    """Real args/cls for one confidence=='high' class, resolved via the same
+    """Real args/cls for one EMC-build class, resolved via the same
     make_deterministic_plan.py -> apply_plan/resolve_hardware path main() uses -- so
     resolve_stage_params("equil"/"equil-check", ...) sees realistic values."""
-    cls = HIGH_CONF_CLASSES[0]
+    cls = SCRIPTED_PATH_CLASSES[0]
     import tempfile
     tmp = Path(tempfile.mkdtemp())
     plan_path = tmp / f"{cls}.json"

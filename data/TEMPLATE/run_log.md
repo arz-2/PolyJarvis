@@ -1,8 +1,8 @@
 # [POLYMER_NAME] Run [N] · [START_DATE] → [END_DATE]
 SMILES: `[SMILES]`  |  FF: [FF]  |  Charges: [CHARGE_METHOD]  |  DP: [DP]  |  Chains: [N_CHAINS]  |  GPU: [IDs used]
 Requested: [PROPERTIES]  |  Replicate: [1 of 1 / N of 5]  |  Seeds: EMC=[N]  |  SEED_HOT=[N]  |  SEED_COLD=[N]
-Plan: `[PLAN_PATH = data/[RUN]/raw/run_plan.json]`  |  mode: [deterministic / reasoned]  |  confidence: [high/medium/low]  |  critic: [approved / N rounds]  |  T_workflow_K: [N]
-Canonical SMILES: `[CANONICAL_SMILES]`  |  IS_NOVEL: [true/false]  |  System probe: [ran, tau_relax=[X] ps / skipped — cached / N/A]
+Plan: `[PLAN_PATH = data/[RUN]/raw/run_plan.json]`  |  mode: [deterministic / reasoned]  |  confidence: [validated/novel]  |  critic: [approved / N rounds]  |  T_workflow_K: [N]
+Canonical SMILES: `[CANONICAL_SMILES]`  |  IS_NOVEL: [true/false]  |  System confidence: [validated/novel]  |  System probe: [ran, tau_relax=[X] ps / skipped — cached / N/A]
 
 ---
 

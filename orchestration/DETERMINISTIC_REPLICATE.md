@@ -2,7 +2,9 @@
 
 Read this instead of `FOUNDATION.md`/`THERMAL_TRACK.md`/`MECHANICAL_TRACK.md` for Phase A/B once
 `CLAUDE.md`'s PLAN step has produced a `plan_mode=="deterministic"` `run_plan.json`
-(`confidence=="high"` for this class — the protocol is already validated). `SUMMARY.md`'s Phase C
+(this exact canonical SMILES's `guides/system_characterization_cache.json` entry has
+`protocol_validated==true` covering the requested properties — the protocol is already
+validated for THIS molecule, never a class-level signal). `SUMMARY.md`'s Phase C
 is unchanged either way; the executor produces the same `raw/*.json` artifacts those steps already
 consume.
 
@@ -81,5 +83,5 @@ whole campaign depends on.
 EMC build path only (18 of ~19 supported classes). `PURA` (the one RadonPy-only class —
 `preferred_builder != "emc"`) is not yet supported by the scripted path; `do_build()` raises a
 clear error rather than attempting it. Run PURA through the normal agent-driven pipeline
-(confidence=high still skips planner/critic via `CLAUDE.md`'s existing shortcut; only the
-execution-stage agent spawns still happen for this one class, for now).
+(a validated SMILES in this class still skips planner/critic via `CLAUDE.md`'s existing
+shortcut; only the execution-stage agent spawns still happen for this one class, for now).

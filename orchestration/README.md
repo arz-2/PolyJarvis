@@ -21,7 +21,9 @@ guides live in `guides/`).
 | Script | Purpose | Primary consumers |
 |---|---|---|
 | `gen_prompt.py` | Builds every worker prompt: inlines the stage guide from `guides/`, threads the approved `run_plan.json` decided_params, and emits the final prompt text. The hub of the orchestrator→worker contract. | Orchestrator (`CLAUDE.md`), all worker stages |
-| `make_deterministic_plan.py` | Emits a byte-identical `run_plan.json` for confidence=high polymer classes (the planner shells out to it; low/medium classes get a reasoned plan instead). Reads `guides/polymer_rules.json`. | `planner` agent, tests |
+| `make_deterministic_plan.py` | Emits a byte-identical `run_plan.json`, used as-is when this exact canonical SMILES is already `protocol_validated` in `guides/system_characterization_cache.json` (the planner shells out to it), or as the starting-hypothesis scaffold every reasoned plan for a novel SMILES revises. Reads `guides/polymer_rules.json`. | `planner` agent, tests |
+| `select_hardware.py` | Mechanically implements `decision_policy.json:policies.hardware`'s D-08 require/prefer clauses (FF-alias resolution, RDKit cell-atom estimate, benchmark-window comparison) so the numbers live in one place. | `planner` agent (reasoned path), `validate_run_plan.py` |
+| `validate_run_plan.py` | Mechanical structural checks for a `run_plan.json` against `decision_policy.json` (criteria coverage, evidence presence, stage schema, hardware arithmetic) — the parts of the Critic's review that don't need judgment. | `planner` (self-check), `critic` agent |
 | `select_tg_path.py` | Phase C helper: picks which per-rate `tg_summary` feeds run-summary (slowest rate if the multirate slope gate passed, else the plan's `tg_slope_gate_fallback` rate, default highest). | Orchestrator (`CLAUDE.md` Phase C) |
 
 ## Hardware runtime (shared lib: `hw_common.py`)

@@ -13,17 +13,18 @@
   },
 
   "confidence_gate": {
-    "description": "Controls planning DEPTH. Read class 'confidence' from polymer_rules.json. This is the 'uncertainty-driven planning' mechanism — grounded in an existing field so reproducible fixed-seed runs are never disturbed.",
-    "gate_direction": "The plan_mode↔confidence gate is ASYMMETRIC. Only `deterministic` on a non-high/off-table class is a bypass that the Critic must ESCALATE (it claims settled defaults the class has not validated). `reasoned` on a high-confidence class is the SAFE direction — never escalate it; it subjects every decision to full step-3 enforcement instead of fast-path auto-approve. A budget-forced deviation to a non-default ladder on a high class (e.g. PEST [25,50,100] infeasible in a 9.5h wall-clock budget) is exactly what reasoned mode exists for.",
-    "high": {
+    "description": "Controls planning DEPTH, gated per EXACT canonical SMILES, never per polymer class. Read guides/system_characterization_cache.json[canonical_smiles] (canonical_smiles from orchestration/canon_smiles.py) — specifically protocol_validated (bool, stamped by protocol-locker.md only after a reasoned run's Phase C confirmed all-PASS on every property it requested) and validated_properties (the set of properties that specific stamp covers). polymer_rules.json class entries carry NO confidence/gating field of their own — they are a starting-hypothesis scaffold every reasoned plan begins from, not a trust signal. A class having many validated siblings says nothing about a genuinely new SMILES in that class; it always earns one full reasoned+critic pass.",
+    "gate_direction": "The plan_mode↔system-validation gate is ASYMMETRIC. Only `deterministic` for a SMILES that is not `protocol_validated` (or whose validated_properties don't cover this run's requested properties) is a bypass that the Critic must ESCALATE. `reasoned` for an already-validated SMILES is the SAFE direction — never escalate it; it subjects every decision to full step-3 enforcement instead of fast-path auto-approve. A budget-forced deviation to a non-default ladder for an otherwise-validated SMILES (e.g. a rate ladder infeasible in a tight wall-clock budget) is exactly what reasoned mode exists for.",
+    "validated": {
       "plan_mode": "deterministic",
-      "behavior": "Planner transcribes polymer_rules.json defaults verbatim into run_plan.json decided_params (a subset of class keys with identical values). Critic auto-approves (trivial pass, 0 reasoning rounds). Worker prompts are byte-identical to the pre-architecture pipeline. The orchestrator's PLAN step skips the planner/critic agents entirely for confidence=high and calls make_deterministic_plan.py directly (CLAUDE.md). emc_seed/velocity_seed are never pinned in polymer_rules.json — left null so the tool draws an independent random seed per run, logged post-submission (cross-track rule 2).",
-      "rationale": "These classes are validated; reproducibility outranks re-derivation. Do not re-reason a settled, cited decision."
+      "condition": "system_characterization_cache.json[canonical_smiles].protocol_validated == true AND validated_properties ⊇ properties_requested",
+      "behavior": "Planner transcribes polymer_rules.json class defaults verbatim into run_plan.json decided_params (a subset of class keys with identical values) — those defaults are validated for THIS SMILES because this exact molecule already passed a full reasoned+critic cycle, not because the class is trusted in the abstract. Critic auto-approves (trivial pass, 0 reasoning rounds). Worker prompts are byte-identical to the pre-architecture pipeline. The orchestrator's PLAN step skips the planner/critic agents entirely and calls make_deterministic_plan.py directly (CLAUDE.md). emc_seed/velocity_seed are never pinned in polymer_rules.json — left null so the tool draws an independent random seed per run, logged post-submission (cross-track rule 2).",
+      "rationale": "This exact molecule's protocol is validated; reproducibility outranks re-derivation. Do not re-reason a settled, cited decision."
     },
-    "medium_low_or_offtable": {
+    "novel_or_partially_validated": {
       "plan_mode": "reasoned",
       "behavior": "Planner reasons each decision against its policy below, records evidence/confidence/alternatives, names the dominant uncertainty and an optional uncertainty-reduction probe. Critic challenges; loop until approved or escalate (max 2 critic rounds).",
-      "applies_to": "confidence in {medium, low} OR polymer_class absent from polymer_rules.json.classes"
+      "applies_to": "canonical_smiles absent from system_characterization_cache.json, OR protocol_validated==false, OR validated_properties does not cover this run's properties_requested — includes a SMILES that is merely 'characterized' (Phase-A timing knobs measured, guides/system_characterization_cache.json[canonical_smiles].derived_*) but never reached Phase-C all-PASS. apply_cached_characterization.py still reuses those timing knobs here regardless — characterization reuse and the plan_mode gate are two independent checks on the same cache entry (see CLAUDE.md's REUSE CACHED CHARACTERIZATION step)."
     }
   },
 
@@ -46,7 +47,8 @@
       ],
       "rationale": "Hardware config is a function of FF cost structure (UA lj/cut vs PCFF class2+pppm) AND cell size (the GPU-saturation / PPPM all-to-all crossover), so it belongs in policy, not ad-hoc submit-time choice. The live anti-patterns: mpi=1 PCFF on the GPU-package (~2.4 ns/day, ~75x slow — but mpi=1 IS correct for PCFF/OPLS on KOKKOS, where kspace is on the GPU); and UA on the GPU with neigh on the CPU (pair-only offload ties CPU). UA on the GPU with `neigh yes` is the CORRECT default (3.7x), NOT an anti-pattern. The planner emits a D-08_hardware decision grounded in directional_probe + the planned cell size; a deviation from the FF-family default flows to runtime via decided_params (engine/gpu_per_run/mpi_ranks) -> gen_prompt.apply_plan. The conservative gate above keeps the default until a CLEAN (values_are_benchmarked=true), host-matched, in-size benchmark exists.",
       "evidence_source": "polymer_rules.json:hardware_policy.directional_probe.{recommended_by_ff,cells_atoms,measured_on,date,values_are_benchmarked}",
-      "default_source": "polymer_rules.json:hardware_policy.directional_probe.recommended_by_ff[fam] when benchmarked+host-match+in-size, else by_forcefield.<FF_FAMILY>"
+      "default_source": "polymer_rules.json:hardware_policy.directional_probe.recommended_by_ff[fam] when benchmarked+host-match+in-size, else by_forcefield.<FF_FAMILY>",
+      "tooling": "orchestration/select_hardware.py implements this policy's require/prefer clauses (FF-alias resolution, cell-atom estimate, threshold comparison, deviate-from-default diff, staleness flagging) mechanically. The Planner calls it and transcribes its D-08 decision row + any decided_params override + uncertainties entry verbatim — it does NOT re-derive these thresholds in prose, so this policy stays the single source of truth for the numbers."
     },
     "forcefield": {
       "decision_id": "D-01_ff",

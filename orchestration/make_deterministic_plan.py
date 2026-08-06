@@ -2,9 +2,12 @@
 """
 make_deterministic_plan.py — Emit a deterministic run_plan.json for a polymer class.
 
-This is the *deterministic* branch of the Planner (confidence=high path, and the
-Phase-1 default for every class). It transcribes the decision-relevant defaults
-from guides/polymer_rules.json into a structured, self-documenting plan artifact.
+This is the *deterministic* branch of the Planner — the validated-system path (see
+decision_policy.json:confidence_gate): used as-is when this exact canonical SMILES
+already has a `protocol_validated` entry in guides/system_characterization_cache.json,
+and as the starting-hypothesis scaffold (class defaults only — never a trust signal)
+every reasoned plan for a novel SMILES begins from. It transcribes the decision-relevant
+defaults from guides/polymer_rules.json into a structured, self-documenting plan artifact.
 
 Reproducibility guarantee: decided_params snapshots ONLY keys already present in
 the class entry, with their existing values. gen_prompt.py --plan overlays them as
@@ -12,9 +15,9 @@ the class entry, with their existing values. gen_prompt.py --plan overlays them 
 byte-identical to the pre-architecture pipeline. The regression test
 tests/test_plan_reproducibility.py enforces this for every class and stage.
 
-The reasoned branch (Planner agent, confidence=low/medium) writes a run_plan.json
-with the SAME schema but possibly-different decided_params and a non-trivial
-critique block. gen_prompt.py --plan consumes both identically.
+The reasoned branch (Planner agent, novel/partially-validated SMILES) writes a
+run_plan.json with the SAME schema but possibly-different decided_params and a
+non-trivial critique block. gen_prompt.py --plan consumes both identically.
 
 Usage:
   python3 orchestration/make_deterministic_plan.py \
@@ -39,7 +42,7 @@ RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
 # EXIST in the class entry are snapshotted, so the overlay stays an exact identity.
 SNAPSHOT_KEYS = [
     "preferred_ff", "preferred_builder", "charge_method", "electrostatics",
-    "cutoff_A", "dt_fs", "confidence",
+    "cutoff_A", "dt_fs",
     "dp_typical", "nchain", "density_initial_gcm3",
     "T_equil_K", "annealing_T_high_K", "eq_annealing_cycles", "P_equil_atm",
     "t_equil_ns", "npt_prod_ns", "melt_npt_ns",
@@ -74,8 +77,15 @@ def _exp_tg_bracket(cls: dict):
 
 def build_decisions(cls: dict) -> list:
     """Structured decision rows carrying evidence/confidence/alternatives, mirroring
-    run_summary.json decision IDs. Evidence is transcribed from existing class fields."""
-    conf = cls.get("confidence", "low")
+    run_summary.json decision IDs. Evidence is transcribed from existing class fields.
+
+    "confidence" here is a fixed "class_default" placeholder, not a per-decision
+    quality tier: this output is either used as-is for an already-`protocol_validated`
+    SMILES (where per-decision confidence is moot -- the exact molecule already passed
+    a full reasoned+critic review once), or as a scaffold the reasoned Planner
+    immediately revises with real evidence and its own confidence per decision
+    (planner.md step B). Never left as "class_default" in a plan that actually ships.
+    """
     ff_evidence = []
     if cls.get("ff_justification_doi"):
         ff_evidence.append({"claim": cls.get("ff_note", "force field choice"),
@@ -83,6 +93,7 @@ def build_decisions(cls: dict) -> list:
     for cit in cls.get("citations", []):
         ff_evidence.append({"claim": "supporting validation", "citation": cit})
 
+    conf = "class_default"
     return [
         {"id": "D-01_ff", "choice": cls.get("preferred_ff"),
          "criteria_evaluated": ["literature_support", "parameter_coverage",
@@ -207,7 +218,11 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
     decided_params["dsc_equiv_rate_K_per_ns"] = cls.get("dsc_equiv_rate_K_per_ns", 1.6667e-10)
     uncertainties = [
         {"name": "ff_transferability",
-         "dominant": cls.get("confidence", "low") != "high",
+         # This script's own raw output only "means" something as the validated/
+         # deterministic case (an already-protocol_validated SMILES, or a scaffold
+         # the reasoned Planner is about to overwrite with its own real dominant
+         # uncertainty) -- never a signal in itself, so not dominant here.
+         "dominant": False,
          "reduction_probe": "none"},
     ]
     if "tg" in properties and cls.get("tg_slope_gate_fallback"):
@@ -223,10 +238,19 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
         "polymer_class": polymer_class.upper(),
         "smiles": smiles,
         "properties": sorted(properties),
-        "confidence": cls.get("confidence", "low"),
+        # Always emitted as "validated" -- this script's raw output is used either
+        # as-is for a SMILES already protocol_validated in
+        # guides/system_characterization_cache.json, or as a scaffold the reasoned
+        # Planner immediately overwrites to "novel" (planner.md step B) once it
+        # starts revising. A plan that ships with confidence="validated" and
+        # plan_mode="reasoned" together is a bug in the caller, never in this script.
+        "confidence": "validated",
         "plan_mode": "deterministic",
         "assumptions": [
-            "polymer_rules.json defaults are validated for this class (confidence-gated)",
+            "polymer_rules.json class defaults are a starting hypothesis, not a "
+            "trust signal -- validity for THIS run rests on plan_mode/confidence "
+            "above, sourced from this exact canonical SMILES's "
+            "system_characterization_cache.json entry, not from this class.",
         ],
         "uncertainties": uncertainties,
         "decided_params": decided_params,
@@ -234,7 +258,8 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
         "planned_stages": build_planned_stages(cls, properties),
         "critique": {"status": "approved", "rounds": 0,
                      "findings": ["deterministic plan: defaults transcribed verbatim; "
-                                  "auto-approved by confidence gate"]},
+                                  "auto-approved -- this exact canonical SMILES is "
+                                  "already protocol_validated"]},
         "provenance": {"generator": "make_deterministic_plan.py",
                        "generated_at": datetime.now(timezone.utc).isoformat()},
     }
@@ -261,11 +286,16 @@ def _recovery_summary(run_plan_path: Path) -> str:
 
 def lock_from(run_plan_path: Path, polymer_class: str, rules_path: Path) -> dict:
     """--lock-from: patch guides/polymer_rules.json's class entry with a finished, fully-PASSed
-    reasoned run's decided_params, and flip confidence -> high so every subsequent run of this
-    class takes the deterministic (script-only) path.
+    reasoned run's decided_params, backfilling the class-level starting-hypothesis scaffold
+    every future reasoned plan for a novel SMILES in this class begins from.
 
-    Only ever writes SNAPSHOT_KEYS fields (the same list make_plan() reads), `confidence`, and
-    one provenance note field (_protocol_locked_note) -- DOI citations, experimental_* targets,
+    This is a class-default improvement only -- it does NOT validate any SMILES for the
+    deterministic/critic-skip path. That is a per-exact-SMILES status
+    (guides/system_characterization_cache.json[canonical_smiles].protocol_validated),
+    stamped separately by protocol-locker.md after this run.
+
+    Only ever writes SNAPSHOT_KEYS fields (the same list make_plan() reads) and one
+    provenance note field (_protocol_locked_note) -- DOI citations, experimental_* targets,
     and every other hand-curated field in the class entry are left untouched.
     """
     plan = json.loads(run_plan_path.read_text())
@@ -297,15 +327,10 @@ def lock_from(run_plan_path: Path, polymer_class: str, rules_path: Path) -> dict
             changes[k] = {"was": old_val, "now": new_val}
             cls_entry[k] = new_val
 
-    old_confidence = cls_entry.get("confidence")
-    if old_confidence != "high":
-        changes["confidence"] = {"was": old_confidence, "now": "high"}
-    cls_entry["confidence"] = "high"
-
     source_run = plan.get("run_name", "unknown")
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     summary = _recovery_summary(run_plan_path)
-    note = f"Locked {date} from {source_run} (prior confidence: {old_confidence})."
+    note = f"Class defaults backfilled {date} from {source_run}."
     if summary:
         note += f" {summary}."
     if not changes:
@@ -329,8 +354,11 @@ def main():
                    help="Output path; default data/<run_name>/raw/run_plan.json; '-' = stdout")
     p.add_argument("--lock-from", default=None, metavar="RUN_PLAN_JSON",
                    help="Patch guides/polymer_rules.json's class entry from a finished, "
-                        "fully-PASSed reasoned run's decided_params and flip confidence to "
-                        "high, instead of generating a new plan. See lock_from().")
+                        "fully-PASSed reasoned run's decided_params, backfilling the "
+                        "class-level starting-hypothesis scaffold, instead of generating "
+                        "a new plan. See lock_from(). Does NOT validate any SMILES for "
+                        "the deterministic path -- that's protocol-locker.md's separate "
+                        "system_characterization_cache.json stamp.")
     p.add_argument("--rules-path", default=str(RULES_PATH),
                    help="polymer_rules.json to read/patch (default: guides/polymer_rules.json). "
                         "Override for --lock-from dry-runs against a scratch copy.")
