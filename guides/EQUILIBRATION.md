@@ -131,7 +131,7 @@ failed stage's partial outputs, regenerate the workflow with identical params, s
 list to resume at the failed stage, resubmit. Do NOT restart from stage 0. Prevention: when
 free disk <60 GB, strip `dump`/`undump`/`write_dump` from the production stages' `.in` — but
 **not** from `npt_prod300`/`npt_production` if `tg`/`bulk_modulus` was requested and IS_NOVEL was
-true for this run: `system-probe-analyzer`'s `task=refine_from_equil` now reads
+true for this run: `system-characterization-analyzer`'s post-PASS characterization step now reads
 `npt_prod300.dump`/`npt_production.dump` (via `npt_prod_dump_path`) to refine bulk-modulus
 timing knobs from the real chain's own stationary hold — stripping it silently disables that
 refinement pass rather than erroring.

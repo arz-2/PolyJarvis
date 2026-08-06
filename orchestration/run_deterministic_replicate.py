@@ -31,9 +31,9 @@ Two-phase invocation, split at the mandatory-refine boundary:
     runs build through run-summary end to end.
   IS_NOVEL=true: Build through Equil-check-PASS needs no agent judgment (do_equil_and_check()
     already runs its own headless EXTEND loop), but a plain script can't spawn Agent(...), and
-    system-probe-analyzer's post-PASS characterization (FOUNDATION.md's `[Equilibration]`
+    system-characterization-analyzer's post-PASS characterization (FOUNDATION.md's `[Equilibration]`
     mandatory refine step) is exactly that. So invoke with `--phase equil` first (runs Build
-    through Equil-check to PASS, stops), let the orchestrator spawn system-probe-analyzer against
+    through Equil-check to PASS, stops), let the orchestrator spawn system-characterization-analyzer against
     the resulting equilibration hold, then re-invoke with `--resume-from thermal` once
     decided_params is characterization-patched (or left at class defaults, if unreliable).
 
@@ -486,7 +486,7 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
                             "exceeded max EXTEND attempts (deterministic cap=2)", "UNRESOLVED — human review")
                 return {"halted": True, "reason": "EXTEND_EXHAUSTED"}
             # A measured relaxation signal from this run's own data beats a blind flat guess —
-            # tau_relax_ps comes from comp's KWW fit (same field system-probe-analyzer reads).
+            # tau_relax_ps comes from comp's KWW fit (same field system-characterization-analyzer reads).
             tau_relax_ps = (((comp or {}).get("chain") or {}).get("ct") or {}).get("tau_relax_ps")
             extend_ns = 1.5
             if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
@@ -788,7 +788,7 @@ def main():
     ap.add_argument("--phase", choices=["full", "equil"], default="full",
                     help="'equil' stops after Equil-check PASS for the IS_NOVEL=true mandatory "
                          "characterization hand-off to the live orchestrator session (a plain "
-                         "script can't spawn system-probe-analyzer); 'full' (default) runs "
+                         "script can't spawn system-characterization-analyzer); 'full' (default) runs "
                          "everything from the first non-done stage in executor_state.json onward.")
     ap.add_argument("--resume-from", default=None,
                     help="Informational — resumption is actually driven by executor_state.json; "

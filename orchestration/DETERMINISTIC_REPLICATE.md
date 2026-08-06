@@ -8,7 +8,7 @@ consume.
 
 ## Invocation — one or two phases, split at the mandatory-refine boundary
 
-A plain script cannot spawn `Agent(...)`. `system-probe-analyzer`'s mandatory post-PASS
+A plain script cannot spawn `Agent(...)`. `system-characterization-analyzer`'s mandatory post-PASS
 characterization (`FOUNDATION.md`'s `[Equilibration]` section) must still run inside the live
 orchestrator session when this SMILES is novel — Build through Equil-check-PASS itself needs no
 agent judgment (`do_equil_and_check()` runs its own EXTEND loop headlessly), so the split point
@@ -36,11 +36,11 @@ SETUP) already determines `IS_NOVEL` before Phase A starts, so the split point i
      "npt_prod_log_path": ..., "npt_prod_dump_path": ..., "density_gcm3": ...}` on success.
      BACKGROUND-WAIT on this invocation (the long one — it now includes the full equilibration
      chain, not just Build).
-  2. Spawn `system-probe-analyzer` exactly as `FOUNDATION.md`'s `[Equilibration]` mandatory
+  2. Spawn `system-characterization-analyzer` exactly as `FOUNDATION.md`'s `[Equilibration]` mandatory
      refine step documents, reading the paths from step 1's printed output plus `data_path` from
      `executor_state.json`'s `build` stage result (for `inspect_data_file`'s `backbone_types`
      lookup — the original pre-simulation `.data` file, never a `write_data` output). No critic
-     step follows — `refine_from_equil` was never critiqued (mechanical-track knobs only,
+     step follows — the characterization step was never critiqued (mechanical-track knobs only,
      narrowly-scoped numeric refinement of an already-approved plan).
   3. Re-invoke: `... run_deterministic_replicate.py --run_name <RUN> --polymer_class <CLASS>
      --plan PLAN_PATH --resume-from thermal` — `executor_state.json` already has `build` and

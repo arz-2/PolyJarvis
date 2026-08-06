@@ -2,7 +2,7 @@
 """
 apply_cached_characterization.py — reuse a prior system-probe measurement for this SMILES.
 
-system-probe-analyzer.md's cache write (guides/system_characterization_cache.json) is already
+system-characterization-analyzer.md's cache write (guides/system_characterization_cache.json) is already
 gated: an entry only exists when at least one of that run's reliability checks
 (probe_tau_relax_reliable / probe_K0_reliable) came back true, so a fully-failed probe never
 poisons the cache. What is still missing is the OTHER half of the loop: nothing reads a usable
@@ -13,7 +13,7 @@ class defaults exactly as if it had never been probed at all.
 
 This script closes that gap: given a run's run_plan.json and its canonical SMILES, if a usable
 cache entry exists, patch decided_params with every non-null derived_* field (same field-name
-mapping system-probe-analyzer.md step 5 uses when it patches decided_params from a FRESH probe),
+mapping system-characterization-analyzer.md step 5 uses when it patches decided_params from a FRESH probe),
 and append a D-09_characterization decision citing the cache entry's provenance. If there is no
 entry, or the entry (defensively) carries no usable derived fields, this is a no-op -- exit 0,
 decided_params untouched.
@@ -40,9 +40,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CACHE_PATH = REPO_ROOT / "guides" / "system_characterization_cache.json"
 
-# Same field-name mapping system-probe-analyzer.md step 5 uses when patching decided_params
+# Same field-name mapping system-characterization-analyzer.md step 5 uses when patching decided_params
 # from a fresh probe -- kept in sync by hand since both sides read the same cache schema
-# (system-probe-analyzer.md step 6's derived_* fields).
+# (system-characterization-analyzer.md step 6's derived_* fields).
 DERIVED_FIELD_MAP = {
     "derived_t_equil_ns": "t_equil_ns",
     "derived_eq_annealing_cycles": "eq_annealing_cycles",
@@ -70,7 +70,7 @@ def apply_cached_characterization(run_plan_path: Path, canonical_smiles: str,
         if entry.get(derived_key) is not None
     }
     if not applied_fields:
-        # Defensive only -- the write-side gate (system-probe-analyzer.md step 6) means an
+        # Defensive only -- the write-side gate (system-characterization-analyzer.md step 6) means an
         # entry should never exist with every derived_* field null, but a reuse consumer
         # should never assume its producer's invariant instead of checking it.
         return {"applied": False, "reason": "no_usable_fields_in_cache_entry",

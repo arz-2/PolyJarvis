@@ -56,7 +56,7 @@ RESULT:
   # rubbery (temp≤300): <work_dir>/npt_production/npt_production.log
   npt_prod_dump_path: <workflow["npt_production_dir"]>/<stage_name>.dump
   # same stage as npt_prod_log_path above — glassy: npt_prod300.dump; rubbery: npt_production.dump
-  # needed by system-probe-analyzer's task=refine_from_equil (check_equilibration_comprehensive
+  # needed by system-characterization-analyzer's post-PASS characterization step (check_equilibration_comprehensive
   # requires dump_file); derive from the matched stage's work_dir + its DUMP_FILE param, same
   # source as npt_prod_log_path/npt_prod_data_path — do not hand-build a numbered path.
   npt_prod_data_path: <workflow["npt_production_dir"]>/<stage_name>_out.data

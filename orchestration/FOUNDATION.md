@@ -39,7 +39,7 @@ Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polym
 Write SIMULATION STATE to run_log.md, then run BACKGROUND-WAIT on `monitor_command` (see CLAUDE.md).
 
 If `IS_NOVEL=true`, once this chain's equil-check gate below returns `equil_verdict=PASS`,
-**mandatory**: spawn `system-probe-analyzer` once to characterize this SMILES from the real
+**mandatory**: spawn `system-characterization-analyzer` once to characterize this SMILES from the real
 chain's own genuine stationary hold — the `npt_prod300` stage for glassy chains (300 K) or
 `npt_production` for rubbery (target T; there is no `npt_prod300` stage for rubbery). **Not**
 `npt_pppm` — it's a pressure ramp, not a hold. This is the only measurement this SMILES ever gets
@@ -48,7 +48,7 @@ could afford anyway, and matches the actual state point where the derived knobs 
 downstream (glassy Murnaghan work runs at `npt_prod300`; rubbery at `npt_production`).
 
 ```
-Agent(subagent_type="system-probe-analyzer", description="🟢 Characterize {polymer_name} from equil",
+Agent(subagent_type="system-characterization-analyzer", description="🟢 Characterize {polymer_name} from equil",
       prompt="run_name: <RUN>\ncanonical_smiles: <CANONICAL_SMILES>\npolymer_class: <CLASS>\n"
              "run_plan_path: PLAN_PATH\ndata_file: <npt_prod_data_path>\n"
              "backbone_types: <from inspect_data_file, on the ORIGINAL pre-simulation .data file>\n"
