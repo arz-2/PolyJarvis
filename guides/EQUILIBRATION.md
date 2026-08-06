@@ -122,9 +122,27 @@ means stale MCP server code; request an orchestrator server restart. Do NOT subm
 **RE-ANNEAL (equil-checker verdict `UNDER_ANNEALED_COOLING`):** melt density right but cooling
 froze in free volume. Do NOT `EXTEND` at 300 K (a glass can't densify below Tg). Re-melt from
 the converged **melt** cell (`npt_production_out.data` at T_equil, NOT the 300 K cell) via
-`generate_equilibration_workflow` with more annealing cycles and a slower cool (rate at/below
-the class default). Max 2 attempts; if still under-band, re-classify as `MELT_STAGE_DEFICIT`
-and record the evidence rather than looping.
+`generate_equilibration_workflow`, slowing the cool ramp with the explicit
+`npt_cool_steps`/`npt_cool300_steps` overrides (`server.py:1278-1300` — these did not exist
+before this fix; the ramp used to be fixed regardless of the caller). Compute the baseline
+being overridden, then pass **2×** it on the first RE-ANNEAL attempt, **4×** on the second
+(max 2 attempts; if still under-band, re-classify as `MELT_STAGE_DEFICIT` and record the
+evidence rather than looping — this remedy targets a too-fast *cooling* ramp, not a deficient
+melt, and cannot fix the latter):
+
+- `npt_cool300_steps` (glassy — the T_workflow→300 K leg, the stage most directly implicated
+  by "cooling too fast to 300 K"): baseline = `int(1.0e6 / dt_fs)` (~1 ns at the class's
+  production timestep).
+- `npt_cool_steps` (rubbery, or the melt→target leg when `add_melt_npt=True`): baseline =
+  the atom-count tier `generate_equilibration_workflow` would otherwise pick —
+  `n_atoms < 5000` → 1,000,000; `< 15000` → 2,000,000; else → 3,000,000 (`n_atoms` is already
+  known from this stage's own `inspect_data_file` call).
+
+Pass the multiplied value(s) as `--npt_cool_steps`/`--npt_cool300_steps` on the re-spawned
+equilibration-worker's `gen_prompt.py --stage equil` call (reasoned path), or patch
+`decided_params.npt_cool_steps`/`npt_cool300_steps` in `run_plan.json` (deterministic path —
+flows through `apply_plan()`'s `{**cls, **decided_params}` overlay the same way every other
+D-09-style numeric refinement does). Log the multiplier used (2× or 4×) in the RECOVERY block.
 
 **Disk-full mid-chain:** completed stages' `_out.data` stay intact. Free disk, delete only the
 failed stage's partial outputs, regenerate the workflow with identical params, slice the stage

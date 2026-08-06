@@ -1298,6 +1298,8 @@ def generate_equilibration_workflow(
     velocity_seed: Optional[int] = None,
     extend_only: bool = False,
     extend_steps: Optional[int] = None,
+    npt_cool_steps: Optional[int] = None,
+    npt_cool300_steps: Optional[int] = None,
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
@@ -1375,6 +1377,18 @@ def generate_equilibration_workflow(
                              These provide density and deformation input for glassy polymers.
                              npt_production_log/dir in the return dict point to npt_prod300
                              when present. Set False only for diagnostic or rubbery-at-high-T runs.
+        npt_cool_steps:      Explicit step count for the npt_cool stage (max_temp→temp, or
+                             the t_equil_K→temp leg when add_melt_npt=True). When None
+                             (default), uses steps_npt from the atom-count tier — the
+                             cooling ramp always runs at the same rate for a given cell
+                             size. Pass a larger value (e.g. 2x/4x the default) to slow
+                             the ramp — this is the re_melt_slow_recool recovery lever for
+                             UNDER_ANNEALED_COOLING (RECOVERY_PLAYBOOK.md / EQUILIBRATION.md).
+        npt_cool300_steps:   Explicit step count for the npt_cool300 stage (glassy only,
+                             T_workflow→300 K). When None (default), uses
+                             int(1.0e6/dt_prod) (~1 ns), fixed regardless of cell size or
+                             T_workflow. Pass a larger value to slow the final cool to
+                             300 K — the other re_melt_slow_recool lever.
 
     Returns:
         dict with:
@@ -1596,6 +1610,7 @@ def generate_equilibration_workflow(
             and t_equil_K is not None
             and temp < t_equil_K
         )
+        _cool_steps = npt_cool_steps if npt_cool_steps is not None else steps_npt
         if _use_melt_npt:
             _melt_steps = melt_npt_steps or int(1.0e6 / dt_prod)
             s5a = _stage("npt_cool_melt", "npt", {
@@ -1634,7 +1649,7 @@ def generate_equilibration_workflow(
                 "P_FINAL":   press,
                 "P_DAMP":    1000.0,
                 "TIMESTEP":  dt_prod,
-                "N_STEPS":   steps_npt,
+                "N_STEPS":   _cool_steps,
                 "use_pppm":  True,
                 "use_gpu":   True,
                 "write_restart": True,
@@ -1649,7 +1664,7 @@ def generate_equilibration_workflow(
                 "P_FINAL":   press,
                 "P_DAMP":    1000.0,
                 "TIMESTEP":  dt_prod,
-                "N_STEPS":   steps_npt,
+                "N_STEPS":   _cool_steps,
                 "use_pppm":  True,
                 "use_gpu":   True,
                 "write_restart": True,
@@ -1694,7 +1709,7 @@ def generate_equilibration_workflow(
         _add_300k = add_300k_production and temp > 300.0
         s8 = s9 = None
         if _add_300k:
-            steps_cool300 = int(1.0e6 / dt_prod)   # ~1 ns
+            steps_cool300 = npt_cool300_steps if npt_cool300_steps is not None else int(1.0e6 / dt_prod)   # ~1 ns default
             steps_prod300 = int(2.0e6 / dt_prod)   # ~2 ns
             s8 = _stage("npt_cool300", "npt", {
                 "T_START":       temp,
