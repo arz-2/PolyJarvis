@@ -13,21 +13,15 @@
 The orchestrator passes the correct cell as `equil_data_path`.
 
 **When to submit:**
-- Glassy → always submit (the prompt's `### ASSERTION` reinforces this even if `bm_pressures_atm` is null).
+- Glassy → always submit.
 - Rubbery with `bm_pressures_atm` set → submit.
-- Rubbery with `bm_pressures_atm` null → return an all-null RESULT (fluctuation path, no job).
+- Rubbery with `bm_pressures_atm` null → return an all-null RESULT.
 
-**Pressure range** comes from the prompt's `bm_pressures_atm` (± symmetric for typical glasses;
-PEST/PKTN and other stiff classes use a compression-biased range). On a `fit_converged=False`
-re-submit, widen the **compression** side (e.g. `[-1000, 0, 1500, 3000, 5000]`), never
-symmetrically — wide tension (< −5000 atm) cavitates the cell.
+**Pressure range** comes from the prompt's `bm_pressures_atm`.
 
-**`engine` is mandatory** — pass the prompt's value. PCFF/OPLS must run `engine="kokkos"` (full
-GPU offload); the GPU-package default leaves class2 bonded + PPPM on the CPU (~7.9× slower, the
-PSU1 failure mode).
+**`engine` is mandatory** — pass the prompt's value.
 
-**FF flags:** pass only the one true selector from `lammps_flags` (`use_pcff`/`use_opls`/`use_trappe`);
-the tool derives `use_pppm`/`LJ_CUTOFF`/`use_shake` internally.
+**FF flags:** pass only the one true selector from `lammps_flags` (`use_pcff`/`use_opls`/`use_trappe`).
 
 **`watch_run` is a tool call.** `run_bulk_modulus_series` returns a placeholder string like
 `"watch_run('chain_id')"` — that is NOT the sentinel. Call `watch_run(chain_id)` as a real MCP
@@ -60,12 +54,3 @@ log_files = result["log_files"]  # absolute paths, one per pressure
 w = watch_run(chain_id)          # MCP tool call — creates sentinel
 # Return chain_id, log_files, w["monitor_command"] to the orchestrator — do NOT call Monitor.
 ```
-
----
-
-## Recovery Notes
-
-**One pressure point fails / GPU OOM / empty `log_files`:** reduce `npt_steps` to 200000 and re-submit (check `nvidia-smi`).
-
-**BACKGROUND-WAIT never returns after watch_run:** sentinel not created — `watch_run` was likely
-called with the placeholder string, not the real `chain_id`. Re-run `watch_run(chain_id)` as a tool call.

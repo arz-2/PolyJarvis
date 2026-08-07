@@ -67,12 +67,11 @@ only EXTEND-type recovery (a parameter tweak that never touches `decided_params`
 script prints `{"status": "halted", "stage": ..., "detail": ...}` and exits without submitting
 anything further:
 - `equil_verdict == STRUCTURAL_FAIL` (or `FAIL`), or EXTEND exhausted at 2 attempts
-- a glassy slope-gate failure with no `tg_slope_gate_fallback` named for the class
 - (implicitly, via the artifact-shape check in `enforce_gate.py`'s retrospective mode) any stage
   whose `run_log.md` write didn't land cleanly
 
 On a halt, `executor_state.json["halted"]` carries the stage, reason, and full diagnostic detail
-(the same fields `enforce_equilibration_gate`/multirate results already return) — write this to
+(the same fields `enforce_equilibration_gate` already returns) — write this to
 `run_log.md` as a "protocol did not reproduce on this seed" finding and surface for human review,
 per `recover.md`'s deterministic-mode rule. Do **not** re-invoke with a changed protocol; changing
 `decided_params` on a locked replicate breaks the fixed-protocol-across-replicates invariant the

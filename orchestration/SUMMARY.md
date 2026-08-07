@@ -25,13 +25,10 @@ polymer_rules median ±5% band, which is correctly wide.
 1. **Verify the lammps-engine MCP server is live** (long sessions >12 h drop the connection
    silently): a minimal call (e.g. `list_templates`) must return; if it hangs/errors, restart the
    MCP server first.
-2. **Determine tg_path + slope_gate_pass with the helper** — do NOT hand-derive the path (the PLA3
-   footgun); the helper encodes the slowest/highest-rate convention:
-   ```
-   eval "$(python3 orchestration/select_tg_path.py --plan PLAN_PATH --multirate data/RUN/raw/tg_multirate_result.json)"
-   # → sets TG_PATH (slowest rate if gate passed, else the plan's tg_slope_gate_fallback rate,
-   #   default highest) and SLOPE_GATE (true|false)
-   ```
+2. **TG_PATH is already known** — single-rate-primary means there's no rate ambiguity to resolve:
+   it's the thermal track's own `tg-analysis-worker` RESULT's `output_dir` field (held from Phase
+   B) + `/tg_summary.json`. No extra resolution step, no `select_tg_path.py` call — that helper
+   still exists for the legacy/opt-in multirate path only.
 3. **Exp ranges:** thread each non-null exp-lookup field as a CLI override; omit nulls so gen_prompt
    falls back to its DB/polymer_rules ±5% band: `--exp_tg_min/--exp_tg_max`,
    `--exp_density_min/--exp_density_max`, `--exp_K_min/--exp_K_max` (else polymer_rules exp_K_GPa).
@@ -42,7 +39,7 @@ polymer_rules median ±5% band, which is correctly wide.
 Agent(subagent_type="run-summary-worker", description="🟢 Run summary {polymer_name}",
       prompt=<gen_prompt.py --stage run-summary --plan PLAN_PATH
              --smiles ... --ff ... --tg_fit_quality ... --d05 equil_verdict
-             --tg_path <TG_PATH> --slope_gate_pass <SLOPE_GATE>
+             --tg_path <TG_PATH>
              [--exp_tg_min ... --exp_tg_max ...] [--exp_density_min ... --exp_density_max ...]
              --exp_K_min ... --exp_K_max ...>)
   → RESULT → run_summary_path → write RESULTS to run_log.md

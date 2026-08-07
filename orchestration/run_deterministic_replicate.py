@@ -44,9 +44,9 @@ re-running with the same --plan) skips any stage already marked "done".
 
 Recovery scope matches .claude/commands/recover.md's plan_mode=="deterministic" rule exactly:
 only EXTEND-type recovery (parameter tweaks that never touch decided_params) auto-applies, capped
-at 2 attempts. STRUCTURAL_FAIL, a slope-gate fail with no tg_slope_gate_fallback, or Murnaghan+
-deform both failing acceptance halt immediately and write the diagnostic for human review —
-never auto-changing a protocol that's supposed to be identical across replicates.
+at 2 attempts. STRUCTURAL_FAIL, or Murnaghan+deform both failing acceptance, halt immediately and
+write the diagnostic for human review — never auto-changing a protocol that's supposed to be
+identical across replicates.
 
 Usage:
   <repo>/mcp-servers/.venv/bin/python orchestration/run_deterministic_replicate.py \\
@@ -520,10 +520,17 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
 
 def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, graphs_dir: Path,
                run_log_path: Path) -> dict:
+    """Single-rate-primary: run one sweep at the class's primary configured rate (highest by
+    default; tg_slope_gate_fallback="slowest_rate" classes — PKTN, PSFO — run rates[0] instead,
+    since their highest-rate fit is documented as degenerate/inverted). Multirate extrapolation
+    is a legacy/opt-in capability (extract_tg_multirate.py, select_tg_path.py) not exercised here."""
     tg_rates = cls.get("tg_rates_K_per_ns", [])
     gpu_per_run = cls.get("gpu_per_run") or 1
     per_rate = []
-    for idx, rate in enumerate(tg_rates):
+    if tg_rates:
+        fallback = cls.get("tg_slope_gate_fallback")
+        idx = 0 if fallback == "slowest_rate" else len(tg_rates) - 1
+        rate = tg_rates[idx]
         args.tg_rate_index = idx
         p = resolve_stage_params("tg", args, cls)
         with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
@@ -553,36 +560,16 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
             enthalpy_col=ap["enthalpy_col"], output_dir=ap["output_dir"], graphs_dir=ap["graphs_dir"],
         ), f"tg analysis rate={rate}")
         per_rate.append({"rate": rate, "Tg_K": thermal.get("Tg_K"),
-                         "fit_quality": thermal.get("fit_quality"), "r_squared": thermal.get("r_squared")})
+                         "fit_quality": thermal.get("fit_quality"), "r_squared": thermal.get("r_squared"),
+                         "output_dir": ap["output_dir"], "used_highest_rate": idx == len(tg_rates) - 1})
 
-    accepted = [r for r in per_rate if r["fit_quality"] in ("EXCELLENT", "GOOD", "ACCEPTABLE")]
-    mp = resolve_stage_params("analyze-tg-multirate", args, cls)
-    if len(accepted) >= 2:
-        cmd = [sys.executable, mp["script"],
-               "--rates", *[str(r["rate"]) for r in accepted],
-               "--tg_values", *[str(r["Tg_K"]) for r in accepted],
-               "--slow_rate_ref", str(mp["dsc_equiv_rate_K_per_ns"]), "--regime", mp["regime"],
-               "--polymer_name", mp["polymer_name"], "--output_dir", mp["output_dir"]]
-        subprocess.run(cmd, check=True)
-        multirate = json.loads((Path(mp["output_dir"]) / "tg_multirate_result.json").read_text())
-    else:
-        multirate = {"status": "insufficient_rates", "slope_gate_pass": None}
-
-    slope_gate_fallback = cls.get("tg_slope_gate_fallback")
     highest = per_rate[-1] if per_rate else None
-    regime = mp["regime"]
-    slope_gate_pass = multirate.get("slope_gate_pass")
 
-    if regime == "glassy" and slope_gate_pass is False and not slope_gate_fallback:
-        state.halt("thermal", "SLOPE_GATE_FAIL", multirate)
-        log_recovery(run_log_path, "thermal", 1, "multirate slope_gate_pass=False (glassy, no fallback)",
-                    "none — deterministic replicate; a locked protocol's slope-gate failure on a "
-                    "replicate seed is a reproducibility finding, not something to auto-fix",
-                    "UNRESOLVED — human review")
-        return {"halted": True, "reason": "SLOPE_GATE_FAIL", "detail": multirate}
-
-    # is_glassy determination (THERMAL_TRACK.md's fixed algorithm)
-    degenerate = (not highest) or highest["fit_quality"] == "POOR" or (regime == "glassy" and slope_gate_pass is False)
+    # is_glassy determination (THERMAL_TRACK.md's single-sweep algorithm): only trust this
+    # sweep's Tg for is_glassy when it ran at the class's highest configured rate — a class that
+    # deliberately ran the slowest rate instead (PKTN, PSFO) falls through to the exp-Tg
+    # decision, the same outcome those classes got via the old slope-gate-failure path.
+    degenerate = (not highest) or highest["fit_quality"] == "POOR" or not highest["used_highest_rate"]
     if degenerate:
         exp_tg = cls.get("experimental_tg_K")
         exp_tg_val = exp_tg if isinstance(exp_tg, (int, float)) else None
@@ -590,8 +577,7 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
     else:
         is_glassy = bool(highest and isinstance(highest["Tg_K"], (int, float)) and highest["Tg_K"] > 300)
 
-    result = {"per_rate": per_rate, "multirate": multirate, "is_glassy": is_glassy,
-             "slope_gate_pass": slope_gate_pass}
+    result = {"per_rate": per_rate, "is_glassy": is_glassy}
     state.mark("thermal", "done", result=result)
     return result
 
@@ -726,19 +712,14 @@ def do_summary(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool, t
     args.exp_density_min, args.exp_density_max = _range("exp_density_min_gcm3", "exp_density_max_gcm3")
     args.exp_K_min, args.exp_K_max = _range("exp_K_min_GPa", "exp_K_max_GPa")
 
-    tg_path, slope_gate = None, None
+    tg_path = None
     if thermal_result is not None:
-        mr_path = raw_dir / "tg_multirate_result.json"
-        if mr_path.exists():
-            r = subprocess.run([sys.executable, str(REPO_ROOT / "orchestration" / "select_tg_path.py"),
-                                "--plan", str(plan_path), "--multirate", str(mr_path)],
-                               capture_output=True, text=True, check=True)
-            for line in r.stdout.splitlines():
-                if line.startswith("TG_PATH="):
-                    tg_path = line.split("=", 1)[1]
-                elif line.startswith("SLOPE_GATE="):
-                    slope_gate = line.split("=", 1)[1] == "true"
-        args.tg_path, args.slope_gate_pass = tg_path, slope_gate
+        # Single-rate-primary: the one sweep's tg_summary.json path is already known from the
+        # analyze-tg stage's own output_dir — no rate ambiguity to resolve, no select_tg_path.py
+        # call (that helper is kept for the legacy/opt-in multirate path only).
+        if thermal_result.get("per_rate"):
+            tg_path = str(Path(thermal_result["per_rate"][-1]["output_dir"]) / "tg_summary.json")
+        args.tg_path = tg_path
         args.tg_fit_quality = (thermal_result["per_rate"][-1]["fit_quality"]
                                if thermal_result.get("per_rate") else "N/A (not requested)")
 
@@ -767,7 +748,7 @@ def _print_dry_run(args, cls: dict, properties: set):
     (tests/test_run_deterministic_replicate.py)."""
     stages = ["build", "equil", "equil-check"]
     if "tg" in properties:
-        stages += ["tg", "analyze-tg", "analyze-tg-multirate"]
+        stages += ["tg", "analyze-tg"]
     if "bulk_modulus" in properties:
         stages += ["murnaghan", "deform", "analyze-bm"]
     stages.append("run-summary")

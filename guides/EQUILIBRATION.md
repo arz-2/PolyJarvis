@@ -4,6 +4,30 @@
 
 ---
 
+## Rules
+
+`temp` (= `T_workflow_K` from the prompt, already resolved upstream from `exp_Tg_K` — pass it
+through as-is, don't re-derive it) selects the chain: `≤ 300.0` (rubbery) → 7-run chain ending
+at `npt_production` (this stage is the density/bulk-modulus source); `> 300.0` (glassy) → 9-run
+chain (`npt_cool300` + `npt_prod300` auto-appended, with `npt_prod300` as the density/deformation
+source — no separate cooling phase needed). Use the return dict keys (`npt_production_dir`,
+`npt_prod300_data`, …) as downstream paths — never construct paths manually. Stage directories
+are NOT numbered on disk — every stage's path is `{work_dir_base}/{name}` (e.g.
+`<work_dir>/npt_production/`, not `<work_dir>/07_npt_production/`).
+
+When `add_melt_npt=True` (rubbery), the return dict also has `npt_tg_prep_data` (path to
+`npt_melt_out.data`, isothermal NPT at `T_equil_K`) — the Tg-sweep starting cell. Do NOT use
+`npt_production_out.data` for rubbery Tg sweeps (too close to Tg, biases the density slope).
+Include `npt_tg_prep_data` in RESULT so the orchestrator threads it to the thermal track.
+
+Extend mode's `temp` param must be `npt_prod_temp_K` (production temp of the cell being
+extended = 300 K for BOTH regimes: glassy cooled to 300, rubbery produced at 300) — NOT
+`T_equil_K`/`T_workflow_K`, which would re-melt the cooled cell.
+
+`info.validation.errors` must be empty before proceeding past the initial inspect.
+
+---
+
 ## Workflow
 
 ### Step 1: Copy and inspect the .data file
@@ -39,18 +63,6 @@ workflow = generate_equilibration_workflow(
 )
 ```
 
-`temp` (= `T_workflow_K` from the prompt, already resolved upstream from `exp_Tg_K` — pass it
-through as-is, don't re-derive it) selects the chain: `≤ 300.0` (rubbery) → 7-run chain ending
-at `npt_production` (this stage is the density/bulk-modulus source); `> 300.0` (glassy) → 9-run
-chain (`npt_cool300` + `npt_prod300` auto-appended, with `npt_prod300` as the density/deformation
-source — no separate cooling phase needed). Use the return dict keys (`npt_production_dir`,
-`npt_prod300_data`, …) as downstream paths — never construct paths manually.
-
-When `add_melt_npt=True` (rubbery), the return dict also has `npt_tg_prep_data` (path to
-`npt_melt_out.data`, isothermal NPT at `T_equil_K`) — the Tg-sweep starting cell. Do NOT use
-`npt_production_out.data` for rubbery Tg sweeps (too close to Tg, biases the density slope).
-Include `npt_tg_prep_data` in RESULT so the orchestrator threads it to the thermal track.
-
 ### Step 3: Submit chain and watch
 
 ```python
@@ -66,9 +78,7 @@ w = watch_run(result["chain_id"])
 # Return chain_id and w["monitor_command"] to orchestrator — do not call Monitor.
 ```
 
----
-
-## Extend mode (`mode: extend`)
+### Extend mode (`mode: extend`)
 
 Triggered when the prompt sets `mode: extend` (with `extend_from_data: <last NPT _out.data>` and
 optional `extend_ns: <1-2>`). Do NOT hand-write a continuation `.in` — generate it
@@ -80,9 +90,7 @@ workflow = generate_equilibration_workflow(
     data_file=extend_from_data,
     work_dir_base=work_dir,
     use_pcff=..., use_opls=..., use_trappe=...,
-    temp=npt_prod_temp_K,   # production temp of the cell being extended = 300 K for BOTH regimes
-                             # (glassy cooled to 300; rubbery produced at 300) — NOT
-                             # T_equil_K/T_workflow_K, which would re-melt the cooled cell.
+    temp=npt_prod_temp_K,   # see Rules above — NOT T_equil_K/T_workflow_K
     press=<same as original run>,
     engine=<same as original run>,
     extend_only=True,
@@ -94,62 +102,3 @@ w = watch_run(result["chain_id"])
 
 Return the standard RESULT block with `npt_prod_data_path` =
 `workflow["npt_production_dir"]/npt_extend_out.data` (the orchestrator re-runs equil-check on it).
-
----
-
-## Common Failures
-
-**GPU crash during NPT:** Check the log; do NOT switch to CPU. Causes: OOM (reduce system
-size/GPUs), bad geometry (more minimize steps), pair-style mismatch (check params file).
-
-**Density not converging:** Add annealing cycles (3–5).
-
-**Chain droplets / vacuum voids:** Initial density too high — rebuild at `density=0.05`.
-
-**"Out of range atoms — cannot compute PPPM" in npt_compress:** Switch `npt_compress`
-pair_style to `lj/cut/coul/cut`, increase neighbor skin 2.0 → 3.0 Å, drop dt to 0.5 fs for
-that run only. Restore `lj/cut/coul/long` + kspace_style from `npt_pppm` onward.
-
-**Same PPPM error at `nvt_softheat` step 0→1 (minimize completed):** localized EMC pack
-overlap for that seed. Rebuild the cell with a fresh EMC seed. If a second seed also fails,
-drop `density_initial` 0.6 → 0.5 before any deck edits.
-
-**Extend mode returns 7 stages instead of 1:** `generate_equilibration_workflow(extend_only=True)`
-must yield `n_stages==1`, `run_order==["npt_extend"]` — verify before submitting. A full chain
-means stale MCP server code; request an orchestrator server restart. Do NOT submit (its
-`nvt_softheat` re-melts the cooled glassy cell) and do NOT hand-write a `.in`.
-
-**RE-ANNEAL (equil-checker verdict `UNDER_ANNEALED_COOLING`):** melt density right but cooling
-froze in free volume. Do NOT `EXTEND` at 300 K (a glass can't densify below Tg). Re-melt from
-the converged **melt** cell (`npt_production_out.data` at T_equil, NOT the 300 K cell) via
-`generate_equilibration_workflow`, slowing the cool ramp with the explicit
-`npt_cool_steps`/`npt_cool300_steps` overrides (`server.py:1278-1300` — these did not exist
-before this fix; the ramp used to be fixed regardless of the caller). Compute the baseline
-being overridden, then pass **2×** it on the first RE-ANNEAL attempt, **4×** on the second
-(max 2 attempts; if still under-band, re-classify as `MELT_STAGE_DEFICIT` and record the
-evidence rather than looping — this remedy targets a too-fast *cooling* ramp, not a deficient
-melt, and cannot fix the latter):
-
-- `npt_cool300_steps` (glassy — the T_workflow→300 K leg, the stage most directly implicated
-  by "cooling too fast to 300 K"): baseline = `int(1.0e6 / dt_fs)` (~1 ns at the class's
-  production timestep).
-- `npt_cool_steps` (rubbery, or the melt→target leg when `add_melt_npt=True`): baseline =
-  the atom-count tier `generate_equilibration_workflow` would otherwise pick —
-  `n_atoms < 5000` → 1,000,000; `< 15000` → 2,000,000; else → 3,000,000 (`n_atoms` is already
-  known from this stage's own `inspect_data_file` call).
-
-Pass the multiplied value(s) as `--npt_cool_steps`/`--npt_cool300_steps` on the re-spawned
-equilibration-worker's `gen_prompt.py --stage equil` call (reasoned path), or patch
-`decided_params.npt_cool_steps`/`npt_cool300_steps` in `run_plan.json` (deterministic path —
-flows through `apply_plan()`'s `{**cls, **decided_params}` overlay the same way every other
-D-09-style numeric refinement does). Log the multiplier used (2× or 4×) in the RECOVERY block.
-
-**Disk-full mid-chain:** completed stages' `_out.data` stay intact. Free disk, delete only the
-failed stage's partial outputs, regenerate the workflow with identical params, slice the stage
-list to resume at the failed stage, resubmit. Do NOT restart from stage 0. Prevention: when
-free disk <60 GB, strip `dump`/`undump`/`write_dump` from the production stages' `.in` — but
-**not** from `npt_prod300`/`npt_production` if `tg`/`bulk_modulus` was requested and IS_NOVEL was
-true for this run: `system-characterization-analyzer`'s post-PASS characterization step now reads
-`npt_prod300.dump`/`npt_production.dump` (via `npt_prod_dump_path`) to refine bulk-modulus
-timing knobs from the real chain's own stationary hold — stripping it silently disables that
-refinement pass rather than erroring.

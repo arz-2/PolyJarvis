@@ -596,8 +596,9 @@ def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
                 f"⚠ WARNING: rate {p['selected_rate_K_per_ns']} K/ns → {p['n_steps_per_t']} steps/T = {ps:.0f} ps/T, "
                 f"BELOW tg_min_steps_per_T={p['tg_min_steps_per_T']} ({p['tg_min_steps_per_T'] * p['dt_fs'] * 1e-3:.0f} ps). Bilinear Tg fit "
                 f"likely DEGENERATE (cis-PBD2/PEEK2 failure mode). This rate is infeasible for "
-                f"tg_t_step_K={p['T_step_K']}, dt={p['dt_fs']}fs — the slope gate is the backstop; do NOT report "
-                f"this rate's Tg as primary.\n\n"
+                f"tg_t_step_K={p['T_step_K']}, dt={p['dt_fs']}fs — investigate fit reliability "
+                f"before trusting this value; the plan-time feasibility check "
+                f"(_assert_tg_rates_feasible) should have caught this earlier.\n\n"
             )
     else:
         rate_line = f"tg_rate_index:     null  # standard single-rate run"

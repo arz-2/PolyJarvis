@@ -1,30 +1,27 @@
 # PolyJarvis
 
-AI agent for autonomous polymer MD simulation. Given a SMILES string, runs the full pipeline — molecular construction (RadonPy/EMC MCP servers) → equilibration → Tg sweep → property extraction (LAMMPS engine MCP server, local GPU) — and reports Tg, density, and bulk modulus validated against experiment.
+AI agent for autonomous polymer MD simulation. Given a SMILES string, runs the full pipeline — molecular construction (RadonPy/EMC MCP servers) → equilibration → track sweeps → property extraction.
 
 ## Key Directories
 
 | Path | Contents |
 |------|----------|
-| `orchestration/` | Orchestrator-read docs (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`, `SUMMARY.md`), `decision_policy.json` (planner/critic framework), and CLI helpers (`gen_prompt.py`, `select_tg_path.py`, `pick_gpu.py`) |
-| `guides/` | Worker guides inlined into worker prompts by `gen_prompt.py` (never read them directly); `polymer_rules.json` (per-class Tg/density/DP/annealing) |
+| `orchestration/` | Orchestrator-read docs (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`, `SUMMARY.md`), `decision_policy.json`, and CLI helpers (`gen_prompt.py`, `select_tg_path.py`, `pick_gpu.py`) |
+| `guides/` | Worker guides inlined into worker prompts by `gen_prompt.py`; `polymer_rules.json` |
 | `data/TEMPLATE/run_log.md` | Run log template — copied to `data/[RUN]/run_log.md` at task start |
-| `data/[RUN]/` | All run files: `run_log.md`, `lammps/`, `raw/`, `graphs/` (git-excluded) |
-| `.understand-anything/knowledge-graph.json` | Codebase map (core system, git-excluded). **Query it before file-walking** |
-
-**Codebase:** before file-walking, query `.understand-anything/knowledge-graph.json` (built by `/understand`; covers orchestration/, mcp-servers/, db/, guides/, `.claude/` — NOT tools/, tests/, hardware/, manuscript/, docs/). Plain JSON (`nodes`=id/type/name/summary/tags, `edges`=source/target/type) — `jq` it, or use `/understand-chat|explain|diff`. It's a snapshot and a **map, not ground truth** (lazy imports under-captured) — verify against the file; for out-of-scope dirs use normal search.
+| `data/[RUN]/` | All run files: `run_log.md`, `lammps/`, `raw/`, `graphs/` |
 
 **Paths:** all run files live under `data/<run_name>/` (repo-relative, git-excluded); use absolute paths in tool calls. `<lammps_base>` = `<repo_root>/data/<run_name>/lammps/` (`gen_prompt.py` derives `<repo_root>` from its own location — never hard-code `/home/<user>/...`). Equilibration paths are tool-defined — use worker RESULT dict keys (`npt_production_dir`, `npt_prod300_data`, ...), never construct them manually.
 
-**Run log:** copy the template at task start; fill it in **real time**, not reconstructed at the end. The RECOVERIES section is the primary evidence of agent value — write a block immediately after resolving any failure.
+**Run log:** copy the template at task start; fill it in **real time**, not reconstructed at the end.
 
 ## Orchestrator Pattern (Multi-Agent Mode)
 
-Default mode is multi-agent: the orchestrator (this session) spawns stateless specialist workers via `Agent(subagent_type=...)` and holds all state + recovery logic. Workers group into **tracks** — foundation runs first and feeds all; mechanical reads `is_glassy` from thermal (or `glassy_hint` when thermal is skipped). Models are set in each agent definition.
+Default mode is multi-agent: the orchestrator (this session) spawns stateless specialist workers via `Agent(subagent_type=...)` and holds all state + recovery logic. Workers group into **tracks** — foundation runs first and feeds all.
 
 | Worker (color) | Track | Role |
 |------|------|------|
-| ⚪ `literature-grounding-worker` | setup | whenever this exact SMILES is not yet protocol_validated (novel) — SMILES+class → DOI-verified `literature_grounding.json` feeding the planner |
+| ⚪ `literature-grounding-worker` | setup | for every unseen SMILES  — SMILES+class → DOI-verified `literature_grounding.json` feeding the planner |
 | 🟡 `planner` | setup | goal + class → `run_plan.json` (deterministic if this exact SMILES is protocol_validated for the requested properties; reasoned otherwise) |
 | 🔴 `critic` | setup | proposed `run_plan.json` → approved \| revise \| escalate |
 | 🔵 `molecule-builder` | foundation | SMILES → `.data` file (EMC or RadonPy) |
@@ -173,11 +170,10 @@ PHASE A — FOUNDATION (always, reasoned path only — see the branch above for 
   session restart.
 
 PHASE B — TRACKS (property-conditional, reasoned path only — see the branch above for deterministic)
-  thermal (if "tg"): Read orchestration/THERMAL_TRACK.md — owns the multirate sweep loop, the
-    slope-gate hard stop + per-class structural fallback, and is_glassy. Gating consequence: if
-    tg_multirate_result.json slope_gate_pass==False (glassy only; rubbery exempt), do NOT proceed
-    to mechanical/run-summary — follow the guide's recovery ladder, UNLESS the plan marks it
-    structural (decided_params.tg_slope_gate_fallback), then use the single-rate fallback.
+  thermal (if "tg"): Read orchestration/THERMAL_TRACK.md — owns the single sweep at the class's
+    primary configured rate (highest by default; decided_params.tg_slope_gate_fallback overrides
+    to the slowest rate for classes whose highest-rate fit is documented as unreliable) and
+    is_glassy. Multirate extrapolation is a legacy/opt-in capability, not part of this default.
   mechanical (if "bulk_modulus"): Read orchestration/MECHANICAL_TRACK.md — owns Murnaghan-primary
     + deform-fallback + BM extraction.
   Re-read the active track guide before resuming after any mid-track restart.
@@ -186,11 +182,6 @@ PHASE C — SUMMARY (always)
   Read orchestration/SUMMARY.md — owns exp-lookup (BEFORE run-summary) → tg_path via
   select_tg_path.py → run-summary → memory capture.
 ```
-
-### Cross-run protocol
-
-Validate each worker result against `run_plan.json` `planned_stages[].success_criteria`; `/recover` if not met (max 2 attempts/worker), then write UNRESOLVED to run_log.md and stop. A probe result contradicting a plan assumption (wrong FF, D-08 mismatch) routes back to the planner (re-plan → re-critic) — never let a worker improvise; for a planned `hardware_benchmark` probe run `hardware/calibrate_hardware.py --cell <.data> --ff <fam>` politely (idle GPU + spare cores; never `--allow-busy`).
-Session restart: read the SIMULATION STATE table → find `status=monitoring` → `get_run_status(id)` → if still running, `watch_run(id)` and relaunch the waiter via BACKGROUND-WAIT, then end your turn; if completed, proceed. In Phase A/B/C re-read the active phase guide first.
 
 <!-- CROSS_STAGE_RULES_START -->
 ## Cross-Track Rules (Always Active — Memorize These)
@@ -202,5 +193,4 @@ Inlined into every worker prompt by `gen_prompt.py`; apply regardless of worker 
 2. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, SEED_COLD in the run_log header. `emc_seed`/`velocity_seed` are never pinned in `polymer_rules.json` (each replicate needs an independent draw, not a shared fixed one) — leave them unset in `decided_params` so the tool draws and reports a random seed, then read it back from job output and log it immediately after submission. Applies uniformly to replicate-1 and replicate-2+ runs alike.
 3. **Check for existing writers before killing any process** — run `lsof | grep <log_filename>`; if another writer is present (concurrent session), do NOT launch, coordinate via the user (a double-launch corrupts the shared log). Backstop: `run_lammps_script`/`run_lammps_chain`/`run_bulk_modulus_series` refuse to launch when a live process holds the target log open (`status=error`, `conflicting_writers`) — kill the stale writer then resubmit; pass `allow_concurrent_writer=True` only after confirming it's stale. The backstop is a safety net, not a substitute for the manual check.
 4. **Log the exact GPU claim label** — copy the `run` field from `pick_gpu.py claim`'s JSON into the SIMULATION STATE table and use it verbatim at release. A label mismatch silently leaves the GPU stuck as claimed.
-5. **Log repo-relative run paths in memory** — in any `.claude/agent-memory/**` file write `data/<run>/...`, never `/home/<user>/...` (keeps captures portable). The memory file itself lives ONLY in the repo-root `.claude/agent-memory/<worker>/` dir (the absolute path in the worker's agent definition) — never a `.claude/` under a work_dir or `data/<run>/` subdir.
 <!-- CROSS_STAGE_RULES_END -->

@@ -111,7 +111,7 @@ def test_dry_run_covers_expected_stages(cls, plan_files):
     dry = json.loads(r.stdout)
     expected_stages = {"build", "equil", "equil-check", "run-summary"}
     if "tg" in properties:
-        expected_stages |= {"tg", "analyze-tg", "analyze-tg-multirate"}
+        expected_stages |= {"tg", "analyze-tg"}
     if "bulk_modulus" in properties:
         expected_stages |= {"murnaghan", "deform", "analyze-bm"}
     assert expected_stages <= set(dry.keys()), (

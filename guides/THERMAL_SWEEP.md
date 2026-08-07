@@ -99,9 +99,3 @@ run = run_lammps_script(
 w = watch_run(run["run_id"])
 # Return run_id and w["monitor_command"] to the orchestrator — do not call Monitor.
 ```
-
----
-
-## Common Failures
-
-**Tg sweep killed mid-run:** restart from the last completed temperature (max 2 attempts); if still failing, return the error to the orchestrator.

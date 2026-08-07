@@ -146,24 +146,14 @@ def build_planned_stages(cls: dict, properties: set) -> list:
         _s("equil-check", {"equil_verdict": "PASS"}),
     ]
     if "tg" in properties:
+        # Single-rate-primary: one sweep at the class's primary configured rate (highest by
+        # default; tg_slope_gate_fallback="slowest_rate" classes run rates[0] instead — their
+        # highest-rate fit is documented as degenerate/inverted). Multirate extrapolation
+        # (extract_tg_multirate.py, select_tg_path.py, the analyze-tg-multirate stage) remains
+        # available as a legacy/opt-in capability but is not part of the default plan DAG.
         stages.append(_s("tg", {"bilinear_fit_r_squared_min": 0.80,
                                 "t_range_brackets_exp_tg": exp_tg_bracket}))
         stages.append(_s("analyze-tg", {}))
-        # Multirate aggregation: log-linear Tg(Γ) fit across cooling rates,
-        # extrapolated to the DSC-equivalent rate. Log-linear R² is the gate
-        # (always reliable); VF is diagnostic only at <2 decades of span.
-        # Classes carrying tg_slope_gate_fallback structurally fail the slope
-        # gate: the R² criterion applies only if the gate passes, and the
-        # headline Tg falls back to the named rate (select_tg_path.py).
-        slope_fb = cls.get("tg_slope_gate_fallback")
-        if slope_fb:
-            stages.append(_s("analyze-tg-multirate",
-                             {"loglinear_r_squared_min": 0.90, "n_rates_min": 2},
-                             fallback=f"single_rate_fallback:{slope_fb}",
-                             slope_gate_fail_expected=True))
-        else:
-            stages.append(_s("analyze-tg-multirate",
-                             {"loglinear_r_squared_min": 0.90, "n_rates_min": 2}))
     if "bulk_modulus" in properties:
         if glassy_hint:
             # Murnaghan-primary at 300 K; deform fallback. (Born+NVT removed 2026-06-21:
@@ -225,11 +215,6 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
          "dominant": False,
          "reduction_probe": "none"},
     ]
-    if "tg" in properties and cls.get("tg_slope_gate_fallback"):
-        # Structural slope-gate fragility (PEST/PKTN/PSFO): the plan does not
-        # predict a passing gate; the fallback rate is in decided_params.
-        uncertainties.append({"name": "slope_fragility", "dominant": True,
-                              "reduction_probe": "none"})
     return {
         "schema_version": "1.0",
         "goal": f"Predict {', '.join(sorted(properties))} for {polymer_class.upper()}"

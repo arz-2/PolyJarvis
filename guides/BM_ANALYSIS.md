@@ -2,18 +2,18 @@
 **Read when:** You are `bulk-modulus-extractor` and need to extract bulk modulus from simulation output.
 **Scope:** Extraction only — 3 routing paths. No simulation submission, no Monitor calls, no `generate_run_summary`.
 
+---
+
+## Rules
+
 `output_dir`/`graphs_dir` are required on every extraction tool and provided in your prompt — pass
 them verbatim.
 
----
-
-## Routing
-
-Inspect which inputs are non-null in your prompt:
+Inspect which inputs are non-null in your prompt to route:
 
 | Condition | Tool | Method | JSON written |
 |-----------|------|--------|-------------|
-| `murnaghan_log_files` non-null | `extract_bulk_modulus_murnaghan` + `extract_bulk_modulus` (diagnostic) | `murnaghan` | `bulk_modulus_murnaghan.json` |
+| `murnaghan_log_files` non-null | `extract_bulk_modulus_murnaghan` + `extract_bulk_modulus` (diagnostic) — call both together in one message, not sequentially | `murnaghan` | `bulk_modulus_murnaghan.json` |
 | `deform_log_path` non-null | `extract_bulk_modulus_deform` | `deformation` | `bulk_modulus_deform.json` |
 | all null | `extract_bulk_modulus` | `fluctuation` | `bulk_modulus.json` |
 
@@ -23,10 +23,13 @@ Inspect which inputs are non-null in your prompt:
 **Interpretation:**
 - PDIE / rubbery Murnaghan: `B0′` 7–10 is normal for polydienes; `B_def` R²≈0 is expected for soft rubber (P vs ln V nonlinear at this scale), not an anomaly — `warning_bdef_unreliable` is standard.
 - Deform rate-sensitivity WARNING (`K` differs >10% between rates): trust the slow-rate fit if `fit_r2_C11_rate2 ≥ 0.90` — the tool already auto-substitutes it into `K_GPa`/`method` when so (`method: "uniaxial_deformation_slow_rate"`); just surface the flag, don't re-derive it.
+- Even when the tool substitutes the slow-rate fit (`method: "uniaxial_deformation_slow_rate"`), still report `bulk_modulus_method: deformation` in the RESULT block — never invent a new method label; note the substitution in `notes`.
 
 ---
 
-## Tool: `extract_bulk_modulus_deform` (glassy fallback)
+## Workflow
+
+### `extract_bulk_modulus_deform` (glassy fallback)
 
 ```python
 extract_bulk_modulus_deform(
@@ -55,9 +58,7 @@ extract_bulk_modulus_deform(
 
 **Report:** `fit_r2_C11`, `fit_r2_C12_yy`, `isotropy_delta_pct`, `avg_window_frames`, and (if present) `rate_sensitivity.verdict`. If `isotropy_delta_pct` ≥ 20%, add WARNING "K BORDERLINE — anisotropy exceeds 20%; Murnaghan should have been primary".
 
----
-
-## Tool: `extract_bulk_modulus_murnaghan`
+### `extract_bulk_modulus_murnaghan`
 
 ```python
 extract_bulk_modulus_murnaghan(
@@ -75,14 +76,12 @@ extract_bulk_modulus_murnaghan(
 **Acceptance:**
 - `fit_converged=True` (linear_fallback = EOS curvature not resolved → WARNING).
 - `r_squared ≥ 0.999` for a 5-point series; lower → poor equilibration at some pressure.
-- **B0′ out of [4, 20] with `fit_converged=True` is WARNING, not FAIL** (the ±1000 atm span under-constrains curvature): high B0′≥13 with r²<0.999 = EOS-nonlinearity artifact (K still correct); low B0′<4 with r²≥0.999 = under-constrained curvature (K robust). Note the artifact; route to deform fallback or a wider pressure series.
+- **B0′ out of [4, 20] with `fit_converged=True` is WARNING, not FAIL** (the ±1000 atm span under-constrains curvature): high B0′≥13 with r²<0.999 = EOS-nonlinearity artifact (K still correct); low B0′<4 with r²≥0.999 = under-constrained curvature (K robust). Note the artifact in `notes`.
 - **Rubbery:** flag any Murnaghan-vs-fluctuation divergence >15% prominently; fluctuation is often more reliable for low-K rubber at ±1000 atm.
 
 **Report:** `bulk_modulus_sem_GPa`, `r_squared`, `B0_prime`.
 
----
-
-## Tool: `extract_bulk_modulus` (fluctuation)
+### `extract_bulk_modulus` (fluctuation)
 
 ```python
 extract_bulk_modulus(
@@ -97,22 +96,7 @@ extract_bulk_modulus(
 **Result fields:** `bulk_modulus_GPa`, `bulk_modulus_sem_GPa`, `isothermal_compressibility_per_Pa`,
 `V_mean_A3`, `V_std_A3`, `tau_eff_frames`, `tau_eff_fraction`, `n_effective_samples`, `diagnostics`.
 
-**Volume drift:**
-- `volume_equilibrated=false` → re-run with `eq_fraction=0.25`; bracket between that and `K_block_mean_GPa`. Flag WARNING.
+- `volume_equilibrated=false` → flag WARNING.
 - `B_def R² < 0.1` → cross-check unusable; report K_dyn only.
 
 **Report:** `bulk_modulus_sem_GPa`, `n_effective_samples`, `tau_eff_frames`, `tau_eff_fraction`.
-
----
-
-## Common Failures
-
-**`extract_bulk_modulus` K < 0.1 or > 20 GPa:** not fully equilibrated (`diagnostics.drift_check` warns) — raise `eq_fraction` to 0.7.
-
-**`extract_bulk_modulus_murnaghan` K < 0 or `fit_converged=False`:** EOS not resolved — check `volume_equilibrated` per pressure. Glassy: narrow to ±500 atm if ±1000 causes creep. `linear_fallback` underestimates K — add pressure points.
-
-**`extract_bulk_modulus_murnaghan` B0_prime outside [4, 20]:** pressure range too wide (glass yielding) or too narrow (curvature not captured). Route to deform fallback.
-
-**`extract_bulk_modulus_deform` fit_r2 < 0.90:** noisy stress-strain — check THERMO_FREQ ≤ 100. If `rate_sensitivity` is present and `verdict=WARNING`, the primary rate is likely too high — the tool already prefers the slow-rate fit when its own R² clears 0.90.
-
-**`extract_bulk_modulus_deform` isotropy_delta_pct ≥ 20%:** too small / not isotropic — BORDERLINE, Murnaghan should have been primary.

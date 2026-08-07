@@ -114,8 +114,9 @@ def test_build_route_consistency(cid):
 
 
 def test_tg_slope_gate_fallback_valid():
-    """tg_slope_gate_fallback marks classes whose glassy slope gate fails
-    structurally; value names the headline-Tg rate on gate failure."""
+    """tg_slope_gate_fallback marks classes whose highest configured Tg rate is
+    documented as unreliable (degenerate/inverted fit); value names which rate
+    the thermal track sweeps by default instead of the highest-rate default."""
     expected = {"PEST": "highest_rate", "PKTN": "slowest_rate", "PSFO": "slowest_rate"}
     found = {cid: c["tg_slope_gate_fallback"] for cid, c in CLASSES.items()
              if "tg_slope_gate_fallback" in c}

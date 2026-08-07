@@ -49,11 +49,3 @@ run_id = run_lammps_script(
     gpu_ids=gpu_ids, mpi=mpi_ranks, engine=engine)  # engine MUST match generate_script
 w = watch_run(run_id)  # return run_id + w["monitor_command"] to orchestrator. Do NOT call Monitor.
 ```
-
-Stop after `watch_run`. Do not call `Monitor`.
-
----
-
-## Recovery Notes
-
-**Deformation crashes:** ensure `dt_fs=1.0` (SHAKE + deform needs 1 fs). Reduce STRAIN_RATE 10× (1e-8 instead of 1e-7 /fs).

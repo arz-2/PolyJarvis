@@ -120,23 +120,28 @@ def test_decided_params_subset_of_class_entry(plan_files):
 SLOPE_FRAGILE = {"PEST": "highest_rate", "PKTN": "slowest_rate", "PSFO": "slowest_rate"}
 
 
-def test_slope_fragile_classes_carry_fallback(plan_files):
-    """Classes with a structural slope-gate failure (tg_slope_gate_fallback in
-    polymer_rules) must stamp the fallback into decided_params, name slope_fragility
-    as a dominant uncertainty, and mark the analyze-tg-multirate stage; all other
-    classes must carry none of these."""
+def test_no_multirate_stage_by_default(plan_files):
+    """Single-rate-primary: analyze-tg-multirate is a legacy/opt-in capability, never
+    compiled into the default plan DAG regardless of class."""
     for cls, path in plan_files.items():
         plan = json.loads(Path(path).read_text())
-        mr = next(s for s in plan["planned_stages"]
-                  if s["stage"] == "analyze-tg-multirate")
+        stages = {s["stage"] for s in plan["planned_stages"]}
+        assert "analyze-tg-multirate" not in stages, cls
+
+
+def test_slope_fragile_classes_carry_fallback(plan_files):
+    """Classes whose highest configured rate is documented as unreliable
+    (tg_slope_gate_fallback in polymer_rules) must stamp the fallback into
+    decided_params — the thermal track reads it directly to pick which rate index
+    to sweep by default; all other classes must carry none of it. No
+    slope_fragility uncertainty is injected anymore (nothing is being
+    extrapolated by default)."""
+    for cls, path in plan_files.items():
+        plan = json.loads(Path(path).read_text())
         frag = [u for u in plan["uncertainties"] if u["name"] == "slope_fragility"]
+        assert not frag, cls
         if cls in SLOPE_FRAGILE:
             expect = SLOPE_FRAGILE[cls]
             assert plan["decided_params"].get("tg_slope_gate_fallback") == expect, cls
-            assert frag and frag[0]["dominant"] is True, cls
-            assert mr.get("fallback") == f"single_rate_fallback:{expect}", cls
-            assert mr.get("slope_gate_fail_expected") is True, cls
         else:
             assert "tg_slope_gate_fallback" not in plan["decided_params"], cls
-            assert not frag, cls
-            assert "fallback" not in mr, cls

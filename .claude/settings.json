@@ -14,7 +14,6 @@
       "mcp__mcp-lammps-engine__inspect_data_file",
       "mcp__mcp-lammps-engine__run_bulk_modulus_series",
       "mcp__mcp-lammps-engine__extract_bulk_modulus_murnaghan",
-      "mcp__mcp-lammps-engine__extract_tg_multirate",
       "mcp__mcp-lammps-engine__calculate_rdf",
       "mcp__mcp-lammps-engine__extract_end_to_end_vectors",
       "mcp__mcp-lammps-engine__unwrap_coordinates",
@@ -65,6 +64,70 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/bash_tool_guard.py\""
           }
         ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__extract_bulk_modulus_murnaghan",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus_murnaghan): fit_converged=True required (else WARNING, linear_fallback); r_squared>=0.999 for a 5-point series; B0_prime outside [4,20] with fit_converged=True is WARNING not FAIL.\"}}'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__extract_bulk_modulus_deform",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus_deform): fit_r2_C11 and fit_r2_C12_yy >= 0.90; isotropy_delta_pct < 20% is a HARD gate (>=20% -> K BORDERLINE); G<0 in y/z alone is NOT a failure if isotropy and K hold.\"}}'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__extract_bulk_modulus",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus): volume_equilibrated=false -> rerun with eq_fraction=0.25, bracket vs K_block_mean_GPa, flag WARNING; B_def R2 < 0.1 -> cross-check unusable, report K_dyn only.\"}}'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-lammps-engine__run_lammps_script|mcp__mcp-lammps-engine__run_lammps_chain|mcp__mcp-lammps-engine__run_bulk_modulus_series",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/gpu_check_before_submit.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-mol-builder-server__assign_forcefield",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"RULE: assign_forcefield must be called AFTER submit_polymerize_job, never before — RadonPy's async polymerize job does not preserve FF parameters assigned to the monomer, and violating this order causes LAMMPS to fail with unknown atom type.\"}}'"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mcp-mol-builder-server__submit_generate_cell_job",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"RULE (RadonPy path): density=0.05 to prevent chain overlap during packing.\"}}'"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/subagent_memory_reminder.py\""
+          }
+        ]
       }
     ],
     "Stop": [
@@ -83,11 +146,20 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "mcp__mcp-lammps-engine__run_bulk_modulus_series",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": \"REMINDER: the monitor_command field just returned is a placeholder string, not a real sentinel — you MUST call watch_run(chain_id) as an actual MCP tool call next; its return value contains the real monitor_command to return to the orchestrator.\"}}'"
+          }
+        ]
+      },
+      {
         "matcher": "mcp__mcp-mol-builder-server__classify_polymer",
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'LOG: classify_polymer done — the result includes preferred_ff, preferred_builder, ff_confidence, ff_justification, and ff_justification_doi fields. Write these directly to D-01 in run_log.md without asking the user — no manual FF choice needed for known classes. For ff_confidence=low or unknown class, escalate to E2 literature search. Also fill D-02 (charges) and D-03 (electrostatics) from the classify_polymer result. Phase A entry (before spawning molecule-builder): Read(orchestration/FOUNDATION.md).'"
+            "command": "echo 'LOG: classify_polymer done — the result includes preferred_ff, preferred_builder, ff_confidence, ff_justification, and ff_justification_doi fields. Write these directly to D-01 in run_log.md without asking the user — no manual FF choice needed for known classes. For ff_confidence=low or unknown class, escalate to E2 literature search. Also fill D-02 (charges) and D-03 (electrostatics) from the classify_polymer result. Phase A entry (before spawning molecule-builder): Read(orchestration/FOUNDATION.md). KNOWN FALSE FLAG: PVC (*CC(Cl)*) may classify as PHAL — it is actually PVNL/PCFF; build per the approved plan class and log the divergence in D-01.'"
           }
         ]
       },
@@ -141,7 +213,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'LOG: extract_thermal done — fill D-06 (R², N_bins, F-stat, is_glassy + Tg K) and the α_g, α_r, ΔCp rows in RESULTS B of run_log.md. The Tg (MD @400 K/ns) row also goes in RESULTS B. D-06b (DSC-equiv Tg) is filled after extract_tg_multirate, not here.'"
+            "command": "echo 'LOG: extract_thermal done — fill D-06 (R², N_bins, F-stat, is_glassy + Tg K) and the α_g, α_r, ΔCp rows in RESULTS B of run_log.md. This single-rate Tg is the headline (single-rate-primary default) — no separate DSC-equiv step follows unless multirate was explicitly opted into.'"
           }
         ]
       },
@@ -178,15 +250,6 @@
           {
             "type": "command",
             "command": "echo 'LOG: bulk modulus extracted — fill K row (with method label: born/deform/murnaghan) in RESULTS C of run_log.md now.'"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__mcp-lammps-engine__extract_tg_multirate",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'LOG: multirate Tg fit done — fill D-06b (DSC-equiv Tg, log-linear slope, R², N_rates, N_repl) and update Tg (DSC-equiv) row in RESULTS B of run_log.md.'"
           }
         ]
       },
