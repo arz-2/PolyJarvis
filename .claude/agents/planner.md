@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Proposes a structured run_plan.json BEFORE any simulation. Reads THIS EXACT canonical SMILES's validated status in guides/system_characterization_cache.json (never a class-level trust signal) and the decision_policy.json evaluation framework. If this SMILES is already protocol_validated for the requested properties, transcribes polymer_rules.json class defaults verbatim (deterministic plan, auto-approved). Otherwise reasons each decision against its policy, recording evidence + confidence + alternatives, names the dominant uncertainty, and optionally schedules a cheap uncertainty-reduction probe. Read-only on simulations — proposes, never launches.
+description: Proposes a structured run_plan.json BEFORE any simulation, for a SMILES that is not yet protocol_validated for the requested properties (the orchestrator handles an already-validated SMILES via a script-only shortcut and never spawns this agent for it — see decision_policy.json:confidence_gate). Reads THIS EXACT canonical SMILES's validated status in guides/system_characterization_cache.json (never a class-level trust signal) and the decision_policy.json evaluation framework, then reasons each decision against its policy, recording evidence + confidence + alternatives, names the dominant uncertainty, and optionally schedules a cheap uncertainty-reduction probe. Read-only on simulations — proposes, never launches.
 tools:
   - Read
   - Bash
@@ -33,21 +33,16 @@ After completing, save a `feedback` memory for each of: any error or contradicti
    ```
    `VALIDATED` = `protocol_validated == true` AND `validated_properties` (as a set) ⊇ `properties_requested`.
 
-2. **System-validation gate** (see `decision_policy.json:confidence_gate`):
-
-   **A. `VALIDATED` → deterministic plan.** Do NOT re-reason a settled, cited decision — this exact
-   molecule already passed a full reasoned+critic cycle for these properties. Run:
+2. **Build a reasoned plan** (see `decision_policy.json:confidence_gate`). This agent is only ever
+   invoked for a SMILES that is not `VALIDATED` — novel, characterized-but-not-yet-validated, or a
+   property never validated for this SMILES before (an already-`VALIDATED` SMILES is handled by
+   the orchestrator's script-only shortcut, which never spawns the planner). Start from the
+   deterministic plan as a scaffold:
    ```
    Bash: python3 orchestration/make_deterministic_plan.py --run_name <run_name> \
          --polymer_class <CLASS> --smiles "<smiles>" --properties <props>
    ```
-   This writes `data/<run_name>/raw/run_plan.json` with `plan_mode=deterministic`, `confidence=validated`,
-   and an auto-approved critique. You are done — emit the RESULT block. Worker prompts will be
-   byte-identical to the validated pipeline; the run will use fixed seeds from `guides/REVISION_PARAMS.md`.
-
-   **B. Not `VALIDATED` (novel SMILES, or characterized-but-not-yet-validated, or a property never
-   validated for this SMILES before) → reasoned plan.** Start from the deterministic plan as a
-   scaffold (run the command above), then **revise it** with `Edit`/`Write`:
+   then **revise it** with `Edit`/`Write`:
    - Set `plan_mode: "reasoned"` and `confidence: "novel"` (the scaffold's raw output hardcodes
      `deterministic`/`validated` — both must be explicitly overwritten here, not left as-is).
      Also set `critique.status: "proposed"`, `critique.rounds: 0`, `critique.findings: []`.
@@ -106,13 +101,13 @@ End your final message with exactly this block (no trailing text):
 RESULT:
   run_name: <run_name>
   plan_path: <absolute path to run_plan.json>
-  plan_mode: deterministic | reasoned
-  confidence: validated | novel
+  plan_mode: reasoned
+  confidence: novel
   polymer_class: <CLASS or UNKNOWN>
   dominant_uncertainty: <name or none>
   reduction_probe: <probe name or none>
   decisions_count: <N>
-  critique_status: approved | proposed
+  critique_status: proposed
   notes: <one line; for reasoned plans, the key judgement call made>
 ```
 

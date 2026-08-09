@@ -22,7 +22,7 @@ You are the Tg sweep setup worker for PolyJarvis. Your job is to generate the te
 1. Call `generate_script` (call signature, DUMP_FILE default, and the opt-in per-T structural dump are in the guide below) → script path.
 2. `run_lammps_script(script_path=..., gpu_ids=gpu_ids, mpi=mpi_ranks)` → run_id
 3. `watch_run(run_id)` → monitor_command string
-4. Read the velocity seed (SEED_HOT) back from the generated deck so it is captured for reproducibility (cross-track rule 2): `grep 'velocity all create' {tg_sweep_dir}/tg_sweep.in`. The seed is the 3rd whitespace token (e.g. `velocity all create 400.0 569515 ...` → SEED_HOT=569515). Report it in the RESULT block even when `velocity_seed` was null (the template auto-draws a random seed — capturing it is the whole point).
+4. Read the velocity seed (SEED_HOT) back from the generated deck so it is captured for reproducibility: `grep 'velocity all create' {tg_sweep_dir}/tg_sweep.in`. The seed is the 3rd whitespace token (e.g. `velocity all create 400.0 569515 ...` → SEED_HOT=569515). Report it in the RESULT block even when `velocity_seed` was null (the template auto-draws a random seed — capturing it is the whole point).
 
 **Stop after step 3. Do NOT call Monitor.** Return run_id and monitor_command to the orchestrator.
 

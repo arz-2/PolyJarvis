@@ -121,6 +121,18 @@ def live_host() -> dict:
             "phys_cores": _phys_cores_probe()}
 
 
+def _gpu_model_matches(live_model: str, saved_model: str) -> bool:
+    """Loose GPU-model comparison: nvidia-smi's bare name (e.g. 'Quadro RTX 6000') and
+    hardware_policy.host's saved name (e.g. 'Quadro RTX 6000 24GB') format the same card
+    differently -- same principle as select_hardware.py's _host_matches_measured_on() token
+    match. Match if either string is a substring of the other."""
+    live_model = (live_model or "").strip()
+    saved_model = (saved_model or "").strip()
+    if not live_model or not saved_model:
+        return False
+    return live_model in saved_model or saved_model in live_model
+
+
 def host_matches(rules: dict | None = None) -> bool:
     """True iff the live box matches hardware_policy.host (GPU model + count + phys cores).
     Used to decide whether the benchmarked per-FF defaults apply here or the user should
@@ -129,7 +141,7 @@ def host_matches(rules: dict | None = None) -> bool:
     if not saved:
         return False
     live = live_host()
-    return (live["gpu_model"] == saved.get("gpu_model")
+    return (_gpu_model_matches(live["gpu_model"], saved.get("gpu_model", ""))
             and live["gpus"] == saved.get("gpus")
             and live["phys_cores"] == saved.get("phys_cores"))
 

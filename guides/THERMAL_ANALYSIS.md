@@ -1,8 +1,6 @@
 # Tg Analysis Guide
 **Read when:** You are `tg-analysis-worker` and need to extract thermal properties from a Tg sweep log.
-**Scope:** `extract_thermal` — the default single-rate path. (Multi-rate aggregation is a
-legacy/opt-in mode; its RESULT format lives in the agent's own instructions, not here.) No
-equil/density/BM work.
+**Scope:** `extract_thermal` — the default single-rate path.
 
 ---
 

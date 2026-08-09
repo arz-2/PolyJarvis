@@ -13,11 +13,11 @@ Inspect which inputs are non-null in your prompt to route:
 
 | Condition | Tool | Method | JSON written |
 |-----------|------|--------|-------------|
-| `murnaghan_log_files` non-null | `extract_bulk_modulus_murnaghan` + `extract_bulk_modulus` (diagnostic) — call both together in one message, not sequentially | `murnaghan` | `bulk_modulus_murnaghan.json` |
+| `murnaghan_log_files` non-null | `extract_bulk_modulus_murnaghan` (pass `npt_prod_log` — the fluctuation cross-check runs inside this one call) | `murnaghan` | `bulk_modulus_murnaghan.json` |
 | `deform_log_path` non-null | `extract_bulk_modulus_deform` | `deformation` | `bulk_modulus_deform.json` |
 | all null | `extract_bulk_modulus` | `fluctuation` | `bulk_modulus.json` |
 
-- **Glassy (`is_glassy=True`):** Murnaghan at 300 K is primary; single-direction deform (with a paired slow-rate rate-sensitivity check, when `deform_log_path_slow` is present) is the fallback when Murnaghan fails (`fit_converged=False` or `B0_prime` outside [4, 20]).
+- **Glassy (`is_glassy=True`):** Murnaghan at 300 K is primary; single-direction deform (with a paired slow-rate rate-sensitivity check, when `deform_log_path_slow` is present) is the fallback only when Murnaghan fails (`fit_converged=False`). `B0_prime` outside [4, 20] is a WARNING annotation (see Acceptance below) — it never by itself triggers the deform-worker fallback.
 - **Rubbery (`is_glassy=False`):** Murnaghan at T>Tg is primary (rubbery classes ship `bm_pressures_atm`). Volume fluctuation overestimates rubbery K (~+70%) — keep it only as the diagnostic B_dyn cross-check, never the reported K when Murnaghan is present. The pure-fluctuation (all-null) path applies only to a rubbery class with no `bm_pressures_atm`.
 
 **Interpretation:**
@@ -67,19 +67,24 @@ extract_bulk_modulus_murnaghan(
     eq_fraction=0.5,
     output_dir=output_dir,
     graphs_dir=graphs_dir,
+    npt_prod_log=npt_prod_log_path,  # embeds the fluctuation cross-check in this same call
 )
 ```
 
 **Result fields:** `bulk_modulus_GPa` (=B0, the reported K), `B0_prime` (dK/dP), `V0_A3`,
-`r_squared`, `fit_converged`, `bulk_modulus_sem_GPa`, `method` ("murnaghan" | "linear_fallback"), `warnings`.
+`r_squared`, `fit_converged`, `bulk_modulus_sem_GPa`, `method` ("murnaghan" | "linear_fallback"),
+`volume_monotonic`, `loo_results`, `loo_n_converged`, `fluctuation_bulk_modulus_GPa`,
+`fluctuation_divergence_pct`, `warnings`.
 
 **Acceptance:**
 - `fit_converged=True` (linear_fallback = EOS curvature not resolved → WARNING).
 - `r_squared ≥ 0.999` for a 5-point series; lower → poor equilibration at some pressure.
 - **B0′ out of [4, 20] with `fit_converged=True` is WARNING, not FAIL** (the ±1000 atm span under-constrains curvature): high B0′≥13 with r²<0.999 = EOS-nonlinearity artifact (K still correct); low B0′<4 with r²≥0.999 = under-constrained curvature (K robust). Note the artifact in `notes`.
-- **Rubbery:** flag any Murnaghan-vs-fluctuation divergence >15% prominently; fluctuation is often more reliable for low-K rubber at ±1000 atm.
+- `volume_monotonic=False` → WARNING; a pressure point's mean volume is out of sequence, most likely inadequate equilibration at that point.
+- Any `loo_results` entry with a large `dB0_GPa_vs_baseline` (script warns above 10%) → the fit leans on one point; note which pressure and whether it's `is_tension_point`.
+- **Fluctuation cross-check:** flag any `fluctuation_divergence_pct` >15% prominently (script already warns). Expected/benign on rubbery classes (fluctuation overestimates rubbery K, up to ~70% in the archive); unusual on glassy classes and worth investigating there.
 
-**Report:** `bulk_modulus_sem_GPa`, `r_squared`, `B0_prime`.
+**Report:** `bulk_modulus_sem_GPa`, `r_squared`, `B0_prime`, `volume_monotonic`, `fluctuation_divergence_pct`, and any `loo_results` warning.
 
 ### `extract_bulk_modulus` (fluctuation)
 

@@ -3345,6 +3345,7 @@ def _run_extract_bulk_modulus_murnaghan(
     output_dir: str,
     eq_fraction: float,
     graphs_dir: Optional[str] = None,
+    npt_prod_log: Optional[str] = None,
 ) -> dict:
     """Background worker — runs extract_bulk_modulus_murnaghan.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/extract_bulk_modulus_murnaghan.py"]
@@ -3354,6 +3355,8 @@ def _run_extract_bulk_modulus_murnaghan(
     parts.append(f"--eq_fraction {eq_fraction}")
     if graphs_dir:
         parts.append(f"--graphs_dir {graphs_dir}")
+    if npt_prod_log:
+        parts.append(f"--npt_prod_log {npt_prod_log}")
 
     command = " ".join(parts)
     logger.info(f"Running Murnaghan bulk modulus extraction via CLI: {command}")
@@ -3372,6 +3375,7 @@ def extract_bulk_modulus_murnaghan(
     output_dir: str,
     graphs_dir: str,
     eq_fraction: float = 0.5,
+    npt_prod_log: Optional[str] = None,
 ) -> dict:
     """
     Fit the Murnaghan equation of state to a multi-pressure NPT series and
@@ -3390,6 +3394,15 @@ def extract_bulk_modulus_murnaghan(
 
     Falls back to linear P vs ln V fit if curve_fit fails to converge.
 
+    When npt_prod_log is passed, also runs three credibility checks embedded
+    in the same result (no separate tool call needed):
+      - Fluctuation cross-check: an independent K estimate from npt_prod_log's
+        volume fluctuations, flagged if it diverges >15% from B0.
+      - Leave-one-out refit: drops each pressure point in turn and refits,
+        flagged if any single point shifts B0 by >10%.
+      - Volume monotonicity: flags a pressure point whose mean volume is out
+        of sequence (likely inadequate equilibration at that point).
+
     Output files written to output_dir:
         bulk_modulus_murnaghan.json  — B0_GPa, B0_prime, V0_A3, r_squared, …
                                        Also contains bulk_modulus_GPa alias for
@@ -3405,6 +3418,8 @@ def extract_bulk_modulus_murnaghan(
         output_dir:     Directory for bulk_modulus_murnaghan.json output.
         graphs_dir:     Directory for PNG figures. Defaults to output_dir/figures.
         eq_fraction:    Fraction of each log used as production window. Default 0.5.
+        npt_prod_log:   Optional separate NPT production log for the fluctuation
+                        cross-check. Omit to skip it (result fields become null).
 
     Returns:
         dict with run_id.  When completed, result includes:
@@ -3414,6 +3429,9 @@ def extract_bulk_modulus_murnaghan(
             r_squared       — goodness of fit (goal > 0.999)
             bulk_modulus_GPa — alias for B0_GPa (used by generate_run_summary)
             fit_converged   — True if Murnaghan converged, False if linear fallback
+            volume_monotonic — False flags an out-of-sequence pressure point
+            loo_results     — per-point leave-one-out refit rows (null if not converged)
+            fluctuation_bulk_modulus_GPa, fluctuation_divergence_pct — cross-check
             warnings        — list of any quality flags
     """
     run_id = run_manager.create(
@@ -3428,6 +3446,7 @@ def extract_bulk_modulus_murnaghan(
             output_dir    = output_dir,
             eq_fraction   = eq_fraction,
             graphs_dir    = graphs_dir,
+            npt_prod_log  = npt_prod_log,
         )),
         daemon=True,
     )

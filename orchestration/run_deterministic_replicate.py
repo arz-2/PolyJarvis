@@ -627,7 +627,7 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
         args.gpu_ids = gpu_ids
         series = lammps.run_bulk_modulus_series(
             data_file=p["equil_data_path"], work_dir=f"{p['work_dir']}/bm_series",
-            pressures_atm=p["bm_pressures_atm"] or [-1000, -500, 0, 500, 1000], temp_K=p["temp_K"],
+            pressures_atm=p["bm_pressures_atm"] or [-1000, 0, 3000, 7000, 15000], temp_K=p["temp_K"],
             run_name=args.run_name, gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"], npt_steps=p["npt_steps"],
             dt_fs=p["dt_fs"], use_trappe=p["lammps_flags"]["use_trappe"],
             use_pcff=p["lammps_flags"]["use_pcff"], use_opls=p["lammps_flags"]["use_opls"], engine=p["engine"],
@@ -643,8 +643,9 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
     murn = wait_for_analysis(lammps, lammps.extract_bulk_modulus_murnaghan(
         log_files=series["log_files"], pressures_atm=series["pressures_atm"],
         output_dir=bp["output_dir"], graphs_dir=bp["graphs_dir"],
+        npt_prod_log=bp["npt_prod_log_path"],
     ), "bulk modulus (murnaghan)")
-    accepted = murn.get("fit_converged") and 4 <= (murn.get("B0_prime") or 0) <= 20
+    accepted = bool(murn.get("fit_converged"))
 
     if accepted:
         result = {"method": "murnaghan", "bulk_modulus_GPa": murn.get("bulk_modulus_GPa"),
@@ -655,7 +656,7 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
     if not is_glassy:
         # rubbery Murnaghan rejection has no deform fallback in this pipeline — report as-is
         result = {"method": "murnaghan", "bulk_modulus_GPa": murn.get("bulk_modulus_GPa"),
-                 "accepted": False, "reason": "fit_converged/B0_prime out of range"}
+                 "accepted": False, "reason": "fit_converged=False"}
         state.mark("mechanical", "done", result=result)
         return result
 

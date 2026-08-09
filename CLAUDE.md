@@ -6,22 +6,22 @@ AI agent for autonomous polymer MD simulation. Given a SMILES string, runs the f
 
 | Path | Contents |
 |------|----------|
-| `orchestration/` | Orchestrator-read docs (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`, `SUMMARY.md`), `decision_policy.json`, and CLI helpers (`gen_prompt.py`, `select_tg_path.py`, `pick_gpu.py`) |
-| `guides/` | Worker guides inlined into worker prompts by `gen_prompt.py`; `polymer_rules.json` |
+| `orchestration/` | Orchestrator-read docs (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`, `SUMMARY.md`, `DETERMINISTIC_REPLICATE.md`), `decision_policy.json`, CLI helpers (`gen_prompt.py`, `select_tg_path.py`, `pick_gpu.py`, `canon_smiles.py`, `make_deterministic_plan.py`, `apply_cached_characterization.py`) |
+| `guides/` | Worker guides inlined into worker prompts by `gen_prompt.py`; `polymer_rules.json`; `system_characterization_cache.json` |
 | `data/TEMPLATE/run_log.md` | Run log template — copied to `data/[RUN]/run_log.md` at task start |
 | `data/[RUN]/` | All run files: `run_log.md`, `lammps/`, `raw/`, `graphs/` |
 
-**Paths:** all run files live under `data/<run_name>/` (repo-relative, git-excluded); use absolute paths in tool calls. `<lammps_base>` = `<repo_root>/data/<run_name>/lammps/` (`gen_prompt.py` derives `<repo_root>` from its own location — never hard-code `/home/<user>/...`). Equilibration paths are tool-defined — use worker RESULT dict keys (`npt_production_dir`, `npt_prod300_data`, ...), never construct them manually.
+**Paths:** all run files live under `data/<run_name>/` (repo-relative, git-excluded); use absolute paths in tool calls. Equilibration paths are tool-defined — use worker RESULT dict keys, never construct them manually.
 
-**Run log:** copy the template at task start; fill it in **real time**, not reconstructed at the end.
+**Run log:** copy the template at task start; fill it in real time, not reconstructed at the end.
 
-## Orchestrator Pattern (Multi-Agent Mode)
+## Orchestrator Pattern
 
 Default mode is multi-agent: the orchestrator (this session) spawns stateless specialist workers via `Agent(subagent_type=...)` and holds all state + recovery logic. Workers group into **tracks** — foundation runs first and feeds all.
 
 | Worker (color) | Track | Role |
 |------|------|------|
-| ⚪ `literature-grounding-worker` | setup | for every unseen SMILES  — SMILES+class → DOI-verified `literature_grounding.json` feeding the planner |
+| ⚪ `literature-grounding-worker` | setup | for every not-yet-validated SMILES — SMILES+class → DOI-verified `literature_grounding.json` feeding the planner |
 | 🟡 `planner` | setup | goal + class → `run_plan.json` (deterministic if this exact SMILES is protocol_validated for the requested properties; reasoned otherwise) |
 | 🔴 `critic` | setup | proposed `run_plan.json` → approved \| revise \| escalate |
 | 🔵 `molecule-builder` | foundation | SMILES → `.data` file (EMC or RadonPy) |
@@ -38,159 +38,62 @@ Default mode is multi-agent: the orchestrator (this session) spawns stateless sp
 ### Orchestrator workflow
 
 ```
-SETUP  (all Agent() calls below use gen_prompt.py-generated prompts unless a field list is given)
-  Read CLAUDE.md at startup. Copy data/TEMPLATE/run_log.md → data/[RUN]/run_log.md.
-  classify_polymer(smiles) if class unknown → CLASS_ID. builder_status unsupported
-    (`jq -r '.classes.CLASS_ID.builder_status // "supported"' guides/polymer_rules.json`)
-    → write UNRESOLVED to run_log.md and stop.
-  properties_requested = task TARGET_PROPERTIES lowercased set; "all"/absent → {density,tg,bulk_modulus}.
-    Write "Requested: {properties_requested}" to run_log.md.
+SETUP
+  Read this file. Copy data/TEMPLATE/run_log.md → data/[RUN]/run_log.md. classify_polymer(smiles)
+  if class unknown; write UNRESOLVED and stop if builder_status is unsupported. Note
+  properties_requested in the run log header.
 
-  NOVELTY GATE (decides whether this SMILES has a *characterized* cache entry to reuse for
-    timing knobs — see REUSE CACHED CHARACTERIZATION below and `orchestration/FOUNDATION.md`'s
-    `[Equilibration]` mandatory refine step, which is what populates the cache for
-    `IS_NOVEL=true` runs). This is independent of whether the SMILES is *validated* (below) —
-    a SMILES can be characterized (Phase-A timing knobs measured) without yet being validated
-    (Phase-C all-PASS), and vice versa is impossible but the two checks stay separate because
-    they gate different things (timing-knob reuse vs. plan_mode):
-    CANONICAL_SMILES=`python3 orchestration/canon_smiles.py "<smiles>"` (prints
-      `{"canonical_smiles": "..."}`; on error, treat as IS_NOVEL=true and proceed — a bad
-      canonicalization should never block the run).
-    IS_NOVEL=`jq --arg s "$CANONICAL_SMILES" 'has($s) | not' guides/system_characterization_cache.json
-      2>/dev/null` (file absent ⇒ IS_NOVEL=true).
-    Write CANONICAL_SMILES + IS_NOVEL to run_log.md header.
+GATE & PLAN — gate per exact canonical SMILES, never per class.
+  CANONICAL_SMILES = canon_smiles.py "<smiles>".
+  IS_NOVEL = `guides/system_characterization_cache.json` has no key CANONICAL_SMILES (file/key
+    absent ⇒ true). Independent of VALIDATED below — a SMILES can be characterized (Phase-A timing
+    knobs measured) without being validated for the requested properties, and vice versa.
+  VALIDATED = system_characterization_cache.json[CANONICAL_SMILES].protocol_validated==true AND
+    validated_properties ⊇ properties_requested.
 
-  VALIDATION GATE (decides plan_mode — gates per EXACT canonical SMILES, never per polymer
-    class; a class having many validated siblings says nothing about a molecule nobody has run).
-    PROPS_CSV = properties_requested joined with commas (same convention `--properties <props>`
-    already uses below), e.g. `"density,tg,bulk_modulus"`:
-    SYSTEM_CONFIDENCE=`jq -r --arg s "$CANONICAL_SMILES" --arg props "$PROPS_CSV" '
-      ($props | split(",")) as $requested
-      | (.[$s] // {"protocol_validated": false, "validated_properties": []}) as $e
-      | if ($e.protocol_validated == true)
-           and ($requested | all(. as $p | ($e.validated_properties // []) | index($p) != null))
-        then "validated" else "novel" end
-    ' guides/system_characterization_cache.json 2>/dev/null || echo novel`
-      (file absent, key absent, or jq error ⇒ "novel" — never let a lookup failure silently
-      grant the fast path). Write SYSTEM_CONFIDENCE to run_log.md header alongside
-      CANONICAL_SMILES/IS_NOVEL.
+  VALIDATED → known SMILES, reproduce as before:
+    `make_deterministic_plan.py --run_name <RUN> --polymer_class <CLASS> --smiles "<smiles>"
+    --properties <props>` then, if IS_NOVEL=false,
+    `apply_cached_characterization.py --run_plan PLAN_PATH --canonical_smiles CANONICAL_SMILES`.
+    No agent spawn, critic auto-approved. Phase A/B: read orchestration/DETERMINISTIC_REPLICATE.md
+    instead of FOUNDATION/THERMAL_TRACK/MECHANICAL_TRACK.md.
 
-  GROUND (whenever SYSTEM_CONFIDENCE=novel — skip only when validated, so the deterministic,
-    byte-identical plan path stays untouched by web nondeterminism). This now fires for every
-    novel molecule, including one in an otherwise well-trodden class — a real cost increase
-    (more WebSearch calls) versus the old class-confidence-gated trigger, and the correct plain
-    translation of "ground whenever the plan will be reasoned":
-    If SYSTEM_CONFIDENCE=novel:
-      ⚪ literature-grounding-worker ← polymer_name, polymer_class(or offtable), smiles,
-        properties_requested, output_path=data/<RUN>/raw/literature_grounding.json
-        → RESULT.grounding_path = GROUNDING_PATH  (advisory planning evidence only, DOI-verified;
-          NEVER used as run-summary grading bounds — exp-lookup owns those in Phase C).
-      Pass grounding_path: GROUNDING_PATH as an extra planner input.
-    If SYSTEM_CONFIDENCE=validated: skip; do NOT pass grounding_path.
+  NOT VALIDATED → first full run for this SMILES (or for its newly-requested properties):
+    ⚪ literature-grounding-worker → literature_grounding.json
+    🟡 planner (+ grounding_path) → run_plan.json
+    🔴 critic loop, max 2 rounds → approved proceeds, revise returns to planner, escalate writes
+      UNRESOLVED and stops
+    If IS_NOVEL=false (characterized by an earlier run, but not validated for these properties):
+      `apply_cached_characterization.py --run_plan PLAN_PATH --canonical_smiles CANONICAL_SMILES`
+      reuses that run's measured timing knobs instead of guessed class defaults, before Phase A.
+    Recover failures per `.claude/commands/recover.md`'s plan_mode ladder, up to 5 attempts or
+    until every requested property completes.
 
-  PLAN
-    If SYSTEM_CONFIDENCE=validated: **script-only shortcut, no agent spawn** — this exact
-      molecule's protocol is already validated (stamped by `protocol-locker`'s
-      `system_characterization_cache.json[canonical_smiles].protocol_validated`, set only after
-      an earlier reasoned run of this exact SMILES fully PASSed every property it requested).
-      Run directly, same as `pick_gpu.py`/`gen_prompt.py`:
-      `python3 orchestration/make_deterministic_plan.py --run_name <RUN> --polymer_class <CLASS>
-      --smiles "<smiles>" --properties <props>` → PLAN_PATH (prints run_plan/plan_mode/
-      confidence). Write the D-00 pointer to run_log.md from that output. Skip CRITIC entirely
-      (an unchanged validated plan is trivially auto-approved — see
-      `decision_policy.json:confidence_gate.validated`; the planner agent's own validated branch
-      does nothing but this same script call). Proceed to "Thread the approved plan".
-    Else (SYSTEM_CONFIDENCE=novel):
-      🟡 planner ← run_name, smiles, polymer_class, properties_requested,
-        work_dir=data/<RUN>/lammps [, grounding_path]
-        → plan_path (PLAN_PATH), plan_mode, confidence, critique_status.
-        Write D-00 pointer to run_log.md header: PLAN_PATH + plan_mode + confidence.
+  Write CANONICAL_SMILES/IS_NOVEL/VALIDATED + PLAN_PATH/plan_mode to the run_log.md header.
 
-      CRITIC loop (max 2 rounds)  🔴 critic ← run_plan_path=PLAN_PATH, critic_round=N
-        → approved → proceed | revise → re-spawn planner with the findings, re-critique |
-          escalate → write UNRESOLVED to run_log.md and stop.
+THREAD THE PLAN
+  Every gen_prompt.py call passes --plan PLAN_PATH, never read polymer_rules.json manually:
+  `gen_prompt.py --stage <STAGE> --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH`.
+  T_workflow_K = decided_params.T_workflow_K; if tg isn't requested, glassy_hint = T_workflow_K != 300.
 
-  REUSE CACHED CHARACTERIZATION (if `IS_NOVEL=false` — applies REGARDLESS of SYSTEM_CONFIDENCE,
-    since "characterized" and "validated" are two independent flags on the same cache entry, not
-    one signal split across two branches: a SMILES can be characterized-but-not-yet-validated
-    [Phase-A timing knobs measured, Phase-C never reached all-PASS] and still land in a
-    `reasoned` plan here, or validated-for-different-properties and still reuse its old timing
-    knobs while going reasoned for the newly-requested property):
-    `python3 orchestration/apply_cached_characterization.py --run_plan PLAN_PATH
-    --canonical_smiles "$CANONICAL_SMILES"` → patches PLAN_PATH's decided_params in place with
-    every non-null derived_* field from the cached entry (skip if `{"applied": false, ...}` — no
-    usable cache entry, proceed with class/plan defaults exactly as before). This is what makes
-    `IS_NOVEL=false` mean "reuse the earlier measurement." If `IS_NOVEL=true`, skip this step
-    entirely — there is nothing to reuse yet; `FOUNDATION.md`'s `[Equilibration]` mandatory
-    refine step measures this SMILES for the first time from its own equilibration chain instead.
+HARDWARE — claim before any GPU-submitting worker spawn (build is not a GPU stage; equilibration,
+  Tg sweep, Murnaghan, and deform all are).
+  GPU_PER_RUN = decided_params.gpu_per_run (default 1). Claim: `pick_gpu.py --json claim --run
+  <RUN> --need ${GPU_PER_RUN:-1}` → success `{"claimed":[ids],...}` used verbatim as gpu_ids;
+  shortfall (exit 1) → defer/retry, never force. Release on completion: `pick_gpu.py release --run
+  <RUN>`. When the plan pins a D-08 override (gpu_per_run/engine/mpi_ranks in decided_params), let
+  gen_prompt.py thread it — do NOT also pass --gpu_ids/--mpi_ranks (CLI wins and would shadow the
+  plan). Deterministic-path carve-out: DETERMINISTIC_REPLICATE.md's scripted executor claims and
+  releases internally — do not also claim at the orchestrator level for that path.
 
-  Thread the approved plan: EVERY gen_prompt.py call MUST include --plan PLAN_PATH (its
-    decided_params drive the worker prompts; never read polymer_rules.json manually):
-    `python3 orchestration/gen_prompt.py --stage <STAGE> --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH [--data_path ...]`
-  T_workflow_K=`jq -r '.decided_params.T_workflow_K // 600' PLAN_PATH` → write to run_log.md header.
-  If "tg" not in properties_requested: glassy_hint = (T_workflow_K != 300.0)
+BACKGROUND-WAIT — canonical wait pattern, referenced by name from every phase guide and /recover.
+  After a worker returns monitor_command: log SIMULATION STATE, then
+  `Bash(command=monitor_command, run_in_background=true)` and END YOUR TURN. On the exit wakeup:
+    RUN_COMPLETE → get_run_status → proceed
+    PROCESS_DEAD_NO_SENTINEL → /recover
+    killed / no terminal line → relaunch the same waiter
 
-  Hardware (before any GPU stage):
-    GPU_PER_RUN=`jq -r '.decided_params.gpu_per_run // empty' PLAN_PATH` (empty ⇒ policy-derived, 1 GPU).
-    When the plan pins a D-08 override (gpu_per_run/engine/mpi_ranks in decided_params), let
-      gen_prompt.py thread it into the worker prompt — do NOT also pass --gpu_ids/--mpi_ranks
-      (CLI wins and would shadow the plan).
-    Claim at submit: `orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}`
-      → success `{"claimed":[ids],...}`: use that list verbatim as the worker's gpu_ids;
-        shortfall (`{"error":...}`, exit 1): defer/retry, do not force.
-      Release on completion (`pick_gpu.py release --run <RUN>`). Write engine/gpu_per_run/mpi to D-08 row.
-
-BACKGROUND-WAIT  (canonical wait pattern — FOUNDATION/THERMAL/MECHANICAL guides and /recover
-  reference it by name; never block in-conversation). After a worker returns a monitor_command:
-  write SIMULATION STATE to run_log.md (status=monitoring + bg task id), then
-  `Bash(command=monitor_command, run_in_background=true)` (detached waiter; no & needed) and END
-  YOUR TURN — launch, STOP, get woken ONCE on exit. A PreToolUse hook also reminds you at launch:
-  do NOT get_run_status / spawn the next stage / release a GPU this turn. On the exit wakeup, route
-  on the exit code:
-    RUN_COMPLETE (0)             → get_run_status(chain_id) → check success/failure → proceed
-    PROCESS_DEAD_NO_SENTINEL (3) → FAILED → /recover (max 2/worker)
-    killed / no terminal line    → relaunch the SAME waiter (lossless; SEEN dedups progress)
-
-DETERMINISTIC-PATH BRANCH (`plan_mode=="deterministic"` — read once, before Phase A):
-  Read orchestration/DETERMINISTIC_REPLICATE.md instead of FOUNDATION.md/THERMAL_TRACK.md/
-  MECHANICAL_TRACK.md for Phase A/B. It owns its own GPU claim/release internally (the script
-  wraps every submission in pick_gpu.py claim/release itself — do NOT also claim at the
-  orchestrator level per the Hardware section above for this path) and its own BACKGROUND-WAIT
-  invocations (one or two, per the IS_NOVEL split it documents) — the canonical BACKGROUND-WAIT
-  pattern above still applies to launching/waiting on the *script itself*, just not per LAMMPS
-  stage. Phase C (below) is unchanged either way — the script produces the same raw/*.json
-  artifacts SUMMARY.md already consumes. Skip straight to PHASE C once the script reports
-  `{"status": "complete", ...}`.
-  Else (`plan_mode=="reasoned"`): Phase A/B below apply unchanged, exactly as today.
-
-PHASE A — FOUNDATION (always, reasoned path only — see the branch above for deterministic)
-  Read orchestration/FOUNDATION.md — build → equilibration (BACKGROUND-WAIT) → equil-check gate
-  (density, D-05) + EXTEND branch. If IS_NOVEL=true, its `[Equilibration]` section's mandatory
-  post-PASS refine step is how this SMILES gets characterized. Re-read after any mid-phase
-  session restart.
-
-PHASE B — TRACKS (property-conditional, reasoned path only — see the branch above for deterministic)
-  thermal (if "tg"): Read orchestration/THERMAL_TRACK.md — owns the single sweep at the class's
-    primary configured rate (highest by default; decided_params.tg_slope_gate_fallback overrides
-    to the slowest rate for classes whose highest-rate fit is documented as unreliable) and
-    is_glassy. Multirate extrapolation is a legacy/opt-in capability, not part of this default.
-  mechanical (if "bulk_modulus"): Read orchestration/MECHANICAL_TRACK.md — owns Murnaghan-primary
-    + deform-fallback + BM extraction.
-  Re-read the active track guide before resuming after any mid-track restart.
-
-PHASE C — SUMMARY (always)
-  Read orchestration/SUMMARY.md — owns exp-lookup (BEFORE run-summary) → tg_path via
-  select_tg_path.py → run-summary → memory capture.
+PHASE A — FOUNDATION: orchestration/FOUNDATION.md.
+PHASE B — TRACKS: thermal (if tg) → THERMAL_TRACK.md; mechanical (if bulk_modulus) → orchestration/MECHANICAL_TRACK.md.
+PHASE C — SUMMARY: orchestration/SUMMARY.md.
 ```
-
-<!-- CROSS_STAGE_RULES_START -->
-## Cross-Track Rules (Always Active — Memorize These)
-
-Inlined into every worker prompt by `gen_prompt.py`; apply regardless of worker or track.
-
-0. **GPU is used for ALL simulation runs** — always pass explicit `gpu_ids` and `mpi`; never leave them unset or default.
-1. **Fill `run_log.md` in real time** — each DECISION row when made, each RECOVERY block immediately after resolving an error; never reconstruct at the end.
-2. **Record all seeds before submitting any job** — log EMC seed, SEED_HOT, SEED_COLD in the run_log header. `emc_seed`/`velocity_seed` are never pinned in `polymer_rules.json` (each replicate needs an independent draw, not a shared fixed one) — leave them unset in `decided_params` so the tool draws and reports a random seed, then read it back from job output and log it immediately after submission. Applies uniformly to replicate-1 and replicate-2+ runs alike.
-3. **Check for existing writers before killing any process** — run `lsof | grep <log_filename>`; if another writer is present (concurrent session), do NOT launch, coordinate via the user (a double-launch corrupts the shared log). Backstop: `run_lammps_script`/`run_lammps_chain`/`run_bulk_modulus_series` refuse to launch when a live process holds the target log open (`status=error`, `conflicting_writers`) — kill the stale writer then resubmit; pass `allow_concurrent_writer=True` only after confirming it's stale. The backstop is a safety net, not a substitute for the manual check.
-4. **Log the exact GPU claim label** — copy the `run` field from `pick_gpu.py claim`'s JSON into the SIMULATION STATE table and use it verbatim at release. A label mismatch silently leaves the GPU stuck as claimed.
-<!-- CROSS_STAGE_RULES_END -->

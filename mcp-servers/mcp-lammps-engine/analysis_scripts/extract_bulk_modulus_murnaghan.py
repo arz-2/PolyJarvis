@@ -139,6 +139,59 @@ def fit_linear_fallback(volumes_A3, pressures_GPa):
 
 
 # ---------------------------------------------------------------------------
+# Credibility checks (monotonicity, leave-one-out, fluctuation cross-check)
+# ---------------------------------------------------------------------------
+
+def leave_one_out_refit(volumes_sorted, pressures_sorted, pressures_atm_sorted,
+                         baseline_B0, baseline_B0_prime):
+    """Drop each pressure point in turn and refit. Detects a single influential
+    point carrying the fit (the failure mode a too-narrow pressure span produces)."""
+    rows = []
+    n = len(volumes_sorted)
+    neg_idx = int(np.argmin(pressures_atm_sorted))
+    for i in range(n):
+        V_sub = volumes_sorted[:i] + volumes_sorted[i + 1:]
+        P_sub = pressures_sorted[:i] + pressures_sorted[i + 1:]
+        popt, _, r2, converged = fit_murnaghan(V_sub, P_sub)
+        if converged:
+            B0, B0p, _ = popt
+        else:
+            B0, B0p, r2 = None, None, None
+        rows.append({
+            "dropped_pressure_atm": pressures_atm_sorted[i],
+            "is_tension_point": (i == neg_idx),
+            "converged": converged,
+            "B0_GPa": round(float(B0), 4) if B0 is not None else None,
+            "B0_prime": round(float(B0p), 4) if B0p is not None else None,
+            "r_squared": round(float(r2), 6) if r2 is not None else None,
+            "dB0_GPa_vs_baseline": round(float(B0) - baseline_B0, 4) if B0 is not None else None,
+            "dB0_prime_vs_baseline": round(float(B0p) - baseline_B0_prime, 4) if B0p is not None else None,
+        })
+    return rows
+
+
+def compute_fluctuation_cross_check(npt_prod_log, eq_fraction):
+    """Independent K estimate (NPT volume fluctuation, Wu 2020 B_dyn) from a
+    separate equilibration log, for cross-checking the Murnaghan fit. Never
+    raises — returns None on any missing/short/unreadable log."""
+    try:
+        from extract_bulk_modulus import compute_bulk_modulus as _compute_K_fluct
+        df = parse_lammps_log(npt_prod_log)
+        vol_col = next((c for c in ["Volume", "Vol", "vol"] if c in df.columns), None)
+        temp_col = next((c for c in ["Temp", "temp", "Temperature"] if c in df.columns), None)
+        if vol_col is None or temp_col is None:
+            return None
+        n = len(df)
+        prod = df.iloc[int(n * (1.0 - eq_fraction)):]
+        if len(prod) < 50:
+            return None
+        K_GPa, _, _ = _compute_K_fluct(prod[vol_col].values, float(prod[temp_col].mean()))
+        return K_GPa
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Plot
 # ---------------------------------------------------------------------------
 
@@ -179,6 +232,9 @@ def main():
                         help="Directory for PNG figures (default: <output_dir>/figures).")
     parser.add_argument("--eq_fraction", type=float, default=0.5,
                         help="Fraction of each log used as production window. Default 0.5.")
+    parser.add_argument("--npt_prod_log", default=None,
+                        help="Optional separate NPT production log for a fluctuation-based "
+                             "K cross-check, embedded in this same result (no separate tool call).")
     args = parser.parse_args()
 
     if len(args.log_files) != len(args.pressures_atm):
@@ -236,12 +292,23 @@ def main():
     n_prod_sorted = [n_prod_list[i] for i in order]
     vol_stds_sorted = [vol_stds[i] for i in order]
 
+    volume_monotonic = all(
+        pressures_sorted[i + 1] > pressures_sorted[i]
+        for i in range(len(pressures_sorted) - 1)
+    )
+
     # -------------------------------------------------------------------
     # 2. Fit Murnaghan EOS
     # -------------------------------------------------------------------
     popt, pcov, r2, converged = fit_murnaghan(volumes_sorted, pressures_sorted)
 
     warnings = []
+    if not volume_monotonic:
+        warnings.append(
+            "Pressure series is not monotonic in volume — sorting by mean volume did not "
+            "reproduce ascending pressure order, meaning at least one point's mean volume is "
+            "out of sequence (likely inadequate equilibration at that pressure)."
+        )
     if not converged:
         warnings.append(
             "Murnaghan EOS fit did not converge — falling back to linear P vs ln V. "
@@ -277,6 +344,48 @@ def main():
         method = "linear_fallback"
 
     # -------------------------------------------------------------------
+    # 2b. Leave-one-out refit (converged fits only)
+    # -------------------------------------------------------------------
+    loo_results = None
+    loo_n_converged = None
+    if converged:
+        loo_results = leave_one_out_refit(
+            volumes_sorted, pressures_sorted, pressures_atm_sorted, B0_GPa, B0_prime
+        )
+        loo_n_converged = sum(1 for r in loo_results if r["converged"])
+        deltas = [abs(r["dB0_GPa_vs_baseline"]) for r in loo_results
+                  if r["dB0_GPa_vs_baseline"] is not None]
+        if deltas and B0_GPa:
+            max_dB0_pct = max(deltas) / abs(B0_GPa) * 100
+            if max_dB0_pct > 10.0:
+                warnings.append(
+                    f"Leave-one-out refit: dropping one pressure point shifts B0 by up to "
+                    f"{max_dB0_pct:.1f}% (>10%) — the fit is not robust to a single point; "
+                    "consider widening the pressure range."
+                )
+
+    # -------------------------------------------------------------------
+    # 2c. Fluctuation cross-check (optional, embeds what used to be a second tool call)
+    # -------------------------------------------------------------------
+    fluctuation_bulk_modulus_GPa = None
+    fluctuation_divergence_pct = None
+    if args.npt_prod_log:
+        fluctuation_bulk_modulus_GPa = compute_fluctuation_cross_check(
+            args.npt_prod_log, args.eq_fraction
+        )
+        if fluctuation_bulk_modulus_GPa is not None and B0_GPa:
+            fluctuation_divergence_pct = (
+                abs(B0_GPa - fluctuation_bulk_modulus_GPa) / abs(B0_GPa) * 100
+            )
+            if fluctuation_divergence_pct > 15.0:
+                warnings.append(
+                    f"Murnaghan B0={B0_GPa:.3f} GPa vs fluctuation K="
+                    f"{fluctuation_bulk_modulus_GPa:.3f} GPa diverge by "
+                    f"{fluctuation_divergence_pct:.1f}% (>15%). Expected/benign for rubbery "
+                    "classes (fluctuation overestimates rubbery K); investigate for glassy classes."
+                )
+
+    # -------------------------------------------------------------------
     # 3. Assemble result
     # -------------------------------------------------------------------
     result = {
@@ -299,6 +408,13 @@ def main():
         "log_files": log_files_sorted,
         "eq_fraction": args.eq_fraction,
         "output_dir": str(output_dir),
+        "volume_monotonic": volume_monotonic,
+        "loo_results": loo_results,
+        "loo_n_converged": loo_n_converged,
+        "fluctuation_bulk_modulus_GPa": round(fluctuation_bulk_modulus_GPa, 4)
+            if fluctuation_bulk_modulus_GPa is not None else None,
+        "fluctuation_divergence_pct": round(fluctuation_divergence_pct, 2)
+            if fluctuation_divergence_pct is not None else None,
         "warnings": warnings,
     }
 

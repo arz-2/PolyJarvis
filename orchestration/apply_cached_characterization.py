@@ -6,10 +6,8 @@ system-characterization-analyzer.md's cache write (guides/system_characterizatio
 gated: an entry only exists when at least one of that run's reliability checks
 (probe_tau_relax_reliable / probe_K0_reliable) came back true, so a fully-failed probe never
 poisons the cache. What is still missing is the OTHER half of the loop: nothing reads a usable
-cached entry's derived_* values back into a NEW run's decided_params. Today CLAUDE.md's Novelty
-Gate only uses the cache's key-existence to decide IS_NOVEL (skip re-probing) -- it never actually
-threads the previously-measured values through, so a "known" SMILES silently falls back to guessed
-class defaults exactly as if it had never been probed at all.
+cached entry's derived_* values back into a NEW run's decided_params, so a "known" SMILES would
+otherwise silently fall back to guessed class defaults exactly as if it had never been measured.
 
 This script closes that gap: given a run's run_plan.json and its canonical SMILES, if a usable
 cache entry exists, patch decided_params with every non-null derived_* field (same field-name
@@ -18,15 +16,14 @@ and append a D-09_characterization decision citing the cache entry's provenance.
 entry, or the entry (defensively) carries no usable derived fields, this is a no-op -- exit 0,
 decided_params untouched.
 
-Called once per run from CLAUDE.md's PLAN section, right after plan generation, whenever the
-Novelty Gate found IS_NOVEL=false -- applies REGARDLESS of the plan's plan_mode/confidence
-(validated vs. novel), since "characterized" (this script's trigger -- Phase-A timing knobs
-measured, guides/system_characterization_cache.json[canonical_smiles].derived_*) and "validated"
-(the plan_mode gate -- protocol_validated, stamped only after Phase-C all-PASS) are two
-independent flags on the same cache entry, not one signal split across two branches. A SMILES
-can be characterized-but-not-yet-validated (still lands in a reasoned plan here) or validated for
-a different property set than requested (still reasoned for the new property, but still reuses
-its old timing knobs) -- see decision_policy.json:confidence_gate.
+Called once per run from CLAUDE.md's GATE & PLAN step, right after plan generation, whenever
+IS_NOVEL=false -- applies REGARDLESS of plan_mode/VALIDATED, since "characterized" (this script's
+trigger -- Phase-A timing knobs measured, guides/system_characterization_cache.json[canonical_
+smiles].derived_*) and "validated" (the plan_mode gate -- protocol_validated, stamped only after
+Phase-C all-PASS) are two independent flags on the same cache entry. A SMILES can be
+characterized-but-not-yet-validated (still lands in a reasoned plan) or validated for a different
+property set than requested (still reasoned for the new property, but still reuses its old timing
+knobs) -- see decision_policy.json:confidence_gate.
 
 Usage:
   python3 orchestration/apply_cached_characterization.py \
@@ -52,7 +49,6 @@ DERIVED_FIELD_MAP = {
     "derived_t_equil_ns": "t_equil_ns",
     "derived_eq_annealing_cycles": "eq_annealing_cycles",
     "derived_ct_min_decay_melt": "ct_min_decay_melt",
-    "derived_bm_pressures_atm": "bm_pressures_atm",
     "derived_K_deform_rate_inv_s": "K_deform_rate_inv_s",
     "derived_K_deform_rate_slow_inv_s": "K_deform_rate_slow_inv_s",
 }

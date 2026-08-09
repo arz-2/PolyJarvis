@@ -1,15 +1,12 @@
 # FOUNDATION track guide (Phase A) — orchestrator-read
 
-This guide governs the `reasoned` path (`confidence` in {low, medium, offtable}) and Phase A's
-Build→Equilibration flow for the `IS_NOVEL=true` case inside the `deterministic` path (see
-`orchestration/DETERMINISTIC_REPLICATE.md`'s phase split for how the two interleave). For
-`plan_mode=="deterministic"` Phase A execution otherwise, see `DETERMINISTIC_REPLICATE.md`.
+Governs Phase A's `reasoned` path and the `IS_NOVEL=true` Build→Equil-check leg inside
+`deterministic` — see `DETERMINISTIC_REPLICATE.md` for how the two interleave and for
+`plan_mode=="deterministic"` execution otherwise.
 
-Read this at **Phase A entry**, before spawning the build/equil workers. Foundation always runs
-and feeds every downstream track; density comes from the equil-check gate. All worker prompts are
-generated with `gen_prompt.py --stage <STAGE> --plan PLAN_PATH [--data_path ...]` — never read
-`polymer_rules.json` manually; the plan's `decided_params` drive the prompts. `BACKGROUND-WAIT` is
-the canonical wait pattern defined in `CLAUDE.md` — launch the detached waiter, then end your turn.
+Read at Phase A entry, before spawning build/equil workers. Foundation always runs and feeds
+every downstream track; density comes from the equil-check gate. Keep run_log.md notes terse:
+cite the field/verdict, not rationale already covered here or in the spawned worker's own doc.
 
 ## [Build]
 
@@ -18,16 +15,21 @@ Agent(subagent_type="molecule-builder", description="🔵 Build {polymer_name} c
       prompt=<gen_prompt.py --stage build --plan PLAN_PATH>)
   → RESULT → data_path, emc_params_path (EMC builds only, else null), lammps_flags,
       emc_seed (integer or null)
-  → immediately write emc_seed to run_log.md header Seeds line (never log -1; log null if RadonPy path)
+  → write emc_seed to run_log.md header Seeds line
 ```
-
-Proceed straight to `[Equilibration]` regardless of `IS_NOVEL` — a genuinely novel SMILES runs
-from class defaults with no pre-measurement, same as any other run; its equilibration result is
-what populates `system_characterization_cache.json` afterward (see `[Equilibration]`'s mandatory
-refine step below), not the other way around.
 
 ## [Equilibration]
 
+Rubbery (`T_workflow_K ≤ 300`): single submission, `phase=full` (gen_prompt.py forces this
+regardless of what's passed — nothing to gate early, `npt_production` is already both the melt
+checkpoint and the final state). Glassy (`T_workflow_K > 300`): two submissions gated by a
+melt-mixing check *before* the `npt_cool300`/`npt_prod300` cool-to-300 tail ever runs — a badly
+mixed melt is caught without spending that ~1-3 ns of GPU time cooling it.
+
+Claim GPU before every submission below; release on that
+submission's completion wakeup — build is not a GPU stage, so no claim before `[Build]`.
+
+**Rubbery / `phase=full`:**
 ```
 Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polymer_name}",
       prompt=<gen_prompt.py --stage equil --plan PLAN_PATH --data_path ...>)
@@ -35,17 +37,32 @@ Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polym
       npt_prod_log_path, npt_prod_dump_path, npt_prod_data_path
     (npt_tg_prep_data non-null for rubbery polymers — npt_melt at T_equil_K; null for glassy)
 ```
+Write SIMULATION STATE to run_log.md, then BACKGROUND-WAIT on `monitor_command`. Proceed to
+`[Equil-check gate]` (`phase=full`).
 
-Write SIMULATION STATE to run_log.md, then run BACKGROUND-WAIT on `monitor_command` (see CLAUDE.md).
+**Glassy — melt phase (`phase=melt`):**
+```
+Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polymer_name} (melt)",
+      prompt=<gen_prompt.py --stage equil --plan PLAN_PATH --phase melt --data_path ...>)
+  → RESULT → chain_id, monitor_command, npt_production_log_path, npt_production_data_path,
+      nvt_production_dump_path, pending_cooldown_path
+```
+Write SIMULATION STATE to run_log.md, then BACKGROUND-WAIT on `monitor_command`. Proceed to
+`[Equil-check gate]` (`phase=melt`) — do NOT submit the cooldown tail yet.
 
-If `IS_NOVEL=true`, once this chain's equil-check gate below returns `equil_verdict=PASS`,
-**mandatory**: spawn `system-characterization-analyzer` once to characterize this SMILES from the real
-chain's own genuine stationary hold — the `npt_prod300` stage for glassy chains (300 K) or
-`npt_production` for rubbery (target T; there is no `npt_prod300` stage for rubbery). **Not**
-`npt_pppm` — it's a pressure ramp, not a hold. This is the only measurement this SMILES ever gets
-(there is no separate pre-equilibration probe); it's longer and better-sampled than a short probe
-could afford anyway, and matches the actual state point where the derived knobs get consumed
-downstream (glassy Murnaghan work runs at `npt_prod300`; rubbery at `npt_production`).
+**Glassy — cooldown phase (`phase=cooldown`, only after the melt gate PASSes):**
+```
+Agent(subagent_type="equilibration-worker", description="🟠 Equilibrate {polymer_name} (cooldown)",
+      prompt=<gen_prompt.py --stage equil --plan PLAN_PATH --phase cooldown
+              --pending_cooldown_path <from melt-phase RESULT>>)
+  → RESULT → chain_id, monitor_command, npt_prod_log_path, npt_prod_dump_path, npt_prod_data_path
+    (same RESULT shape as phase=full — npt_prod300 paths)
+```
+Write SIMULATION STATE to run_log.md, then BACKGROUND-WAIT on `monitor_command`. Proceed to
+`[Equil-check gate]` (`phase=full`) for the final density/cooling-contraction check.
+
+If `IS_NOVEL=true`, once `[Equil-check gate]`'s `phase=full` call returns `equil_verdict=PASS`:
+mandatory, spawn `system-characterization-analyzer` once:
 
 ```
 Agent(subagent_type="system-characterization-analyzer", description="🟢 Characterize {polymer_name} from equil",
@@ -55,52 +72,37 @@ Agent(subagent_type="system-characterization-analyzer", description="🟢 Charac
              "output_dir: data/<RUN>/raw\ngraphs_dir: data/<RUN>/graphs\n"
              "log_file: <npt_prod_log_path>\ndump_file: <npt_prod_dump_path>")
   → RESULT → tau_relax_ps, tau_relax_reliable, K0_GPa, K0_reliable, fields_derived,
-      cache_path, characterization_path
-  → PLAN_PATH's decided_params.bm_pressures_atm/K_deform_rate_inv_s/_slow are patched in place if
-    reliable (Phase B hasn't started yet — these still gate it); guides/system_characterization_
-    cache.json[CANONICAL_SMILES] is created/updated only if at least one reliability flag is
-    true — an unreliable characterization leaves the cache exactly as it was (absent, or
-    present-with-partial-data from an earlier run), it does not force a write.
+      fields_kept_as_class_default, cache_path, characterization_path
 ```
 
-Write a `run_log.md` note: which knobs came from this characterization, which stayed at class
-defaults. No re-critique — this is a narrowly-scoped numeric refinement of an already-approved
-plan (mechanical-track knobs only), not a new decision category.
+Write a run_log.md note: `fields_derived` vs `fields_kept_as_class_default`. No re-critique —
+this is a numeric refinement of an already-approved plan, not a new decision category.
 
 ## [Equil-check gate]
 
+**`phase=full`** (rubbery's only gate; glassy's gate after cooldown):
 ```
 Agent(subagent_type="equilibration-checker", description="🟠 Equil check {polymer_name}",
       prompt=<gen_prompt.py --stage equil-check --plan PLAN_PATH --data_path npt_prod_data_path>)
   → RESULT → equil_verdict, structural_fail_remedy, structural_fail_remedy_confidence,
       density_gcm3, ct_decay_fraction, ct_tau_relax_ps,
       end_to_end_r_mean_A, end_to_end_r_std_A, end_to_end_n_chains
-    → write D-05 to run_log.md (populate Chain Structure Summary rows from these fields)
+    → write D-05 to run_log.md (Chain Structure Summary rows)
 ```
+- `PASS` → proceed.
+- `EXTEND` / `STRUCTURAL_FAIL` / `FAIL` → `/recover`
 
-- **equil_verdict=EXTEND** → re-spawn equilibration-worker in extend mode (prompt: mode=extend,
-  extend_from_data=`<npt_prod_data_path>`, extend_ns=1–2 (if this check's `ct_tau_relax_ps` is a
-  finite, reasonably-fit number, prefer `extend_ns = max(1.5, 1.5 * ct_tau_relax_ps/1000)` over
-  the flat guess — a measured signal from this run's own data beats a blind guess), press/engine
-  same, temp=npt_prod_temp_K — the 300 K production temperature of the cell, **NOT** the melt
-  T_equil/T_workflow; the melt T would re-melt a cooled glassy cell). The worker generates a single
-  deterministic npt_extend stage via `generate_equilibration_workflow(extend_only=True)` and
-  submits it — do **not** hand-write a continuation `.in`. Re-run BACKGROUND-WAIT, then re-run
-  equil-check on `npt_extend_out.data` (max 2 extensions).
-- **equil_verdict=STRUCTURAL_FAIL** → do NOT EXTEND (the cell converged to the wrong value, not
-  merely an unconverged one) and do NOT silently accept as FF bias. Route through `/recover`
-  (attempt cap, escalation ladder, low-confidence handling, and UNRESOLVED fallback are all owned
-  by `.claude/commands/recover.md` §2b — don't re-derive those rules here) with
-  `structural_fail_remedy` as diagnostic context. That field's text (emitted live by
-  `enforce_gate.py`) already explains what the remedy means and cites its source where relevant —
-  read it rather than re-deriving the diagnosis. What `/recover` needs from you that it can't get
-  from the remedy string alone is the **worker-spawn routing**:
-  - `re_melt_slow_recool` / `heavy_melt_anneal_probe` → fresh (non-extend) equilibration-worker
-    spawn under a corrected protocol — never a continuation of the existing chain. If this is a
-    recurring pattern for the class, consider bumping `guides/polymer_rules.json`'s class defaults
-    per `.claude/commands/ingest-memory.md`'s existing rule.
-  - melt-mixing remedy (density_homogeneity) → extend melt-stage dwell (`melt_npt_steps`/
-    `t_equil_ns`) via a fresh equilibration-worker spawn, not an extend-mode continuation — the
-    defect is upstream of the stage `extend` operates on. (Not covered in `recover.md`'s ladder —
-    the routing above is FOUNDATION-specific.)
-- **equil_verdict=FAIL** → write UNRESOLVED to run_log.md and stop.
+**`phase=melt`** (glassy only, before cooldown — structural/thermo gates only, no density
+extraction, no cooling-contraction diagnosis; see `guides/EQUIL_CHECK.md`'s Phase section):
+```
+Agent(subagent_type="equilibration-checker", description="🟠 Melt-mixing check {polymer_name}",
+      prompt=<gen_prompt.py --stage equil-check --plan PLAN_PATH --phase melt
+              --data_path npt_production_data_path
+              --npt_prod_log npt_production_log_path --npt_prod_dump nvt_production_dump_path>)
+  → RESULT → equil_verdict, structural_fail_remedy, equilibration_warnings
+```
+- `PASS` → proceed to `[Equilibration]`'s cooldown phase.
+- `EXTEND` / `STRUCTURAL_FAIL` (remedy is a melt-mixing note, never
+  `re_melt_slow_recool`/`heavy_melt_anneal_probe` — those need the post-cool glass state, which
+  doesn't exist yet) / `FAIL` → `/recover` (MELT-MIXING procedure) — extends the melt checkpoint
+  in place and re-runs this same `phase=melt` gate; only PASS here reaches cooldown.

@@ -10,8 +10,8 @@ guides live in `guides/`).
 
 | Doc | Read at | Owns |
 |---|---|---|
-| `FOUNDATION.md` | Phase A | build → equilibration (BACKGROUND-WAIT) → equil-check gate + EXTEND branch |
-| `THERMAL_TRACK.md` | Phase B (tg) | multirate Tg sweep, slope gate + per-class fallback, is_glassy |
+| `FOUNDATION.md` | Phase A | build → equilibration (BACKGROUND-WAIT) → equil-check gate (non-PASS → `/recover`) |
+| `THERMAL_TRACK.md` | Phase B (tg) | single-rate Tg sweep + analysis, per-class rate fallback, is_glassy |
 | `MECHANICAL_TRACK.md` | Phase B (bulk_modulus) | Murnaghan primary + deform fallback + BM extraction routing |
 | `SUMMARY.md` | Phase C | exp-lookup → tg_path (`select_tg_path.py`) → run-summary → memory capture |
 | `decision_policy.json` | planner/critic (at plan/critique time) | evaluation framework the planner/critic reason against |

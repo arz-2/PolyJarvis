@@ -1,14 +1,14 @@
 {
   "hardware_policy": {
-    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (orchestration/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default: chosen so up to 4 runs fit in 32 cores (4 x mpi=4 = 16) — this is what gen_prompt derives. `mpi_single_run_hint` is the (faster) value to use only when the box is dedicated to one run; it is a provisional GUESS pending hardware/benchmark_hardware.py (see hardware/HARDWARE.md), NOT yet benchmark-derived. NOTE: the per-run mpi/gpu values and the directional_probe timings below were measured on the PRIOR box (4x RTX 6000 24GB / i9-10980XE 18c), not this A800 box — only host/budget fields were updated; re-run benchmark_hardware.py on the A800s to retune. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
+    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (orchestration/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default \u2014 for pcff/opls/trappe this is mpi=1 (KOKKOS/GPU-resident kspace, 1 core/run, up to 4 concurrent runs on 4 GPUs); gaff is the outlier at mpi=4. `mpi_single_run_hint` equals `mpi` (both 1) for pcff/opls/trappe, confirmed by the 2026-08-08 clean host-matched /calibrate-hardware pass (values_are_benchmarked=true, see hardware/HARDWARE_STUDY.md); gaff's mpi_single_run_hint=8 remains a provisional GUESS \u2014 no calibration cell exists for it yet. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
     "host": {
       "gpus": 4,
-      "gpu_model": "Quadro RTX 6000 24GB",
+      "gpu_model": "Quadro RTX 6000",
       "phys_cores": 18
     },
-    "concurrency_rule": "Sum of mpi over all concurrent runs <= 18 physical cores; at most one GPU-heavy run per physical GPU. At the default mpi=4 this permits 4 concurrent runs (16 ranks). Raise mpi toward mpi_single_run_hint only when fewer runs share the box; check with `orchestration/pick_gpu.py budget --mpi N` before launch.",
+    "concurrency_rule": "Sum of mpi over all concurrent runs <= 18 physical cores; at most one GPU-heavy run per physical GPU. pcff/opls/trappe default to mpi=1 (1 core/run), so up to 4 runs go concurrent at 1 per GPU (4 ranks total, well under the 18-core ceiling); gaff defaults to mpi=4 (16 ranks for 4 concurrent runs, near the ceiling). Raise mpi toward mpi_single_run_hint only when fewer runs share the box; check with `orchestration/pick_gpu.py budget --mpi N` before launch.",
     "min_mpi_for_pppm": 4,
-    "values_are_benchmarked": false,
+    "values_are_benchmarked": true,
     "directional_probe": {
       "kokkos_offload_study": {
         "date": "2026-06-20",
@@ -29,17 +29,17 @@
         "opls_parity_2026-06-20": "PASS. run-0 on decane-oplsaa (3200 atoms, OPLS-AA): lj/cut/coul/long/kk + harmonic bond/angle kk + dihedral opls/kk + pppm/kk vs GPU-package agree to 0.000% on E_bond/E_angle/E_dihed/E_vdwl/E_coul/E_long/PotEng and the pressure tensor. OPLS KOKKOS stack validated.",
         "gate": "GREEN as of 2026-06-20. pcff + opls FLIPPED to engine=kokkos, mpi=1, gpu_per_run=1 (both run-0 parity-validated). trappe FLIPPED to engine=gpu, mpi=1, gpu_per_run=1 with `neigh yes` (run-0 parity PASS, see trappe_neigh_yes_2026-06-20). gaff pending its own parity (no cell yet).",
         "binary": "/home/arz2/lammps-install-kokkos/bin/lmp (env LAMBDA_LAMMPS_KOKKOS)",
-        "kokkos_deck_gotchas": "Three KOKKOS pitfalls (hit on the 2nd machine pre-merge; ALREADY correct on this hardware-optimization branch): (1) the KOKKOS package is loaded on the COMMAND LINE via `-pk kokkos` (in _engine_launch), NOT as an in-deck `package kokkos ...` line — script_generator renders only a comment for engine=kokkos. An in-deck `package kokkos gpu 1 comm no` is ILLEGAL (use `package kokkos neigh full comm no` if ever hand-writing one). (2) `-sf kk` rewrites STYLE commands (pair/bond/angle/dihedral/kspace/fix) to /kk, but NOT the `neighbor` command — decks keep plain `neighbor 2.0 bin`; `neighbor 2.0 bin/kk` is an invalid suffix. (3) run_lammps_script AND run_lammps_chain both take `engine=`, so no manual binary wrapper is needed — pass engine='kokkos' and the right binary+flags are selected. Our single-GPU mpi=1 `-pk kokkos` defaults passed parity; multi-GPU may need explicit `comm`/`neigh` tuning.",
+        "kokkos_deck_gotchas": "Three KOKKOS pitfalls (hit on the 2nd machine pre-merge; ALREADY correct on this hardware-optimization branch): (1) the KOKKOS package is loaded on the COMMAND LINE via `-pk kokkos` (in _engine_launch), NOT as an in-deck `package kokkos ...` line \u2014 script_generator renders only a comment for engine=kokkos. An in-deck `package kokkos gpu 1 comm no` is ILLEGAL (use `package kokkos neigh full comm no` if ever hand-writing one). (2) `-sf kk` rewrites STYLE commands (pair/bond/angle/dihedral/kspace/fix) to /kk, but NOT the `neighbor` command \u2014 decks keep plain `neighbor 2.0 bin`; `neighbor 2.0 bin/kk` is an invalid suffix. (3) run_lammps_script AND run_lammps_chain both take `engine=`, so no manual binary wrapper is needed \u2014 pass engine='kokkos' and the right binary+flags are selected. Our single-GPU mpi=1 `-pk kokkos` defaults passed parity; multi-GPU may need explicit `comm`/`neigh` tuning.",
         "trappe_neigh_yes_2026-06-20": "TraPPE-UA is NOT a CPU job. CALIB_PHYC (1640 atoms), mpi=1/GPU, niced on idle GPU2 under identical contention (ratios robust, absolute ns/day suppressed uniformly): cpu_mpi4=136; A0 gpu-pkg neigh-on-CPU=136 (Neigh 71% stays on CPU -> no win, ties CPU); A1 gpu-pkg neigh-ON-GPU=501 (3.7x, now Bond 60% CPU-bound); A3 KOKKOS full-offload=397 (2.9x; Modify/Bond/Neigh, /kk launch+fix overhead loses on tiny UA cells). WINNER = GPU package + `neigh yes`, mpi=1, 1 GPU/run (A1). Implemented by gating `package gpu 1 neigh yes` on use_trappe in script_generator.py. Parity: run-0 static CPU lj/cut vs GPU lj/cut/gpu+neigh-yes on CALIB_PHYC = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl/density (only virial/pressure differs ~0.3% from FP summation order; advisory/non-gated). bench_accuracy_diff.py PASS. (Note: bench_accuracy_diff _pct_diff fixed to handle the no-kspace E_long=0/0 nan edge.) Open: mpi=2 may beat mpi=1 (Bond is CPU-bound at mpi=1) but costs a core -> defer to a drained box; 2/GPU MPS throughput for batches still to measure.",
         "gpu_sharing_2026-06-20": "DO NOT pack >1 run/GPU for PPPM-heavy (PCFF/OPLS) KOKKOS runs. Measured on PEG1 7020 atoms, GPU2: solo=38.9 ns/day; 2 concurrent time-sliced (no MPS)=6.3 aggregate (0.16x, Kspace blows up 15x from GPU context-switching on PPPM sync points); 2 concurrent with CUDA MPS=39.0 aggregate (1.00x, clean 2x/section, 50% each) = ZERO gain. The GPU is already saturated by one PPPM job (pair kernel is tiny but the cuFFT pipeline keeps it busy). Optimal = 1 run/GPU, 4 concurrent across 4 GPUs (mpi=1, gpu_per_run=1)."
       },
-      "measured_on": "4x NVIDIA A800 40GB Active / 32 phys cores (calibrate_hardware.py --revalidate)",
-      "date": "2026-06-21",
-      "mode": "revalidate — ran the shipped by_forcefield default per FF (no engine re-search) + run-0 parity vs CPU; records host-matched ns/day. Use --full for a fresh engine×config sweep on a drained box.",
+      "measured_on": "4x Quadro RTX 6000 / 18 phys cores (calibrate_hardware.py --revalidate)",
+      "date": "2026-08-08",
+      "mode": "revalidate \u2014 ran the shipped by_forcefield default per FF (no engine re-search) + run-0 parity vs CPU; records host-matched ns/day. Use --full for a fresh engine\u00d7config sweep on a drained box.",
       "cells": {
-        "pcff": "hardware/CALIB_PCFF/emc_build.data",
-        "opls": "hardware/CALIB_OPLS/emc_build.data",
-        "trappe": "hardware/CALIB_TRAPPE/emc_build.data"
+        "pcff": "/home/arz2/PolyJarvis/hardware/CALIB_PCFF/emc_build.data",
+        "opls": "/home/arz2/PolyJarvis/hardware/CALIB_OPLS/emc_build.data",
+        "trappe": "/home/arz2/PolyJarvis/hardware/CALIB_TRAPPE/emc_build.data"
       },
       "cells_atoms": {
         "pcff": 3020,
@@ -51,7 +51,7 @@
           "name": "gpu1_mpi1",
           "mpi": 1,
           "gpu": 1,
-          "ns_per_day": 42.826,
+          "ns_per_day": 42.269,
           "cell_atoms": 3020,
           "engine": "kokkos",
           "parity": "PASS",
@@ -61,7 +61,7 @@
           "name": "gpu1_mpi1",
           "mpi": 1,
           "gpu": 1,
-          "ns_per_day": 57.075,
+          "ns_per_day": 55.191,
           "cell_atoms": 3220,
           "engine": "kokkos",
           "parity": "PASS",
@@ -71,7 +71,7 @@
           "name": "gpu1_mpi1",
           "mpi": 1,
           "gpu": 1,
-          "ns_per_day": 580.729,
+          "ns_per_day": 639.19,
           "cell_atoms": 1640,
           "engine": "gpu",
           "parity": "PASS",
@@ -79,15 +79,15 @@
         }
       },
       "pcff_ns_per_day": {
-        "gpu1_mpi1": 42.826
+        "gpu1_mpi1": 42.269
       },
       "opls_ns_per_day": {
-        "gpu1_mpi1": 57.075
+        "gpu1_mpi1": 55.191
       },
       "trappe_ns_per_day": {
-        "gpu1_mpi1": 580.729
+        "gpu1_mpi1": 639.19
       },
-      "calibration_note": "partial revalidation — evidence recorded, values_are_benchmarked left false: CPU contended (busy~18 > headroom 8)"
+      "calibration_note": "clean host-matched revalidation \u2014 every shipped default ran and passed run-0 parity on this box; values_are_benchmarked=true."
     },
     "ff_aliases": {
       "PCFF": "pcff",
@@ -102,7 +102,7 @@
         "mpi": 1,
         "mpi_single_run_hint": 1,
         "gpu_per_run": 1,
-        "note": "class2/kk FULL-OFFLOAD (pair+class2 bonded+pppm+neigh on GPU) via the KOKKOS binary (env LAMBDA_LAMMPS_KOKKOS). mpi=1 is CANONICAL here — kspace runs on the GPU, NOT CPU-serial, so the old GPU-package 'never mpi=1' rule does NOT apply. ~7.9x vs gpu-pkg A0 at 1 rank; 1 core/run frees cores for ~4 concurrent runs (1/GPU). Parity run-0 vs CPU class2 = 0.000% on energies+forces (2026-06-20). Fallback: engine=gpu, mpi=4 (GPU package).",
+        "note": "class2/kk FULL-OFFLOAD (pair+class2 bonded+pppm+neigh on GPU) via the KOKKOS binary (env LAMBDA_LAMMPS_KOKKOS). mpi=1 is CANONICAL here \u2014 kspace runs on the GPU, NOT CPU-serial, so the old GPU-package 'never mpi=1' rule does NOT apply. ~7.9x vs gpu-pkg A0 at 1 rank; 1 core/run frees cores for ~4 concurrent runs (1/GPU). Parity run-0 vs CPU class2 = 0.000% on energies+forces (2026-06-20). Fallback: engine=gpu, mpi=4 (GPU package).",
         "_prev_gpu_package": {
           "engine": "gpu",
           "mpi": 4,
@@ -126,7 +126,7 @@
         "mpi": 1,
         "mpi_single_run_hint": 1,
         "gpu_per_run": 1,
-        "note": "lj/cut, no kspace, neigh-build dominated (~71%). GPU package with `neigh yes` (neighbor build ON the GPU) = 3.7x vs CPU mpi=4 at 1 core/run (A1 501 vs 136 ns/day, CALIB_PHYC 1640 atoms, 2026-06-20, niced/contended ratio). BEATS KOKKOS here (397) — UA bonded is trivial and lj/cut/gpu is leaner than /kk per-kernel launch overhead on small cells (opposite of PCFF). The `neigh yes` line is rendered automatically by script_generator gating on use_trappe (engine=gpu only — PPPM classes keep neigh no). Parity run-0 vs CPU lj/cut = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl (2026-06-20). mpi=1 is the concurrency-optimal default (4 TraPPE runs on 4 GPUs = 4 cores). Fallback: engine=cpu, mpi=4.",
+        "note": "lj/cut, no kspace, neigh-build dominated (~71%). GPU package with `neigh yes` (neighbor build ON the GPU) = 3.7x vs CPU mpi=4 at 1 core/run (A1 501 vs 136 ns/day, CALIB_PHYC 1640 atoms, 2026-06-20, niced/contended ratio). BEATS KOKKOS here (397) \u2014 UA bonded is trivial and lj/cut/gpu is leaner than /kk per-kernel launch overhead on small cells (opposite of PCFF). The `neigh yes` line is rendered automatically by script_generator gating on use_trappe (engine=gpu only \u2014 PPPM classes keep neigh no). Parity run-0 vs CPU lj/cut = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl (2026-06-20). mpi=1 is the concurrency-optimal default (4 TraPPE runs on 4 GPUs = 4 cores). Fallback: engine=cpu, mpi=4.",
         "_prev_cpu": {
           "engine": "cpu",
           "mpi": 4,
@@ -519,12 +519,13 @@
       ],
       "bm_pressures_atm": [
         1,
-        500,
         1000,
-        2000,
-        5000
+        2500,
+        5000,
+        10000,
+        15000
       ],
-      "bm_pressures_note": "Widened from [1,100,300,600,1000] (~0.1 GPa span) on 2026-06-24: narrow ±1000 atm under-constrains EOS curvature for low-K rubbery polymers → B0_prime runaway (PE3 Murnaghan 1.358 vs fluctuation 1.651 GPa, 21.6% gap). Cross-check K against NPT fluctuation; flag divergence >15%.",
+      "bm_pressures_note": "Widened from [1,100,300,600,1000] (~0.1 GPa span) on 2026-06-24: narrow ±1000 atm under-constrains EOS curvature for low-K rubbery polymers → B0_prime runaway (PE3 Murnaghan 1.358 vs fluctuation 1.651 GPa, 21.6% gap). Cross-check K against NPT fluctuation; flag divergence >15%. Ceiling widened 5000->15000 on 2026-08-08 (compression-only leg on PE4 clean, no kink); tension still excluded, see MURNAGHAN.md.",
       "exp_K_GPa": {
         "min": 1.5,
         "max": 2.0,
@@ -669,14 +670,6 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
-      "bm_pressures_atm": [
-        -1000,
-        0,
-        1500,
-        3000,
-        5000
-      ],
-      "bm_pressures_note": "Glassy at 300 K (Murnaghan primary). Set [-1000,0,1500,3000,5000] (~0.5 GPa, compression-biased) on 2026-06-24: PVC2 at ±1000 atm ran B0' to 16.3; the widened span gives B0'=9.5 (R²=0.9990), K=2.80 GPa, B_dyn=2.93 GPa (4.6% agreement). PCFF systematically underpredicts PVC K by ~30% (K~2.8-2.9 vs exp 3.5-4.5 GPa) independent of span — a known FF limitation, not a fit artifact. Deform fallback if B0' still outside [4,20].",
       "experimental_tg_K": {
         "PVA": 303,
         "PVC": 354,
@@ -953,12 +946,13 @@
       ],
       "bm_pressures_atm": [
         1,
-        500,
         1000,
-        2000,
-        5000
+        2500,
+        5000,
+        10000,
+        15000
       ],
-      "bm_pressures_note": "Widened from [1,100,300,600,1000] (~0.1 GPa span) on 2026-06-24: narrow ±1000 atm under-constrains EOS curvature for low-K rubbery polymers → B0_prime runaway (cis-PBD3 Murnaghan 1.263 vs fluctuation 1.566 GPa, ~24% gap). Cross-check K against NPT fluctuation; flag divergence >15%.",
+      "bm_pressures_note": "Widened from [1,100,300,600,1000] (~0.1 GPa span) on 2026-06-24: narrow ±1000 atm under-constrains EOS curvature for low-K rubbery polymers → B0_prime runaway (cis-PBD3 Murnaghan 1.263 vs fluctuation 1.566 GPa, ~24% gap). Cross-check K against NPT fluctuation; flag divergence >15%. Ceiling widened 5000->15000 on 2026-08-08 (compression-only leg on cis-PBD4 clean, no kink); tension still excluded, see MURNAGHAN.md.",
       "experimental_density_gcm3": 0.9,
       "exp_density_note": "PBD amorphous = 0.90 g/cm³; PI amorphous = 0.91 g/cm³ (Brandrup & Immergut). Use 0.90 as the default comparator for PBD SMILES; override to 0.91 for PI.",
       "exp_K_GPa": {
@@ -1216,7 +1210,8 @@
       "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PLA PASS, PET PASS). PCFF has explicit ester types (c_1, o_2, oe). Klajmon2023 benchmarks PLA/PEG with AA-MD.",
       "exp_K_GPa": {
         "min": 3.0,
-        "max": 4.5
+        "max": 4.5,
+        "note": "Provenance unverified - no primary PVT/Tait or ultrasonic bulk-modulus measurement identified. Likely derived from Mark 2007 Table 24.4 PET/PBT Young's modulus via K=E/[3(1-2nu)], nu~0.37 (see exp_E_GPa note in this same class), not a direct bulk-modulus measurement - treat as approximate; K_S vs K_T flavor unknown."
       },
       "K_deform_rate_slow_inv_s": 10000000.0,
       "melt_npt_ns": 1.0,
@@ -1854,14 +1849,6 @@
       "_tg_slope_gate_note": "Slope-gate FAIL is structural for rigid aromatics: the staircase cold-starts from the 300 K glassy cell, so the highest-T plateaus under-equilibrate at fast rates and invert the Tg-vs-rate trend. Headline Tg = SLOWEST (most-equilibrated) rate + degeneracy caveat; seed rerolls cannot fix this. Root fix (backlog): melt-start sweep.",
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
-      "bm_pressures_atm": [
-        -1000,
-        0,
-        1500,
-        3000,
-        5000
-      ],
-      "bm_pressures_note": "Stiff ketone glass: +/-1000 atm gives insufficient EOS curvature (B0_prime ~1, gate fail); compression-biased range confirmed (PEEK 2026: B0_prime=6.30, r2=0.9998, K=5.16 GPa). Tension capped at -1000 atm to avoid cavitation.",
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
       "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",

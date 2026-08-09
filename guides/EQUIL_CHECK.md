@@ -34,12 +34,26 @@ from the raw numbers yourself.** The four possible verdicts:
   - `re_melt_slow_recool` (from `UNDER_ANNEALED_COOLING`) — melt was fine, cooling ramp too fast.
   - `heavy_melt_anneal_probe` (from `MELT_STAGE_DEFICIT`) — melt itself deficient; re-cooling
     slower will NOT help. Root cause (FF underbinding vs. melt under-annealing) needs the probe.
-  - melt-mixing remedy (density_homogeneity failing with density otherwise in-band) — extend
-    melt-stage dwell (`melt_npt_steps`/`t_equil_ns`), not the cooling ramp.
+  - melt-mixing remedy (`density_homogeneity` failing) — this is what `phase=melt`'s pre-cool
+    gate exists to catch (see Phase below): extend melt-stage dwell in place, not the cooling
+    ramp, and never re-melt from scratch. Owned by `/recover`'s MELT-MIXING procedure, not this
+    worker.
 - **`FAIL`** → `equil_verdict=FAIL`. Box collapse, charge imbalance, dead cell (C(t) exactly 0%),
   or any binding-gate failure the mechanized script can't classify into the above. (C(t)
   decaying-but-incomplete is reptation-limited, not a FAIL — the script already treats it as
   advisory under the applicable carve-out; you should never see it in `failing_binding_gates`.)
+
+## Phase
+
+`phase` from the prompt: `full` (default) is today's gate, after the whole equilibration chain
+completes, with density extraction and the cooling-contraction diagnosis available. `melt`
+(glassy only) runs against `npt_production`/`nvt_production` — the pre-cool checkpoint — *before*
+`npt_cool300`/`npt_prod300` are even submitted, so a badly-mixed melt is caught without spending
+the GPU time cooling it. `phase=melt` cannot run `assess_cooling_contraction` (no glass state
+exists yet), so `UNDER_ANNEALED_COOLING`/`MELT_STAGE_DEFICIT` are unreachable verdicts there —
+only the structural/thermo gates that are meaningful on the melt trajectory alone (density/energy
+drift, block-SEM, Rg CV, P2, density-homogeneity CV, C(t)) can fire. The prompt's `tasks:` list
+and MECHANIZED GATE args already reflect which phase you're in — follow them, don't infer.
 
 ---
 

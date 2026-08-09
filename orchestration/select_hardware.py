@@ -145,7 +145,11 @@ def select_hardware(polymer_class: str, smiles: str, dp_typical: int | None,
                   f"{recommended.get('cell_atoms')} outside [0.5x,2x] of the planned estimate "
                   f"({cell_atoms} atoms) -- probe is out of size range for this run")
         evidence = [{"claim": reason, "note": default.get("note")}]
-        confidence = "low" if not cleanly_benchmarked else "high"
+        # cleanly_benchmarked-but-out-of-size-window still falls back to the by_forcefield
+        # default (not the measured recommendation) -- "medium", not "high": the host/engine
+        # choice is calibrated, but this specific cell size wasn't. "low" is reserved for no
+        # clean sweep at all.
+        confidence = "low" if not cleanly_benchmarked else "medium"
 
     # Size-scale floor: never let anything (probe or default) pin >=2 GPUs for a small cell.
     if cell_atoms < 10000 and choice.get("gpu_per_run", 1) and choice["gpu_per_run"] >= 2:

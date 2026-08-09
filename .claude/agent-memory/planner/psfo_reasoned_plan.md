@@ -20,3 +20,9 @@ PSFO (Polysulfones) is confidence=medium and IS in polymer_rules.json with class
 - **D-07 = glassy** (PSU exp Tg 463 >> 300): Murnaghan NPT compression at 300 K primary, deform fallback, Born+NVT removed. Exp K_T 4.0-5.5 GPa (Zoller 1978 via Mark 2007 Table 7.6). DP=25 ~1 M_e: adequate for Tg, short of entanglement for K → flag K offset.
 - **D-08 hardware:** family=pcff. Cell ≈ dp25 × nchain8 × **57 all-atom/monomer** (PSU repeat, incl. ether-O caps) ≈ **11,400 atoms** (>10k). Still adopt by_forcefield.pcff default (kokkos, mpi=1, gpu_per_run=1): directional_probe HINT-only (values_are_benchmarked=false, host A800/RTX6000 not clean live host, 11.4k is ~3.8x the 3020-atom pcff bench cell, outside [0.5x,2x]); no multi-GPU pin (recommended_by_ff.pcff.gpu=1, no benchmark support for >10k). Keep decided_params hardware-free (choice = default → stay on policy path), set D-08 confidence=low + planned `hardware_benchmark` probe (uncertainty `hardware_optimum`).
 - **D-06 ladder [25,50,100]** clears steps-per-T floor at dt=1fs/step=20K (800/400/200 ps). Sweep 250-750 K brackets exp 463 K AND expected MD 540-580 K — set `t_range_brackets_exp_tg: true`.
+
+**Superseded 2026-08-08:** `hardware_policy.values_are_benchmarked` is now `true` (clean
+host-matched calibration on this exact box, RTX 6000x4/18-core). The D-08 `confidence:low`
+reasoning above no longer applies — the cell (11.4k atoms) is still outside the pcff probe's
+[0.5x,2x] size window, so the correct confidence is now **medium** (host/engine choice is
+calibrated; only this cell size is unconfirmed), not `low`. See `hardware/HARDWARE_STUDY.md`.

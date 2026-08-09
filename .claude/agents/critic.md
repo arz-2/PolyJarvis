@@ -45,9 +45,10 @@ After completing, save a `feedback` memory for each of: any error or contradicti
     is a bypass of the gate and must NOT be auto-approved — a well-trodden class is not evidence
     for a molecule nobody has actually run.
 
-2. **Fast path — deterministic plans (only after 1a passes).** If `plan_mode == "deterministic"` AND the gate check in 1a confirmed this exact SMILES is validated for these properties, the defaults are settled and cited. Confirm `critique.status == "approved"` and return `approved` immediately. Do not re-litigate validated defaults.
-
-3. **Reasoned plans — run the mechanical checks first, then apply judgment.**
+2. **Run the mechanical checks first, then apply judgment.** (This agent is only ever invoked for
+   a reasoned plan — the orchestrator's script-only shortcut handles an already-validated SMILES
+   without spawning the critic. If a `deterministic` plan somehow reaches here anyway, step 1a's
+   gate-mismatch check above already escalates it before this step runs.)
    ```
    Bash: python3 orchestration/validate_run_plan.py --run_plan <run_plan_path>
    ```
@@ -73,7 +74,7 @@ After completing, save a `feedback` memory for each of: any error or contradicti
    - **`alternatives_empty` advisory findings:** the script flags these but does not decide —
      apply the no-boilerplate-bounce carve-out below.
 
-4. **Verdict** (write into the plan's `critique` block with `Edit`; set `rounds` to `critic_round`):
+3. **Verdict** (write into the plan's `critique` block with `Edit`; set `rounds` to `critic_round`):
    - **approved** — no findings. The plan may execute.
    - **revise** — one or more findings. List each as a precise, fixable instruction naming the unmet criterion and decision id (e.g. `"D-01_ff: missing validation_data evidence — cite a density/Tg paper or set confidence:low with reason"`). Status `revise` returns control to the Planner.
      - **No boilerplate bounce (budget-constrained recovery re-plans):** the only real decision under review is the one driving the recovery (e.g. a budget-forced tg_rate ladder). Do NOT `revise` to backfill boilerplate on carried-over validated defaults — e.g. `alternatives:[]` on an evidence_required decision, or a policy-forced decision (glassy-Murnaghan) lacking an explicit `decisions[]` entry. Note these as a one-line advisory in `findings` and approve. A bounce changes zero substance and costs a full planner round-trip a tight wall-clock budget cannot afford.
@@ -81,7 +82,7 @@ After completing, save a `feedback` memory for each of: any error or contradicti
 
    Always write `critique.findings` as a list of strings, even when approving (use `[]` or a one-line confirmation).
 
-5. Validate the edit parses: `Bash: jq .critique <run_plan_path>`.
+4. Validate the edit parses: `Bash: jq .critique <run_plan_path>`.
 
 ## Required output format
 

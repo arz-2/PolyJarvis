@@ -7,9 +7,9 @@ Usage:
 
 Workers: build | equil | tg | deform | murnaghan | analyze-tg | equil-check | analyze-bm | run-summary
 
-The script reads polymer_rules.json (for class defaults) and cross-track rules
-from CLAUDE.md at runtime, so prompts always reflect the current configuration
-without the orchestrator needing to read either file directly.
+The script reads polymer_rules.json (for class defaults) at runtime, so prompts
+always reflect the current configuration without the orchestrator needing to
+read it directly.
 
 Required for all workers:
   --run_name NAME
@@ -64,7 +64,6 @@ Physics knob overrides (all optional; defaults from polymer_rules.json):
 import argparse
 import json
 import os
-import re
 import sys
 import textwrap
 from pathlib import Path
@@ -75,7 +74,6 @@ from hw_common import (load_rules, resolve_ff_family,  # shared rules/FF-family 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
-CLAUDE_MD_PATH = REPO_ROOT / "CLAUDE.md"
 
 WORKER_GUIDES = {
     "build":        "MOLECULE_BUILDER.md",
@@ -93,14 +91,6 @@ WORKER_GUIDES = {
 
 # ─── Loaders ──────────────────────────────────────────────────────────────────
 # load_rules() is imported from hw_common (single source of truth).
-
-def load_cross_track_rules() -> str:
-    text = CLAUDE_MD_PATH.read_text()
-    m = re.search(r'<!-- CROSS_STAGE_RULES_START -->(.*?)<!-- CROSS_STAGE_RULES_END -->', text, re.DOTALL)
-    if m:
-        return m.group(1).strip()
-    return "[Cross-track rules not found in CLAUDE.md — check CROSS_STAGE_RULES_START/END markers]"
-
 
 def load_worker_guide(stage: str) -> str:
     filename = WORKER_GUIDES.get(stage)
@@ -363,7 +353,7 @@ def _resolve_build_params(args, cls: dict) -> dict:
     }
 
 
-def build_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def build_prompt(args, cls: dict) -> str:
     p = _resolve_build_params(args, cls)
     guide = load_worker_guide("build")
     return f"""\
@@ -386,8 +376,6 @@ ff_confidence:     {p['ff_confidence']}
 
 --- Worker Guide (MOLECULE_BUILDER) ---
 {guide}
---- Cross-Track Rules ---
-{cross_track_rules}
 """
 
 
@@ -445,8 +433,17 @@ def _resolve_equil_params(args, cls: dict) -> dict:
     melt_npt_ns_val = _pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None
     melt_npt_steps = (int(melt_npt_ns_val * 1e6 / dt)
                        if (add_melt_npt and melt_npt_ns_val is not None) else None)
+    # melt/cooldown split only exists for glassy chains (T_workflow > 300, npt_cool300+
+    # npt_prod300 appended) — rubbery already ends at npt_production with nothing to split,
+    # so force phase=full regardless of what was passed (prevents an orchestrator mistake from
+    # silently truncating a rubbery chain).
+    phase = getattr(args, 'phase', 'full') or 'full'
+    if T_workflow <= 300.0:
+        phase = 'full'
     return {
         "data_path": args.data_path,
+        "phase": phase,
+        "pending_cooldown_path": getattr(args, 'pending_cooldown_path', None),
         "lammps_flags": _lammps_flags(args.lammps_flags, cls),
         "work_dir": args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/equil",
         "dt_fs": dt,
@@ -469,7 +466,7 @@ def _resolve_equil_params(args, cls: dict) -> dict:
     }
 
 
-def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def equil_prompt(args, cls: dict) -> str:
     p = _resolve_equil_params(args, cls)
     guide = load_worker_guide("equil")
     if p["npt_prod_ns"] is not None:
@@ -497,8 +494,21 @@ def equil_prompt(args, cls: dict, cross_track_rules: str) -> str:
         f"npt_cool_steps:    {p['npt_cool_steps']}  # pass as npt_cool_steps= — override, null = atom-count-tier default\n"
         f"npt_cool300_steps: {p['npt_cool300_steps']}  # pass as npt_cool300_steps= — override, null = ~1ns default"
     )
+    if p["phase"] == "melt":
+        phase_line = (
+            "phase:             melt   # submit only through npt_production; save the "
+            "npt_cool300/npt_prod300 tail to _pending_cooldown_stages.json — do NOT submit it yet"
+        )
+    elif p["phase"] == "cooldown":
+        phase_line = (
+            f"phase:             cooldown   # read back {_v(p['pending_cooldown_path'])} and "
+            "submit that stage list directly — do NOT call generate_equilibration_workflow again"
+        )
+    else:
+        phase_line = "phase:             full   # single submission, all stages (today's behavior)"
     return f"""\
 data_path:         {_v(p['data_path'])}
+{phase_line}
 lammps_flags:      {json.dumps(p['lammps_flags'])}
 run_name:          {args.run_name}
 work_dir:          {p['work_dir']}
@@ -519,8 +529,6 @@ velocity_seed:     {p['velocity_seed'] if p['velocity_seed'] is not None else 'n
 
 --- Worker Guide (EQUILIBRATION) ---
 {guide}
---- Cross-Track Rules ---
-{cross_track_rules}
 """
 
 
@@ -581,7 +589,7 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     }
 
 
-def tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def tg_prompt(args, cls: dict) -> str:
     p = _resolve_tg_params(args, cls)
     guide = load_worker_guide("tg")
     tg_floor_warning = ""
@@ -638,8 +646,6 @@ generate_script:
 
 --- Worker Guide (THERMAL_SWEEP) ---
 {guide}
---- Cross-Track Rules ---
-{cross_track_rules}
 """
 
 
@@ -662,7 +668,7 @@ def _resolve_deform_params(args, cls: dict) -> dict:
     }
 
 
-def deform_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def deform_prompt(args, cls: dict) -> str:
     p = _resolve_deform_params(args, cls)
     guide = load_worker_guide("deform")
     return f"""\
@@ -683,12 +689,10 @@ engine:            "{p['engine']}"
 
 --- Worker Guide (DEFORM) ---
 {guide}
---- Cross-Track Rules ---
-{cross_track_rules}
 """
 
 
-def born_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def born_prompt(args, cls: dict) -> str:
     raise SystemExit(
         "ERROR: --stage born is no longer supported. Born+NVT has been removed from the "
         "PolyJarvis pipeline (2026-06-21) due to PCFF+PPPM virial incompatibility (failed "
@@ -729,7 +733,7 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     }
 
 
-def analyze_tg_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def analyze_tg_prompt(args, cls: dict) -> str:
     p = _resolve_analyze_tg_params(args, cls)
     guide = load_worker_guide("analyze-tg")
     rate_line = (f"cooling_rate_K_per_ns: {p['selected_rate_K_per_ns']}  # tg_rate_index={p['tg_rate_index']}; "
@@ -748,8 +752,6 @@ tasks:
 
 --- Worker Guide (THERMAL_ANALYSIS) ---
 {guide}
---- Cross-Track Rules ---
-{cross_track_rules}
 """
 
 
@@ -774,7 +776,7 @@ def _resolve_analyze_tg_multirate_params(args, cls: dict) -> dict:
     }
 
 
-def analyze_tg_multirate_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def analyze_tg_multirate_prompt(args, cls: dict) -> str:
     """Aggregate per-rate (rate, Tg_MD) pairs: log-linear + VF fit, extrapolated to the
     DSC-equivalent rate. The orchestrator supplies --mr_rates / --mr_tg_values from this
     run's per-rate analyze-tg results (fit_quality >= ACCEPTABLE); the worker runs the
@@ -805,8 +807,6 @@ command: |
 
 --- Worker Guide (THERMAL_ANALYSIS) ---
 {guide}
---- Cross-Track Rules ---
-{cross_track_rules}
 """
 
 
@@ -833,16 +833,27 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
     # the production NPT, which for a glassy polymer is below Tg and yields trapped dynamics by
     # construction. check_equilibration_comprehensive decouples thermo (log_file) from structural
     # (dump_file), so a single call covers both: log_file = production NPT log, dump_file = melt dump.
+    # phase=melt (glassy only — see equil stage's same guard): gate on the pre-cool melt
+    # checkpoint (npt_production at T_workflow) instead of the post-cool npt_prod300, so a bad
+    # melt is caught before the ~1-3 ns cool-to-300/produce-at-300 tail ever runs. Rubbery chains
+    # already end at npt_production with nothing earlier to gate — phase forced to full there.
+    phase = getattr(args, 'phase', 'full') or 'full'
     if T_workflow <= 300:
+        phase = 'full'
+    if phase == 'melt' or T_workflow <= 300:
         prod, npt_prod_temp = "npt_production", T_workflow
     else:
         prod, npt_prod_temp = "npt_prod300", 300.0
     # For the mechanized gate's density_value_binding check (glassy only): glass_data is npt_data
     # below; melt_data is the pre-cool NPT stage (npt_production_out.data), present in both the
     # 7-run rubbery chain (= npt_data itself there) and the 9-run glassy chain (a distinct earlier
-    # stage than npt_prod300).
+    # stage than npt_prod300). density_value_binding compares melt vs. post-cool glass density —
+    # it cannot run yet at phase=melt (no glass state exists), so equil_check_prompt omits
+    # glass_data/melt_data/exp_density_gcm3/tg_K from the gate call and skips
+    # extract_equilibrated_density entirely in that case (see phase branch below).
     return {
         "output_dir": output_dir,
+        "phase": phase,
         "graphs_dir": graphs_dir,
         "exp_density_range": _exp_density_range(cls),
         "ct_min_decay_melt": ct_decay,
@@ -874,36 +885,45 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
     }
 
 
-def equil_check_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def equil_check_prompt(args, cls: dict) -> str:
     """Prompt for equilibration-checker (equil-check gate — equil check + density)."""
     p = _resolve_equil_check_params(args, cls)
     guide = load_worker_guide("equil-check")
-    return f"""\
-npt_prod_log_path: {p['npt_prod_log_path']}
-melt_dump_path:    {p['melt_dump_path']}
-npt_prod_temp_K:   {p['npt_prod_temp_K']}   # target_temp= for extract_equilibrated_density
-equil_data_path:   {p['npt_prod_data_path']}
-run_name:          {args.run_name}
-polymer_class:     {args.polymer_class.upper()}
-backbone_types:    {p['backbone_types'] or '<FILL from inspect_data_file>'}
-ct_min_decay_melt: {p['ct_min_decay_melt'] if p['ct_min_decay_melt'] is not None else 'null'}   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
-is_glassy:         {str(p['is_glassy']).lower()}   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
-regime:            {p['regime']}   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<2% AND density-homogeneity CV<25% AND energy drift/SEM; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
-dp:                {p['dp'] if p['dp'] is not None else 'null'}   # DP≥30 required for require_glassy carve-out to apply. NOTE: a class with ct_gate_reliable=false (aromatic main chain) already has ct_min_decay=null above, so its melt-diffusion C(t) gate is suppressed INDEPENDENT of DP — a DP<30 aromatic cell still passes equil on the structural gates (density/SEM/CV/P2/Rg). The DP≥30 clause only bites classes that would otherwise arm ct_min_decay.
-exp_density_range: {p['exp_density_range']}
-output_dir:        {p['output_dir']}
-graphs_dir:        {p['graphs_dir']}
-tasks:
-  - check_equilibration_comprehensive
-  - extract_equilibrated_density
-
-### D-05 REQUIREMENT (PEEK2 I-04): paste result["d05_markdown"] (also written to
-### {p['output_dir']}d05_block.md) VERBATIM into the run_log.md D-05 CONVERGENCE DETAIL section.
-### It contains the real Rg/MSD/density/C(t)/R_ee values. Leaving any [X ± Y] / [X]% /
-### [PASS / FAIL] placeholder in run_log.md is a FAILURE of this equil-check step — the tool
-### already fills every field, so there is no reason to leave a placeholder.
-
-### MECHANIZED GATE (Step 3, replaces your own PASS/EXTEND/FAIL judgment — see EQUIL_CHECK guide):
+    is_melt_phase = p["phase"] == "melt"
+    if is_melt_phase:
+        tasks_block = "tasks:\n  - check_equilibration_comprehensive"
+        density_note = (
+            "### phase=melt: SKIP extract_equilibrated_density — this checkpoint is at\n"
+            "### T_workflow_K (melt), not 300 K, so there is no experimental band to compare\n"
+            "### against yet. Density-vs-experiment is checked at the phase=full gate after cooldown."
+        )
+        gate_block = f"""### MECHANIZED GATE (Step 2, replaces your own PASS/EXTEND/FAIL judgment — see EQUIL_CHECK guide):
+### after Step 1 writes its JSON to output_dir, call the MCP tool
+### mcp__mcp-lammps-engine__enforce_equilibration_gate with:
+###   comprehensive_json = {p['output_dir']}equilibration_comprehensive.json
+###   regime              = {p['regime']}
+###   dp                  = {p['dp'] if p['dp'] is not None else 'null'}
+###   ct_gate_reliable    = {str(p['ct_gate_reliable']).lower()}
+###   out_dir             = {p['output_dir']}
+### Deliberately OMIT exp_density_gcm3/tg_K/glass_data/melt_data — density_value_binding's
+### melt-vs-glass cooling-contraction diagnosis (UNDER_ANNEALED_COOLING / MELT_STAGE_DEFICIT)
+### cannot run without a post-cool glass state, which doesn't exist yet at this checkpoint. This
+### gate only evaluates the structural/thermo gates that ARE meaningful on the melt trajectory
+### alone (density/energy drift, block-SEM, Rg CV, P2, density-homogeneity CV, C(t)) — a
+### STRUCTURAL_FAIL here with a density_homogeneity-only remedy note is the melt-mixing signal
+### /recover's MELT-MIXING procedure handles; it is NOT re_melt_slow_recool/heavy_melt_anneal_probe
+### (those require the melt-vs-glass split this call can't perform).
+### Use its "verdict" field (PASS | EXTEND | STRUCTURAL_FAIL | FAIL) as equil_verdict directly."""
+    else:
+        tasks_block = "tasks:\n  - check_equilibration_comprehensive\n  - extract_equilibrated_density"
+        density_note = (
+            "### D-05 REQUIREMENT (PEEK2 I-04): paste result[\"d05_markdown\"] (also written to\n"
+            f"### {p['output_dir']}d05_block.md) VERBATIM into the run_log.md D-05 CONVERGENCE DETAIL section.\n"
+            "### It contains the real Rg/MSD/density/C(t)/R_ee values. Leaving any [X ± Y] / [X]% /\n"
+            "### [PASS / FAIL] placeholder in run_log.md is a FAILURE of this equil-check step — the tool\n"
+            "### already fills every field, so there is no reason to leave a placeholder."
+        )
+        gate_block = f"""### MECHANIZED GATE (Step 3, replaces your own PASS/EXTEND/FAIL judgment — see EQUIL_CHECK guide):
 ### after Steps 1-2 write their JSON to output_dir, call the MCP tool
 ### mcp__mcp-lammps-engine__enforce_equilibration_gate with:
 ###   comprehensive_json = {p['output_dir']}equilibration_comprehensive.json
@@ -927,12 +947,31 @@ tasks:
 ### verdict directly (no needs_probe round-trip). Use its "verdict" field (PASS | EXTEND |
 ### STRUCTURAL_FAIL | FAIL) as equil_verdict directly. Do NOT override it with your own reading
 ### of the numbers. (orchestration/enforce_gate.py --live is the same logic as a Bash-callable
-### CLI, kept for retrospective/offline auditing — not used by this live prompt.)
+### CLI, kept for retrospective/offline auditing — not used by this live prompt.)"""
+    return f"""\
+phase:             {p['phase']}
+npt_prod_log_path: {p['npt_prod_log_path']}
+melt_dump_path:    {p['melt_dump_path']}
+npt_prod_temp_K:   {p['npt_prod_temp_K']}   # target_temp= for extract_equilibrated_density
+equil_data_path:   {p['npt_prod_data_path']}
+run_name:          {args.run_name}
+polymer_class:     {args.polymer_class.upper()}
+backbone_types:    {p['backbone_types'] or '<FILL from inspect_data_file>'}
+ct_min_decay_melt: {p['ct_min_decay_melt'] if p['ct_min_decay_melt'] is not None else 'null'}   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
+is_glassy:         {str(p['is_glassy']).lower()}   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
+regime:            {p['regime']}   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<2% AND density-homogeneity CV<25% AND energy drift/SEM; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
+dp:                {p['dp'] if p['dp'] is not None else 'null'}   # DP≥30 required for require_glassy carve-out to apply. NOTE: a class with ct_gate_reliable=false (aromatic main chain) already has ct_min_decay=null above, so its melt-diffusion C(t) gate is suppressed INDEPENDENT of DP — a DP<30 aromatic cell still passes equil on the structural gates (density/SEM/CV/P2/Rg). The DP≥30 clause only bites classes that would otherwise arm ct_min_decay.
+exp_density_range: {p['exp_density_range']}
+output_dir:        {p['output_dir']}
+graphs_dir:        {p['graphs_dir']}
+{tasks_block}
+
+{density_note}
+
+{gate_block}
 
 --- Worker Guide (EQUIL_CHECK) ---
 {guide}
---- Cross-Track Rules ---
-{cross_track_rules}
 """
 
 
@@ -956,7 +995,7 @@ def _resolve_murnaghan_params(args, cls: dict) -> dict:
     }
 
 
-def murnaghan_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def murnaghan_prompt(args, cls: dict) -> str:
     """Prompt for murnaghan-worker (rubbery BM pressure series submission)."""
     p = _resolve_murnaghan_params(args, cls)
     guide = load_worker_guide("murnaghan")
@@ -986,8 +1025,6 @@ engine:            "{p['engine']}"
 
 --- Worker Guide (MURNAGHAN) ---
 {guide}
---- Cross-Track Rules ---
-{cross_track_rules}
 """
 
 
@@ -1020,7 +1057,7 @@ def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     }
 
 
-def analyze_bm_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def analyze_bm_prompt(args, cls: dict) -> str:
     """Prompt for bulk-modulus-extractor (BM extraction, all four routing paths)."""
     p = _resolve_analyze_bm_params(args, cls)
     deform_log_line = (f"deform_log_path:     {p['deform_log_path']}"
@@ -1048,8 +1085,6 @@ graphs_dir:        {p['graphs_dir']}
 
 --- Worker Guide (BM_ANALYSIS) ---
 {guide}
---- Cross-Track Rules ---
-{cross_track_rules}
 """
 
 
@@ -1146,7 +1181,7 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
     }
 
 
-def run_summary_prompt(args, cls: dict, cross_track_rules: str) -> str:
+def run_summary_prompt(args, cls: dict) -> str:
     """Prompt for run-summary-worker (always-terminal, calls generate_run_summary)."""
     p = _resolve_run_summary_params(args, cls)
     return f"""\
@@ -1250,6 +1285,17 @@ def main():
                         "produce byte-identical output to the no-plan path.")
     p.add_argument("--smiles")
     p.add_argument("--data_path")
+    p.add_argument("--phase", default="full", choices=["full", "melt", "cooldown"],
+                   help="equil stage: full (default; rubbery — single submission) | melt "
+                        "(glassy — submit only through npt_production, gate before cooling) | "
+                        "cooldown (glassy — submit the saved post-gate stage tail from "
+                        "--pending_cooldown_path). equil-check stage: full (default; final gate, "
+                        "includes density_value_binding cooling-contraction diagnosis) | melt "
+                        "(glassy pre-cool gate on npt_production/nvt_production — structural/"
+                        "thermo gates only, no glass_data/melt_data/exp_density_gcm3 comparison).")
+    p.add_argument("--pending_cooldown_path",
+                   help="equil stage, phase=cooldown only: JSON file the phase=melt submission "
+                        "wrote with the remaining (post-npt_production) stage list.")
     p.add_argument("--tg_start_data",
                    help="Tg sweep starting .data file (rubbery: npt_tg_prep_data = npt_melt at "
                         "T_equil_K). Overrides --data_path for the tg stage only. Glassy polymers "
@@ -1391,7 +1437,6 @@ def main():
     args = p.parse_args()
 
     rules = load_rules()
-    cross_track_rules = load_cross_track_rules()
     cls = get_class_entry(rules, args.polymer_class, warn_on_miss=True)
 
     if args.plan:
@@ -1400,7 +1445,7 @@ def main():
     resolve_hardware(args, cls, rules)
 
     prompt_fn = STAGE_MAP[args.stage]
-    print(prompt_fn(args, cls, cross_track_rules))
+    print(prompt_fn(args, cls))
 
 
 if __name__ == "__main__":

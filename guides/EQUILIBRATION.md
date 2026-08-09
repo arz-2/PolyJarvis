@@ -20,11 +20,19 @@ When `add_melt_npt=True` (rubbery), the return dict also has `npt_tg_prep_data` 
 `npt_production_out.data` for rubbery Tg sweeps (too close to Tg, biases the density slope).
 Include `npt_tg_prep_data` in RESULT so the orchestrator threads it to the thermal track.
 
-Extend mode's `temp` param must be `npt_prod_temp_K` (production temp of the cell being
-extended = 300 K for BOTH regimes: glassy cooled to 300, rubbery produced at 300) — NOT
-`T_equil_K`/`T_workflow_K`, which would re-melt the cooled cell.
+Extend mode's `temp` param is the temperature of whichever stage is being extended, not
+necessarily 300 K: `npt_prod_temp_K` (300 K) when extending the final production stage — NOT
+`T_equil_K`/`T_workflow_K`, which would re-melt the cooled cell — but `T_workflow_K` when
+extending the pre-cool melt checkpoint (`phase=melt`'s `npt_production`, per `/recover`'s
+MELT-MIXING procedure). The rule is: match `temp` to the state you're actually dwelling longer
+at, never the workflow's other temperature.
 
 `info.validation.errors` must be empty before proceeding past the initial inspect.
+
+`phase` (glassy runs only — `T_workflow_K > 300`; rubbery is always `full`, see FOUNDATION.md):
+`melt` submits only through `npt_production` and defers the `npt_cool300`/`npt_prod300` tail
+until the melt-mixing gate passes; `cooldown` submits that saved tail. `full` (default) is
+today's single-submission behavior. See Step 3 below.
 
 ---
 
@@ -65,6 +73,8 @@ workflow = generate_equilibration_workflow(
 
 ### Step 3: Submit chain and watch
 
+`phase=full` (rubbery, or glassy default) — submit everything, unchanged:
+
 ```python
 result = run_lammps_chain(
     stages=workflow["stages"],
@@ -77,6 +87,41 @@ result = run_lammps_chain(
 w = watch_run(result["chain_id"])
 # Return chain_id and w["monitor_command"] to orchestrator — do not call Monitor.
 ```
+
+`phase=melt` (glassy — gate before cooling): `workflow["stages"]` already has each stage's input
+data path baked in at generation time (`generate_equilibration_workflow` resolves the whole chain
+in one call, regardless of how much of it you submit), so submitting a prefix is safe — the tail
+you don't submit yet stays valid to submit later unmodified.
+
+```python
+idx = workflow["run_order"].index("npt_production") + 1   # never hand-count — glassy adds
+                                                            # npt_cool300/npt_prod300 after this
+melt_stages, cooldown_stages = workflow["stages"][:idx], workflow["stages"][idx:]
+Write(f"{work_dir}/_pending_cooldown_stages.json", json.dumps(cooldown_stages))
+result = run_lammps_chain(stages=melt_stages, gpu_ids=gpu_ids, mpi=mpi,
+                           data_file="{work_dir}/cell.data",
+                           params_file="{work_dir}/emc_build.params", engine=engine)
+w = watch_run(result["chain_id"])
+```
+
+Return RESULT with `chain_id`, `monitor_command`, `npt_production_log_path`,
+`npt_production_data_path`, `nvt_production_dump_path`, and
+`pending_cooldown_path={work_dir}/_pending_cooldown_stages.json` — the orchestrator gates on these
+via the melt-mixing equil-check (`phase=melt`) before ever spawning `phase=cooldown`.
+
+`phase=cooldown` (second spawn, only after the melt gate passes) — read the saved tail back and
+submit it directly; **do not call `generate_equilibration_workflow` again**, it would regenerate
+`minimize`/`nvt_softheat`/etc. from scratch instead of continuing from the melt state:
+
+```python
+cooldown_stages = json.loads(Read(pending_cooldown_path))
+result = run_lammps_chain(stages=cooldown_stages, gpu_ids=gpu_ids, mpi=mpi, engine=engine)
+w = watch_run(result["chain_id"])
+```
+
+Return the standard RESULT block (`npt_prod300_data`/`npt_prod300_log`/`npt_prod300_dump`, etc.)
+exactly as `phase=full` does — downstream (thermal/mechanical tracks) never needs to know the
+chain was submitted in two pieces.
 
 ### Extend mode (`mode: extend`)
 

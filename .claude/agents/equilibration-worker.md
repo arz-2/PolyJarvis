@@ -1,6 +1,6 @@
 ---
 name: equilibration-worker
-description: Validates a .data file, generates the equilibration workflow, and submits the LAMMPS chain. Returns chain_id and monitor_command immediately without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter.
+description: Validates a .data file, generates the equilibration workflow, and submits the LAMMPS chain. Glassy runs split submission on `phase` (melt = through npt_production only, so a bad melt is caught before the cool-to-300 GPU time runs; cooldown = the saved post-gate tail); rubbery stays single-submission (`phase=full`). Returns chain_id and monitor_command immediately without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter.
 tools:
   - Read
   - Bash
@@ -19,9 +19,17 @@ You are the equilibration setup worker for PolyJarvis. Your job is to validate t
 
 **Output style:** Proceed directly to tool calls. One sentence of status per completed step max. No reasoning narration between steps.
 
+`phase` from the prompt is `full` (default), `melt`, or `cooldown` — see the guide's Step 3 for
+the exact split. `full` and `melt` both start the same way:
+
 1. `inspect_data_file(data_file=data_path)`
 2. Call `generate_equilibration_workflow` (call signature and chain-selection rules in the guide below).
-3. `run_lammps_chain(stages=workflow["stages"], gpu_ids=gpu_ids, mpi=mpi_ranks)`
+3. `phase=full`: `run_lammps_chain(stages=workflow["stages"], gpu_ids=gpu_ids, mpi=mpi_ranks)`.
+   `phase=melt`: slice `workflow["stages"]` at `workflow["run_order"].index("npt_production")+1`,
+   `Write` the remainder to `{work_dir}/_pending_cooldown_stages.json`, then
+   `run_lammps_chain(stages=<the prefix>, ...)`.
+   `phase=cooldown` (skip steps 1-2 entirely — do NOT re-inspect or regenerate): `Read` back
+   `pending_cooldown_path`, `run_lammps_chain(stages=<that list>, gpu_ids=gpu_ids, mpi=mpi_ranks)`.
 4. `watch_run(chain_id)`
 
 **Stop after step 4. Do NOT call Monitor.** Return chain_id and monitor_command to the orchestrator.
@@ -30,7 +38,7 @@ You are the equilibration setup worker for PolyJarvis. Your job is to validate t
 
 Substitute the actual `work_dir` value for every `{work_dir}` placeholder — the RESULT block must contain real absolute paths, not literal `{work_dir}` text.
 
-End your final message with this exact block (no trailing text after it):
+`phase=full` or `phase=cooldown` — end your final message with this exact block (no trailing text after it):
 
 ```
 RESULT:
@@ -49,6 +57,22 @@ RESULT:
   gpu_ids_used: "0,1,2,3"
   n_atoms: <n_atoms from inspect_data_file>
   n_stages: <workflow["n_stages"]>
+```
+
+`phase=melt` — end with this instead (no `npt_prod300`/final paths yet, and the cooldown pointer):
+
+```
+RESULT:
+  chain_id: <chain_id from run_lammps_chain, melt-prefix submission>
+  stages_dir: <work_dir>/
+  npt_production_log_path: <work_dir>/npt_production/npt_production.log
+  npt_production_data_path: <work_dir>/npt_production/npt_production_out.data
+  nvt_production_dump_path: <work_dir>/nvt_production/nvt_production.dump
+  pending_cooldown_path: <work_dir>/_pending_cooldown_stages.json
+  monitor_command: <monitor_command string from watch_run>
+  gpu_ids_used: "0,1,2,3"
+  n_atoms: <n_atoms from inspect_data_file>
+  n_stages: <len of the melt-prefix stage list>
 ```
 
 If validation fails or submission fails, end with:

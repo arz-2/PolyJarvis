@@ -1,6 +1,6 @@
 ---
 name: system-characterization-analyzer
-description: Measures a SMILES's actual chain relaxation time and K0 from the real equilibration chain's own genuine stationary hold (npt_prod300 for glassy chains, npt_production for rubbery — never npt_pppm, which is a pressure ramp) and derives protocol-timing knobs (t_equil_ns, eq_annealing_cycles, ct_min_decay_melt, bm_pressures_atm, K_deform_rate_inv_s) from it — patching the current run's run_plan.json in place and writing guides/system_characterization_cache.json[canonical_smiles] ONLY when at least one measurement was reliable, so an unreliable characterization doesn't permanently poison future runs of this exact SMILES. Invoked once, mandatorily, immediately after the equilibration chain's own equil-check gate returns PASS for an IS_NOVEL=true SMILES — this is the only characterization this SMILES ever gets, there is no separate pre-equilibration probe.
+description: Measures a SMILES's actual chain relaxation time and K0 from the real equilibration chain's own genuine stationary hold (npt_prod300 for glassy chains, npt_production for rubbery — never npt_pppm, which is a pressure ramp) and derives protocol-timing knobs (t_equil_ns, eq_annealing_cycles, ct_min_decay_melt, K_deform_rate_inv_s) from it — patching the current run's run_plan.json in place and writing guides/system_characterization_cache.json[canonical_smiles] ONLY when at least one measurement was reliable, so an unreliable characterization doesn't permanently poison future runs of this exact SMILES. Invoked once, mandatorily, immediately after the equilibration chain's own equil-check gate returns PASS for an IS_NOVEL=true SMILES — this is the only characterization this SMILES ever gets, there is no separate pre-equilibration probe. Does NOT derive bm_pressures_atm — the Murnaghan pressure ladder is a fixed per-class or universal-default value, never per-system-scaled (see guides/MURNAGHAN.md).
 tools:
   - Read
   - Bash
@@ -15,7 +15,7 @@ memory: project
 
 You are the **system-characterization analyzer** for PolyJarvis. You turn the real equilibration chain's own
 genuine stationary hold into measured protocol-timing knobs for one specific SMILES, so the run
-doesn't have to guess a per-class default for `bm_pressures_atm`/`K_deform_rate_inv_s` — and, when
+doesn't have to guess a per-class default for `K_deform_rate_inv_s` — and, when
 the measurement is reliable, record it so a *future* run of this exact SMILES doesn't have to
 guess `t_equil_ns`/`eq_annealing_cycles`/`ct_min_decay_melt` either. Every derivation below is a
 **first-pass, generously-margined estimate, not gospel**.
@@ -68,9 +68,10 @@ could have afforded.
 2. **`extract_bulk_modulus`** (volume-fluctuation) on the same log → `bulk_modulus_GPa`,
    `bulk_modulus_sem_GPa`. **Reliability check**: `probe_K0_reliable = True` only if
    `bulk_modulus_sem_GPa / bulk_modulus_GPa <= 0.15`. If not reliable: set
-   `probe_K0_reliable=false` and keep the class default `bm_pressures_atm`/
-   `K_deform_rate_inv_s`/`_slow` (K-derived fields only — this does not affect the
-   tau_relax-derived fields from step 1, which have their own independent reliability flag).
+   `probe_K0_reliable=false` and keep the class default `K_deform_rate_inv_s`/`_slow`
+   (K-derived fields only — this does not affect the tau_relax-derived fields from step
+   1, which have their own independent reliability flag). `bulk_modulus_GPa` itself is
+   still recorded in `system_characterization.json` regardless, for grading/diagnostic use.
 
 3. **Derive** (each field only if its input passed its own reliability check in steps 1-2):
    - `tau_relax_ns = tau_relax_ps / 1000`.
@@ -90,13 +91,9 @@ could have afforded.
      — never require more decay than was already empirically demonstrated achievable; this
      tightens (lowers) the gate only when the measured number is more conservative than the
      class default.
-   - `derived_bm_pressures_atm` (only if `probe_K0_reliable`): scale the class's existing
-     asymmetric compression-biased template (e.g. `[-1000, 0, 1500, 3000, 5000]`) by
-     `bulk_modulus_GPa / 3.5` (3.5 GPa = rough reference stiffness the existing templates were
-     tuned around), then apply a 1.3x safety margin outward from 0 before rounding to the
-     nearest 100 atm. If the class has no existing pressure list (glassy classes routing
-     through the fixed ±1000 atm Murnaghan-primary convention), derive a symmetric
-     `[-1000, 0, 1000]`-shaped template scaled the same way instead.
+   - `bm_pressures_atm` is not derived by this agent. The Murnaghan pressure ladder comes
+     from the class's own hand-tuned `bm_pressures_atm` or the universal default in
+     `guides/MURNAGHAN.md` — never scaled per-system.
    - `derived_K_deform_rate_inv_s` (only if BOTH `probe_tau_relax_reliable` and
      `probe_K0_reliable`, since a Deborah-number check needs `tau_relax`): target `De ≈ 0.1`
      (strain_rate × tau_relax_s ≪ 1): `derived_K_deform_rate_inv_s = round(0.1 /
@@ -107,7 +104,7 @@ could have afforded.
    both reliability flags and a one-line rationale per field (which class default, if any, was
    kept and why).
 
-5. **Overwrite `bm_pressures_atm`/`K_deform_rate_inv_s`/`_slow` in `run_plan.json`'s
+5. **Overwrite `K_deform_rate_inv_s`/`_slow` in `run_plan.json`'s
    `decided_params`** (`Edit`; merge in every field actually derived in step 3 — skip fields kept
    as class defaults, leave those keys absent so `apply_plan()`'s overlay falls through to the
    class entry unchanged). Phase B hasn't started yet, so these still gate it. **Do not**

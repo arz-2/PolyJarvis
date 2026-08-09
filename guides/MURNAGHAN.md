@@ -17,7 +17,12 @@ The orchestrator passes the correct cell as `equil_data_path`.
 - Rubbery with `bm_pressures_atm` set → submit.
 - Rubbery with `bm_pressures_atm` null → return an all-null RESULT.
 
-**Pressure range** comes from the prompt's `bm_pressures_atm`.
+**Pressure range** comes from the prompt's `bm_pressures_atm`. If null, use
+`[-1000, 0, 3000, 7000, 15000]` — never a narrow symmetric span. This null-fallback path
+only ever fires for glassy classes (rubbery + null returns all-null per above) and is
+validated for glassy stiffness only — a soft rubbery melt can cavitate at -1000 atm even
+though the same tension is safe for glassy systems. Never apply this fallback to a
+rubbery class outside the routing above.
 
 **`engine` is mandatory** — pass the prompt's value.
 
@@ -32,7 +37,7 @@ tool, then return its `monitor_command`.
 ## Workflow
 
 ```python
-pressures = bm_pressures_atm if bm_pressures_atm else [-1000, -500, 0, 500, 1000]
+pressures = bm_pressures_atm if bm_pressures_atm else [-1000, 0, 3000, 7000, 15000]
 
 result = run_bulk_modulus_series(
     data_file=equil_data_path,   # npt_prod300_out.data (glassy) or npt_production_out.data (rubbery)

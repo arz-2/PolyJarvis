@@ -17,8 +17,7 @@
 ### Step 1: Generate Tg sweep script
 
 `generate_script` is synchronous — returns the script path immediately. Use `tg_sweep_dir` from
-the prompt (rate-suffixed for multi-rate, e.g. `.../tg_sweep_r40`); analyze-tg reads
-`tg_sweep_dir/tg_sweep.log`. Never hardcode `.../thermal/tg_sweep/` — it collides across rates.
+the prompt.
 
 For TraPPE-UA systems (`use_trappe=True`), detect bond types before generating:
 ```bash
@@ -78,9 +77,6 @@ grep -E 'pair_style|dihedral_style|kspace' "<tg_sweep_dir>/tg_sweep.in"
 # PCFF      → "pair_style lj/class2/coul/long ..." + "kspace_style pppm ..."
 # GAFF2 leak (lj/charmm... / dihedral_style fourier) = wrong → do NOT submit
 ```
-
-**GPU neighbor list (small PCFF cells <5k atoms):** edit `package gpu 1 neigh no` → `neigh yes`
-for +30% (NPT-stable; not for kokkos — it manages its own neighbor list).
 
 ### Step 2: Submit sweep
 

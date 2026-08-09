@@ -88,7 +88,11 @@ find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/
 **`plan_mode=="reasoned"` escalation ladder** (per §2b): a `STRUCTURAL_FAIL` verdict from
 `enforce_equilibration_gate` (see `structural_fail_remedy`/`structural_fail_remedy_confidence`
 in the equilibration-checker's RESULT block) isn't a log-grep match, so it isn't in the taxonomy
-table above — escalate through these rungs in order, spending one attempt each:
+table above — escalate through these rungs in order, spending one attempt each. This ladder is
+for the **`phase=full` gate only** (rubbery's only gate, or glassy after cooldown), where a glass
+state exists to diagnose against. A glassy `phase=melt` gate failure (before cooldown) is a
+different checkpoint with its own procedure — see "## MELT-MIXING procedure" below, not this
+ladder:
 1. The named `structural_fail_remedy`:
    - `re_melt_slow_recool` — parameter-level, not a full re-plan: re-melt from the converged
      melt cell with `npt_cool_steps`/`npt_cool300_steps` overridden to 2×/4× baseline across
@@ -160,6 +164,48 @@ equilibration-worker's `gen_prompt.py --stage equil` call (reasoned path), or pa
 `decided_params.npt_cool_steps`/`npt_cool300_steps` in `run_plan.json` (deterministic path —
 flows through `apply_plan()`'s `{**cls, **decided_params}` overlay the same way every other
 D-09-style numeric refinement does). Log the multiplier used (2× or 4×) in the RECOVERY block.
+
+---
+
+## EXTEND procedure (`equil_verdict: EXTEND`, either gate)
+
+Triggered by a plain `EXTEND` verdict — density/energy drift or block-SEM not yet converged
+(genuinely not-yet-converged, not a wrong-value defect; contrast `STRUCTURAL_FAIL` above). Do NOT
+hand-write a continuation `.in` — the re-spawned equilibration-worker generates it deterministically
+via `generate_equilibration_workflow(extend_only=True)` (`mode: extend` in its prompt), never a
+fresh (non-extend) chain.
+
+Which stage gets extended depends on which gate call produced the `EXTEND`:
+- **`phase=full` gate** (rubbery's only gate, or glassy after cooldown): extend
+  `npt_prod_data_path` (the 300 K / final-target cell) at `temp=npt_prod_temp_K` — **never**
+  `T_equil_K`/`T_workflow_K`, which would re-melt an already-cooled glassy cell.
+- **`phase=melt` gate** (glassy pre-cool checkpoint — see MELT-MIXING procedure below, which
+  routes here for its own EXTEND/STRUCTURAL_FAIL cases too): extend
+  `npt_production_data_path` (the melt cell, still pre-cool) at `temp=T_workflow_K`, then
+  re-run the same `phase=melt` gate — do not proceed to `phase=cooldown` until it PASSes.
+
+`extend_ns = max(1.5, 1.5 * ct_tau_relax_ps/1000)` when this gate's own `ct_tau_relax_ps` is a
+finite, reasonably-fit number (a measured signal from this run's own data beats a blind guess);
+else a flat 1.5 ns fallback. Cap at 2 extensions **per gate** — `phase=full` and `phase=melt` are
+independent checkpoints with independent budgets, not one shared count. Re-run BACKGROUND-WAIT,
+then re-run the same gate that produced the `EXTEND` on the extended stage's own output.
+
+## MELT-MIXING procedure (`phase=melt` gate: `EXTEND`, or `STRUCTURAL_FAIL` with a melt-mixing remedy)
+
+Triggered by the glassy `[Equil-check gate]`'s `phase=melt` call (`orchestration/FOUNDATION.md`)
+— the checkpoint that runs on `npt_production`/`nvt_production` *before* `npt_cool300`/
+`npt_prod300` are ever submitted, specifically so a badly-mixed melt doesn't waste that cool-to-300
+GPU time. This checkpoint has no glass state to diagnose against yet, so a `STRUCTURAL_FAIL` here
+is **never** `re_melt_slow_recool`/`heavy_melt_anneal_probe` (those are the RE-ANNEAL /
+`plan_mode=="reasoned"` ladder's remedies for the post-cool `phase=full` gate, above) — it's a
+melt-mixing note (`density_homogeneity` failing on its own), and both `EXTEND` and this
+`STRUCTURAL_FAIL` route the same way here: apply the EXTEND procedure's `phase=melt` branch
+(extend `npt_production_data_path` at `T_workflow_K`, in place — never restart the chain from
+`minimize`). Cap at 2 extensions; if still failing after 2, treat it as a genuine `MELT_STAGE_
+DEFICIT`-equivalent and escalate to the `plan_mode=="reasoned"` ladder's rung 3 (full re-plan
+with a different force field) rather than looping a third time — a melt that won't mix after 2
+extensions is a force-field/system-size problem, not a dwell-time one. Only once `phase=melt`
+PASSes does the orchestrator proceed to `phase=cooldown`.
 
 ---
 
