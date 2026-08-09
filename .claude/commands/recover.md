@@ -192,7 +192,7 @@ then re-run the same gate that produced the `EXTEND` on the extended stage's own
 
 ## MELT-MIXING procedure (`phase=melt` gate: `EXTEND`, or `STRUCTURAL_FAIL` with a melt-mixing remedy)
 
-Triggered by the glassy `[Equil-check gate]`'s `phase=melt` call (`orchestration/FOUNDATION.md`)
+Triggered by the glassy `[Equil-check gate]`'s `phase=melt` call (`orchestration/tracks/FOUNDATION.md`)
 — the checkpoint that runs on `npt_production`/`nvt_production` *before* `npt_cool300`/
 `npt_prod300` are ever submitted, specifically so a badly-mixed melt doesn't waste that cool-to-300
 GPU time. This checkpoint has no glass state to diagnose against yet, so a `STRUCTURAL_FAIL` here

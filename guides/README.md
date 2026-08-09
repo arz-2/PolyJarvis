@@ -25,9 +25,10 @@ one into the worker's prompt.
 ## 2. Orchestrator-read guides — moved to `orchestration/`
 
 The orchestrator phase/track guides (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`,
-`SUMMARY.md`) and the planner/critic `decision_policy.json` now live alongside the orchestration
-code in [`orchestration/`](../orchestration/README.md) — the orchestrator `Read`s them on phase
-entry.
+`SUMMARY.md`, `DETERMINISTIC_REPLICATE.md`) live in
+[`orchestration/tracks/`](../orchestration/README.md), and the planner/critic `decision_policy.json`
+alongside the orchestration code in [`orchestration/`](../orchestration/README.md) — the
+orchestrator `Read`s the phase docs on phase entry.
 
 ## 3. Machine-read config (JSON, not prose)
 

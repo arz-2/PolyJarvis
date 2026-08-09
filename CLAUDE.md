@@ -6,7 +6,7 @@ AI agent for autonomous polymer MD simulation. Given a SMILES string, runs the f
 
 | Path | Contents |
 |------|----------|
-| `orchestration/` | Orchestrator-read docs (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`, `SUMMARY.md`, `DETERMINISTIC_REPLICATE.md`), `decision_policy.json`, CLI helpers (`gen_prompt.py`, `select_tg_path.py`, `pick_gpu.py`, `canon_smiles.py`, `make_deterministic_plan.py`, `apply_cached_characterization.py`) |
+| `orchestration/` | `decision_policy.json`; `tracks/` — orchestrator-read phase docs (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`, `SUMMARY.md`, `DETERMINISTIC_REPLICATE.md`); `scripts/` — CLI helpers (`gen_prompt.py`, `select_tg_path.py`, `pick_gpu.py`, `canon_smiles.py`, `make_deterministic_plan.py`, `apply_cached_characterization.py`) |
 | `guides/` | Worker guides inlined into worker prompts by `gen_prompt.py`; `polymer_rules.json`; `system_characterization_cache.json` |
 | `data/TEMPLATE/run_log.md` | Run log template — copied to `data/[RUN]/run_log.md` at task start |
 | `data/[RUN]/` | All run files: `run_log.md`, `lammps/`, `raw/`, `graphs/` |
@@ -55,7 +55,7 @@ GATE & PLAN — gate per exact canonical SMILES, never per class.
     `make_deterministic_plan.py --run_name <RUN> --polymer_class <CLASS> --smiles "<smiles>"
     --properties <props>` then, if IS_NOVEL=false,
     `apply_cached_characterization.py --run_plan PLAN_PATH --canonical_smiles CANONICAL_SMILES`.
-    No agent spawn, critic auto-approved. Phase A/B: read orchestration/DETERMINISTIC_REPLICATE.md
+    No agent spawn, critic auto-approved. Phase A/B: read orchestration/tracks/DETERMINISTIC_REPLICATE.md
     instead of FOUNDATION/THERMAL_TRACK/MECHANICAL_TRACK.md.
 
   NOT VALIDATED → first full run for this SMILES (or for its newly-requested properties):
@@ -93,7 +93,8 @@ BACKGROUND-WAIT — canonical wait pattern, referenced by name from every phase 
     PROCESS_DEAD_NO_SENTINEL → /recover
     killed / no terminal line → relaunch the same waiter
 
-PHASE A — FOUNDATION: orchestration/FOUNDATION.md.
-PHASE B — TRACKS: thermal (if tg) → THERMAL_TRACK.md; mechanical (if bulk_modulus) → orchestration/MECHANICAL_TRACK.md.
-PHASE C — SUMMARY: orchestration/SUMMARY.md.
+PHASE A — FOUNDATION: orchestration/tracks/FOUNDATION.md.
+PHASE B — TRACKS: thermal (if tg) → orchestration/tracks/THERMAL_TRACK.md; mechanical (if bulk_modulus)
+  → orchestration/tracks/MECHANICAL_TRACK.md.
+PHASE C — SUMMARY: orchestration/tracks/SUMMARY.md.
 ```
