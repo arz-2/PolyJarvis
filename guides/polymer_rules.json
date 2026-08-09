@@ -1,12 +1,12 @@
 {
   "hardware_policy": {
-    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (orchestration/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default \u2014 for pcff/opls/trappe this is mpi=1 (KOKKOS/GPU-resident kspace, 1 core/run, up to 4 concurrent runs on 4 GPUs); gaff is the outlier at mpi=4. `mpi_single_run_hint` equals `mpi` (both 1) for pcff/opls/trappe, confirmed by the 2026-08-08 clean host-matched /calibrate-hardware pass (values_are_benchmarked=true, see hardware/HARDWARE_STUDY.md); gaff's mpi_single_run_hint=8 remains a provisional GUESS \u2014 no calibration cell exists for it yet. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
+    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (orchestration/scripts/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default \u2014 for pcff/opls/trappe this is mpi=1 (KOKKOS/GPU-resident kspace, 1 core/run, up to 4 concurrent runs on 4 GPUs); gaff is the outlier at mpi=4. `mpi_single_run_hint` equals `mpi` (both 1) for pcff/opls/trappe, confirmed by the 2026-08-08 clean host-matched /calibrate-hardware pass (values_are_benchmarked=true, see hardware/HARDWARE_STUDY.md); gaff's mpi_single_run_hint=8 remains a provisional GUESS \u2014 no calibration cell exists for it yet. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
     "host": {
       "gpus": 4,
       "gpu_model": "Quadro RTX 6000",
       "phys_cores": 18
     },
-    "concurrency_rule": "Sum of mpi over all concurrent runs <= 18 physical cores; at most one GPU-heavy run per physical GPU. pcff/opls/trappe default to mpi=1 (1 core/run), so up to 4 runs go concurrent at 1 per GPU (4 ranks total, well under the 18-core ceiling); gaff defaults to mpi=4 (16 ranks for 4 concurrent runs, near the ceiling). Raise mpi toward mpi_single_run_hint only when fewer runs share the box; check with `orchestration/pick_gpu.py budget --mpi N` before launch.",
+    "concurrency_rule": "Sum of mpi over all concurrent runs <= 18 physical cores; at most one GPU-heavy run per physical GPU. pcff/opls/trappe default to mpi=1 (1 core/run), so up to 4 runs go concurrent at 1 per GPU (4 ranks total, well under the 18-core ceiling); gaff defaults to mpi=4 (16 ranks for 4 concurrent runs, near the ceiling). Raise mpi toward mpi_single_run_hint only when fewer runs share the box; check with `orchestration/scripts/pick_gpu.py budget --mpi N` before launch.",
     "min_mpi_for_pppm": 4,
     "values_are_benchmarked": true,
     "directional_probe": {

@@ -16,7 +16,7 @@ from types import SimpleNamespace
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "orchestration"))
+sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import enforce_gate  # noqa: E402
 

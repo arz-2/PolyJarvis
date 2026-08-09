@@ -16,7 +16,7 @@ offset baked into PASS/FAIL.
   IDX = 0 if FALLBACK == "slowest_rate" else (len(TG_RATES) - 1)   # else highest rate
 
   [Tg sweep @ primary rate]
-  Claim GPU(s): orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
+  Claim GPU(s): orchestration/scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
     → on shortfall (exit 1) defer/retry; NEVER --allow-busy on the shared box.
   Agent(subagent_type="tg-sweep-worker", description="🟣 Tg sweep {polymer_name}",
         prompt=<gen_prompt.py --stage tg --plan PLAN_PATH
@@ -26,7 +26,7 @@ offset baked into PASS/FAIL.
   Write SIMULATION STATE to run_log.md, then BACKGROUND-WAIT on `monitor_command` — keep the GPU
     claimed until the wakeup.
   # completion wakeup:
-  orchestration/pick_gpu.py release --run <RUN>
+  orchestration/scripts/pick_gpu.py release --run <RUN>
   get_run_status(run_id) → RUN_COMPLETE/completed → proceed; PROCESS_DEAD_NO_SENTINEL/failed → /recover
 
   [Tg analysis @ primary rate]

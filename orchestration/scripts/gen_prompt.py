@@ -72,7 +72,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hw_common import (load_rules, resolve_ff_family,  # shared rules/FF-family access
                        get_class_entry, host_matches, live_host)
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
 
 WORKER_GUIDES = {
@@ -292,7 +292,7 @@ def _db_exp_lookup(cls_id: str, polymer_name: str | None = None) -> dict:
     """
     try:
         import sys as _sys
-        _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         if _repo_root not in _sys.path:
             _sys.path.insert(0, _repo_root)
         from db.query_best_match import (

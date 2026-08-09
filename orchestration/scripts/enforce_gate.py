@@ -343,7 +343,7 @@ def enforce_live(args) -> dict:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run_name", nargs="?")
-    ap.add_argument("--repo-root", default=str(Path(__file__).resolve().parents[1]))
+    ap.add_argument("--repo-root", default=str(Path(__file__).resolve().parents[2]))
     ap.add_argument("--live", action="store_true", help="Live-run mode for equilibration-checker")
     ap.add_argument("--comprehensive-json")
     ap.add_argument("--regime", choices=["glassy", "rubbery"])

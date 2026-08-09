@@ -70,8 +70,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "orchestration"))
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 from gen_prompt import resolve_stage_params, apply_plan, resolve_hardware, load_plan  # noqa: E402
 from hw_common import load_rules, get_class_entry  # noqa: E402
@@ -168,7 +168,7 @@ class ExecutorState:
 # ─── GPU claim (A.6 — cross-track rules as code, not convention) ──────────────
 
 def _pick_gpu(action: str, run_name: str, need: int = None) -> dict:
-    cmd = [sys.executable, str(REPO_ROOT / "orchestration" / "pick_gpu.py"),
+    cmd = [sys.executable, str(REPO_ROOT / "orchestration" / "scripts" / "pick_gpu.py"),
            "--json", action, "--run", run_name]
     if need is not None:
         cmd += ["--need", str(need)]

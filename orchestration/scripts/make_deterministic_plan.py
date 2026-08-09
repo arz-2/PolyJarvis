@@ -35,7 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hw_common import load_rules, get_class_entry  # shared rules access (single source of truth)
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
 
 # Decision-relevant class keys consumed by gen_prompt.py builders. Only keys that

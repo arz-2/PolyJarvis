@@ -1,7 +1,7 @@
 """Regression guard for the scripted deterministic-replicate executor.
 
 run_deterministic_replicate.py's --dry-run mode resolves every stage's params via
-orchestration/gen_prompt.py's resolve_stage_params() -- the same function the agent-prompt
+orchestration/scripts/gen_prompt.py's resolve_stage_params() -- the same function the agent-prompt
 text-rendering path uses (A.0's refactor). This test proves the executor actually calls it the
 same way the text-prompt path does, by re-deriving the expected params directly and comparing --
 so a future change to either the executor's args-namespace construction or gen_prompt.py's
@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "orchestration"))
+sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 from gen_prompt import resolve_stage_params, apply_plan, resolve_hardware, load_plan  # noqa: E402
 from hw_common import load_rules, get_class_entry  # noqa: E402
@@ -34,8 +34,8 @@ RULES = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
 SCRIPTED_PATH_CLASSES = sorted(c for c, v in RULES["classes"].items()
                                if v.get("preferred_builder", "emc") == "emc")
 
-EXECUTOR = REPO_ROOT / "orchestration" / "run_deterministic_replicate.py"
-MAKE_PLAN = REPO_ROOT / "orchestration" / "make_deterministic_plan.py"
+EXECUTOR = REPO_ROOT / "orchestration" / "scripts" / "run_deterministic_replicate.py"
+MAKE_PLAN = REPO_ROOT / "orchestration" / "scripts" / "make_deterministic_plan.py"
 
 
 def _run(cmd):

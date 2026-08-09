@@ -2752,7 +2752,7 @@ def enforce_equilibration_gate(
         re_melt_slow_recool | heavy_melt_anneal_probe | a melt-mixing extension note).
     """
     repo_root = Path(__file__).resolve().parents[2]
-    orchestration_dir = str(repo_root / "orchestration")
+    orchestration_dir = str(repo_root / "orchestration" / "scripts")
     if orchestration_dir not in sys.path:
         sys.path.insert(0, orchestration_dir)
     import enforce_gate

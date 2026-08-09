@@ -27,7 +27,7 @@ After completing, save a `feedback` memory for each of: any error or contradicti
    `Bash: jq '.classes.<CLASS>' guides/polymer_rules.json`.
    Derive this exact molecule's validated status — never a class-level signal:
    ```
-   Bash: CANONICAL_SMILES=$(python3 orchestration/canon_smiles.py "<smiles>" | jq -r .canonical_smiles)
+   Bash: CANONICAL_SMILES=$(python3 orchestration/scripts/canon_smiles.py "<smiles>" | jq -r .canonical_smiles)
    Bash: jq --arg s "$CANONICAL_SMILES" '.[$s] // {"protocol_validated": false, "validated_properties": []}' \
          guides/system_characterization_cache.json
    ```
@@ -39,7 +39,7 @@ After completing, save a `feedback` memory for each of: any error or contradicti
    the orchestrator's script-only shortcut, which never spawns the planner). Start from the
    deterministic plan as a scaffold:
    ```
-   Bash: python3 orchestration/make_deterministic_plan.py --run_name <run_name> \
+   Bash: python3 orchestration/scripts/make_deterministic_plan.py --run_name <run_name> \
          --polymer_class <CLASS> --smiles "<smiles>" --properties <props>
    ```
    then **revise it** with `Edit`/`Write`:
@@ -50,7 +50,7 @@ After completing, save a `feedback` memory for each of: any error or contradicti
      (off-table — a class *present* in the table always uses its class defaults as the starting
      hypothesis, regardless of how sparse its citation evidence is), run:
      ```
-     Bash: python3 orchestration/estimate_tg_group_contribution.py --smiles "<smiles>" --output json
+     Bash: python3 orchestration/scripts/estimate_tg_group_contribution.py --smiles "<smiles>" --output json
      ```
      If the result has `confidence != "very_low"`, override these keys in `decided_params` with the script output: `T_equil_K`, `annealing_T_high_K`, `tg_t_high_K`, `tg_t_low_K`, `T_workflow_K`. Also set `decided_params.experimental_tg_K` to the estimated value and mark it as estimated in the `D-04_system_size` decision evidence (e.g. `{"claim": "Tg estimated via van Krevelen group contribution", "method": "van_krevelen_group_contribution", "value_K": <N>}`). Add a `dominant: true` uncertainty named `"temperature_parameters_estimated"` with `reduction_probe: "fast_density_screen"`.
      If `confidence="very_low"` (>30% unmatched groups), leave global_defaults unchanged and record `"temperature_parameters_unvalidated"` as the dominant uncertainty with `reduction_probe: "literature_anchor"`.
@@ -63,9 +63,9 @@ After completing, save a `feedback` memory for each of: any error or contradicti
    - For every decision in `decisions`, ensure `criteria_evaluated` covers that decision's `evaluate` list in `decision_policy.json`, and populate `evidence` (claim + `source_doi` or `citation`) and `alternatives` (with their known error where applicable). Where the policy sets `evidence_required: true` (forcefield, electrostatics, property_method) you MUST cite a source or explicitly record `confidence: low` with a stated reason.
    - If you deviate from a `polymer_rules.json` default, change the corresponding key in `decided_params` and justify it in that decision's `evidence`.
    - **Preserve `tg_slope_gate_fallback`** if the scaffold carries it (classes whose highest configured rate is documented as unreliable, e.g. PSFO): keep it in `decided_params` unchanged — the thermal track reads it directly to pick which rate index to sweep by default (`"slowest_rate"` → `tg_rates_K_per_ns[0]`, otherwise the highest rate), so dropping it silently routes the sweep to the wrong (degenerate) rate (per `decision_policy.json:tg_protocol`).
-   - **Hardware (D-08) — select from benchmark evidence, scaled by cell size.** This is an *active* decision on the reasoned path. (Deterministic plans skip it entirely: `make_deterministic_plan.py` leaves hardware to policy, which keeps worker prompts byte-identical — never add hardware to a deterministic plan's `decided_params`.) `decision_policy.json:policies.hardware`'s require/prefer thresholds are implemented mechanically in `orchestration/select_hardware.py` — call it and transcribe its output rather than re-deriving the numbers:
+   - **Hardware (D-08) — select from benchmark evidence, scaled by cell size.** This is an *active* decision on the reasoned path. (Deterministic plans skip it entirely: `make_deterministic_plan.py` leaves hardware to policy, which keeps worker prompts byte-identical — never add hardware to a deterministic plan's `decided_params`.) `decision_policy.json:policies.hardware`'s require/prefer thresholds are implemented mechanically in `orchestration/scripts/select_hardware.py` — call it and transcribe its output rather than re-deriving the numbers:
      ```
-     Bash: python3 orchestration/select_hardware.py --polymer_class <CLASS> --smiles "<smiles>" \
+     Bash: python3 orchestration/scripts/select_hardware.py --polymer_class <CLASS> --smiles "<smiles>" \
            --dp_typical <decided_params.dp_typical> --nchain <decided_params.nchain>
      ```
      Merge its output: append `.decision` verbatim to `decisions[]` (that's the full `D-08_hardware`
@@ -82,7 +82,7 @@ After completing, save a `feedback` memory for each of: any error or contradicti
 
 3. **Self-check before finalizing.** Run the same structural validator the Critic will run first:
    ```
-   Bash: python3 orchestration/validate_run_plan.py --run_plan data/<run_name>/raw/run_plan.json
+   Bash: python3 orchestration/scripts/validate_run_plan.py --run_plan data/<run_name>/raw/run_plan.json
    ```
    Fix any `severity: structural` finding yourself (criteria coverage, evidence presence, stage
    schema, hardware anti-patterns) before handing off — catching these here saves a full critic

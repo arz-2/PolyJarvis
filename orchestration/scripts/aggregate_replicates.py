@@ -19,7 +19,7 @@ import json
 import statistics
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 PROPERTIES = {
     "tg": "value_K",

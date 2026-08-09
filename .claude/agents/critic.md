@@ -1,6 +1,6 @@
 ---
 name: critic
-description: challenge a proposed run_plan.json against decision_policy.json before any simulation launches. First independently re-derives whether plan_mode should be deterministic or reasoned from THIS EXACT canonical SMILES's protocol_validated status in guides/system_characterization_cache.json (never class-level trust) and escalates on a mismatch. For reasoned plans, runs orchestration/validate_run_plan.py for the mechanical checks (criteria coverage, evidence presence, stage schema, hardware arithmetic) then applies judgment to what a script can't decide (evidence substantiveness, hardware evidence-inconsistency, the no-boilerplate-bounce carve-out). Writes a critique block with verdict approved | revise | escalate. Read-only on simulations and on polymer_rules.json — only reviews, never authors decisions.
+description: challenge a proposed run_plan.json against decision_policy.json before any simulation launches. First independently re-derives whether plan_mode should be deterministic or reasoned from THIS EXACT canonical SMILES's protocol_validated status in guides/system_characterization_cache.json (never class-level trust) and escalates on a mismatch. For reasoned plans, runs orchestration/scripts/validate_run_plan.py for the mechanical checks (criteria coverage, evidence presence, stage schema, hardware arithmetic) then applies judgment to what a script can't decide (evidence substantiveness, hardware evidence-inconsistency, the no-boilerplate-bounce carve-out). Writes a critique block with verdict approved | revise | escalate. Read-only on simulations and on polymer_rules.json — only reviews, never authors decisions.
 tools:
   - Read
   - Bash
@@ -33,7 +33,7 @@ After completing, save a `feedback` memory for each of: any error or contradicti
     class's:
     ```
     Bash: SMILES=$(jq -r '.smiles' <run_plan_path>)
-    Bash: CANONICAL_SMILES=$(python3 orchestration/canon_smiles.py "$SMILES" | jq -r .canonical_smiles)
+    Bash: CANONICAL_SMILES=$(python3 orchestration/scripts/canon_smiles.py "$SMILES" | jq -r .canonical_smiles)
     Bash: jq --arg s "$CANONICAL_SMILES" '.[$s] // {"protocol_validated": false, "validated_properties": []}' \
           guides/system_characterization_cache.json
     ```
@@ -50,7 +50,7 @@ After completing, save a `feedback` memory for each of: any error or contradicti
    without spawning the critic. If a `deterministic` plan somehow reaches here anyway, step 1a's
    gate-mismatch check above already escalates it before this step runs.)
    ```
-   Bash: python3 orchestration/validate_run_plan.py --run_plan <run_plan_path>
+   Bash: python3 orchestration/scripts/validate_run_plan.py --run_plan <run_plan_path>
    ```
    This covers criteria coverage (`criteria_evaluated` ⊇ each matched policy's `evaluate`),
    evidence-required presence, stage schema (`stage`/`track`/`success_criteria` fields, valid

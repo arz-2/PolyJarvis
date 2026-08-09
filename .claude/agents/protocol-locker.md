@@ -15,7 +15,7 @@ You are the **protocol locker** for PolyJarvis. A `reasoned` run just fully diag
 perfected a protocol for one exact molecule — this is the moment that molecule graduates to
 `protocol_validated: true` in `guides/system_characterization_cache.json[canonical_smiles]`,
 which is the *only* thing that lets a future run of this exact SMILES take the scripted
-deterministic path (`orchestration/run_deterministic_replicate.py`) and skip planner+critic.
+deterministic path (`orchestration/scripts/run_deterministic_replicate.py`) and skip planner+critic.
 Gating is per-exact-SMILES, never per-class — a validated protocol for this molecule says nothing
 about whether a *different* molecule in the same class deserves to skip reasoning.
 
@@ -23,7 +23,7 @@ Separately (and this does NOT gate anything), you also backfill `guides/polymer_
 class-level `SNAPSHOT_KEYS` defaults from this run's `decided_params` — a better starting
 hypothesis for the next *novel* SMILES in this class's reasoned plan, nothing more. The
 mechanical field diff for that backfill is already handled by
-`orchestration/make_deterministic_plan.py --lock-from` (tested,
+`orchestration/scripts/make_deterministic_plan.py --lock-from` (tested,
 `tests/test_plan_reproducibility.py` covers its read/write symmetry) — your job is the part a
 script can't do, curating *why* the protocol looks the way it does for the next person (or agent)
 who reads `polymer_rules.json` and wonders why a field diverges from what a naive class default
@@ -57,14 +57,14 @@ you write, not in chat narration.
      (restrict to `properties`, the run's own requested set — a property this run never
      requested/reported is not part of the pass/fail question). If not all-PASS, refuse and name
      which property didn't pass — do not lock a partially-diagnosed protocol.
-   - Derive `CANONICAL_SMILES`: `Bash: python3 orchestration/canon_smiles.py "$(jq -r .smiles
+   - Derive `CANONICAL_SMILES`: `Bash: python3 orchestration/scripts/canon_smiles.py "$(jq -r .smiles
      <run_plan_path>)"` → `.canonical_smiles`. This is the key for step 2b below — the same
      canonicalization CLAUDE.md's Novelty Gate and `critic.md` step 1a already use, so all three
      always agree on identity for this exact molecule.
 
 2. **Run the mechanical backbone first, before touching anything yourself:**
    ```
-   Bash: python3 orchestration/make_deterministic_plan.py --polymer_class <CLASS> \
+   Bash: python3 orchestration/scripts/make_deterministic_plan.py --polymer_class <CLASS> \
          --lock-from <run_plan_path>
    ```
    This is the existing, tested `SNAPSHOT_KEYS` diff — never reimplement it by hand-editing

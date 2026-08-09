@@ -6,7 +6,7 @@ metadata:
 ---
 
 The MOLECULE_BUILDER guide says "save outputs into `{work_dir}/cell/`", but
-`orchestration/gen_prompt.py` emits `work_dir: {work_dir}/cell` (line ~347, the
+`orchestration/scripts/gen_prompt.py` emits `work_dir: {work_dir}/cell` (line ~347, the
 `_v(args.smiles)` prompt block). The prompt therefore already hands over the
 appended path, e.g. `data/<RUN>/lammps/cell`.
 

@@ -11,29 +11,29 @@ GATE: do not spawn murnaghan-worker or deform-worker until the thermal track has
 ```
   [mechanical track — if "bulk_modulus" in properties_requested]
   if is_glassy or bm_pressures_atm is non-null in plan.decided_params:
-    Claim GPU: orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
+    Claim GPU: orchestration/scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
     Agent(subagent_type="murnaghan-worker", description="🟠 Murnaghan BM {polymer_name}",
           prompt=<gen_prompt.py --stage murnaghan --plan PLAN_PATH
                   --data_path npt_prod_data_path --gpu_ids <claimed>>)
       → RESULT → chain_id_murnaghan, log_files (murnaghan_log_files), monitor_command_murnaghan
     Write SIMULATION STATE, then BACKGROUND-WAIT on `monitor_command_murnaghan`.
     # completion wakeup:
-    orchestration/pick_gpu.py release --run <RUN>
+    orchestration/scripts/pick_gpu.py release --run <RUN>
     get_run_status → RUN_COMPLETE/completed → proceed to extraction; PROCESS_DEAD_NO_SENTINEL/failed → /recover
     # Rubbery Murnaghan: if dV/dP jumps >3x between pressure intervals, report low-P points only.
 
     Recovery if murnaghan fails (fit_converged=False):
-      Claim GPU: orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
+      Claim GPU: orchestration/scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
       Agent(subagent_type="deform-worker", description="🔵 Deform fallback {polymer_name}",
             prompt=<gen_prompt.py --stage deform --plan PLAN_PATH --data_path npt_prod_data_path
                     --deform_rate_mode primary --gpu_ids <claimed>>)
         → RESULT → run_id_deform, deform_log_path, monitor_command_deform
       Write SIMULATION STATE, then BACKGROUND-WAIT on `monitor_command_deform`.
-      # completion wakeup: orchestration/pick_gpu.py release --run <RUN>
+      # completion wakeup: orchestration/scripts/pick_gpu.py release --run <RUN>
 
       Always spawn a second deform-worker for the rate-sensitivity check (no-ops safely if the
       class has no K_deform_rate_slow_inv_s):
-        Claim GPU: orchestration/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
+        Claim GPU: orchestration/scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
         Agent(subagent_type="deform-worker", description="🔵 Deform rate-check {polymer_name}",
               prompt=<gen_prompt.py --stage deform --plan PLAN_PATH --data_path npt_prod_data_path
                       --deform_rate_mode slow --gpu_ids <claimed>>)

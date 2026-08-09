@@ -39,7 +39,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 CACHE_PATH = REPO_ROOT / "guides" / "system_characterization_cache.json"
 
 # Same field-name mapping system-characterization-analyzer.md step 5 uses when patching decided_params

@@ -20,7 +20,7 @@ SETUP) already determines `IS_NOVEL` before Phase A starts, so the split point i
 - **`IS_NOVEL=false`** (the common replicate-2+ case — this exact SMILES already has a cached
   characterization from an earlier run): one invocation, end to end.
   ```
-  <repo>/mcp-servers/.venv/bin/python orchestration/run_deterministic_replicate.py \
+  <repo>/mcp-servers/.venv/bin/python orchestration/scripts/run_deterministic_replicate.py \
       --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH
   ```
   Write SIMULATION STATE to run_log.md (status=monitoring), launch this detached
