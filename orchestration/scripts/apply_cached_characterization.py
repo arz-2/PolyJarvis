@@ -16,7 +16,7 @@ and append a D-09_characterization decision citing the cache entry's provenance.
 entry, or the entry (defensively) carries no usable derived fields, this is a no-op -- exit 0,
 decided_params untouched.
 
-Called once per run from CLAUDE.md's GATE & PLAN step, right after plan generation, whenever
+Called once per run from orchestration/ORCHESTRATOR.md's GATE & PLAN step, right after plan generation, whenever
 IS_NOVEL=false -- applies REGARDLESS of plan_mode/VALIDATED, since "characterized" (this script's
 trigger -- Phase-A timing knobs measured, guides/system_characterization_cache.json[canonical_
 smiles].derived_*) and "validated" (the plan_mode gate -- protocol_validated, stamped only after

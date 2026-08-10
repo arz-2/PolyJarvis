@@ -10,7 +10,7 @@
 
 PolyJarvis is a **stateful orchestrator driving a fleet of stateless specialist agents** over a Model Context Protocol (MCP) tool layer. Given a SMILES string (or polymer name) and a set of target properties, it autonomously runs the full pipeline — construction → equilibration → property campaigns → experiment-validated reporting — on a local 4× Quadro RTX 6000 GPU node.
 
-**Orchestration layer.** A single long-lived Claude session (the *orchestrator*) holds all run state, recovery logic, and the approved plan. It never runs simulations itself; it spawns workers and routes their results. Workers are **stateless** — each gets a self-contained prompt and returns a structured RESULT block — so the orchestrator is the only stateful component and the sole point of recovery. [`CLAUDE.md`](CLAUDE.md) is its operating manual and the authoritative worker roster.
+**Orchestration layer.** A single long-lived Claude session (the *orchestrator*) holds all run state, recovery logic, and the approved plan. It never runs simulations itself; it spawns workers and routes their results. Workers are **stateless** — each gets a self-contained prompt and returns a structured RESULT block — so the orchestrator is the only stateful component and the sole point of recovery. [`orchestration/ORCHESTRATOR.md`](orchestration/ORCHESTRATOR.md) is its operating manual and the authoritative worker roster, invoked via the `/run-campaign` skill; [`CLAUDE.md`](CLAUDE.md) covers repo layout and development conventions.
 
 **Agent layer (13 specialist workers).** Each worker has a fixed role, a model tier matched to task difficulty, and a canonical guide inlined into its prompt by `orchestration/scripts/gen_prompt.py`:
 
@@ -53,10 +53,10 @@ The framework was validated on a **36-run replicate study: 9 polymers × 4 indep
 
 | Path | What lives there |
 |---|---|
-| `CLAUDE.md` | Orchestrator operating manual — the agent's workflow spec (start here to understand the pipeline) |
+| `CLAUDE.md` | Repo layout, key directories, development conventions (start here to understand the codebase) |
 | `.claude/` | Agent definitions (13 workers), hooks, slash commands, per-agent memory |
 | `guides/` | **Agent prompts & machine-read config**, not human docs — worker guides inlined by `gen_prompt.py`, `polymer_rules.json` (see [`guides/README.md`](guides/README.md)) |
-| `orchestration/` | `scripts/` — CLI/orchestration helpers (prompt generation, deterministic planning, GPU allocation); `tracks/` — orchestrator-read phase/track guides (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`, `SUMMARY.md`); `decision_policy.json` (see [`orchestration/README.md`](orchestration/README.md)) |
+| `orchestration/` | `ORCHESTRATOR.md` — orchestrator operating manual, the agent's workflow spec, invoked via `/run-campaign`; `scripts/` — CLI/orchestration helpers (prompt generation, deterministic planning, GPU allocation); `tracks/` — orchestrator-read phase/track guides (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`, `SUMMARY.md`); `decision_policy.json` (see [`orchestration/README.md`](orchestration/README.md)) |
 | `mcp-servers/` | The three MCP servers: `mcp-mol-builder-server` (RadonPy), `mcp-emc-server` (EMC), `mcp-lammps-engine` (LAMMPS + analysis scripts + templates) |
 | `data/` | Live pipeline working directory — per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`), run template |
 | `hardware/` | Hardware calibration — `/calibrate-hardware` toolchain (`calibrate_hardware.py`, `benchmark_hardware.py`, `bench_accuracy_diff.py`) and the per-FF calibration cells (`CALIB_<FAM>/`); the engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`) are machine-specific and local-only (gitignored) |
@@ -147,11 +147,11 @@ Calibration is **polite by default** on a shared box: idle GPUs only, rank caps 
 
 ## Usage
 
-Open Claude Code in the `PolyJarvis/` directory and describe your polymer:
+Open Claude Code in the `PolyJarvis/` directory and invoke the `run-campaign` skill with your polymer:
 
-> *"Run a full MD simulation of PVDF. SMILES: \*CC(F)(F)\*. I want Tg and equilibrated density."*
+> `/run-campaign "*CC(F)(F)*" Tg,density pvdf1`
 
-The agent reads `CLAUDE.md` automatically on every task, classifies the polymer, selects the correct force field and builder, plans and critiques the run, builds the amorphous cell, equilibrates, runs the requested property tracks, and reports results graded against experiment — all without manual intervention.
+This reads `orchestration/ORCHESTRATOR.md`, classifies the polymer, selects the correct force field and builder, plans and critiques the run, builds the amorphous cell, equilibrates, runs the requested property tracks, and reports results graded against experiment — all without further manual intervention. Orchestration only starts on explicit `/run-campaign` invocation; plain chat describing a polymer does not.
 
 To start a new simulation, copy `Task_TEMPLATE.txt` and fill in the polymer name and SMILES.
 

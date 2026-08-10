@@ -126,7 +126,7 @@ could have afforded.
 6. **Gate: write `guides/system_characterization_cache.json[canonical_smiles]` only if at least
    one of `probe_tau_relax_reliable`/`probe_K0_reliable` is `true`** (equivalently: at least one
    `derived_*` field from step 3 is non-null). The orchestrator's novelty gate
-   (`CLAUDE.md`) is a bare key-existence check — writing an entry when both flags failed
+   (`orchestration/ORCHESTRATOR.md`) is a bare key-existence check — writing an entry when both flags failed
    (nothing usable derived) would permanently poison it: every future run of this exact SMILES
    would read `IS_NOVEL=false` and silently skip characterization forever, inheriting an all-null
    entry instead of getting a fresh attempt on its own next equilibration chain.

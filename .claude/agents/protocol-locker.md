@@ -59,7 +59,7 @@ you write, not in chat narration.
      which property didn't pass — do not lock a partially-diagnosed protocol.
    - Derive `CANONICAL_SMILES`: `Bash: python3 orchestration/scripts/canon_smiles.py "$(jq -r .smiles
      <run_plan_path>)"` → `.canonical_smiles`. This is the key for step 2b below — the same
-     canonicalization CLAUDE.md's Novelty Gate and `critic.md` step 1a already use, so all three
+     canonicalization orchestration/ORCHESTRATOR.md's Novelty Gate and `critic.md` step 1a already use, so all three
      always agree on identity for this exact molecule.
 
 2. **Run the mechanical backbone first, before touching anything yourself:**

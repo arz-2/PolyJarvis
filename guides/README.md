@@ -20,7 +20,7 @@ one into the worker's prompt.
 | `DEFORM.md` | `deform` → deform-worker |
 | `BM_ANALYSIS.md` | `analyze-bm` → bulk-modulus-extractor |
 | `REVISION_PARAMS.md` | Fixed seeds/params for replication runs (inlined into several stages; local-only, gitignored) |
-| `EXP_LOOKUP.md` | exp-lookup background. **Currently not wired in** — the orchestrator composes the exp-lookup prompt inline (CLAUDE.md Phase C) |
+| `EXP_LOOKUP.md` | exp-lookup background. **Currently not wired in** — the orchestrator composes the exp-lookup prompt inline (orchestration/ORCHESTRATOR.md Phase C) |
 
 ## 2. Orchestrator-read guides — moved to `orchestration/`
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Select the Tg-summary path for run-summary, by the multirate slope-gate verdict.
 
-Replaces the inline shell the orchestrator used to hand-execute in CLAUDE.md Phase C
+Replaces the inline shell the orchestrator used to hand-execute in orchestration/ORCHESTRATOR.md Phase C
 (deriving TG_PATH by hand was the PLA3 footgun — feedback_run_summary_tg_mismatch.md).
 
 Convention:

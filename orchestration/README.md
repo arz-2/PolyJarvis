@@ -6,8 +6,9 @@ bare-import each other (`hw_common.py`, `select_hardware.py`) via a same-directo
 insert; splitting them across further subdirectories would break those imports. `decision_policy.json`
 and this file stay at the `orchestration/` top level.
 
-These paths are hard-wired into `CLAUDE.md`, the agent definitions in `.claude/agents/`, and the
-guides — do not move or rename without a repo-wide reference sweep.
+These paths are hard-wired into `CLAUDE.md`, `orchestration/ORCHESTRATOR.md`, the agent
+definitions in `.claude/agents/`, and the guides — do not move or rename without a repo-wide
+reference sweep.
 
 ## tracks/ — orchestrator-read docs
 
@@ -26,11 +27,11 @@ guides live in `guides/`).
 
 | Script | Purpose | Primary consumers |
 |---|---|---|
-| `gen_prompt.py` | Builds every worker prompt: inlines the stage guide from `guides/`, threads the approved `run_plan.json` decided_params, and emits the final prompt text. The hub of the orchestrator→worker contract. | Orchestrator (`CLAUDE.md`), all worker stages |
+| `gen_prompt.py` | Builds every worker prompt: inlines the stage guide from `guides/`, threads the approved `run_plan.json` decided_params, and emits the final prompt text. The hub of the orchestrator→worker contract. | Orchestrator (`orchestration/ORCHESTRATOR.md`), all worker stages |
 | `make_deterministic_plan.py` | Emits a byte-identical `run_plan.json`, used as-is when this exact canonical SMILES is already `protocol_validated` in `guides/system_characterization_cache.json` (the planner shells out to it), or as the starting-hypothesis scaffold every reasoned plan for a novel SMILES revises. Reads `guides/polymer_rules.json`. | `planner` agent, tests |
 | `select_hardware.py` | Mechanically implements `decision_policy.json:policies.hardware`'s D-08 require/prefer clauses (FF-alias resolution, RDKit cell-atom estimate, benchmark-window comparison) so the numbers live in one place. | `planner` agent (reasoned path), `validate_run_plan.py` |
 | `validate_run_plan.py` | Mechanical structural checks for a `run_plan.json` against `decision_policy.json` (criteria coverage, evidence presence, stage schema, hardware arithmetic) — the parts of the Critic's review that don't need judgment. | `planner` (self-check), `critic` agent |
-| `select_tg_path.py` | Phase C helper: picks which per-rate `tg_summary` feeds run-summary (slowest rate if the multirate slope gate passed, else the plan's `tg_slope_gate_fallback` rate, default highest). | Orchestrator (`CLAUDE.md` Phase C) |
+| `select_tg_path.py` | Phase C helper: picks which per-rate `tg_summary` feeds run-summary (slowest rate if the multirate slope gate passed, else the plan's `tg_slope_gate_fallback` rate, default highest). | Orchestrator (`orchestration/ORCHESTRATOR.md` Phase C) |
 | `canon_smiles.py` | Canonicalizes a SMILES string — the gate key for `system_characterization_cache.json` and `polymer_rules.json` validation lookups. | Orchestrator (GATE & PLAN), `planner`, `critic`, `protocol-locker` |
 | `apply_cached_characterization.py` | Reuses an earlier run's measured timing knobs (`derived_*` fields) for a SMILES that's characterized but not yet validated for the requested properties, instead of guessed class defaults. | Orchestrator (GATE & PLAN, `IS_NOVEL=false` branch) |
 | `enforce_gate.py` | Mechanized PASS/EXTEND/STRUCTURAL_FAIL/FAIL verdict enforcement for the equil-check gate, against `decision_policy.json`'s binding/advisory clauses. `--live` mode is called directly by the `enforce_equilibration_gate` MCP tool at tool-call time — a live production dependency, not just a CLI. | `equilibration-checker` (via the MCP tool), retrospective audits |
@@ -60,5 +61,6 @@ The benchmark data-release rebuilder lives with the manuscript material: `manusc
 
 | File | Purpose |
 |---|---|
+| `ORCHESTRATOR.md` | Orchestrator operating manual — worker roster + the full SETUP/GATE & PLAN/THREAD/HARDWARE/BACKGROUND-WAIT/RECOVERY workflow. Invoked via the `run-campaign` skill (`.claude/commands/run-campaign.md`); `CLAUDE.md` covers repo layout only. |
 | `decision_policy.json` | Evaluation framework the planner/critic reason against; also read directly by `enforce_gate.py` and `validate_run_plan.py` (both anchor its path at `orchestration/`, not `orchestration/scripts/` — why it stays here rather than moving with the scripts). |
 | `README.md` | This file. |
