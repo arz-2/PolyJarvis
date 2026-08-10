@@ -5,4 +5,3 @@
 - [PSFO reasoned plan](psfo_reasoned_plan.md) — polysulfones (PSU/PES/PPSU) reasoned-plan: member-by-SMILES, PCFF/pppm/glassy-K, >10k-atom cell still 1 GPU [ingested 2026-06-25]
 - [Don't assert prior-run results unchecked](feedback_dont_assert_prior_run_results_unchecked.md) — never cite a sibling run's ladder/slope_gate_pass in evidence without jq-verifying; PSU4 claim about PSU1/PSU2 was false [2026-06-26]
 - [PHAL reasoned plan](phal_reasoned_plan.md) — polyhalogenated (PVDF *CC(F)(F)*): rubbery-at-300K Tg ambiguity, missing class bm_pressures_atm/exp_K_GPa (add PHYC/PDIE convention), grounding-invalidated ff_justification_doi handling [ingested 2026-08-05]
-- [Dangling uncertainty citation](feedback_dangling_uncertainty_citation.md) — add the uncertainties[] entry in the SAME edit as any evidence prose citing it as a safety net; PVDF1 critic round 1 caught this [2026-08-05]
