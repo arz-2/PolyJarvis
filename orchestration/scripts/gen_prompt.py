@@ -1008,8 +1008,19 @@ def murnaghan_prompt(args, cls: dict) -> str:
         "NOW, regardless of bm_pressures_atm being null. The rubbery null-return guard does NOT "
         "apply to glassy cells. Do not return an all-null RESULT.\n\n"
     ) if p["is_glassy"] else ""
+    # 2026-08-09: rubbery+null used to be a deliberate skip (all-null RESULT, fluctuation-only
+    # fallback). That's retired -- every rubbery class now gets a real Murnaghan attempt via the
+    # PROBE ladder (guides/MURNAGHAN.md). Same belt-and-suspenders reasoning as glassy_assertion
+    # above: assert imperatively in the prompt itself, don't rely solely on the worker reading it
+    # off the markdown guide.
+    rubbery_probe_assertion = (
+        "### ASSERTION (overrides old guide Rule B): bm_pressures_atm is null and is_glassy=false "
+        "→ SUBMIT NOW using the PROBE ladder [-200, 0, 3000, 7000, 15000] from "
+        "guides/MURNAGHAN.md. Do NOT return an all-null RESULT -- that behavior was retired "
+        "2026-08-09; every rubbery class gets a real Murnaghan attempt now.\n\n"
+    ) if (not p["is_glassy"] and not p["bm_pressures_atm"]) else ""
     return f"""\
-{glassy_assertion}equil_data_path:   {p['equil_data_path']}
+{glassy_assertion}{rubbery_probe_assertion}equil_data_path:   {p['equil_data_path']}
 lammps_flags:      {p['lammps_flags']}
 polymer_class:     {args.polymer_class.upper()}
 run_name:          {args.run_name}

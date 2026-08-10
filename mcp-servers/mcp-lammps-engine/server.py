@@ -3461,6 +3461,123 @@ def extract_bulk_modulus_murnaghan(
     }
 
 
+# ── Tool: extract_solubility_parameter ────────────────────────────────────────
+
+def _run_extract_solubility_parameter(
+    bulk_log: str,
+    vacuum_log: str,
+    n_chains: int,
+    output_dir: str,
+    charge_method: Optional[str] = None,
+    eq_fraction: float = 0.5,
+    system_label: Optional[str] = None,
+) -> dict:
+    """Background worker — runs extract_solubility_parameter.py via CLI."""
+    parts = [f"python {MDA_SCRIPTS_DIR}/extract_solubility_parameter.py"]
+    parts.append(f"--bulk_log {bulk_log}")
+    parts.append(f"--vacuum_log {vacuum_log}")
+    parts.append(f"--n_chains {n_chains}")
+    parts.append(f"--output_dir {output_dir}")
+    parts.append(f"--eq_fraction {eq_fraction}")
+    if charge_method:
+        parts.append(f"--charge_method {charge_method}")
+    if system_label:
+        parts.append(f"--system_label {system_label}")
+
+    command = " ".join(parts)
+    logger.info(f"Running solubility parameter extraction via CLI: {command}")
+
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=600)
+
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def extract_solubility_parameter(
+    bulk_log: str,
+    vacuum_log: str,
+    n_chains: int,
+    output_dir: str,
+    charge_method: Optional[str] = None,
+    eq_fraction: float = 0.5,
+    system_label: Optional[str] = None,
+) -> dict:
+    """
+    Cohesive energy density (CED) / Hildebrand solubility parameter (delta) via
+    a vacuum single-chain intramolecular-energy reference.
+
+    STANDALONE DIAGNOSTIC TOOL — not currently wired into any agent's mandatory
+    workflow. Used to measure per-SYSTEM cohesion for cavitation-risk research
+    (does measured CED predict whether a rubbery Murnaghan pressure series can
+    safely include a tension point). Never cache/reuse the result across a
+    nominal polymer class — different monomers in the same class can have
+    meaningfully different cohesion; always measure the specific system.
+
+    Method: a bulk NPT hold's log reports TOTAL nonbonded energy (E_vdwl+E_coul),
+    which mixes intramolecular (chain-on-itself) and intermolecular (chain-to-
+    chain, the part that resists tension) contributions — not separable from
+    the bulk log alone. A separate short NVT hold of ONE isolated chain at low
+    density (large box, no periodic-image contacts) gives a clean intramolecular
+    reference (100% of its nonbonded energy is self-interaction by construction):
+
+        E_inter_total = E_bulk_total - n_chains * E_intra_per_chain
+        CED = -E_inter_total / V_bulk   (J/cm^3 == MPa);  delta = sqrt(CED)
+
+    This is an approximation relative to RadonPy's true per-molecule tally
+    decomposition (see the separate, currently-inactive
+    extract_solubility_parameter_tally.py, gated on a TALLY-enabled LAMMPS
+    binary that doesn't exist yet).
+
+    Args:
+        bulk_log:      The system's own bulk NPT hold log (npt_production.log /
+                       npt_prod300.log) — must be the SAME system as vacuum_log.
+        vacuum_log:    Log from a short NVT hold of one isolated chain of that
+                       same system (same topology/force field/temperature),
+                       built at low density so periodic images don't interact.
+        n_chains:      Number of chains in the bulk cell (a known build parameter).
+        output_dir:    Directory for solubility_parameter.json output.
+        charge_method: e.g. none/Gasteiger/AM1-BCC/RESP — sets ced_confidence
+                       ("degraded" for embedded/Gasteiger charges, per
+                       docs/ROADMAP.md's 20%+ error-risk caveat for those systems).
+        eq_fraction:   Fraction of each log used as production window. Default 0.5.
+        system_label:  Traceability label (e.g. "PE4") — never a class name.
+
+    Returns:
+        dict with run_id. When completed, result includes:
+            CED_MPa, solubility_parameter_MPa0p5, ced_confidence,
+            e_bulk_total_nonbonded_kcal_mol, e_intra_per_chain_kcal_mol,
+            e_inter_total_kcal_mol, v_bulk_A3, v_vacuum_chain_A3, warnings
+    """
+    run_id = run_manager.create(
+        "extract_solubility_parameter",
+        {"bulk_log": bulk_log, "vacuum_log": vacuum_log, "output_dir": output_dir}
+    )
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_extract_solubility_parameter, dict(
+            bulk_log      = bulk_log,
+            vacuum_log    = vacuum_log,
+            n_chains      = n_chains,
+            output_dir    = output_dir,
+            charge_method = charge_method,
+            eq_fraction   = eq_fraction,
+            system_label  = system_label,
+        )),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":       "submitted",
+        "run_id":       run_id,
+        "run_type":     "extract_solubility_parameter",
+        "system_label": system_label,
+        "output_dir":   output_dir,
+        "message":      "Poll with get_run_status(run_id)",
+    }
+
+
 # ── Tool: generate_run_summary ────────────────────────────────────────────────
 
 def _run_generate_run_summary(

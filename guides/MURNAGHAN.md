@@ -12,17 +12,17 @@
 
 The orchestrator passes the correct cell as `equil_data_path`.
 
-**When to submit:**
-- Glassy → always submit.
-- Rubbery with `bm_pressures_atm` set → submit.
-- Rubbery with `bm_pressures_atm` null → return an all-null RESULT.
+**Always submit** — glassy and rubbery both, regardless of whether `bm_pressures_atm` is set.
 
-**Pressure range** comes from the prompt's `bm_pressures_atm`. If null, use
-`[-1000, 0, 3000, 7000, 15000]` — never a narrow symmetric span. This null-fallback path
-only ever fires for glassy classes (rubbery + null returns all-null per above) and is
-validated for glassy stiffness only — a soft rubbery melt can cavitate at -1000 atm even
-though the same tension is safe for glassy systems. Never apply this fallback to a
-rubbery class outside the routing above.
+**Pressure range** comes from the prompt's `bm_pressures_atm`. If null:
+- Glassy: `[-1000, 0, 3000, 7000, 15000]`. Never apply this array to a rubbery class.
+- Rubbery: the **PROBE ladder** `[-200, 0, 3000, 7000, 15000]` — compression is validated
+  safe at any cohesion level; the shallow tension point is a conservative probe, not a
+  proven-safe depth. The orchestrator (`MECHANICAL_TRACK.md`) drives a two-leg protocol
+  around this: if the probe point survives clean, it re-spawns this worker with
+  `bm_pressures_atm=[-1000]` alone (Leg 2, single-point, merged with Leg 1's compression
+  logs). This worker just submits whatever `bm_pressures_atm` it's given each call — it
+  does not decide the legs.
 
 **`engine` is mandatory** — pass the prompt's value.
 
@@ -37,7 +37,12 @@ tool, then return its `monitor_command`.
 ## Workflow
 
 ```python
-pressures = bm_pressures_atm if bm_pressures_atm else [-1000, 0, 3000, 7000, 15000]
+if bm_pressures_atm:
+    pressures = bm_pressures_atm          # class-tuned ladder, or Leg 2's [-1000]
+elif is_glassy:
+    pressures = [-1000, 0, 3000, 7000, 15000]   # glassy universal fallback
+else:
+    pressures = [-200, 0, 3000, 7000, 15000]    # rubbery PROBE ladder (Leg 1)
 
 result = run_bulk_modulus_series(
     data_file=equil_data_path,   # npt_prod300_out.data (glassy) or npt_production_out.data (rubbery)

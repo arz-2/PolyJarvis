@@ -134,7 +134,6 @@ def build_planned_stages(cls: dict, properties: set) -> list:
     exp_tg = _exp_tg_scalar(cls)                 # regime/temperature (median ok for multi-member)
     glassy_hint = (exp_tg is not None and exp_tg > 300)
     exp_tg_bracket = _exp_tg_bracket(cls)        # accuracy gate (None for multi-member → planner pins)
-    bm_pressures_atm = cls.get("bm_pressures_atm")
 
     def _s(stage, criteria, **extra):
         return {"stage": stage, "track": STAGE_TRACK[stage],
@@ -155,13 +154,13 @@ def build_planned_stages(cls: dict, properties: set) -> list:
                                 "t_range_brackets_exp_tg": exp_tg_bracket}))
         stages.append(_s("analyze-tg", {}))
     if "bulk_modulus" in properties:
-        if glassy_hint:
-            # Murnaghan-primary at 300 K; deform fallback. (Born+NVT removed 2026-06-21:
-            # PCFF+PPPM virial inflated K_Born 8–15×.)
-            stages.append(_s("murnaghan", {"chain_submitted": True}, fallback="deform"))
-        elif bm_pressures_atm:
-            stages.append(_s("murnaghan", {"chain_submitted": True}))
-        # else: rubbery without pressures — fluctuation path, no submit stage
+        # Murnaghan always submits now (2026-08-09): guides/MURNAGHAN.md's rubbery
+        # null-fallback resolves to the PROBE ladder instead of an all-null RESULT, so
+        # there is no longer a "rubbery without pressures -> fluctuation only, no submit
+        # stage" case. Glassy still carries the deform fallback; rubbery (empirical
+        # ladder or PROBE ladder) does not.
+        stages.append(_s("murnaghan", {"chain_submitted": True},
+                          **({"fallback": "deform"} if glassy_hint else {})))
         stages.append(_s("analyze-bm", {}))
     stages.append(_s("run-summary", {}))  # always terminal
     return stages

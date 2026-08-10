@@ -205,24 +205,42 @@ The ratio α_rubber/α_glass ≈ 2–3 is a universal polymer physics result and
 
 ### J2 — Cohesive Energy Density / Hildebrand Solubility Parameter
 
-**Rationale:** δ = √(E_pair / V) is a one-line post-process on the existing NPT production log. Experimental values are in Barton's CRC Handbook for nearly every revision polymer. Useful for solvent compatibility screening.
+**Rationale:** measure per-system cohesion to predict rubbery Murnaghan tension-cavitation risk (2026-08-09 investigation), and more generally for solvent-compatibility screening. Experimental values are in Barton's CRC Handbook for nearly every revision polymer.
+
+**Correction (2026-08-09):** the original one-line `CED = E_pair/V` post-process below is **physically wrong, not just approximate**, and was never shipped. `E_pair` (`E_vdwl+E_coul`) in a bulk melt log is TOTAL nonbonded energy — intramolecular (a chain folded on itself) and intermolecular (chain-to-chain, the part that resists tension) combined, with no split; for a real coiled melt the intramolecular share is not a rounding error the way the "verify 1-4 pairs are subtracted or negligible" caveat below implied. **Shipped instead:** `extract_solubility_parameter.py` (active) — a vacuum single-chain reference (one separate short NVT hold of an isolated chain, same topology/FF; its nonbonded energy is 100% intramolecular by construction) subtracted from the bulk log's total:
 
 ```
-CED = E_pair / V          (J/cm³)
-δ   = √CED                (MPa^0.5)
+E_inter_total = E_bulk_total - n_chains * E_intra_per_chain
+CED = -E_inter_total / V_bulk     (J/cm³ == MPa)
+δ   = √CED                        (MPa^0.5)
 ```
 
-**Artifact note:** For PCFF `lj/class2` pair_style, `e_pair` in LAMMPS thermo includes 1–4 intramolecular pairs — verify these are subtracted or negligible before reporting. Validate against PMMA (δ_exp ≈ 19.4 MPa^0.5) before enabling for other classes. Gasteiger-charged systems (apolar TraPPE-UA classes) may show 20%+ error; flag `charge_method` from polymer_rules.json in the output.
+Validated against measured (not handbook) values for PHYC (PE4, δ≈12.0, degraded confidence), PDIE (cis-PBD4, δ≈11.3, degraded confidence) — both known-cavitating at -1000 atm tension — with PMMA/POXI validation/calibration in progress. Never cache a result across a nominal polymer class — measure the specific system (see the calibration effort's own findings for why: PSIL is bond-polar but weakly cohesive, breaking a naive polarity-based proxy).
+
+**Shipped implementation** (`extract_solubility_parameter.py` + `extract_solubility_parameter` MCP tool in `mcp-lammps-engine/server.py`):
+- [x] `extract_solubility_parameter(bulk_log, vacuum_log, n_chains, output_dir, charge_method, ...)` tool
+  - Tail-window mean of `E_vdwl+E_coul(+E_long)` from the bulk log minus `n_chains ×` the same from a vacuum single-chain log
+  - `ced_confidence: "degraded"` when `charge_method` is embedded/Gasteiger (TraPPE-UA classes), per the 20%+ error-risk caveat
+- [x] Validated methodology against PMMA (δ_exp ≈ 19.4 MPa^0.5) — see calibration results
+- [ ] `experimental_solubility_param_MPa05` field to polymer_rules.json for each class (deferred — per-system measurement is the point; a class-level field would repeat the mistake this correction fixed)
+- [ ] δ row in RESULTS table in `data/TEMPLATE/run_log.md`
+- [ ] `--properties solubility_param` flag support to `gen_prompt.py` and `PROPERTIES.md`
+- **Checkpoint resolved (2026-08-09): stays a standalone diagnostic tool, not wired into any agent's mandatory workflow.** The live gating decision (does a novel rubbery class's Murnaghan series include a tension point) is instead handled by an empirical two-leg PROBE protocol in `guides/MURNAGHAN.md`/`orchestration/tracks/MECHANICAL_TRACK.md` — submit a shallow -200 atm probe alongside the always-safe compression ladder, then deepen to -1000 atm only if that probe's own outcome is clean. This was chosen over gating on a CED prediction because (a) the actual PHYC/PDIE failure mode was a LAMMPS crash, which post-hoc statistical screening can't catch since there's no data to screen if the run dies, and (b) the CED calibration (3 systems, a real PPPM-vs-cutoff bias) isn't precise enough yet to hang a hard decision on. CED remains available to measure and cite as evidence, just not as the mechanism.
+
+---
+
+### J2b — Per-molecule tally decomposition (deferred upgrade to J2)
+
+**Rationale:** RadonPy already ships a more rigorous version of J2's measurement — a true per-molecule energy decomposition via a LAMMPS `rerun` of the bulk trajectory with `pe/mol/tally`/`group/group ... molecule intra` computes (`radonpy.sim.preset.sp.SPMD.rerun`/`SPMD_analyze.Solubility_Parameter`), rather than J2's one-averaged-chain vacuum reference. Ported into this project's own idiom as `extract_solubility_parameter_tally.py` (2026-08-09) — validated against a hand-computed synthetic log (formula matches RadonPy's exactly; both this and J2's method reduce to `CED = -E_inter_total/V_bulk`).
+
+**Status: inactive, code-complete but unrunnable.** Requires LAMMPS's TALLY package, which neither production binary (`lammps-install`, `lammps-install-kokkos`) has compiled in (`PKG_TALLY:BOOL=OFF` in both). The source tree at `/home/arz2/lammps` already contains it — building a third, separate binary with `PKG_TALLY=yes` is confirmed low-risk (never touches the two binaries every live run depends on) but is its own ops step, not done as part of this port.
 
 **Implementation plan:**
-- [ ] Add `extract_solubility_parameter(log_path, output_dir)` tool to `mcp-lammps-engine/server.py`
-  - Reads `e_pair` and `vol` thermo columns from NPT production log
-  - Computes CED = mean(e_pair) / mean(vol); δ = √CED in MPa^0.5
-  - Emits warning if `charge_method == "Gasteiger"` (confidence degraded)
-- [ ] Validate E_pair decomposition for PCFF on PMMA4 run before wiring into pipeline
-- [ ] Add `experimental_solubility_param_MPa05` field to polymer_rules.json for each class
-- [ ] Add δ row to RESULTS table in `data/TEMPLATE/run_log.md`
-- [ ] Add `--properties solubility_param` flag support to `gen_prompt.py` and `PROPERTIES.md`
+- [x] `generate_rerun_block(n_chains)` / `add_rerun_block(dump_file)` — the per-chain compute/variable `.in` fragment + `rerun` command
+- [x] `analyze_rerun_log(...)` — parses the resulting log, same output schema as J2's tool (drop-in alternative)
+- [ ] Build a TALLY-enabled LAMMPS binary (separate prefix, e.g. `lammps-install-tally`)
+- [ ] Run once against a real bulk trajectory dump, compare its δ against J2's vacuum-single-chain value for the same system to check whether the coarser approximation needs correction
+- [ ] Only then consider wiring into any live workflow
 
 ---
 
