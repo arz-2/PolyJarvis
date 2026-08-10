@@ -19,7 +19,7 @@ find /home/arz2/PolyJarvis -path "*/.claude/agent-memory/*.md" ! -name "MEMORY.m
   2>/dev/null | xargs grep -rL "ingested_at:" 2>/dev/null
 ```
 
-Each file without `ingested_at:` in its frontmatter is "pending." (Going forward, ingested memories are deleted rather than marked — see Step 7 — so any legacy file still carrying `ingested_at:` is skipped.) The harness resolves a worker's `.claude/agent-memory/<worker>/` dir **relative to its cwd**, so findings strand under whatever subdir the worker ran in — not just `data/<run>/`. The repo-wide `-path` glob catches them all; treat strays identically to canonical ones. If an optional worker-name argument was given, filter to that worker's subdirectory only. If no pending files are found, report "No pending memories — nothing to ingest." and stop.
+Each file without `ingested_at:` in its frontmatter is "pending." (Going forward, ingested memories are deleted rather than marked — see Step 7 — so any legacy file still carrying `ingested_at:` is skipped.) The harness resolves a worker's `.claude/agent-memory/<worker>/` dir **relative to its cwd**, so findings strand under whatever subdir the worker ran in — not just `data/<run>/`. `orchestration/scripts/gen_prompt.py`'s `CWD_NOTE` (appended to every generated worker prompt) is the prevention for this — it tells workers never to `cd` — but the repo-wide `-path` glob here remains the safety net; treat strays identically to canonical ones. If an optional worker-name argument was given, filter to that worker's subdirectory only. If no pending files are found, report "No pending memories — nothing to ingest." and stop.
 
 ---
 
@@ -146,6 +146,7 @@ Only after Step 6 has committed (so nothing is lost if interrupted), delete each
 
 1. `rm` the memory `.md` file at the exact path Step 1 reported it (the canonical repo-root `.claude/agent-memory/<worker>/`, or any stray `.../.claude/agent-memory/<worker>/` under a subdir such as `data/<run>/...` or `mcp-servers/<srv>/...`).
 2. Remove that file's one-line entry from the corresponding `MEMORY.md` index.
+3. If step 1 emptied a *stray* `<worker>/` directory (i.e. under a `.claude/agent-memory/` that is not the canonical repo-root one), `rmdir` upward through `<worker>/` → `agent-memory/` → `.claude/`, stopping at the first non-empty directory (a plain `rmdir` refuses on non-empty, so no manual emptiness check is needed) and never above where the stray `.claude/` began. This is what keeps stray trees from accumulating as hollow skeletons across ingestion passes.
 
 Then commit the deletions:
 
