@@ -21,6 +21,9 @@
   random integer. Never pass `seed=-1` — that means irreproducible.
 - PPHS: PCFF has P=N backbone types but no polyphosphazene-specific validation — flag results.
 - PURT: EMC aliphatic segments only; aromatic MDI fails.
+- Tacticity: `submit_emc_cell_job` has no tacticity/stereochemistry parameter. If the plan names
+  a tacticity, report it as "not enforced/not verifiable" rather than asserting the requested
+  value — only RadonPy's `submit_polymerize_job(tacticity=...)` actually honors it.
 
 **RadonPy path:**
 - Force field must be assigned strictly **after** polymerization —
@@ -50,24 +53,33 @@ job = submit_emc_cell_job(
 )
 ```
 
-Poll with `get_emc_job_status(job_id)` until `status == "completed"`, then:
+`get_emc_job_status` reports no progress fraction, so prefer blocking on the artifact over
+repeated status polls (foreground `sleep N; ls` is blocked by the Bash tool):
+
+```bash
+until [ -f <output_dir>/emc_build.data ]; do sleep 5; done   # generous timeout
+```
+
+Then call `get_emc_job_output(job_id)` once:
 
 ```python
 out = get_emc_job_output(job_id)
 data_path    = out["result"]["data_path"]      # EMC writes emc_build.data (not polymer.data) — use verbatim
-params_path  = out["result"]["params_path"]   # may be None
+output_dir   = out["result"]["output_dir"]
+params_path  = f"{output_dir}/emc_build.params"  # get_emc_job_output has no params_path key — EMC always writes this fixed basename into output_dir
 lammps_flags = out["result"]["lammps_flags"]  # e.g. {"use_pcff": True, "use_opls": False}
 ```
 
-**Output placement:** After the job completes, copy outputs into `{work_dir}/cell/`:
+**Output placement:** `work_dir` already ends in `/cell` (the orchestrator prompt appends it) —
+copy outputs directly into `{work_dir}`, not `{work_dir}/cell/`:
 
 ```bash
-mkdir -p {work_dir}/cell
-cp <data_path>   {work_dir}/cell/cell.data
-cp <params_path> {work_dir}/cell/emc_build.params   # skip if params_path is None
+mkdir -p {work_dir}
+cp <data_path>   {work_dir}/cell.data
+cp <params_path> {work_dir}/emc_build.params
 ```
 
-Report `data_path = {work_dir}/cell/cell.data` and `emc_params_path = {work_dir}/cell/emc_build.params` in the RESULT block.
+Report `data_path = {work_dir}/cell.data` and `emc_params_path = {work_dir}/emc_build.params` in the RESULT block.
 
 ### Path B — RadonPy
 
@@ -87,7 +99,8 @@ build_molecule_from_smiles(smiles)
 - `submit_assign_charges_job` — use `charge_method="RESP"`.
 - `submit_polymerize_job` — overwrites `mol_file` in place — save a checkpoint first.
 - `submit_generate_cell_job` — `density=0.05` (see Rules above).
-- `save_lammps_data` — save to `{work_dir}/cell/cell.data` (create the directory first).
+- `save_lammps_data` — save to `{work_dir}/cell.data` (`work_dir` already ends in `/cell`;
+  create the directory first if needed).
 
 **Checkpoint Saves:**
 
@@ -97,6 +110,21 @@ save_molecule(polymer_output,  "./checkpoints/02_polymer.json",         format="
 save_molecule(ff_output,       "./checkpoints/03_polymer_ff.json",      format="json")
 save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="json")
 ```
+
+---
+
+## Known Failures
+
+- **EMC binary expiry** — `submit_emc_cell_job` fails instantly (exit 255, ~0.15s) with
+  `Error: main: Validity has run out; please download a fresh version.` This is
+  class/SMILES-independent — do not misdiagnose as a SMILES/`*`-placement/FF problem, and do
+  not retry with a smaller `dp`. Fix: swap only `~/emc/bin/emc_linux_x86_64` from a fresh
+  SourceForge `montecarlo`-project tarball; never overwrite `~/emc/field/`, `~/emc/scripts/`,
+  `~/emc/templates/` (the field tree carries local parameter patches). The sandbox denies both
+  executing a freshly downloaded binary and writing to `~/emc/bin/` — diagnose and stage the fix
+  (download/extract/diff are allowed) but emit the failure RESULT with the exact tarball URL and
+  `cp` commands for the orchestrator/human to apply; do not reach for
+  `dangerouslyDisableSandbox`.
 
 ---
 
