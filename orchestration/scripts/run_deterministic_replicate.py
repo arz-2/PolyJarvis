@@ -27,20 +27,14 @@ Scope of this version: EMC build path only (18 of ~19 supported classes). PURA (
 RadonPy-only class) is out of scope for now — do_build() raises a clear error rather than
 attempting it; see the deferred build_via_radonpy.py cross-interpreter driver in the plan.
 
-Two-phase invocation, split at the mandatory-refine boundary:
-  IS_NOVEL=false (the common replicate-2+ case): one invocation, `--phase full` (default),
-    runs build through run-summary end to end.
-  IS_NOVEL=true: Build through Equil-check-PASS needs no agent judgment (do_equil_and_check()
-    already runs its own headless EXTEND loop), but a plain script can't spawn Agent(...), and
-    system-characterization-analyzer's post-PASS characterization (FOUNDATION.md's `[Equilibration]`
-    mandatory refine step) is exactly that. So invoke with `--phase equil` first (runs Build
-    through Equil-check to PASS, stops), let the orchestrator spawn system-characterization-analyzer against
-    the resulting equilibration hold, then re-invoke with `--resume-from thermal` once
-    decided_params is characterization-patched (or left at class defaults, if unreliable).
+One invocation, end to end: this SMILES is always already covered by a
+system_characterization_cache.json entry (protocol_validated==true requires it), so
+system-characterization-analyzer's mandatory refine (FOUNDATION.md's `[Equilibration]` step,
+reasoned-path only) never applies here — this script runs build through run-summary in one call.
 
 Resumability: data/<RUN>/raw/executor_state.json tracks per-stage status, so a crash (reboot,
-OOM-killed wrapper) doesn't discard hours of completed work — `--resume-from` (or just
-re-running with the same --plan) skips any stage already marked "done".
+OOM-killed wrapper) doesn't discard hours of completed work — just re-running with the same
+--plan skips any stage already marked "done".
 
 Recovery scope matches .claude/commands/recover.md's plan_mode=="deterministic" rule exactly:
 only EXTEND-type recovery (parameter tweaks that never touch decided_params) auto-applies, capped
@@ -51,7 +45,7 @@ identical across replicates.
 Usage:
   <repo>/mcp-servers/.venv/bin/python orchestration/run_deterministic_replicate.py \\
       --run_name RUN --polymer_class CLASS --plan data/RUN/raw/run_plan.json \\
-      [--phase full|equil] [--resume-from STAGE] [--dry-run] [--properties density,tg,bulk_modulus]
+      [--dry-run] [--properties density,tg,bulk_modulus]
 
   (Invoking via a different interpreter is fine — the script re-execs itself under the venv
   python needed for fastmcp/numpy/scipy/MDAnalysis before importing the MCP servers.)
@@ -131,9 +125,9 @@ def _load_server_module(name: str, path: Path, cwd: Path, extra_env: dict):
 
 class ExecutorState:
     """Per-run persisted stage status (data/<RUN>/raw/executor_state.json). A stage marked
-    "done" is never re-run; --resume-from (or simply re-invoking with the same --plan) picks
-    up from the first non-done stage. Also what protocol-locker reads for "what did this run
-    need to fix" when a locked-protocol replicate needed an EXTEND."""
+    "done" is never re-run; re-invoking with the same --plan picks up from the first non-done
+    stage. Also what protocol-locker reads for "what did this run need to fix" when a
+    locked-protocol replicate needed an EXTEND."""
 
     def __init__(self, path: Path, run_name: str, polymer_class: str, plan_path: str):
         self.path = path
@@ -769,14 +763,6 @@ def main():
     ap.add_argument("--run_name", required=True)
     ap.add_argument("--polymer_class", required=True)
     ap.add_argument("--plan", required=True, help="Path to run_plan.json")
-    ap.add_argument("--phase", choices=["full", "equil"], default="full",
-                    help="'equil' stops after Equil-check PASS for the IS_NOVEL=true mandatory "
-                         "characterization hand-off to the live orchestrator session (a plain "
-                         "script can't spawn system-characterization-analyzer); 'full' (default) runs "
-                         "everything from the first non-done stage in executor_state.json onward.")
-    ap.add_argument("--resume-from", default=None,
-                    help="Informational — resumption is actually driven by executor_state.json; "
-                         "this just asserts which stage you expect to resume from.")
     ap.add_argument("--dry-run", action="store_true",
                     help="Resolve every stage's params without submitting anything; print JSON and exit.")
     ap.add_argument("--properties", default=None, help="Override properties_requested (else from plan).")
@@ -835,10 +821,6 @@ def main():
     else:
         equil_result = state.stage("equil_check")["result"]
     args.data_path = equil_result["npt_prod_data_path"]
-
-    if args_cli.phase == "equil":
-        print(json.dumps({"status": "equil_complete", **equil_result}))
-        return
 
     thermal_result = None
     is_glassy = None
