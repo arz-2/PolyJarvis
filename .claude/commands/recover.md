@@ -3,124 +3,42 @@ description: Diagnose and plan recovery for a failed PolyJarvis simulation stage
 allowed-tools: Read, Bash, mcp__mcp-lammps-engine__get_run_status, mcp__mcp-lammps-engine__get_run_output, mcp__mcp-mol-builder-server__get_job_status, mcp__mcp-mol-builder-server__get_job_output
 ---
 
-Recovery procedure for a failed PolyJarvis simulation. Follow these steps exactly:
+Source of truth for `recovery-agent` (`plan_mode=="reasoned"` runs only — `recovery-agent` is never
+spawned for `plan_mode=="deterministic"`; `run_deterministic_replicate.py` owns that path's own
+bounded EXTEND-only recovery inline, see §2b) and for a human doing Session Recovery (Mode B, end
+of file).
 
-**1. Find the active run_log.md:**
+**1. Find the active run_log.md** (skip if the prompt already gave `run_name`/`chain_id`):
 ```bash
 find /home/arz2/PolyJarvis/data -name "run_log.md" -newer /home/arz2/PolyJarvis/data/TEMPLATE/run_log.md | sort -t/ -k6 | tail -5
 ```
 
-**2. Read the SIMULATION STATE table** from that run_log.md. Identify the row with status `monitoring` or `failed` and note the `chain_id` / `run_id`.
+**2. Read the SIMULATION STATE table** for the row with status `monitoring`/`failed`; note `chain_id`/`run_id`.
 
-**2b. Read the attempt ladder for this run:** `jq -r '.plan_mode' data/<RUN>/raw/run_plan.json`.
-- **`reasoned`** — this run is establishing or re-establishing a protocol (grounded/reasoned
-  plan, not yet locked via `make_deterministic_plan.py --lock-from`). Max attempts = **5**, and
-  protocol-level changes are sanctioned as ladder rungs, not just parameter tweaks — see the
-  escalation ladder below.
-- **`deterministic`** — this run is replaying an already-locked protocol (this exact canonical
-  SMILES is `protocol_validated`, possibly a replicate-2+ of a campaign). Max attempts = **2**,
-  and only EXTEND-type recovery
-  (parameter tweaks that never touch `decided_params`, e.g. re-running longer at 300K) may
-  auto-apply. Any recovery that would change `decided_params` (a different FF, a different
-  cooling rate, a different pressure range) must **stop immediately, write the finding to
-  run_log.md, and surface for human review** instead of applying it — changing the protocol on
-  a locked replicate breaks the fixed-protocol-across-replicates invariant the whole campaign
-  depends on. Do not spend an attempt trying it.
-- Missing/unreadable `run_plan.json`: fall back to the deterministic rule (max 2, no
-  protocol-level changes) — the conservative default.
+**2b. Attempt ladder** — `jq -r '.plan_mode' data/<RUN>/raw/run_plan.json`:
+- `reasoned` (the only mode this agent runs under): max **5** attempts; protocol-level changes are
+  sanctioned as ladder rungs (see the STRUCTURAL_FAIL ladder under Foundation → equil).
+- `deterministic`, or plan missing/unreadable: max **2**, EXTEND-type only, any `decided_params`
+  change stops immediately for human review — describes `run_deterministic_replicate.py`'s own
+  inline logic; not a path this agent ever executes.
 
-**3. Get actual status:**
-- For a LAMMPS chain: `get_run_status(chain_id)`
-- For a RadonPy/EMC job: `get_job_status(job_id)`
+**3. Get actual status:** `get_run_status(chain_id)` (LAMMPS) or `get_job_status(job_id)` (RadonPy/EMC).
 
-**4. Read the error:**
-- `get_run_output(run_id)` — read the last 50 lines of the LAMMPS log
-- For RadonPy: `get_job_output(job_id)`
+**4. Read the error:** `get_run_output(run_id)` (last 50 lines) or `get_job_output(job_id)`.
 
-**5. Diagnose — consult the recovery playbook first, then the built-in taxonomy:**
+**5. Diagnose:**
+- `guides/RECOVERY_PLAYBOOK.md` first if it exists and a clustered signature matches (rows carry
+  an empirical `k/n` success rate — rank by it, skip low-`n`/low-success rows).
+- Else jump straight to the `## <Track> → <Step>` section below matching the prompt's `track`/
+  `step` (`equil`/`equil-check` both map to Foundation → equil). Fall back to Cross-cutting, or the
+  reasoned STRUCTURAL_FAIL ladder, only if nothing there matches.
+- A row tagged **`[INFO]`** is never a failure — return `verdict: no_action_needed`, spend no
+  attempt, write no RECOVERY block.
 
-- **Read `guides/RECOVERY_PLAYBOOK.md` if it exists** (a generated, local-only artifact — regenerate from past run_logs via `python -m tools.runlog_miner --playbook -o guides/RECOVERY_PLAYBOOK.md`). If a clustered signature matches this failure's symptom/error, prefer its **Recovery action** — those rows carry an empirical success rate (`k/n`) across past runs, so rank by it and skip low-`n` or low-success rows.
-- If the playbook is absent, no row matches, or it has no incidents yet, fall back to the built-in taxonomy below:
+**6. Return your RESULT** in `recovery-agent.md`'s required format — never print free text instead.
 
-| Error string / condition | Root cause | Recovery action |
-|---|---|---|
-| "lost atoms" | Timestep too large or bad geometry | Re-spawn worker with `dt_fs: 0.5` |
-| "out of memory" / GPU OOM | Cell too large for VRAM | Re-spawn with `mpi_ranks` halved |
-| "unknown atom type" / segfault on startup | FF assigned before polymerization | Re-spawn molecule-builder from `assign_forcefield` step |
-| Energy NaN / diverges in first 100 steps | `density_initial` too high | Re-spawn with `density_initial − 0.10 g/cm³` |
-| Density drift > 3% after 2 EXTEND cycles | Won't converge at this density | Restart compress with `density_initial − 0.05 g/cm³` |
-| Tg sweep R² < 0.80 or fewer than 4 bins | T range too narrow | Re-run sweep: `T_start + 50 K`, `T_end − 50 K` |
-| Tg sweep R² 0.80–0.90 | Borderline bilinear fit | Re-run sweep with `T_step` halved |
-| Tg sweep killed mid-run | Process death (OOM, GPU preemption, etc.) | Restart from the last completed temperature (max 2 attempts); if still failing, return the error to the orchestrator |
-| `Tg_K` vs `Tg_alternative_K` disagree by >20 K | Noisy density or sweep range doesn't bracket the transition | Increase `N_STEPS_PER_T` or extend the T range |
-| `extract_thermal` `fit_quality` POOR despite a clean log | Velocity re-init discontinuity or excessive plateau drift exclusion | Plot `tg_density_bins.csv`; check for velocity re-init (Tg-sweep no-reinit rule) and `n_plateaus_skipped_drift` |
-| "Bilinear curve_fit failed" | Sweep log spans <~100 K or collapses to a single bin — defective single-isothermal run, not a staircase | Return FAIL, regenerate the sweep; do NOT tune `initial_tg_guess` |
-| RadonPy conformer/charge job `failed` | QM instability | Retry once with `n_conformers` halved; if still fails, use AM1-BCC and note in D-02 |
-| "missing FF parameters" (EMC build) | SMILES attachment points wrong | Verify exactly two `*` atoms; try `dp: 15` if `dp: 20` fails |
-| Polymerization job hangs in "pending" | Job queue stuck / RadonPy worker crash | Check `list_all_jobs()`; `cancel_job(job_id)` if still pending after a reasonable wait, then resubmit `submit_polymerize_job` |
-| EMC stalls/fails on amide-N monomers (pcff lacks the amide/lactam/urea N→carbonyl increment, `{na,c_2}`) | Force field constraint, not a build error | Rescue ladder: primary amide (e.g. polyacrylamide) → OPLS-AA; secondary amide/lactam/urea (e.g. PNIPAM, PVP, PURA) → RadonPy/GAFF2 |
-| EMC dies with a negative exit code (`segfault (signal N)`, no `Error:` line) | Monomer/field mismatch (typical: chlorinated monomer on trappe-ua/opls-aa), not an unbuildable SMILES | Continue the field cascade (try pcff next) |
-| LAMMPS crashes steps 0–10, wrong style keyword (`fourier` / `none` / `lj/charmm`) | FF directive mismatch: `generate_script` called without explicit FF flag | Confirm `**lammps_flags` is in `params_deform`; re-generate script passing `use_trappe=True` / `use_pcff=True` / `use_opls=True` explicitly |
-| Log truncated, no LAMMPS error string, process gone | External kill (OOM killer / GPU preemption) | Identify last completed stage `_out.data` via `ls`; submit remaining stages as new chain from that checkpoint |
-| Background waiter never returns after `run_lammps_chain` | `watch_run` sentinel lost on MCP server restart | `grep -r "STAGE COMPLETE" <work_dir>/` — if all stages present, proceed without waiting and mark done in run_log |
-| Submit returns `status=error` with `conflicting_writers` | Double-launch guard: a live LAMMPS/MPI process already holds the target log open (concurrent session, or an orphaned chain from a context restart) | Inspect the listed pid/cmd; if it is a stale orphan, `kill <pid>` then resubmit. If it is a legitimate concurrent run, do NOT relaunch — coordinate via user. Pass `allow_concurrent_writer=True` only after confirming the writer is dead/stale |
-| "Out of range atoms — cannot compute PPPM" in npt_compress | PPPM ghost region exceeded during high-pressure box shrink | Switch compress stage pair_style to `lj/cut/coul/cut`; skin=3.0 Å; dt=0.5 fs; restore kspace for all production stages |
-| K = negative or density at melt value (~0.8–0.9 g/cm³) for a glassy polymer | deform-worker received `npt_production` (melt) data instead of `npt_prod300` (300 K) data | Verify `equil_data_path` is `npt_prod300_out.data`; if `npt_prod300` missing, run the cool+prod 300 K phase first; re-spawn deform-worker |
-| `extract_thermal` returns "fewer than 4 temperature bins" after partial sweep kill | Sweep killed before sufficient T coverage | If ≥ 60% of planned T points completed AND both glassy+rubbery slopes present, attempt `extract_thermal`; if fit_quality ≥ ACCEPTABLE accept; else restart full sweep |
-| `extract_bulk_modulus` K < 0.1 or > 20 GPa | Not fully equilibrated (`diagnostics.drift_check` warns) | Re-spawn bulk-modulus-extractor with `eq_fraction=0.7` |
-| `extract_bulk_modulus` `volume_equilibrated=false` | Volume hasn't settled in the production window | Re-spawn bulk-modulus-extractor with `eq_fraction=0.25`; bracket that K against the original `K_block_mean_GPa` |
-| `extract_bulk_modulus_murnaghan` K < 0 or `fit_converged=False` | EOS curvature not resolved at this pressure range | Check `volume_equilibrated` per pressure; glassy: narrow to ±500 atm if ±1000 causes creep; `linear_fallback` underestimates K — add pressure points and re-submit via murnaghan-worker |
-| `extract_bulk_modulus_murnaghan` `B0_prime` outside [4, 20] | Pressure range too wide (glass yielding) or too narrow (curvature not captured) | Route to deform-worker fallback, or re-submit murnaghan-worker with a wider pressure series |
-| `run_bulk_modulus_series`: one pressure point fails / GPU OOM / empty `log_files` | `npt_steps` too large for available VRAM at that pressure | Reduce `npt_steps` to 200000 and re-submit (check `nvidia-smi`) |
-| BACKGROUND-WAIT never returns after murnaghan-worker's `watch_run` call | Worker error: `watch_run` was called with `run_bulk_modulus_series`'s placeholder `monitor_command` string instead of the real `chain_id` — no sentinel was ever created (distinct from the generic "background waiter never returns" row above, which is an MCP-server-restart sentinel loss) | Re-run `watch_run(chain_id)` as a real MCP tool call using the actual `chain_id` |
-| `extract_bulk_modulus_deform` `fit_r2_C11`/`fit_r2_C12_yy` < 0.90 | Noisy stress-strain fit | Check `THERMO_FREQ` ≤ 100 in the deform script; if `rate_sensitivity` is present with `verdict=WARNING`, the primary rate was too high — the tool already prefers the slow-rate fit when its own R² clears 0.90 |
-| `extract_bulk_modulus_deform` `isotropy_delta_pct` ≥ 20% | Cell too small / not isotropic at this strain | BORDERLINE — Murnaghan should have been primary; re-submit murnaghan-worker with a wider/adjusted pressure series instead |
-| Deformation run (`npt_deform`) crashes | `dt_fs` too large for SHAKE + deform | Re-spawn deform-worker with `dt_fs=1.0`; if it still crashes, reduce `STRAIN_RATE` 10× (e.g. 1e-8 instead of 1e-7 /fs) |
-| `extract_equilibrated_density` returns <0.5 g/cm³ | Log likely contains the compression ramp, not just the production plateau | Verify `plateau_step_range` starts after the ramp; re-spawn equilibration-checker with `eq_fraction=0.7` |
-| `check_equilibration_comprehensive` hangs on a large dump (>~1 GB / >1000 frames) | Trajectory I/O timeout | Do not re-run it — rely on `extract_equilibrated_density` plus the most recent pre-extension comprehensive result instead (structural metrics can't have moved over a short extension of an already-equilibrated cell) |
-| GPU crash during NPT production | OOM, bad geometry, or pair-style mismatch | Check the log (do NOT switch to CPU): OOM → reduce system size/GPUs; bad geometry → more minimize steps; pair-style mismatch → check params file |
-| Density not converging during equilibration | Insufficient annealing | Add annealing cycles (3–5) |
-| Chain droplets / vacuum voids in the packed cell | Initial density too high | Rebuild the cell at `density=0.05` |
-| "Out of range atoms — cannot compute PPPM" at `nvt_softheat` step 0→1 (minimize completed) | Localized EMC pack overlap for that seed | Rebuild the cell with a fresh EMC seed; if a second seed also fails, drop `density_initial` 0.6 → 0.5 before any deck edits |
-| `generate_equilibration_workflow(extend_only=True)` returns 7 stages instead of 1 | Stale MCP server code — should yield `n_stages==1`, `run_order==["npt_extend"]` | Do NOT submit (its `nvt_softheat` re-melts the cooled glassy cell) and do NOT hand-write a `.in`; request an orchestrator server restart |
-| Disk-full mid-chain (equilibration) | Ran out of space partway through the chain | Completed stages' `_out.data` stay intact — free disk, delete only the failed stage's partial outputs, regenerate the workflow with identical params, slice the stage list to resume at the failed stage, resubmit (do NOT restart from stage 0). Prevention: below 60 GB free, strip `dump`/`undump`/`write_dump` from production stages' `.in` — but never from `npt_prod300`/`npt_production` if `tg`/`bulk_modulus` was requested and this SMILES was novel (`system-characterization-analyzer`'s post-PASS refinement reads that dump) |
-
-**`plan_mode=="reasoned"` escalation ladder** (per §2b): a `STRUCTURAL_FAIL` verdict from
-`enforce_equilibration_gate` (see `structural_fail_remedy`/`structural_fail_remedy_confidence`
-in the equilibration-checker's RESULT block) isn't a log-grep match, so it isn't in the taxonomy
-table above — escalate through these rungs in order, spending one attempt each. This ladder is
-for the **`phase=full` gate only** (rubbery's only gate, or glassy after cooldown), where a glass
-state exists to diagnose against. A glassy `phase=melt` gate failure (before cooldown) is a
-different checkpoint with its own procedure — see "## MELT-MIXING procedure" below, not this
-ladder:
-1. The named `structural_fail_remedy`:
-   - `re_melt_slow_recool` — parameter-level, not a full re-plan: re-melt from the converged
-     melt cell with `npt_cool_steps`/`npt_cool300_steps` overridden to 2×/4× baseline across
-     the 2 attempts (see "## RE-ANNEAL procedure" below for the exact formula).
-   - `heavy_melt_anneal_probe` — no mechanized implementation exists yet (see
-     `guides/EQUILIBRATION.md`/`polymer_rules.json`'s NkepsuMbitou-2025 provenance notes);
-     treat as a diagnostic investigation, not a parameter to set, and escalate to rung 3 if
-     the melt deficit doesn't resolve.
-2. If the remedy doesn't resolve it (or `structural_fail_remedy_confidence=low` and it fails
-   once), the taxonomy-table fix most consistent with the symptom.
-3. A full re-plan with a different force field — routes back through the planner per
-   `CLAUDE.md`'s "probe result contradicting a plan assumption" cross-run protocol (re-plan →
-   re-critic); counts as one ladder rung, not a restart of the count.
-Only after all rungs are exhausted at attempt 5 does UNRESOLVED apply (see Max attempts rule).
-
-**6. Output a recovery plan in this format:**
-```
-RECOVERY PLAN
-  Stage:        <molecule-builder | equilibration | tg-sweep | murnaghan-worker | deform-worker | bulk-modulus-extractor | phase-2>
-  Failure:      <exact error string or condition from log>
-  Root cause:   <diagnosis from taxonomy above, or structural_fail_remedy for STRUCTURAL_FAIL>
-  Action:       <parameter change or step to re-run>
-  Worker:       <subagent_type to re-spawn>
-  Params changed: <field: old → new>
-  Attempt:      <N of max 5 (plan_mode=reasoned) | N of max 2 (plan_mode=deterministic)>
-```
-
-**7. Write a RECOVERY block to run_log.md immediately** (before re-spawning anything):
+**7. (Orchestrator, not this agent) writes this to run_log.md before re-spawning anything** —
+format fixed, `protocol-locker` parses it:
 ```markdown
 ## RECOVERY — [Stage] attempt N
 - **Trigger:** <error>
@@ -129,97 +47,141 @@ RECOVERY PLAN
 - **Outcome:** pending
 ```
 
-**Max attempts rule:** the cap is read from `plan_mode` (§2b):
-- `plan_mode=="reasoned"` — after **5** recovery attempts spanning the escalation ladder above
-  without a clean PASS, stop and write a checkpoint note to run_log.md asking the user to
-  review, instead of silently writing `UNRESOLVED`.
-- `plan_mode=="deterministic"`, or `run_plan.json` missing/unreadable (conservative default) —
-  after **2** attempts (EXTEND-type only; any `STRUCTURAL_FAIL` stops immediately at attempt 1
-  per §2b, it is never auto-applied), write `UNRESOLVED` and stop.
-Do not attempt a retry beyond the applicable cap without human review.
-
 ---
 
-## RE-ANNEAL procedure (`structural_fail_remedy: re_melt_slow_recool`)
+## Cross-cutting (any track/step)
 
-Triggered by an equil-checker verdict of `UNDER_ANNEALED_COOLING`: melt density right but cooling
-froze in free volume. Do NOT `EXTEND` at 300 K (a glass can't densify below Tg). Re-melt from the
-converged **melt** cell (`npt_production_out.data` at T_equil, NOT the 300 K cell) via
-`generate_equilibration_workflow`, slowing the cool ramp with the explicit
-`npt_cool_steps`/`npt_cool300_steps` overrides. Compute the baseline being overridden, then pass
-**2×** it on the first RE-ANNEAL attempt, **4×** on the second (max 2 attempts; if still
-under-band, re-classify as `MELT_STAGE_DEFICIT` and record the evidence rather than looping — this
-remedy targets a too-fast *cooling* ramp, not a deficient melt, and cannot fix the latter):
+| Condition | Root cause | Action |
+|---|---|---|
+| "lost atoms" | Timestep too large / bad geometry | `dt_fs: 0.5` |
+| "out of memory" / GPU OOM | Cell too large for VRAM | halve `mpi_ranks` |
+| LAMMPS crashes steps 0–10, wrong style keyword (`fourier`/`none`/`lj/charmm`) | `generate_script` called without an explicit FF flag | confirm `**lammps_flags` present; re-generate with explicit `use_trappe`/`use_pcff`/`use_opls` |
+| Background waiter never returns after `run_lammps_chain` | `watch_run` sentinel lost on MCP server restart | `grep -r "STAGE COMPLETE" <work_dir>/` — if all stages present, proceed without waiting |
+| Submit returns `status=error`, `conflicting_writers` | Live process already holds the target log open | inspect pid/cmd; stale orphan → `kill` then resubmit; legitimate concurrent run → do NOT relaunch, coordinate via user |
+| Log truncated, no error string, process gone | External kill (OOM killer / GPU preemption) | identify last completed stage's `_out.data`; submit remaining stages as a new chain from that checkpoint |
+| GPU crash during NPT production | OOM, bad geometry, or pair-style mismatch | check the log (do NOT switch to CPU): OOM → reduce size/GPUs; bad geometry → more minimize steps; pair-style mismatch → check params |
 
-- `npt_cool300_steps` (glassy — the T_workflow→300 K leg, the stage most directly implicated
-  by "cooling too fast to 300 K"): baseline = `int(1.0e6 / dt_fs)` (~1 ns at the class's
-  production timestep).
-- `npt_cool_steps` (rubbery, or the melt→target leg when `add_melt_npt=True`): baseline =
-  the atom-count tier `generate_equilibration_workflow` would otherwise pick —
-  `n_atoms < 5000` → 1,000,000; `< 15000` → 2,000,000; else → 3,000,000 (`n_atoms` is already
-  known from this stage's own `inspect_data_file` call).
+## Foundation → build
 
-Pass the multiplied value(s) as `--npt_cool_steps`/`--npt_cool300_steps` on the re-spawned
-equilibration-worker's `gen_prompt.py --stage equil` call (reasoned path), or patch
-`decided_params.npt_cool_steps`/`npt_cool300_steps` in `run_plan.json` (deterministic path —
-flows through `apply_plan()`'s `{**cls, **decided_params}` overlay the same way every other
-D-09-style numeric refinement does). Log the multiplier used (2× or 4×) in the RECOVERY block.
+| Condition | Root cause | Action |
+|---|---|---|
+| "unknown atom type" / segfault on startup | FF assigned before polymerization | re-spawn from `assign_forcefield` step |
+| RadonPy conformer/charge job `failed` | QM instability | retry once with `n_conformers` halved; still fails → AM1-BCC, note in D-02 |
+| "missing FF parameters" (EMC build) | SMILES attachment points wrong | verify exactly two `*` atoms; try `dp: 15` if `dp: 20` fails |
+| Polymerization job hangs in "pending" | Job queue stuck / RadonPy worker crash | `list_all_jobs()`; `cancel_job` if still pending; resubmit `submit_polymerize_job` |
+| EMC stalls/fails on amide-N monomers (pcff lacks `{na,c_2}`) | FF constraint, not a build error | rescue ladder: primary amide → OPLS-AA; secondary amide/lactam/urea → RadonPy/GAFF2 |
+| EMC dies with negative exit code (`segfault`, no `Error:` line) | Monomer/field mismatch, not unbuildable | continue the field cascade (try pcff next) |
+| Chain droplets / vacuum voids in packed cell | Initial density too high | rebuild at `density=0.05` |
 
----
+## Foundation → equil (equilibration-worker + equil-check gate)
 
-## EXTEND procedure (`equil_verdict: EXTEND`, either gate)
+| Condition | Root cause | Action |
+|---|---|---|
+| Energy NaN / diverges in first 100 steps | `density_initial` too high | re-spawn with `density_initial − 0.10` |
+| Density drift > 3% after 2 EXTEND cycles | Won't converge at this density | restart compress with `density_initial − 0.05` |
+| "Out of range atoms — PPPM" in `npt_compress` | PPPM ghost region exceeded during box shrink | switch compress `pair_style` to `lj/cut/coul/cut`, skin=3.0 Å, dt=0.5 fs; restore kspace for production |
+| "Out of range atoms — PPPM" at `nvt_softheat` step 0→1 | Localized EMC pack overlap for that seed | rebuild cell with a fresh EMC seed; 2nd seed also fails → drop `density_initial` 0.6→0.5 before any deck edits |
+| `extract_equilibrated_density` returns <0.5 g/cm³ | Log likely has the compression ramp, not the production plateau | verify `plateau_step_range` starts after the ramp; re-spawn equil-checker `eq_fraction=0.7` |
+| `check_equilibration_comprehensive` hangs on a large dump (>~1 GB / >1000 frames) | Trajectory I/O timeout | do NOT re-run; use `extract_equilibrated_density` + the last pre-extension comprehensive result |
+| Density not converging during equilibration | Insufficient annealing | add annealing cycles (3–5) |
+| `generate_equilibration_workflow(extend_only=True)` returns 7 stages instead of 1 | Stale MCP server code (`n_stages` should be 1) | do NOT submit, do NOT hand-write a `.in`; request an MCP server restart |
+| Disk-full mid-chain | Ran out of space partway | keep completed stages' `_out.data`; free disk; delete only the failed stage's partial outputs; regenerate the workflow, slice to resume at the failed stage (never restart from stage 0). Prevention: <60 GB free, strip `dump` from production stages *except* `npt_prod300`/`npt_production` when `tg`/`bulk_modulus` was requested on a novel SMILES (`system-characterization-analyzer` needs that dump) |
 
-Triggered by a plain `EXTEND` verdict — density/energy drift or block-SEM not yet converged
-(genuinely not-yet-converged, not a wrong-value defect; contrast `STRUCTURAL_FAIL` above). Do NOT
-hand-write a continuation `.in` — the re-spawned equilibration-worker generates it deterministically
-via `generate_equilibration_workflow(extend_only=True)` (`mode: extend` in its prompt), never a
-fresh (non-extend) chain.
+**`plan_mode=="reasoned"` STRUCTURAL_FAIL ladder** — a `STRUCTURAL_FAIL` verdict from
+`enforce_equilibration_gate` (`phase=full` only; `phase=melt` routes to MELT-MIXING below)
+escalates through these rungs, one attempt each:
+1. The named `structural_fail_remedy`: `re_melt_slow_recool` → RE-ANNEAL below. `heavy_melt_anneal_probe`
+   → no mechanized implementation; treat as a diagnostic investigation, escalate to rung 3 if the
+   melt deficit doesn't resolve.
+2. Unresolved (or `structural_fail_remedy_confidence=low` and rung 1 fails once) → the closest row
+   in Cross-cutting/Foundation → equil above.
+3. Full re-plan with a different force field — routes back through planner→critic; counts as one
+   rung, not a restart. Only after rung 3 fails at attempt 5 does `escalate_human` apply.
 
-Which stage gets extended depends on which gate call produced the `EXTEND`:
-- **`phase=full` gate** (rubbery's only gate, or glassy after cooldown): extend
-  `npt_prod_data_path` (the 300 K / final-target cell) at `temp=npt_prod_temp_K` — **never**
-  `T_equil_K`/`T_workflow_K`, which would re-melt an already-cooled glassy cell.
-- **`phase=melt` gate** (glassy pre-cool checkpoint — see MELT-MIXING procedure below, which
-  routes here for its own EXTEND/STRUCTURAL_FAIL cases too): extend
-  `npt_production_data_path` (the melt cell, still pre-cool) at `temp=T_workflow_K`, then
-  re-run the same `phase=melt` gate — do not proceed to `phase=cooldown` until it PASSes.
+**RE-ANNEAL** (`re_melt_slow_recool`, from `UNDER_ANNEALED_COOLING`): re-melt from the converged
+**melt** cell (`npt_production_out.data` at `T_equil_K`, not the 300 K cell) via
+`generate_equilibration_workflow`, with `npt_cool_steps`/`npt_cool300_steps` overridden to **2×**
+baseline (attempt 1) then **4×** (attempt 2; max 2 — still under-band → re-classify as
+`MELT_STAGE_DEFICIT`, rung 3, not a third loop). Baseline: `npt_cool300_steps` (glassy
+T_workflow→300K leg) = `int(1.0e6/dt_fs)`; `npt_cool_steps` (rubbery, or melt→target when
+`add_melt_npt=True`) = the atom-count tier `generate_equilibration_workflow` already picks
+(`n_atoms<5000`→1e6, `<15000`→2e6, else 3e6). Pass as `--npt_cool_steps`/`--npt_cool300_steps` on
+the re-spawned equilibration-worker. Log the multiplier used in the RECOVERY block.
 
-`extend_ns = max(1.5, 1.5 * ct_tau_relax_ps/1000)` when this gate's own `ct_tau_relax_ps` is a
-finite, reasonably-fit number (a measured signal from this run's own data beats a blind guess);
-else a flat 1.5 ns fallback. Cap at 2 extensions **per gate** — `phase=full` and `phase=melt` are
-independent checkpoints with independent budgets, not one shared count. Re-run BACKGROUND-WAIT,
-then re-run the same gate that produced the `EXTEND` on the extended stage's own output.
+**EXTEND** (plain `EXTEND` verdict, either gate — drift not yet converged, not a wrong-value
+defect): re-spawn equilibration-worker with `generate_equilibration_workflow(extend_only=True)`
+(`mode: extend`), never a hand-written `.in` or a fresh chain. `phase=full` → extend
+`npt_prod_data_path` at `temp=npt_prod_temp_K` (never `T_equil_K`/`T_workflow_K` — would re-melt a
+cooled glass). `phase=melt` → extend `npt_production_data_path` at `temp=T_workflow_K`, then
+re-run the same `phase=melt` gate. `extend_ns = max(1.5, 1.5*ct_tau_relax_ps/1000)` when finite,
+else 1.5 ns flat. Cap 2 extensions **per gate** (`phase=full`/`phase=melt` independent budgets).
 
-## MELT-MIXING procedure (`phase=melt` gate: `EXTEND`, or `STRUCTURAL_FAIL` with a melt-mixing remedy)
+**MELT-MIXING** (`phase=melt` gate: `EXTEND`, or `STRUCTURAL_FAIL` from `density_homogeneity`
+alone — never `re_melt_slow_recool`/`heavy_melt_anneal_probe`, which need the post-cool glass
+state that doesn't exist yet): apply the EXTEND procedure's `phase=melt` branch. Cap 2 extensions;
+still failing → `MELT_STAGE_DEFICIT`-equivalent, escalate to rung 3. Only `phase=melt` PASS reaches
+`phase=cooldown`.
 
-Triggered by the glassy `[Equil-check gate]`'s `phase=melt` call (`orchestration/tracks/FOUNDATION.md`)
-— the checkpoint that runs on `npt_production`/`nvt_production` *before* `npt_cool300`/
-`npt_prod300` are ever submitted, specifically so a badly-mixed melt doesn't waste that cool-to-300
-GPU time. This checkpoint has no glass state to diagnose against yet, so a `STRUCTURAL_FAIL` here
-is **never** `re_melt_slow_recool`/`heavy_melt_anneal_probe` (those are the RE-ANNEAL /
-`plan_mode=="reasoned"` ladder's remedies for the post-cool `phase=full` gate, above) — it's a
-melt-mixing note (`density_homogeneity` failing on its own), and both `EXTEND` and this
-`STRUCTURAL_FAIL` route the same way here: apply the EXTEND procedure's `phase=melt` branch
-(extend `npt_production_data_path` at `T_workflow_K`, in place — never restart the chain from
-`minimize`). Cap at 2 extensions; if still failing after 2, treat it as a genuine `MELT_STAGE_
-DEFICIT`-equivalent and escalate to the `plan_mode=="reasoned"` ladder's rung 3 (full re-plan
-with a different force field) rather than looping a third time — a melt that won't mix after 2
-extensions is a force-field/system-size problem, not a dwell-time one. Only once `phase=melt`
-PASSes does the orchestrator proceed to `phase=cooldown`.
+## Thermal → tg (tg-sweep-worker)
+
+| Condition | Root cause | Action |
+|---|---|---|
+| R² < 0.80 or fewer than 4 bins | T range too narrow | re-run: `T_start+50K`, `T_end−50K` |
+| R² 0.80–0.90 | Borderline bilinear fit | re-run with `T_step` halved |
+| Sweep killed mid-run | Process death (OOM, GPU preemption) | restart from last completed T (max 2 attempts); still failing → return error to orchestrator |
+
+## Thermal → analyze-tg (tg-analysis-worker)
+
+| Condition | Root cause | Action |
+|---|---|---|
+| `Tg_K` vs `Tg_alternative_K` disagree by >20 K | Noisy density or sweep range doesn't bracket the transition | increase `N_STEPS_PER_T` or extend the T range |
+| `fit_quality` POOR despite a clean log | Velocity re-init discontinuity or excessive plateau drift exclusion | plot `tg_density_bins.csv`; check velocity re-init + `n_plateaus_skipped_drift` |
+| "Bilinear curve_fit failed" | Sweep log spans <~100 K or collapses to one bin — defective single-isothermal run | return FAIL, regenerate the sweep; do NOT tune `initial_tg_guess` |
+| "fewer than 4 temperature bins" after partial kill | Sweep killed before sufficient T coverage | ≥60% planned T points + both slopes present → attempt `extract_thermal`, accept if `fit_quality≥ACCEPTABLE`; else restart full sweep |
+
+## Mechanical → murnaghan (murnaghan-worker)
+
+| Condition | Root cause | Action |
+|---|---|---|
+| `fit_converged=False` or `K<0` | EOS curvature not resolved at this pressure range | check `volume_equilibrated` per pressure; glassy: narrow to ±500 atm if ±1000 causes creep; add pressure points and re-submit |
+| `B0_prime` outside [4, 20] with `fit_converged=True` | **[INFO]** — `guides/BM_ANALYSIS.md`: WARNING annotation only (EOS-nonlinearity artifact or under-constrained curvature at this span); K stays correct. Never triggers deform-worker fallback by itself. |
+| `run_bulk_modulus_series`: a pressure point fails / GPU OOM / empty `log_files` | `npt_steps` too large for available VRAM | reduce `npt_steps` to 200000, re-submit (check `nvidia-smi`) |
+| Rubbery PROBE ladder's `-200 atm` point crashes / log missing or truncated | **[INFO]** — deliberate outcome of the shallow safety probe (`guides/MURNAGHAN.md`'s two-leg protocol), already handled inline by `MECHANICAL_TRACK.md`: re-run `analyze-bm` on the remaining compression-only logs, never resubmit the probe or attempt Leg 2. Note tension untested; never write a class-level `bm_pressures_atm` from it. |
+| BACKGROUND-WAIT never returns after murnaghan-worker's `watch_run` call | Worker passed `run_bulk_modulus_series`'s placeholder string instead of the real `chain_id` — no sentinel created | re-run `watch_run(chain_id)` as a real MCP call with the actual `chain_id` |
+| `K` negative or at melt-value density (~0.8–0.9 g/cm³) for a glassy polymer | Worker received `npt_production` (melt) data instead of `npt_prod300` (300 K) data | verify `equil_data_path` is `npt_prod300_out.data`; run the cool+prod300 phase first if missing; re-spawn |
+
+## Mechanical → deform (deform-worker)
+
+| Condition | Root cause | Action |
+|---|---|---|
+| `fit_r2_C11`/`fit_r2_C12_yy` < 0.90 | Noisy stress-strain fit | check `THERMO_FREQ ≤ 100` in the deform script |
+| `rate_sensitivity` present, `verdict=WARNING`, slow-rate `fit_r2 ≥ 0.90` | **[INFO]** — `guides/BM_ANALYSIS.md`: tool already auto-substitutes the slow-rate fit into `K_GPa`/`method`; just surface the flag. |
+| `isotropy_delta_pct` ≥ 20% | Cell too small / not isotropic at this strain | BORDERLINE — Murnaghan should have been primary; re-submit murnaghan-worker with a wider/adjusted pressure series |
+| `npt_deform` run crashes | `dt_fs` too large for SHAKE + deform | re-spawn `dt_fs=1.0`; still crashes → reduce `STRAIN_RATE` 10× |
+
+## Mechanical → analyze-bm (bulk-modulus-extractor, fluctuation path)
+
+| Condition | Root cause | Action |
+|---|---|---|
+| `K < 0.1` or `> 20` GPa | Not fully equilibrated (`diagnostics.drift_check` warns) | re-spawn with `eq_fraction=0.7` |
+| `volume_equilibrated=false` | Volume hasn't settled in the production window | re-spawn with `eq_fraction=0.25`; bracket K against the original `K_block_mean_GPa` |
 
 ---
 
 ## Session Recovery (Mode B)
 
-When the Claude process dies while a background waiter is in flight (no tmux, machine reboot, or session killed):
+When the Claude process dies while a background waiter is in flight (no tmux, machine reboot,
+session killed):
 
-1. `ssh lambda && pj && claude --continue` (or start fresh if conversation unavailable)
-2. Read `data/[RUN]/run_log.md` → find the row where `status = monitoring`; note the `id` value
-3. Call `get_run_status(id)`:
-   - **running** → `watch_run(id)` → relaunch the waiter via BACKGROUND-WAIT (`Bash(command=monitor_command, run_in_background=true)`, the CLAUDE.md canonical pattern) → update run_log back to `monitoring`, then **end your turn**; the harness re-invokes you when it exits. `RUN_COMPLETE` (exit 0) → completed; `PROCESS_DEAD_NO_SENTINEL` (exit 3) → treat as **failed** below.
-   - **completed** → update run_log to `done` → continue from the next orchestrator step
-   - **failed** → `get_run_output(id)` → diagnose with taxonomy above → re-spawn worker (counts as attempt 1)
-   - **not found** → wait 60–90 s for MCP server restart; retry; if still missing, treat as failed
-4. `monitor_command` is deterministic — `watch_run(id)` regenerates it from the ID alone; always safe to re-call
+1. `ssh lambda && pj && claude --continue` (or start fresh if conversation unavailable).
+2. Read `data/[RUN]/run_log.md` → find the row where `status = monitoring`; note the `id`.
+3. `get_run_status(id)`:
+   - **running** → `watch_run(id)` → relaunch the waiter (`Bash(command=monitor_command, run_in_background=true)`) → update run_log to `monitoring`, end your turn. `RUN_COMPLETE` (exit 0) → completed; `PROCESS_DEAD_NO_SENTINEL` (exit 3) → treat as failed below.
+   - **completed** → update run_log to `done` → continue from the next orchestrator step.
+   - **failed** → `get_run_output(id)` → diagnose with the tables above → re-spawn worker (attempt 1).
+   - **not found** → wait 60–90s for MCP server restart; retry; still missing → treat as failed.
+4. `monitor_command` is deterministic — `watch_run(id)` regenerates it from the ID alone; always
+   safe to re-call.
 
-If tmux is still alive (B-1): `ssh lambda && pj` to re-attach; the background waiter is still running and will re-invoke the session on exit — no action needed.
+If tmux is still alive: `ssh lambda && pj` to re-attach; the background waiter is still running and
+will re-invoke the session on exit — no action needed.

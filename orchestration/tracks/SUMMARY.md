@@ -62,8 +62,8 @@ for a single-run task.
    ```
    See `protocol-locker.md` for what it does with this (own doc owns the procedure). Write its
    `changes`/note to `run_log.md` (a new `## PROTOCOL LOCKED` block). If not all requested
-   properties PASSed, do **not** spawn it — continue diagnosing per `/recover`'s
-   `plan_mode=="reasoned"` ladder instead.
+   properties PASSed, do **not** spawn it — continue via RECOVERY's `plan_mode=="reasoned"`
+   ladder instead.
 
 
 ## [Capture errors + improvements — to MEMORY ONLY, last action of the run]

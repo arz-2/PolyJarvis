@@ -17,7 +17,7 @@ AI agent for autonomous polymer MD simulation. Given a SMILES string, runs the f
 
 ## Orchestrator Pattern
 
-Default mode is multi-agent: the orchestrator (this session) spawns stateless specialist workers via `Agent(subagent_type=...)` and holds all state + recovery logic. Workers group into **tracks** — foundation runs first and feeds all.
+Default mode is multi-agent: the orchestrator (this session) spawns stateless specialist workers via `Agent(subagent_type=...)` and holds all state + recovery authority (diagnosis is delegated to `recovery-agent`; the orchestrator alone writes run_log.md, re-spawns workers, and owns GPU claims / BACKGROUND-WAIT). Workers group into **tracks** — foundation runs first and feeds all.
 
 | Worker (color) | Track | Role |
 |------|------|------|
@@ -34,6 +34,7 @@ Default mode is multi-agent: the orchestrator (this session) spawns stateless sp
 | 🟢 `bulk-modulus-extractor` | mechanical | Murnaghan/deform/fluctuation logs → bulk_modulus_GPa |
 | 🟢 `exp-lookup-worker` | summary | polymer name/class → condition-matched exp ranges (Tg/density/K) |
 | 🟢 `run-summary-worker` | summary | all output JSONs → `run_summary.json` |
+| ⚫ `recovery-agent` | any | failed stage + injected context → diagnosis + `RECOVERY PLAN` verdict (`respawn`/`escalate_human`/`no_action_needed`); orchestrator writes run_log.md and re-spawns |
 
 ### Orchestrator workflow
 
@@ -66,8 +67,8 @@ GATE & PLAN — gate per exact canonical SMILES, never per class.
     If IS_NOVEL=false (characterized by an earlier run, but not validated for these properties):
       `apply_cached_characterization.py --run_plan PLAN_PATH --canonical_smiles CANONICAL_SMILES`
       reuses that run's measured timing knobs instead of guessed class defaults, before Phase A.
-    Recover failures per `.claude/commands/recover.md`'s plan_mode ladder, up to 5 attempts or
-    until every requested property completes.
+    Recover failures via RECOVERY (below), up to 5 attempts or until every requested property
+    completes.
 
   Write CANONICAL_SMILES/IS_NOVEL/VALIDATED + PLAN_PATH/plan_mode to the run_log.md header.
 
@@ -86,15 +87,39 @@ HARDWARE — claim before any GPU-submitting worker spawn (build is not a GPU st
   plan). Deterministic-path carve-out: DETERMINISTIC_REPLICATE.md's scripted executor claims and
   releases internally — do not also claim at the orchestrator level for that path.
 
-BACKGROUND-WAIT — canonical wait pattern, referenced by name from every phase guide and /recover.
+BACKGROUND-WAIT — canonical wait pattern, referenced by name from every phase guide and RECOVERY.
   After a worker returns monitor_command: log SIMULATION STATE, then
   `Bash(command=monitor_command, run_in_background=true)` and END YOUR TURN. On the exit wakeup:
     RUN_COMPLETE → get_run_status → proceed
-    PROCESS_DEAD_NO_SENTINEL → /recover
+    PROCESS_DEAD_NO_SENTINEL → RECOVERY
     killed / no terminal line → relaunch the same waiter
 
+RECOVERY — canonical recovery pattern, referenced by name from every phase guide on an
+  `EXTEND`/`STRUCTURAL_FAIL`/`FAIL` gate verdict or `PROCESS_DEAD_NO_SENTINEL`. Diagnosis is
+  delegated to a subagent; the orchestrator retains sole authority to act.
+  **Never for `plan_mode=="deterministic"`** — `DETERMINISTIC_REPLICATE.md`'s scripted executor
+  (`run_deterministic_replicate.py`) owns that path's bounded EXTEND-only recovery inline and
+  halts straight to human review beyond it; `recovery-agent` is never spawned there.
+    1. `Agent(subagent_type="recovery-agent", description="<emoji> Diagnose <step> failure —
+       {polymer_name}", prompt="run_name=<...> track=<foundation|thermal|mechanical>
+       step=<build|equil|equil-check|tg|analyze-tg|murnaghan|deform|analyze-bm>
+       chain_id/run_id=<if known> symptom=<if known> plan_mode=reasoned
+       attempt_so_far=<N>")` → RESULT.
+    2. `verdict: respawn` → write `## RECOVERY — [Stage] attempt N` to run_log.md (format fixed by
+       `.claude/commands/recover.md` §7 — `protocol-locker` parses it, never change its shape),
+       re-spawn the named `worker` with `params_changed` applied, resume BACKGROUND-WAIT.
+    3. `verdict: escalate_human` → write a checkpoint note to run_log.md and stop; never
+       auto-respawn (reasoned ladder exhausted at attempt 5, or a rung would touch
+       `decided_params` with no in-pipeline fix).
+    4. `verdict: no_action_needed` → proceed; do not write a RECOVERY block or spend an attempt
+       (an `[INFO]`-tagged condition in `recover.md` — already handled elsewhere, not a failure).
+  `.claude/commands/recover.md` remains the source of truth (grouped by `## <Track> → <Step>`) for
+  the taxonomy, the `plan_mode` ladder, and the RE-ANNEAL/EXTEND/MELT-MIXING procedures —
+  `recovery-agent` reads it at runtime. Its "Session Recovery (Mode B)" section (Claude process
+  itself died) is unaffected and stays a manually-invoked `/recover`, since there's no live
+  orchestrator session to spawn `recovery-agent` from in that case.
+
 PHASE A — FOUNDATION: orchestration/tracks/FOUNDATION.md.
-PHASE B — TRACKS: thermal (if tg) → orchestration/tracks/THERMAL_TRACK.md; mechanical (if bulk_modulus)
-  → orchestration/tracks/MECHANICAL_TRACK.md.
+PHASE B — TRACKS: thermal → orchestration/tracks/THERMAL_TRACK.md; mechanical → orchestration/tracks/MECHANICAL_TRACK.md.
 PHASE C — SUMMARY: orchestration/tracks/SUMMARY.md.
 ```

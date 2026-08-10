@@ -90,7 +90,7 @@ Agent(subagent_type="equilibration-checker", description="🟠 Equil check {poly
     → write D-05 to run_log.md (Chain Structure Summary rows)
 ```
 - `PASS` → proceed.
-- `EXTEND` / `STRUCTURAL_FAIL` / `FAIL` → `/recover`
+- `EXTEND` / `STRUCTURAL_FAIL` / `FAIL` → RECOVERY (`track=foundation step=equil-check`)
 
 **`phase=melt`** (glassy only, before cooldown — structural/thermo gates only, no density
 extraction, no cooling-contraction diagnosis; see `guides/EQUIL_CHECK.md`'s Phase section):
@@ -104,5 +104,6 @@ Agent(subagent_type="equilibration-checker", description="🟠 Melt-mixing check
 - `PASS` → proceed to `[Equilibration]`'s cooldown phase.
 - `EXTEND` / `STRUCTURAL_FAIL` (remedy is a melt-mixing note, never
   `re_melt_slow_recool`/`heavy_melt_anneal_probe` — those need the post-cool glass state, which
-  doesn't exist yet) / `FAIL` → `/recover` (MELT-MIXING procedure) — extends the melt checkpoint
-  in place and re-runs this same `phase=melt` gate; only PASS here reaches cooldown.
+  doesn't exist yet) / `FAIL` → RECOVERY (`track=foundation step=equil-check`, MELT-MIXING
+  procedure) — extends the melt checkpoint in place and re-runs this same `phase=melt` gate; only
+  PASS here reaches cooldown.

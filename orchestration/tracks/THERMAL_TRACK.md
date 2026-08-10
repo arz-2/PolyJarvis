@@ -27,7 +27,8 @@ offset baked into PASS/FAIL.
     claimed until the wakeup.
   # completion wakeup:
   orchestration/scripts/pick_gpu.py release --run <RUN>
-  get_run_status(run_id) → RUN_COMPLETE/completed → proceed; PROCESS_DEAD_NO_SENTINEL/failed → /recover
+  get_run_status(run_id) → RUN_COMPLETE/completed → proceed; PROCESS_DEAD_NO_SENTINEL/failed →
+    RECOVERY (`track=thermal step=tg`)
 
   [Tg analysis @ primary rate]
   Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg {polymer_name}",

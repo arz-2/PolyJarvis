@@ -16,7 +16,7 @@ guides live in `guides/`).
 
 | Doc | Read at | Owns |
 |---|---|---|
-| `FOUNDATION.md` | Phase A | build → equilibration (BACKGROUND-WAIT) → equil-check gate (non-PASS → `/recover`) |
+| `FOUNDATION.md` | Phase A | build → equilibration (BACKGROUND-WAIT) → equil-check gate (non-PASS → RECOVERY) |
 | `THERMAL_TRACK.md` | Phase B (tg) | single-rate Tg sweep + analysis, per-class rate fallback, is_glassy |
 | `MECHANICAL_TRACK.md` | Phase B (bulk_modulus) | Murnaghan primary + deform fallback + BM extraction routing |
 | `SUMMARY.md` | Phase C | exp-lookup → tg_path (`select_tg_path.py`) → run-summary → memory capture |

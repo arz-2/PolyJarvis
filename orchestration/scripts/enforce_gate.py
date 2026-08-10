@@ -317,7 +317,7 @@ def enforce_live(args) -> dict:
         elif "density_homogeneity" in failing_binding:
             remedy = "extend melt-stage mixing time (melt_npt_steps / t_equil_ns) and re-verify homogeneity CV pre-cooling"
         else:
-            remedy = "route to /recover — structural gate failure without a specific density_value_binding diagnosis"
+            remedy = "route to RECOVERY — structural gate failure without a specific density_value_binding diagnosis"
 
         if cooling_verdict in ("UNDER_ANNEALED_COOLING", "MELT_STAGE_DEFICIT") and not cooling_reliable:
             remedy_confidence = "low"
