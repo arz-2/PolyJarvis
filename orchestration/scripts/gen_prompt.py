@@ -75,14 +75,11 @@ from hw_common import (load_rules, resolve_ff_family,  # shared rules/FF-family 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 RULES_PATH = REPO_ROOT / "guides" / "polymer_rules.json"
 
-# Appended to every generated prompt (see main()) — never let a worker `cd`, since
-# .claude/agent-memory/<worker>/ writes resolve relative to Bash's cwd, and cd-ing
-# into a run subdirectory strands memory there instead of the repo root.
+# Appended to every prompt (see main()) — agent-memory writes resolve relative to Bash cwd.
 CWD_NOTE = (
-    "\n\n---\n**Bash cwd:** never `cd`; use absolute paths in every Bash call this "
-    "turn. Your `.claude/agent-memory/<worker>/` notes resolve relative to Bash's "
-    "current directory — `cd`-ing into a run subdirectory strands them there instead "
-    "of the repo root."
+    "\n\n---\n**Bash cwd:** never `cd`; use absolute paths. Your "
+    "`.claude/agent-memory/<worker>/` notes resolve relative to cwd — `cd` strands "
+    "them outside the repo root."
 )
 
 WORKER_GUIDES = {

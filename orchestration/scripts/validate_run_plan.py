@@ -15,10 +15,9 @@ the "no boilerplate bounce" carve-out (a finding here tagged severity=advisory m
 legitimate approve — critic.md decides), and verdict/escalation sequencing.
 
 planner.md also calls this as a self-check before finalizing a reasoned plan, to catch schema
-mistakes before they cost a critic round-trip. This script checks schema only, not runtime-
-consumption correctness -- also smoke-render `gen_prompt.py --stage <X> --plan <path>` for every
-stage a non-default decided_params key touches, and grep the output for the field a decision's
-evidence makes a claim about, before finalizing.
+mistakes before they cost a critic round-trip. Checks schema only, not runtime consumption --
+also smoke-render `gen_prompt.py --stage <X> --plan <path>` for touched stages and grep the
+cited field before finalizing.
 
 Usage:
   python3 orchestration/validate_run_plan.py --run_plan data/<RUN>/raw/run_plan.json
@@ -53,17 +52,16 @@ def _criteria_and_evidence_findings(plan: dict, policy: dict) -> list:
         d_id = d.get("id", "")
         pol = policies_by_decision_id.get(d_id)
         if not pol:
-            # Check A: a unique D-0N-prefix match still gets evaluated (never silently
-            # skip enforcement on an id typo/drift) and is flagged as advisory.
+            # Check A: unique D-0N-prefix match still gets evaluated (no silent skip),
+            # flagged advisory.
             candidates = policies_by_prefix.get(_prefix(d_id), [])
             if len(candidates) != 1:
                 continue
             cand_id, pol = candidates[0]
             findings.append({"check": "decision_id_drift", "decision_id": d_id,
                              "severity": "advisory",
-                             "detail": f"decision id {d_id!r} does not exactly match "
-                                       f"policy decision_id {cand_id!r} (same D-0N prefix) "
-                                       "-- evaluated against it anyway, but ids should agree"})
+                             "detail": f"id {d_id!r} != policy decision_id {cand_id!r} "
+                                       "(same D-0N prefix) -- evaluated anyway, ids should agree"})
         missing = set(pol.get("evaluate", [])) - set(d.get("criteria_evaluated", []))
         if missing:
             findings.append({"check": "criteria_coverage", "decision_id": d["id"],
@@ -141,10 +139,8 @@ def _uncertainty_findings(plan: dict, policy: dict) -> list:
 
 
 def _exp_tg_companion_findings(plan: dict) -> list:
-    """Check C: a multi-member class's tg stage that has resolved
-    t_range_brackets_exp_tg to a bare `true` (rather than a numeric single-member exp
-    Tg) should carry a companion success_criteria.exp_tg_K pinning which member the
-    SMILES resolved to (the PVC1/PMMA1/PVDF1 pattern) -- flag if missing."""
+    """Check C: multi-member tg stage (t_range_brackets_exp_tg=true) should carry a
+    companion success_criteria.exp_tg_K -- flag if missing."""
     findings = []
     for s in plan.get("planned_stages", []):
         if s.get("stage") != "tg":
@@ -152,9 +148,8 @@ def _exp_tg_companion_findings(plan: dict) -> list:
         sc = s.get("success_criteria", {})
         if sc.get("t_range_brackets_exp_tg") is True and "exp_tg_K" not in sc:
             findings.append({"check": "exp_tg_companion", "stage": "tg", "severity": "advisory",
-                             "detail": "t_range_brackets_exp_tg is bare `true` (multi-member "
-                                       "class) with no companion success_criteria.exp_tg_K "
-                                       "pinning the resolved member's exp Tg"})
+                             "detail": "t_range_brackets_exp_tg=true with no companion "
+                                       "success_criteria.exp_tg_K"})
     return findings
 
 

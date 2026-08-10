@@ -48,24 +48,15 @@ toolchain and cells in [`hardware/`](../hardware/); they are machine-specific no
 
 ## Backlog
 
-Items with no compliant fix target yet (`.claude/agents/*.md` are static descriptors and are
-never edited for worker-pattern findings; these three currently have nowhere else to live):
+No compliant fix target yet (`.claude/agents/*.md` is off-limits for worker-pattern edits):
 
-- **literature-grounding-worker has no dedicated `guides/STAGE_N_*.md`.** When one exists, add:
-  WebFetch on a `doi.org/<doi>` link for Elsevier/ACS publishers often returns only a redirect
-  notice (302), not content — if the source PDF is already available locally under `literature/`
-  and has been `Read` with a matching title/DOI/journal header, treat that as sufficient
-  verification rather than chasing the WebFetch redirect.
-- **`critic.md`'s `system_characterization_cache.json` probe** (`jq --arg s "$CANONICAL_SMILES"
-  '.[$s] // {...}'`) has no `jq -c 'type'` guard first — harmless today (the file is
-  object-typed) but would hard-error on an array-typed file. `critic.md` isn't reachable via
-  `gen_prompt.py`'s `STAGE_MAP`, so this needs a direct edit to that file by whoever next
-  touches it, not a guide addition.
-- **A robust "dangling uncertainty citation" check for `validate_run_plan.py`** (evidence prose
-  claiming a risk is "recorded as uncertainty `X`" when `X` isn't actually in `uncertainties[]`)
-  was scoped but not built: a blanket scan for snake_case-looking tokens in evidence text is too
-  noisy against the real plan corpus (planners routinely coin descriptive pseudo-identifiers in
-  prose — e.g. `t_range_brackets_experimental_tg`, `bilinear_fit_r_squared` — that were never
-  meant as literal field references), and citations aren't consistently backtick-quoted either.
-  A future pass needs a narrower signal (e.g. matching specifically on phrasing like "uncertainty
-  (`name`)" or "recorded as ... uncertainty X") before this is safe to automate.
+- **literature-grounding-worker has no dedicated guide.** WebFetch on `doi.org/<doi>` for
+  Elsevier/ACS often 302-redirects without content — if a matching PDF was already `Read`
+  locally under `literature/`, that's sufficient verification.
+- **`critic.md`'s cache probe** has no `jq -c 'type'` guard before indexing
+  `system_characterization_cache.json` — harmless today (object-typed), but `critic.md` isn't
+  reachable via `gen_prompt.py`, so it needs a direct edit.
+- **Dangling-uncertainty-citation check for `validate_run_plan.py`** (evidence claiming a risk
+  is "recorded as uncertainty `X`" when `X` isn't in `uncertainties[]`) was scoped but not
+  built — a snake_case token scan is too noisy (planners coin many pseudo-identifiers in prose
+  that aren't real citations). Needs a narrower phrase-match signal first.

@@ -21,9 +21,8 @@
   random integer. Never pass `seed=-1` — that means irreproducible.
 - PPHS: PCFF has P=N backbone types but no polyphosphazene-specific validation — flag results.
 - PURT: EMC aliphatic segments only; aromatic MDI fails.
-- Tacticity: `submit_emc_cell_job` has no tacticity/stereochemistry parameter. If the plan names
-  a tacticity, report it as "not enforced/not verifiable" rather than asserting the requested
-  value — only RadonPy's `submit_polymerize_job(tacticity=...)` actually honors it.
+- Tacticity: `submit_emc_cell_job` has no tacticity parameter — report as "not enforced",
+  never assert it. Only RadonPy's `submit_polymerize_job(tacticity=...)` honors it.
 
 **RadonPy path:**
 - Force field must be assigned strictly **after** polymerization —
@@ -53,25 +52,25 @@ job = submit_emc_cell_job(
 )
 ```
 
-`get_emc_job_status` reports no progress fraction, so prefer blocking on the artifact over
-repeated status polls (foreground `sleep N; ls` is blocked by the Bash tool):
+`get_emc_job_status` has no progress fraction — block on the artifact instead (foreground
+`sleep N; ls` is blocked):
 
 ```bash
-until [ -f <output_dir>/emc_build.data ]; do sleep 5; done   # generous timeout
+until [ -f <output_dir>/emc_build.data ]; do sleep 5; done
 ```
 
 Then call `get_emc_job_output(job_id)` once:
 
 ```python
 out = get_emc_job_output(job_id)
-data_path    = out["result"]["data_path"]      # EMC writes emc_build.data (not polymer.data) — use verbatim
+data_path    = out["result"]["data_path"]      # emc_build.data, not polymer.data — use verbatim
 output_dir   = out["result"]["output_dir"]
-params_path  = f"{output_dir}/emc_build.params"  # get_emc_job_output has no params_path key — EMC always writes this fixed basename into output_dir
+params_path  = f"{output_dir}/emc_build.params"  # no params_path key in result; fixed basename
 lammps_flags = out["result"]["lammps_flags"]  # e.g. {"use_pcff": True, "use_opls": False}
 ```
 
-**Output placement:** `work_dir` already ends in `/cell` (the orchestrator prompt appends it) —
-copy outputs directly into `{work_dir}`, not `{work_dir}/cell/`:
+**Output placement:** `work_dir` already ends in `/cell` — copy directly into `{work_dir}`,
+not `{work_dir}/cell/`:
 
 ```bash
 mkdir -p {work_dir}
@@ -99,8 +98,7 @@ build_molecule_from_smiles(smiles)
 - `submit_assign_charges_job` — use `charge_method="RESP"`.
 - `submit_polymerize_job` — overwrites `mol_file` in place — save a checkpoint first.
 - `submit_generate_cell_job` — `density=0.05` (see Rules above).
-- `save_lammps_data` — save to `{work_dir}/cell.data` (`work_dir` already ends in `/cell`;
-  create the directory first if needed).
+- `save_lammps_data` — save to `{work_dir}/cell.data` (`work_dir` already ends in `/cell`).
 
 **Checkpoint Saves:**
 
@@ -115,16 +113,12 @@ save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="
 
 ## Known Failures
 
-- **EMC binary expiry** — `submit_emc_cell_job` fails instantly (exit 255, ~0.15s) with
-  `Error: main: Validity has run out; please download a fresh version.` This is
-  class/SMILES-independent — do not misdiagnose as a SMILES/`*`-placement/FF problem, and do
-  not retry with a smaller `dp`. Fix: swap only `~/emc/bin/emc_linux_x86_64` from a fresh
-  SourceForge `montecarlo`-project tarball; never overwrite `~/emc/field/`, `~/emc/scripts/`,
-  `~/emc/templates/` (the field tree carries local parameter patches). The sandbox denies both
-  executing a freshly downloaded binary and writing to `~/emc/bin/` — diagnose and stage the fix
-  (download/extract/diff are allowed) but emit the failure RESULT with the exact tarball URL and
-  `cp` commands for the orchestrator/human to apply; do not reach for
-  `dangerouslyDisableSandbox`.
+- **EMC binary expiry** — instant fail (exit 255) with `Validity has run out`.
+  Class/SMILES-independent — don't misdiagnose as SMILES/FF, don't retry with smaller `dp`.
+  Fix: swap only `~/emc/bin/emc_linux_x86_64` from a fresh SourceForge `montecarlo` tarball;
+  never touch `~/emc/field/`, `~/emc/scripts/`, `~/emc/templates/` (local patches live there).
+  Sandbox blocks writing `~/emc/bin/` — stage the fix (download/extract allowed) and emit the
+  tarball URL + `cp` commands for the orchestrator to apply.
 
 ---
 
