@@ -40,7 +40,12 @@ today's single-submission behavior. See Step 3 below.
 
 ### Step 1: Copy and inspect the .data file
 
-Copy the `.data` file from `data_path` to `{work_dir}/cell.data`, then:
+Copy the `.data` file from `data_path` to `{work_dir}/cell.data` **AND**, for EMC builds,
+copy `emc_params_path` to `{work_dir}/emc_build.params` — this AND is load-bearing, not
+optional: EMC `.data` files carry no `Coeffs` sections at all, every pair/bond/angle
+coefficient lives in `emc_build.params`, and Steps 2/3 below already assume it's sitting
+next to `cell.data`. `ls -la {work_dir}` to positively confirm both files landed before
+proceeding — `inspect_data_file` does not itself verify the params file exists. Then:
 
 ```python
 info = inspect_data_file(data_file="{work_dir}/cell.data")
@@ -104,10 +109,18 @@ result = run_lammps_chain(stages=melt_stages, gpu_ids=gpu_ids, mpi=mpi,
 w = watch_run(result["chain_id"])
 ```
 
+Slice `workflow["stages"]` programmatically as shown above (`json.dumps`/`Write` on the
+in-context `workflow` dict) rather than hand-copying stage dicts into the `Write` call —
+transcription of a growing stage list risks silent field drift.
+
 Return RESULT with `chain_id`, `monitor_command`, `npt_production_log_path`,
 `npt_production_data_path`, `nvt_production_dump_path`, and
 `pending_cooldown_path={work_dir}/_pending_cooldown_stages.json` — the orchestrator gates on these
 via the melt-mixing equil-check (`phase=melt`) before ever spawning `phase=cooldown`.
+The `RESULT:` block must be the entire final message — no leading status sentence, no
+prose recap in place of it — for `phase=full`, `melt`, and `cooldown` alike; the
+orchestrator parses it verbatim and a byte-for-byte `monitor_command` is required to
+proceed with BACKGROUND-WAIT.
 
 `phase=cooldown` (second spawn, only after the melt gate passes) — read the saved tail back and
 submit it directly; **do not call `generate_equilibration_workflow` again**, it would regenerate

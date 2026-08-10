@@ -86,6 +86,7 @@ format fixed, `protocol-locker` parses it:
 | Density not converging during equilibration | Insufficient annealing | add annealing cycles (3–5) |
 | `generate_equilibration_workflow(extend_only=True)` returns 7 stages instead of 1 | Stale MCP server code (`n_stages` should be 1) | do NOT submit, do NOT hand-write a `.in`; request an MCP server restart |
 | Disk-full mid-chain | Ran out of space partway | keep completed stages' `_out.data`; free disk; delete only the failed stage's partial outputs; regenerate the workflow, slice to resume at the failed stage (never restart from stage 0). Prevention: <60 GB free, strip `dump` from production stages *except* `npt_prod300`/`npt_production` when `tg`/`bulk_modulus` was requested on a novel SMILES (`system-characterization-analyzer` needs that dump) |
+| "Cannot open input script .../emc_build.params: No such file or directory" | EMC staging omission — only `cell.data` was copied into `{work_dir}`, not the paired `emc_params_path` | copy `emc_params_path` into `{work_dir}/emc_build.params`, resubmit from stage 0. Not a taxonomy/ladder case: zero stages completed, so no `enforce_equilibration_gate` verdict exists — omit `ladder_rung` |
 
 **`plan_mode=="reasoned"` STRUCTURAL_FAIL ladder** — a `STRUCTURAL_FAIL` verdict from
 `enforce_equilibration_gate` (`phase=full` only; `phase=melt` routes to MELT-MIXING below)
