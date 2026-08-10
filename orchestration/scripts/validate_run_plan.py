@@ -15,7 +15,10 @@ the "no boilerplate bounce" carve-out (a finding here tagged severity=advisory m
 legitimate approve — critic.md decides), and verdict/escalation sequencing.
 
 planner.md also calls this as a self-check before finalizing a reasoned plan, to catch schema
-mistakes before they cost a critic round-trip.
+mistakes before they cost a critic round-trip. This script checks schema only, not runtime-
+consumption correctness -- also smoke-render `gen_prompt.py --stage <X> --plan <path>` for every
+stage a non-default decided_params key touches, and grep the output for the field a decision's
+evidence makes a claim about, before finalizing.
 
 Usage:
   python3 orchestration/validate_run_plan.py --run_plan data/<RUN>/raw/run_plan.json
@@ -34,13 +37,33 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
 
 
+def _prefix(decision_id: str) -> str:
+    """'D-06_tg_ladder' -> 'D-06'."""
+    return decision_id.split("_", 1)[0] if decision_id else ""
+
+
 def _criteria_and_evidence_findings(plan: dict, policy: dict) -> list:
     findings = []
     policies_by_decision_id = {p["decision_id"]: p for p in policy.get("policies", {}).values()}
+    policies_by_prefix = {}
+    for did, p in policies_by_decision_id.items():
+        policies_by_prefix.setdefault(_prefix(did), []).append((did, p))
+
     for d in plan.get("decisions", []):
-        pol = policies_by_decision_id.get(d.get("id"))
+        d_id = d.get("id", "")
+        pol = policies_by_decision_id.get(d_id)
         if not pol:
-            continue
+            # Check A: a unique D-0N-prefix match still gets evaluated (never silently
+            # skip enforcement on an id typo/drift) and is flagged as advisory.
+            candidates = policies_by_prefix.get(_prefix(d_id), [])
+            if len(candidates) != 1:
+                continue
+            cand_id, pol = candidates[0]
+            findings.append({"check": "decision_id_drift", "decision_id": d_id,
+                             "severity": "advisory",
+                             "detail": f"decision id {d_id!r} does not exactly match "
+                                       f"policy decision_id {cand_id!r} (same D-0N prefix) "
+                                       "-- evaluated against it anyway, but ids should agree"})
         missing = set(pol.get("evaluate", [])) - set(d.get("criteria_evaluated", []))
         if missing:
             findings.append({"check": "criteria_coverage", "decision_id": d["id"],
@@ -117,6 +140,24 @@ def _uncertainty_findings(plan: dict, policy: dict) -> list:
     return findings
 
 
+def _exp_tg_companion_findings(plan: dict) -> list:
+    """Check C: a multi-member class's tg stage that has resolved
+    t_range_brackets_exp_tg to a bare `true` (rather than a numeric single-member exp
+    Tg) should carry a companion success_criteria.exp_tg_K pinning which member the
+    SMILES resolved to (the PVC1/PMMA1/PVDF1 pattern) -- flag if missing."""
+    findings = []
+    for s in plan.get("planned_stages", []):
+        if s.get("stage") != "tg":
+            continue
+        sc = s.get("success_criteria", {})
+        if sc.get("t_range_brackets_exp_tg") is True and "exp_tg_K" not in sc:
+            findings.append({"check": "exp_tg_companion", "stage": "tg", "severity": "advisory",
+                             "detail": "t_range_brackets_exp_tg is bare `true` (multi-member "
+                                       "class) with no companion success_criteria.exp_tg_K "
+                                       "pinning the resolved member's exp Tg"})
+    return findings
+
+
 def _hardware_findings(plan: dict) -> list:
     """Delegates the recommended choice to select_hardware.py -- decision_policy.json's
     hardware require/prefer thresholds live there once, not duplicated here."""
@@ -186,6 +227,7 @@ def validate_plan(plan: dict, policy: dict) -> list:
     findings += _stage_schema_findings(plan, policy)
     findings += _stage_properties_findings(plan)
     findings += _uncertainty_findings(plan, policy)
+    findings += _exp_tg_companion_findings(plan)
     findings += _hardware_findings(plan)
     return findings
 
