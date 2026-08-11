@@ -23,7 +23,7 @@ Default mode is multi-agent: the orchestrator (this session) spawns stateless sp
 | 🟢 `bulk-modulus-extractor` | mechanical | Murnaghan/deform/fluctuation logs → bulk_modulus_GPa |
 | 🟢 `exp-lookup-worker` | summary | polymer name/class → condition-matched exp ranges (Tg/density/K) |
 | 🟢 `run-summary-worker` | summary | all output JSONs → `run_summary.json` |
-| ⚫ `recovery-agent` | any | failed stage + injected context → diagnosis + `RECOVERY PLAN` verdict (`respawn`/`escalate_human`/`no_action_needed`); orchestrator writes run_log.md and re-spawns |
+| ⚫ `recovery-agent` | any | failed stage + injected context → diagnosis + `RECOVERY PLAN` verdict (`respawn`/`accept_with_annotation`/`escalate_human`/`no_action_needed`); orchestrator writes run_log.md and re-spawns |
 
 ## Orchestrator workflow
 
@@ -107,9 +107,15 @@ RECOVERY — canonical recovery pattern, referenced by name from every phase gui
     2. `verdict: respawn` → write `## RECOVERY — [Stage] attempt N` to run_log.md (format fixed by
        `.claude/commands/recover.md` §7 — `protocol-locker` parses it, never change its shape),
        re-spawn the named `worker` with `params_changed` applied, resume BACKGROUND-WAIT.
-    3. `verdict: escalate_human` → write a checkpoint note to run_log.md and stop; never
+    3. `verdict: accept_with_annotation` → the rung is not worth its wall time (`remedy_economics.py`
+       returned `STOP_ANNOTATE`). End the ladder without respawning: write the RECOVERY block with
+       the `economics` line and outcome `accepted — annotated`, set the stage's success criteria to
+       `STRUCTURAL_FAIL_ACCEPTED_EXCEPTION` with the deviation percentage, carry `annotation` into
+       the downstream `analyze-bm`/`run-summary` fields, set
+       `decided_params._protocol_lock_barred=true`, and proceed. Do not stop for a human.
+    4. `verdict: escalate_human` → write a checkpoint note to run_log.md and stop; never
        auto-respawn.
-    4. `verdict: no_action_needed` → proceed; do not write a RECOVERY block or spend an attempt.
+    5. `verdict: no_action_needed` → proceed; do not write a RECOVERY block or spend an attempt.
   `.claude/commands/recover.md` remains the source of truth (grouped by `## <Track> → <Step>`) for
   the taxonomy, the `plan_mode` ladder, and the RE-ANNEAL/EXTEND/MELT-MIXING procedures —
   `recovery-agent` reads it at runtime. Its "Session Recovery (Mode B)" section (Claude process

@@ -48,13 +48,22 @@ RESULT:
   step: <build | equil | equil-check | tg | analyze-tg | murnaghan | deform | analyze-bm>
   failure: <exact error string or condition from log>
   root_cause: <diagnosis from recover.md>
-  verdict: respawn | escalate_human | no_action_needed
+  verdict: respawn | accept_with_annotation | escalate_human | no_action_needed
   worker: <subagent_type to re-spawn — only when verdict=respawn>
   params_changed: <field: old → new — only when verdict=respawn>
   attempt: <N of max 5>
   ladder_rung: <1 | 2 | 3 — reasoned STRUCTURAL_FAIL only, else omit>
+  economics: <verdict, margin_factor, cost_to_physical_target_hours — whenever step 5b ran, else omit>
+  annotation: <remedy_economics annotation_required — only when verdict=accept_with_annotation>
   notes: <attempt-count mismatch, or why verdict is escalate_human/no_action_needed>
 ```
+
+`accept_with_annotation` = the ladder should stop and the result be reported with its deviation
+stated. Return it whenever step 5b returns `STOP_ANNOTATE`; copy the script's `reason` into `notes`
+and its `annotation_required` into `annotation`. It is not `escalate_human` — the call is made, not
+deferred. The orchestrator represents it as `STRUCTURAL_FAIL_ACCEPTED_EXCEPTION` in the plan's
+`equil-check` success criteria, carries the deviation into the downstream `analyze-bm`/`run-summary`
+fields, and sets `decided_params._protocol_lock_barred=true`.
 
 If diagnosis itself fails (e.g. `run_log.md` not found, status tool errors):
 ```

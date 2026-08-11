@@ -27,17 +27,21 @@ Density passes within ±5% of experimental; **below −5% is BINDING, not a soft
 **Use `enforce_equilibration_gate`'s `verdict` field directly — do not re-derive PASS/EXTEND/FAIL
 from the raw numbers yourself.** The four possible verdicts:
 - **`PASS`** → `equil_verdict=PASS`.
-- **`EXTEND`** → `equil_verdict=EXTEND`. Only density/energy drift or block-SEM failed — genuinely
-  not-yet-converged, more NPT at the same T can fix it.
+- **`EXTEND`** → `equil_verdict=EXTEND`. Only density/energy drift, block-SEM, or `n_eff_density`
+  failed — genuinely not-yet-converged, more NPT at the same T can fix it.
 - **`STRUCTURAL_FAIL`** → `equil_verdict=STRUCTURAL_FAIL`. The cell converged to the *wrong*
   value, not merely an unconverged one — `EXTEND` cannot fix this. Check the `remedy` field:
   - `re_melt_slow_recool` (from `UNDER_ANNEALED_COOLING`) — melt was fine, cooling ramp too fast.
   - `heavy_melt_anneal_probe` (from `MELT_STAGE_DEFICIT`) — melt itself deficient; re-cooling
     slower will NOT help.
-  - melt-mixing remedy (`density_homogeneity` failing) — this is what `phase=melt`'s pre-cool
-    gate exists to catch (see Phase below): extend melt-stage dwell in place, not the cooling
-    ramp, and never re-melt from scratch. Owned by `/recover`'s MELT-MIXING procedure, not this
-    worker.
+  - melt-mixing remedy (`density_homogeneity` failing, `homogeneity_verdict=HOMOG_HETEROGENEOUS`) —
+    this is what `phase=melt`'s pre-cool gate exists to catch (see Phase below): extend melt-stage
+    dwell in place, not the cooling ramp, and never re-melt from scratch. Owned by `/recover`'s
+    MELT-MIXING procedure, not this worker.
+  - rebuild remedy (`finite_size_verdict=SIZE_MIN_IMAGE_VIOLATION` or `SIZE_CHAIN_SELF_IMAGE`) — the
+    box is too small for its own contents: below `2·cutoff_A` the pair potential is wrong, and below
+    `2·Rg` every chain overlaps its own periodic images. Raise `nchain` and rebuild; no amount of
+    equilibration fixes a too-small box.
 - **`FAIL`** → `equil_verdict=FAIL`. Box collapse, charge imbalance, dead cell (C(t) exactly 0%),
   or any binding-gate failure the mechanized script can't classify into the above. (C(t)
   decaying-but-incomplete is not a FAIL — you should never see it in `failing_binding_gates`.)
@@ -50,8 +54,19 @@ completes, with density extraction and the cooling-contraction diagnosis availab
 `npt_cool300`/`npt_prod300` are even submitted. `phase=melt` cannot run `assess_cooling_contraction` (no glass state
 exists yet), so `UNDER_ANNEALED_COOLING`/`MELT_STAGE_DEFICIT` are unreachable verdicts there —
 only the structural/thermo gates that are meaningful on the melt trajectory alone (density/energy
-drift, block-SEM, Rg CV, P2, density-homogeneity CV, C(t)) can fire. The prompt's `tasks:` list
-and MECHANIZED GATE args already reflect which phase you're in — follow them, don't infer.
+drift, block-SEM, `n_eff_density`, Rg CV, P2, density-homogeneity signal CV, finite size, C(t)) can
+fire. The prompt's `tasks:` list and MECHANIZED GATE args already reflect which phase you're in —
+follow them, don't infer.
+
+Always pass `cutoff_A` from the prompt to `check_equilibration_comprehensive` — it is required,
+never optional. It arms the minimum-image half of the finite-size gate (`L ≥ 2·cutoff_A`); omitted,
+that half is not evaluated and the verdict rests on the chain-self-imaging criterion (`L ≥ 2·Rg`)
+alone. Report `L_over_2cutoff`, `L_over_2Rg`, and `L_over_Ree` in the RESULT block, and report
+`min_image_evaluated: false` as a defect in your own invocation, not as a property of the cell.
+`L < R_ee` alone is advisory — do not treat it as a failure.
+
+`residual_stress` is reported, never binding. Copy `von_mises_atm`, `z_max`, and `resolved` into the
+RESULT block as-is; do not treat a large `z_max` as a failure or re-derive a verdict from it.
 
 ---
 
@@ -76,6 +91,7 @@ kwargs = dict(
 )
 if ct_min_decay_melt is not None:
     kwargs["ct_min_decay"] = ct_min_decay_melt
+kwargs["cutoff_A"] = cutoff_A              # required — arms the minimum-image check
 check_equilibration_comprehensive(**kwargs)
 ```
 
@@ -84,6 +100,7 @@ check_equilibration_comprehensive(**kwargs)
 - `result["chain"]["ct"]["decay_fraction_at_end"]` → `ct_decay_fraction`
 - `result["chain"]["ct"]["tau_relax_ps"]` → `ct_tau_relax_ps`
 - `result["chain"]["ree"]["mean_R_ee_A"|"std_R_ee_A"|"n_chains"]` → `end_to_end_r_mean_A` / `_std_A` / `_n_chains`
+- `result["spatial"]["finite_size"]` → `L_min_A`, `L_over_2cutoff`, `L_over_2Rg`, `L_over_Ree`, `verdict`
 
 ### `extract_equilibrated_density`
 
