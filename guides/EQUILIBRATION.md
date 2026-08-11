@@ -92,9 +92,8 @@ w = watch_run(result["chain_id"])
 ```
 
 `phase=melt` (glassy — gate before cooling): `workflow["stages"]` already has each stage's input
-data path baked in at generation time (`generate_equilibration_workflow` resolves the whole chain
-in one call, regardless of how much of it you submit), so submitting a prefix is safe — the tail
-you don't submit yet stays valid to submit later unmodified.
+data path baked in at generation time. Submitting a prefix is safe — the tail you don't submit
+yet stays valid to submit later unmodified.
 
 ```python
 idx = workflow["run_order"].index("npt_production") + 1   # never hand-count — glassy adds
@@ -107,8 +106,7 @@ result = run_lammps_chain(stages=melt_stages, gpu_ids=gpu_ids, mpi=mpi,
 w = watch_run(result["chain_id"])
 ```
 
-Slice `workflow["stages"]` programmatically as above, not by hand-copying — avoids
-transcription drift on long stage lists.
+Slice `workflow["stages"]` programmatically as above, not by hand-copying.
 
 Return RESULT with `chain_id`, `monitor_command`, `npt_production_log_path`,
 `npt_production_data_path`, `nvt_production_dump_path`, and
@@ -128,8 +126,7 @@ w = watch_run(result["chain_id"])
 ```
 
 Return the standard RESULT block (`npt_prod300_data`/`npt_prod300_log`/`npt_prod300_dump`, etc.)
-exactly as `phase=full` does — downstream (thermal/mechanical tracks) never needs to know the
-chain was submitted in two pieces.
+exactly as `phase=full` does.
 
 ### Extend mode (`mode: extend`)
 

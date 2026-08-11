@@ -1,6 +1,6 @@
 ---
 name: murnaghan-worker
-description: BM worker — submits run_bulk_modulus_series for glassy polymers at 300 K (npt_prod300_out.data, primary path) and rubbery polymers at T>Tg (npt_production_out.data). Pressure range is the plan/class's bm_pressures_atm, or guides/MURNAGHAN.md's universal fallback if unset (glassy: wide array; rubbery: the PROBE ladder, or a single-point [-1000] series when spawned for Leg 2) — never hardcoded here. Always submits something now; never returns an all-null RESULT for rubbery+null. Born+NVT removed. Returns chain_id, log_files, and monitor_command without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter and the two-leg sequencing.
+description: BM worker — submits run_bulk_modulus_series for glassy polymers at 300 K (npt_prod300_out.data, primary path) and rubbery polymers at T>Tg (npt_production_out.data). Pressure range is the plan/class's bm_pressures_atm, or guides/MURNAGHAN.md's fallback ladder if unset (glassy: wide array; rubbery: the PROBE ladder, or a single-point [-1000] series when spawned for Leg 2). Always submits — no skip guard for either glassy or rubbery. Returns chain_id, log_files, and monitor_command without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter and the two-leg sequencing.
 tools:
   - Read
   - Bash
@@ -22,11 +22,10 @@ Check `.claude/agent-memory/murnaghan-worker/` for known submission issues befor
 
 ### Always submits — no skip guard
 
-Glassy 300 K Murnaghan is the PRIMARY path and must always submit, regardless of `bm_pressures_atm`.
-Rubbery with `bm_pressures_atm` null ALSO always submits now — `guides/MURNAGHAN.md`'s pressure-range
-rule resolves it to the PROBE ladder (Leg 1) or, when the orchestrator spawns you a second time for
-Leg 2, to a single-point `[-1000]` series. There is no longer a case where this worker returns an
-all-null RESULT for a rubbery class — every rubbery class gets a real submission.
+Glassy 300 K Murnaghan is the primary path and always submits, regardless of `bm_pressures_atm`.
+Rubbery with `bm_pressures_atm` null also always submits — `guides/MURNAGHAN.md`'s pressure-range
+rule resolves it to the PROBE ladder (Leg 1), or a single-point `[-1000]` series when spawned for
+Leg 2. Never return an all-null RESULT for a rubbery class.
 
 1. Call `run_bulk_modulus_series` (call signature in the guide below) → extract `chain_id` and `log_files` from result.
 2. Call `watch_run(chain_id)` as a real MCP tool call — its return value has the actual `monitor_command`.

@@ -21,10 +21,9 @@ Agent(subagent_type="molecule-builder", description="🔵 Build {polymer_name} c
 ## [Equilibration]
 
 Rubbery (`T_workflow_K ≤ 300`): single submission, `phase=full` (gen_prompt.py forces this
-regardless of what's passed — nothing to gate early, `npt_production` is already both the melt
-checkpoint and the final state). Glassy (`T_workflow_K > 300`): two submissions gated by a
-melt-mixing check *before* the `npt_cool300`/`npt_prod300` cool-to-300 tail ever runs — a badly
-mixed melt is caught without spending that ~1-3 ns of GPU time cooling it.
+regardless of what's passed — `npt_production` is already both the melt checkpoint and the final
+state). Glassy (`T_workflow_K > 300`): two submissions gated by a melt-mixing check *before* the
+`npt_cool300`/`npt_prod300` cool-to-300 tail ever runs.
 
 Claim GPU before every submission below; release on that
 submission's completion wakeup — build is not a GPU stage, so no claim before `[Build]`.
@@ -75,8 +74,7 @@ Agent(subagent_type="system-characterization-analyzer", description="🟢 Charac
       fields_kept_as_class_default, cache_path, characterization_path
 ```
 
-Write a run_log.md note: `fields_derived` vs `fields_kept_as_class_default`. No re-critique —
-this is a numeric refinement of an already-approved plan, not a new decision category.
+Write a run_log.md note: `fields_derived` vs `fields_kept_as_class_default`. No re-critique.
 
 ## [Equil-check gate]
 
@@ -103,7 +101,6 @@ Agent(subagent_type="equilibration-checker", description="🟠 Melt-mixing check
 ```
 - `PASS` → proceed to `[Equilibration]`'s cooldown phase.
 - `EXTEND` / `STRUCTURAL_FAIL` (remedy is a melt-mixing note, never
-  `re_melt_slow_recool`/`heavy_melt_anneal_probe` — those need the post-cool glass state, which
-  doesn't exist yet) / `FAIL` → RECOVERY (`track=foundation step=equil-check`, MELT-MIXING
-  procedure) — extends the melt checkpoint in place and re-runs this same `phase=melt` gate; only
-  PASS here reaches cooldown.
+  `re_melt_slow_recool`/`heavy_melt_anneal_probe`) / `FAIL` → RECOVERY (`track=foundation
+  step=equil-check`, MELT-MIXING procedure) — extends the melt checkpoint in place and re-runs
+  this same `phase=melt` gate; only PASS here reaches cooldown.

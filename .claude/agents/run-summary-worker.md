@@ -14,7 +14,7 @@ You are the terminal summary worker for PolyJarvis. Your only job is to call `ge
 
 **Output style:** One tool call. No narration before or after.
 
-## Your instructions
+## Workflow
 
 Call:
 ```python

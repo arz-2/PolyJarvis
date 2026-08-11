@@ -11,13 +11,24 @@ AI agent for autonomous polymer MD simulation. Given a SMILES string, runs the f
 | `data/TEMPLATE/run_log.md` | Run log template — copied to `data/[RUN]/run_log.md` at task start |
 | `data/[RUN]/` | All run files: `run_log.md`, `lammps/`, `raw/`, `graphs/` |
 
-**Paths:** all run files live under `data/<run_name>/` (repo-relative, git-excluded); use absolute paths in tool calls. Equilibration paths are tool-defined — use worker RESULT dict keys, never construct them manually.
-
-**Run log:** copy the template at task start; fill it in real time, not reconstructed at the end.
+**Paths:** all run files live under `data/<run_name>/` (repo-relative, git-excluded)
 
 ## Running a campaign
 
 To run a simulation campaign for a SMILES, invoke the `run-campaign` skill
-(`.claude/commands/run-campaign.md`) — it reads `orchestration/ORCHESTRATOR.md`, which owns the
-worker roster and the full SETUP/GATE & PLAN/THREAD/HARDWARE/BACKGROUND-WAIT/RECOVERY workflow.
+(`.claude/commands/run-campaign.md`)
+
+## Conventions
+
+Applies to all code, architecture, and doc changes/additions:
+
+- Minimal additions — don't add a file, section, or comment unless it's load-bearing.
+- Worker-facing docs (agent `.md`, `guides/*.md`) state rules and steps only, not the design
+  reasoning behind them.
+- Keep comments and doc notes to a minimum — state the current rule, not a running commentary.
+- No timestamps, changelog phrasing, or references to prior/dead code — describe only the current
+  state.
+- State hard rules and instructions only — don't explain rationale or walk through alternatives;
+  let agents infer at runtime.
+
 This file covers repo layout and development conventions only.

@@ -36,8 +36,7 @@ SETUP
 GATE & PLAN — gate per exact canonical SMILES, never per class.
   CANONICAL_SMILES = canon_smiles.py "<smiles>".
   IS_NOVEL = `guides/system_characterization_cache.json` has no key CANONICAL_SMILES (file/key
-    absent ⇒ true). Independent of VALIDATED below — a SMILES can be characterized (Phase-A timing
-    knobs measured) without being validated for the requested properties, and vice versa.
+    absent ⇒ true). Independent of VALIDATED below.
   VALIDATED = system_characterization_cache.json[CANONICAL_SMILES].protocol_validated==true AND
     validated_properties ⊇ properties_requested.
 
@@ -98,15 +97,12 @@ RECOVERY — canonical recovery pattern, referenced by name from every phase gui
        `.claude/commands/recover.md` §7 — `protocol-locker` parses it, never change its shape),
        re-spawn the named `worker` with `params_changed` applied, resume BACKGROUND-WAIT.
     3. `verdict: escalate_human` → write a checkpoint note to run_log.md and stop; never
-       auto-respawn (reasoned ladder exhausted at attempt 5, or a rung would touch
-       `decided_params` with no in-pipeline fix).
-    4. `verdict: no_action_needed` → proceed; do not write a RECOVERY block or spend an attempt
-       (an `[INFO]`-tagged condition in `recover.md` — already handled elsewhere, not a failure).
+       auto-respawn.
+    4. `verdict: no_action_needed` → proceed; do not write a RECOVERY block or spend an attempt.
   `.claude/commands/recover.md` remains the source of truth (grouped by `## <Track> → <Step>`) for
   the taxonomy, the `plan_mode` ladder, and the RE-ANNEAL/EXTEND/MELT-MIXING procedures —
   `recovery-agent` reads it at runtime. Its "Session Recovery (Mode B)" section (Claude process
-  itself died) is unaffected and stays a manually-invoked `/recover`, since there's no live
-  orchestrator session to spawn `recovery-agent` from in that case.
+  itself died) is unaffected and stays a manually-invoked `/recover`.
 
 PHASE A — FOUNDATION: orchestration/tracks/FOUNDATION.md.
 PHASE B — TRACKS: thermal → orchestration/tracks/THERMAL_TRACK.md; mechanical → orchestration/tracks/MECHANICAL_TRACK.md.

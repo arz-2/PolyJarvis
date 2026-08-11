@@ -36,7 +36,7 @@ GATE: do not spawn murnaghan-worker or deform-worker until the thermal track has
   If the probe log itself crashed (missing/truncated — analyze-bm's own call errors reading
   it, distinct from a normal excluded_points screening flag): see recover.md's taxonomy row
   for this — re-run analyze-bm on the remaining compression-only logs, do not resubmit the
-  probe. This is the expected, informative outcome of a deliberate probe, not a bug.
+  probe.
 
   # Leg 2 (conditional deeper tension) — ONLY when is_novel_rubbery_probe and the probe point
   # (the most negative pressure, e.g. -200 atm) came back clean: present in log_files with a
@@ -60,7 +60,7 @@ GATE: do not spawn murnaghan-worker or deform-worker until the thermal track has
                  write D-07 to run_log.md (overwriting leg 1's provisional entry, if any)
   # else: leg 1's (already-screened) result is final. Note in run_log.md that tension beyond
   # the probe depth is untested for THIS system — never write a class-level bm_pressures_atm
-  # from one system's outcome (per-system evidence, not an accumulated class default).
+  # from one system's outcome.
 
   Recovery if murnaghan fails (fit_converged=False) — applies to whichever leg's extraction
   is final (glassy only has this fallback; rubbery does not):

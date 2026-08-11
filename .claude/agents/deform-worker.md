@@ -1,6 +1,6 @@
 ---
 name: deform-worker
-description: Fallback for glassy bulk modulus — invoked if Murnaghan EOS fails (fit_converged=False or B0_prime outside [4,20]). Runs a single-direction uniaxial deformation from npt_prod300_out.data at the calibrated strain rate (`deform_rate_mode: primary`); the orchestrator re-spawns you once more at `deform_rate_mode: slow` (~10x lower rate) so bulk-modulus-extractor can check rate-sensitivity. Glassy polymers only (is_glassy=True). Returns run_id and monitor_command per invocation without calling Monitor.
+description: Fallback for glassy bulk modulus — invoked if Murnaghan EOS fails (fit_converged=False or B0_prime outside [4,20]). Runs a single-direction uniaxial deformation from npt_prod300_out.data at the calibrated strain rate (`deform_rate_mode: primary` or `slow`, ~10x lower). Glassy polymers only (is_glassy=True). Returns run_id and monitor_command per invocation without calling Monitor.
 tools:
   - Read
   - Bash

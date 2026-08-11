@@ -21,9 +21,8 @@ falls back to its DB lookup / polymer_rules median ±5% band.
 
 ## Before spawning run-summary-worker
 
-1. **Verify the lammps-engine MCP server is live** (long sessions >12 h drop the connection
-   silently): a minimal call (e.g. `list_templates`) must return; if it hangs/errors, restart the
-   MCP server first.
+1. **Verify the lammps-engine MCP server is live**: a minimal call (e.g. `list_templates`) must
+   return; if it hangs/errors, restart the MCP server first.
 2. **TG_PATH**: the thermal track's own `tg-analysis-worker` RESULT's `output_dir` field (held
    from Phase B) + `/tg_summary.json`.
 3. **Exp ranges:** thread each non-null exp-lookup field as a CLI override; omit nulls so gen_prompt
@@ -40,8 +39,7 @@ Agent(subagent_type="run-summary-worker", description="🟢 Run summary {polymer
              [--exp_tg_min ... --exp_tg_max ...] [--exp_density_min ... --exp_density_max ...]
              [--exp_K_min ... --exp_K_max ...]>)
   → RESULT → run_summary_path → write RESULTS to run_log.md
-  → if run_summary tg.primary_fit_invalid==True, flag the headline Tg as unreliable in run_log.md
-    (the fit violated a hard physics constraint and no valid alternative existed).
+  → if run_summary tg.primary_fit_invalid==True, flag the headline Tg as unreliable in run_log.md.
 ```
 
 ## [Campaign hooks — after run-summary, before memory capture]

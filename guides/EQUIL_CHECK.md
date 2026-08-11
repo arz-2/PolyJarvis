@@ -29,27 +29,25 @@ from the raw numbers yourself.** The four possible verdicts:
 - **`PASS`** → `equil_verdict=PASS`.
 - **`EXTEND`** → `equil_verdict=EXTEND`. Only density/energy drift or block-SEM failed — genuinely
   not-yet-converged, more NPT at the same T can fix it.
-- **`STRUCTURAL_FAIL`** → `equil_verdict=STRUCTURAL_FAIL`. The cell converged to the *wrong* value, not merely an unconverged one — `EXTEND`
-  cannot fix this (a glass cannot densify below Tg). Check the `remedy` field:
+- **`STRUCTURAL_FAIL`** → `equil_verdict=STRUCTURAL_FAIL`. The cell converged to the *wrong*
+  value, not merely an unconverged one — `EXTEND` cannot fix this. Check the `remedy` field:
   - `re_melt_slow_recool` (from `UNDER_ANNEALED_COOLING`) — melt was fine, cooling ramp too fast.
   - `heavy_melt_anneal_probe` (from `MELT_STAGE_DEFICIT`) — melt itself deficient; re-cooling
-    slower will NOT help. Root cause (FF underbinding vs. melt under-annealing) needs the probe.
+    slower will NOT help.
   - melt-mixing remedy (`density_homogeneity` failing) — this is what `phase=melt`'s pre-cool
     gate exists to catch (see Phase below): extend melt-stage dwell in place, not the cooling
     ramp, and never re-melt from scratch. Owned by `/recover`'s MELT-MIXING procedure, not this
     worker.
 - **`FAIL`** → `equil_verdict=FAIL`. Box collapse, charge imbalance, dead cell (C(t) exactly 0%),
   or any binding-gate failure the mechanized script can't classify into the above. (C(t)
-  decaying-but-incomplete is reptation-limited, not a FAIL — the script already treats it as
-  advisory under the applicable carve-out; you should never see it in `failing_binding_gates`.)
+  decaying-but-incomplete is not a FAIL — you should never see it in `failing_binding_gates`.)
 
 ## Phase
 
 `phase` from the prompt: `full` (default) is today's gate, after the whole equilibration chain
 completes, with density extraction and the cooling-contraction diagnosis available. `melt`
 (glassy only) runs against `npt_production`/`nvt_production` — the pre-cool checkpoint — *before*
-`npt_cool300`/`npt_prod300` are even submitted, so a badly-mixed melt is caught without spending
-the GPU time cooling it. `phase=melt` cannot run `assess_cooling_contraction` (no glass state
+`npt_cool300`/`npt_prod300` are even submitted. `phase=melt` cannot run `assess_cooling_contraction` (no glass state
 exists yet), so `UNDER_ANNEALED_COOLING`/`MELT_STAGE_DEFICIT` are unreachable verdicts there —
 only the structural/thermo gates that are meaningful on the melt trajectory alone (density/energy
 drift, block-SEM, Rg CV, P2, density-homogeneity CV, C(t)) can fire. The prompt's `tasks:` list

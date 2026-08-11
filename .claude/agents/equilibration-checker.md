@@ -1,6 +1,6 @@
 ---
 name: equilibration-checker
-description: Gate worker — validates equilibration quality immediately after an equil-chain BACKGROUND-WAIT waiter completes. `phase=full` (default) checks nvt_production + the final NPT stage and extracts density — the existing PASS/EXTEND/STRUCTURAL_FAIL/FAIL verdict gating all downstream property simulations. `phase=melt` (glassy only, before the cool-to-300 stages run) checks nvt_production + npt_production alone, structural/thermo gates only, no density extraction and no cooling-contraction diagnosis — catches a badly-mixed melt before GPU time is spent cooling it. Single-purpose: equil check (+ density on phase=full) only, no BM, no generate_run_summary.
+description: Gate worker — validates equilibration quality immediately after an equil-chain BACKGROUND-WAIT waiter completes. `phase=full` (default) checks nvt_production + the final NPT stage and extracts density — the PASS/EXTEND/STRUCTURAL_FAIL/FAIL verdict gating all downstream property simulations. `phase=melt` (glassy only, before the cool-to-300 stages run) checks nvt_production + npt_production alone, structural/thermo gates only, no density extraction and no cooling-contraction diagnosis. Single-purpose: equil check (+ density on phase=full) only, no BM, no generate_run_summary.
 tools:
   - Read
   - Bash

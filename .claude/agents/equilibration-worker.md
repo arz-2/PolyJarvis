@@ -1,6 +1,6 @@
 ---
 name: equilibration-worker
-description: Validates a .data file, generates the equilibration workflow, and submits the LAMMPS chain. Glassy runs split submission on `phase` (melt = through npt_production only, so a bad melt is caught before the cool-to-300 GPU time runs; cooldown = the saved post-gate tail); rubbery stays single-submission (`phase=full`). Returns chain_id and monitor_command immediately without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter.
+description: Validates a .data file, generates the equilibration workflow, and submits the LAMMPS chain. Glassy runs split submission on `phase` (melt = through npt_production only; cooldown = the saved post-gate tail); rubbery stays single-submission (`phase=full`). Returns chain_id and monitor_command immediately without calling Monitor. The orchestrator owns the BACKGROUND-WAIT waiter.
 tools:
   - Read
   - Bash

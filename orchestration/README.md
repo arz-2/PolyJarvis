@@ -1,9 +1,8 @@
 # orchestration/ — CLI & Orchestration Helpers + Orchestrator-Read Docs
 
 Two subdirectories: `tracks/` — orchestrator-read phase/track guides, `Read` directly on phase
-entry — and `scripts/` — every CLI helper, all siblings in one directory because five of them
-bare-import each other (`hw_common.py`, `select_hardware.py`) via a same-directory `sys.path`
-insert; splitting them across further subdirectories would break those imports. `decision_policy.json`
+entry — and `scripts/` — every CLI helper in one directory; five bare-import each other
+(`hw_common.py`, `select_hardware.py`) via a same-directory `sys.path` insert. `decision_policy.json`
 and this file stay at the `orchestration/` top level.
 
 These paths are hard-wired into `CLAUDE.md`, `orchestration/ORCHESTRATOR.md`, the agent
@@ -62,5 +61,5 @@ The benchmark data-release rebuilder lives with the manuscript material: `manusc
 | File | Purpose |
 |---|---|
 | `ORCHESTRATOR.md` | Orchestrator operating manual — worker roster + the full SETUP/GATE & PLAN/THREAD/HARDWARE/BACKGROUND-WAIT/RECOVERY workflow. Invoked via the `run-campaign` skill (`.claude/commands/run-campaign.md`); `CLAUDE.md` covers repo layout only. |
-| `decision_policy.json` | Evaluation framework the planner/critic reason against; also read directly by `enforce_gate.py` and `validate_run_plan.py` (both anchor its path at `orchestration/`, not `orchestration/scripts/` — why it stays here rather than moving with the scripts). |
+| `decision_policy.json` | Evaluation framework the planner/critic reason against; also read directly by `enforce_gate.py` and `validate_run_plan.py`, both anchored at `orchestration/`. |
 | `README.md` | This file. |
