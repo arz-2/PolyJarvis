@@ -79,7 +79,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus_murnaghan): fit_converged=True required (else WARNING, linear_fallback); r_squared>=0.999 for a 5-point series; B0_prime outside [4,20] with fit_converged=True is WARNING not FAIL.\"}}'"
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus_murnaghan): route on bm_gate_verdict. INADMISSIBLE (K<=0, B0_prime<=0, volume_monotonic=false, V0 outside sampled range, r_squared<0.99) -> do NOT report K. FALLBACK_TO_DEFORM (fit_converged=false) -> deform path. r_squared<0.999 and B0_prime outside [4,20] are WARNINGS, never blocking.\"}}'"
           }
         ]
       },
@@ -88,7 +88,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus_deform): fit_r2_C11 and fit_r2_C12_yy >= 0.90; isotropy_delta_pct < 20% is a HARD gate (>=20% -> K BORDERLINE); G<0 in y/z alone is NOT a failure if isotropy and K hold.\"}}'"
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus_deform): pass deform_direction matching the strained axis. Route on deform_gate_verdict: INADMISSIBLE (K<0, E<0, or isotropy_delta_pct>=20%) -> do NOT report K, it is a hard failure not BORDERLINE. Also require fit_r2_C11 and both transverse r2 >= 0.90. G<0 in a y/z leg means deform_direction was wrong, not small-cell anisotropy.\"}}'"
           }
         ]
       },
@@ -129,6 +129,36 @@
         ]
       }
     ],
+    "PreCompact": [
+      {
+        "matcher": "manual",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/precompact_summary_directive.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/precompact_summary_directive.py\""
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/subagent_output_contract.py\""
+          }
+        ]
+      }
+    ],
     "SubagentStop": [
       {
         "hooks": [
@@ -144,11 +174,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'ROADMAP: If any items in guides/ROADMAP.md were completed this turn, update their checkboxes from [ ] to [x] before stopping.'"
+            "command": "grep -q '^ *- \\[ \\]' \"$CLAUDE_PROJECT_DIR/guides/ROADMAP.md\" 2>/dev/null && echo 'ROADMAP: If any items in guides/ROADMAP.md were completed this turn, update their checkboxes from [ ] to [x] before stopping.' || true"
           },
           {
             "type": "command",
-            "command": "pending=$(find /home/arz2/PolyJarvis -path '*/.claude/agent-memory/*.md' ! -name 'MEMORY.md' 2>/dev/null | xargs grep -rL 'ingested_at:' 2>/dev/null | head -5); [ -n \"$pending\" ] && printf 'INGEST: Pending agent memories found — run /ingest-memory before stopping:\\n%s\\n' \"$(echo \"$pending\" | sed 's|.*/||')\" || true"
+            "command": "pending=$(find \"$CLAUDE_PROJECT_DIR/.claude/agent-memory\" -name '*.md' ! -name 'MEMORY.md' 2>/dev/null | xargs grep -rL 'ingested_at:' 2>/dev/null | head -5); [ -n \"$pending\" ] && printf 'INGEST: Pending agent memories found — run /ingest-memory before stopping:\\n%s\\n' \"$(echo \"$pending\" | sed 's|.*/||')\" || true"
           }
         ]
       }
@@ -204,7 +234,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'RECOVERY: If the watch_run result shows a failed or error status, invoke /recover before attempting any manual fix. Do not retry ad-hoc — use the skill.'"
+            "command": "echo 'RECOVERY: failed/error status → /recover, never an ad-hoc retry.'"
           }
         ]
       },
@@ -213,7 +243,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'LOG: check_equilibration_comprehensive done — read recovery_hint in result for PASS/EXTEND/ESCALATE action. Copy result[\"d05_markdown\"] to run_log.md as D-05.'"
+            "command": "echo 'LOG: check_equilibration_comprehensive done — read recovery_hint in result for PASS/EXTEND/ESCALATE action. Return result[\"d05_markdown_path\"]; the orchestrator splices it in with orchestration/scripts/write_d05.py. Never paste the block.'"
           }
         ]
       },
@@ -222,7 +252,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'LOG: extract_thermal done — fill D-06 (R², N_bins, F-stat, is_glassy + Tg K) and the α_g, α_r, ΔCp rows in RESULTS B of run_log.md. This single-rate Tg is the headline (single-rate-primary default) — no separate DSC-equiv step follows unless multirate was explicitly opted into.'"
+            "command": "echo 'LOG: extract_thermal done — check tg_gate_verdict first: NOT_REPORTABLE (fit_quality=POOR / primary_fit_invalid) means do NOT report a Tg, REVIEW (tg_method_gap_K > 20 K) means halt before reporting; record tg_gate_reasons either way. Blocking the report does not block the is_glassy routing. Then fill D-06 (R², N_bins, F-stat, is_glassy + Tg K) and the α_g, α_r, ΔCp rows in RESULTS B of run_log.md. This single-rate Tg is the headline (single-rate-primary default) — no separate DSC-equiv step follows unless multirate was explicitly opted into.'"
           }
         ]
       },
@@ -285,7 +315,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'ROUTING: status=completed/done → proceed to next stage; status=failed/error → /recover (do not retry ad-hoc). Phase-entry reads (before spawning that phase workers): IF this get_run_status completes the EQUIL chain and a track is still pending → entering Phase B: Read(orchestration/tracks/THERMAL_TRACK.md) if tg requested and/or Read(orchestration/tracks/MECHANICAL_TRACK.md) if bulk_modulus requested; entering Phase C: Read(orchestration/tracks/SUMMARY.md). (Fires on every poll — apply only when it actually closes a stage.)'"
+            "command": "echo 'PHASE ENTRY (only if this closes a stage): equil chain done → Read(orchestration/tracks/THERMAL_TRACK.md) if tg requested and/or Read(orchestration/tracks/MECHANICAL_TRACK.md) if bulk_modulus requested; tracks done → Read(orchestration/tracks/SUMMARY.md).'"
           }
         ]
       }

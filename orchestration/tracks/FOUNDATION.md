@@ -83,9 +83,10 @@ Write a run_log.md note: `fields_derived` vs `fields_kept_as_class_default`. No 
 Agent(subagent_type="equilibration-checker", description="🟠 Equil check {polymer_name}",
       prompt=<gen_prompt.py --stage equil-check --plan PLAN_PATH --data_path npt_prod_data_path>)
   → RESULT → equil_verdict, structural_fail_remedy, structural_fail_remedy_confidence,
-      density_gcm3, ct_decay_fraction, ct_tau_relax_ps,
+      density_gcm3, ct_decay_fraction, ct_tau_relax_ps, d05_markdown_path,
       end_to_end_r_mean_A, end_to_end_r_std_A, end_to_end_n_chains
-    → write D-05 to run_log.md (Chain Structure Summary rows)
+    → `write_d05.py --run_log data/[RUN]/run_log.md --d05 <d05_markdown_path>`, then fill the
+      Chain Structure Summary rows from the RESULT fields
 ```
 - `PASS` → proceed.
 - `EXTEND` / `STRUCTURAL_FAIL` / `FAIL` → RECOVERY (`track=foundation step=equil-check`)

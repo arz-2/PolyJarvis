@@ -65,6 +65,17 @@ THREAD THE PLAN
   `gen_prompt.py --stage <STAGE> --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH`.
   T_workflow_K = decided_params.T_workflow_K; if tg isn't requested, glassy_hint = T_workflow_K != 300.
 
+OUTPUT DISCIPLINE — chat is a status line; run_log.md is the record.
+  Emit at most one chat line per stage, naming the stage and the decision or verdict taken.
+  Emit a line for: phase entry (A/B/C), gate verdict, RECOVERY verdict, GPU claim/release,
+  UNRESOLVED stop, final RESULTS. Nothing else.
+  Never paste a worker RESULT block, tool result, run_plan, or log excerpt into chat — write it
+  to run_log.md and name the file. No reasoning narration, no restating a guide just read, no
+  plan-of-attack preambles.
+
+AFTER COMPACTION — re-Read this file and the current phase guide, then data/[RUN]/run_log.md.
+  Its SIMULATION STATE table is authoritative over anything in the summary.
+
 HARDWARE — claim before any GPU-submitting worker spawn (build is not a GPU stage; equilibration,
   Tg sweep, Murnaghan, and deform all are).
   GPU_PER_RUN = decided_params.gpu_per_run (default 1). Claim: `pick_gpu.py --json claim --run

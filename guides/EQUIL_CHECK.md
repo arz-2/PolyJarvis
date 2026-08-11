@@ -80,7 +80,7 @@ check_equilibration_comprehensive(**kwargs)
 ```
 
 **Result fields for the RESULT block** (all from this single call):
-- `overall_pass`, `d05_markdown`, `density_converged`, `energy_converged`, `ct_decayed`, `warnings`
+- `overall_pass`, `d05_markdown_path`, `density_converged`, `energy_converged`, `ct_decayed`, `warnings`
 - `result["chain"]["ct"]["decay_fraction_at_end"]` → `ct_decay_fraction`
 - `result["chain"]["ct"]["tau_relax_ps"]` → `ct_tau_relax_ps`
 - `result["chain"]["ree"]["mean_R_ee_A"|"std_R_ee_A"|"n_chains"]` → `end_to_end_r_mean_A` / `_std_A` / `_n_chains`

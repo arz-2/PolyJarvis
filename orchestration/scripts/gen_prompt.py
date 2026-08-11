@@ -62,6 +62,7 @@ Physics knob overrides (all optional; defaults from polymer_rules.json):
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -924,11 +925,11 @@ def equil_check_prompt(args, cls: dict) -> str:
     else:
         tasks_block = "tasks:\n  - check_equilibration_comprehensive\n  - extract_equilibrated_density"
         density_note = (
-            "### D-05 REQUIREMENT (PEEK2 I-04): paste result[\"d05_markdown\"] (also written to\n"
-            f"### {p['output_dir']}d05_block.md) VERBATIM into the run_log.md D-05 CONVERGENCE DETAIL section.\n"
-            "### It contains the real Rg/MSD/density/C(t)/R_ee values. Leaving any [X ± Y] / [X]% /\n"
-            "### [PASS / FAIL] placeholder in run_log.md is a FAILURE of this equil-check step — the tool\n"
-            "### already fills every field, so there is no reason to leave a placeholder."
+            "### D-05 REQUIREMENT (PEEK2 I-04): return result[\"d05_markdown_path\"] (the tool writes\n"
+            f"### the block to {p['output_dir']}d05_block.md) as d05_markdown_path in your RESULT block.\n"
+            "### Do NOT paste the block itself — the orchestrator splices it into run_log.md with\n"
+            "### orchestration/scripts/write_d05.py. It contains the real Rg/MSD/density/C(t)/R_ee\n"
+            "### values, so no [X ± Y] / [X]% / [PASS / FAIL] placeholder may survive in run_log.md."
         )
         gate_block = f"""### MECHANIZED GATE (Step 3, replaces your own PASS/EXTEND/FAIL judgment — see EQUIL_CHECK guide):
 ### after Steps 1-2 write their JSON to output_dir, call the MCP tool
@@ -1374,6 +1375,10 @@ def main():
                    help="Atom type IDs as JSON list (equil-check only)")
     p.add_argument("--enthalpy_col", default="Enthalpy",
                    help="LAMMPS thermo column name for enthalpy (analyze-tg; default 'Enthalpy')")
+    p.add_argument("--out", action="store_true",
+                   help="Write the prompt to data/<run_name>/raw/prompts/ and print only that "
+                        "path, so the prompt body never enters the orchestrator's context. The "
+                        "spawned worker reads the file itself.")
     p.add_argument("--output_dir")
     p.add_argument("--equil_data_path",
                    help="Path to equilibrated .data file (LAMMPS .data input to Tg sweep; required for ΔCp mass normalisation in extract_thermal)")
@@ -1463,7 +1468,23 @@ def main():
     resolve_hardware(args, cls, rules)
 
     prompt_fn = STAGE_MAP[args.stage]
-    print(prompt_fn(args, cls) + CWD_NOTE)
+    prompt = prompt_fn(args, cls) + CWD_NOTE
+
+    if not args.out:
+        print(prompt)
+        return
+
+    # --out keeps the prompt body out of the orchestrator's context: it goes to a file the worker
+    # reads itself, and stdout carries only the path. Stdout must stay exactly one line — every
+    # diagnostic in this script already goes to stderr.
+    if not args.run_name:
+        p.error("--out requires --run_name")
+    digest = hashlib.sha1(prompt.encode()).hexdigest()[:8]
+    out_dir = REPO_ROOT / "data" / args.run_name / "raw" / "prompts"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{args.stage}-{digest}.txt"
+    out_path.write_text(prompt)
+    print(out_path)
 
 
 if __name__ == "__main__":
