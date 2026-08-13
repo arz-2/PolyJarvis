@@ -161,8 +161,8 @@ generate_equilibration_workflow(
     add_melt_npt   = True,                       # inserts npt_cool_melt → npt_melt → npt_cool
     t_equil_K      = <class T_equil_K>,          # 350–800 K depending on class
     melt_npt_steps = MULT * int(1.0e6/dt_fs),    # MULT = 10 (attempt 1), 50 (attempt 2)
-)   # changed args only — `velocity_seed` and the other four step counts are required on
-    # every call; pass them from the prompt, `null` included
+)   # changed args only. `velocity_seed`, all five step counts, `temp`, the three force-field
+    # flags, and `engine` are required on every call — pass them from the prompt, `null` included
 ```
 Re-run the `phase=melt` gate after each rung. `npt_melt` is the melt-density extraction target.
 Max 2 rungs; still under-band → rung 3 (different force field). Log `MULT` in the RECOVERY block.

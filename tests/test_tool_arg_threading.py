@@ -205,6 +205,33 @@ def test_guide_call_block_names_every_required_arg(tool):
                 f"{guide}'s {tool} block omits {name}= -- workers copy this block verbatim")
 
 
+# Worker-facing docs outside guides/ that carry their own literal call blocks. An agent .md
+# loads before its guide, and recover.md is the recovery path's source of truth, so a block
+# here that omits a required arg hard-fails that worker on its first call.
+OTHER_CALLER_DOCS = (sorted((REPO_ROOT / ".claude" / "agents").glob("*.md"))
+                     + [REPO_ROOT / ".claude" / "commands" / "recover.md",
+                        REPO_ROOT / "orchestration" / "tracks" / "FOUNDATION.md"])
+
+# recover.md's RE-ANNEAL block is a deliberate delta -- it shows only the arguments that
+# change, and says so on the next line. Exempt the tool there, not the file.
+DELTA_BLOCK_EXEMPT = {("recover.md", "generate_equilibration_workflow")}
+
+
+@pytest.mark.parametrize("doc", OTHER_CALLER_DOCS, ids=lambda p: p.name)
+def test_agent_and_recovery_docs_name_every_required_arg(doc):
+    text = doc.read_text()
+    for tool, (_srv, required, _g) in REQUIRED_ARGS.items():
+        if (doc.name, tool) in DELTA_BLOCK_EXEMPT:
+            continue
+        for block in _call_blocks(text, tool):
+            # Prose mentions like `tool(extend_only=True)` inside a table cell are not call
+            # sites; a real block names at least the tool's own first positional arg.
+            if len(block) < 40:
+                continue
+            missing = [n for n in required if not re.search(rf"\b{n}\s*=", block)]
+            assert not missing, f"{doc.name}'s {tool} block omits {missing}"
+
+
 def test_no_guide_still_instructs_conditional_omission():
     """`if x is not None: kwargs[...]` and 'do NOT pass' were how the omission got
     written down in the first place. Under required-and-nullable the instruction is

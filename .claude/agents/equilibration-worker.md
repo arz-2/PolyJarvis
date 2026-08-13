@@ -30,12 +30,14 @@ the exact split. `full` and `melt` both start the same way:
    submit the chain — no amount of equilibration fixes a box dimension, and submitting burns the
    full `t_equil` before the equil-check gate would say the same thing.
 2. Call `generate_equilibration_workflow` (call signature and chain-selection rules in the guide below).
-3. `phase=full`: `run_lammps_chain(stages=workflow["stages"], gpu_ids=gpu_ids, mpi=mpi_ranks)`.
+3. `engine` is a required argument of `run_lammps_chain` and must match the one passed to
+   `generate_equilibration_workflow` — its old `"gpu"` default silently ignored a KOKKOS build.
+   `phase=full`: `run_lammps_chain(stages=workflow["stages"], gpu_ids=gpu_ids, mpi=mpi_ranks, engine=engine)`.
    `phase=melt`: slice `workflow["stages"]` at `workflow["run_order"].index("npt_production")+1`,
    `Write` the remainder to `{work_dir}/_pending_cooldown_stages.json`, then
-   `run_lammps_chain(stages=<the prefix>, ...)`.
+   `run_lammps_chain(stages=<the prefix>, gpu_ids=gpu_ids, mpi=mpi_ranks, engine=engine)`.
    `phase=cooldown` (skip steps 1-2 entirely — do NOT re-inspect or regenerate): `Read` back
-   `pending_cooldown_path`, `run_lammps_chain(stages=<that list>, gpu_ids=gpu_ids, mpi=mpi_ranks)`.
+   `pending_cooldown_path`, `run_lammps_chain(stages=<that list>, gpu_ids=gpu_ids, mpi=mpi_ranks, engine=engine)`.
 4. `watch_run(chain_id)`
 
 **Stop after step 4. Do NOT call Monitor.** Return chain_id and monitor_command to the orchestrator.
