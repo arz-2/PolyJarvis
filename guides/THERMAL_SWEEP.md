@@ -32,7 +32,7 @@ result = generate_script(
     template_name="npt_tg_step",
     output_script=f"{tg_sweep_dir}/tg_sweep.in",
     data_file=equil_data_path,        # MUST be absolute — see caveat below
-    velocity_seed=<velocity_seed from prompt, or None>,
+    velocity_seed=<velocity_seed from prompt>,   # required, never null
     params={
         "LOG_FILE":            "tg_sweep.log",
         "DUMP_FILE":           "",

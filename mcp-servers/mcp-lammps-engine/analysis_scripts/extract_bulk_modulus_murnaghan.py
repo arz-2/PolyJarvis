@@ -446,6 +446,14 @@ def main():
     parser.add_argument("--npt_prod_log", default=None,
                         help="Optional separate NPT production log for a fluctuation-based "
                              "K cross-check, embedded in this same result (no separate tool call).")
+    parser.add_argument("--r2_floor", type=float, default=0.99,
+                        help="Admissibility floor below which the Murnaghan form does not "
+                             "describe the data (model breakdown). Distinct from the 0.999 "
+                             "warning/trim-selection level, which is precision, not validity.")
+    parser.add_argument("--v0_range_margin", type=float, default=0.25,
+                        help="How far outside the sampled volume range V0 may fall, as a "
+                             "fraction of that range's width, before the fit's zero-pressure "
+                             "reference state counts as unsupported by the data.")
     args = parser.parse_args()
 
     if len(args.log_files) != len(args.pressures_atm):
@@ -637,6 +645,48 @@ def main():
                 )
 
     # -------------------------------------------------------------------
+    # 2e. Admissibility gate (Class A) -- conditions physics ENTAILS, kept separate from
+    # the precision warnings above. These reject a result that is not a bulk modulus at
+    # all, whether or not it happens to land near the replicate mean; r2 >= 0.999 is
+    # deliberately NOT among them (it flags physically valid fits while missing real
+    # outliers -- see decision_policy.json rationale_bm_admissibility).
+    # -------------------------------------------------------------------
+    sel_V = [volumes_sorted[i] for i in range(len(volumes_sorted)) if i not in excluded_idx]
+    gate_reasons = []
+    if primary_B0_GPa is None or primary_B0_GPa <= 0:
+        gate_reasons.append(f"K={primary_B0_GPa} is not positive — thermodynamically inadmissible")
+    if primary_converged and primary_B0_prime is not None and primary_B0_prime <= 0:
+        gate_reasons.append(f"B0'={primary_B0_prime:.3f} is not positive — inadmissible EOS")
+    if not window["volume_monotonic"]:
+        gate_reasons.append(
+            "volume is not monotonic in pressure — dV/dP > 0 somewhere violates mechanical "
+            "stability; the affected pressure point(s) must be re-run, not re-fitted"
+        )
+    if primary_V0_A3 is not None and len(sel_V) >= 2:
+        lo, hi = min(sel_V), max(sel_V)
+        margin = args.v0_range_margin * (hi - lo)
+        if not (lo - margin <= primary_V0_A3 <= hi + margin):
+            gate_reasons.append(
+                f"V0={primary_V0_A3:.0f} A^3 lies outside the sampled volume range "
+                f"[{lo:.0f}, {hi:.0f}] by more than {args.v0_range_margin:.0%} of its width — "
+                "the fit's zero-pressure reference state is not supported by the data"
+            )
+    if primary_converged and primary_r2 is not None and primary_r2 < args.r2_floor:
+        gate_reasons.append(
+            f"r_squared={primary_r2:.5f} < {args.r2_floor} — the Murnaghan form does not "
+            "describe this P-V data at all (model breakdown, not imprecision)"
+        )
+
+    if gate_reasons:
+        bm_gate_verdict = "BM_INADMISSIBLE"
+    elif not primary_converged:
+        bm_gate_verdict = "BM_FALLBACK_DEFORM"
+        gate_reasons.append("Murnaghan fit did not converge — route to the uniaxial-deformation "
+                            "fallback (documented trigger; not itself a physics violation)")
+    else:
+        bm_gate_verdict = "BM_REPORTABLE"
+
+    # -------------------------------------------------------------------
     # 3. Assemble result -- top-level fields reflect the SELECTED WINDOW
     # (the screened, primary answer); all_points_fit preserves the original
     # unscreened fit for continuity/comparison/audit.
@@ -645,6 +695,9 @@ def main():
         "status": "success",
         "method": primary_method,
         "fit_converged": primary_converged,
+        "bm_gate_verdict": bm_gate_verdict,
+        "bm_gate_reasons": gate_reasons,
+        "bm_reportable": bm_gate_verdict == "BM_REPORTABLE",
         "B0_GPa": round(float(primary_B0_GPa), 4) if primary_B0_GPa is not None else None,
         "bulk_modulus_GPa": round(float(primary_B0_GPa), 4)
             if primary_B0_GPa is not None else None,   # alias for generate_run_summary

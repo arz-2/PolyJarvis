@@ -33,22 +33,32 @@ from hw_common import load_rules, get_class_entry, hardware_policy, resolve_ff_f
 _RDKIT_SNIPPET = """\
 import os
 from rdkit import Chem
+from rdkit.Chem import Descriptors
 smi = os.environ['SELECT_HW_SMILES']
 ua = os.environ['SELECT_HW_UA'] == '1'
 mol = Chem.MolFromSmiles(smi)
 if mol is None:
     raise SystemExit('RDKit could not parse SMILES: ' + smi)
-print(mol.GetNumAtoms() if ua else Chem.AddHs(mol).GetNumAtoms())
+# The two `*` connection points parse as dummy atoms: discount them from the atom count
+# rather than deleting them from the string, which would leave an empty branch `c(...)` ->
+# `c()` and fail to parse for any SMILES whose `*` sits inside a branch.
+dummies = sum(1 for a in mol.GetAtoms() if a.GetAtomicNum() == 0)
+with_h = Chem.AddHs(mol)
+n_atoms = (mol.GetNumAtoms() if ua else with_h.GetNumAtoms()) - dummies
+# Dummy atoms carry zero mass, so this is the repeat unit's residue mass as it appears
+# in the chain -- exactly what the cell-mass estimate needs.
+print(n_atoms, Descriptors.MolWt(with_h))
 """
 
 
-def _atoms_per_monomer(smiles: str, is_ua: bool, env: str = "radonpy", timeout: int = 30) -> int:
-    """Heavy-atom count (UA FFs, e.g. TraPPE) or all-atom count with H (all-atom FFs:
-    PCFF/OPLS/GAFF) for one repeat unit. `*` connection-point atoms are stripped first --
+def _monomer_atoms_and_mw(smiles: str, is_ua: bool, env: str = "radonpy",
+                          timeout: int = 30) -> tuple:
+    """(atom count, molar mass g/mol) for one repeat unit. Count is heavy-atom for UA FFs
+    (e.g. TraPPE) or all-atom with H for all-atom FFs (PCFF/OPLS/GAFF); the mass is always
+    all-atom. `*` connection-point atoms are stripped first --
     RDKit would otherwise count them as real (wildcard) atoms. Same conda-activate
     subprocess pattern as canon_smiles.py's canonicalize() -- RDKit lives outside `base`."""
     import os
-    stripped = smiles.replace("*", "")
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
         f.write(_RDKIT_SNIPPET)
         snippet_path = f.name
@@ -59,14 +69,15 @@ def _atoms_per_monomer(smiles: str, is_ua: bool, env: str = "radonpy", timeout: 
             f"python3 {snippet_path}\n"
         )
         run_env = dict(os.environ)
-        run_env["SELECT_HW_SMILES"] = stripped
+        run_env["SELECT_HW_SMILES"] = smiles
         run_env["SELECT_HW_UA"] = "1" if is_ua else "0"
         r = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
                            stdin=subprocess.DEVNULL, timeout=timeout, env=run_env)
         out = r.stdout.strip()
         if r.returncode != 0 or not out:
             raise RuntimeError(r.stderr.strip() or "empty output from RDKit atom-count")
-        return int(out.splitlines()[-1])
+        n_atoms, mw = out.splitlines()[-1].split()
+        return int(n_atoms), float(mw)
     finally:
         Path(snippet_path).unlink(missing_ok=True)
 
@@ -106,10 +117,11 @@ def select_hardware(polymer_class: str, smiles: str, dp_typical: int | None,
     nchain_v = nchain if nchain is not None else cls.get("nchain", 10)
     is_ua = (fam == "trappe")
     try:
-        atoms_per_monomer = _atoms_per_monomer(smiles, is_ua)
+        atoms_per_monomer, mw_per_monomer = _monomer_atoms_and_mw(smiles, is_ua)
     except Exception as e:
         return {"error": f"RDKit atom-count failed: {e}"}
     cell_atoms = atoms_per_monomer * dp * nchain_v
+    cell_mass = mw_per_monomer * dp * nchain_v          # g/mol, end caps neglected
 
     dp_probe = hp.get("directional_probe", {})
     values_are_benchmarked = bool(hp.get("values_are_benchmarked", False))
@@ -180,6 +192,7 @@ def select_hardware(polymer_class: str, smiles: str, dp_typical: int | None,
         "decided_params_override": decided_params_override,
         "uncertainties": uncertainties,
         "cell_atoms_estimate": cell_atoms,
+        "cell_mass_g_per_mol_estimate": round(cell_mass, 1),
         "ff_family": fam,
     }
 

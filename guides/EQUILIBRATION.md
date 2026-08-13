@@ -46,17 +46,42 @@ Steps 2/3 assume `emc_build.params` is already there. `ls -la {work_dir}` to con
 landed. Then:
 
 ```python
-info = inspect_data_file(data_file="{work_dir}/cell.data")
+info = inspect_data_file(
+    data_file="{work_dir}/cell.data",
+    lj_cutoff=cutoff_A,                        # from the prompt
+    target_density_gcm3=exp_density_gcm3,      # from the prompt — arms the size forecast
+    nchain=nchain,                             # from the prompt — turns a failure into a target
+)
 # info.validation.errors must be empty before proceeding
 # save info.n_atoms for generate_equilibration_workflow
 ```
 
+**This call is the size gate — do not submit past it.** `target_density_gcm3` makes
+`inspect_data_file` forecast whether the cell will self-image once compressed: Rg is measured
+on the packed coordinates and the post-compression box edge is predicted from the cell's own
+mass. A `SIZE_CHAIN_SELF_IMAGE` or `SIZE_MIN_IMAGE_VIOLATION` entry in
+`validation.errors` means **rebuild with a larger `nchain`** (`finite_size_forecast.remedy`
+gives the factor and target) — never submit the chain and never try to fix it by
+equilibrating longer. Catching this at the equil-check gate instead wastes the whole chain:
+3–20 ns of `t_equil` by class, plus the cooling tail.
+
 ### Step 2: Generate the equilibration workflow
+
+`velocity_seed` and all five step counts are required arguments. Pass every one from the
+prompt on every call, including those whose value is `null` — omitting an argument is a schema
+error, not a default, and two runs of the same system that differ in which arguments were
+passed produce different decks.
 
 ```python
 workflow = generate_equilibration_workflow(
     data_file="{work_dir}/cell.data",
     work_dir_base="{work_dir}",
+    velocity_seed=velocity_seed,                 # required, never null
+    npt_prod_steps=npt_prod_steps,               # required; null = atom-count-tier default
+    npt_cool_steps=npt_cool_steps,               # required; null = atom-count-tier default
+    npt_cool300_steps=npt_cool300_steps,         # required; null = ~1 ns default
+    melt_npt_steps=melt_npt_steps,               # required; null = ~1 ns default
+    extend_steps=None,                           # required; only extend_only=True calls set it
     polymer_name=polymer_name,
     temp=T_workflow_K,
     max_temp=T_anneal_high_K,
@@ -66,9 +91,7 @@ workflow = generate_equilibration_workflow(
     use_pcff=lammps_flags["use_pcff"],
     use_trappe=lammps_flags["use_trappe"],
     params_file="{work_dir}/emc_build.params",  # EMC only — omit for RadonPy
-    npt_prod_steps=npt_prod_steps,
     engine=engine,                               # selects deck (kokkos: no `package gpu` line)
-    velocity_seed=velocity_seed,
     add_melt_npt=add_melt_npt,                   # True for rubbery (auto-set when T_workflow_K ≤ 300)
     t_equil_K=T_equil_K,                         # required when add_melt_npt=True
 )
@@ -139,12 +162,15 @@ info = inspect_data_file(data_file=extend_from_data)   # sanity-check the equili
 workflow = generate_equilibration_workflow(
     data_file=extend_from_data,
     work_dir_base=work_dir,
+    velocity_seed=velocity_seed,          # same seed as the original run
+    extend_steps=int(extend_ns * 1e6 / dt_fs),
+    npt_prod_steps=None, npt_cool_steps=None,   # required; unused on this path
+    npt_cool300_steps=None, melt_npt_steps=None,
     use_pcff=..., use_opls=..., use_trappe=...,
     temp=npt_prod_temp_K,   # see Rules above — NOT T_equil_K/T_workflow_K
     press=<same as original run>,
     engine=<same as original run>,
     extend_only=True,
-    extend_steps=int(extend_ns * 1e6 / dt_fs),
 )   # → a single `npt_extend` stage
 result = run_lammps_chain(stages=workflow["stages"], gpu_ids=gpu_ids, mpi=mpi_ranks, engine=engine)
 w = watch_run(result["chain_id"])

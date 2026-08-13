@@ -186,6 +186,8 @@ class _FakeEquilLammps:
         self._chain_n = 0
         self.generate_equilibration_workflow_calls = []
         self.inspect_data_file_calls = []
+        self._inspect_errors = []
+        self._inspect_forecast = {"available": False}
         self._atom_type_names = atom_type_names or {}
 
     def _sentinel(self):
@@ -206,9 +208,16 @@ class _FakeEquilLammps:
     def watch_run(self, run_id):
         return {"sentinel_path": str(self._sentinel()), "pidfile": None}
 
-    def inspect_data_file(self, data_file):
+    def inspect_data_file(self, data_file, **kwargs):
+        # **kwargs so this fake keeps matching the real tool as its signature grows
+        # (lj_cutoff / target_density_gcm3 / nchain arm the finite-size forecast).
         self.inspect_data_file_calls.append(data_file)
-        return {"info": {"atom_type_names": self._atom_type_names}}
+        return {
+            "info": {"atom_type_names": self._atom_type_names},
+            "validation": {"valid": True, "errors": list(self._inspect_errors),
+                           "warnings": [], "stats": {}},
+            "finite_size_forecast": self._inspect_forecast,
+        }
 
     def check_equilibration_comprehensive(self, **kwargs):
         return self._comp_results.pop(0)

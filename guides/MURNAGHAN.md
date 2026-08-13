@@ -52,6 +52,7 @@ result = run_bulk_modulus_series(
     run_name=run_name,
     gpu_ids=gpu_ids,
     mpi=mpi_ranks,
+    velocity_seed=velocity_seed,   # from prompt — required, never null
     npt_steps=npt_steps,         # from prompt (default 500000 = 0.5 ns at 1 fs)
     use_trappe=lammps_flags["use_trappe"],
     use_pcff=lammps_flags["use_pcff"],

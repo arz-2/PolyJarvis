@@ -34,8 +34,14 @@ offset baked into PASS/FAIL.
   Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg {polymer_name}",
         prompt=<gen_prompt.py --stage analyze-tg --plan PLAN_PATH
                 --data_path {tg_log_path} --tg_rate_index {IDX}>)
-    → RESULT → Tg_K, Tg_fit_quality, Tg_r_squared, cooling_rate_K_per_ns, output_dir
-  Hold (Tg_K, Tg_fit_quality, output_dir) in state and the D-06 run_log row.
+    → RESULT → Tg_K, Tg_fit_quality, Tg_r_squared, tg_gate_verdict, tg_method_gap_K,
+               cooling_rate_K_per_ns, output_dir
+  Hold (Tg_K, Tg_fit_quality, tg_gate_verdict, output_dir) in state and the D-06 run_log row.
+
+  [Tg reportability]
+  if tg_gate_verdict == "TG_NOT_REPORTABLE":  report no Tg value; D-06 records tg_gate_reasons.
+  if tg_gate_verdict == "TG_REVIEW":       halt to human review before reporting Tg.
+  Either way, continue to the is_glassy determination below — routing is a separate decision.
 
   [is_glassy determination]
   if "tg" in properties_requested:

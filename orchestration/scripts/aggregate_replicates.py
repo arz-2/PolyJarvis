@@ -36,6 +36,51 @@ def _run_summary_path(run_name: str) -> Path:
     return REPO_ROOT / "data" / run_name / "raw" / "run_summary.json"
 
 
+# Replicate spread is the only check that sees a run which passed every per-run gate yet
+# disagrees with its siblings -- e.g. cis-PBD3's K is 16.3% below its family mean with
+# r_squared=0.9985 and no admissibility violation. Per-run fit statistics are blind to it.
+#
+# Deviation is measured in LEAVE-ONE-OUT SDs, not pooled SDs. A pooled-SD rule is
+# unsatisfiable at small n: the largest deviation any single point can have is (n-1)/sqrt(n)
+# pooled SDs, which is 1.5 at n=4 -- so a "beyond 2 SD" rule can never fire on a 4-replicate
+# family, because the outlier inflates the very SD it is compared against. Excluding the
+# candidate first gives cis-PBD3 16.0 LOO-SD while every other archived family's worst point
+# sits at 2.1-3.4.
+#
+# Both conditions must hold. LOO-SD alone would flag a trivially small deviation whenever the
+# remaining replicates happen to agree very tightly (PVC3: 2.7 LOO-SD on a 3.0% deviation),
+# and a percentage alone would flag ordinary replicate scatter (PS4 at 15.3%, PLA3 at 13.7%).
+OUTLIER_LOO_SD = 4.0
+OUTLIER_MIN_DEVIATION_PCT = 10.0
+MIN_REPLICATES_REPORTABLE = 3
+
+
+def _dispersion(replicates: list, mean, sd):
+    """Flag replicates far from the mean of the OTHERS; report the worst deviation."""
+    if mean is None or not replicates or abs(mean) < 1e-12:
+        return [], None
+    max_pct = max(abs(r["value"] - mean) / abs(mean) * 100 for r in replicates)
+    outliers = []
+    if len(replicates) >= 4:
+        for i, r in enumerate(replicates):
+            others = [o["value"] for j, o in enumerate(replicates) if j != i]
+            o_mean = statistics.fmean(others)
+            o_sd = statistics.stdev(others) if len(others) >= 2 else 0.0
+            if o_sd <= 0 or abs(o_mean) < 1e-12:
+                continue
+            loo_sd = abs(r["value"] - o_mean) / o_sd
+            dev_pct = abs(r["value"] - o_mean) / abs(o_mean) * 100
+            if loo_sd > OUTLIER_LOO_SD and dev_pct > OUTLIER_MIN_DEVIATION_PCT:
+                outliers.append({
+                    "run": r["run"],
+                    "value": r["value"],
+                    "others_mean": round(o_mean, 4),
+                    "deviation_pct": round(dev_pct, 2),
+                    "loo_sd": round(loo_sd, 2),
+                })
+    return outliers, round(max_pct, 2)
+
+
 def aggregate(polymer_class: str, run_names: list) -> dict:
     per_property = {prop: {"values": [], "runs_with_value": [], "runs_missing": [],
                             "statuses": {}} for prop in PROPERTIES}
@@ -75,11 +120,19 @@ def aggregate(polymer_class: str, run_names: list) -> dict:
         n = len(vals)
         mean = statistics.fmean(vals) if n else None
         sd = statistics.stdev(vals) if n >= 2 else None
+        outliers, dispersion_pct = _dispersion(per_property[prop]["runs_with_value"], mean, sd)
         aggregated[prop] = {
             "n": n,
             "mean": mean,
             "sd": sd,
             "sd_note": None if n >= 2 else ("insufficient replicates for SD (n<2)" if n else "no valid values"),
+            "max_deviation_pct": dispersion_pct,
+            "dispersion_outliers": outliers or None,
+            "reportable": n >= MIN_REPLICATES_REPORTABLE,
+            "reportable_note": (
+                None if n >= MIN_REPLICATES_REPORTABLE
+                else f"only {n} replicate(s) with a value; need >={MIN_REPLICATES_REPORTABLE}"
+            ),
             "replicates": per_property[prop]["runs_with_value"],
             "runs_missing_value": per_property[prop]["runs_missing"],
             "status_counts": per_property[prop]["statuses"],

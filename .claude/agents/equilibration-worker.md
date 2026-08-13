@@ -22,7 +22,13 @@ You are the equilibration setup worker for PolyJarvis. Your job is to validate t
 `phase` from the prompt is `full` (default), `melt`, or `cooldown` — see the guide's Step 3 for
 the exact split. `full` and `melt` both start the same way:
 
-1. `inspect_data_file(data_file=data_path)`
+1. `inspect_data_file(data_file=data_path, lj_cutoff=cutoff_A,
+   target_density_gcm3=exp_density_gcm3, nchain=nchain)` — **this is the size gate.** A
+   `SIZE_CHAIN_SELF_IMAGE` or `SIZE_MIN_IMAGE_VIOLATION` entry in `validation.errors` means the
+   cell is too small for its own chains: return `step_failed: inspect_data_file` with
+   `finite_size_forecast` verbatim so the orchestrator rebuilds at a larger `nchain`. Do NOT
+   submit the chain — no amount of equilibration fixes a box dimension, and submitting burns the
+   full `t_equil` before the equil-check gate would say the same thing.
 2. Call `generate_equilibration_workflow` (call signature and chain-selection rules in the guide below).
 3. `phase=full`: `run_lammps_chain(stages=workflow["stages"], gpu_ids=gpu_ids, mpi=mpi_ranks)`.
    `phase=melt`: slice `workflow["stages"]` at `workflow["run_order"].index("npt_production")+1`,

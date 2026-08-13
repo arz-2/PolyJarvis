@@ -17,11 +17,14 @@ import sys
 from pathlib import Path
 
 BINDING_GLASSY = {"density_drift", "density_sem", "energy_drift", "energy_sem",
-                   "density_in_band", "density_homogeneity", "p2"}
-ADVISORY_GLASSY = {"ct", "rg", "msid_gaussian", "msd_not_trapped"}
+                   "density_in_band", "density_homogeneity", "p2", "n_eff_density",
+                   "finite_size"}
+ADVISORY_GLASSY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "residual_stress"}
 
-BINDING_RUBBERY = {"density_sem", "density_homogeneity", "energy_drift", "energy_sem"}
-ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_drift"}
+BINDING_RUBBERY = {"density_sem", "density_homogeneity", "energy_drift", "energy_sem",
+                   "n_eff_density", "finite_size"}
+ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_drift",
+                    "residual_stress"}
 # density_drift isn't in require_rubbery's binding text (density_sem is); treated advisory here.
 
 # MSD diffusivity metrics are advisory everywhere, unconditionally -- decision_policy.json's
@@ -31,7 +34,14 @@ ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_dri
 # overall_pass unsatisfiable by construction. classify()'s plain-require branch defaults every
 # gates key to binding; this carve-out is applied there too, explicitly -- not decided as a
 # side effect of dict membership.
-ALWAYS_ADVISORY = {"msd_not_trapped", "msid_gaussian"}
+#
+# residual_stress joins them for the same class of reason, but by calibration status
+# rather than by physics: a resolved deviatoric stress IS a genuine mechanical-equilibrium
+# violation (glassy cells carry 100-290 atm, 10-29% of the +/-1000 atm Murnaghan increment,
+# while their melts are stress-isotropic), but every archived glassy run violates it to some
+# degree, so binding it before the magnitude bound is calibrated would halt the whole glassy
+# track. It is emitted and logged now; promote to STRUCTURAL_GATES once the bound is set.
+ALWAYS_ADVISORY = {"msd_not_trapped", "msid_gaussian", "residual_stress"}
 
 D05_PLACEHOLDER_RE = re.compile(r"\[PASS\s*/\s*EXTEND[×x]N\s*/\s*ESCALATE\]", re.IGNORECASE)
 
@@ -85,6 +95,68 @@ def classify(gates: dict, regime: str, dp_typical, ct_gate_reliable):
     return clause, binding_results, advisory_results
 
 
+def collect_gates(comp: dict) -> dict:
+    """Pull every per-gate pass boolean out of equilibration_comprehensive.json.
+
+    Single source of truth for both enforce() and enforce_live() -- a gate key added to
+    only one of them would be a silent no-op in the other path.
+    """
+    thermo = comp.get("thermo", {})
+    chain = comp.get("chain", {})
+    spatial = comp.get("spatial", {})
+    return {
+        "density_drift": thermo.get("density_drift", {}).get("pass"),
+        "energy_drift": thermo.get("energy_drift", {}).get("pass"),
+        "density_sem": thermo.get("density_sem", {}).get("pass"),
+        "energy_sem": thermo.get("energy_sem", {}).get("pass"),
+        "n_eff_density": thermo.get("n_eff_density", {}).get("pass"),
+        "residual_stress": residual_stress_gate(thermo),
+        "rg": chain.get("rg", {}).get("pass"),
+        "ct": chain.get("ct", {}).get("pass"),
+        "p2": spatial.get("p2", {}).get("pass"),
+        "density_homogeneity": spatial.get("density_homogeneity", {}).get("pass"),
+        "finite_size": finite_size_gate(spatial),
+        **msd_msid_gates(chain),
+    }
+
+
+def residual_stress_gate(thermo: dict):
+    """Pass-polarity entry for the mechanical-equilibrium check -- advisory (see
+    ALWAYS_ADVISORY). None when the log carried no pressure tensor. Never thresholds
+    z, which grows as sqrt(n); `resolved` only says the deviatoric stress is measurable."""
+    rs = thermo.get("residual_stress") or {}
+    if not rs.get("available"):
+        return None
+    return not rs.get("resolved", False)
+
+
+def finite_size_gate(spatial: dict):
+    """Pass-polarity entry for the periodic self-imaging checks. None when the box or Rg
+    could not be measured. Binding and STRUCTURAL: neither a minimum-image violation nor a
+    chain overlapping its own image can be fixed by sampling longer -- the cell is wrong."""
+    fs = spatial.get("finite_size") or {}
+    if not fs.get("available"):
+        return None
+    return fs.get("pass")
+
+
+def finite_size_verdict(comp: dict):
+    """SIZE_MIN_IMAGE_VIOLATION | SIZE_CHAIN_SELF_IMAGE | SIZE_PASS | None."""
+    fs = (comp.get("spatial") or {}).get("finite_size") or {}
+    return fs.get("verdict") if fs.get("available") else None
+
+
+def finite_size_min_image_unarmed(comp: dict) -> bool:
+    """True when the gate ran but L >= 2*cutoff_A was never evaluated (no cutoff_A passed).
+
+    A SIZE_PASS then rests on the 2*Rg criterion alone. Surfaced so the omission cannot sit
+    unnoticed: minimum image is cleared by 2-3x on realistic cells, so its silent
+    non-evaluation almost never changes a verdict, which is exactly why it can stay broken.
+    """
+    fs = (comp.get("spatial") or {}).get("finite_size") or {}
+    return bool(fs.get("available") and not fs.get("min_image_evaluated", True))
+
+
 def msd_msid_gates(chain: dict) -> dict:
     """Pass-polarity gate entries for the MSD kinetic-trap flag and the MSID Gaussian-chain
     check, computed by check_equilibration_comprehensive.py at chain.msd / chain.msid but
@@ -97,10 +169,14 @@ def msd_msid_gates(chain: dict) -> dict:
 
 
 # Gates that a 300K EXTEND can actually fix (not-yet-converged, not structurally wrong).
-EXTENDABLE_GATES = {"density_drift", "energy_drift", "density_sem", "energy_sem"}
+# n_eff_density belongs here: too few independent samples is undersampling of a valid
+# state, and more NPT at the same temperature is exactly the remedy.
+EXTENDABLE_GATES = {"density_drift", "energy_drift", "density_sem", "energy_sem",
+                    "n_eff_density"}
 # Gates whose failure means the cell is WRONG, not merely unconverged -- extending at 300K
 # cannot fix these (policy: "a glass cannot densify below Tg").
-STRUCTURAL_GATES = {"density_homogeneity", "density_in_band", "p2", "density_value_binding"}
+STRUCTURAL_GATES = {"density_homogeneity", "density_in_band", "p2", "density_value_binding",
+                    "finite_size"}
 
 
 def enforce(run_name, repo_root: Path):
@@ -130,20 +206,7 @@ def enforce(run_name, repo_root: Path):
     ct_gate_reliable = cls_rules.get("ct_gate_reliable")
 
     # --- pull per-gate pass booleans from equilibration_comprehensive.json ---
-    thermo = comp.get("thermo", {})
-    chain = comp.get("chain", {})
-    spatial = comp.get("spatial", {})
-    gates = {
-        "density_drift": thermo.get("density_drift", {}).get("pass"),
-        "energy_drift": thermo.get("energy_drift", {}).get("pass"),
-        "density_sem": thermo.get("density_sem", {}).get("pass"),
-        "energy_sem": thermo.get("energy_sem", {}).get("pass"),
-        "rg": chain.get("rg", {}).get("pass"),
-        "ct": chain.get("ct", {}).get("pass"),
-        "p2": spatial.get("p2", {}).get("pass"),
-        "density_homogeneity": spatial.get("density_homogeneity", {}).get("pass"),
-        **msd_msid_gates(chain),
-    }
+    gates = collect_gates(comp)
 
     # --- density-in-band (density_value_binding target) ---
     exp_density_dict = cls_rules.get("experimental_density_gcm3")
@@ -228,20 +291,7 @@ def enforce_live(args) -> dict:
     if comp is None:
         return {"verdict": "FAIL", "reason": f"missing {args.comprehensive_json}"}
 
-    thermo = comp.get("thermo", {})
-    chain = comp.get("chain", {})
-    spatial = comp.get("spatial", {})
-    gates = {
-        "density_drift": thermo.get("density_drift", {}).get("pass"),
-        "energy_drift": thermo.get("energy_drift", {}).get("pass"),
-        "density_sem": thermo.get("density_sem", {}).get("pass"),
-        "energy_sem": thermo.get("energy_sem", {}).get("pass"),
-        "rg": chain.get("rg", {}).get("pass"),
-        "ct": chain.get("ct", {}).get("pass"),
-        "p2": spatial.get("p2", {}).get("pass"),
-        "density_homogeneity": spatial.get("density_homogeneity", {}).get("pass"),
-        **msd_msid_gates(chain),
-    }
+    gates = collect_gates(comp)
 
     regime = args.regime
     dp_typical = args.dp
@@ -309,13 +359,49 @@ def enforce_live(args) -> dict:
 
     remedy = None
     remedy_confidence = "high"
-    if verdict == "STRUCTURAL_FAIL":
-        if cooling_verdict == "UNDER_ANNEALED_COOLING":
-            remedy = "re_melt_slow_recool (re-melt above Tg, re-equilibrate, cool slower / more anneal cycles — do NOT extend at 300K)"
+    fs_verdict = finite_size_verdict(comp)
+    if verdict == "EXTEND":
+        # Size the extension from the deficit rather than a flat 1.5 ns: a run at n_eff=11
+        # against a floor of 20 needs ~2x the sampling, not one more nominal nanosecond.
+        n_eff = ((comp.get("thermo") or {}).get("n_eff_density") or {}).get("n_eff")
+        n_eff_min = ((comp.get("thermo") or {}).get("n_eff_density") or {}).get("n_eff_min", 20)
+        if "n_eff_density" in failing_binding and n_eff:
+            extend_ns = round(1.5 * max(1.0, n_eff_min / max(n_eff, 1)), 1)
+            remedy = (f"extend_only at the SAME temperature: extend_ns={extend_ns} "
+                      f"(1.5 x {n_eff_min}/{n_eff} independent-sample deficit). "
+                      "phase=full extends npt_prod_data_path at npt_prod_temp_K; phase=melt "
+                      "extends npt_production_data_path at T_workflow_K. Cap 2 per gate.")
+        else:
+            remedy = ("extend_only at the SAME temperature: extend_ns = "
+                      "max(1.5, 1.5*ct_tau_relax_ps/1000), else 1.5 ns. Never re-melt a cooled "
+                      "glass — phase=full uses npt_prod_temp_K, not T_equil_K. Cap 2 per gate.")
+    elif verdict == "STRUCTURAL_FAIL":
+        if fs_verdict == "SIZE_MIN_IMAGE_VIOLATION":
+            remedy = ("REBUILD LARGER — L < 2*cutoff_A means the pair potential itself is wrong "
+                      "(atoms interact with their own images). Raise nchain (or dp) until "
+                      "L >= 2*cutoff_A; no re-equilibration of this cell is meaningful.")
+        elif fs_verdict == "SIZE_CHAIN_SELF_IMAGE":
+            remedy = ("REBUILD LARGER — L < 2*Rg means every chain overlaps its own periodic "
+                      "images, biasing packing and therefore density and the moduli. Raise nchain "
+                      "(cell volume scales with it at fixed density, so L grows as nchain^(1/3)) "
+                      "until L >= 2*Rg. Extending or re-cooling cannot fix a too-small box.")
+        elif cooling_verdict == "UNDER_ANNEALED_COOLING":
+            remedy = ("re_melt_slow_recool — re-melt from npt_production_out.data at T_equil_K "
+                      "(never the 300 K cell) and slow the ramp: npt_cool300_steps and "
+                      "npt_cool_steps x2 on attempt 1, x4 on attempt 2 (max 2). Baselines: "
+                      "npt_cool300_steps=int(1.0e6/dt_fs); npt_cool_steps from the atom tier "
+                      "(<5000->1e6, <15000->2e6, else 3e6). Do NOT extend at 300 K.")
         elif cooling_verdict == "MELT_STAGE_DEFICIT":
-            remedy = "heavy_melt_anneal_probe (NkepsuMbitou 10-TAC) — distinguish FF underbinding from melt under-annealing before any protocol change"
+            remedy = ("heavy_melt_anneal_probe — re-generate the workflow with add_melt_npt=True, "
+                      "t_equil_K=<class T_equil_K>, and melt_npt_steps=10*int(1.0e6/dt_fs) "
+                      "(~10 ns hold) on attempt 1, 50x (~50 ns) on attempt 2; re-run the "
+                      "phase=melt gate after each. The 1 ns default is ~100x short of the ~100 ns "
+                      "melt anneal that reached PMMA 1.19 g/cm3 (NkepsuMbitou 2025). Still "
+                      "under-band after rung 2 -> escalate to a different force field.")
         elif "density_homogeneity" in failing_binding:
-            remedy = "extend melt-stage mixing time (melt_npt_steps / t_equil_ns) and re-verify homogeneity CV pre-cooling"
+            remedy = ("MELT-MIXING — extend the melt stage in place (phase=melt extend_only at "
+                      "T_workflow_K, cap 2), then re-run the phase=melt gate. Never re-melt from "
+                      "scratch and never touch the cooling ramp for a mixing defect.")
         else:
             remedy = "route to RECOVERY — structural gate failure without a specific density_value_binding diagnosis"
 
@@ -333,6 +419,18 @@ def enforce_live(args) -> dict:
         "advisory_gates": advisory_results,
         "density_gap_pct": round(gap_pct, 2) if gap_pct is not None else None,
         "density_value_binding": dvb_status,
+        # Structured, not only embedded in the remedy prose: the melt/cooling split is
+        # alpha-extrapolated and unreliable past a 300 K span (PKTN 470 K, PSFO 400 K),
+        # so a consumer that reports the verdict must be able to read that flag.
+        # None means no cooling assessment applied here, NOT "reliable".
+        "cooling_verdict": cooling_verdict,
+        "cooling_extrapolation_reliable": cooling_reliable if cooling_verdict else None,
+        "homogeneity_verdict": ((comp.get("spatial") or {})
+                                .get("density_homogeneity", {}).get("verdict")),
+        "finite_size_verdict": fs_verdict,
+        "finite_size": (comp.get("spatial") or {}).get("finite_size"),
+        "finite_size_min_image_unarmed": finite_size_min_image_unarmed(comp),
+        "residual_stress": (comp.get("thermo") or {}).get("residual_stress"),
         "failing_binding_gates": failing_binding,
         "verdict": verdict,
         "remedy": remedy,

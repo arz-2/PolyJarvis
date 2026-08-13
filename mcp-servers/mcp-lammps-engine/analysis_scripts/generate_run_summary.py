@@ -384,6 +384,9 @@ def main():
                 # tg_dsc_equiv_K is the reported "theoretical DSC-equivalent experimental Tg".
                 "tg_dsc_equiv_K":      tg_mr.get("tg_at_slow_rate_K"),
                 "loglinear_slope_K":   tg_mr.get("loglinear_slope_K"),
+                # Per e-fold above; the per-decade value is the one to grade against the
+                # 3-5 K/decade physical expectation. Older artifacts lack it -> None.
+                "loglinear_slope_K_per_decade": tg_mr.get("loglinear_slope_K_per_decade"),
                 "loglinear_r_squared": tg_mr.get("loglinear_r_squared"),
                 "vf_fit_quality":      tg_mr.get("vf_fit_quality"),
                 "n_rates":             tg_mr.get("n_points"),

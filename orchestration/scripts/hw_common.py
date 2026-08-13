@@ -154,6 +154,9 @@ def resolve_ff_family(ff_raw: str, hp: dict) -> str:
     fam = hp.get("ff_aliases", {}).get(ff_raw) or hp.get("ff_aliases", {}).get(ff_raw.upper())
     if fam is None:
         fl = ff_raw.lower()
-        fam = ("pcff" if "pcff" in fl else "opls" if "opls" in fl
+        # compass shares pcff's class2 functional form and its hardware profile, but
+        # contains neither "pcff" nor any other family token, so the substring chain
+        # below would silently drop it into "gaff" -- a different engine and rank count.
+        fam = ("pcff" if ("pcff" in fl or fl == "compass") else "opls" if "opls" in fl
                else "trappe" if "trappe" in fl else "gaff")
     return fam

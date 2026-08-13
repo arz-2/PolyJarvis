@@ -1,0 +1,214 @@
+{
+  "scope": "force-field selection methodology for novel polymers",
+  "generated_at": "2026-08-12T13:20:34Z",
+  "sub_questions": {
+    "1_benchmark_studies": {
+      "findings": [
+        {
+          "claim": "PDMS benchmark of 5 force fields (UA/Frischknecht-Curro, HUANG improved Class II, COMPASS, OPLS-AA, DREIDING) against experimental density/Cp/compressibility/viscosity/thermal conductivity vs temperature. Density RMSE (g/cm3): HUANG 0.0101 (best), OPLS-AA 0.0414, UA 0.0523, DREIDING 0.1337, COMPASS 0.1781 (worst). COMPASS consistently OVERESTIMATED density across the temperature range.",
+          "doi": "10.1021/acs.jpcb.4c08471",
+          "title": "Force-Field Benchmark for Polydimethylsiloxane: Density, Heat Capacity, Isothermal Compressibility, Viscosity and Thermal Conductivity",
+          "year": 2025,
+          "doi_verified": true,
+          "polymers": ["PDMS"],
+          "fields": ["COMPASS", "OPLS-AA", "DREIDING", "UA (Frischknecht-Curro)", "HUANG (modified Class II)"],
+          "reported_errors": "Density RMSE g/cm3: HUANG 0.0101, OPLS-AA 0.0414, UA 0.0523, DREIDING 0.1337, COMPASS 0.1781; COMPASS sign is OVER-prediction, not under-prediction",
+          "relevance": "Direct multi-FF, same-polymer, same-metric comparison including COMPASS; shows a Class-II field (COMPASS) can be the WORST performer and can err in the opposite direction (over-density) from our measured PCFF under-density, contradicting any assumption that all Class-II fields share PCFF's sign/magnitude of bias"
+        },
+        {
+          "claim": "Review of all-atom force fields on PMMA and polyisobutylene (PIB): Class II force fields (PCFF/COMPASS-family) reproduced amorphous density of both polymers within 2% of experiment; OPLS-AA was the only field to keep PIB density error within 2%; GAFF showed discrepancies above 5% for PMMA.",
+          "doi": "10.1016/j.commatsci.2025.113861",
+          "title": "A review on all-atom force fields capabilities to predict polymer properties: Case of poly(methyl methacrylate) and polyisobutylene polymer systems",
+          "year": 2025,
+          "doi_verified": true,
+          "polymers": ["PMMA", "polyisobutylene (PIB)"],
+          "fields": ["PCFF/COMPASS (Class II)", "OPLS-AA", "GAFF"],
+          "reported_errors": "Class II fields: density within 2% for PMMA and PIB (i.e. no systematic large deficit reported for these two polymers); GAFF: >5% error on PMMA density (sign not specified in accessible abstract/snippet); OPLS-AA: within 2% for PIB",
+          "relevance": "This is a chemistry-adjacent (acrylic, hydrocarbon) literature counterexample: it reports Class II (PCFF-family) density performance WITHIN 2% for PMMA specifically, which is inconsistent in magnitude with our measured PCFF PMMA density deficit of -6.2%. Full text is paywalled beyond the verified abstract/summary, so the exact PCFF-vs-COMPASS split and sign are not confirmed at full resolution."
+        },
+        {
+          "claim": "Atomistic polymer modeling review surveying 82 published MD studies found COMPASS is the most widely used force field for synthetic polymer simulation, followed by OPLS-AA; PCFF was NOT found to be the primary force field used, and PCFF 'has not undergone the same level of continuous refinement and benchmarking as general-purpose force fields, resulting in inaccuracies for some chemistries.' 23 different force fields were used across the 82 studies, with ad-hoc modifications in 27 instances.",
+          "doi": "10.1021/acs.macromol.5c01166",
+          "title": "Atomistic Polymer Modeling: Recent Advances and Challenges in Building and Parametrization Workflows",
+          "year": 2025,
+          "doi_verified": true,
+          "polymers": ["cross-polymer survey, 82 studies"],
+          "fields": ["COMPASS", "OPLS-AA", "PCFF", "21 others"],
+          "reported_errors": "No single aggregated error table; qualitative finding that PCFF specifically is flagged as under-benchmarked relative to COMPASS/OPLS-AA in the literature",
+          "relevance": "Corroborates that PCFF is comparatively less validated in the open literature than COMPASS/OPLS-AA — this is consistent with (does not contradict) a possibility that PCFF's polymer-density bias is under-characterized rather than well-established at -5.9%"
+        }
+      ],
+      "synthesis": "Multi-force-field, same-polymer benchmark studies exist but are sparse and polymer-specific. Where COMPASS is directly benchmarked against other fields on a single polymer (PDMS), it is not uniformly better than PCFF-family or OPLS-AA — it is reported as the WORST performer among 5 fields tested, and it OVER-predicts rather than under-predicts density. On PMMA/PIB, Class II (PCFF-family) is reported within 2% of experimental density, which is a smaller error than our measured -6.2% PMMA deficit. GAFF is reported to have >5% error on PMMA (same order as our PCFF numbers but a different chemistry-specific case, not a general GAFF-beats-PCFF result).",
+      "gaps": "No literature source found that reproduces our exact systematic -5.9% PCFF density deficit across PEEK/PEG/PMMA/PS as a class-wide trend; no study benchmarks COMPASS or GAFF2 against PCFF on PEEK, PEG, or PS specifically (our four chemistries). The PDMS and PMMA/PIB studies are the only same-polymer multi-FF benchmarks found and neither covers our four polymers or corroborates our specific magnitude/sign."
+    },
+    "2_highthroughput_pipelines": {
+      "findings": [
+        {
+          "claim": "RadonPy (open-source high-throughput MD pipeline for polymer informatics, PoLyInfo-scale, >1000 amorphous polymers, 15 properties) standardizes on GAFF2 for all polymer chemistries. Justification given is GAFF2's broad chemical coverage/established parameterization and automatic bonded/non-bonded assignment via heuristic rules for missing parameters — not a per-polymer field-selection step. The authors explicitly report that GAFF2 density calculation for high-density organic liquids/polymers is 'often poorly performed' and correct this with a machine-learning transfer-learning bias-correction step applied AFTER the raw MD density, rather than by switching force fields.",
+          "doi": "10.1038/s41524-022-00906-4",
+          "title": "RadonPy: automated physical property calculation using all-atom classical molecular dynamics simulations for polymer informatics",
+          "year": 2022,
+          "doi_verified": true,
+          "polymers": ["general pipeline, >1000 amorphous polymers"],
+          "fields": ["GAFF2"],
+          "reported_errors": "Systematic GAFF2 density bias acknowledged and corrected post hoc via ML/transfer learning rather than resolved by force-field choice",
+          "relevance": "Directly answers Q2: RadonPy fixes ONE force field (GAFF2) for ALL chemistries rather than doing per-polymer FF selection, and treats a known systematic FF density bias as a statistical correction problem, not a force-field-choice problem. This is a precedent for correcting rather than avoiding a known systematic bias."
+        },
+        {
+          "claim": "A separate GPU-MD high-throughput workflow standardized on the OPLS3e force field and calculated Tg for 315 polymers with experimental values reported, finding 'good agreement' between predicted and experimental Tg across polymer subsets.",
+          "doi": "10.1021/acsapm.0c00524",
+          "title": "High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications",
+          "year": 2020,
+          "doi_verified": true,
+          "polymers": ["315 polymers, cross-chemistry screening set"],
+          "fields": ["OPLS3e"],
+          "reported_errors": "Qualitative 'good agreement' claimed; no per-polymer quantitative RMSE verified from accessible text (full text paywalled beyond abstract-level claims retrieved via search snippet, not independently WebFetch-confirmed)",
+          "relevance": "A second precedent for fixing one general-purpose all-atom field (OPLS3e) across an entire cross-chemistry high-throughput screen rather than selecting per-polymer."
+        }
+      ],
+      "synthesis": "The two identified high-throughput pipelines (RadonPy/GAFF2, OPLS3e-workflow) both fix a single force field across all chemistries screened; neither implements automated per-polymer force-field selection. Known systematic bias (RadonPy's GAFF2 density bias) is handled by a statistical/ML bias-correction layer applied after MD, not by switching fields per polymer.",
+      "gaps": "No high-throughput pipeline was found that performs automated force-field selection conditioned on polymer chemistry. This means there is no published precedent to cite for a 'pick PCFF vs GAFF2 vs COMPASS per polymer' step — the literature's answer to 'how do pipelines decide' is largely 'they don't decide per-polymer; they pick one field and, if needed, statistically correct its bias.'"
+    },
+    "3_transferability_criteria": {
+      "findings": [
+        {
+          "claim": "82-study literature survey found no systematic, quantitative relationship established in the literature between a force field's parameterization/training-set coverage and prediction error; instead the dominant practice found was ad-hoc post-hoc parameter modification to match experimental targets, which the authors state causes 'parameter proliferation, loss of transferability, and importantly poor reproducibility' — i.e., the field lacks a standardized error-prediction criterion based on chemical distance from the training set.",
+          "doi": "10.1021/acs.macromol.5c01166",
+          "title": "Atomistic Polymer Modeling: Recent Advances and Challenges in Building and Parametrization Workflows",
+          "year": 2025,
+          "doi_verified": true,
+          "polymers": ["cross-polymer survey"],
+          "fields": ["23 force fields surveyed"],
+          "reported_errors": "No quantitative correlation between training-set coverage and error was found reported anywhere in the surveyed literature",
+          "relevance": "This is the closest published statement to our own measurement that extrapolated-atom-fraction does not predict |error| (our correlations: -0.26 on K, -0.64 on density, i.e. negative, meaning MORE extrapolation associates with LOWER error in our data). The review does not report a quantitative test either way — it reports absence of such a test in the literature, which does not contradict our finding but also does not corroborate it; it corroborates the ABSENCE of an established transferability-predicts-error relationship."
+        }
+      ],
+      "synthesis": "No paper was found that quantitatively tests whether being outside a force field's parameterization set predicts larger simulated-property error, for or against. The one relevant review found states the community relies on ad-hoc post-hoc reparameterization rather than a principled applicability-domain metric, which is itself evidence the field has no validated transferability-predicts-error criterion.",
+      "gaps": "No study directly measures or reports a correlation (positive or negative) between atom-type/chemistry extrapolation and property error, so our own negative-correlation finding (-0.26 K, -0.64 density) is neither corroborated nor contradicted by anything found — it appears to be a genuinely novel quantitative result relative to the searched literature."
+    },
+    "4_reference_free_validation": {
+      "findings": [
+        {
+          "claim": "A modified group-contribution (GAP-based) scheme for Tg prediction, validated on 198 homopolymers, achieved R2=0.9925 (in-sample) with mean relative error 8.09% (96/194 polymers <5% MRE, 87/194 in 5-20% MRE). Reports Bicerano's method at R2=0.9749 on a 320-polymer dataset for comparison (explicitly caveating that R2 values are not strictly comparable across differing datasets).",
+          "doi": "10.1021/acsomega.0c04499",
+          "title": "Modified Group Contribution Scheme to Predict the Glass-Transition Temperature of Homopolymers through a Limiting Property Dataset",
+          "year": 2020,
+          "doi_verified": true,
+          "polymers": ["198 homopolymers (in-sample)"],
+          "fields": ["group contribution / GAP, not MD"],
+          "reported_errors": "MRE 8.09% in-sample; ~50% of polymers under 5% MRE; Bicerano comparator R2=0.9749 on a different (320-polymer) dataset",
+          "relevance": "Direct evidence for Q4a: group-contribution Tg accuracy is roughly 8% MRE in-sample, on ~200 polymers, but validation is in-sample, not out-of-sample/held-out, which is the relevant regime for a truly novel polymer"
+        },
+        {
+          "claim": "A hybrid QSPR-GAP method on 146 PAEK-family polymers (77 homopolymers + 69 copolymers) achieved a median out-of-sample RMSE of 8 K for Tg, versus an earlier traditional GAP (van-Krevelen-style) method's in-sample MAE of ~10 K (Weyland et al.), and the authors state traditional GAP methods specifically fail for polymers containing structural fragments absent from the training set.",
+          "doi": "10.1021/acs.macromol.5c00178",
+          "title": "Polymer Informatics Method for Fast and Accurate Prediction of the Glass Transition Temperature from Chemical Structure",
+          "year": 2025,
+          "doi_verified": true,
+          "polymers": ["146 poly(aryl ether ketone) family polymers"],
+          "fields": ["QSPR-GAP hybrid, not MD"],
+          "reported_errors": "median out-of-sample RMSE 8 K (QSPR-GAP) vs ~10 K in-sample MAE for traditional van-Krevelen-type GAP",
+          "relevance": "Directly on PAEK family (chemically adjacent to our PEEK polymer of interest); confirms group-contribution Tg estimators are usable to roughly +-10 K in this family but that the traditional (non-hybrid) van-Krevelen-style approach specifically degrades for novel fragments — relevant caution for using group contribution as a reference-free check on a genuinely novel polymer"
+        },
+        {
+          "claim": "Cohesive-energy-density-derived Hildebrand/Hansen solubility parameters computed via a multi-sample MD procedure with a consistent force field and QM-derived charges achieve RMS accuracy of ~1.1 Hildebrands vs experimental solubility-parameter tables, and the method is proposed explicitly as a discriminating check against experimental/tabulated solubility-parameter data.",
+          "doi": "10.1002/jcc.20098",
+          "title": "Hildebrand and Hansen solubility parameters from Molecular Dynamics with applications to electronic nose polymer sensors",
+          "year": 2004,
+          "doi_verified": true,
+          "polymers": ["multiple sensor-relevant polymers"],
+          "fields": ["general MD/CED methodology, force-field-agnostic method description"],
+          "reported_errors": "RMS ~1.1 Hildebrands vs tabulated experimental solubility parameters",
+          "relevance": "Direct evidence for Q4b: CED/solubility-parameter comparison against Hansen/Hildebrand group-contribution tables IS used in the literature as an independent MD validation observable, with a reported discriminating accuracy of ~1.1 Hildebrands (roughly a few percent of typical polymer delta values ~15-25 (J/cm3)^0.5)"
+        }
+      ],
+      "synthesis": "Group-contribution Tg estimators achieve roughly 8-10 K (or ~5-10% MRE) accuracy against experiment when validated in-sample on 150-320 polymer datasets; true out-of-sample performance on structurally novel fragments is explicitly flagged as a weakness of traditional (van Krevelen/Bicerano-style) group contribution, motivating newer hybrid QSPR-GAP methods. CED/solubility-parameter comparison against Hansen/Hildebrand tables is an established, force-field-agnostic reference-free check with ~1.1 Hildebrand RMS discriminating power, independent of the density/Tg pathway.",
+      "gaps": "No literature source gives explicit accuracy numbers for van Krevelen's or Bicerano's ORIGINAL (unmodified) methods on truly out-of-training-set novel polymers — every quantitative accuracy number found is in-sample or on a chemically related family (PAEK), not a genuinely novel/unseen chemistry, which is exactly our use case. No source was found directly comparing CED discrimination power against amorphous-density or Tg discrimination power for judging force-field trustworthiness (i.e., no head-to-head 'CED vs density vs Tg as the most sensitive reference-free check' comparison)."
+    },
+    "5_compass_gaff2_validation_scope": {
+      "findings": [
+        {
+          "claim": "Original COMPASS force field (Sun 1998) validation set spans molecular liquids and molecular crystals across 28 molecular classes, emphasizing small-to-medium molecules; explicit polymer-relevant claim found is PEO: density predicted to accuracy of 1-2% over >=200 K and 180 MPa ranges, with oligomer-to-high-molar-mass PEO extrapolation accurate to better than 1%.",
+          "doi": "10.1021/jp980939v",
+          "title": "COMPASS: An ab Initio Force-Field Optimized for Condensed-Phase Applications-Overview with Details on Alkane and Benzene Compounds",
+          "year": 1998,
+          "doi_verified": true,
+          "polymers": ["PEO (explicit polymer case); alkanes/benzene as primary validation focus"],
+          "fields": ["COMPASS"],
+          "reported_errors": "PEO density <1-2% error claimed by the original developers",
+          "relevance": "Confirms original COMPASS validation was primarily on small molecules (alkanes, benzene) with PEO as essentially the sole amorphous-polymer-bulk validation case in the founding paper; broad polymer-family coverage (aromatic/heteroatom-rich polymers like PEEK/polysulfone analogs) is NOT part of the original validation set"
+        },
+        {
+          "claim": "COMPASS II (2016) extended COMPASS coverage specifically to 'polymer and drug-like molecule databases' using a fragmentation method to construct small molecules exhibiting key functional groups found in those databases -- i.e. extension is via small-molecule fragments representative of polymer functional groups, not via direct amorphous-bulk polymer density/Tg validation.",
+          "doi": "10.1007/s00894-016-2909-0",
+          "title": "COMPASS II: extended coverage for polymer and drug-like molecule databases",
+          "year": 2016,
+          "doi_verified": true,
+          "polymers": ["fragment-level extension targeting polymer-database functional groups, not amorphous-bulk polymer validation"],
+          "fields": ["COMPASS II"],
+          "reported_errors": "Not available from accessible abstract-level text",
+          "relevance": "Clarifies that COMPASS II's 'polymer coverage' claim is atom-type/fragment coverage, not amorphous-bulk density/Tg validation on actual polymer melts -- the same gap our own measurement found (atom-type coverage does not track bulk-property error)"
+        },
+        {
+          "claim": "RadonPy (GAFF2 for >1000 amorphous polymers) is the only identified source with amorphous-polymer-bulk (not small-molecule-liquid) validation of GAFF2, and it explicitly reports GAFF2 density is 'often poorly performed' for high-density organic systems, correcting this with post-hoc ML bias correction rather than reporting GAFF2 as inherently accurate on bulk polymer density.",
+          "doi": "10.1038/s41524-022-00906-4",
+          "title": "RadonPy: automated physical property calculation using all-atom classical molecular dynamics simulations for polymer informatics",
+          "year": 2022,
+          "doi_verified": true,
+          "polymers": [">1000 amorphous polymers, cross-chemistry"],
+          "fields": ["GAFF2"],
+          "reported_errors": "Systematic density bias acknowledged, magnitude not isolated by chemistry class in the accessible summary; corrected via transfer learning post-simulation",
+          "relevance": "Directly answers whether GAFF2 has amorphous-polymer-bulk (not just small-molecule) validation: yes, at scale (>1000 polymers), but with an admitted systematic density bias requiring statistical correction -- GAFF2 is not presented by its own largest-scale users as bias-free on bulk polymer density"
+        }
+      ],
+      "synthesis": "COMPASS's foundational validation is predominantly small-molecule-liquid/crystal, with PEO as essentially the sole polymer-bulk case (<1-2% density) in the original paper; COMPASS II's 'polymer' extension is fragment/atom-type coverage of polymer functional groups via small-molecule surrogates, not direct amorphous-bulk density/Tg validation across polymer families. GAFF2's only identified large-scale amorphous-polymer-bulk validation (RadonPy, >1000 polymers) reports and statistically corrects a systematic density bias rather than presenting the field as accurate out of the box. No source was found presenting GAFF2 (or GAFF2_mod) amorphous-bulk validation specifically for aromatic, ring-rich polymer families like PEEK or polysulfone.",
+      "gaps": "No polymer-family-resolved density/Tg accuracy table was found for either COMPASS or GAFF2 broken out by chemistry (e.g., aromatic vs aliphatic vs heteroatom-backbone), so no literature basis was found to defend or reject GAFF2 specifically for PEEK/polysulfone-class aromatic backbones as our fallback from PCFF. The claim that GAFF2 is 'defensible for aromatic polymers' is UNSUPPORTED by anything found -- it is a validated small-molecule/aliphatic-heavy force field with an admitted systematic bulk-density bias at the polymer scale, and no aromatic-polymer-specific bulk-density number was located for it."
+    }
+  },
+  "selection_criteria_extracted": [
+    {
+      "criterion": "Prefer a field with a same-polymer or same-family published benchmark reporting signed density/Tg error against experiment, over a field chosen solely on general reputation.",
+      "how_to_apply": "Before adopting a fallback field for a novel/no-experimental-data polymer, search for any same-polymer or same-family multi-FF benchmark (as in the PDMS and PMMA/PIB cases found here); if none exists, treat the fallback choice as unvalidated rather than assuming general-purpose reputation transfers.",
+      "evidence_strength": "moderate",
+      "sources": ["10.1021/acs.jpcb.4c08471", "10.1016/j.commatsci.2025.113861"]
+    },
+    {
+      "criterion": "Do not assume atom-type/fragment coverage of a novel chemistry by a force field's parameterization set predicts lower simulated-property error; the literature has not established this relationship, and directly measuring it (as we did, -0.26 K, -0.64 density) is more informative than an a-priori coverage argument.",
+      "how_to_apply": "Treat 'this polymer contains atom types outside the field's training set' as a flag for verification-needed, not as a predictor of error direction or magnitude, when deciding whether to trust a force field on a novel polymer.",
+      "evidence_strength": "weak",
+      "sources": ["10.1021/acs.macromol.5c01166"]
+    },
+    {
+      "criterion": "When no experimental data exists, use CED/solubility-parameter comparison against Hansen/Hildebrand group-contribution tables as an independent (density/Tg-orthogonal) reference-free check, expecting ~1 Hildebrand-unit discriminating accuracy.",
+      "how_to_apply": "Compute CED from the equilibrated MD cell and compare to a group-contribution-estimated solubility parameter for the polymer's chemistry; treat disagreement beyond ~1-2 Hildebrands as a flag against the force field/parameterization, independent of the density/Tg gates already in use.",
+      "evidence_strength": "moderate",
+      "sources": ["10.1002/jcc.20098"]
+    },
+    {
+      "criterion": "Group-contribution Tg estimators (van Krevelen/Bicerano-style, or newer hybrid QSPR-GAP) can serve as a reference-free Tg sanity check to roughly 8-10 K or ~5-10% MRE, but only when the polymer's structural fragments are well represented in the estimator's training set; traditional (non-hybrid) group contribution is explicitly reported to degrade on fragments absent from training data.",
+      "how_to_apply": "Use a group-contribution Tg estimate as a secondary sanity bound on simulated Tg for novel polymers, but discount it (do not treat disagreement as force-field evidence) when the polymer's backbone chemistry is not well represented in the estimator's own training set.",
+      "evidence_strength": "moderate",
+      "sources": ["10.1021/acsomega.0c04499", "10.1021/acs.macromol.5c00178"]
+    },
+    {
+      "criterion": "A known systematic force-field bias (e.g., a class-wide density deficit) does not by itself justify switching fields; the largest-scale published pipeline (RadonPy) response to an admitted systematic GAFF2 density bias was a statistical/ML post-hoc correction, not a per-chemistry field switch.",
+      "how_to_apply": "If a systematic, well-characterized bias is found (as with our measured -5.9% PCFF density deficit), consider a calibrated post-hoc correction as a literature-precedented alternative to switching to an unvalidated fallback field, especially when the fallback field (e.g. GAFF2 for aromatic backbones) itself lacks chemistry-specific bulk validation.",
+      "evidence_strength": "moderate",
+      "sources": ["10.1038/s41524-022-00906-4"]
+    },
+    {
+      "criterion": "High-throughput pipelines in the literature fix one force field for an entire cross-chemistry screening campaign rather than performing automated per-polymer force-field selection; there is no published precedent for a per-chemistry FF-selection algorithm to cite or emulate.",
+      "how_to_apply": "Do not present per-polymer automated FF selection as literature-validated methodology; frame it as a novel design choice if implemented, and validate it empirically per family rather than by appeal to precedent.",
+      "evidence_strength": "strong",
+      "sources": ["10.1038/s41524-022-00906-4", "10.1021/acsapm.0c00524"]
+    }
+  ],
+  "contradictions_with_our_measurements": [
+    "In the one same-polymer multi-FF benchmark that included COMPASS directly against other fields (PDMS: COMPASS, OPLS-AA, DREIDING, UA, HUANG), COMPASS was the WORST performer (density RMSE 0.178 g/cm3, largest of the five) and OVER-predicted density, the opposite sign from our measured PCFF under-density deficit. This directly contradicts an assumption that COMPASS would systematically outperform or share PCFF's bias direction on chemistries where PCFF underperforms -- at least for this one polymer.",
+    "The PMMA/PIB review reports Class II (PCFF-family) force fields reproducing amorphous density within 2% for both polymers, versus our measured PCFF PMMA deficit of -6.2% -- a roughly 3x discrepancy in magnitude between the literature's reported PCFF-family performance on PMMA and our own measurement, for the same polymer chemistry (though not necessarily the identical PMMA model/tacticity/chain-length/protocol).",
+    "GAFF2's only large-scale amorphous-polymer-bulk validation found (RadonPy, >1000 polymers) reports GAFF2 itself has an admitted systematic density bias requiring ML correction -- meaning our fallback-to-GAFF2 assumption (that it is a clean alternative to a biased PCFF) is not supported; GAFF2 has its own known systematic bulk-density bias, just not characterized per-chemistry-family in what we could verify.",
+    "No literature source corroborates our specific -5.9% PCFF class-wide magnitude (PEEK -5.3, PEG -5.5, PMMA -6.2, PS -6.5); the one comparable literature case (PMMA/PIB review) reports a much smaller (<2%) Class-II density error for PMMA, suggesting our -6.2% PMMA figure may be protocol-specific (equilibration/annealing/quench-rate dependent) rather than an inherent PCFF limitation -- this is worth cross-checking against our own equilibration protocol before attributing the deficit purely to the force field.",
+    "Our own measured negative correlation between extrapolated-atom-type fraction and |error| (-0.26 K, -0.64 density) has no direct corroboration or contradiction in the literature searched; the closest source (the 82-study review) establishes only that the field has never quantitatively tested this relationship, meaning our finding is not contradicted but is also not independently reproduced elsewhere -- treat it as an internal-archive-specific result until tested on a different polymer set."
+  ],
+  "overall_confidence": "Moderate on general selection-methodology conclusions (high-throughput pipelines fix one field per campaign; transferability-predicts-error is unestablished in the literature; CED is an established but underused reference-free check). Low on chemistry-specific claims relevant to our actual fallback decision (GAFF2 for aromatic PEEK/polysulfone-class backbones has no located bulk-density validation at all, for or against; COMPASS-vs-PCFF-vs-GAFF2 head-to-head data exists for only two polymer systems, neither of which is PEEK, PEG, PMMA, or PS in a directly comparable protocol). The strongest, best-verified finding is that PCFF is comparatively under-benchmarked in the open literature relative to COMPASS/OPLS-AA (10.1021/acs.macromol.5c01166), which argues for caution in either direction rather than confidence that any specific alternative field is safer."
+}

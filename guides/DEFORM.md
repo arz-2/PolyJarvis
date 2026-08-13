@@ -31,6 +31,7 @@ n_steps = int(K_strain_max / (strain_rate_per_fs * dt_fs))
 
 generate_script("npt_deform", data_file=equil_data_path,
     output_script=f"{work_dir}/mechanical/05_deform{suffix}.in",
+    velocity_seed=<velocity_seed from prompt>,     # required, never null
     params={
         "STRAIN_RATE": strain_rate_per_fs,
         "N_STEPS":     n_steps,

@@ -26,11 +26,40 @@ not an error signal; a non-empty list is not itself a failure, see severity per 
 """
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from select_hardware import select_hardware
+from hw_common import load_rules, get_class_entry
+
+_ENGINE_SCRIPTS = (Path(__file__).resolve().parents[2]
+                   / "mcp-servers" / "mcp-lammps-engine" / "analysis_scripts")
+if str(_ENGINE_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_ENGINE_SCRIPTS))
+from finite_size import predict_equilibrated_L  # noqa: E402
+
+
+def _target_density(cls: dict, run_name: str):
+    """Class experimental density. Multi-member classes key it by member name (PACR
+    {PMMA, PMA}, PHYC {PE, PP, PIB}), so resolve via the run name's alpha prefix; a bare
+    float applies to the whole class. Returns None when it cannot be resolved -- the
+    caller then skips rather than guessing a density."""
+    ed = cls.get("experimental_density_gcm3")
+    if isinstance(ed, (int, float)):
+        return float(ed)
+    if isinstance(ed, dict):
+        key = run_name.rstrip("0123456789")
+        v = ed.get(key)
+        if isinstance(v, (int, float)):
+            return float(v)
+        numeric = [x for x in ed.values() if isinstance(x, (int, float))]
+        # Single-member dict is unambiguous; a real multi-member class without a run-name
+        # match is NOT -- refuse rather than pick one.
+        if len(numeric) == 1:
+            return float(numeric[0])
+    return None
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
@@ -153,6 +182,66 @@ def _exp_tg_companion_findings(plan: dict) -> list:
     return findings
 
 
+def _finite_size_findings(plan: dict) -> list:
+    """Cheapest possible finite-size check: plan time, before the build, before any GPU.
+
+    Only the MINIMUM-IMAGE criterion is decidable here -- it needs no Rg. The predicted
+    equilibrated box edge follows from the planned cell mass and the class experimental
+    density: L = (m / (N_A * rho))^(1/3), accurate to within ~3% of the archive's actual
+    post-compression boxes.
+
+    The chain-self-imaging criterion (L >= 2*Rg) needs a real Rg, so it is enforced one
+    step later by inspect_data_file's finite_size_forecast on the built cell -- still
+    before any MD. This function only notes that it is pending, so a plan is never
+    approved believing the size question is fully settled here.
+    """
+    findings = []
+    dp = plan.get("decided_params", {})
+    smiles, polymer_class = plan.get("smiles"), plan.get("polymer_class")
+    if not smiles or not polymer_class:
+        return findings
+
+    cls = get_class_entry(load_rules(), polymer_class) or {}
+    cutoff_A = dp.get("cutoff_A") or cls.get("cutoff_A")
+    rho = _target_density(cls, plan.get("run_name") or "")
+    if not cutoff_A or not rho:
+        return findings
+
+    try:
+        rec = select_hardware(polymer_class, smiles, dp.get("dp_typical"), dp.get("nchain"))
+        cell_mass = rec.get("cell_mass_g_per_mol_estimate")
+    except Exception:
+        return findings
+    if not cell_mass:
+        return findings
+
+    L_pred = predict_equilibrated_L(cell_mass, rho)
+    if L_pred is None:
+        return findings
+
+    if L_pred < 2.0 * cutoff_A:
+        nchain = dp.get("nchain") or cls.get("nchain")
+        factor = ((2.0 * cutoff_A) / L_pred) ** 3
+        suggest = f" Raise nchain by x{factor:.2f}"
+        if nchain:
+            suggest += f" (>= {math.ceil(nchain * factor)})"
+        findings.append({
+            "check": "finite_size_min_image", "severity": "structural",
+            "detail": (f"predicted equilibrated box L={L_pred:.1f} A (cell mass "
+                       f"{cell_mass:.0f} g/mol at {rho} g/cm3) < 2*cutoff_A="
+                       f"{2 * cutoff_A:.1f} A. Atoms would interact with their own periodic "
+                       f"images -- the pair potential itself would be wrong."
+                       f"{suggest}. Do not build this plan.")})
+    else:
+        findings.append({
+            "check": "finite_size_min_image", "severity": "info",
+            "detail": (f"minimum image OK: predicted L={L_pred:.1f} A vs 2*cutoff_A="
+                       f"{2 * cutoff_A:.1f} A (ratio {L_pred / (2 * cutoff_A):.2f}). "
+                       "Chain self-imaging (L >= 2*Rg) needs a measured Rg and is enforced "
+                       "by inspect_data_file on the built cell, before any MD.")})
+    return findings
+
+
 def _hardware_findings(plan: dict) -> list:
     """Delegates the recommended choice to select_hardware.py -- decision_policy.json's
     hardware require/prefer thresholds live there once, not duplicated here."""
@@ -216,6 +305,37 @@ def _hardware_findings(plan: dict) -> list:
     return findings
 
 
+# decided_params that no executor consumes, so setting them changes nothing that runs.
+# Entries require a traced call path, not a name grep: eq_annealing_cycles is listed
+# because generate_equilibration_workflow's signature has no such parameter at all --
+# the workflow performs exactly one heat/compress/cool pass regardless of the value.
+UNIMPLEMENTED_PARAMS = {
+    "eq_annealing_cycles": ("generate_equilibration_workflow takes no annealing-cycles "
+                            "argument; the workflow runs one heat/compress/cool pass "
+                            "regardless of this value"),
+}
+
+
+def _unimplemented_param_findings(plan: dict) -> list:
+    """A parameter that cannot reach the deck must not be usable as a remedy lever.
+
+    This fires structural rather than info because the failure is silent in both
+    directions: the plan records a protocol that was not run, and a gate-driven fix
+    written here produces no change in behaviour to explain why it did not work.
+    """
+    findings = []
+    dp = plan.get("decided_params", {})
+    for key, why in sorted(UNIMPLEMENTED_PARAMS.items()):
+        if dp.get(key) in (None, "null"):
+            continue
+        findings.append({
+            "check": "decided_param_not_executed", "severity": "structural",
+            "detail": (f"decided_params.{key}={dp[key]} is recorded but never executed: "
+                       f"{why}. Either wire it through or drop it from the plan -- do not "
+                       "report it as protocol and do not use it as a remedy.")})
+    return findings
+
+
 def validate_plan(plan: dict, policy: dict) -> list:
     findings = []
     findings += _criteria_and_evidence_findings(plan, policy)
@@ -224,6 +344,8 @@ def validate_plan(plan: dict, policy: dict) -> list:
     findings += _uncertainty_findings(plan, policy)
     findings += _exp_tg_companion_findings(plan)
     findings += _hardware_findings(plan)
+    findings += _finite_size_findings(plan)
+    findings += _unimplemented_param_findings(plan)
     return findings
 
 

@@ -40,6 +40,7 @@ extract_bulk_modulus_deform(
     strain_start=0.002,               # skip initial transient
     output_dir=output_dir,
     graphs_dir=graphs_dir,
+    deform_direction="x",             # the axis the deck strained — see below
     # rate-sensitivity check — only when the orchestrator ran the paired slow-rate leg:
     log_file_2=deform_log_path_slow,      # None if not present
     strain_rate_2=strain_rate_slow_per_fs,  # None if not present
@@ -47,16 +48,35 @@ extract_bulk_modulus_deform(
 ```
 
 **Result fields:** `C11_GPa`, `C12_GPa`, `K_GPa`, `G_GPa`, `E_GPa`, `nu_Poisson`, `fit_r2_C11`,
-`fit_r2_C12_yy`, `isotropy_delta_pct`, `avg_window_frames`, `stress_strain_csv`, `summary_json`,
-`rate_sensitivity` (present only when `log_file_2` was passed — see Interpretation above).
+`isotropy_delta_pct`, `deform_direction`, `transverse_axes`, `C12_t1_GPa`, `C12_t2_GPa`,
+`deform_gate_verdict`, `deform_gate_reasons`, `avg_window_frames`, `stress_strain_csv`,
+`summary_json`, `rate_sensitivity` (present only when `log_file_2` was passed — see Interpretation
+above).
 - `avg_window_frames` (default 2000): R² is on the smoothed stress series — correct, since raw thermal noise (~0.2 GPa) swamps the elastic signal (~0.09 GPa at 3% strain). Judge quality by `isotropy_delta_pct` + physical plausibility of K/G/E, not raw R².
 
-**Acceptance:**
-- `fit_r2_C11` and `fit_r2_C12_yy` ≥ 0.90; K > 0.
-- `isotropy_delta_pct` < 20% — **hard gate** (C12_yy vs C12_zz within this single run). If ≥ 20%, flag K BORDERLINE.
-- **G<0 in y/z is NOT a hard failure.** On small amorphous cells C11<C12 in some directions → negative shear G, but K=(C11+2C12)/3 averages transverse stresses and stays robust. Report K as `bulk_modulus_GPa` if `isotropy_delta_pct<20%` and both fit_r²≥0.90; report G and E as-is, noting "G<0 — small-cell anisotropy; K robust."
+**Pass `deform_direction`** matching the axis the deck strained. It selects which stress component
+is the loading response and which two are transverse; a y- or z-direction leg analysed as `x` puts a
+loading slope into the transverse average, corrupting C11, C12, G, E, ν and `isotropy_delta_pct`.
+K is invariant (it is one third of the response trace), so a wrong axis shows up in the moduli and
+the isotropy delta, not in K.
 
-**Report:** `fit_r2_C11`, `fit_r2_C12_yy`, `isotropy_delta_pct`, `avg_window_frames`, and (if present) `rate_sensitivity.verdict`. If `isotropy_delta_pct` ≥ 20%, add WARNING "K BORDERLINE — anisotropy exceeds 20%; Murnaghan should have been primary".
+**Acceptance:** use `deform_gate_verdict` directly.
+- `DEFORM_INADMISSIBLE` → do not report this K; `deform_gate_reasons` says why. Triggers: K < 0, E < 0, or
+  `isotropy_delta_pct` ≥ 20%. At that level a *single-direction* Voigt K is a biased estimate — only
+  one of three inequivalent directions was sampled (PLA2's three legs span 8.1% in K, and its most
+  anisotropic leg is also its worst K outlier; PVC1 at 24.2% gives K=1.68 vs Murnaghan 2.85, 41%
+  low). Hard failure, not a BORDERLINE annotation. G/E/ν are hit ~5× harder than K (PLA2 G spans
+  44.6%), so never report those from an anisotropic leg either.
+- `DEFORM_REPORTABLE` → also require `fit_r2_C11` and both transverse fit r² ≥ 0.90.
+- **G<0 in a y/z leg means `deform_direction` was wrong, not small-cell anisotropy.** Analysing a
+  y- or z-strained leg as `x` swaps a loading slope into C12, which drives C11 below C12 and flips
+  the sign of G and E. Passing the correct axis removes it (PLA2 `deform_y`: G −0.599 → +1.105 GPa,
+  E −1.909 → +2.994, isotropy 56.25% → 4.62%). K is unaffected either way, being one third of the
+  response trace and so independent of which axis is labelled loading. If G<0 survives a correct
+  `deform_direction`, treat it as a real result and investigate.
+
+**Report:** `fit_r2_C11`, `fit_r2_C12_t1`/`_t2`, `isotropy_delta_pct`, `deform_direction`,
+`deform_gate_verdict`, `avg_window_frames`, and (if present) `rate_sensitivity.verdict`.
 
 ### `extract_bulk_modulus_murnaghan`
 
@@ -74,14 +94,28 @@ extract_bulk_modulus_murnaghan(
 **Result fields:** `bulk_modulus_GPa` (=B0, the reported K), `B0_prime` (dK/dP), `V0_A3`,
 `r_squared`, `fit_converged`, `bulk_modulus_sem_GPa`, `method` ("murnaghan" | "linear_fallback"),
 `volume_monotonic`, `loo_results`, `loo_n_converged`, `fluctuation_bulk_modulus_GPa`,
-`fluctuation_divergence_pct`, `warnings`.
+`fluctuation_divergence_pct`, `bm_gate_verdict`, `bm_gate_reasons`, `warnings`.
 
-**Acceptance:**
-- `fit_converged=True` (linear_fallback = EOS curvature not resolved → WARNING).
-- `r_squared ≥ 0.999` for a 5-point series; lower → poor equilibration at some pressure.
+**Acceptance:** use `bm_gate_verdict` directly; `bm_gate_reasons` lists what tripped.
+- `BM_INADMISSIBLE` → do not report this K. Triggers are conditions physics entails, not precision
+  bars: K ≤ 0, B0′ ≤ 0, `volume_monotonic=False` (dV/dP > 0 violates mechanical stability — re-run
+  the offending pressure point, don't re-fit), `V0_A3` outside the sampled volume range by >25% of
+  its width (the zero-pressure reference state isn't supported by the data), or `r_squared < 0.99`
+  (the Murnaghan form doesn't describe this P–V data at all).
+- `BM_FALLBACK_DEFORM` → `fit_converged=False`; route to the deformation fallback.
+- `BM_REPORTABLE` → report K.
+
+Precision annotations, none of which block reporting:
+- `r_squared < 0.999` → WARNING only. It does **not** predict B0 accuracy (across the 36-run
+  archive, mean |ΔB0| vs the family mean is 4.39% below 0.999 and 4.37% at or above it, Welch
+  p=0.990), and at that threshold it flags physically sound fits while passing real outliers.
 - **B0′ out of [4, 20] with `fit_converged=True` is WARNING, not FAIL** (the ±1000 atm span under-constrains curvature): high B0′≥13 with r²<0.999 = EOS-nonlinearity artifact (K still correct); low B0′<4 with r²≥0.999 = under-constrained curvature (K robust). Note the artifact in `notes`.
-- `volume_monotonic=False` → WARNING; a pressure point's mean volume is out of sequence, most likely inadequate equilibration at that point.
-- Any `loo_results` entry with a large `dB0_GPa_vs_baseline` (script warns above 10%) → the fit leans on one point; note which pressure and whether it's `is_tension_point`.
+- Any `loo_results` entry with a large `dB0_GPa_vs_baseline` (script warns above 10%) → the fit leans on one point; note which pressure and whether it's `is_tension_point`. Not binding: whole-replicate spread is 4.4% mean / 16.6% worst, so a >10% single-point shift is not yet known to be pathological.
+
+**Across replicates** — `aggregate_replicates.py` flags a run whose K sits >4 leave-one-out SDs and
+>10% from the other replicates' mean, and marks a property non-`reportable` below 3 replicates. This
+is what catches a run that passes every per-run gate yet disagrees with its siblings; per-run fit
+statistics cannot see it.
 - **Fluctuation cross-check:** flag any `fluctuation_divergence_pct` >15% prominently (script already warns). Expected/benign on rubbery classes (fluctuation overestimates rubbery K, up to ~70% in the archive); unusual on glassy classes and worth investigating there.
 
 **Report:** `bulk_modulus_sem_GPa`, `r_squared`, `B0_prime`, `volume_monotonic`, `fluctuation_divergence_pct`, and any `loo_results` warning.

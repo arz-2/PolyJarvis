@@ -228,8 +228,13 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
     ff = cls.get("preferred_ff", "").lower()
     # Substring/family match (mutually exclusive tokens) — an exact-match here returned
     # use_opls=False for both PHAL and PSIL, whose canonical field is "opls/2024/opls-aa".
+    # compass is class2 like pcff but shares no token with it, so it must be named: the
+    # substring chain alone returns all-False and the deck falls back to GAFF2 styles
+    # (lj/charmm/coul/long, mix arithmetic) against a class2 params file.
+    # Mirrors mcp-emc-server's own _lammps_flags field grouping.
+    class_ii = ("pcff" in ff) or ff in ("compass", "pcff_ore")
     return {
-        "use_pcff": "pcff" in ff,
+        "use_pcff": class_ii,
         "use_opls": "opls" in ff,
         "use_trappe": "trappe" in ff,
     }
@@ -429,6 +434,17 @@ def _regime(args, cls: dict) -> str:
     return "rubbery" if _resolve_t_workflow(args, cls) <= 300.0 else "glassy"
 
 
+def _velocity_seed(args) -> int:
+    """The equilibration chain's `velocity all create` seed. generate_equilibration_workflow
+    rejects a null seed, so resolve one here: the plan's pinned value if it has one, else a
+    value derived from run_name — stable across prompt regenerations, distinct per replicate."""
+    pinned = getattr(args, 'velocity_seed', None)
+    if pinned is not None:
+        return int(pinned)
+    digest = hashlib.sha256(args.run_name.encode()).hexdigest()
+    return 10000 + int(digest, 16) % 989_999
+
+
 def _resolve_equil_params(args, cls: dict) -> dict:
     """Resolved values for the equilibration stage — consumed by equil_prompt's text template
     and, identically, by run_deterministic_replicate.py's scripted equilibration-chain call."""
@@ -470,7 +486,12 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         "gpu_ids": args.gpu_ids,
         "mpi_ranks": args.mpi_ranks,
         "engine": args.engine,
-        "velocity_seed": getattr(args, 'velocity_seed', None),
+        "velocity_seed": _velocity_seed(args),
+        # Arms inspect_data_file's pre-submission finite-size forecast: predicted compressed
+        # box vs 2*cutoff_A and 2*Rg, so a too-small cell is caught before any GPU time.
+        "cutoff_A": cls.get('cutoff_A', 12.0),
+        "nchain": args.nchain or cls.get('nchain', 10),
+        "exp_density_gcm3": _exp_density_point(cls, args.run_name),
     }
 
 
@@ -483,7 +504,10 @@ def equil_prompt(args, cls: dict) -> str:
             f"npt_prod_steps:    {p['npt_prod_steps']}  # pass as npt_prod_steps="
         )
     else:
-        npt_prod_line = "t_npt_prod_ns:     null  # auto-sized by atom count"
+        npt_prod_line = (
+            "t_npt_prod_ns:     null\n"
+            "npt_prod_steps:    null  # pass as npt_prod_steps=None — null = atom-count-tier default"
+        )
     if p["add_melt_npt"] and p["melt_npt_ns"] is not None:
         melt_npt_line = (
             f"add_melt_npt:      true\n"
@@ -494,13 +518,17 @@ def equil_prompt(args, cls: dict) -> str:
     elif p["add_melt_npt"]:
         melt_npt_line = (
             f"add_melt_npt:      true\n"
-            f"t_equil_K:         {p['T_equil_K']}"
+            f"t_equil_K:         {p['T_equil_K']}\n"
+            f"melt_npt_steps:    null  # pass as melt_npt_steps=None — null = ~1ns default"
         )
     else:
-        melt_npt_line = "add_melt_npt:      false"
+        melt_npt_line = (
+            "add_melt_npt:      false\n"
+            "melt_npt_steps:    null  # pass as melt_npt_steps=None — unused when add_melt_npt=false"
+        )
     cool_steps_line = (
-        f"npt_cool_steps:    {p['npt_cool_steps']}  # pass as npt_cool_steps= — override, null = atom-count-tier default\n"
-        f"npt_cool300_steps: {p['npt_cool300_steps']}  # pass as npt_cool300_steps= — override, null = ~1ns default"
+        f"npt_cool_steps:    {_v(p['npt_cool_steps'], 'null')}  # pass as npt_cool_steps= — override, null = atom-count-tier default\n"
+        f"npt_cool300_steps: {_v(p['npt_cool300_steps'], 'null')}  # pass as npt_cool300_steps= — override, null = ~1ns default"
     )
     if p["phase"] == "melt":
         phase_line = (
@@ -521,6 +549,9 @@ lammps_flags:      {json.dumps(p['lammps_flags'])}
 run_name:          {args.run_name}
 work_dir:          {p['work_dir']}
 polymer_class:     {args.polymer_class.upper()}
+cutoff_A:          {p['cutoff_A']}   # inspect_data_file lj_cutoff=
+nchain:            {p['nchain']}   # inspect_data_file nchain=
+exp_density_gcm3:  {p['exp_density_gcm3'] if p['exp_density_gcm3'] is not None else 'null'}   # inspect_data_file target_density_gcm3= — arms the pre-submission size forecast; a SIZE_* error there means REBUILD, do not submit
 T_equil_K:         {p['T_equil_K']}
 T_workflow_K:      {p['T_workflow_K']}   # pass as temp=
 P_equil_atm:       {p['P_equil_atm']}
@@ -533,7 +564,12 @@ dt_fs:             {p['dt_fs']}
 gpu_ids:           "{p['gpu_ids']}"
 mpi_ranks:         {p['mpi_ranks']}
 engine:            "{p['engine']}"
-velocity_seed:     {p['velocity_seed'] if p['velocity_seed'] is not None else 'null'}   # null = random; pin for reproducible trajectory
+velocity_seed:     {p['velocity_seed']}   # pass as velocity_seed= — required, never null
+extend_steps:      null   # pass as extend_steps=None — required; only extend_only=True calls set it
+
+Every step count above and velocity_seed are REQUIRED arguments of
+generate_equilibration_workflow. Pass each one on the call, including the ones whose value is
+null. Omitting an argument is a schema error, not a default.
 
 --- Worker Guide (EQUILIBRATION) ---
 {guide}
@@ -593,7 +629,7 @@ def _resolve_tg_params(args, cls: dict) -> dict:
         "gpu_ids": args.gpu_ids,
         "mpi_ranks": args.mpi_ranks,
         "engine": args.engine,
-        "velocity_seed": getattr(args, 'velocity_seed', None),
+        "velocity_seed": _velocity_seed(args),
     }
 
 
@@ -638,7 +674,7 @@ dt_fs:             {p['dt_fs']}
 gpu_ids:           "{p['gpu_ids']}"
 mpi_ranks:         {p['mpi_ranks']}
 engine:            "{p['engine']}"   # forward as engine= to run_lammps_chain / run_lammps_script / generate_equilibration_workflow
-velocity_seed:     {p['velocity_seed'] if p['velocity_seed'] is not None else 'null'}   # null = random; pin for reproducible/recovery trajectory
+velocity_seed:     {p['velocity_seed']}   # pass as velocity_seed= — required by generate_script, never null
 per_t_dump:
   enabled:         true
   file:            {p['tg_sweep_dir']}/per_t_structs.dump   # one final frame per T step
@@ -673,6 +709,7 @@ def _resolve_deform_params(args, cls: dict) -> dict:
         "gpu_ids": args.gpu_ids,
         "mpi_ranks": args.mpi_ranks,
         "engine": args.engine,
+        "velocity_seed": _velocity_seed(args),
     }
 
 
@@ -694,6 +731,7 @@ dt_fs:             {p['dt_fs']}
 gpu_ids:           "{p['gpu_ids']}"
 mpi_ranks:         {p['mpi_ranks']}
 engine:            "{p['engine']}"
+velocity_seed:     {p['velocity_seed']}   # pass as velocity_seed= — required by generate_script, never null
 
 --- Worker Guide (DEFORM) ---
 {guide}
@@ -738,6 +776,11 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
         "enthalpy_col": getattr(args, "enthalpy_col", None) or "Enthalpy",
         "output_dir": output_dir,
         "graphs_dir": graphs_dir,
+        # Classes carrying tg_slope_gate_fallback have documented highest-rate degeneracy on the
+        # rigid-aromatic staircase (PKTN/PSFO), so their primary-vs-alternative Tg gap routinely
+        # exceeds 20 K for a known, already-handled reason. Exempt records the gap without forcing
+        # REVIEW -- otherwise the gate fires mostly where the artifact already has a carve-out.
+        "method_gap_exempt": bool(cls.get("tg_slope_gate_fallback") == "slowest_rate"),
     }
 
 
@@ -755,6 +798,7 @@ run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 {rate_line}output_dir:        {p['output_dir']}
 graphs_dir:        {p['graphs_dir']}
+method_gap_exempt: {str(p['method_gap_exempt']).lower()}    # pass --method_gap_exempt to extract_thermal when true
 tasks:
   - extract_thermal
 
@@ -865,6 +909,8 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
         "graphs_dir": graphs_dir,
         "exp_density_range": _exp_density_range(cls),
         "ct_min_decay_melt": ct_decay,
+        # Enables the minimum-image half of the finite-size gate (L >= 2*cutoff_A).
+        "cutoff_A": cls.get("cutoff_A"),
         "npt_prod_log_path": args.npt_prod_log or f"{lammps_base}/equil/{prod}/{prod}.log",
         "npt_prod_data_path": args.data_path or f"{lammps_base}/equil/{prod}/{prod}_out.data",
         "melt_dump_path": args.npt_prod_dump or f"{lammps_base}/equil/nvt_production/nvt_production.dump",
@@ -926,7 +972,7 @@ def equil_check_prompt(args, cls: dict) -> str:
         tasks_block = "tasks:\n  - check_equilibration_comprehensive\n  - extract_equilibrated_density"
         density_note = (
             "### D-05 REQUIREMENT (PEEK2 I-04): return result[\"d05_markdown_path\"] (the tool writes\n"
-            f"### the block to {p['output_dir']}d05_block.md) as d05_markdown_path in your RESULT block.\n"
+            f"### the block to {p['output_dir'].rstrip('/')}/d05_block.md) as d05_markdown_path in your RESULT block.\n"
             "### Do NOT paste the block itself — the orchestrator splices it into run_log.md with\n"
             "### orchestration/scripts/write_d05.py. It contains the real Rg/MSD/density/C(t)/R_ee\n"
             "### values, so no [X ± Y] / [X]% / [PASS / FAIL] placeholder may survive in run_log.md."
@@ -966,8 +1012,9 @@ run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 backbone_types:    {p['backbone_types'] or '<FILL from inspect_data_file>'}
 ct_min_decay_melt: {p['ct_min_decay_melt'] if p['ct_min_decay_melt'] is not None else 'null'}   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
+cutoff_A:          {p['cutoff_A'] if p['cutoff_A'] is not None else 'null'}   # pass as cutoff_A= — arms the minimum-image check L >= 2*cutoff_A
 is_glassy:         {str(p['is_glassy']).lower()}   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
-regime:            {p['regime']}   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<2% AND density-homogeneity CV<25% AND energy drift/SEM; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
+regime:            {p['regime']}   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<1% AND Poisson-corrected homogeneity signal CV<=0.11 AND n_eff_density>=20 AND energy drift/SEM AND finite size; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
 dp:                {p['dp'] if p['dp'] is not None else 'null'}   # DP≥30 required for require_glassy carve-out to apply. NOTE: a class with ct_gate_reliable=false (aromatic main chain) already has ct_min_decay=null above, so its melt-diffusion C(t) gate is suppressed INDEPENDENT of DP — a DP<30 aromatic cell still passes equil on the structural gates (density/SEM/CV/P2/Rg). The DP≥30 clause only bites classes that would otherwise arm ct_min_decay.
 exp_density_range: {p['exp_density_range']}
 output_dir:        {p['output_dir']}
@@ -1000,6 +1047,7 @@ def _resolve_murnaghan_params(args, cls: dict) -> dict:
         "gpu_ids": args.gpu_ids,
         "mpi_ranks": args.mpi_ranks,
         "engine": args.engine,
+        "velocity_seed": _velocity_seed(args),
     }
 
 
@@ -1041,6 +1089,7 @@ dt_fs:             {p['dt_fs']}
 gpu_ids:           "{p['gpu_ids']}"
 mpi_ranks:         {p['mpi_ranks']}
 engine:            "{p['engine']}"
+velocity_seed:     {p['velocity_seed']}   # pass as velocity_seed= — required, never null
 
 --- Worker Guide (MURNAGHAN) ---
 {guide}

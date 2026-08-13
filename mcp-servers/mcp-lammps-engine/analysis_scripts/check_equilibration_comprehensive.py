@@ -11,7 +11,8 @@ Runs all convergence and structural checks in one pass and returns:
 Hard gates (block overall_pass):
   A. Density drift, energy drift, density SEM, energy SEM
   B. Rg CV across chains (>30%)
-  C. P2 nematic order (>0.10), density homogeneity voxel CV (>0.25)
+  C. P2 nematic order (>0.10), Poisson-corrected density homogeneity CV (>cv_signal_max),
+     finite size: minimum image (L >= 2*cutoff_A) and chain self-imaging (L >= 2*Rg)
 
 Soft warnings (reported, never blocking):
   A. tau_eff / T_traj > 10%
@@ -35,6 +36,7 @@ Usage:
 import argparse
 import json
 import math
+import re
 import sys
 import warnings
 from datetime import datetime
@@ -50,7 +52,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from analysis_utils import compute_tau_eff, parse_lammps_log
+from analysis_utils import (compute_tau_eff, effective_sample_size, integrated_act,
+                            parse_lammps_log)
+from finite_size import classify_finite_size, parse_data_box_mass_rg
 
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -106,8 +110,71 @@ def _analyse_property(values, name, drift_threshold_pct, drift_pvalue, block_cou
     return res
 
 
+def _residual_stress(prod, pressure_cols):
+    """Time-averaged deviatoric stress of the production window.
+
+    Under `fix npt ... iso` only the pressure TRACE is controlled, so the box is
+    cubic by construction and box-shape isotropy is vacuous — but a persistent
+    difference between Pxx/Pyy/Pzz is a real departure from mechanical equilibrium.
+    Reported as a magnitude (atm) plus a resolved/unresolved z qualifier.
+
+    z is NEVER a gate: it grows as sqrt(n), so thresholding it would make the check
+    HARDER to pass the longer a cell is equilibrated. Callers must bind the magnitude
+    against a physical scale (e.g. a fraction of the planned pressure increment) and
+    read z only as "is this difference resolved at all".
+    """
+    cols = [c for c in pressure_cols if c in prod.columns]
+    if len(cols) != 3:
+        return {"available": False, "reason": f"need 3 pressure columns, found {cols}"}
+    n = len(prod)
+    P = prod[cols].values.astype(float)
+    trace = P.mean(axis=1)
+    dev = P - trace[:, None]
+    means, zs = [], []
+    for i in range(3):
+        m = float(dev[:, i].mean())
+        tau, _ = integrated_act(dev[:, i])
+        sem = float(np.std(dev[:, i], ddof=1) / math.sqrt(max(n / tau, 1.0)))
+        means.append(m)
+        zs.append(abs(m) / sem if sem > 0 else 0.0)
+    von_mises = float(np.sqrt(1.5 * np.dot(means, means)))
+    z_max = float(max(zs))
+    return {
+        "available": True,
+        "dev_atm": {c: r(m, 1) for c, m in zip(cols, means)},
+        "von_mises_atm": r(von_mises, 1),
+        "max_abs_dev_atm": r(max(abs(m) for m in means), 1),
+        "z_max": r(z_max, 2),
+        "resolved": bool(z_max >= 2.0),
+        "mean_pressure_atm": r(float(trace.mean()), 1),
+    }
+
+
+def check_finite_size(data_file, cutoff_A, mean_rg_A, mean_ree_A):
+    """Post-equilibration periodic self-imaging check — the backstop.
+
+    Shares its criteria with the PRE-SUBMISSION forecast in
+    server.inspect_data_file (both call finite_size.classify_finite_size), so a cell that
+    passed the forecast and fails here means the melt expanded beyond what the packed
+    conformation predicted, not that the two checks disagree.
+
+    Box comes from the .data file being graded (for a glassy chain the cooled 300 K cell,
+    the tightest box the system occupies) while Rg/R_ee come from the melt dump where
+    chains are mobile enough to measure. Chains do not relax appreciably on cooling below
+    Tg, so pairing the two is sound and errs toward strictness.
+    """
+    parsed = parse_data_box_mass_rg(data_file)
+    if parsed is None:
+        return {"available": False, "reason": f"box unparseable from {data_file}"}
+    result = classify_finite_size(parsed["L_min_A"], cutoff_A, mean_rg_A, mean_ree_A)
+    if result.get("available"):
+        result["box_A"] = [r(b, 2) for b in parsed["box_A"]]
+        result["graded_box"] = "actual_equilibrated"
+    return result
+
+
 def check_thermo(log_file, eq_fraction, drift_threshold_pct, drift_pvalue, block_count,
-                 temp_col, density_col, energy_col):
+                 temp_col, density_col, energy_col, pressure_cols):
     df = parse_lammps_log(log_file)
     n_total = len(df)
     n_discard = int(n_total * (1 - eq_fraction))
@@ -135,11 +202,16 @@ def check_thermo(log_file, eq_fraction, drift_threshold_pct, drift_pvalue, block
         else:
             results[label] = {"error": f"Column '{col}' not found", "equilibrated": False}
 
-    # tau_eff for density
+    # tau_eff and independent-sample count for density
     tau_eff_frac = None
+    n_eff_density = None
     if density_col in prod.columns:
-        tau_eff_frac = compute_tau_eff(prod[density_col].values)[1]
+        tau_frames, tau_eff_frac = compute_tau_eff(prod[density_col].values)
         results["density"]["tau_eff_fraction"] = r(tau_eff_frac, 4)
+        n_eff_density = effective_sample_size(n_prod, tau_frames)
+        results["density"]["n_effective_samples"] = n_eff_density
+
+    residual_stress = _residual_stress(prod, pressure_cols)
 
     density_ok = bool(results.get("density", {}).get("equilibrated", False))
     energy_ok = bool(results.get("energy", {}).get("equilibrated", False))
@@ -155,6 +227,8 @@ def check_thermo(log_file, eq_fraction, drift_threshold_pct, drift_pvalue, block
         "density": results.get("density"),
         "energy": results.get("energy"),
         "tau_eff_density_fraction": tau_eff_frac,
+        "n_eff_density": n_eff_density,
+        "residual_stress": residual_stress,
         "is_npt": is_npt,
         "meta": meta,
     }
@@ -242,7 +316,8 @@ def _kww_fit(lags_ps, ct_values):
 
 def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
                             n_backbone_bonds, bond_length_A, timestep_fs, dump_every,
-                            grid_n, trajectory_slice, ct_min_decay=None, graphs_dir=None):
+                            grid_n, trajectory_slice, ct_min_decay=None, graphs_dir=None,
+                            cv_signal_max=0.11):
     """Single-pass over dump frames. Returns raw per-frame arrays for all checks."""
     # Storage
     rg_sq_per_frame = []   # (n_frames, n_chains)
@@ -499,19 +574,35 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     }
 
     # ── Density homogeneity ──
+    # The raw voxel CV mixes real heterogeneity with counting shot noise, and the
+    # noise floor moves with cell size (integer rounding of the adaptive grid leaves
+    # 20-33 atoms/voxel, i.e. poisson_cv 0.17-0.22).  Gate on the noise-subtracted
+    # signal CV so the criterion means the same thing at every cell size.
     cv_mean = float(cv_arr.mean())
     atoms_per_voxel = n_atoms / grid_n ** 3
     poisson_cv = float(1.0 / math.sqrt(atoms_per_voxel)) if atoms_per_voxel > 0 else 1.0
-    poisson_limited = poisson_cv > 0.30
-    heterogeneous_flag = cv_mean > 0.25 and not poisson_limited
+    cv_signal = math.sqrt(max(cv_mean ** 2 - poisson_cv ** 2, 0.0))
+    # The adaptive grid targets ~25 atoms/voxel and is clamped to [3,10], so occupancy
+    # never drops far below that -- poisson_cv only exceeds 0.30 below ~300 atoms, which
+    # no buildable polymer cell reaches. Cell-size adequacy is therefore NOT expressed
+    # here; it is a physics question answered by check_finite_size() (minimum image and
+    # chain self-imaging), which does fire on real cells.
+    if cv_signal > cv_signal_max:
+        verdict = "HOMOG_HETEROGENEOUS"
+        heterogeneous_flag = True
+    else:
+        verdict = "HOMOG_PASS"
+        heterogeneous_flag = False
     dh_result = {
-        "pass": bool(not heterogeneous_flag),
+        "pass": verdict == "HOMOG_PASS",
+        "verdict": verdict,
         "cv_mean": r(cv_mean, 4),
         "cv_max": r(float(cv_arr.max()), 4),
+        "cv_signal": r(cv_signal, 4),
+        "cv_signal_max": cv_signal_max,
         "grid_n": grid_n,
         "atoms_per_voxel": r(atoms_per_voxel, 1),
         "poisson_cv": r(poisson_cv, 3),
-        "poisson_limited": poisson_limited,
         "heterogeneous_flag": heterogeneous_flag,
     }
 
@@ -528,7 +619,8 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
 
 # ─── Build D-05 markdown block ────────────────────────────────────────────────
 
-def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestamp, n_frames, skip_frames):
+def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestamp, n_frames,
+                       skip_frames, n_eff_min=20, finite_size=None):
     verdict = "PASS" if overall_pass else "FAIL"
     lines = [
         f"## D-05 CONVERGENCE DETAIL",
@@ -564,6 +656,16 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
         tau_pct = r(tau_frac * 100, 1)
         status = "⚠ long" if tau_frac > 0.10 else "OK"
         lines.append(f"| τ_eff density | {tau_pct}% of trajectory | — | {status} |")
+    n_eff = thermo.get("n_eff_density")
+    if n_eff is not None:
+        lines.append(f"| Independent density samples | {n_eff} | ≥{n_eff_min} | "
+                     f"{_gate(n_eff >= n_eff_min)} |")
+    rs = thermo.get("residual_stress") or {}
+    if rs.get("available"):
+        qual = "resolved" if rs.get("resolved") else "not resolved (z<2)"
+        lines.append(f"| Residual deviatoric stress | {rs.get('von_mises_atm')} atm von Mises "
+                     f"(max |dev| {rs.get('max_abs_dev_atm')} atm, z={rs.get('z_max')}, {qual}) "
+                     f"| — | INFO |")
 
     lines += ["", "### B. Chain conformation",
               "| Check | Value | Threshold | Result |",
@@ -623,8 +725,27 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
     grid_n = dh.get("grid_n")
     cv = dh.get("cv_mean")
     apv = dh.get("atoms_per_voxel")
-    note = " (Poisson-limited — use caution)" if dh.get("poisson_limited") else ""
-    lines.append(f"| Density homogeneity CV | {cv:.1%} ({grid_n}³ grid, {apv} atoms/voxel{note}) | <25% | {_gate(dh.get('pass',False))} |")
+    sig = dh.get("cv_signal")
+    sig_max = dh.get("cv_signal_max")
+    label = _gate(dh.get("pass", False))
+    fs = finite_size or {}
+    if fs.get("available"):
+        _fsmark = {"SIZE_PASS": "PASS",
+                   "SIZE_CHAIN_SELF_IMAGE": "FAIL — chain sees its own image",
+                   "SIZE_MIN_IMAGE_VIOLATION": "FAIL — minimum image violated"}
+        _cutr = fs.get("L_over_2cutoff")
+        lines.append(
+            f"| Finite size | L={fs.get('L_min_A')} Å · L/2r_cut="
+            f"{_cutr if _cutr is not None else 'n/a'} · L/2Rg={fs.get('L_over_2Rg')} · "
+            f"L/R_ee={fs.get('L_over_Ree')} | ≥1.0 | "
+            f"{_fsmark.get(fs.get('verdict'), fs.get('verdict'))} |"
+        )
+
+    lines.append(
+        f"| Density homogeneity CV (signal) | {sig:.1%} "
+        f"(raw {cv:.1%} − Poisson {dh.get('poisson_cv', 0):.1%}; {grid_n}³ grid, {apv} atoms/voxel) "
+        f"| <{sig_max:.0%} | {label} |"
+    )
 
     if warnings_list:
         lines.append("")
@@ -689,7 +810,22 @@ def main():
     parser.add_argument("--temp_col",          default="Temp")
     parser.add_argument("--density_col",       default="Density")
     parser.add_argument("--energy_col",        default="TotEng")
+    parser.add_argument("--pressure_cols",     nargs=3, default=["Pxx", "Pyy", "Pzz"],
+                        help="Diagonal pressure-tensor columns, for the residual "
+                             "deviatoric-stress (mechanical-equilibrium) check.")
+    parser.add_argument("--cutoff_A",          type=float, default=None,
+                        help="Pair-potential cutoff (A), from polymer_rules.json:cutoff_A. Enables "
+                             "the minimum-image check L >= 2*cutoff_A. Omitted -> that check is "
+                             "skipped and only the chain-self-image criterion applies.")
+    parser.add_argument("--n_eff_min",         type=int, default=20,
+                        help="Minimum independent density samples (n_prod/tau_eff). Below "
+                             "this the plateau is undersampled — an EXTEND, not a structural "
+                             "failure.")
     parser.add_argument("--atom_style",        default="id resid type charge x y z")
+    parser.add_argument("--cv_signal_max",     type=float, default=0.11,
+                        help="Max Poisson-corrected density-homogeneity CV. Calibrated on the "
+                             "36-run archive: heterogeneous-underpack families span 0.120-0.192, "
+                             "all others 0.000-0.094.")
     parser.add_argument("--ct_min_decay",      type=float, default=None,
                         help="Minimum C(t) decay fraction to pass hard gate (0–1). "
                              "Omit for soft-warning-only behaviour (backwards compat). "
@@ -713,6 +849,7 @@ def main():
         temp_col=args.temp_col,
         density_col=args.density_col,
         energy_col=args.energy_col,
+        pressure_cols=args.pressure_cols,
     )
     if "error" in thermo:
         print(json.dumps({"status": "failed", "error": thermo["error"]}))
@@ -774,6 +911,15 @@ def main():
         trajectory_slice=traj_slice,
         ct_min_decay=args.ct_min_decay,
         graphs_dir=args.graphs_dir,
+        cv_signal_max=args.cv_signal_max,
+    )
+
+    # ── Finite-size (periodic self-imaging) ──
+    finite_size = check_finite_size(
+        data_file=args.data_file,
+        cutoff_A=args.cutoff_A,
+        mean_rg_A=(structural.get("rg") or {}).get("mean_Rg_A"),
+        mean_ree_A=(structural.get("ree") or {}).get("mean_R_ee_A"),
     )
 
     # ── overall_pass ──
@@ -787,6 +933,8 @@ def main():
         structural["density_homogeneity"].get("pass", False),
         # C(t) gate — only active when --ct_min_decay supplied; defaults True otherwise
         structural.get("ct", {}).get("pass", True),
+        # Finite-size: skipped (True) when the box or Rg could not be measured
+        finite_size.get("pass", True),
     ]
     overall_pass = all(hard_checks)
 
@@ -799,6 +947,8 @@ def main():
         timestamp=timestamp,
         n_frames=n_frames_used,
         skip_frames=args.skip_frames,
+        n_eff_min=args.n_eff_min,
+        finite_size=finite_size,
     )
 
     result = to_native({
@@ -811,6 +961,13 @@ def main():
             "density_sem": thermo.get("density", {}).get("block_sem"),
             "energy_sem": thermo.get("energy", {}).get("block_sem"),
             "tau_eff_density_fraction": thermo.get("tau_eff_density_fraction"),
+            "n_eff_density": {
+                "pass": (thermo.get("n_eff_density") is None
+                         or thermo["n_eff_density"] >= args.n_eff_min),
+                "n_eff": thermo.get("n_eff_density"),
+                "n_eff_min": args.n_eff_min,
+            },
+            "residual_stress": thermo.get("residual_stress"),
             "meta": thermo.get("meta"),
         },
         "chain": {
@@ -823,6 +980,7 @@ def main():
         "spatial": {
             "p2": structural["p2"],
             "density_homogeneity": structural["density_homogeneity"],
+            "finite_size": finite_size,
         },
         "warnings": warnings_list,
         "d05_markdown": d05,

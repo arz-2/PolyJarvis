@@ -31,7 +31,7 @@ import pandas as pd
 from pathlib import Path
 from scipy import stats as sp_stats
 
-from analysis_utils import compute_tau_eff, parse_lammps_log
+from analysis_utils import compute_tau_eff, effective_sample_size, parse_lammps_log
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ def main():
 
     # τ_eff and effective sample size
     tau_frames, tau_frac = compute_tau_eff(plateau_rho)
-    n_eff = int(n_plateau / max(1.0, 2.0 * tau_frames))
+    n_eff = effective_sample_size(n_plateau, tau_frames)
 
     # τ_eff-aware block-SEM
     min_block_size = max(5, int(5.0 * max(tau_frames, 1.0)))
@@ -166,7 +166,7 @@ def main():
     # The 1% total-drift magnitude is the operative criterion.  The p-value is a
     # secondary guard but is NOT a reliable significance test: linregress assumes
     # i.i.d. residuals, while MD thermo is autocorrelated — tau_eff (computed above)
-    # means n_eff = n/(2*tau_eff) << n, so the OLS SE is understated and p is
+    # means n_eff = n/tau_eff << n, so the OLS SE is understated and p is
     # systematically too small.  In practice p almost always satisfies p < 0.01 for
     # correlated series, so the gate reduces to the magnitude floor.
     x_idx = np.arange(n_plateau, dtype=float)

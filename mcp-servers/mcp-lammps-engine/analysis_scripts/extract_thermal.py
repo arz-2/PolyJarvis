@@ -517,6 +517,13 @@ def main():
                              "Required for ΔCp mass normalisation and MDAnalysis structural analysis.")
     parser.add_argument("--backbone_types", nargs="*", type=int, default=None,
                         help="Backbone atom type IDs for P2 nematic order computation.")
+    parser.add_argument("--method_gap_max_K", type=float, default=20.0,
+                        help="Max allowed |Tg_primary - Tg_alternative|. Above it the transition "
+                             "region is noisy or the sweep too narrow -> tg_gate_verdict=REVIEW.")
+    parser.add_argument("--method_gap_exempt", action="store_true",
+                        help="Record a method-gap exceedance as a reason but do not set REVIEW. "
+                             "For classes with documented highest-rate degeneracy on the "
+                             "rigid-aromatic staircase (those carrying tg_slope_gate_fallback).")
     args = parser.parse_args()
 
     log_file = args.log_file
@@ -526,6 +533,8 @@ def main():
     graphs_dir.mkdir(parents=True, exist_ok=True)
     initial_tg_guess = args.initial_tg_guess
     equilibration_fraction = args.equilibration_fraction
+    method_gap_max_K = args.method_gap_max_K
+    method_gap_exempt = args.method_gap_exempt
     temp_col = args.temp_col
     density_col = args.density_col
     enthalpy_col = args.enthalpy_col
@@ -918,6 +927,13 @@ def main():
                         "H_r_squared":                   round(H_r2, 4),
                         "H_fit_quality":                 H_fit_quality,
                         "system_mass_g_per_mol":         system_mass,
+                        # A transition with essentially no heat-capacity step is not a glass
+                        # transition. Reported, not gated: on the archive the two lowest values
+                        # (PEEK1 0.037, cis-PBD2 0.018 J/g/K, against a typical 0.1-0.3) are
+                        # already caught by transition_width_degenerate and slope_sign_invalid
+                        # respectively, so a floor here would add no independent discrimination
+                        # while inventing a threshold the data cannot justify.
+                        "dCp_weak_step_flag":            bool(dCp_J_per_g_K < 0.05),
                     }
                 else:
                     dCp_fields["dCp_status"] = "skipped (enthalpy bilinear fit failed)"
@@ -972,12 +988,43 @@ def main():
     # -------------------------------------------------------------------
     # 6. Assemble final result
     # -------------------------------------------------------------------
+    # ── Reportability gate ──
+    # Mechanizes what THERMAL_ANALYSIS.md previously stated only as prose ("POOR — do not
+    # report", ">20 K primary/alternative disagreement — investigate"), so the orchestrator
+    # routes on a field instead of re-deriving it. Distinct from the is_glassy routing
+    # fallback in THERMAL_TRACK.md, which may still use the plan's experimental Tg.
+    Tg_alt = round(alt_result["Tg_K"], 1) if alt_result else round(cf_result["Tg_alt_K"], 1)
+    method_gap_K = round(abs(round(Tg_primary, 1) - Tg_alt), 1) if Tg_alt is not None else None
+    gate_reasons = []
+    if fit_quality == "POOR":
+        gate_reasons.append(f"fit_quality=POOR ({', '.join(fit_warnings) or 'low r²'})")
+    if primary_fit_invalid:
+        gate_reasons.append(f"primary_fit_invalid: {','.join(primary_violations)}")
+    gate_verdict = "TG_NOT_REPORTABLE" if gate_reasons else "TG_REPORTABLE"
+    if (gate_verdict == "TG_REPORTABLE" and method_gap_K is not None
+            and method_gap_K > method_gap_max_K):
+        if method_gap_exempt:
+            gate_reasons.append(
+                f"method_gap={method_gap_K:.1f} K exceeds {method_gap_max_K:.0f} K but this class "
+                "is exempt (documented highest-rate degeneracy on the rigid-aromatic staircase)"
+            )
+        else:
+            gate_verdict = "TG_REVIEW"
+            gate_reasons.append(
+                f"method_gap={method_gap_K:.1f} K between {fit_method_used} and the alternative "
+                f"fit exceeds {method_gap_max_K:.0f} K — transition region noisy or sweep too narrow"
+            )
+
     result = {
         "status":              "success",
         "log_file":            log_file,
         "output_dir":          str(output_dir),
         "Tg_K":                round(Tg_primary, 1),
-        "Tg_alternative_K":    round(alt_result["Tg_K"], 1) if alt_result else round(cf_result["Tg_alt_K"], 1),
+        "Tg_alternative_K":    Tg_alt,
+        "tg_method_gap_K":     method_gap_K,
+        "tg_gate_verdict":     gate_verdict,
+        "tg_gate_reasons":     gate_reasons,
+        "tg_reportable":       gate_verdict == "TG_REPORTABLE",
         "r_squared":           round(r2_primary, 4),
         "fit_quality":         fit_quality,
         "fit_method":          fit_method_used,

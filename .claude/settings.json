@@ -79,7 +79,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus_murnaghan): route on bm_gate_verdict. INADMISSIBLE (K<=0, B0_prime<=0, volume_monotonic=false, V0 outside sampled range, r_squared<0.99) -> do NOT report K. FALLBACK_TO_DEFORM (fit_converged=false) -> deform path. r_squared<0.999 and B0_prime outside [4,20] are WARNINGS, never blocking.\"}}'"
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus_murnaghan): route on bm_gate_verdict. BM_INADMISSIBLE (K<=0, B0_prime<=0, volume_monotonic=false, V0 outside sampled range, r_squared<0.99) -> do NOT report K. BM_FALLBACK_DEFORM (fit_converged=false) -> deform path. r_squared<0.999 and B0_prime outside [4,20] are WARNINGS, never blocking.\"}}'"
           }
         ]
       },
@@ -88,7 +88,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus_deform): pass deform_direction matching the strained axis. Route on deform_gate_verdict: INADMISSIBLE (K<0, E<0, or isotropy_delta_pct>=20%) -> do NOT report K, it is a hard failure not BORDERLINE. Also require fit_r2_C11 and both transverse r2 >= 0.90. G<0 in a y/z leg means deform_direction was wrong, not small-cell anisotropy.\"}}'"
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"GATE (extract_bulk_modulus_deform): pass deform_direction matching the strained axis. Route on deform_gate_verdict: DEFORM_INADMISSIBLE (K<0, E<0, or isotropy_delta_pct>=20%) -> do NOT report K, it is a hard failure not BORDERLINE. Also require fit_r2_C11 and both transverse r2 >= 0.90. G<0 in a y/z leg means deform_direction was wrong, not small-cell anisotropy.\"}}'"
           }
         ]
       },
@@ -252,7 +252,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'LOG: extract_thermal done — check tg_gate_verdict first: NOT_REPORTABLE (fit_quality=POOR / primary_fit_invalid) means do NOT report a Tg, REVIEW (tg_method_gap_K > 20 K) means halt before reporting; record tg_gate_reasons either way. Blocking the report does not block the is_glassy routing. Then fill D-06 (R², N_bins, F-stat, is_glassy + Tg K) and the α_g, α_r, ΔCp rows in RESULTS B of run_log.md. This single-rate Tg is the headline (single-rate-primary default) — no separate DSC-equiv step follows unless multirate was explicitly opted into.'"
+            "command": "echo 'LOG: extract_thermal done — check tg_gate_verdict first: TG_NOT_REPORTABLE (fit_quality=POOR / primary_fit_invalid) means do NOT report a Tg, TG_REVIEW (tg_method_gap_K > 20 K) means halt before reporting; record tg_gate_reasons either way. Blocking the report does not block the is_glassy routing. Then fill D-06 (R², N_bins, F-stat, is_glassy + Tg K) and the α_g, α_r, ΔCp rows in RESULTS B of run_log.md. This single-rate Tg is the headline (single-rate-primary default) — no separate DSC-equiv step follows unless multirate was explicitly opted into.'"
           }
         ]
       },

@@ -15,7 +15,18 @@
 | ≥ 0.90 | < 0.05 | ACCEPTABLE | Report with caveat |
 | < 0.90 | ≥ 0.05 | POOR | Do not report — investigate |
 
-`Tg_K` vs `Tg_alternative_K` disagreement >20 K means the transition region is noisy or the sweep range is too narrow — investigate before reporting.
+**Reportability** — `extract_thermal` emits `tg_gate_verdict`; use it directly rather than
+re-deriving reportability from the numbers:
+- `TG_REPORTABLE` — report the Tg.
+- `TG_REVIEW` — `tg_method_gap_K` (|`Tg_K` − `Tg_alternative_K`|) exceeds 20 K: the transition region
+  is noisy or the sweep range too narrow. Investigate before reporting. When your prompt says
+  `method_gap_exempt: true`, pass `--method_gap_exempt` to `extract_thermal` — that class has
+  documented highest-rate degeneracy, so the gap is recorded as a reason without forcing REVIEW.
+- `TG_NOT_REPORTABLE` — `fit_quality=POOR` or `primary_fit_invalid`. Do not report the Tg. This blocks
+  *reporting* only; the `is_glassy` routing in THERMAL_TRACK.md may still fall back to the plan's
+  experimental Tg.
+
+Read `tg_gate_reasons` into the D-06 row verbatim. `dCp_weak_step_flag` is informational.
 
 **CTE sanity:** α_r/α_g ≈ 2–3 (flag if outside 1.5–5).
 

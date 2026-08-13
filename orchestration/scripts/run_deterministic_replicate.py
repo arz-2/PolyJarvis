@@ -340,7 +340,24 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
         dest_params = cell_dir / "emc_build.params"
         shutil.copy(src_params_matches[0], dest_params)
 
-    info = lammps.inspect_data_file(data_file=str(dest_data))
+    # Size gate at the cheapest point: the built cell, before any MD. A too-small cell would
+    # otherwise burn the whole equilibration chain before the equil-check gate said the same.
+    ep = resolve_stage_params("equil", args, cls)
+    info = lammps.inspect_data_file(
+        data_file=str(dest_data), lj_cutoff=ep.get("cutoff_A") or 12.0,
+        target_density_gcm3=ep.get("exp_density_gcm3"), nchain=ep.get("nchain"),
+    )
+    size_errors = [e for e in (info.get("validation", {}).get("errors") or [])
+                   if e.startswith("SIZE_")]
+    if size_errors:
+        state.mark("build", "failed",
+                   result={"finite_size_forecast": info.get("finite_size_forecast")})
+        raise SystemExit(
+            "Halting before equilibration — the built cell would self-image once compressed: "
+            + " ".join(size_errors)
+            + " A deterministic replicate must not silently rebuild at a different nchain; "
+              "that is a decided_params change and needs human review."
+        )
 
     result = {
         "data_path": str(dest_data),
@@ -360,6 +377,7 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
                          extend_temp: float = None, extend_ns: float = 1.5) -> dict:
     p = resolve_stage_params("equil", args, cls)
     flags = p["lammps_flags"]
+    velocity_seed = p["velocity_seed"]
     if extend_from_data is None:
         workflow = lammps.generate_equilibration_workflow(
             data_file=p["data_path"], work_dir_base=p["work_dir"],
@@ -367,8 +385,9 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             press=p["P_equil_atm"], use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"],
             use_opls=flags["use_opls"], npt_prod_steps=p["npt_prod_steps"],
             add_melt_npt=p["add_melt_npt"], t_equil_K=p["T_equil_K"] if p["add_melt_npt"] else None,
-            melt_npt_steps=p["melt_npt_steps"], engine=p["engine"], velocity_seed=p["velocity_seed"],
+            melt_npt_steps=p["melt_npt_steps"], engine=p["engine"], velocity_seed=velocity_seed,
             npt_cool_steps=p["npt_cool_steps"], npt_cool300_steps=p["npt_cool300_steps"],
+            extend_steps=None,
         )
     else:
         dt = p["dt_fs"]
@@ -377,7 +396,9 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             data_file=extend_from_data, work_dir_base=p["work_dir"], polymer_name=args.run_name,
             temp=extend_temp, press=p["P_equil_atm"], use_pcff=flags["use_pcff"],
             use_trappe=flags["use_trappe"], use_opls=flags["use_opls"], engine=p["engine"],
-            velocity_seed=p["velocity_seed"], extend_only=True, extend_steps=extend_steps,
+            velocity_seed=velocity_seed, extend_only=True, extend_steps=extend_steps,
+            npt_prod_steps=None, npt_cool_steps=None, npt_cool300_steps=None,
+            melt_npt_steps=None,
         )
     if workflow.get("status") == "error":
         raise SystemExit(f"generate_equilibration_workflow failed: {workflow}")
@@ -401,6 +422,10 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
     # has the "# <name>" comments inspect_data_file's atom_type_names parsing needs; a write_data
     # output (which npt_prod_data_path always is) has stripped them.
     build_data_path = args.data_path
+
+    # generate_equilibration_workflow rejects a null seed; gen_prompt resolves one (pinned, else
+    # derived from run_name) for the chain and every EXTEND continuation below. Log it like EMC's.
+    log_seed(run_log_path, "velocity", resolve_stage_params("equil", args, cls)["velocity_seed"])
 
     gpu_per_run = cls.get("gpu_per_run") or 1
     with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
@@ -532,6 +557,7 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
             script = lammps.generate_script(
                 template_name="npt_tg_step", data_file=p["equil_data_path"],
                 output_script=f"{p['tg_sweep_dir']}/tg_sweep.in",
+                velocity_seed=p["velocity_seed"],
                 params={"LOG_FILE": "tg_sweep.log", "DUMP_FILE": "",
                        "T_START": p["T_start_K"], "T_END": p["T_end_K"], "T_STEP": p["T_step_K"],
                        "N_STEPS_PER_T": p["n_steps_per_t"], "P_START": 1.0, "P_FINAL": 1.0,
@@ -552,6 +578,7 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
         thermal = wait_for_analysis(lammps, lammps.extract_thermal(
             log_file=ap["tg_log_path"], tg_data_file=ap["tg_data_file"],
             enthalpy_col=ap["enthalpy_col"], output_dir=ap["output_dir"], graphs_dir=ap["graphs_dir"],
+            method_gap_exempt=ap["method_gap_exempt"],
         ), f"tg analysis rate={rate}")
         per_rate.append({"rate": rate, "Tg_K": thermal.get("Tg_K"),
                          "fit_quality": thermal.get("fit_quality"), "r_squared": thermal.get("r_squared"),
@@ -590,6 +617,7 @@ def _submit_deform(args, cls: dict, lammps, mode: str) -> dict:
     script = lammps.generate_script(
         template_name="npt_deform", data_file=p["equil_data_path"],
         output_script=f"{p['work_dir']}/05_deform{suffix}.in",
+        velocity_seed=p["velocity_seed"],
         params={"LOG_FILE": f"05_deform{suffix}.log", "STRAIN_RATE": strain_rate_per_fs,
                "STRAIN_MAX": p["K_strain_max"], "TIMESTEP": p["dt_fs"], "use_gpu": True,
                "engine": p["engine"], **p["lammps_flags"]},
@@ -622,7 +650,8 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
         series = lammps.run_bulk_modulus_series(
             data_file=p["equil_data_path"], work_dir=f"{p['work_dir']}/bm_series",
             pressures_atm=p["bm_pressures_atm"] or [-1000, 0, 3000, 7000, 15000], temp_K=p["temp_K"],
-            run_name=args.run_name, gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"], npt_steps=p["npt_steps"],
+            run_name=args.run_name, gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"],
+            velocity_seed=p["velocity_seed"], npt_steps=p["npt_steps"],
             dt_fs=p["dt_fs"], use_trappe=p["lammps_flags"]["use_trappe"],
             use_pcff=p["lammps_flags"]["use_pcff"], use_opls=p["lammps_flags"]["use_opls"], engine=p["engine"],
         )

@@ -62,6 +62,14 @@ GATE: do not spawn murnaghan-worker or deform-worker until the thermal track has
   # the probe depth is untested for THIS system — never write a class-level bm_pressures_atm
   # from one system's outcome.
 
+  Admissibility (both legs, and the deform fallback below) — route on the extractor's own verdict:
+    bm_gate_verdict == "BM_REPORTABLE"       → write D-07 as usual.
+    bm_gate_verdict == "BM_FALLBACK_DEFORM"  → the recovery path below (glassy only).
+    bm_gate_verdict == "BM_INADMISSIBLE"     → do NOT write a K. Record bm_gate_reasons in D-07 and
+      halt to human review. `volume_monotonic=false` means the offending pressure point must be
+      re-run, not re-fitted. Same for deform_gate_verdict == "DEFORM_INADMISSIBLE" (K<0, E<0, or
+      isotropy_delta_pct >= 20%).
+
   Recovery if murnaghan fails (fit_converged=False) — applies to whichever leg's extraction
   is final (glassy only has this fallback; rubbery does not):
     Claim GPU: orchestration/scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
