@@ -61,6 +61,23 @@ After completing, save a `feedback` memory for each of: any error or contradicti
    - For every decision in `decisions`, ensure `criteria_evaluated` covers that decision's `evaluate` list in `decision_policy.json`, and populate `evidence` (claim + `source_doi` or `citation`) and `alternatives` (with their known error where applicable). Where the policy sets `evidence_required: true` (forcefield, electrostatics, property_method) you MUST cite a source or explicitly record `confidence: low` with a stated reason.
    - If you deviate from a `polymer_rules.json` default, change the corresponding key in `decided_params` and justify it in that decision's `evidence`.
    - **Preserve `tg_slope_gate_fallback`** if the scaffold carries it (classes whose highest configured rate is documented as unreliable, e.g. PSFO): keep it in `decided_params` unchanged — the thermal track reads it directly to pick which rate index to sweep by default (`"slowest_rate"` → `tg_rates_K_per_ns[0]`, otherwise the highest rate). Never drop it (per `decision_policy.json:tg_protocol`).
+   - **Force field (D-01) — select from measured admissibility, not the class map.** `decision_policy.json:policies.forcefield`'s require clauses are implemented mechanically in `orchestration/scripts/select_forcefield.py` — call it and transcribe its output:
+     ```
+     Bash: python3 orchestration/scripts/select_forcefield.py <CLASS> "<smiles>"
+     ```
+     Merge exactly as for D-08 below: append `.decision` verbatim to `decisions[]`, merge a
+     non-empty `.decided_params_override` into `decided_params` (an empty override means the
+     class default was admissible), and append `.uncertainties` to the plan's `uncertainties[]`.
+     Three rules on what you may conclude from it:
+     - `.admissible` is measured by building this SMILES under each field. Never choose a field
+       outside it, and never overrule it from a coverage table or a paper.
+     - `archive_prior` / `ff_domain` verdicts are REPORTED, never ranked on — extrapolation does
+       not predict error on this archive.
+     - If `.decision.provenance_flags` is non-empty the field's parameters were locally patched,
+       silently zeroed, or unexplained. This does not veto the field, but the plan MUST carry the
+       `ff_parameter_provenance` uncertainty the script emits, or the validator rejects it.
+     If `.decision.choice` is `null`, no admissible field carries evidence — escalate to human
+     review instead of planning a run.
    - **Hardware (D-08) — select from benchmark evidence, scaled by cell size.** This is an *active* decision on the reasoned path. (Deterministic plans skip it entirely — never add hardware to a deterministic plan's `decided_params`.) `decision_policy.json:policies.hardware`'s require/prefer thresholds are implemented mechanically in `orchestration/scripts/select_hardware.py` — call it and transcribe its output rather than re-deriving the numbers:
      ```
      Bash: python3 orchestration/scripts/select_hardware.py --polymer_class <CLASS> --smiles "<smiles>" \

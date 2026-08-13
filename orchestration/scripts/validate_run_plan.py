@@ -336,6 +336,61 @@ def _unimplemented_param_findings(plan: dict) -> list:
     return findings
 
 
+# NO_SOURCE_ROW is deliberately absent: it reports a gap in ff_provenance.py's own
+# lookup, not a defect in the field, and must never block a plan or change a field choice
+_PROVENANCE_BLOCKING = ("LOCAL_PATCH", "ZERO_SUBSTITUTED")
+
+
+def _forcefield_findings(plan: dict) -> list:
+    """D-01_ff must name a field that was measured admissible for THIS SMILES.
+
+    Admissibility is the one clause in policies.forcefield.require that a plan can
+    silently violate: the class default applies whether or not the field can represent
+    the molecule, and the only previous symptom was the build crashing. select_forcefield.py
+    records what it measured; this checks the plan agrees with it.
+    """
+    findings = []
+    d = next((x for x in plan.get("decisions", []) if x.get("id") == "D-01_ff"), None)
+    if not d:
+        return findings
+    choice = d.get("choice")
+    admissible = d.get("admissible")
+    dp_ff = plan.get("decided_params", {}).get("preferred_ff")
+
+    if isinstance(admissible, list) and choice and choice not in admissible:
+        findings.append({
+            "check": "ff_not_admissible", "severity": "structural",
+            "detail": (f"D-01_ff.choice={choice!r} is not in the measured admissible set "
+                       f"{admissible} — the field cannot integrate or cannot type this "
+                       "SMILES, so the build will fail or the parameters are not this "
+                       "molecule's. Re-run orchestration/scripts/select_forcefield.py.")})
+    if isinstance(admissible, list) and not admissible:
+        findings.append({
+            "check": "ff_no_admissible_field", "severity": "structural",
+            "detail": ("no field was measured admissible for this SMILES — escalate to "
+                       "human review rather than planning a run that cannot be built.")})
+    if choice and dp_ff and dp_ff != choice:
+        findings.append({
+            "check": "ff_choice_not_applied", "severity": "structural",
+            "detail": (f"decided_params.preferred_ff={dp_ff!r} disagrees with "
+                       f"D-01_ff.choice={choice!r}. Hardware selection keys off "
+                       "decided_params.preferred_ff, so the two must match.")})
+
+    flags = d.get("provenance_flags") or {}
+    blocking = sorted(f for f in flags if f in _PROVENANCE_BLOCKING and flags[f])
+    acknowledged = any(u.get("name") == "ff_parameter_provenance"
+                       for u in plan.get("uncertainties", []))
+    if blocking and not acknowledged:
+        findings.append({
+            "check": "ff_provenance_unacknowledged", "severity": "structural",
+            "detail": (f"D-01_ff.provenance_flags {blocking} record parameters that were "
+                       "locally patched, silently zeroed, or unexplained, and no "
+                       "uncertainties entry named 'ff_parameter_provenance' acknowledges "
+                       "them. The flag does not veto the field — it must be carried as a "
+                       "stated uncertainty, not inherited silently.")})
+    return findings
+
+
 def validate_plan(plan: dict, policy: dict) -> list:
     findings = []
     findings += _criteria_and_evidence_findings(plan, policy)
@@ -344,6 +399,7 @@ def validate_plan(plan: dict, policy: dict) -> list:
     findings += _uncertainty_findings(plan, policy)
     findings += _exp_tg_companion_findings(plan)
     findings += _hardware_findings(plan)
+    findings += _forcefield_findings(plan)
     findings += _finite_size_findings(plan)
     findings += _unimplemented_param_findings(plan)
     return findings

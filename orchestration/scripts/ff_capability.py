@@ -204,7 +204,7 @@ def _try_radonpy(smiles, field):
         return False, f"{type(e).__name__}: {e}"[:400]
 
 
-def check_typing(smiles, field):
+def check_typing(smiles, field, keep_dir=None):
     """Try the front end for real -- never consult a coverage table.
 
     The two front ends prove DIFFERENT things and the caller must not conflate them:
@@ -212,25 +212,35 @@ def check_typing(smiles, field):
     ff_assign only proves atom types and bonded parameters were assigned; a runnable
     GAFF2 cell additionally needs the per-chemistry QM charge step, which this does
     not run. `typing_evidence` records which standard was met.
+
+    `keep_dir` retains the built cell there instead of discarding it, so a caller that
+    wants to inspect the emitted parameters does not pay for a second build.
     """
     spec = FIELDS[field]
+    cell_dir = None
     if spec["front_end"] == "emc":
-        workdir = tempfile.mkdtemp(prefix=f"ffcap_{field.replace('/', '_')}_")
-        try:
-            ok, err = _try_emc(smiles, spec["name"], workdir)
-        finally:
-            shutil.rmtree(workdir, ignore_errors=True)
+        if keep_dir:
+            cell_dir = os.path.join(keep_dir, field.replace("/", "_"))
+            os.makedirs(cell_dir, exist_ok=True)
+            ok, err = _try_emc(smiles, spec["name"], cell_dir)
+        else:
+            workdir = tempfile.mkdtemp(prefix=f"ffcap_{field.replace('/', '_')}_")
+            try:
+                ok, err = _try_emc(smiles, spec["name"], workdir)
+            finally:
+                shutil.rmtree(workdir, ignore_errors=True)
         evidence = "built_cell"
     else:
         ok, err = _try_radonpy(smiles, field)
         evidence = "typed_only"
     return {"types_smiles": ok, "front_end": spec["front_end"], "typing_error": err,
             "typing_evidence": evidence if ok else None,
+            "cell_dir": cell_dir if ok else None,
             "further_steps_required": (["QM charge assignment (per chemistry)"]
                                        if ok and evidence == "typed_only" else [])}
 
 
-def assess_all(smiles, fields=None, lmp=LMP):
+def assess_all(smiles, fields=None, lmp=LMP, keep_dir=None):
     styles = installed_styles(lmp)
     if not styles:
         return {"error": f"could not read styles from {lmp}"}
@@ -238,10 +248,11 @@ def assess_all(smiles, fields=None, lmp=LMP):
     for field in (fields or sorted(FIELDS)):
         integ = check_integration(field, styles)
         # typing is the expensive half -- skip it when the field cannot run anyway
-        typ = (check_typing(smiles, field) if integ["integrates"]
+        typ = (check_typing(smiles, field, keep_dir) if integ["integrates"]
                else {"types_smiles": None, "front_end": FIELDS[field]["front_end"],
                      "typing_error": "not attempted — field does not integrate",
-                     "typing_evidence": None, "further_steps_required": []})
+                     "typing_evidence": None, "cell_dir": None,
+                     "further_steps_required": []})
         results[field] = dict(integ, **typ)
         results[field]["candidate"] = bool(integ["integrates"] and typ["types_smiles"])
     cands = sorted(f for f, r in results.items() if r["candidate"])
