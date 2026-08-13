@@ -604,10 +604,12 @@ def list_templates(template_name: Optional[str] = None) -> dict:
 @mcp.tool()
 def inspect_data_file(
     data_file: str,
+    lj_cutoff: float,
+    target_density_gcm3: Optional[float],
+    nchain: Optional[int],
     h_type_ids: Optional[list] = None,
     backbone_types: Optional[list] = None,
     atom_type_pairs: Optional[list] = None,
-    lj_cutoff: float = 12.0,
     charge_tol: float = 0.01,
     params_file: str = "",
 ) -> dict:
@@ -619,25 +621,46 @@ def inspect_data_file(
     safe to submit.
 
     BLOCKING errors: charge non-neutrality, missing Coeffs sections,
-    box smaller than 2×cutoff, type IDs out of range.
+    box smaller than 2×cutoff, type IDs out of range, and — when
+    target_density_gcm3 is given — a forecast chain-self-imaging violation
+    (the compressed cell would have L < 2*Rg).
     ADVISORY warnings: unusual density, H-mass mismatch, bad bond/atom ratio.
+
+    THIS IS THE CHEAPEST PLACE TO CATCH A TOO-SMALL CELL. Pass
+    target_density_gcm3 (the class experimental density) and the finite-size
+    forecast runs here, before any MD: Rg is measured on the packed coordinates
+    (it barely changes on equilibration) and the post-compression box edge is
+    predicted from the cell's own mass. Catching it at the equilibration gate
+    instead wastes the whole chain — 3–20 ns of t_equil by class, plus the
+    cooling tail.
 
     Args:
         data_file:       Path to the .data file.
         h_type_ids:      SHAKE H type IDs to validate.
         backbone_types:  Backbone atom type IDs to validate (end-to-end, P2).
         atom_type_pairs: RDF atom type pairs to validate.
-        lj_cutoff:       LJ cutoff in Å (default 12.0 for GAFF2).
+        lj_cutoff:       REQUIRED. LJ cutoff in Å — the class's own value, not a nominal one.
+                         The old 12.0 default over-stated the minimum-image bound for the 18
+                         classes that run 9.5 Å.
         charge_tol:      Maximum allowed |net charge| in e (default 0.01).
         params_file:     Optional path to an EMC-generated .params file. When
                          provided, "Coeffs section missing" errors are suppressed
                          — EMC TraPPE-UA and PCFF .data files store coefficients
                          in the params file, not in the .data file.
+        target_density_gcm3: REQUIRED, may be null. Target (experimental) density the cell
+                         will be compressed to. Enables the finite_size_forecast block below;
+                         a null skips the forecast rather than grading the roomier as-built
+                         box, so pass the null deliberately — this is the pre-submission size
+                         gate and an omission disarms it silently.
+        nchain:          REQUIRED, may be null. Chain count, used only to turn a forecast
+                         violation into a concrete rebuild target (nchain_suggested).
 
     Returns:
         dict with:
-            info       — n_atoms, n_atom_types, box, atom type names, h_type_ids
-            validation — {valid, errors, warnings, stats}
+            info                 — n_atoms, n_atom_types, box, atom type names, h_type_ids
+            validation           — {valid, errors, warnings, stats}
+            finite_size_forecast — predicted-equilibrated L vs 2*cutoff_A and 2*Rg,
+                                   verdict, and a nchain rebuild target when it fails
     """
     try:
         content = Path(data_file).read_text(encoding="utf-8")
@@ -654,11 +677,37 @@ def inspect_data_file(
         if params_file:
             vr["errors"] = [e for e in vr["errors"] if "Coeffs' section missing" not in e]
             vr["valid"] = len(vr["errors"]) == 0
+
+        # Finite-size forecast — blocking, and free: it reads the same .data file already
+        # parsed above and needs no trajectory.
+        forecast = {"available": False, "reason": "target_density_gcm3 not supplied"}
+        if target_density_gcm3:
+            if MDA_SCRIPTS_DIR not in sys.path:
+                sys.path.insert(0, MDA_SCRIPTS_DIR)
+            from finite_size import forecast_from_data_file
+            forecast = forecast_from_data_file(
+                data_file, lj_cutoff, target_density_gcm3, nchain=nchain
+            )
+            if forecast.get("available") and not forecast.get("pass"):
+                rem = forecast.get("remedy") or {}
+                suggest = (f" Rebuild with nchain x{rem['nchain_factor']}"
+                           + (f" (>= {rem['nchain_suggested']})" if rem.get("nchain_suggested") else "")
+                           + "." if rem else "")
+                vr["errors"].append(
+                    f"{forecast['verdict']}: compressed cell would have "
+                    f"L={forecast.get('L_predicted_A')} A at {target_density_gcm3} g/cm3 vs "
+                    f"2*Rg={2 * forecast.get('packed_Rg_A', 0):.1f} A "
+                    f"(L/2Rg={forecast.get('L_over_2Rg')}, L/2cutoff={forecast.get('L_over_2cutoff')}). "
+                    f"Every chain would overlap its own periodic image.{suggest}"
+                )
+                vr["valid"] = False
+
         return {
             "status":     "success",
             "data_file":  data_file,
             "info":       info,
             "validation": vr,
+            "finite_size_forecast": forecast,
         }
     except Exception as e:
         return {
@@ -675,6 +724,7 @@ def generate_script(
     data_file: str,
     output_script: str,
     params: dict,
+    velocity_seed: int,
 ) -> dict:
     """
     Generate a filled LAMMPS .in script from a template and write it to disk.
@@ -687,11 +737,25 @@ def generate_script(
         params:        Parameter overrides (see list_templates(template_name) for options).
                        Common params: T_START, T_FINAL, N_STEPS, T_DAMP,
                        P_START, P_FINAL, P_DAMP, use_gpu, LOG_FILE, DUMP_FILE.
+        velocity_seed: REQUIRED, non-null. Pins every RNG seed the script carries — the
+                       `velocity all create` seed, the npt_tg_step staircase's per-temperature
+                       reseed, and the nemd_langevin thermostat seeds (SEED_HOT = seed,
+                       SEED_COLD = seed + 1, unless params sets them). Pass the same value
+                       every call for a run and record it in run_log.md. Templates that
+                       inherit velocities from the .data file ignore it.
 
     Returns:
         dict with script content, output path, and params used.
     """
     try:
+        if velocity_seed is None:
+            return {
+                "status": "error",
+                "error": "velocity_seed is required and must not be null — a null seed makes "
+                         "the script draw its own random seeds, so the run cannot be "
+                         "reproduced. Pass the run's seed and record it in run_log.md.",
+            }
+
         gen = ScriptGenerator(data_file=data_file)
         try:
             gen.parse_data_file(content=Path(data_file).read_text(encoding="utf-8"))
@@ -703,6 +767,7 @@ def generate_script(
             output_path=output_script,
             params=params,
             data_file_override=data_file,
+            velocity_seed=velocity_seed,
         )
 
         # For Tg staircases, compute and return the number of temperature steps so workers
@@ -741,9 +806,9 @@ def run_lammps_script(
     work_dir: str,
     gpu_ids: str,
     mpi: int,
+    engine: str,
     log_file: str = "lammps_run.log",
     use_gpu: bool = True,
-    engine: str = "gpu",
     progress_file: str = "",
     n_stages: int = 0,
     allow_concurrent_writer: bool = False,
@@ -823,11 +888,11 @@ def run_lammps_chain(
     stages: list,
     gpu_ids: str,
     mpi: int,
+    engine: str,
     data_file: Optional[str] = None,
     h_type_ids: Optional[list] = None,
     backbone_types: Optional[list] = None,
     params_file: str = "",
-    engine: str = "gpu",
     allow_concurrent_writer: bool = False,
 ) -> dict:
     """
@@ -1278,26 +1343,28 @@ def watch_run(run_id: str) -> dict:
 def generate_equilibration_workflow(
     data_file: str,
     work_dir_base: str,
+    velocity_seed: int,
+    npt_prod_steps: Optional[int],
+    npt_cool_steps: Optional[int],
+    npt_cool300_steps: Optional[int],
+    melt_npt_steps: Optional[int],
+    extend_steps: Optional[int],
+    temp: float,
+    use_pcff: bool,
+    use_trappe: bool,
+    use_opls: bool,
+    engine: str,
     polymer_name: str = "polymer",
-    temp: float = 300.0,
     max_temp: float = 600.0,
     press: float = 1.0,
     max_press: float = 50000.0,
     n_chains: int = 6,
     n_atoms: Optional[int] = None,
-    use_pcff: bool = False,
-    use_trappe: bool = False,
-    use_opls: bool = False,
     params_file: str = "",
-    npt_prod_steps: Optional[int] = None,
     add_melt_npt: bool = False,
     t_equil_K: Optional[float] = None,
-    melt_npt_steps: Optional[int] = None,
     add_300k_production: bool = True,
-    engine: str = "gpu",
-    velocity_seed: Optional[int] = None,
     extend_only: bool = False,
-    extend_steps: Optional[int] = None,
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
@@ -1325,24 +1392,55 @@ def generate_equilibration_workflow(
       npt_cool         - NPT cool t_equil_K → temp  (replaces standard npt_cool)
       Runs 6–7: unchanged
 
+    Required args — no defaults. Every step count and the velocity seed must be passed on
+    every call, including as an explicit null where the value does not apply to this path.
+    Omitting one is what let two identically-prompted runs of the same system emit different
+    `run N` counts, so omission is a schema error rather than a silent substitution.
+
     Args:
         data_file:      Path to the .data file.
         work_dir_base:  Base directory for all stage subdirectories.
+        velocity_seed:  REQUIRED, non-null. Pins the `velocity all create` RNG seed for every
+                        stage that initialises velocities. Draw once per run, pass the same
+                        value to every call for that run, and record it in run_log.md.
+        npt_prod_steps: REQUIRED. Step count for npt_production. Pass null to take the
+                        atom-count tier default (steps_npt // 2). Convert from ns:
+                        int(t_ns * 1e6 / dt_fs).
+        npt_cool_steps: REQUIRED. Step count for the npt_cool stage (max_temp→temp, or the
+                        t_equil_K→temp leg when add_melt_npt=True). Pass null to take
+                        steps_npt from the atom-count tier — the cooling ramp then runs at the
+                        same rate for a given cell size. Pass a larger value (e.g. 2x/4x the
+                        default) to slow the ramp — this is the re_melt_slow_recool recovery
+                        lever for UNDER_ANNEALED_COOLING (RECOVERY_PLAYBOOK.md /
+                        EQUILIBRATION.md).
+        npt_cool300_steps: REQUIRED. Step count for npt_cool300 (glassy only,
+                        T_workflow→300 K). Pass null to take int(1.0e6/dt_prod) (~1 ns), fixed
+                        regardless of cell size or T_workflow. Pass a larger value to slow the
+                        final cool to 300 K — the other re_melt_slow_recool lever.
+        melt_npt_steps: REQUIRED. Step count for the npt_melt isothermal run. Pass null to
+                        take int(1.0e6 / dt_prod) (≈1 ns at the production timestep). Ignored
+                        unless add_melt_npt=True.
+        extend_steps:   REQUIRED. Step count for the npt_extend stage. Pass null to take
+                        int(1.0e6 / dt_prod) (~1 ns). Ignored unless extend_only=True.
         polymer_name:   Label used in filenames and log comments.
-        temp:           Target simulation temperature (K).
+        temp:           REQUIRED. Target simulation temperature (K). This is the workflow
+                        temperature, not room temperature — a glassy melt runs at T_equil_K
+                        (typically 500-700 K), so the old 300.0 default silently built a
+                        cold chain that never melted.
         max_temp:       Peak annealing temperature (K). Typically 2x Tg.
         press:          Target pressure (atm), typically 1.
         max_press:      Compression pressure (atm), typically 50000.
-        n_chains:       Number of polymer chains (informational).
+        n_chains:       NO-OP — accepted for backward compatibility but never read. Chain
+                        count comes from the .data file. Do not use it as a protocol knob.
         n_atoms:        Total atom count. Auto-detected if not provided.
-        npt_prod_steps: Explicit step count for npt_production run. When None
-                        (default), uses steps_npt // 2 from the atom-count tier.
-                        Convert from ns: int(t_ns * 1e6 / dt_fs).
-        engine:         Execution engine stamped into every GPU stage deck: "gpu"
-                        (default; renders `package gpu`) or "kokkos" (renders no GPU
+        engine:         REQUIRED. Execution engine stamped into every GPU stage deck: "gpu"
+                        (renders `package gpu`) or "kokkos" (renders no GPU
                         package — `-sf kk` rewrites styles to /kk at launch). Submit
                         the chain with the matching engine= in run_lammps_chain().
-        use_pcff:       Set True for EMC/PCFF class2 systems (PCBN, PAMD, PKTN,
+        use_pcff:       REQUIRED. All three FF flags must be passed on every call: they are
+                        mutually exclusive, and all three defaulting to False emits GAFF2
+                        styles against whatever the cell actually is.
+                        Set True for EMC/PCFF class2 systems (PCBN, PAMD, PKTN,
                         PSFO, PIMD, POXI, PEST, PSUL, PURT, PANH, PPHS, PACR,
                         PIMN, PVNL, PPNL). Switches all templates to class2
                         styles, sixthpower mixing, and full 1-4 interactions.
@@ -1368,8 +1466,6 @@ def generate_equilibration_workflow(
                              Default False (standard 7-run workflow).
         t_equil_K:           Melt equilibration temperature (K). Required when
                              add_melt_npt=True. Must satisfy temp < t_equil_K < max_temp.
-        melt_npt_steps:      Step count for npt_melt isothermal run. Defaults to
-                             int(1.0e6 / dt_prod) (≈1 ns at the production timestep).
         add_300k_production: When True (default) and temp > 300.0, append npt_cool300
                              (T→300 K, ~1 ns) and npt_prod300 (300 K constant-T, ~2 ns).
                              These provide density and deformation input for glassy polymers.
@@ -1383,6 +1479,15 @@ def generate_equilibration_workflow(
             instructions - how to execute this workflow
     """
     try:
+        if velocity_seed is None:
+            return {
+                "status": "error",
+                "error": "velocity_seed is required and must not be null — a null seed makes "
+                         "every stage draw its own random `velocity all create` seed, so the "
+                         "chain cannot be reproduced. Draw one seed per run, pass it here, and "
+                         "record it in run_log.md.",
+            }
+
         # Parse data file to get system info
         content = Path(data_file).read_text(encoding="utf-8")
         gen = ScriptGenerator(data_file=data_file)
@@ -1596,6 +1701,7 @@ def generate_equilibration_workflow(
             and t_equil_K is not None
             and temp < t_equil_K
         )
+        _cool_steps = npt_cool_steps if npt_cool_steps is not None else steps_npt
         if _use_melt_npt:
             _melt_steps = melt_npt_steps or int(1.0e6 / dt_prod)
             s5a = _stage("npt_cool_melt", "npt", {
@@ -1634,7 +1740,7 @@ def generate_equilibration_workflow(
                 "P_FINAL":   press,
                 "P_DAMP":    1000.0,
                 "TIMESTEP":  dt_prod,
-                "N_STEPS":   steps_npt,
+                "N_STEPS":   _cool_steps,
                 "use_pppm":  True,
                 "use_gpu":   True,
                 "write_restart": True,
@@ -1649,7 +1755,7 @@ def generate_equilibration_workflow(
                 "P_FINAL":   press,
                 "P_DAMP":    1000.0,
                 "TIMESTEP":  dt_prod,
-                "N_STEPS":   steps_npt,
+                "N_STEPS":   _cool_steps,
                 "use_pppm":  True,
                 "use_gpu":   True,
                 "write_restart": True,
@@ -1694,7 +1800,7 @@ def generate_equilibration_workflow(
         _add_300k = add_300k_production and temp > 300.0
         s8 = s9 = None
         if _add_300k:
-            steps_cool300 = int(1.0e6 / dt_prod)   # ~1 ns
+            steps_cool300 = npt_cool300_steps if npt_cool300_steps is not None else int(1.0e6 / dt_prod)   # ~1 ns default
             steps_prod300 = int(2.0e6 / dt_prod)   # ~2 ns
             s8 = _stage("npt_cool300", "npt", {
                 "T_START":       temp,
@@ -2136,6 +2242,7 @@ def _run_extract_thermal(
     per_t_dump_file: Optional[str] = None,
     tg_data_file: Optional[str] = None,
     backbone_types: Optional[List[str]] = None,
+    method_gap_exempt: bool = False,
 ) -> dict:
     """Background worker — runs extract_thermal.py via CLI."""
 
@@ -2156,6 +2263,8 @@ def _run_extract_thermal(
         parts.append(f"--tg_data_file {tg_data_file}")
     if backbone_types:
         parts.append(f"--backbone_types {' '.join(str(t) for t in backbone_types)}")
+    if method_gap_exempt:
+        parts.append("--method_gap_exempt")
 
     command = " ".join(parts)
     logger.info(f"Running thermal extraction via CLI: {command}")
@@ -2189,13 +2298,14 @@ def extract_thermal(
     log_file: str,
     output_dir: str,
     graphs_dir: str,
+    tg_data_file: Optional[str],
+    per_t_dump_file: Optional[str],
+    method_gap_exempt: bool,
     initial_tg_guess: Optional[float] = None,
     equilibration_fraction: float = 0.5,
     temp_col: str = "Temp",
     density_col: str = "Density",
     enthalpy_col: str = "Enthalpy",
-    per_t_dump_file: Optional[str] = None,
-    tg_data_file: Optional[str] = None,
     backbone_types: Optional[List[str]] = None,
 ) -> dict:
     """
@@ -2238,12 +2348,16 @@ def extract_thermal(
         density_col:            Density column name (default: 'Density').
         enthalpy_col:           Enthalpy column name (default: 'Enthalpy').
                                 Used for ΔCp calculation.
-        per_t_dump_file:        Path to per-T structural dump written by the
-                                Tg staircase (one frame per T step, cooling order).
-                                Enables dump-based structural analysis.
-        tg_data_file:           LAMMPS .data file used as input to the Tg sweep
-                                (topology/masses). Required for ΔCp mass
-                                normalisation and MDAnalysis structural analysis.
+        per_t_dump_file:        REQUIRED, may be null. Path to the per-T structural dump
+                                written by the Tg staircase (one frame per T step, cooling
+                                order). With tg_data_file it enables the dump-based
+                                structural block; null skips it.
+        tg_data_file:           REQUIRED, may be null. LAMMPS .data file used as input to
+                                the Tg sweep (topology/masses). Null silently skips ΔCp
+                                entirely — pass the null deliberately, never by omission.
+        method_gap_exempt:      REQUIRED. True records a >20 K primary-vs-alternative Tg gap
+                                as a reason without forcing TG_REVIEW (classes with
+                                documented highest-rate degeneracy). Pass the false too.
         backbone_types:         Backbone atom type IDs (list of strings/ints).
                                 Used for P2 nematic order computation.
 
@@ -2276,7 +2390,8 @@ def extract_thermal(
             per_t_dump_file        = per_t_dump_file,
             tg_data_file           = tg_data_file,
             backbone_types         = backbone_types,
-        )),
+                    method_gap_exempt   = method_gap_exempt,
+)),
         daemon=True,
     )
     t.start()
@@ -2400,6 +2515,8 @@ def _run_check_equilibration_comprehensive(
     atom_style: str,
     graphs_dir: Optional[str] = None,
     ct_min_decay: Optional[float] = None,
+    cv_signal_max: float = 0.11,
+    cutoff_A: Optional[float] = None,
 ) -> dict:
     """Background worker — runs check_equilibration_comprehensive.py via CLI."""
     bt_str = " ".join(str(t) for t in backbone_types)
@@ -2422,7 +2539,10 @@ def _run_check_equilibration_comprehensive(
         f"--density_col {density_col}",
         f"--energy_col {energy_col}",
         f'--atom_style "{atom_style}"',
+        f"--cv_signal_max {cv_signal_max}",
     ]
+    if cutoff_A is not None:
+        parts.append(f"--cutoff_A {cutoff_A}")
     if n_backbone_bonds is not None:
         parts.append(f"--n_backbone_bonds {n_backbone_bonds}")
     if graphs_dir:
@@ -2458,8 +2578,10 @@ def check_equilibration_comprehensive(
     backbone_types: list,
     output_dir: str,
     graphs_dir: str,
+    timestep_fs: float,
+    ct_min_decay: Optional[float],
+    cutoff_A: Optional[float],
     skip_frames: int = 50,
-    timestep_fs: float = 1.0,
     dump_every: int = 1000,
     n_backbone_bonds: Optional[int] = None,
     bond_length_A: float = 1.54,
@@ -2471,7 +2593,7 @@ def check_equilibration_comprehensive(
     density_col: str = "Density",
     energy_col: str = "TotEng",
     atom_style: str = "id resid type charge x y z",
-    ct_min_decay: Optional[float] = None,
+    cv_signal_max: float = 0.11,
 ) -> dict:
     """
     Comprehensive polymer equilibration validator — thermo + structural checks in
@@ -2484,7 +2606,11 @@ def check_equilibration_comprehensive(
       D. Energy block-SEM < 1% of mean
       E. Rg CV across chains < 30%  (unequal conformation flag)
       F. P2 nematic order < 0.10    (residual backbone alignment)
-      G. Density homogeneity voxel CV < 25%  (adaptive grid; corrects 10³ false positives)
+      G. Poisson-corrected density homogeneity CV < cv_signal_max (default 0.11; the raw
+         voxel CV's noise floor moves with cell size, so the signal CV is gated instead).
+      H. Finite size (spatial.finite_size), when cutoff_A is supplied: minimum image
+         L >= 2*cutoff_A (below it the pair potential itself is wrong) and chain
+         self-imaging L >= 2*Rg. L >= R_ee is reported but advisory.
 
     Soft warnings (reported but never block unless ct_min_decay supplied):
       - τ_eff / T_traj > 10%  (trajectory too short for good statistics)
@@ -2503,8 +2629,16 @@ def check_equilibration_comprehensive(
         backbone_types:      List of LAMMPS atom type IDs that form the backbone.
                              Determine from inspect_data_file() — do not guess.
         output_dir:          Output directory (default: <dump_dir>/eq_comprehensive).
+        timestep_fs:         REQUIRED. MD timestep in femtoseconds — must match the deck. The
+                             dump time axis is dt_ps = timestep_fs * dump_every / 1000, and
+                             unlike dump_every this is NOT auto-detected, so a dt=2 fs deck left
+                             on 1.0 reports tau_relax_ps and MSD at half their real values.
+        ct_min_decay:        REQUIRED, may be null. Promotes the C(t) end-to-end decay warning to
+                             a hard gate (use 0.25 for melt). Null leaves it advisory — pass the
+                             null explicitly; omission is a schema error, not a default.
+        cutoff_A:            REQUIRED, may be null. Arms the minimum-image half of the finite-size
+                             gate (L >= 2*cutoff_A). Null evaluates chain self-imaging only.
         skip_frames:         Frames to skip at start of dump (production window start).
-        timestep_fs:         MD timestep in femtoseconds.
         dump_every:          Dump frequency in steps (auto-detected from dump header if possible).
         n_backbone_bonds:    Backbone bonds per chain (DP − 1); enables C∞ calculation.
         bond_length_A:       Backbone bond length in Å for C∞ (default: 1.54 C-C).
@@ -2564,6 +2698,8 @@ def check_equilibration_comprehensive(
             atom_style          = atom_style,
             graphs_dir          = graphs_dir,
             ct_min_decay        = ct_min_decay,
+            cv_signal_max       = cv_signal_max,
+            cutoff_A            = cutoff_A,
         )),
         daemon=True,
     )
@@ -2684,16 +2820,16 @@ def assess_cooling_contraction(
 def enforce_equilibration_gate(
     comprehensive_json: str,
     regime: str,
-    dp: Optional[float] = None,
-    ct_gate_reliable: bool = True,
-    exp_density_gcm3: Optional[float] = None,
-    tg_K: Optional[float] = None,
-    t_equil_K: Optional[float] = None,
-    glass_data: Optional[str] = None,
-    melt_data: Optional[str] = None,
-    out_dir: Optional[str] = None,
-    alpha_glass_per_K: Optional[float] = None,
-    alpha_melt_per_K: Optional[float] = None,
+    dp: Optional[float],
+    ct_gate_reliable: bool,
+    exp_density_gcm3: Optional[float],
+    tg_K: Optional[float],
+    t_equil_K: Optional[float],
+    glass_data: Optional[str],
+    melt_data: Optional[str],
+    out_dir: Optional[str],
+    alpha_glass_per_K: Optional[float],
+    alpha_melt_per_K: Optional[float],
 ) -> dict:
     """
     Mechanized equilibration gate verdict — replaces prose PASS/EXTEND/FAIL judgment with a
@@ -2708,6 +2844,11 @@ def enforce_equilibration_gate(
     (same script the assess_cooling_contraction tool wraps) and saves the result itself —
     no round-trip back to the caller required, unlike enforce_gate.py's --live CLI mode (which
     this wraps and is kept for retrospective/offline auditing of completed runs).
+
+    Every argument is required — no defaults. Several may be null, and at the phase=melt
+    checkpoint most of them are: no post-cool glass state exists yet, so density_value_binding
+    cannot run. Pass those as explicit nulls. An omitted argument and a null one produced the
+    same weakened gate with no record of which was intended, so omission is a schema error.
 
     Args:
         comprehensive_json: Path to check_equilibration_comprehensive's saved JSON output.
@@ -2737,7 +2878,7 @@ def enforce_equilibration_gate(
         re_melt_slow_recool | heavy_melt_anneal_probe | a melt-mixing extension note).
     """
     repo_root = Path(__file__).resolve().parents[2]
-    orchestration_dir = str(repo_root / "orchestration")
+    orchestration_dir = str(repo_root / "orchestration" / "scripts")
     if orchestration_dir not in sys.path:
         sys.path.insert(0, orchestration_dir)
     import enforce_gate
@@ -2794,8 +2935,8 @@ def enforce_equilibration_gate(
 def extract_equilibrated_density(
     log_file: str,
     output_dir: str,
+    target_temp: Optional[float],
     eq_fraction: float = 0.5,
-    target_temp: Optional[float] = None,
     temp_tolerance: float = 50.0,
     plateau_shift_sigma: float = 1.0,
     density_col: str = "Density",
@@ -2844,9 +2985,9 @@ def extract_equilibrated_density(
             plateau_fraction         — fraction of production window identified as plateau
             production_n_points      — rows in production window
             total_n_points           — total rows in log
-            tau_eff_frames           — autocorrelation time (batch-means plateau, F&P 1989)
+            tau_eff_frames           — integrated autocorrelation time / statistical inefficiency
             tau_eff_fraction         — tau_eff / n_plateau
-            n_effective_samples      — n_plateau / (2 * tau_eff)
+            n_effective_samples      — n_plateau / tau_eff
             drift_slope              — linear regression slope over plateau (g/cm3 per frame)
             drift_pct                — |slope * n| / |mean| * 100
             drift_p_value            — p-value of drift slope
@@ -3030,6 +3171,7 @@ def _run_extract_bulk_modulus_deform(
     graphs_dir: Optional[str] = None,
     log_file_2: Optional[str] = None,
     strain_rate_2: Optional[float] = None,
+    deform_direction: str = "x",
 ) -> dict:
     """Background worker — runs extract_bulk_modulus_deform.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/extract_bulk_modulus_deform.py"]
@@ -3047,6 +3189,7 @@ def _run_extract_bulk_modulus_deform(
         parts.append(f"--log_file_2 {log_file_2}")
     if strain_rate_2 is not None:
         parts.append(f"--strain_rate_2 {strain_rate_2}")
+    parts.append(f"--deform_direction {deform_direction}")
 
     command = " ".join(parts)
     logger.info(f"Running deformation bulk modulus extraction via CLI: {command}")
@@ -3063,14 +3206,15 @@ def extract_bulk_modulus_deform(
     log_file: str,
     output_dir: str,
     graphs_dir: str,
-    strain_rate: float = 1e-7,
-    strain_max: float = 0.03,
-    timestep: float = 1.0,
+    strain_rate: float,
+    strain_max: float,
+    timestep: float,
+    log_file_2: Optional[str],
+    strain_rate_2: Optional[float],
     eq_steps: int = 200000,
     strain_start: float = 0.002,
     avg_window: int = 2000,
-    log_file_2: Optional[str] = None,
-    strain_rate_2: Optional[float] = None,
+    deform_direction: str = "x",
 ) -> dict:
     """
     Extract elastic constants from a LAMMPS uniaxial deformation log
@@ -3104,19 +3248,25 @@ def extract_bulk_modulus_deform(
     Args:
         log_file:     Full path to the npt_deform LAMMPS log.
         output_dir:   Output directory. Defaults to <log_dir>/deform_analysis.
-        strain_rate:  Engineering strain rate in 1/fs (= K_deform_rate_inv_s × 1e-15).
-                      Default 1e-7 corresponds to 1e8 s⁻¹ from polymer_rules.json.
-        strain_max:   Maximum strain for linear-regime fit (K_strain_max). Default 0.03.
-        timestep:     MD timestep in fs (must match simulation). Default 1.0.
+        strain_rate:  REQUIRED. Engineering strain rate in 1/fs (= K_deform_rate_inv_s × 1e-15).
+        strain_max:   REQUIRED. Maximum strain for linear-regime fit (K_strain_max, ~0.03).
+        timestep:     REQUIRED. MD timestep in fs — must match the deck. Strain is reconstructed
+                      as eps(step) = strain_rate * (step - step_0) * timestep, so a dt=2 fs deck
+                      analysed at 1.0 reports half the strain and twice the modulus.
         eq_steps:     NVT pre-equilibration steps (N_EQ_STEPS) — skipped in analysis.
         strain_start: Minimum strain to include in fit (skip initial transient). Default 0.002.
         avg_window:   Rolling-average window in thermo frames applied to stress before fitting.
                       Thermal noise (~0.2 GPa at THERMO_FREQ=100) swamps the elastic signal
                       (~0.09 GPa at 3% strain) on individual thermo rows. Default 2000 = 200 ps
                       at THERMO_FREQ=100. Set to 1 to disable. Scale with THERMO_FREQ if changed.
-        log_file_2:   Optional second deformation log (slow-rate run) for rate-sensitivity check.
-                      When provided, K is extracted independently from both logs and compared.
-        strain_rate_2: Strain rate for log_file_2 in 1/fs. Required if log_file_2 is set.
+        log_file_2:   REQUIRED, may be null. Second deformation log (slow-rate run) for the
+                      rate-sensitivity check; when non-null, K is extracted independently from
+                      both logs and compared. Pass the null when there is no slow leg.
+        strain_rate_2: REQUIRED, may be null. Strain rate for log_file_2 in 1/fs; non-null
+                      whenever log_file_2 is.
+        deform_direction: Axis the deck strained along ("x", "y", or "z"). Selects the loading
+                       vs transverse stress components. Must match the deck — a y/z leg analysed
+                       as "x" mislabels C11/C12 and can flip G/E negative (K is invariant).
 
     Returns:
         dict with run_id.  When completed, result includes:
@@ -3148,6 +3298,7 @@ def extract_bulk_modulus_deform(
             graphs_dir    = graphs_dir,
             log_file_2    = log_file_2,
             strain_rate_2 = strain_rate_2,
+            deform_direction = deform_direction,
         )),
         daemon=True,
     )
@@ -3173,14 +3324,15 @@ def run_bulk_modulus_series(
     run_name: str,
     gpu_ids: str,
     mpi: int,
-    npt_steps: int = 500000,
-    dt_fs: float = 1.0,
+    velocity_seed: int,
+    npt_steps: int,
+    dt_fs: float,
+    use_trappe: bool,
+    use_pcff: bool,
+    use_opls: bool,
+    engine: str,
     thermo_freq: int = 100,
     output_dir: Optional[str] = None,
-    use_trappe: bool = False,
-    use_pcff: bool = False,
-    use_opls: bool = False,
-    engine: str = "gpu",
 ) -> dict:
     """
     Run a series of constant-pressure NPT simulations to support Murnaghan
@@ -3200,23 +3352,28 @@ def run_bulk_modulus_series(
         work_dir:       Base directory; subdirs bm_P{P}/ are created per pressure.
         pressures_atm:  List of target pressures in atm (at least 3).
         temp_K:         Simulation temperature (K). Use 300 K for property measurement.
-        run_name:       Human-readable label for logging.
-        npt_steps:      MD steps per pressure point. Default 500000 (500 ps at dt=1 fs).
-        dt_fs:          Timestep in fs. Default 1.0.
+        run_name:       NO-OP — accepted and required for backward compatibility, but never
+                        read in the body. Do not treat it as a protocol knob.
+        velocity_seed:  REQUIRED, non-null. The run's seed, forwarded to every pressure
+                        point's generated script — see generate_script.
+        npt_steps:      REQUIRED. MD steps per pressure point (500000 = 500 ps at dt=1 fs).
+        dt_fs:          REQUIRED. Timestep in fs — must match the class's own dt.
         thermo_freq:    Thermo output frequency. Default 100.
         gpu_ids:        Comma-separated GPU IDs (e.g. "0" or "0,1"). Required —
                         no default; the engine no longer falls back to GPU 0,1.
         mpi:            MPI processes. Required — no default.
         output_dir:     Where to store the list of log file paths (JSON).
                         Defaults to work_dir.
-        use_trappe:     Set True for TraPPE-UA systems (PHYC, PDIE). Emits lj/cut +
+        use_trappe:     REQUIRED. True for TraPPE-UA systems (PHYC, PDIE). Emits lj/cut +
                         neigh yes instead of PPPM/CHARMM defaults. Mirrors the same
                         flag in generate_equilibration_workflow and generate_script.
-        use_pcff:       Set True for PCFF (Class II) systems. Emits pppm + class2 pair.
-        use_opls:       Set True for OPLS-AA systems. Emits pppm + lj/cut/coul/long.
-        engine:         Launch engine forwarded to run_lammps_chain: "kokkos"
+                        All three FF flags are required because all three defaulting to
+                        False silently emits the wrong pair_style.
+        use_pcff:       REQUIRED. True for PCFF (Class II) systems. Emits pppm + class2 pair.
+        use_opls:       REQUIRED. True for OPLS-AA systems. Emits pppm + lj/cut/coul/long.
+        engine:         REQUIRED. Launch engine forwarded to run_lammps_chain: "kokkos"
                         (full-offload; canonical for PCFF/OPLS PPPM cells, mpi=1),
-                        "gpu" (GPU package; default), or "cpu". Must match the
+                        "gpu" (GPU package), or "cpu". Must match the
                         per-FF hardware_policy default or the chain runs the wrong
                         binary (PCFF on the GPU package is CPU-bound).
 
@@ -3231,6 +3388,12 @@ def run_bulk_modulus_series(
                 "status": "error",
                 "error": f"At least 3 pressure points required for Murnaghan fit "
                          f"(got {len(pressures_atm)})."
+            }
+        if velocity_seed is None:
+            return {
+                "status": "error",
+                "error": "velocity_seed is required and must not be null — the pressure points "
+                         "would each draw their own random seed. Pass the run's seed.",
             }
 
         out_dir = Path(output_dir or work_dir)
@@ -3249,6 +3412,7 @@ def run_bulk_modulus_series(
                 template_name="npt",
                 data_file=data_file,
                 output_script=script_path,
+                velocity_seed=velocity_seed,
                 params={
                     "T_START":     temp_K,
                     "T_FINAL":     temp_K,
@@ -3330,6 +3494,7 @@ def _run_extract_bulk_modulus_murnaghan(
     output_dir: str,
     eq_fraction: float,
     graphs_dir: Optional[str] = None,
+    npt_prod_log: Optional[str] = None,
 ) -> dict:
     """Background worker — runs extract_bulk_modulus_murnaghan.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/extract_bulk_modulus_murnaghan.py"]
@@ -3339,6 +3504,8 @@ def _run_extract_bulk_modulus_murnaghan(
     parts.append(f"--eq_fraction {eq_fraction}")
     if graphs_dir:
         parts.append(f"--graphs_dir {graphs_dir}")
+    if npt_prod_log:
+        parts.append(f"--npt_prod_log {npt_prod_log}")
 
     command = " ".join(parts)
     logger.info(f"Running Murnaghan bulk modulus extraction via CLI: {command}")
@@ -3356,6 +3523,7 @@ def extract_bulk_modulus_murnaghan(
     pressures_atm: list,
     output_dir: str,
     graphs_dir: str,
+    npt_prod_log: Optional[str],
     eq_fraction: float = 0.5,
 ) -> dict:
     """
@@ -3375,6 +3543,15 @@ def extract_bulk_modulus_murnaghan(
 
     Falls back to linear P vs ln V fit if curve_fit fails to converge.
 
+    When npt_prod_log is passed, also runs three credibility checks embedded
+    in the same result (no separate tool call needed):
+      - Fluctuation cross-check: an independent K estimate from npt_prod_log's
+        volume fluctuations, flagged if it diverges >15% from B0.
+      - Leave-one-out refit: drops each pressure point in turn and refits,
+        flagged if any single point shifts B0 by >10%.
+      - Volume monotonicity: flags a pressure point whose mean volume is out
+        of sequence (likely inadequate equilibration at that point).
+
     Output files written to output_dir:
         bulk_modulus_murnaghan.json  — B0_GPa, B0_prime, V0_A3, r_squared, …
                                        Also contains bulk_modulus_GPa alias for
@@ -3390,6 +3567,8 @@ def extract_bulk_modulus_murnaghan(
         output_dir:     Directory for bulk_modulus_murnaghan.json output.
         graphs_dir:     Directory for PNG figures. Defaults to output_dir/figures.
         eq_fraction:    Fraction of each log used as production window. Default 0.5.
+        npt_prod_log:   Optional separate NPT production log for the fluctuation
+                        cross-check. Omit to skip it (result fields become null).
 
     Returns:
         dict with run_id.  When completed, result includes:
@@ -3399,6 +3578,9 @@ def extract_bulk_modulus_murnaghan(
             r_squared       — goodness of fit (goal > 0.999)
             bulk_modulus_GPa — alias for B0_GPa (used by generate_run_summary)
             fit_converged   — True if Murnaghan converged, False if linear fallback
+            volume_monotonic — False flags an out-of-sequence pressure point
+            loo_results     — per-point leave-one-out refit rows (null if not converged)
+            fluctuation_bulk_modulus_GPa, fluctuation_divergence_pct — cross-check
             warnings        — list of any quality flags
     """
     run_id = run_manager.create(
@@ -3413,6 +3595,7 @@ def extract_bulk_modulus_murnaghan(
             output_dir    = output_dir,
             eq_fraction   = eq_fraction,
             graphs_dir    = graphs_dir,
+            npt_prod_log  = npt_prod_log,
         )),
         daemon=True,
     )
@@ -3424,6 +3607,123 @@ def extract_bulk_modulus_murnaghan(
         "n_pressure_points": len(log_files),
         "output_dir":    output_dir,
         "message":       "Poll with get_run_status(run_id)",
+    }
+
+
+# ── Tool: extract_solubility_parameter ────────────────────────────────────────
+
+def _run_extract_solubility_parameter(
+    bulk_log: str,
+    vacuum_log: str,
+    n_chains: int,
+    output_dir: str,
+    charge_method: Optional[str] = None,
+    eq_fraction: float = 0.5,
+    system_label: Optional[str] = None,
+) -> dict:
+    """Background worker — runs extract_solubility_parameter.py via CLI."""
+    parts = [f"python {MDA_SCRIPTS_DIR}/extract_solubility_parameter.py"]
+    parts.append(f"--bulk_log {bulk_log}")
+    parts.append(f"--vacuum_log {vacuum_log}")
+    parts.append(f"--n_chains {n_chains}")
+    parts.append(f"--output_dir {output_dir}")
+    parts.append(f"--eq_fraction {eq_fraction}")
+    if charge_method:
+        parts.append(f"--charge_method {charge_method}")
+    if system_label:
+        parts.append(f"--system_label {system_label}")
+
+    command = " ".join(parts)
+    logger.info(f"Running solubility parameter extraction via CLI: {command}")
+
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=600)
+
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def extract_solubility_parameter(
+    bulk_log: str,
+    vacuum_log: str,
+    n_chains: int,
+    output_dir: str,
+    charge_method: Optional[str] = None,
+    eq_fraction: float = 0.5,
+    system_label: Optional[str] = None,
+) -> dict:
+    """
+    Cohesive energy density (CED) / Hildebrand solubility parameter (delta) via
+    a vacuum single-chain intramolecular-energy reference.
+
+    STANDALONE DIAGNOSTIC TOOL — not currently wired into any agent's mandatory
+    workflow. Used to measure per-SYSTEM cohesion for cavitation-risk research
+    (does measured CED predict whether a rubbery Murnaghan pressure series can
+    safely include a tension point). Never cache/reuse the result across a
+    nominal polymer class — different monomers in the same class can have
+    meaningfully different cohesion; always measure the specific system.
+
+    Method: a bulk NPT hold's log reports TOTAL nonbonded energy (E_vdwl+E_coul),
+    which mixes intramolecular (chain-on-itself) and intermolecular (chain-to-
+    chain, the part that resists tension) contributions — not separable from
+    the bulk log alone. A separate short NVT hold of ONE isolated chain at low
+    density (large box, no periodic-image contacts) gives a clean intramolecular
+    reference (100% of its nonbonded energy is self-interaction by construction):
+
+        E_inter_total = E_bulk_total - n_chains * E_intra_per_chain
+        CED = -E_inter_total / V_bulk   (J/cm^3 == MPa);  delta = sqrt(CED)
+
+    This is an approximation relative to RadonPy's true per-molecule tally
+    decomposition (see the separate, currently-inactive
+    extract_solubility_parameter_tally.py, gated on a TALLY-enabled LAMMPS
+    binary that doesn't exist yet).
+
+    Args:
+        bulk_log:      The system's own bulk NPT hold log (npt_production.log /
+                       npt_prod300.log) — must be the SAME system as vacuum_log.
+        vacuum_log:    Log from a short NVT hold of one isolated chain of that
+                       same system (same topology/force field/temperature),
+                       built at low density so periodic images don't interact.
+        n_chains:      Number of chains in the bulk cell (a known build parameter).
+        output_dir:    Directory for solubility_parameter.json output.
+        charge_method: e.g. none/Gasteiger/AM1-BCC/RESP — sets ced_confidence
+                       ("degraded" for embedded/Gasteiger charges, per
+                       docs/ROADMAP.md's 20%+ error-risk caveat for those systems).
+        eq_fraction:   Fraction of each log used as production window. Default 0.5.
+        system_label:  Traceability label (e.g. "PE4") — never a class name.
+
+    Returns:
+        dict with run_id. When completed, result includes:
+            CED_MPa, solubility_parameter_MPa0p5, ced_confidence,
+            e_bulk_total_nonbonded_kcal_mol, e_intra_per_chain_kcal_mol,
+            e_inter_total_kcal_mol, v_bulk_A3, v_vacuum_chain_A3, warnings
+    """
+    run_id = run_manager.create(
+        "extract_solubility_parameter",
+        {"bulk_log": bulk_log, "vacuum_log": vacuum_log, "output_dir": output_dir}
+    )
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_extract_solubility_parameter, dict(
+            bulk_log      = bulk_log,
+            vacuum_log    = vacuum_log,
+            n_chains      = n_chains,
+            output_dir    = output_dir,
+            charge_method = charge_method,
+            eq_fraction   = eq_fraction,
+            system_label  = system_label,
+        )),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":       "submitted",
+        "run_id":       run_id,
+        "run_type":     "extract_solubility_parameter",
+        "system_label": system_label,
+        "output_dir":   output_dir,
+        "message":      "Poll with get_run_status(run_id)",
     }
 
 

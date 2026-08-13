@@ -1,1 +1,23 @@
-{}
+{
+  "*C/C=C\\C*": {
+    "source_run_name": "cis-PBD1",
+    "generated_at": "2026-08-11T16:39:18+00:00",
+    "polymer_class": "PDIE",
+    "probe_tau_relax_reliable": false,
+    "probe_K0_reliable": true,
+    "tau_relax_ps": 296013.8,
+    "decay_fraction_at_end": 0.03,
+    "K0_GPa": 1.8608,
+    "K0_sem_GPa": 0.1232,
+    "derived_t_equil_ns": null,
+    "derived_eq_annealing_cycles": null,
+    "derived_ct_min_decay_melt": null,
+    "derived_K_deform_rate_inv_s": null,
+    "derived_K_deform_rate_slow_inv_s": null,
+    "refined_from_full_run": true,
+    "reprobe_recommended": true,
+    "note": "WARNING -- these values were measured on a 100% cis cell produced by a cis-microstructure lock stage (cis_lock_deck above). EMC does NOT honour SMILES double-bond stereo: a plain build/equil for this SMILES yields a ~48:52 cis/trans MIXTURE, and these numbers do NOT apply to it. Any future run of this SMILES must reproduce the cis-lock before reusing anything here, and must re-measure if it does not. protocol_validated is deliberately NOT set. probe_tau_relax_reliable=false: decay_fraction_at_end=0.03 < 0.15 floor on the 300 K/2902 ps npt_production rubbery hold (DP=100, 20-chain TraPPE-UA melt) -- tau_relax fit (296013.8 ps) is not trustworthy for deriving t_equil_ns/eq_annealing_cycles/ct_min_decay_melt/K_deform_rate_inv_s. probe_K0_reliable=true (sem/mean=6.62%) from NPT volume-fluctuation on the same hold; recorded for Murnaghan cross-check use only, not used for K-rate derivation since that needs tau_relax too. A longer production hold on this exact SMILES would likely raise decay_fraction_at_end enough to unlock the tau-derived fields on a future run.",
+    "requires_cis_lock": true,
+    "cis_lock_deck": "data/cis-PBD1/lammps/cis_lock/cis_lock.in"
+  }
+}

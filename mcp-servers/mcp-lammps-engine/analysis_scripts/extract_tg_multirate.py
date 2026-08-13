@@ -104,12 +104,18 @@ def fit_multirate(
     span_decades = float(np.log10(rates_arr.max() / rates_arr.min()))
 
     # ── 1. Log-linear fit (primary) ────────────────────────────────────────
+    # The fit is against natural log, so `slope` is K per e-fold. Every physical
+    # comparison (the 3-5 K/decade expectation, the flat-rate threshold below) is
+    # per DECADE, so convert before comparing — never compare `slope` directly.
+    # `intercept` and tg_slow below stay paired with the natural-log fit.
     slope, intercept, r_val, _, _ = linregress(log_rates, tg_arr)
     r2_lin  = float(r_val ** 2)
+    slope_per_decade = float(slope * np.log(10.0))
 
     # Slope gates — applied before any extrapolation
     slope_gate_pass  = bool(slope > 0)       # negative slope is physically impossible (glassy)
-    flat_rate_regime = bool(abs(slope) < 1.0) # < 1 K/decade → rubbery, extrapolation meaningless
+    # < 1 K/decade → rubbery, extrapolation meaningless
+    flat_rate_regime = bool(abs(slope_per_decade) < 1.0)
     rubbery_regime   = (str(regime).lower() == "rubbery")
 
     if rubbery_regime:
@@ -142,8 +148,11 @@ def fit_multirate(
         "rates_K_per_ns":          [float(r) for r in rates],
         "tg_values_K":             [float(t) for t in tg_values],
         "rates_span_decades":      span_decades,
-        # Log-linear (primary)
+        # Log-linear (primary). loglinear_slope_K is per e-fold (the fit's own units);
+        # grade physics against loglinear_slope_K_per_decade, which is what the 3-5
+        # K/decade literature expectation refers to.
         "loglinear_slope_K":       float(slope),
+        "loglinear_slope_K_per_decade": slope_per_decade,
         "loglinear_intercept_K":   float(intercept),
         "loglinear_r_squared":     r2_lin,
         "tg_at_slow_rate_K":       tg_slow,

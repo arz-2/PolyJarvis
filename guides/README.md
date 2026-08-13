@@ -4,7 +4,7 @@ This directory holds **prompts and config for the agent pipeline**, not human tu
 (human docs live in `docs/` and the root `README.md`). Four genres share the folder; the
 key distinction is *who consumes each file*:
 
-## 1. Worker guides — inlined into worker prompts by `orchestration/gen_prompt.py`
+## 1. Worker guides — inlined into worker prompts by `orchestration/scripts/gen_prompt.py`
 
 Never `Read` these directly during a run; `gen_prompt.py --stage <STAGE>` embeds the right
 one into the worker's prompt.
@@ -20,14 +20,15 @@ one into the worker's prompt.
 | `DEFORM.md` | `deform` → deform-worker |
 | `BM_ANALYSIS.md` | `analyze-bm` → bulk-modulus-extractor |
 | `REVISION_PARAMS.md` | Fixed seeds/params for replication runs (inlined into several stages; local-only, gitignored) |
-| `EXP_LOOKUP.md` | exp-lookup background. **Currently not wired in** — the orchestrator composes the exp-lookup prompt inline (CLAUDE.md Phase C) |
+| `EXP_LOOKUP.md` | exp-lookup background. **Currently not wired in** — the orchestrator composes the exp-lookup prompt inline (orchestration/ORCHESTRATOR.md Phase C) |
 
 ## 2. Orchestrator-read guides — moved to `orchestration/`
 
 The orchestrator phase/track guides (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`,
-`SUMMARY.md`) and the planner/critic `decision_policy.json` now live alongside the orchestration
-code in [`orchestration/`](../orchestration/README.md) — the orchestrator `Read`s them on phase
-entry.
+`SUMMARY.md`, `DETERMINISTIC_REPLICATE.md`) live in
+[`orchestration/tracks/`](../orchestration/README.md), and the planner/critic `decision_policy.json`
+alongside the orchestration code in [`orchestration/`](../orchestration/README.md) — the
+orchestrator `Read`s the phase docs on phase entry.
 
 ## 3. Machine-read config (JSON, not prose)
 

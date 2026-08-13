@@ -1,0 +1,2282 @@
+{
+  "melt_reference": [
+    {
+      "run": "PEEK1",
+      "family": "PEEK",
+      "t_equil_K": 770.0,
+      "rho_melt_sim": 1.038384554792148,
+      "rho_glass_sim": 1.1949246546359065,
+      "exp_density_300K_used": 1.263,
+      "melt_gap_alpha_pct": 2.01,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.397*math.exp(-6.69*1e-4*t)",
+          "t_min_C": 338.0,
+          "t_max_C": 400.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0019363024920989,
+          "melt_gap_pct": 3.6377813848437275,
+          "source": "Mark2007",
+          "fit_width_C": 62.0,
+          "beyond_range_C": 96.9,
+          "beyond_frac_of_width": 1.562
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 3.6377813848437275,
+      "nearest_range_C": [
+        338.0,
+        400.0
+      ],
+      "degrees_beyond_range_C": 96.9,
+      "beyond_frac_of_width": 1.562,
+      "evidence": "insufficient",
+      "glass_equations": []
+    },
+    {
+      "run": "PEEK2",
+      "family": "PEEK",
+      "t_equil_K": 770.0,
+      "rho_melt_sim": 1.0540580520863454,
+      "rho_glass_sim": 1.1914855813803327,
+      "exp_density_300K_used": 1.263,
+      "melt_gap_alpha_pct": 3.54,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.397*math.exp(-6.69*1e-4*t)",
+          "t_min_C": 338.0,
+          "t_max_C": 400.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0019363024920989,
+          "melt_gap_pct": 5.202102116133032,
+          "source": "Mark2007",
+          "fit_width_C": 62.0,
+          "beyond_range_C": 96.9,
+          "beyond_frac_of_width": 1.562
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 5.202102116133032,
+      "nearest_range_C": [
+        338.0,
+        400.0
+      ],
+      "degrees_beyond_range_C": 96.9,
+      "beyond_frac_of_width": 1.562,
+      "evidence": "insufficient",
+      "glass_equations": []
+    },
+    {
+      "run": "PEEK3",
+      "family": "PEEK",
+      "t_equil_K": 770.0,
+      "rho_melt_sim": 1.0397881412514862,
+      "rho_glass_sim": 1.1973435976756275,
+      "exp_density_300K_used": 1.263,
+      "melt_gap_alpha_pct": 2.14,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.397*math.exp(-6.69*1e-4*t)",
+          "t_min_C": 338.0,
+          "t_max_C": 400.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0019363024920989,
+          "melt_gap_pct": 3.7778687792067354,
+          "source": "Mark2007",
+          "fit_width_C": 62.0,
+          "beyond_range_C": 96.9,
+          "beyond_frac_of_width": 1.562
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 3.7778687792067354,
+      "nearest_range_C": [
+        338.0,
+        400.0
+      ],
+      "degrees_beyond_range_C": 96.9,
+      "beyond_frac_of_width": 1.562,
+      "evidence": "insufficient",
+      "glass_equations": []
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "t_equil_K": 770.0,
+      "rho_melt_sim": 1.047148061360131,
+      "rho_glass_sim": 1.1953488999959878,
+      "exp_density_300K_used": 1.263,
+      "melt_gap_alpha_pct": 2.87,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.397*math.exp(-6.69*1e-4*t)",
+          "t_min_C": 338.0,
+          "t_max_C": 400.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0019363024920989,
+          "melt_gap_pct": 4.5124384410044485,
+          "source": "Mark2007",
+          "fit_width_C": 62.0,
+          "beyond_range_C": 96.9,
+          "beyond_frac_of_width": 1.562
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 4.5124384410044485,
+      "nearest_range_C": [
+        338.0,
+        400.0
+      ],
+      "degrees_beyond_range_C": 96.9,
+      "beyond_frac_of_width": 1.562,
+      "evidence": "insufficient",
+      "glass_equations": []
+    },
+    {
+      "run": "PLA1",
+      "family": "PLA",
+      "t_equil_K": 620.0,
+      "rho_melt_sim": 1.0877743501294104,
+      "rho_glass_sim": 1.235044414886104,
+      "exp_density_300K_used": 1.25,
+      "melt_gap_alpha_pct": 2.79,
+      "status": "NO_EXPERIMENTAL_EQUATION"
+    },
+    {
+      "run": "PLA2",
+      "family": "PLA",
+      "t_equil_K": 620.0,
+      "rho_melt_sim": 1.1005442312784366,
+      "rho_glass_sim": 1.2307884450614937,
+      "exp_density_300K_used": 1.25,
+      "melt_gap_alpha_pct": 3.99,
+      "status": "NO_EXPERIMENTAL_EQUATION"
+    },
+    {
+      "run": "PLA3",
+      "family": "PLA",
+      "t_equil_K": 620.0,
+      "rho_melt_sim": 1.0994444909310264,
+      "rho_glass_sim": 1.2200584332819693,
+      "exp_density_300K_used": 1.25,
+      "melt_gap_alpha_pct": 3.89,
+      "status": "NO_EXPERIMENTAL_EQUATION"
+    },
+    {
+      "run": "PLA4",
+      "family": "PLA",
+      "t_equil_K": 620.0,
+      "rho_melt_sim": 1.112490348889392,
+      "rho_glass_sim": 1.2319067254972635,
+      "exp_density_300K_used": 1.25,
+      "melt_gap_alpha_pct": 5.12,
+      "status": "NO_EXPERIMENTAL_EQUATION"
+    },
+    {
+      "run": "PMMA1",
+      "family": "PMMA",
+      "t_equil_K": 550.0,
+      "rho_melt_sim": 1.0483233766417588,
+      "rho_glass_sim": 1.1157769645940383,
+      "exp_density_300K_used": 1.19,
+      "melt_gap_alpha_pct": -1.1,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.223-5.29*1e-4*t-0.507*1e-6*t**2",
+          "t_min_C": 120.0,
+          "t_max_C": 270.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0376868672925001,
+          "melt_gap_pct": 1.0250211007306167,
+          "source": "Mark2007",
+          "fit_width_C": 150.0,
+          "beyond_range_C": 6.9,
+          "beyond_frac_of_width": 0.046
+        },
+        {
+          "py_expr": "1.2135-4.64*1e-4*t-0.648*1e-6*t**2",
+          "t_min_C": 114.0,
+          "t_max_C": 159.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.03537504222,
+          "melt_gap_pct": 1.2505936393826442,
+          "source": "Mark2007",
+          "fit_width_C": 45.0,
+          "beyond_range_C": 117.9,
+          "beyond_frac_of_width": 2.619
+        },
+        {
+          "py_expr": "1.228*math.exp(-5.23*1e-4*t)",
+          "t_min_C": 115.0,
+          "t_max_C": 230.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0624677620168845,
+          "melt_gap_pct": -1.3312766637055822,
+          "source": "Mark2007",
+          "fit_width_C": 115.0,
+          "beyond_range_C": 46.9,
+          "beyond_frac_of_width": 0.407
+        },
+        {
+          "py_expr": "1.211-5.96*1e-4*t",
+          "t_min_C": 105.0,
+          "t_max_C": 150.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0459974,
+          "melt_gap_pct": 0.22236925653531348,
+          "source": "Mark2007",
+          "fit_width_C": 45.0,
+          "beyond_range_C": 126.9,
+          "beyond_frac_of_width": 2.819
+        },
+        {
+          "py_expr": "1.229-7.12*1e-4*t",
+          "t_min_C": 110.0,
+          "t_max_C": 194.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0318828,
+          "melt_gap_pct": 1.5932600719537915,
+          "source": "Mark2007",
+          "fit_width_C": 84.0,
+          "beyond_range_C": 82.9,
+          "beyond_frac_of_width": 0.986
+        }
+      ],
+      "n_equations": 5,
+      "n_in_range": 0,
+      "status": "NEAR_RANGE",
+      "melt_gap_exp_pct": 1.0250211007306167,
+      "melt_gap_exp_spread_pct": 0.0,
+      "all_equation_gaps_pct": [
+        1.03,
+        1.25,
+        -1.33,
+        0.22,
+        1.59
+      ],
+      "all_equation_spread_pp": 2.92,
+      "evidence": "decisive",
+      "glass_equations": [
+        {
+          "py_expr": "1.188-1.34*1e-4*t-0.91*1e-6*t**2",
+          "in_range": false,
+          "rho_exp_300K": 1.183746060525,
+          "t_min_C": 30.0,
+          "t_max_C": 100.0
+        },
+        {
+          "py_expr": "1.188-1.72*1e-4*t-1.04*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.1826320406,
+          "t_min_C": 17.0,
+          "t_max_C": 80.0
+        },
+        {
+          "py_expr": "1.175-2.47*1e-4*t",
+          "in_range": true,
+          "rho_exp_300K": 1.16836805,
+          "t_min_C": -30.0,
+          "t_max_C": 105.0
+        },
+        {
+          "py_expr": "1.187-2.35*1e-4*t-0.67*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.180207231925,
+          "t_min_C": 20.0,
+          "t_max_C": 95.0
+        }
+      ],
+      "rho_exp_300K_from_equations": 1.1770691075083333,
+      "comparator_discrepancy_pct": 1.0985669753103373
+    },
+    {
+      "run": "PMMA2",
+      "family": "PMMA",
+      "t_equil_K": 550.0,
+      "rho_melt_sim": 1.0632592554303886,
+      "rho_glass_sim": 1.1208734151655273,
+      "exp_density_300K_used": 1.19,
+      "melt_gap_alpha_pct": 0.31,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.223-5.29*1e-4*t-0.507*1e-6*t**2",
+          "t_min_C": 120.0,
+          "t_max_C": 270.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0376868672925001,
+          "melt_gap_pct": 2.4643646309807403,
+          "source": "Mark2007",
+          "fit_width_C": 150.0,
+          "beyond_range_C": 6.9,
+          "beyond_frac_of_width": 0.046
+        },
+        {
+          "py_expr": "1.2135-4.64*1e-4*t-0.648*1e-6*t**2",
+          "t_min_C": 114.0,
+          "t_max_C": 159.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.03537504222,
+          "melt_gap_pct": 2.6931509910264517,
+          "source": "Mark2007",
+          "fit_width_C": 45.0,
+          "beyond_range_C": 117.9,
+          "beyond_frac_of_width": 2.619
+        },
+        {
+          "py_expr": "1.228*math.exp(-5.23*1e-4*t)",
+          "t_min_C": 115.0,
+          "t_max_C": 230.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0624677620168845,
+          "melt_gap_pct": 0.07449575806437152,
+          "source": "Mark2007",
+          "fit_width_C": 115.0,
+          "beyond_range_C": 46.9,
+          "beyond_frac_of_width": 0.407
+        },
+        {
+          "py_expr": "1.211-5.96*1e-4*t",
+          "t_min_C": 105.0,
+          "t_max_C": 150.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0459974,
+          "melt_gap_pct": 1.6502770877239747,
+          "source": "Mark2007",
+          "fit_width_C": 45.0,
+          "beyond_range_C": 126.9,
+          "beyond_frac_of_width": 2.819
+        },
+        {
+          "py_expr": "1.229-7.12*1e-4*t",
+          "t_min_C": 110.0,
+          "t_max_C": 194.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0318828,
+          "melt_gap_pct": 3.040699528123599,
+          "source": "Mark2007",
+          "fit_width_C": 84.0,
+          "beyond_range_C": 82.9,
+          "beyond_frac_of_width": 0.986
+        }
+      ],
+      "n_equations": 5,
+      "n_in_range": 0,
+      "status": "NEAR_RANGE",
+      "melt_gap_exp_pct": 2.4643646309807403,
+      "melt_gap_exp_spread_pct": 0.0,
+      "all_equation_gaps_pct": [
+        2.46,
+        2.69,
+        0.07,
+        1.65,
+        3.04
+      ],
+      "all_equation_spread_pp": 2.97,
+      "evidence": "decisive",
+      "glass_equations": [
+        {
+          "py_expr": "1.188-1.34*1e-4*t-0.91*1e-6*t**2",
+          "in_range": false,
+          "rho_exp_300K": 1.183746060525,
+          "t_min_C": 30.0,
+          "t_max_C": 100.0
+        },
+        {
+          "py_expr": "1.188-1.72*1e-4*t-1.04*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.1826320406,
+          "t_min_C": 17.0,
+          "t_max_C": 80.0
+        },
+        {
+          "py_expr": "1.175-2.47*1e-4*t",
+          "in_range": true,
+          "rho_exp_300K": 1.16836805,
+          "t_min_C": -30.0,
+          "t_max_C": 105.0
+        },
+        {
+          "py_expr": "1.187-2.35*1e-4*t-0.67*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.180207231925,
+          "t_min_C": 20.0,
+          "t_max_C": 95.0
+        }
+      ],
+      "rho_exp_300K_from_equations": 1.1770691075083333,
+      "comparator_discrepancy_pct": 1.0985669753103373
+    },
+    {
+      "run": "PMMA3",
+      "family": "PMMA",
+      "t_equil_K": 550.0,
+      "rho_melt_sim": 1.049797429167271,
+      "rho_glass_sim": 1.1196986282541916,
+      "exp_density_300K_used": 1.19,
+      "melt_gap_alpha_pct": -0.96,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.223-5.29*1e-4*t-0.507*1e-6*t**2",
+          "t_min_C": 120.0,
+          "t_max_C": 270.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0376868672925001,
+          "melt_gap_pct": 1.1670728672098618,
+          "source": "Mark2007",
+          "fit_width_C": 150.0,
+          "beyond_range_C": 6.9,
+          "beyond_frac_of_width": 0.046
+        },
+        {
+          "py_expr": "1.2135-4.64*1e-4*t-0.648*1e-6*t**2",
+          "t_min_C": 114.0,
+          "t_max_C": 159.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.03537504222,
+          "melt_gap_pct": 1.392962584489873,
+          "source": "Mark2007",
+          "fit_width_C": 45.0,
+          "beyond_range_C": 117.9,
+          "beyond_frac_of_width": 2.619
+        },
+        {
+          "py_expr": "1.228*math.exp(-5.23*1e-4*t)",
+          "t_min_C": 115.0,
+          "t_max_C": 230.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0624677620168845,
+          "melt_gap_pct": -1.1925380988088985,
+          "source": "Mark2007",
+          "fit_width_C": 115.0,
+          "beyond_range_C": 46.9,
+          "beyond_frac_of_width": 0.407
+        },
+        {
+          "py_expr": "1.211-5.96*1e-4*t",
+          "t_min_C": 105.0,
+          "t_max_C": 150.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0459974,
+          "melt_gap_pct": 0.36329241040855803,
+          "source": "Mark2007",
+          "fit_width_C": 45.0,
+          "beyond_range_C": 126.9,
+          "beyond_frac_of_width": 2.819
+        },
+        {
+          "py_expr": "1.229-7.12*1e-4*t",
+          "t_min_C": 110.0,
+          "t_max_C": 194.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0318828,
+          "melt_gap_pct": 1.736110841974586,
+          "source": "Mark2007",
+          "fit_width_C": 84.0,
+          "beyond_range_C": 82.9,
+          "beyond_frac_of_width": 0.986
+        }
+      ],
+      "n_equations": 5,
+      "n_in_range": 0,
+      "status": "NEAR_RANGE",
+      "melt_gap_exp_pct": 1.1670728672098618,
+      "melt_gap_exp_spread_pct": 0.0,
+      "all_equation_gaps_pct": [
+        1.17,
+        1.39,
+        -1.19,
+        0.36,
+        1.74
+      ],
+      "all_equation_spread_pp": 2.93,
+      "evidence": "decisive",
+      "glass_equations": [
+        {
+          "py_expr": "1.188-1.34*1e-4*t-0.91*1e-6*t**2",
+          "in_range": false,
+          "rho_exp_300K": 1.183746060525,
+          "t_min_C": 30.0,
+          "t_max_C": 100.0
+        },
+        {
+          "py_expr": "1.188-1.72*1e-4*t-1.04*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.1826320406,
+          "t_min_C": 17.0,
+          "t_max_C": 80.0
+        },
+        {
+          "py_expr": "1.175-2.47*1e-4*t",
+          "in_range": true,
+          "rho_exp_300K": 1.16836805,
+          "t_min_C": -30.0,
+          "t_max_C": 105.0
+        },
+        {
+          "py_expr": "1.187-2.35*1e-4*t-0.67*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.180207231925,
+          "t_min_C": 20.0,
+          "t_max_C": 95.0
+        }
+      ],
+      "rho_exp_300K_from_equations": 1.1770691075083333,
+      "comparator_discrepancy_pct": 1.0985669753103373
+    },
+    {
+      "run": "PMMA4",
+      "family": "PMMA",
+      "t_equil_K": 550.0,
+      "rho_melt_sim": 1.0572595271825573,
+      "rho_glass_sim": 1.1071761658304458,
+      "exp_density_300K_used": 1.19,
+      "melt_gap_alpha_pct": -0.25,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.223-5.29*1e-4*t-0.507*1e-6*t**2",
+          "t_min_C": 120.0,
+          "t_max_C": 270.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0376868672925001,
+          "melt_gap_pct": 1.886181709240048,
+          "source": "Mark2007",
+          "fit_width_C": 150.0,
+          "beyond_range_C": 6.9,
+          "beyond_frac_of_width": 0.046
+        },
+        {
+          "py_expr": "1.2135-4.64*1e-4*t-0.648*1e-6*t**2",
+          "t_min_C": 114.0,
+          "t_max_C": 159.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.03537504222,
+          "melt_gap_pct": 2.113677080300642,
+          "source": "Mark2007",
+          "fit_width_C": 45.0,
+          "beyond_range_C": 117.9,
+          "beyond_frac_of_width": 2.619
+        },
+        {
+          "py_expr": "1.228*math.exp(-5.23*1e-4*t)",
+          "t_min_C": 115.0,
+          "t_max_C": 230.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0624677620168845,
+          "melt_gap_pct": -0.49020168145529375,
+          "source": "Mark2007",
+          "fit_width_C": 115.0,
+          "beyond_range_C": 46.9,
+          "beyond_frac_of_width": 0.407
+        },
+        {
+          "py_expr": "1.211-5.96*1e-4*t",
+          "t_min_C": 105.0,
+          "t_max_C": 150.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0459974,
+          "melt_gap_pct": 1.0766878753768658,
+          "source": "Mark2007",
+          "fit_width_C": 45.0,
+          "beyond_range_C": 126.9,
+          "beyond_frac_of_width": 2.819
+        },
+        {
+          "py_expr": "1.229-7.12*1e-4*t",
+          "t_min_C": 110.0,
+          "t_max_C": 194.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.0318828,
+          "melt_gap_pct": 2.459264480671385,
+          "source": "Mark2007",
+          "fit_width_C": 84.0,
+          "beyond_range_C": 82.9,
+          "beyond_frac_of_width": 0.986
+        }
+      ],
+      "n_equations": 5,
+      "n_in_range": 0,
+      "status": "NEAR_RANGE",
+      "melt_gap_exp_pct": 1.886181709240048,
+      "melt_gap_exp_spread_pct": 0.0,
+      "all_equation_gaps_pct": [
+        1.89,
+        2.11,
+        -0.49,
+        1.08,
+        2.46
+      ],
+      "all_equation_spread_pp": 2.95,
+      "evidence": "decisive",
+      "glass_equations": [
+        {
+          "py_expr": "1.188-1.34*1e-4*t-0.91*1e-6*t**2",
+          "in_range": false,
+          "rho_exp_300K": 1.183746060525,
+          "t_min_C": 30.0,
+          "t_max_C": 100.0
+        },
+        {
+          "py_expr": "1.188-1.72*1e-4*t-1.04*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.1826320406,
+          "t_min_C": 17.0,
+          "t_max_C": 80.0
+        },
+        {
+          "py_expr": "1.175-2.47*1e-4*t",
+          "in_range": true,
+          "rho_exp_300K": 1.16836805,
+          "t_min_C": -30.0,
+          "t_max_C": 105.0
+        },
+        {
+          "py_expr": "1.187-2.35*1e-4*t-0.67*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.180207231925,
+          "t_min_C": 20.0,
+          "t_max_C": 95.0
+        }
+      ],
+      "rho_exp_300K_from_equations": 1.1770691075083333,
+      "comparator_discrepancy_pct": 1.0985669753103373
+    },
+    {
+      "run": "PS1",
+      "family": "PS",
+      "t_equil_K": 550.0,
+      "rho_melt_sim": 0.8814530793400004,
+      "rho_glass_sim": 0.9828174217677016,
+      "exp_density_300K_used": 1.05,
+      "melt_gap_alpha_pct": -5.6,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.0865-6.19*1e-4*t+0.136*1e-6*t**2",
+          "t_min_C": 100.0,
+          "t_max_C": 222.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 0.92555369546,
+          "melt_gap_pct": -4.764782025756119,
+          "source": "Mark2007",
+          "fit_width_C": 122.0,
+          "beyond_range_C": 54.9,
+          "beyond_frac_of_width": 0.45
+        },
+        {
+          "py_expr": "1.077-5.49*1e-4*t+0.124*1e-6*t**2",
+          "t_min_C": 115.0,
+          "t_max_C": 196.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 0.93451344439,
+          "melt_gap_pct": -5.6778599996102255,
+          "source": "Mark2007",
+          "fit_width_C": 81.0,
+          "beyond_range_C": 80.9,
+          "beyond_frac_of_width": 0.998
+        },
+        {
+          "py_expr": "1.067-5.02*1e-4*t-0.135*1e-6*t**2",
+          "t_min_C": 79.0,
+          "t_max_C": 320.0,
+          "in_range": true,
+          "rho_exp_at_t_equil": 0.9176741004625,
+          "melt_gap_pct": -3.9470462448754406,
+          "source": "Mark2007",
+          "fit_width_C": 241.0,
+          "beyond_range_C": 0.0,
+          "beyond_frac_of_width": 0.0
+        }
+      ],
+      "n_equations": 3,
+      "n_in_range": 1,
+      "status": "IN_RANGE",
+      "melt_gap_exp_pct": -3.9470462448754406,
+      "melt_gap_exp_spread_pct": 0.0,
+      "all_equation_gaps_pct": [
+        -4.76,
+        -5.68,
+        -3.95
+      ],
+      "all_equation_spread_pp": 1.73,
+      "evidence": "decisive",
+      "glass_equations": [
+        {
+          "py_expr": "1.048-1.88*1e-4*t-0.608*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.04251387912,
+          "t_min_C": 8.0,
+          "t_max_C": 75.0
+        },
+        {
+          "py_expr": "1.052*math.exp(-2.86*1e-4*t)",
+          "in_range": false,
+          "rho_exp_300K": 1.043952525028168,
+          "t_min_C": 30.0,
+          "t_max_C": 79.0
+        }
+      ],
+      "rho_exp_300K_from_equations": 1.04251387912,
+      "comparator_discrepancy_pct": 0.7180835699107669
+    },
+    {
+      "run": "PS2",
+      "family": "PS",
+      "t_equil_K": 550.0,
+      "rho_melt_sim": 0.907706229373243,
+      "rho_glass_sim": 0.9832119971678046,
+      "exp_density_300K_used": 1.05,
+      "melt_gap_alpha_pct": -2.79,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.0865-6.19*1e-4*t+0.136*1e-6*t**2",
+          "t_min_C": 100.0,
+          "t_max_C": 222.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 0.92555369546,
+          "melt_gap_pct": -1.9283015317535779,
+          "source": "Mark2007",
+          "fit_width_C": 122.0,
+          "beyond_range_C": 54.9,
+          "beyond_frac_of_width": 0.45
+        },
+        {
+          "py_expr": "1.077-5.49*1e-4*t+0.124*1e-6*t**2",
+          "t_min_C": 115.0,
+          "t_max_C": 196.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 0.93451344439,
+          "melt_gap_pct": -2.8685745697596983,
+          "source": "Mark2007",
+          "fit_width_C": 81.0,
+          "beyond_range_C": 80.9,
+          "beyond_frac_of_width": 0.998
+        },
+        {
+          "py_expr": "1.067-5.02*1e-4*t-0.135*1e-6*t**2",
+          "t_min_C": 79.0,
+          "t_max_C": 320.0,
+          "in_range": true,
+          "rho_exp_at_t_equil": 0.9176741004625,
+          "melt_gap_pct": -1.0862103533523813,
+          "source": "Mark2007",
+          "fit_width_C": 241.0,
+          "beyond_range_C": 0.0,
+          "beyond_frac_of_width": 0.0
+        }
+      ],
+      "n_equations": 3,
+      "n_in_range": 1,
+      "status": "IN_RANGE",
+      "melt_gap_exp_pct": -1.0862103533523813,
+      "melt_gap_exp_spread_pct": 0.0,
+      "all_equation_gaps_pct": [
+        -1.93,
+        -2.87,
+        -1.09
+      ],
+      "all_equation_spread_pp": 1.78,
+      "evidence": "decisive",
+      "glass_equations": [
+        {
+          "py_expr": "1.048-1.88*1e-4*t-0.608*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.04251387912,
+          "t_min_C": 8.0,
+          "t_max_C": 75.0
+        },
+        {
+          "py_expr": "1.052*math.exp(-2.86*1e-4*t)",
+          "in_range": false,
+          "rho_exp_300K": 1.043952525028168,
+          "t_min_C": 30.0,
+          "t_max_C": 79.0
+        }
+      ],
+      "rho_exp_300K_from_equations": 1.04251387912,
+      "comparator_discrepancy_pct": 0.7180835699107669
+    },
+    {
+      "run": "PS3",
+      "family": "PS",
+      "t_equil_K": 550.0,
+      "rho_melt_sim": 0.9124922940512041,
+      "rho_glass_sim": 0.9848918539142598,
+      "exp_density_300K_used": 1.05,
+      "melt_gap_alpha_pct": -2.28,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.0865-6.19*1e-4*t+0.136*1e-6*t**2",
+          "t_min_C": 100.0,
+          "t_max_C": 222.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 0.92555369546,
+          "melt_gap_pct": -1.4111986665781011,
+          "source": "Mark2007",
+          "fit_width_C": 122.0,
+          "beyond_range_C": 54.9,
+          "beyond_frac_of_width": 0.45
+        },
+        {
+          "py_expr": "1.077-5.49*1e-4*t+0.124*1e-6*t**2",
+          "t_min_C": 115.0,
+          "t_max_C": 196.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 0.93451344439,
+          "melt_gap_pct": -2.3564294843473372,
+          "source": "Mark2007",
+          "fit_width_C": 81.0,
+          "beyond_range_C": 80.9,
+          "beyond_frac_of_width": 0.998
+        },
+        {
+          "py_expr": "1.067-5.02*1e-4*t-0.135*1e-6*t**2",
+          "t_min_C": 79.0,
+          "t_max_C": 320.0,
+          "in_range": true,
+          "rho_exp_at_t_equil": 0.9176741004625,
+          "melt_gap_pct": -0.564667392125838,
+          "source": "Mark2007",
+          "fit_width_C": 241.0,
+          "beyond_range_C": 0.0,
+          "beyond_frac_of_width": 0.0
+        }
+      ],
+      "n_equations": 3,
+      "n_in_range": 1,
+      "status": "IN_RANGE",
+      "melt_gap_exp_pct": -0.564667392125838,
+      "melt_gap_exp_spread_pct": 0.0,
+      "all_equation_gaps_pct": [
+        -1.41,
+        -2.36,
+        -0.56
+      ],
+      "all_equation_spread_pp": 1.79,
+      "evidence": "decisive",
+      "glass_equations": [
+        {
+          "py_expr": "1.048-1.88*1e-4*t-0.608*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.04251387912,
+          "t_min_C": 8.0,
+          "t_max_C": 75.0
+        },
+        {
+          "py_expr": "1.052*math.exp(-2.86*1e-4*t)",
+          "in_range": false,
+          "rho_exp_300K": 1.043952525028168,
+          "t_min_C": 30.0,
+          "t_max_C": 79.0
+        }
+      ],
+      "rho_exp_300K_from_equations": 1.04251387912,
+      "comparator_discrepancy_pct": 0.7180835699107669
+    },
+    {
+      "run": "PS4",
+      "family": "PS",
+      "t_equil_K": 550.0,
+      "rho_melt_sim": 0.9049405135708766,
+      "rho_glass_sim": 0.9896129811104704,
+      "exp_density_300K_used": 1.05,
+      "melt_gap_alpha_pct": -3.09,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.0865-6.19*1e-4*t+0.136*1e-6*t**2",
+          "t_min_C": 100.0,
+          "t_max_C": 222.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 0.92555369546,
+          "melt_gap_pct": -2.227118965678018,
+          "source": "Mark2007",
+          "fit_width_C": 122.0,
+          "beyond_range_C": 54.9,
+          "beyond_frac_of_width": 0.45
+        },
+        {
+          "py_expr": "1.077-5.49*1e-4*t+0.124*1e-6*t**2",
+          "t_min_C": 115.0,
+          "t_max_C": 196.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 0.93451344439,
+          "melt_gap_pct": -3.1645270591507644,
+          "source": "Mark2007",
+          "fit_width_C": 81.0,
+          "beyond_range_C": 80.9,
+          "beyond_frac_of_width": 0.998
+        },
+        {
+          "py_expr": "1.067-5.02*1e-4*t-0.135*1e-6*t**2",
+          "t_min_C": 79.0,
+          "t_max_C": 320.0,
+          "in_range": true,
+          "rho_exp_at_t_equil": 0.9176741004625,
+          "melt_gap_pct": -1.3875935787231857,
+          "source": "Mark2007",
+          "fit_width_C": 241.0,
+          "beyond_range_C": 0.0,
+          "beyond_frac_of_width": 0.0
+        }
+      ],
+      "n_equations": 3,
+      "n_in_range": 1,
+      "status": "IN_RANGE",
+      "melt_gap_exp_pct": -1.3875935787231857,
+      "melt_gap_exp_spread_pct": 0.0,
+      "all_equation_gaps_pct": [
+        -2.23,
+        -3.16,
+        -1.39
+      ],
+      "all_equation_spread_pp": 1.78,
+      "evidence": "decisive",
+      "glass_equations": [
+        {
+          "py_expr": "1.048-1.88*1e-4*t-0.608*1e-6*t**2",
+          "in_range": true,
+          "rho_exp_300K": 1.04251387912,
+          "t_min_C": 8.0,
+          "t_max_C": 75.0
+        },
+        {
+          "py_expr": "1.052*math.exp(-2.86*1e-4*t)",
+          "in_range": false,
+          "rho_exp_300K": 1.043952525028168,
+          "t_min_C": 30.0,
+          "t_max_C": 79.0
+        }
+      ],
+      "rho_exp_300K_from_equations": 1.04251387912,
+      "comparator_discrepancy_pct": 0.7180835699107669
+    },
+    {
+      "run": "PSU1",
+      "family": "PSU",
+      "t_equil_K": 700.0,
+      "rho_melt_sim": 1.0450858759258241,
+      "rho_glass_sim": 1.1845299457135785,
+      "exp_density_300K_used": 1.24,
+      "melt_gap_alpha_pct": -0.3,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.314-6.49*1e-4*t-0.018*1e-6*t**2",
+          "t_min_C": 185.0,
+          "t_max_C": 371.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.033694733395,
+          "melt_gap_pct": 1.1019832222044754,
+          "source": "Mark2007",
+          "fit_width_C": 186.0,
+          "beyond_range_C": 55.9,
+          "beyond_frac_of_width": 0.3
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 1.1019832222044754,
+      "nearest_range_C": [
+        185.0,
+        371.0
+      ],
+      "degrees_beyond_range_C": 55.9,
+      "beyond_frac_of_width": 0.3,
+      "evidence": "indicative",
+      "glass_equations": [
+        {
+          "py_expr": "1.242-2.59*1e-4*t",
+          "in_range": false,
+          "rho_exp_300K": 1.23504585,
+          "t_min_C": 30.0,
+          "t_max_C": 186.0
+        }
+      ]
+    },
+    {
+      "run": "PSU2",
+      "family": "PSU",
+      "t_equil_K": 700.0,
+      "rho_melt_sim": 1.0503104670816055,
+      "rho_glass_sim": 1.1850552097638898,
+      "exp_density_300K_used": 1.24,
+      "melt_gap_alpha_pct": 0.2,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.314-6.49*1e-4*t-0.018*1e-6*t**2",
+          "t_min_C": 185.0,
+          "t_max_C": 371.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.033694733395,
+          "melt_gap_pct": 1.6074120482392202,
+          "source": "Mark2007",
+          "fit_width_C": 186.0,
+          "beyond_range_C": 55.9,
+          "beyond_frac_of_width": 0.3
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 1.6074120482392202,
+      "nearest_range_C": [
+        185.0,
+        371.0
+      ],
+      "degrees_beyond_range_C": 55.9,
+      "beyond_frac_of_width": 0.3,
+      "evidence": "indicative",
+      "glass_equations": [
+        {
+          "py_expr": "1.242-2.59*1e-4*t",
+          "in_range": false,
+          "rho_exp_300K": 1.23504585,
+          "t_min_C": 30.0,
+          "t_max_C": 186.0
+        }
+      ]
+    },
+    {
+      "run": "PSU3",
+      "family": "PSU",
+      "t_equil_K": 700.0,
+      "rho_melt_sim": 1.0527467637045569,
+      "rho_glass_sim": 1.1869327307673834,
+      "exp_density_300K_used": 1.24,
+      "melt_gap_alpha_pct": 0.43,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.314-6.49*1e-4*t-0.018*1e-6*t**2",
+          "t_min_C": 185.0,
+          "t_max_C": 371.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.033694733395,
+          "melt_gap_pct": 1.8431002591048984,
+          "source": "Mark2007",
+          "fit_width_C": 186.0,
+          "beyond_range_C": 55.9,
+          "beyond_frac_of_width": 0.3
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 1.8431002591048984,
+      "nearest_range_C": [
+        185.0,
+        371.0
+      ],
+      "degrees_beyond_range_C": 55.9,
+      "beyond_frac_of_width": 0.3,
+      "evidence": "indicative",
+      "glass_equations": [
+        {
+          "py_expr": "1.242-2.59*1e-4*t",
+          "in_range": false,
+          "rho_exp_300K": 1.23504585,
+          "t_min_C": 30.0,
+          "t_max_C": 186.0
+        }
+      ]
+    },
+    {
+      "run": "PSU4",
+      "family": "PSU",
+      "t_equil_K": 700.0,
+      "rho_melt_sim": 1.043309765190956,
+      "rho_glass_sim": 1.1783825712556832,
+      "exp_density_300K_used": 1.24,
+      "melt_gap_alpha_pct": -0.47,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.314-6.49*1e-4*t-0.018*1e-6*t**2",
+          "t_min_C": 185.0,
+          "t_max_C": 371.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.033694733395,
+          "melt_gap_pct": 0.9301616314109518,
+          "source": "Mark2007",
+          "fit_width_C": 186.0,
+          "beyond_range_C": 55.9,
+          "beyond_frac_of_width": 0.3
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 0.9301616314109518,
+      "nearest_range_C": [
+        185.0,
+        371.0
+      ],
+      "degrees_beyond_range_C": 55.9,
+      "beyond_frac_of_width": 0.3,
+      "evidence": "indicative",
+      "glass_equations": [
+        {
+          "py_expr": "1.242-2.59*1e-4*t",
+          "in_range": false,
+          "rho_exp_300K": 1.23504585,
+          "t_min_C": 30.0,
+          "t_max_C": 186.0
+        }
+      ]
+    },
+    {
+      "run": "PVC1",
+      "family": "PVC",
+      "t_equil_K": 530.0,
+      "rho_melt_sim": 1.209875901088139,
+      "rho_glass_sim": 1.3498723857691086,
+      "exp_density_300K_used": 1.385,
+      "melt_gap_alpha_pct": -2.24,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.394-2.03*1e-4*t-2.19*1e-6*t**2",
+          "t_min_C": 100.0,
+          "t_max_C": 150.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.197380939725,
+          "melt_gap_pct": 1.0435243245152035,
+          "source": "Mark2007",
+          "fit_width_C": 50.0,
+          "beyond_range_C": 106.9,
+          "beyond_frac_of_width": 2.137
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 1.0435243245152035,
+      "nearest_range_C": [
+        100.0,
+        150.0
+      ],
+      "degrees_beyond_range_C": 106.9,
+      "beyond_frac_of_width": 2.137,
+      "evidence": "insufficient",
+      "glass_equations": []
+    },
+    {
+      "run": "PVC2",
+      "family": "PVC",
+      "t_equil_K": 530.0,
+      "rho_melt_sim": 1.2027288805877603,
+      "rho_glass_sim": 1.3510051918535582,
+      "exp_density_300K_used": 1.385,
+      "melt_gap_alpha_pct": -2.82,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.394-2.03*1e-4*t-2.19*1e-6*t**2",
+          "t_min_C": 100.0,
+          "t_max_C": 150.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.197380939725,
+          "melt_gap_pct": 0.44663654525756935,
+          "source": "Mark2007",
+          "fit_width_C": 50.0,
+          "beyond_range_C": 106.9,
+          "beyond_frac_of_width": 2.137
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 0.44663654525756935,
+      "nearest_range_C": [
+        100.0,
+        150.0
+      ],
+      "degrees_beyond_range_C": 106.9,
+      "beyond_frac_of_width": 2.137,
+      "evidence": "insufficient",
+      "glass_equations": []
+    },
+    {
+      "run": "PVC3",
+      "family": "PVC",
+      "t_equil_K": 530.0,
+      "rho_melt_sim": 1.2236983238489336,
+      "rho_glass_sim": 1.3431621112151415,
+      "exp_density_300K_used": 1.385,
+      "melt_gap_alpha_pct": -1.12,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.394-2.03*1e-4*t-2.19*1e-6*t**2",
+          "t_min_C": 100.0,
+          "t_max_C": 150.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.197380939725,
+          "melt_gap_pct": 2.1979123978687984,
+          "source": "Mark2007",
+          "fit_width_C": 50.0,
+          "beyond_range_C": 106.9,
+          "beyond_frac_of_width": 2.137
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": 2.1979123978687984,
+      "nearest_range_C": [
+        100.0,
+        150.0
+      ],
+      "degrees_beyond_range_C": 106.9,
+      "beyond_frac_of_width": 2.137,
+      "evidence": "insufficient",
+      "glass_equations": []
+    },
+    {
+      "run": "PVC4",
+      "family": "PVC",
+      "t_equil_K": 530.0,
+      "rho_melt_sim": 1.1792634496478496,
+      "rho_glass_sim": 1.3465170682821381,
+      "exp_density_300K_used": 1.385,
+      "melt_gap_alpha_pct": -4.71,
+      "equations_evaluated": [
+        {
+          "py_expr": "1.394-2.03*1e-4*t-2.19*1e-6*t**2",
+          "t_min_C": 100.0,
+          "t_max_C": 150.0,
+          "in_range": false,
+          "rho_exp_at_t_equil": 1.197380939725,
+          "melt_gap_pct": -1.5130932417640925,
+          "source": "Mark2007",
+          "fit_width_C": 50.0,
+          "beyond_range_C": 106.9,
+          "beyond_frac_of_width": 2.137
+        }
+      ],
+      "n_equations": 1,
+      "n_in_range": 0,
+      "status": "T_EQUIL_OUTSIDE_EQUATION_RANGE",
+      "melt_gap_exp_pct": null,
+      "melt_gap_extrapolated_pct": -1.5130932417640925,
+      "nearest_range_C": [
+        100.0,
+        150.0
+      ],
+      "degrees_beyond_range_C": 106.9,
+      "beyond_frac_of_width": 2.137,
+      "evidence": "insufficient",
+      "glass_equations": []
+    }
+  ],
+  "alpha_sensitivity": [
+    {
+      "run": "PEEK1",
+      "family": "PEEK",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": 2.01,
+          "target_rho": 1.018
+        }
+      },
+      "spread_pp": 0.0
+    },
+    {
+      "run": "PEEK2",
+      "family": "PEEK",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": 3.54,
+          "target_rho": 1.018
+        },
+        "sim_tg_r160": {
+          "alpha_melt": 0.00034526,
+          "melt_gap_pct": -3.94,
+          "target_rho": 1.0973
+        },
+        "sim_tg_r40": {
+          "alpha_melt": 0.00042739,
+          "melt_gap_pct": -1.53,
+          "target_rho": 1.0704
+        },
+        "sim_tg_r400": {
+          "alpha_melt": 0.000296398,
+          "melt_gap_pct": -5.37,
+          "target_rho": 1.1139
+        }
+      },
+      "spread_pp": 8.91
+    },
+    {
+      "run": "PEEK3",
+      "family": "PEEK",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": 2.14,
+          "target_rho": 1.018
+        },
+        "sim_tg_r25": {
+          "alpha_melt": 0.000427313,
+          "melt_gap_pct": -2.86,
+          "target_rho": 1.0704
+        }
+      },
+      "spread_pp": 5.0
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": 2.87,
+          "target_rho": 1.018
+        },
+        "sim_tg_r100": {
+          "alpha_melt": 0.000394813,
+          "melt_gap_pct": -3.12,
+          "target_rho": 1.0809
+        },
+        "sim_tg_r100_rec1": {
+          "alpha_melt": 0.000395323,
+          "melt_gap_pct": -3.11,
+          "target_rho": 1.0807
+        },
+        "sim_tg_r100_rec2": {
+          "alpha_melt": 0.000430047,
+          "melt_gap_pct": -2.09,
+          "target_rho": 1.0695
+        },
+        "sim_tg_r25": {
+          "alpha_melt": 0.000418669,
+          "melt_gap_pct": -2.43,
+          "target_rho": 1.0732
+        },
+        "sim_tg_r25_rec1": {
+          "alpha_melt": 0.000475027,
+          "melt_gap_pct": -0.78,
+          "target_rho": 1.0554
+        },
+        "sim_tg_r25_rec2": {
+          "alpha_melt": 0.000481268,
+          "melt_gap_pct": -0.6,
+          "target_rho": 1.0535
+        },
+        "sim_tg_r50": {
+          "alpha_melt": 0.000466451,
+          "melt_gap_pct": -1.03,
+          "target_rho": 1.0581
+        },
+        "sim_tg_r50_rec1": {
+          "alpha_melt": 0.000410575,
+          "melt_gap_pct": -2.66,
+          "target_rho": 1.0758
+        },
+        "sim_tg_r50_rec2": {
+          "alpha_melt": 0.000405471,
+          "melt_gap_pct": -2.81,
+          "target_rho": 1.0774
+        }
+      },
+      "spread_pp": 5.99
+    },
+    {
+      "run": "PMMA1",
+      "family": "PMMA",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -1.1,
+          "target_rho": 1.0599
+        },
+        "experimental_rho_T": {
+          "alpha_melt": null,
+          "melt_gap_pct": 1.03
+        }
+      },
+      "spread_pp": 2.13
+    },
+    {
+      "run": "PMMA2",
+      "family": "PMMA",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": 0.31,
+          "target_rho": 1.0599
+        },
+        "sim_tg_r160": {
+          "alpha_melt": 0.000268011,
+          "melt_gap_pct": -4.79,
+          "target_rho": 1.1167
+        },
+        "sim_tg_r40": {
+          "alpha_melt": 0.000277707,
+          "melt_gap_pct": -4.64,
+          "target_rho": 1.115
+        },
+        "sim_tg_r400": {
+          "alpha_melt": 0.000212058,
+          "melt_gap_pct": -5.65,
+          "target_rho": 1.1269
+        },
+        "experimental_rho_T": {
+          "alpha_melt": null,
+          "melt_gap_pct": 2.46
+        }
+      },
+      "spread_pp": 8.11
+    },
+    {
+      "run": "PMMA3",
+      "family": "PMMA",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -0.96,
+          "target_rho": 1.0599
+        },
+        "sim_tg_r100": {
+          "alpha_melt": 0.000250082,
+          "melt_gap_pct": -6.27,
+          "target_rho": 1.12
+        },
+        "experimental_rho_T": {
+          "alpha_melt": null,
+          "melt_gap_pct": 1.17
+        }
+      },
+      "spread_pp": 7.44
+    },
+    {
+      "run": "PMMA4",
+      "family": "PMMA",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -0.25,
+          "target_rho": 1.0599
+        },
+        "sim_tg_r100": {
+          "alpha_melt": 0.000270748,
+          "melt_gap_pct": -5.28,
+          "target_rho": 1.1163
+        },
+        "sim_tg_r25": {
+          "alpha_melt": 0.000356217,
+          "melt_gap_pct": -3.98,
+          "target_rho": 1.1011
+        },
+        "sim_tg_r50": {
+          "alpha_melt": 0.000458136,
+          "melt_gap_pct": -2.42,
+          "target_rho": 1.0835
+        },
+        "experimental_rho_T": {
+          "alpha_melt": null,
+          "melt_gap_pct": 1.89
+        }
+      },
+      "spread_pp": 7.17
+    },
+    {
+      "run": "PS1",
+      "family": "PS",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -5.6,
+          "target_rho": 0.9338
+        },
+        "experimental_rho_T": {
+          "alpha_melt": null,
+          "melt_gap_pct": -3.95
+        }
+      },
+      "spread_pp": 1.65
+    },
+    {
+      "run": "PS2",
+      "family": "PS",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -2.79,
+          "target_rho": 0.9338
+        },
+        "sim_tg_r160": {
+          "alpha_melt": 0.000878334,
+          "melt_gap_pct": 1.47,
+          "target_rho": 0.8946
+        },
+        "sim_tg_r400": {
+          "alpha_melt": 0.000544637,
+          "melt_gap_pct": -3.64,
+          "target_rho": 0.942
+        },
+        "experimental_rho_T": {
+          "alpha_melt": null,
+          "melt_gap_pct": -1.09
+        }
+      },
+      "spread_pp": 5.11
+    },
+    {
+      "run": "PS3",
+      "family": "PS",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -2.28,
+          "target_rho": 0.9338
+        },
+        "sim_tg_r160": {
+          "alpha_melt": 0.000440233,
+          "melt_gap_pct": -4.74,
+          "target_rho": 0.9579
+        },
+        "sim_tg_r40": {
+          "alpha_melt": 0.000472703,
+          "melt_gap_pct": -4.24,
+          "target_rho": 0.9529
+        },
+        "sim_tg_r400": {
+          "alpha_melt": 0.000419534,
+          "melt_gap_pct": -5.06,
+          "target_rho": 0.9611
+        },
+        "experimental_rho_T": {
+          "alpha_melt": null,
+          "melt_gap_pct": -0.56
+        }
+      },
+      "spread_pp": 4.5
+    },
+    {
+      "run": "PS4",
+      "family": "PS",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -3.09,
+          "target_rho": 0.9338
+        },
+        "sim_tg_r100": {
+          "alpha_melt": 0.000473399,
+          "melt_gap_pct": -5.02,
+          "target_rho": 0.9528
+        },
+        "sim_tg_r25": {
+          "alpha_melt": 0.000477344,
+          "melt_gap_pct": -4.96,
+          "target_rho": 0.9522
+        },
+        "sim_tg_r50": {
+          "alpha_melt": 0.000454514,
+          "melt_gap_pct": -5.31,
+          "target_rho": 0.9557
+        },
+        "experimental_rho_T": {
+          "alpha_melt": null,
+          "melt_gap_pct": -1.39
+        }
+      },
+      "spread_pp": 3.92
+    },
+    {
+      "run": "PSU1",
+      "family": "PSU",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -0.3,
+          "target_rho": 1.0482
+        },
+        "sim_tg_r160": {
+          "alpha_melt": 0.000458927,
+          "melt_gap_pct": -3.12,
+          "target_rho": 1.0787
+        },
+        "sim_tg_r40": {
+          "alpha_melt": 0.000468033,
+          "melt_gap_pct": -2.94,
+          "target_rho": 1.0767
+        },
+        "sim_tg_r640": {
+          "alpha_melt": 0.000419694,
+          "melt_gap_pct": -3.9,
+          "target_rho": 1.0875
+        }
+      },
+      "spread_pp": 3.6
+    },
+    {
+      "run": "PSU2",
+      "family": "PSU",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": 0.2,
+          "target_rho": 1.0482
+        },
+        "sim_tg_r160": {
+          "alpha_melt": 0.000413177,
+          "melt_gap_pct": -3.55,
+          "target_rho": 1.089
+        },
+        "sim_tg_r40": {
+          "alpha_melt": 0.000499272,
+          "melt_gap_pct": -1.82,
+          "target_rho": 1.0698
+        },
+        "sim_tg_r400": {
+          "alpha_melt": 0.000352506,
+          "melt_gap_pct": -4.77,
+          "target_rho": 1.1029
+        },
+        "sim_tg_rec1_r400": {
+          "alpha_melt": 0.000335933,
+          "melt_gap_pct": -5.1,
+          "target_rho": 1.1068
+        }
+      },
+      "spread_pp": 5.3
+    },
+    {
+      "run": "PSU3",
+      "family": "PSU",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": 0.43,
+          "target_rho": 1.0482
+        },
+        "sim_tg_r100": {
+          "alpha_melt": 0.00045254,
+          "melt_gap_pct": -2.54,
+          "target_rho": 1.0801
+        },
+        "sim_tg_r25": {
+          "alpha_melt": 0.000467503,
+          "melt_gap_pct": -2.23,
+          "target_rho": 1.0768
+        },
+        "sim_tg_r50": {
+          "alpha_melt": 0.000570109,
+          "melt_gap_pct": -0.17,
+          "target_rho": 1.0545
+        }
+      },
+      "spread_pp": 2.97
+    },
+    {
+      "run": "PSU4",
+      "family": "PSU",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -0.47,
+          "target_rho": 1.0482
+        },
+        "sim_tg_r100": {
+          "alpha_melt": 0.00044713,
+          "melt_gap_pct": -3.52,
+          "target_rho": 1.0813
+        },
+        "sim_tg_r25": {
+          "alpha_melt": 0.000532392,
+          "melt_gap_pct": -1.82,
+          "target_rho": 1.0626
+        },
+        "sim_tg_r50": {
+          "alpha_melt": 0.00045655,
+          "melt_gap_pct": -3.33,
+          "target_rho": 1.0792
+        },
+        "sim_tg_r80": {
+          "alpha_melt": 0.000497316,
+          "melt_gap_pct": -2.52,
+          "target_rho": 1.0702
+        }
+      },
+      "spread_pp": 3.05
+    },
+    {
+      "run": "PVC1",
+      "family": "PVC",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -2.24,
+          "target_rho": 1.2376
+        }
+      },
+      "spread_pp": 0.0
+    },
+    {
+      "run": "PVC2",
+      "family": "PVC",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -2.82,
+          "target_rho": 1.2376
+        },
+        "sim_tg_r160": {
+          "alpha_melt": 0.000459331,
+          "melt_gap_pct": -4.97,
+          "target_rho": 1.2656
+        },
+        "sim_tg_r40": {
+          "alpha_melt": 0.000524574,
+          "melt_gap_pct": -3.97,
+          "target_rho": 1.2525
+        },
+        "sim_tg_r400": {
+          "alpha_melt": 0.000455891,
+          "melt_gap_pct": -5.02,
+          "target_rho": 1.2663
+        },
+        "sim_tg_r40_recov07": {
+          "alpha_melt": 0.000534668,
+          "melt_gap_pct": -3.82,
+          "target_rho": 1.2504
+        }
+      },
+      "spread_pp": 2.2
+    },
+    {
+      "run": "PVC3",
+      "family": "PVC",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -1.12,
+          "target_rho": 1.2376
+        },
+        "sim_tg_r100": {
+          "alpha_melt": 0.000489218,
+          "melt_gap_pct": -2.85,
+          "target_rho": 1.2595
+        },
+        "sim_tg_r25": {
+          "alpha_melt": 0.000529616,
+          "melt_gap_pct": -2.22,
+          "target_rho": 1.2515
+        },
+        "sim_tg_r50": {
+          "alpha_melt": 0.000505902,
+          "melt_gap_pct": -2.59,
+          "target_rho": 1.2562
+        }
+      },
+      "spread_pp": 1.73
+    },
+    {
+      "run": "PVC4",
+      "family": "PVC",
+      "variants": {
+        "generic_6.0e-4": {
+          "alpha_melt": 0.0006,
+          "melt_gap_pct": -4.71,
+          "target_rho": 1.2376
+        },
+        "sim_tg_r25": {
+          "alpha_melt": 0.000552942,
+          "melt_gap_pct": -5.42,
+          "target_rho": 1.2468
+        }
+      },
+      "spread_pp": 0.71
+    }
+  ],
+  "expansivity_comparison": [
+    {
+      "run": "PEEK2",
+      "family": "PEEK",
+      "rate": "tg_r160",
+      "alpha_rubbery_sim_per_K": 0.00034526,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -42.5
+    },
+    {
+      "run": "PEEK2",
+      "family": "PEEK",
+      "rate": "tg_r40",
+      "alpha_rubbery_sim_per_K": 0.00042739,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -28.8
+    },
+    {
+      "run": "PEEK2",
+      "family": "PEEK",
+      "rate": "tg_r400",
+      "alpha_rubbery_sim_per_K": 0.000296398,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -50.6
+    },
+    {
+      "run": "PEEK3",
+      "family": "PEEK",
+      "rate": "tg_r25",
+      "alpha_rubbery_sim_per_K": 0.000427313,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -28.8
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "rate": "tg_r100",
+      "alpha_rubbery_sim_per_K": 0.000394813,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -34.2
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "rate": "tg_r100_rec1",
+      "alpha_rubbery_sim_per_K": 0.000395323,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -34.1
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "rate": "tg_r100_rec2",
+      "alpha_rubbery_sim_per_K": 0.000430047,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -28.3
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "rate": "tg_r25",
+      "alpha_rubbery_sim_per_K": 0.000418669,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -30.2
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "rate": "tg_r25_rec1",
+      "alpha_rubbery_sim_per_K": 0.000475027,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -20.8
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "rate": "tg_r25_rec2",
+      "alpha_rubbery_sim_per_K": 0.000481268,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -19.8
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "rate": "tg_r50",
+      "alpha_rubbery_sim_per_K": 0.000466451,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -22.3
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "rate": "tg_r50_rec1",
+      "alpha_rubbery_sim_per_K": 0.000410575,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -31.6
+    },
+    {
+      "run": "PEEK4",
+      "family": "PEEK",
+      "rate": "tg_r50_rec2",
+      "alpha_rubbery_sim_per_K": 0.000405471,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -32.4
+    },
+    {
+      "run": "PMMA2",
+      "family": "PMMA",
+      "rate": "tg_r160",
+      "alpha_rubbery_sim_per_K": 0.000268011,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -55.3
+    },
+    {
+      "run": "PMMA2",
+      "family": "PMMA",
+      "rate": "tg_r40",
+      "alpha_rubbery_sim_per_K": 0.000277707,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -53.7
+    },
+    {
+      "run": "PMMA2",
+      "family": "PMMA",
+      "rate": "tg_r400",
+      "alpha_rubbery_sim_per_K": 0.000212058,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -64.7
+    },
+    {
+      "run": "PMMA3",
+      "family": "PMMA",
+      "rate": "tg_r100",
+      "alpha_rubbery_sim_per_K": 0.000250082,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -58.3
+    },
+    {
+      "run": "PMMA4",
+      "family": "PMMA",
+      "rate": "tg_r100",
+      "alpha_rubbery_sim_per_K": 0.000270748,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -54.9
+    },
+    {
+      "run": "PMMA4",
+      "family": "PMMA",
+      "rate": "tg_r25",
+      "alpha_rubbery_sim_per_K": 0.000356217,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -40.6
+    },
+    {
+      "run": "PMMA4",
+      "family": "PMMA",
+      "rate": "tg_r50",
+      "alpha_rubbery_sim_per_K": 0.000458136,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -23.6
+    },
+    {
+      "run": "PS2",
+      "family": "PS",
+      "rate": "tg_r160",
+      "alpha_rubbery_sim_per_K": 0.000878334,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": 46.4
+    },
+    {
+      "run": "PS2",
+      "family": "PS",
+      "rate": "tg_r400",
+      "alpha_rubbery_sim_per_K": 0.000544637,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -9.2
+    },
+    {
+      "run": "PS3",
+      "family": "PS",
+      "rate": "tg_r160",
+      "alpha_rubbery_sim_per_K": 0.000440233,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -26.6
+    },
+    {
+      "run": "PS3",
+      "family": "PS",
+      "rate": "tg_r40",
+      "alpha_rubbery_sim_per_K": 0.000472703,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -21.2
+    },
+    {
+      "run": "PS3",
+      "family": "PS",
+      "rate": "tg_r400",
+      "alpha_rubbery_sim_per_K": 0.000419534,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -30.1
+    },
+    {
+      "run": "PS4",
+      "family": "PS",
+      "rate": "tg_r100",
+      "alpha_rubbery_sim_per_K": 0.000473399,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -21.1
+    },
+    {
+      "run": "PS4",
+      "family": "PS",
+      "rate": "tg_r25",
+      "alpha_rubbery_sim_per_K": 0.000477344,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -20.4
+    },
+    {
+      "run": "PS4",
+      "family": "PS",
+      "rate": "tg_r50",
+      "alpha_rubbery_sim_per_K": 0.000454514,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -24.2
+    },
+    {
+      "run": "PSU1",
+      "family": "PSU",
+      "rate": "tg_r160",
+      "alpha_rubbery_sim_per_K": 0.000458927,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -23.5
+    },
+    {
+      "run": "PSU1",
+      "family": "PSU",
+      "rate": "tg_r40",
+      "alpha_rubbery_sim_per_K": 0.000468033,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -22.0
+    },
+    {
+      "run": "PSU1",
+      "family": "PSU",
+      "rate": "tg_r640",
+      "alpha_rubbery_sim_per_K": 0.000419694,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -30.1
+    },
+    {
+      "run": "PSU2",
+      "family": "PSU",
+      "rate": "tg_r160",
+      "alpha_rubbery_sim_per_K": 0.000413177,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -31.1
+    },
+    {
+      "run": "PSU2",
+      "family": "PSU",
+      "rate": "tg_r40",
+      "alpha_rubbery_sim_per_K": 0.000499272,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -16.8
+    },
+    {
+      "run": "PSU2",
+      "family": "PSU",
+      "rate": "tg_r400",
+      "alpha_rubbery_sim_per_K": 0.000352506,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -41.2
+    },
+    {
+      "run": "PSU2",
+      "family": "PSU",
+      "rate": "tg_rec1_r400",
+      "alpha_rubbery_sim_per_K": 0.000335933,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -44.0
+    },
+    {
+      "run": "PSU3",
+      "family": "PSU",
+      "rate": "tg_r100",
+      "alpha_rubbery_sim_per_K": 0.00045254,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -24.6
+    },
+    {
+      "run": "PSU3",
+      "family": "PSU",
+      "rate": "tg_r25",
+      "alpha_rubbery_sim_per_K": 0.000467503,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -22.1
+    },
+    {
+      "run": "PSU3",
+      "family": "PSU",
+      "rate": "tg_r50",
+      "alpha_rubbery_sim_per_K": 0.000570109,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -5.0
+    },
+    {
+      "run": "PSU4",
+      "family": "PSU",
+      "rate": "tg_r100",
+      "alpha_rubbery_sim_per_K": 0.00044713,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -25.5
+    },
+    {
+      "run": "PSU4",
+      "family": "PSU",
+      "rate": "tg_r25",
+      "alpha_rubbery_sim_per_K": 0.000532392,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -11.3
+    },
+    {
+      "run": "PSU4",
+      "family": "PSU",
+      "rate": "tg_r50",
+      "alpha_rubbery_sim_per_K": 0.00045655,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -23.9
+    },
+    {
+      "run": "PSU4",
+      "family": "PSU",
+      "rate": "tg_r80",
+      "alpha_rubbery_sim_per_K": 0.000497316,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -17.1
+    },
+    {
+      "run": "PVC2",
+      "family": "PVC",
+      "rate": "tg_r160",
+      "alpha_rubbery_sim_per_K": 0.000459331,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -23.4
+    },
+    {
+      "run": "PVC2",
+      "family": "PVC",
+      "rate": "tg_r40",
+      "alpha_rubbery_sim_per_K": 0.000524574,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -12.6
+    },
+    {
+      "run": "PVC2",
+      "family": "PVC",
+      "rate": "tg_r400",
+      "alpha_rubbery_sim_per_K": 0.000455891,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -24.0
+    },
+    {
+      "run": "PVC2",
+      "family": "PVC",
+      "rate": "tg_r40_recov07",
+      "alpha_rubbery_sim_per_K": 0.000534668,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -10.9
+    },
+    {
+      "run": "PVC3",
+      "family": "PVC",
+      "rate": "tg_r100",
+      "alpha_rubbery_sim_per_K": 0.000489218,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -18.5
+    },
+    {
+      "run": "PVC3",
+      "family": "PVC",
+      "rate": "tg_r25",
+      "alpha_rubbery_sim_per_K": 0.000529616,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -11.7
+    },
+    {
+      "run": "PVC3",
+      "family": "PVC",
+      "rate": "tg_r50",
+      "alpha_rubbery_sim_per_K": 0.000505902,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -15.7
+    },
+    {
+      "run": "PVC4",
+      "family": "PVC",
+      "rate": "tg_r25",
+      "alpha_rubbery_sim_per_K": 0.000552942,
+      "alpha_melt_generic_per_K": 0.0006,
+      "sim_vs_generic_pct": -7.8
+    }
+  ],
+  "rubbery_melt": [
+    {
+      "family": "PE",
+      "runs": [
+        "PE1",
+        "PE2",
+        "PE3",
+        "PE4"
+      ],
+      "rho_300K_sim_mean": 0.8596,
+      "equations": [
+        {
+          "t_min_C": 130.0,
+          "t_max_C": 207.0,
+          "below_range_C": 103.2,
+          "in_range": false,
+          "rho_exp_300K": 0.8507035273344812,
+          "gap_pct": 1.05
+        },
+        {
+          "t_min_C": 142.0,
+          "t_max_C": 200.0,
+          "below_range_C": 115.2,
+          "in_range": false,
+          "rho_exp_300K": 0.85002599945,
+          "gap_pct": 1.13
+        }
+      ],
+      "gap_pct_mean": 1.09,
+      "gap_spread_pp": 0.08,
+      "min_below_range_C": 103.2
+    },
+    {
+      "family": "PEG",
+      "runs": [
+        "PEG1",
+        "PEG2",
+        "PEG3",
+        "PEG4"
+      ],
+      "rho_300K_sim_mean": 1.0586,
+      "equations": [
+        {
+          "t_min_C": 88.0,
+          "t_max_C": 224.0,
+          "below_range_C": 61.1,
+          "in_range": false,
+          "rho_exp_300K": 1.120465765858439,
+          "gap_pct": -5.52
+        },
+        {
+          "t_min_C": 30.0,
+          "t_max_C": 90.0,
+          "below_range_C": 3.1,
+          "in_range": false,
+          "rho_exp_300K": 1.1183052,
+          "gap_pct": -5.34
+        },
+        {
+          "t_min_C": 75.0,
+          "t_max_C": 136.0,
+          "below_range_C": 48.1,
+          "in_range": false,
+          "rho_exp_300K": 1.11937265,
+          "gap_pct": -5.43
+        }
+      ],
+      "gap_pct_mean": -5.43,
+      "gap_spread_pp": 0.18,
+      "min_below_range_C": 3.1
+    }
+  ]
+}

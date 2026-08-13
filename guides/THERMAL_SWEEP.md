@@ -17,8 +17,7 @@
 ### Step 1: Generate Tg sweep script
 
 `generate_script` is synchronous — returns the script path immediately. Use `tg_sweep_dir` from
-the prompt (rate-suffixed for multi-rate, e.g. `.../tg_sweep_r40`); analyze-tg reads
-`tg_sweep_dir/tg_sweep.log`. Never hardcode `.../thermal/tg_sweep/` — it collides across rates.
+the prompt.
 
 For TraPPE-UA systems (`use_trappe=True`), detect bond types before generating:
 ```bash
@@ -33,7 +32,7 @@ result = generate_script(
     template_name="npt_tg_step",
     output_script=f"{tg_sweep_dir}/tg_sweep.in",
     data_file=equil_data_path,        # MUST be absolute — see caveat below
-    velocity_seed=<velocity_seed from prompt, or None>,
+    velocity_seed=<velocity_seed from prompt>,   # required, never null
     params={
         "LOG_FILE":            "tg_sweep.log",
         "DUMP_FILE":           "",
@@ -79,9 +78,6 @@ grep -E 'pair_style|dihedral_style|kspace' "<tg_sweep_dir>/tg_sweep.in"
 # GAFF2 leak (lj/charmm... / dihedral_style fourier) = wrong → do NOT submit
 ```
 
-**GPU neighbor list (small PCFF cells <5k atoms):** edit `package gpu 1 neigh no` → `neigh yes`
-for +30% (NPT-stable; not for kokkos — it manages its own neighbor list).
-
 ### Step 2: Submit sweep
 
 `run_lammps_script` is async — returns `run_id` immediately.
@@ -99,9 +95,3 @@ run = run_lammps_script(
 w = watch_run(run["run_id"])
 # Return run_id and w["monitor_command"] to the orchestrator — do not call Monitor.
 ```
-
----
-
-## Common Failures
-
-**Tg sweep killed mid-run:** restart from the last completed temperature (max 2 attempts); if still failing, return the error to the orchestrator.

@@ -19,3 +19,10 @@ PSTR is confidence=medium and IS in polymer_rules.json with class-specific tempe
 - **D-08 hardware:** PCFF→family pcff. Cell ≈ dp40 × nchain10 × 16 (all-atom styrene-repeat atoms) ≈ 6,400 atoms <10k → 1 GPU. Adopt by_forcefield.pcff default (engine=kokkos, mpi=1, gpu_per_run=1). directional_probe is HINT-only here: values_are_benchmarked=false AND probe host (A800/A100) != live host (RTX 6000), and 6,400 is ~2.1x the 3,020-atom benchmark cell (outside [0.5x,2x]). So keep the default, do NOT write engine/gpu/mpi into decided_params (stay on policy path), set D-08 confidence=low + a planned `hardware_benchmark` probe (uncertainty `hardware_optimum`).
 - **D-06 Tg ladder [25,50,100]** clears the steps-per-T floor at dt=1fs/step=20K (800/400/200 ps). Retired [40,160,400] gave degenerate 50/125 ps fits. PS PCFF multirate slope-gate is seed/build-dependent (PS2 failed-inverted; PS3 fresh seed → Tg 376.5 K = exp). Handled by orchestrator fresh-seed recovery, not at plan time — record as a non-dominant uncertainty.
 - Set `t_range_brackets_exp_tg: true` in the tg stage success_criteria (200-600 K brackets 373 K).
+
+**Superseded 2026-08-08:** `hardware_policy.values_are_benchmarked` is now `true` (clean
+host-matched calibration on this exact box, RTX 6000x4/18-core — confirmed live, not A800/A100
+as the D-08 line above assumed). The `confidence:low` reasoning above no longer applies — the
+cell (6,400 atoms) is still just outside the pcff probe's [0.5x,2x]=[1510,6040] size window, so
+the correct confidence is now **medium** (host/engine choice is calibrated; only this cell size
+is unconfirmed), not `low`. See `hardware/HARDWARE_STUDY.md`.

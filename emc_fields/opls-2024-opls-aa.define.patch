@@ -1,0 +1,29 @@
+--- opls-aa.define.bak	2026-06-05 22:57:27.042371220 -0400
++++ opls-aa.define	2026-06-05 23:02:35.303447250 -0400
+@@ -1228,7 +1228,9 @@
+ c4o	C	-	-	0	C(^6c)(O(H))(C)(C)
+ c4o	C	-	-	0	C(^6c)(O(H))(C)(H)
+ o2h	O	-	-	0	O(C)(H)
++o2h	O	-	-	0	O([Si])(H)
+ h1o	H	-	-	0	H(O(C))
++h1o	H	-	-	0	H(O([Si]))
+ 
+ ITEM	END	# RULES
+ 
+@@ -2008,6 +2010,7 @@
+ c4oe	C	-	-	0	C(~O(~C))(~C)(~C)(H)
+ c4oe	C	-	-	0	C(~O(~C))(~C)(H)(H)
+ o2e	O	-	-	0	O(~C)(~C)
++o2	O	-	-	0	O(~[Si])([Si])
+ 
+ ITEM	END	# RULES
+ 
+@@ -4886,6 +4889,8 @@
+ si4	Si	-	-	0	[Si](~C)(C)(C)(H)
+ si4	Si	-	-	0	[Si](~C)(C)(H)(H)
+ si4	Si	-	-	0	[Si](~C)(H)(H)(H)
++si4	Si	-	-	0	[Si](~O)(O)(C)(C)
++si4	Si	-	-	0	[Si](~O)(C)(C)(H)
+ 
+ ITEM	END	# RULES
+ 

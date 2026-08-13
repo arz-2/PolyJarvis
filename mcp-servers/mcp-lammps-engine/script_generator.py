@@ -122,6 +122,32 @@ TRAPPE_SPECIAL_BONDS = "special_bonds lj 0 0 0"
 TRAPPE_PAIR_MODIFY   = "mix arithmetic tail yes"
 
 
+# Lumped CHn pseudo-atom masses (CH, CH2, CH3, CH4). None coincides with an element
+# mass: the closest pair is CH2 14.0268 vs N 14.007, so the 0.005 tolerance separates
+# them. Presence of any of these is the unambiguous united-atom signature — unlike
+# absence of hydrogen, which would also match all-atom fluoropolymers (PTFE/PHAL).
+_UA_LUMPED_MASSES = (13.0189, 14.0268, 15.0347, 16.0426)
+
+
+def _has_united_atom_masses(content: str, tol: float = 0.005) -> bool:
+    """True when the Masses section carries lumped CHn pseudo-atoms."""
+    sec = re.search(r"^Masses\s*$\n(.*?)(?=^\s*[A-Z][A-Za-z ]*\s*$)",
+                    content, re.MULTILINE | re.DOTALL)
+    if not sec:
+        return False
+    for line in sec.group(1).splitlines():
+        f = line.split()
+        if len(f) < 2:
+            continue
+        try:
+            mass = float(f[1])
+        except ValueError:
+            continue
+        if any(abs(mass - ua) < tol for ua in _UA_LUMPED_MASSES):
+            return True
+    return False
+
+
 def _detect_ff_from_data_file(data_file: str) -> dict:
     """Detect FF type from .data file content.
 
@@ -179,13 +205,18 @@ def _detect_ff_from_data_file(data_file: str) -> dict:
         return {}
 
     # ── Pre-equil EMC build files (no inline coeffs; coeffs via .params include) ────
+    # United-atom must be decided FIRST, by mass. Both other branches below are
+    # all-atom-only, and a UA cell reaching either one is silently mis-run: TraPPE-EH
+    # PMMA/PS carry 1 improper type and would take the PCFF branch (class2 pair style
+    # against harmonic coeffs); TraPPE-EH PE/cis-PBD carry 0 and would take the OPLS
+    # fallback (PPPM + 1-4 scaling on a chargeless cell).
+    if _has_united_atom_masses(content):
+        return {"use_pcff": False, "use_trappe": True, "use_opls": False}
     # PCFF (class2): always has improper types — class2 requires them.
     if n_improper > 0:
         return {"use_pcff": True, "use_trappe": False, "use_opls": False}
-    # TraPPE-UA: united-atom names in Masses section (e.g. "# c4h2", "# c4h3").
-    if re.search(r"#\s*c\d+h\d+", content):
-        return {"use_pcff": False, "use_trappe": True, "use_opls": False}
-    # OPLS-AA: remaining EMC case — no impropers, non-UA atom types (PHAL/PSIL).
+    # OPLS-AA: remaining EMC case — all-atom, no impropers (PHAL/PSIL). EMC's OPLS-AA
+    # defines impropers only for c3= alkene centers, so 0 here is normal, not a defect.
     return {"use_pcff": False, "use_trappe": False, "use_opls": True}
 
 
@@ -910,6 +941,25 @@ class ScriptGenerator:
         if velocity_seed is not None:
             cfg["_velocity_seed"] = int(velocity_seed)
 
+        # npt_deform: the strain the deck actually reaches is N_STEPS * STRAIN_RATE * TIMESTEP.
+        # The template has no STRAIN_MAX placeholder, so a caller that passes STRAIN_MAX and
+        # omits N_STEPS used to get the 300000-step default silently -- PSTR runs at 1e7 /s and
+        # every class's slow leg at ~10x below its primary rate, so those decks stopped at a
+        # tenth of the requested strain and the fit window sat in the noise floor. Derive the
+        # step count from STRAIN_MAX so the two cannot disagree, and refuse an inconsistent pair.
+        if template_name == "npt_deform" and params.get("STRAIN_MAX") is not None:
+            rate, dt = float(cfg["STRAIN_RATE"]), float(cfg["TIMESTEP"])
+            derived = int(round(float(params["STRAIN_MAX"]) / (rate * dt)))
+            if params.get("N_STEPS") is None:
+                cfg["N_STEPS"] = derived
+            elif abs(int(params["N_STEPS"]) - derived) > max(1, 0.01 * derived):
+                raise ValueError(
+                    f"npt_deform strain mismatch: N_STEPS={params['N_STEPS']} at "
+                    f"STRAIN_RATE={rate}/fs and TIMESTEP={dt} fs reaches strain "
+                    f"{int(params['N_STEPS']) * rate * dt:.4f}, but STRAIN_MAX="
+                    f"{params['STRAIN_MAX']} needs {derived} steps. Pass one or the other, "
+                    f"or a consistent pair.")
+
         # Data file path
         data_file = data_file_override or self.data_file
 
@@ -1294,9 +1344,12 @@ write_data tg_step_out.data
         subs["NEMD_AXIS_MID"] = axis_mid
         subs["NEMD_AXIS_HI"]  = axis_hi
 
-        # Random seeds for Langevin thermostats
-        subs["SEED_HOT"]  = cfg.get("SEED_HOT")  or random.randint(10000, 999999)
-        subs["SEED_COLD"] = cfg.get("SEED_COLD") or random.randint(10000, 999999)
+        # Langevin thermostat seeds — derived from the run's velocity_seed so a NEMD deck is
+        # reproducible from it alone. Override either one explicitly through params.
+        _lseed = (int(cfg["_velocity_seed"]) if cfg.get("_velocity_seed") is not None
+                  else random.randint(10000, 999999))
+        subs["SEED_HOT"]  = cfg.get("SEED_HOT")  or _lseed
+        subs["SEED_COLD"] = cfg.get("SEED_COLD") or _lseed + 1
 
         # ── Uniaxial deformation specifics (npt_deform) ──────────────────────
         subs["STRAIN_RATE"]  = cfg.get("STRAIN_RATE",  1e-7)

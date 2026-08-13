@@ -1,6 +1,8 @@
 # Critic Memory Index
 
-- [property_method is_glassy contradiction](feedback_property_method_is_glassy_contradiction.md) — two require clauses conflict for multi-member classes with tg requested; advisory only, never escalate
-- [Plan fields with no schema check](feedback_plan_fields_unvalidated.md) — criteria_evaluated, uncertainty cross-refs, t_range_brackets_exp_tg, decisions[].id vs decision_id; diff mechanically before reading prose
-
-
+- [Critic scope blocks default_source checks](feedback_critic_scope_blocks_default_source_checks.md) — polymer_rules.json/MURNAGHAN.md denied on Read AND Bash; literature_grounding.json:notes transcribes class defaults and is the partial workaround; split corroborated vs uncorroborated keys in the advisory
+- [Rate ladder is not a sweep list](feedback_rate_ladder_is_not_a_sweep_list.md) — tg_rates_K_per_ns=[25,50,100] schedules ONE sweep (rates[0] under slowest_rate); resolve count from planned_stages[tg], not the orchestrator prompt's "N-rate ladder" prose
+- [Tool-scope denials go both ways](feedback_critic_md_commands_blocked_use_read.md) — Read denied on .claude/commands/recover.md while Bash sed works; Bash jq on orchestration/ denial is not stable; never `jq .` a whole plan (spills to an unreadable path)
+- [Glassy Tg sweep starts from the 300 K glass](feedback_glassy_tg_sweep_starts_from_glass_cell.md) — FOUNDATION.md:37 npt_tg_prep_data is null for glassy ⇒ THERMAL_TRACK.md:23 passes npt_prod300_out.data; re-derive any "Tg escapes the deviant cell" claim
+- [Plan annotations never reach worker prompts](feedback_plan_annotations_never_reach_workers.md) — decided_params._* and evidence prose render nowhere; encode gate exceptions as planned_stages[].success_criteria companions (PVC1 exp_tg_K pattern)
+- [Blocked probe is not a plan inconsistency](feedback_blocked_probe_is_not_a_plan_inconsistency.md) — reduction_probe named with no probe stage is policy-prescribed (fast_density_screen is BLOCKED, record as planned-not-executed); no top-level `probe` key exists

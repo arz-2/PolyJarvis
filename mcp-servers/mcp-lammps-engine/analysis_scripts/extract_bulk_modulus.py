@@ -56,7 +56,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from plot_style import apply_style, save_fig
 
-from analysis_utils import compute_tau_eff, parse_lammps_log
+from analysis_utils import compute_tau_eff, effective_sample_size, parse_lammps_log
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ def main():
     # 3. Autocorrelation time and effective sample size
     # -------------------------------------------------------------------
     tau_frames, tau_frac = compute_tau_eff(volumes)
-    n_eff = int(n_prod / max(1.0, 2.0 * tau_frames))
+    n_eff = effective_sample_size(n_prod, tau_frames)
 
     # -------------------------------------------------------------------
     # 4. Drift check on volume (warn if still equilibrating)

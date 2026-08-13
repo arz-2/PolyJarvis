@@ -52,8 +52,8 @@ Quick index of all available MCP tools.
 |---|---|---|
 | `list_templates` | sync | All templates when called with no args; pass `template_name` to get full parameter defaults for that template (replaces the old `get_template_defaults` — used by deform-worker, tg-sweep-worker before `generate_script`) |
 | `inspect_data_file` | sync | Parse + validate in one call: atom count, box dims, H-type IDs, pre-flight checks |
-| `generate_script` | sync | Fill template → write `.in` file; `use_pcff=True` for PCFF class2 |
-| `generate_equilibration_workflow` | sync | Auto-generate 7-run (rubbery) or 9-run (glassy) GPU equilibration chain; `use_pcff=True` for PCFF; `params_file=` for EMC builds |
+| `generate_script` | sync | Fill template → write `.in` file; `use_pcff=True` for PCFF class2. `velocity_seed` required, non-null — pins the staircase, init-velocity and NEMD Langevin seeds |
+| `generate_equilibration_workflow` | sync | Auto-generate 7-run (rubbery) or 9-run (glassy) GPU equilibration chain; `use_pcff=True` for PCFF; `params_file=` for EMC builds. `velocity_seed` and all five step counts are required — pass each one, `null` included |
 | `run_lammps_script` | async | Run single script (daemon thread) |
 | `run_lammps_chain` | async | Run ordered pipeline under nohup; crash-safe |
 
@@ -76,7 +76,7 @@ Quick index of all available MCP tools.
 | `extract_tg_multirate` | sync | Rate-extrapolated Tg from multiple cooling-rate runs; returns log-linear slope and VF Tg⁰ |
 | `extract_bulk_modulus` | async | Isothermal K from NPT volume fluctuations (cross-check; rubbery no-pressures fallback) |
 | `extract_bulk_modulus_murnaghan` | sync | Fits Murnaghan EOS to P vs V from a pressure series; returns B0, B0', V0 (primary K path — glassy 300 K and rubbery T>Tg) |
-| `run_bulk_modulus_series` | async | Submits N NPT runs at each pressure in `pressures_atm`; returns chain_id + log_files list (used by murnaghan-worker) |
+| `run_bulk_modulus_series` | async | Submits N NPT runs at each pressure in `pressures_atm`; returns chain_id + log_files list (used by murnaghan-worker). `velocity_seed` required, non-null |
 | `extract_bulk_modulus_deform` | sync | Young's modulus and K from a 3-direction uniaxial deformation log; fallback when a Murnaghan fit fails acceptance |
 | `assess_cooling_contraction` | async | Volumetric contraction sanity check across the equilibration cooling stage |
 | `generate_run_summary` | sync | Assembles `run_summary.json` with all properties, validation status, and experimental comparison; call after all analysis tools complete |

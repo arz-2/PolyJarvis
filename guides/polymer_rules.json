@@ -1,14 +1,14 @@
 {
   "hardware_policy": {
-    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (orchestration/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default: chosen so up to 4 runs fit in 32 cores (4 x mpi=4 = 16) — this is what gen_prompt derives. `mpi_single_run_hint` is the (faster) value to use only when the box is dedicated to one run; it is a provisional GUESS pending hardware/benchmark_hardware.py (see hardware/HARDWARE.md), NOT yet benchmark-derived. NOTE: the per-run mpi/gpu values and the directional_probe timings below were measured on the PRIOR box (4x RTX 6000 24GB / i9-10980XE 18c), not this A800 box — only host/budget fields were updated; re-run benchmark_hardware.py on the A800s to retune. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
+    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (orchestration/scripts/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default \u2014 for pcff/opls/trappe this is mpi=1 (KOKKOS/GPU-resident kspace, 1 core/run, up to 4 concurrent runs on 4 GPUs); gaff is the outlier at mpi=4. `mpi_single_run_hint` equals `mpi` (both 1) for pcff/opls/trappe, confirmed by the 2026-08-08 clean host-matched /calibrate-hardware pass (values_are_benchmarked=true, see hardware/HARDWARE_STUDY.md); gaff's mpi_single_run_hint=8 remains a provisional GUESS \u2014 no calibration cell exists for it yet. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
     "host": {
       "gpus": 4,
-      "gpu_model": "Quadro RTX 6000 24GB",
+      "gpu_model": "Quadro RTX 6000",
       "phys_cores": 18
     },
-    "concurrency_rule": "Sum of mpi over all concurrent runs <= 18 physical cores; at most one GPU-heavy run per physical GPU. At the default mpi=4 this permits 4 concurrent runs (16 ranks). Raise mpi toward mpi_single_run_hint only when fewer runs share the box; check with `orchestration/pick_gpu.py budget --mpi N` before launch.",
+    "concurrency_rule": "Sum of mpi over all concurrent runs <= 18 physical cores; at most one GPU-heavy run per physical GPU. pcff/opls/trappe default to mpi=1 (1 core/run), so up to 4 runs go concurrent at 1 per GPU (4 ranks total, well under the 18-core ceiling); gaff defaults to mpi=4 (16 ranks for 4 concurrent runs, near the ceiling). Raise mpi toward mpi_single_run_hint only when fewer runs share the box; check with `orchestration/scripts/pick_gpu.py budget --mpi N` before launch.",
     "min_mpi_for_pppm": 4,
-    "values_are_benchmarked": false,
+    "values_are_benchmarked": true,
     "directional_probe": {
       "kokkos_offload_study": {
         "date": "2026-06-20",
@@ -29,17 +29,17 @@
         "opls_parity_2026-06-20": "PASS. run-0 on decane-oplsaa (3200 atoms, OPLS-AA): lj/cut/coul/long/kk + harmonic bond/angle kk + dihedral opls/kk + pppm/kk vs GPU-package agree to 0.000% on E_bond/E_angle/E_dihed/E_vdwl/E_coul/E_long/PotEng and the pressure tensor. OPLS KOKKOS stack validated.",
         "gate": "GREEN as of 2026-06-20. pcff + opls FLIPPED to engine=kokkos, mpi=1, gpu_per_run=1 (both run-0 parity-validated). trappe FLIPPED to engine=gpu, mpi=1, gpu_per_run=1 with `neigh yes` (run-0 parity PASS, see trappe_neigh_yes_2026-06-20). gaff pending its own parity (no cell yet).",
         "binary": "/home/arz2/lammps-install-kokkos/bin/lmp (env LAMBDA_LAMMPS_KOKKOS)",
-        "kokkos_deck_gotchas": "Three KOKKOS pitfalls (hit on the 2nd machine pre-merge; ALREADY correct on this hardware-optimization branch): (1) the KOKKOS package is loaded on the COMMAND LINE via `-pk kokkos` (in _engine_launch), NOT as an in-deck `package kokkos ...` line — script_generator renders only a comment for engine=kokkos. An in-deck `package kokkos gpu 1 comm no` is ILLEGAL (use `package kokkos neigh full comm no` if ever hand-writing one). (2) `-sf kk` rewrites STYLE commands (pair/bond/angle/dihedral/kspace/fix) to /kk, but NOT the `neighbor` command — decks keep plain `neighbor 2.0 bin`; `neighbor 2.0 bin/kk` is an invalid suffix. (3) run_lammps_script AND run_lammps_chain both take `engine=`, so no manual binary wrapper is needed — pass engine='kokkos' and the right binary+flags are selected. Our single-GPU mpi=1 `-pk kokkos` defaults passed parity; multi-GPU may need explicit `comm`/`neigh` tuning.",
+        "kokkos_deck_gotchas": "Three KOKKOS pitfalls (hit on the 2nd machine pre-merge; ALREADY correct on this hardware-optimization branch): (1) the KOKKOS package is loaded on the COMMAND LINE via `-pk kokkos` (in _engine_launch), NOT as an in-deck `package kokkos ...` line \u2014 script_generator renders only a comment for engine=kokkos. An in-deck `package kokkos gpu 1 comm no` is ILLEGAL (use `package kokkos neigh full comm no` if ever hand-writing one). (2) `-sf kk` rewrites STYLE commands (pair/bond/angle/dihedral/kspace/fix) to /kk, but NOT the `neighbor` command \u2014 decks keep plain `neighbor 2.0 bin`; `neighbor 2.0 bin/kk` is an invalid suffix. (3) run_lammps_script AND run_lammps_chain both take `engine=`, so no manual binary wrapper is needed \u2014 pass engine='kokkos' and the right binary+flags are selected. Our single-GPU mpi=1 `-pk kokkos` defaults passed parity; multi-GPU may need explicit `comm`/`neigh` tuning.",
         "trappe_neigh_yes_2026-06-20": "TraPPE-UA is NOT a CPU job. CALIB_PHYC (1640 atoms), mpi=1/GPU, niced on idle GPU2 under identical contention (ratios robust, absolute ns/day suppressed uniformly): cpu_mpi4=136; A0 gpu-pkg neigh-on-CPU=136 (Neigh 71% stays on CPU -> no win, ties CPU); A1 gpu-pkg neigh-ON-GPU=501 (3.7x, now Bond 60% CPU-bound); A3 KOKKOS full-offload=397 (2.9x; Modify/Bond/Neigh, /kk launch+fix overhead loses on tiny UA cells). WINNER = GPU package + `neigh yes`, mpi=1, 1 GPU/run (A1). Implemented by gating `package gpu 1 neigh yes` on use_trappe in script_generator.py. Parity: run-0 static CPU lj/cut vs GPU lj/cut/gpu+neigh-yes on CALIB_PHYC = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl/density (only virial/pressure differs ~0.3% from FP summation order; advisory/non-gated). bench_accuracy_diff.py PASS. (Note: bench_accuracy_diff _pct_diff fixed to handle the no-kspace E_long=0/0 nan edge.) Open: mpi=2 may beat mpi=1 (Bond is CPU-bound at mpi=1) but costs a core -> defer to a drained box; 2/GPU MPS throughput for batches still to measure.",
         "gpu_sharing_2026-06-20": "DO NOT pack >1 run/GPU for PPPM-heavy (PCFF/OPLS) KOKKOS runs. Measured on PEG1 7020 atoms, GPU2: solo=38.9 ns/day; 2 concurrent time-sliced (no MPS)=6.3 aggregate (0.16x, Kspace blows up 15x from GPU context-switching on PPPM sync points); 2 concurrent with CUDA MPS=39.0 aggregate (1.00x, clean 2x/section, 50% each) = ZERO gain. The GPU is already saturated by one PPPM job (pair kernel is tiny but the cuFFT pipeline keeps it busy). Optimal = 1 run/GPU, 4 concurrent across 4 GPUs (mpi=1, gpu_per_run=1)."
       },
-      "measured_on": "4x NVIDIA A800 40GB Active / 32 phys cores (calibrate_hardware.py --revalidate)",
-      "date": "2026-06-21",
-      "mode": "revalidate — ran the shipped by_forcefield default per FF (no engine re-search) + run-0 parity vs CPU; records host-matched ns/day. Use --full for a fresh engine×config sweep on a drained box.",
+      "measured_on": "4x Quadro RTX 6000 / 18 phys cores (calibrate_hardware.py --revalidate)",
+      "date": "2026-08-08",
+      "mode": "revalidate \u2014 ran the shipped by_forcefield default per FF (no engine re-search) + run-0 parity vs CPU; records host-matched ns/day. Use --full for a fresh engine\u00d7config sweep on a drained box.",
       "cells": {
-        "pcff": "hardware/CALIB_PCFF/emc_build.data",
-        "opls": "hardware/CALIB_OPLS/emc_build.data",
-        "trappe": "hardware/CALIB_TRAPPE/emc_build.data"
+        "pcff": "/home/arz2/PolyJarvis/hardware/CALIB_PCFF/emc_build.data",
+        "opls": "/home/arz2/PolyJarvis/hardware/CALIB_OPLS/emc_build.data",
+        "trappe": "/home/arz2/PolyJarvis/hardware/CALIB_TRAPPE/emc_build.data"
       },
       "cells_atoms": {
         "pcff": 3020,
@@ -51,7 +51,7 @@
           "name": "gpu1_mpi1",
           "mpi": 1,
           "gpu": 1,
-          "ns_per_day": 42.826,
+          "ns_per_day": 42.269,
           "cell_atoms": 3020,
           "engine": "kokkos",
           "parity": "PASS",
@@ -61,7 +61,7 @@
           "name": "gpu1_mpi1",
           "mpi": 1,
           "gpu": 1,
-          "ns_per_day": 57.075,
+          "ns_per_day": 55.191,
           "cell_atoms": 3220,
           "engine": "kokkos",
           "parity": "PASS",
@@ -71,7 +71,7 @@
           "name": "gpu1_mpi1",
           "mpi": 1,
           "gpu": 1,
-          "ns_per_day": 580.729,
+          "ns_per_day": 639.19,
           "cell_atoms": 1640,
           "engine": "gpu",
           "parity": "PASS",
@@ -79,15 +79,15 @@
         }
       },
       "pcff_ns_per_day": {
-        "gpu1_mpi1": 42.826
+        "gpu1_mpi1": 42.269
       },
       "opls_ns_per_day": {
-        "gpu1_mpi1": 57.075
+        "gpu1_mpi1": 55.191
       },
       "trappe_ns_per_day": {
-        "gpu1_mpi1": 580.729
+        "gpu1_mpi1": 639.19
       },
-      "calibration_note": "partial revalidation — evidence recorded, values_are_benchmarked left false: CPU contended (busy~18 > headroom 8)"
+      "calibration_note": "clean host-matched revalidation \u2014 every shipped default ran and passed run-0 parity on this box; values_are_benchmarked=true."
     },
     "ff_aliases": {
       "PCFF": "pcff",
@@ -102,7 +102,7 @@
         "mpi": 1,
         "mpi_single_run_hint": 1,
         "gpu_per_run": 1,
-        "note": "class2/kk FULL-OFFLOAD (pair+class2 bonded+pppm+neigh on GPU) via the KOKKOS binary (env LAMBDA_LAMMPS_KOKKOS). mpi=1 is CANONICAL here — kspace runs on the GPU, NOT CPU-serial, so the old GPU-package 'never mpi=1' rule does NOT apply. ~7.9x vs gpu-pkg A0 at 1 rank; 1 core/run frees cores for ~4 concurrent runs (1/GPU). Parity run-0 vs CPU class2 = 0.000% on energies+forces (2026-06-20). Fallback: engine=gpu, mpi=4 (GPU package).",
+        "note": "class2/kk FULL-OFFLOAD (pair+class2 bonded+pppm+neigh on GPU) via the KOKKOS binary (env LAMBDA_LAMMPS_KOKKOS). mpi=1 is CANONICAL here \u2014 kspace runs on the GPU, NOT CPU-serial, so the old GPU-package 'never mpi=1' rule does NOT apply. ~7.9x vs gpu-pkg A0 at 1 rank; 1 core/run frees cores for ~4 concurrent runs (1/GPU). Parity run-0 vs CPU class2 = 0.000% on energies+forces (2026-06-20). Fallback: engine=gpu, mpi=4 (GPU package).",
         "_prev_gpu_package": {
           "engine": "gpu",
           "mpi": 4,
@@ -126,7 +126,7 @@
         "mpi": 1,
         "mpi_single_run_hint": 1,
         "gpu_per_run": 1,
-        "note": "lj/cut, no kspace, neigh-build dominated (~71%). GPU package with `neigh yes` (neighbor build ON the GPU) = 3.7x vs CPU mpi=4 at 1 core/run (A1 501 vs 136 ns/day, CALIB_PHYC 1640 atoms, 2026-06-20, niced/contended ratio). BEATS KOKKOS here (397) — UA bonded is trivial and lj/cut/gpu is leaner than /kk per-kernel launch overhead on small cells (opposite of PCFF). The `neigh yes` line is rendered automatically by script_generator gating on use_trappe (engine=gpu only — PPPM classes keep neigh no). Parity run-0 vs CPU lj/cut = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl (2026-06-20). mpi=1 is the concurrency-optimal default (4 TraPPE runs on 4 GPUs = 4 cores). Fallback: engine=cpu, mpi=4.",
+        "note": "lj/cut, no kspace, neigh-build dominated (~71%). GPU package with `neigh yes` (neighbor build ON the GPU) = 3.7x vs CPU mpi=4 at 1 core/run (A1 501 vs 136 ns/day, CALIB_PHYC 1640 atoms, 2026-06-20, niced/contended ratio). BEATS KOKKOS here (397) \u2014 UA bonded is trivial and lj/cut/gpu is leaner than /kk per-kernel launch overhead on small cells (opposite of PCFF). The `neigh yes` line is rendered automatically by script_generator gating on use_trappe (engine=gpu only \u2014 PPPM classes keep neigh no). Parity run-0 vs CPU lj/cut = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl (2026-06-20). mpi=1 is the concurrency-optimal default (4 TraPPE runs on 4 GPUs = 4 cores). Fallback: engine=cpu, mpi=4.",
         "_prev_cpu": {
           "engine": "cpu",
           "mpi": 4,
@@ -492,7 +492,6 @@
         "PIB": 205,
         "notes": "PE: amorphous Tg ~195 K (Boyer 1973 Tg_U; Ramos2015 MD=187 K). Tg_L ~145 K is a sub-Tg relaxation in semicrystalline PE. PP atactic: ~-15°C (258 K); PIB: ~-68°C (205 K)."
       },
-      "confidence": "high",
       "citations": [
         "PE_RSC2016",
         "Hayashi2022",
@@ -520,12 +519,13 @@
       ],
       "bm_pressures_atm": [
         1,
-        500,
         1000,
-        2000,
-        5000
+        2500,
+        5000,
+        10000,
+        15000
       ],
-      "bm_pressures_note": "Widened from [1,100,300,600,1000] (~0.1 GPa span) on 2026-06-24: narrow ±1000 atm under-constrains EOS curvature for low-K rubbery polymers → B0_prime runaway (PE3 Murnaghan 1.358 vs fluctuation 1.651 GPa, 21.6% gap). Cross-check K against NPT fluctuation; flag divergence >15%.",
+      "bm_pressures_note": "Widened from [1,100,300,600,1000] (~0.1 GPa span) on 2026-06-24: narrow ±1000 atm under-constrains EOS curvature for low-K rubbery polymers → B0_prime runaway (PE3 Murnaghan 1.358 vs fluctuation 1.651 GPa, 21.6% gap). Cross-check K against NPT fluctuation; flag divergence >15%. Ceiling widened 5000->15000 on 2026-08-08 (compression-only leg on PE4 clean, no kink); tension still excluded, see MURNAGHAN.md.",
       "exp_K_GPa": {
         "min": 1.5,
         "max": 2.0,
@@ -572,7 +572,7 @@
         "notes": "amorphous PS at RT; K=3.4-4.2 GPa derived via K=E/[3(1-2nu)] at nu=0.33"
       },
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 550.0,
       "P_equil_atm": 1.0,
@@ -599,7 +599,6 @@
         "P2VP": 374,
         "notes": "PS: ~100°C (373 K). P2VP similar to PS due to similar backbone rigidity."
       },
-      "confidence": "medium",
       "citations": [
         "Srivastava2026",
         "Tang2022",
@@ -650,7 +649,7 @@
       },
       "density_initial_gcm3": 0.55,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 530.0,
       "P_equil_atm": 1.0,
@@ -671,21 +670,12 @@
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
-      "bm_pressures_atm": [
-        -1000,
-        0,
-        1500,
-        3000,
-        5000
-      ],
-      "bm_pressures_note": "Glassy at 300 K (Murnaghan primary). Set [-1000,0,1500,3000,5000] (~0.5 GPa, compression-biased) on 2026-06-24: PVC2 at ±1000 atm ran B0' to 16.3; the widened span gives B0'=9.5 (R²=0.9990), K=2.80 GPa, B_dyn=2.93 GPa (4.6% agreement). PCFF systematically underpredicts PVC K by ~30% (K~2.8-2.9 vs exp 3.5-4.5 GPa) independent of span — a known FF limitation, not a fit artifact. Deform fallback if B0' still outside [4,20].",
       "experimental_tg_K": {
         "PVA": 303,
         "PVC": 354,
         "PVAc": 304,
         "notes": "PVA: ~30°C (303 K) from OpenLearn; PVC: ~80°C (354 K); PVAc: ~30°C (304 K)."
       },
-      "confidence": "medium",
       "citations": [
         "Afzal2021",
         "Webb2024",
@@ -747,7 +737,7 @@
         "notes": "amorphous PMMA at RT; K=3.1-4.1 GPa derived via K=E/[3(1-2nu)] at nu=0.34-0.40"
       },
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 550.0,
       "P_equil_atm": 1.0,
@@ -776,7 +766,6 @@
         "PAA": 379,
         "notes": "PMMA: ~105°C (378 K); PMA: ~8°C (281 K); PAA: ~106°C (379 K)."
       },
-      "confidence": "high",
       "citations": [
         "Hayashi2022",
         "Webb2024",
@@ -794,7 +783,8 @@
         "Exp. RT density: PMMA=1.19 g/cm³, PMA=1.22 g/cm³. Initial 0.60 g/cm³ = ~0.5x PMMA density.",
         "GAFF2 Tg failure (critical): NkepsuMbitou2025 benchmark shows GAFF Tg error >45% for both PMMA and PIB — the largest error of all tested FFs. Class II FFs (PCFF, IFF) reproduce PMMA density within 2% and Tg within ~10% after WLF rate correction. PCFF (Class II) is used here via EMC.",
         "SCREENING dp: dp_typical=40 for 48h-budget Tg sweep (6,000 atoms, ~10h/4GPU). Tg is chain-length independent above dp≥30 for PMMA. ENTANGLEMENT NOTE: a-PMMA Me=12,500 g/mol → DP@Me=125 (Mark2007 Table 25.3). At dp=40 < Me: K from uniaxial deformation will be systematically underestimated by ~30-50% vs converged value. dp_min=30 is the Tg-convergence floor; for accurate K use dp≥150 in a dedicated property run. PMA (Tg=281 K) is rubbery — Me-based dp limit irrelevant for PMA modulus.",
-        "STRAIN RATE ARTIFACT: see PSTR class note. Same systematic ~1.5-2x K overestimate applies to PMMA deformation runs."
+        "STRAIN RATE ARTIFACT: see PSTR class note. Same systematic ~1.5-2x K overestimate applies to PMMA deformation runs.",
+        "CTE NOTE: Wu2020 (CG-MD, ≤400K) reports melt CTE ≈4.4e-4/K, ~40% below alpha_melt_per_K=6.15e-4 (Mark2007, ~550K) — likely different state-point, not a contradiction. Context only if UNDER_ANNEALED_COOLING or unexpected melt density near 400-450K appears."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
@@ -818,8 +808,8 @@
       ],
       "preferred_ff": "opls/2024/opls-aa",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1021/ma9918295",
-      "ff_note": "Halogen → OPLS-AA path. Afzal 2021 halogen-class R²=0.87, MAE=20.8K. Note: Watkins & Jorgensen 2001 covers perfluoroalkanes (PTFE-like all-CF2); PVDF mixed CF2-CH2 dihedrals use general OPLS-AA CT/HC types. PVDF2 run in progress for validation.",
+      "ff_justification_doi": "10.1021/jp004071w",
+      "ff_note": "Halogen → OPLS-AA path. Afzal 2021 halogen-class R²=0.87, MAE=20.8K. Note: Watkins & Jorgensen 2001 covers perfluoroalkanes (PTFE-like all-CF2); PVDF mixed CF2-CH2 dihedrals use general OPLS-AA CT/HC types. PVDF2 run in progress for validation. ff_justification_doi = Watkins & Jorgensen 2001 (10.1021/jp004071w), the real OPLS-AA lineage; Byutner2000 is a separate bespoke FF, kept only for density-target/PPPM justification.",
       "forcefield": "OPLS-AA",
       "charge_method": "none",
       "dp_typical": 60,
@@ -837,7 +827,7 @@
       },
       "density_initial_gcm3": 0.89,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 700.0,
       "P_equil_atm": 1.0,
@@ -862,7 +852,6 @@
         "PCTFE": 325,
         "notes": "PVDF: -40°C (233 K); PTFE: Tg controversial, -103°C (170 K) from dynamic mech. tests, some report 130°C secondary relaxation; PCTFE: ~52°C (325 K)."
       },
-      "confidence": "medium",
       "citations": [
         "Hayashi2022",
         "Afzal2021",
@@ -911,7 +900,7 @@
       },
       "density_initial_gcm3": 0.57,
       "electrostatics": "lj_cut",
-      "cutoff_A": 12.0,
+      "cutoff_A": 14.0,
       "dt_fs": 2.0,
       "T_equil_K": 400.0,
       "P_equil_atm": 1.0,
@@ -938,7 +927,6 @@
         "PI": 200,
         "notes": "Polybutadiene: ~-92°C (181 K); cis-polyisoprene (natural rubber): ~-73°C (200 K). Very low Tg rubbers."
       },
-      "confidence": "high",
       "citations": [
         "Polyisoprene2021",
         "Afzal2021",
@@ -959,12 +947,13 @@
       ],
       "bm_pressures_atm": [
         1,
-        500,
         1000,
-        2000,
-        5000
+        2500,
+        5000,
+        10000,
+        15000
       ],
-      "bm_pressures_note": "Widened from [1,100,300,600,1000] (~0.1 GPa span) on 2026-06-24: narrow ±1000 atm under-constrains EOS curvature for low-K rubbery polymers → B0_prime runaway (cis-PBD3 Murnaghan 1.263 vs fluctuation 1.566 GPa, ~24% gap). Cross-check K against NPT fluctuation; flag divergence >15%.",
+      "bm_pressures_note": "Widened from [1,100,300,600,1000] (~0.1 GPa span) on 2026-06-24: narrow ±1000 atm under-constrains EOS curvature for low-K rubbery polymers → B0_prime runaway (cis-PBD3 Murnaghan 1.263 vs fluctuation 1.566 GPa, ~24% gap). Cross-check K against NPT fluctuation; flag divergence >15%. Ceiling widened 5000->15000 on 2026-08-08 (compression-only leg on cis-PBD4 clean, no kink); tension still excluded, see MURNAGHAN.md.",
       "experimental_density_gcm3": 0.9,
       "exp_density_note": "PBD amorphous = 0.90 g/cm³; PI amorphous = 0.91 g/cm³ (Brandrup & Immergut). Use 0.90 as the default comparator for PBD SMILES; override to 0.91 for PI.",
       "exp_K_GPa": {
@@ -1004,7 +993,7 @@
         "note": "bulk at 300 K; Wu2011 OPLS-AA PEO 1.10-1.12 g/cm³"
       },
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 500.0,
       "P_equil_atm": 1.0,
@@ -1039,7 +1028,6 @@
         "PVME": 242,
         "notes": "PEO: ~-67°C (206 K); PPO: ~-75°C (198 K); PVME: ~-31°C (242 K). All low-Tg flexible polyethers."
       },
-      "confidence": "high",
       "citations": [
         "Webb2024",
         "Hayashi2022",
@@ -1088,7 +1076,7 @@
       },
       "density_initial_gcm3": 0.65,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 560.0,
       "P_equil_atm": 1.0,
@@ -1119,7 +1107,6 @@
         "source": "Mark2007_Table24.4",
         "notes": "amorphous PPS at RT; density=1.35 g/cm³"
       },
-      "confidence": "medium",
       "citations": [
         "Hayashi2022",
         "Afzal2021"
@@ -1167,7 +1154,7 @@
       },
       "density_initial_gcm3": 0.63,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 620.0,
       "P_equil_atm": 1.0,
@@ -1202,7 +1189,6 @@
         "source": "Mark2007_Table24.4",
         "notes": "amorphous PET at RT; density=1.29-1.40 g/cm³. K≈3.8 GPa for PET via K=E/[3(1-2nu)] at nu=0.37"
       },
-      "confidence": "high",
       "citations": [
         "Afzal2021",
         "Hayashi2022",
@@ -1225,7 +1211,8 @@
       "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PLA PASS, PET PASS). PCFF has explicit ester types (c_1, o_2, oe). Klajmon2023 benchmarks PLA/PEG with AA-MD.",
       "exp_K_GPa": {
         "min": 3.0,
-        "max": 4.5
+        "max": 4.5,
+        "note": "Provenance unverified - no primary PVT/Tait or ultrasonic bulk-modulus measurement identified. Likely derived from Mark 2007 Table 24.4 PET/PBT Young's modulus via K=E/[3(1-2nu)], nu~0.37 (see exp_E_GPa note in this same class), not a direct bulk-modulus measurement - treat as approximate; K_S vs K_T flavor unknown."
       },
       "K_deform_rate_slow_inv_s": 10000000.0,
       "melt_npt_ns": 1.0,
@@ -1260,7 +1247,7 @@
       },
       "density_initial_gcm3": 0.57,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 650.0,
       "P_equil_atm": 1.0,
@@ -1291,7 +1278,6 @@
         "source": "Mark2007_Table24.4",
         "notes": "dry as molded; E drops with moisture absorption. PA6 density=1.13, PA66=1.14 g/cm³"
       },
-      "confidence": "medium",
       "citations": [
         "Afzal2021",
         "Webb2024",
@@ -1332,7 +1318,7 @@
       "nchain": 10,
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 570.0,
       "P_equil_atm": 1.0,
@@ -1356,7 +1342,6 @@
         "hard_segment": 380,
         "notes": "Polyurethanes have two Tg values: soft segment (polyol-based, ~-50°C=223 K) and hard segment (diisocyanate-based, ~100°C=373 K). Effective Tg depends on composition."
       },
-      "confidence": "medium",
       "citations": [
         "Hayashi2022",
         "Afzal2021",
@@ -1415,7 +1400,6 @@
         "hard_segment": 400,
         "notes": "Hard segment Tg ~127°C (400 K). Polyurea networks can show two Tg values (Soft Matter 2014 DOI:10.1039/C4SM00979G)."
       },
-      "confidence": "low",
       "citations": [
         "Hayashi2022",
         "Roos2025"
@@ -1451,7 +1435,7 @@
       "nchain": 6,
       "density_initial_gcm3": 0.71,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 800.0,
       "P_equil_atm": 1.0,
@@ -1478,7 +1462,6 @@
         "general_range": "451-691",
         "notes": "PMDA-ODA (Kapton): ~360°C (633 K); BPDA-PDA: ~360°C (633 K); polyimide range 178-418°C = 451-691 K (Wen2020)."
       },
-      "confidence": "high",
       "citations": [
         "Wen2020",
         "Klajmon2023",
@@ -1521,7 +1504,7 @@
       "nchain": 10,
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 530.0,
       "P_equil_atm": 1.0,
@@ -1545,7 +1528,6 @@
         "PLGA": 318,
         "notes": "Polyanhydrides generally Tg=40-80°C (313-353 K). PLGA: ~45°C (318 K). Degradable linkage."
       },
-      "confidence": "low",
       "citations": [
         "Hayashi2022"
       ],
@@ -1557,7 +1539,8 @@
         "PLGA (poly(lactic-co-glycolic acid)) is technically a polyester-co-glycolide; anhydride-linkage variants follow similar parameters.",
         "Tg sensitive to copolymer ratio in PLGA-like systems; homopolymer model is approximate.",
         "Exp. RT density: PLGA ~1.20-1.25 g/cm³. Initial 0.60 g/cm³ = ~0.5x PLGA density.",
-        "WARNING: Low confidence — polyanhydride-specific PCFF MD literature is sparse. Parameters inferred from PEST class analogy."
+        "WARNING: Low confidence — polyanhydride-specific PCFF MD literature is sparse. Parameters inferred from PEST class analogy.",
+        "CITATION CAVEAT: ff_justification_doi (Afzal2021) is an OPLS3e screen — not PCFF, no polyanhydride coverage, does not validate PCFF routing. Kept (no better source exists) but ff_confidence still renders 'cited' off it — treat as effectively uncited."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
@@ -1580,7 +1563,7 @@
       "nchain": 10,
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 600.0,
       "P_equil_atm": 1.0,
@@ -1614,7 +1597,6 @@
         "source": "Mark2007_Table24.4",
         "notes": "amorphous BPA-PC at RT; density=1.2 g/cm³. K=~3.1 GPa via K=E/[3(1-2nu)] at nu=0.36-0.37"
       },
-      "confidence": "high",
       "citations": [
         "Afzal2021",
         "Tang2022"
@@ -1653,7 +1635,7 @@
       "nchain": 10,
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 550.0,
       "P_equil_atm": 1.0,
@@ -1678,7 +1660,6 @@
         "DGEBA_amine": 400,
         "notes": "Ultem (PEI polyetherimide): ~215°C (488 K). Linear poly(ethyleneimine): ~60°C (333 K). DGEBA-amine epoxy: ~127°C (400 K)."
       },
-      "confidence": "medium",
       "citations": [
         "Hayashi2022",
         "Wen2020"
@@ -1717,7 +1698,7 @@
       "nchain": 20,
       "density_initial_gcm3": 0.49,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 350.0,
       "P_equil_atm": 1.0,
@@ -1751,7 +1732,6 @@
         "PMHS": 158,
         "notes": "PDMS: ~-125°C (148 K); PMHS: ~-115°C (158 K). Exceptionally low Tg due to flexible Si-O backbone."
       },
-      "confidence": "high",
       "citations": [
         "Hayashi2022",
         "Srivastava2026",
@@ -1788,7 +1768,7 @@
       "nchain": 10,
       "density_initial_gcm3": 0.55,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 440.0,
       "P_equil_atm": 1.0,
@@ -1812,7 +1792,6 @@
         "poly_ethoxyphosphazene": 213,
         "notes": "Polyphosphazenes: highly tunable Tg from -100°C to 100°C (173-373 K) depending on substituents. Poly(ethoxyphosphazene): ~-60°C (213 K)."
       },
-      "confidence": "low",
       "citations": [
         "Hayashi2022",
         "Tiwary2022"
@@ -1848,7 +1827,7 @@
       "nchain": 8,
       "density_initial_gcm3": 0.66,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 770.0,
       "P_equil_atm": 1.0,
@@ -1872,14 +1851,6 @@
       "_tg_slope_gate_note": "Slope-gate FAIL is structural for rigid aromatics: the staircase cold-starts from the 300 K glassy cell, so the highest-T plateaus under-equilibrate at fast rates and invert the Tg-vs-rate trend. Headline Tg = SLOWEST (most-equilibrated) rate + degeneracy caveat; seed rerolls cannot fix this. Root fix (backlog): melt-start sweep.",
       "K_deform_rate_inv_s": 100000000.0,
       "K_strain_max": 0.03,
-      "bm_pressures_atm": [
-        -1000,
-        0,
-        1500,
-        3000,
-        5000
-      ],
-      "bm_pressures_note": "Stiff ketone glass: +/-1000 atm gives insufficient EOS curvature (B0_prime ~1, gate fail); compression-biased range confirmed (PEEK 2026: B0_prime=6.30, r2=0.9998, K=5.16 GPa). Tension capped at -1000 atm to avoid cavitation.",
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
       "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
@@ -1896,7 +1867,6 @@
         "source": "Mark2007_Table24.4",
         "notes": "amorphous PEEK at RT; Mark2007 lists 1.32 g/cm³ specimen which is semicrystalline — apply E as order-of-magnitude reference only for fully amorphous cells"
       },
-      "confidence": "high",
       "citations": [
         "Afzal2021",
         "Hayashi2022",
@@ -1940,7 +1910,7 @@
       "nchain": 8,
       "density_initial_gcm3": 0.62,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 700.0,
       "P_equil_atm": 1.0,
@@ -1978,7 +1948,6 @@
         "source": "Mark2007_Table24.4",
         "notes": "amorphous PSU/Udel at RT; density=1.25 g/cm³"
       },
-      "confidence": "medium",
       "citations": [
         "Hayashi2022",
         "Afzal2021"
@@ -2021,7 +1990,7 @@
       "nchain": 10,
       "density_initial_gcm3": 0.55,
       "electrostatics": "pppm",
-      "cutoff_A": 12.0,
+      "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 650.0,
       "P_equil_atm": 1.0,
@@ -2048,7 +2017,6 @@
         "PPO_PPE": 480,
         "notes": "PPV (unsubstituted): ~143°C (416 K); MEH-PPV: ~85°C (358 K); PPO/PPE (poly(2,6-dimethylphenylene oxide)): ~207°C (480 K)."
       },
-      "confidence": "medium",
       "citations": [
         "Hayashi2022",
         "Afzal2021",
@@ -2083,7 +2051,7 @@
     "nchain": 10,
     "density_initial_gcm3": 0.6,
     "electrostatics": "pppm",
-    "cutoff_A": 12.0,
+    "cutoff_A": 9.5,
     "dt_fs": 1.0,
     "T_equil_K": 600.0,
     "P_equil_atm": 1.0,
@@ -2106,7 +2074,6 @@
     "dsc_equiv_rate_K_per_ns": 1.6667e-10,
     "K_deform_rate_inv_s": 100000000.0,
     "K_strain_max": 0.03,
-    "confidence": "low",
     "notes": [
       "Default to PPPM when polymer class is unknown (conservative choice; no accuracy penalty vs lj_cut for apolar polymers).",
       "Default Tg sweep 150-600 K covers most common polymer classes except PSIL (too low) and PIMD/PKTN/PSFO (too low).",

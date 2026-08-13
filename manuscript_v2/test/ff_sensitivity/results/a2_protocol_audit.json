@@ -1,0 +1,397 @@
+{
+  "summary": {
+    "families": 9,
+    "runs_total": 36,
+    "runs_sum_check": true,
+    "families_with_protocol_variation": [
+      "PE",
+      "PEEK",
+      "PEG",
+      "PLA",
+      "PMMA",
+      "PS",
+      "PSU",
+      "PVC",
+      "cis-PBD"
+    ]
+  },
+  "families": {
+    "PE": {
+      "n_runs": 4,
+      "n_with_plan": 4,
+      "runs_without_plan": [],
+      "varying_axes": [
+        "bm_pressures_atm",
+        "charge_method",
+        "melt_npt_ns",
+        "npt_prod_ns",
+        "t_equil_ns",
+        "tg_min_steps_per_T",
+        "tg_rates_K_per_ns"
+      ],
+      "varying_detail": {
+        "charge_method": {
+          "PE1": "Gasteiger",
+          "PE2": "Gasteiger",
+          "PE3": "none",
+          "PE4": "none"
+        },
+        "t_equil_ns": {
+          "PE1": 10.0,
+          "PE2": 10.0,
+          "PE3": 5.0,
+          "PE4": 5.0
+        },
+        "npt_prod_ns": {
+          "PE1": 10.0,
+          "PE2": 10.0,
+          "PE3": 5.0,
+          "PE4": 5.0
+        },
+        "melt_npt_ns": {
+          "PE1": 2.0,
+          "PE2": 2.0,
+          "PE3": 1.0,
+          "PE4": 1.0
+        },
+        "tg_rates_K_per_ns": {
+          "PE1": "[40, 160, 640]",
+          "PE2": "[40, 160, 640]",
+          "PE3": "[25, 50, 100]",
+          "PE4": "[10, 25, 40]"
+        },
+        "tg_min_steps_per_T": {
+          "PE1": null,
+          "PE2": null,
+          "PE3": 100000,
+          "PE4": 250000
+        },
+        "bm_pressures_atm": {
+          "PE1": "[1, 100, 300, 600, 1000]",
+          "PE2": "[1, 100, 300, 600, 1000]",
+          "PE3": "[1, 100, 300, 600, 1000]",
+          "PE4": "[1, 500, 1000, 2000, 5000]"
+        }
+      },
+      "n_varying": 7
+    },
+    "PEEK": {
+      "n_runs": 4,
+      "n_with_plan": 4,
+      "runs_without_plan": [],
+      "varying_axes": [
+        "charge_method",
+        "dp_typical",
+        "nchain",
+        "tg_min_steps_per_T",
+        "tg_rates_K_per_ns",
+        "tg_t_high_K",
+        "tg_t_low_K"
+      ],
+      "varying_detail": {
+        "charge_method": {
+          "PEEK1": "RESP",
+          "PEEK2": "bond-increment",
+          "PEEK3": "none",
+          "PEEK4": "none"
+        },
+        "dp_typical": {
+          "PEEK1": 15,
+          "PEEK2": 32,
+          "PEEK3": 32,
+          "PEEK4": 32
+        },
+        "nchain": {
+          "PEEK1": 8,
+          "PEEK2": 10,
+          "PEEK3": 8,
+          "PEEK4": 8
+        },
+        "tg_t_high_K": {
+          "PEEK1": 700,
+          "PEEK2": 700,
+          "PEEK3": 750,
+          "PEEK4": 750
+        },
+        "tg_t_low_K": {
+          "PEEK1": 350,
+          "PEEK2": 350,
+          "PEEK3": 250,
+          "PEEK4": 250
+        },
+        "tg_rates_K_per_ns": {
+          "PEEK1": "[40, 160, 640]",
+          "PEEK2": "[40, 160, 400]",
+          "PEEK3": "[25, 50, 100]",
+          "PEEK4": "[25, 50, 100]"
+        },
+        "tg_min_steps_per_T": {
+          "PEEK1": null,
+          "PEEK2": null,
+          "PEEK3": 200000,
+          "PEEK4": 200000
+        }
+      },
+      "n_varying": 7
+    },
+    "PEG": {
+      "n_runs": 4,
+      "n_with_plan": 4,
+      "runs_without_plan": [],
+      "varying_axes": [
+        "bm_pressures_atm",
+        "charge_method",
+        "tg_rates_K_per_ns"
+      ],
+      "varying_detail": {
+        "charge_method": {
+          "PEG1": "AM1-BCC",
+          "PEG2": "none",
+          "PEG3": "none",
+          "PEG4": "none"
+        },
+        "tg_rates_K_per_ns": {
+          "PEG1": "[40, 160, 640]",
+          "PEG2": "[40, 160, 400]",
+          "PEG3": "[40, 160, 400]",
+          "PEG4": "[25, 50, 100]"
+        },
+        "bm_pressures_atm": {
+          "PEG1": null,
+          "PEG2": null,
+          "PEG3": null,
+          "PEG4": "[-1000, 0, 3000, 7000, 15000]"
+        }
+      },
+      "n_varying": 3
+    },
+    "PLA": {
+      "n_runs": 4,
+      "n_with_plan": 4,
+      "runs_without_plan": [],
+      "varying_axes": [
+        "bm_pressures_atm",
+        "charge_method",
+        "melt_npt_ns",
+        "tg_min_steps_per_T",
+        "tg_rates_K_per_ns"
+      ],
+      "varying_detail": {
+        "charge_method": {
+          "PLA1": "RESP",
+          "PLA2": "none",
+          "PLA3": "none",
+          "PLA4": "none"
+        },
+        "melt_npt_ns": {
+          "PLA1": null,
+          "PLA2": null,
+          "PLA3": 1.0,
+          "PLA4": 1.0
+        },
+        "tg_rates_K_per_ns": {
+          "PLA1": "[40, 160, 640]",
+          "PLA2": "[40, 100]",
+          "PLA3": "[25, 50, 100]",
+          "PLA4": "[40, 80, 100]"
+        },
+        "tg_min_steps_per_T": {
+          "PLA1": null,
+          "PLA2": null,
+          "PLA3": 200000,
+          "PLA4": 200000
+        },
+        "bm_pressures_atm": {
+          "PLA1": "[-1000, -500, 0, 500, 1000]",
+          "PLA2": null,
+          "PLA3": null,
+          "PLA4": "[-5000, -2500, 0, 2500, 5000]"
+        }
+      },
+      "n_varying": 5
+    },
+    "PMMA": {
+      "n_runs": 4,
+      "n_with_plan": 4,
+      "runs_without_plan": [],
+      "varying_axes": [
+        "charge_method",
+        "dp_typical",
+        "melt_npt_ns",
+        "tg_rates_K_per_ns"
+      ],
+      "varying_detail": {
+        "charge_method": {
+          "PMMA1": "RESP",
+          "PMMA2": "none",
+          "PMMA3": "none",
+          "PMMA4": "none"
+        },
+        "dp_typical": {
+          "PMMA1": 40,
+          "PMMA2": 50,
+          "PMMA3": 50,
+          "PMMA4": 50
+        },
+        "melt_npt_ns": {
+          "PMMA1": null,
+          "PMMA2": null,
+          "PMMA3": 1.0,
+          "PMMA4": 1.0
+        },
+        "tg_rates_K_per_ns": {
+          "PMMA1": "[40, 160, 640]",
+          "PMMA2": "[40, 160, 400]",
+          "PMMA3": "[25, 50, 100]",
+          "PMMA4": "[25, 50, 100]"
+        }
+      },
+      "n_varying": 4
+    },
+    "PS": {
+      "n_runs": 4,
+      "n_with_plan": 4,
+      "runs_without_plan": [],
+      "varying_axes": [
+        "bm_pressures_atm",
+        "charge_method",
+        "tg_rates_K_per_ns"
+      ],
+      "varying_detail": {
+        "charge_method": {
+          "PS1": "RESP",
+          "PS2": "bond-increment",
+          "PS3": "bond-increment",
+          "PS4": "bond-increment"
+        },
+        "tg_rates_K_per_ns": {
+          "PS1": "[40, 160, 640]",
+          "PS2": "[40, 160, 400]",
+          "PS3": "[40, 160, 400]",
+          "PS4": "[25, 50, 100]"
+        },
+        "bm_pressures_atm": {
+          "PS1": null,
+          "PS2": "[-1000, -500, 0, 500, 1000]",
+          "PS3": "[-1000, -500, 0, 500, 1000]",
+          "PS4": null
+        }
+      },
+      "n_varying": 3
+    },
+    "PSU": {
+      "n_runs": 4,
+      "n_with_plan": 4,
+      "runs_without_plan": [],
+      "varying_axes": [
+        "charge_method",
+        "dp_typical",
+        "nchain",
+        "tg_rates_K_per_ns"
+      ],
+      "varying_detail": {
+        "charge_method": {
+          "PSU1": "RESP",
+          "PSU2": "none",
+          "PSU3": "none",
+          "PSU4": "none"
+        },
+        "dp_typical": {
+          "PSU1": 20,
+          "PSU2": 20,
+          "PSU3": 25,
+          "PSU4": 25
+        },
+        "nchain": {
+          "PSU1": 8,
+          "PSU2": 10,
+          "PSU3": 8,
+          "PSU4": 8
+        },
+        "tg_rates_K_per_ns": {
+          "PSU1": "[40, 160, 640]",
+          "PSU2": "[40, 160, 400]",
+          "PSU3": "[25, 50, 100]",
+          "PSU4": "[25, 50, 100]"
+        }
+      },
+      "n_varying": 4
+    },
+    "PVC": {
+      "n_runs": 4,
+      "n_with_plan": 4,
+      "runs_without_plan": [],
+      "varying_axes": [
+        "bm_pressures_atm",
+        "eq_annealing_cycles",
+        "t_equil_ns",
+        "tg_rates_K_per_ns"
+      ],
+      "varying_detail": {
+        "eq_annealing_cycles": {
+          "PVC1": 5,
+          "PVC2": 5,
+          "PVC3": 7,
+          "PVC4": 7
+        },
+        "t_equil_ns": {
+          "PVC1": 5.0,
+          "PVC2": 5.0,
+          "PVC3": 8.0,
+          "PVC4": 8
+        },
+        "tg_rates_K_per_ns": {
+          "PVC1": "[40, 160, 400]",
+          "PVC2": "[40, 160, 400]",
+          "PVC3": "[25, 50, 100]",
+          "PVC4": "[25]"
+        },
+        "bm_pressures_atm": {
+          "PVC1": null,
+          "PVC2": null,
+          "PVC3": "[-1000, 0, 1500, 3000, 5000]",
+          "PVC4": "[-1000, 0, 1500, 3000, 5000]"
+        }
+      },
+      "n_varying": 4
+    },
+    "cis-PBD": {
+      "n_runs": 4,
+      "n_with_plan": 4,
+      "runs_without_plan": [],
+      "varying_axes": [
+        "bm_pressures_atm",
+        "charge_method",
+        "tg_min_steps_per_T",
+        "tg_rates_K_per_ns"
+      ],
+      "varying_detail": {
+        "charge_method": {
+          "cis-PBD1": "Gasteiger",
+          "cis-PBD2": "trappe-ua-fixed",
+          "cis-PBD3": "none",
+          "cis-PBD4": "none"
+        },
+        "tg_rates_K_per_ns": {
+          "cis-PBD1": "[40, 160, 640]",
+          "cis-PBD2": "[40, 160, 400]",
+          "cis-PBD3": "[25, 50, 100]",
+          "cis-PBD4": "[10, 25, 40]"
+        },
+        "tg_min_steps_per_T": {
+          "cis-PBD1": null,
+          "cis-PBD2": null,
+          "cis-PBD3": 100000,
+          "cis-PBD4": 250000
+        },
+        "bm_pressures_atm": {
+          "cis-PBD1": "[1, 100, 300, 600, 1000]",
+          "cis-PBD2": "[1, 100, 300, 600, 1000]",
+          "cis-PBD3": "[1, 100, 300, 600, 1000]",
+          "cis-PBD4": "[1, 500, 1000, 2000, 5000]"
+        }
+      },
+      "n_varying": 4
+    }
+  }
+}

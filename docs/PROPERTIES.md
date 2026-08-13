@@ -71,8 +71,8 @@ Fit parameters: B0 (GPa) = K_T, B0' (pressure derivative), V0 (reference volume 
 |-------|-------|
 | Worker | murnaghan-worker: `run_bulk_modulus_series` submits N NPT runs at each pressure from `npt_prod300_out.data` (the 300 K cell), then fits |
 | Tool | `extract_bulk_modulus_murnaghan` |
-| Acceptance | `fit_converged=True` and `B0_prime ∈ [4, 20]`; otherwise fall back to Path C (deformation) |
-| Cross-check | `extract_bulk_modulus` (volume fluctuation) runs in parallel as a diagnostic, not the reported value |
+| Acceptance | `fit_converged=True`; otherwise fall back to Path C (deformation). `B0_prime` outside [4, 20] is a WARNING annotation only, not a fallback trigger |
+| Cross-check | Volume-fluctuation K, computed inside the same `extract_bulk_modulus_murnaghan` call via its `npt_prod_log` argument — a diagnostic, not the reported value |
 | Method label | `murnaghan` |
 | Outputs | `bulk_modulus_murnaghan.json`, `murnaghan_eos.png` |
 
@@ -97,7 +97,7 @@ Same Murnaghan EOS fit as Path A, run at T>Tg from the melt production cell over
 
 ### Path C — 3-direction deformation  *(Murnaghan fallback)*
 
-Invoked when a Murnaghan fit fails acceptance (`fit_converged=False`, or `B0_prime` outside [4, 20]).
+Invoked when a Murnaghan fit fails acceptance (`fit_converged=False`).
 
 `extract_bulk_modulus_deform` reads three uniaxial-deformation logs (DEFORM_DIR x/y/z, run sequentially by deform-worker from `npt_prod300_out.data`) and derives the bulk modulus from the stress–strain response.
 

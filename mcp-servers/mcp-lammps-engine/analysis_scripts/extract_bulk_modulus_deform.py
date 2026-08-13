@@ -5,9 +5,12 @@ uniaxial deformation log (npt_deform template, Stage 5b).
 
 Method: Linear stress-strain fit in the elastic regime.
 
-Applies to uniaxial x-strain at fixed y/z (NVT, no barostat):
-  C11 = -d(pxx)/d(ε_xx)  in GPa   (axial stiffness)
-  C12 = -d(pyy)/d(ε_xx)  in GPa   (lateral coupling, isotropic assumption)
+Applies to uniaxial strain along --deform_direction at fixed transverse axes
+(NVT, no barostat):
+  C11 = -d(p_load)/d(ε)   in GPa   (axial stiffness, loading axis)
+  C12 = -d(p_trans)/d(ε)  in GPa   (lateral coupling, averaged over the two
+                                    transverse axes; their disagreement is the
+                                    isotropy check)
 
 Derived moduli (Voigt isotropic approximation):
   K = (C11 + 2·C12) / 3           (bulk modulus, GPa)
@@ -111,6 +114,11 @@ def main():
                              "for rate-sensitivity comparison. Used with --strain_rate_2.")
     parser.add_argument("--strain_rate_2", type=float, default=None,
                         help="Strain rate (1/fs) for --log_file_2. Typically 10× slower than --strain_rate.")
+    parser.add_argument("--deform_direction", choices=["x", "y", "z"], default="x",
+                        help="Axis the cell was strained along. Selects which stress component is "
+                             "the loading response (C11) and which two are transverse (C12). Must "
+                             "match the deck: a y/z leg analysed as x mislabels C11/C12 and can "
+                             "flip G and E negative. K is invariant, being trace/3.")
     parser.add_argument("--graphs_dir", default=None,
                         help="Accepted for interface compatibility with the standardized analysis-script "
                              "convention (the MCP wrapper passes it). This script emits no plots, so the "
@@ -120,6 +128,7 @@ def main():
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    deform_direction = args.deform_direction
 
     # -------------------------------------------------------------------
     # 1. Parse log
@@ -221,14 +230,24 @@ def main():
     # -------------------------------------------------------------------
     # 5. Fit C11 and C12
     # -------------------------------------------------------------------
-    # C11 = dσ_xx/dε_xx (slope of σ_xx vs ε)
-    # C12 = dσ_yy/dε_xx (slope of σ_yy vs ε, isotropic → same as C13)
+    # C11 = dσ_load/dε (loading direction); C12 = dσ_trans/dε (the two transverse
+    # directions, which are equal for an isotropic cell -- hence the isotropy check).
+    # Which axis is which depends on the deformation direction: for a y- or z-direction
+    # leg of the 3-direction fallback, σ_yy or σ_zz IS the loading response, so assuming
+    # x throughout puts a loading slope into the transverse average and silently corrupts
+    # both K and the isotropy delta.
     slope_xx, _, r2_xx, p_xx = linear_fit(eps, s_xx)
     slope_yy, _, r2_yy, p_yy = linear_fit(eps, s_yy)
     slope_zz, _, r2_zz, p_zz = linear_fit(eps, s_zz)
 
-    C11 = float(slope_xx)   # GPa
-    C12 = float((slope_yy + slope_zz) / 2.0)   # average of yy and zz (isotropy check)
+    _slopes = {"x": slope_xx, "y": slope_yy, "z": slope_zz}
+    _r2s = {"x": r2_xx, "y": r2_yy, "z": r2_zz}
+    _trans_axes = [a for a in ("x", "y", "z") if a != deform_direction]
+    slope_load = _slopes[deform_direction]
+    slope_t1, slope_t2 = (_slopes[a] for a in _trans_axes)
+
+    C11 = float(slope_load)   # GPa
+    C12 = float((slope_t1 + slope_t2) / 2.0)   # average of the two transverse responses
 
     # -------------------------------------------------------------------
     # 6. Derived moduli (Voigt isotropic)
@@ -238,9 +257,9 @@ def main():
     E = 9.0 * K * G / (3.0 * K + G) if (3.0 * K + G) > 1e-6 else None
     nu = C12 / (C11 + C12) if (C11 + C12) > 1e-6 else None
 
-    # Isotropy check: σ_yy and σ_zz should agree
-    isotropy_delta = abs(slope_yy - slope_zz) / abs((slope_yy + slope_zz) / 2.0) * 100 \
-        if abs((slope_yy + slope_zz) / 2.0) > 1e-6 else None
+    # Isotropy check: the two TRANSVERSE responses should agree
+    isotropy_delta = abs(slope_t1 - slope_t2) / abs((slope_t1 + slope_t2) / 2.0) * 100 \
+        if abs((slope_t1 + slope_t2) / 2.0) > 1e-6 else None
 
     # -------------------------------------------------------------------
     # 7. Mean temperature
@@ -275,6 +294,10 @@ def main():
         "method":           "uniaxial_deformation",
         "C11_GPa":          round(C11, 4),
         "C12_GPa":          round(C12, 4),
+        "deform_direction": deform_direction,
+        "transverse_axes":  _trans_axes,
+        "C12_t1_GPa":       round(float(slope_t1), 4),
+        "C12_t2_GPa":       round(float(slope_t2), 4),
         "C12_yy_GPa":       round(float(slope_yy), 4),
         "C12_zz_GPa":       round(float(slope_zz), 4),
         "K_GPa":            round(K, 4),
@@ -308,7 +331,7 @@ def main():
             "simulation not equilibrated at 300 K, unstable at this deformation rate, "
             "or strain too large (non-linear regime). Check fit quality (R²)."
         )
-    if min(r2_xx, r2_yy, r2_zz) < 0.90:
+    if min(_r2s[deform_direction], _r2s[_trans_axes[0]], _r2s[_trans_axes[1]]) < 0.90:
         result["warning_poor_fit"] = (
             f"Low R²: C11 R²={r2_xx:.3f}, C12_yy R²={r2_yy:.3f}, C12_zz R²={r2_zz:.3f}. "
             f"avg_window={avg_window} frames used. "
@@ -316,17 +339,32 @@ def main():
             "exceeds elastic signal at THERMO_FREQ=100. "
             "Alternatively: reduce strain_max (non-linear regime) or increase N_STEPS."
         )
-    if isotropy_delta is not None and isotropy_delta > 20.0:
-        result["warning_anisotropy"] = (
-            f"C12_yy={slope_yy:.3f} and C12_zz={slope_zz:.3f} GPa disagree by "
-            f"{isotropy_delta:.1f}% — system may not be isotropic. "
-            "Run more chains or longer equilibration."
-        )
     if E is not None and E < 0:
         result["warning_negative_E"] = (
             f"Negative Young's modulus E={E:.3f} GPa from K={K:.3f}, G={G:.3f}. "
             "Check that K > 0 and G > 0."
         )
+
+    # Admissibility gate (Class A). Reporting a single scalar isotropic modulus from a
+    # response that is demonstrably not isotropic is a category error, not a precision
+    # issue -- so >=20% disagreement between the two transverse responses is a hard fail
+    # rather than an annotation. Same for a negative K or E, which no material has.
+    gate_reasons = []
+    if K is None or K < 0:
+        gate_reasons.append(f"K={K} is negative — thermodynamically inadmissible")
+    if E is not None and E < 0:
+        gate_reasons.append(f"E={E:.3f} GPa is negative — inadmissible elastic response")
+    if isotropy_delta is not None and isotropy_delta >= 20.0:
+        gate_reasons.append(
+            f"transverse C12_{_trans_axes[0]}{_trans_axes[0]}={slope_t1:.3f} vs "
+            f"C12_{_trans_axes[1]}{_trans_axes[1]}={slope_t2:.3f} GPa disagree by "
+            f"{isotropy_delta:.1f}% (>=20%) — the cell's transverse response is anisotropic, so a "
+            "scalar isotropic K is not the quantity being measured. Run more chains or longer "
+            "equilibration; do not report this K."
+        )
+    result["deform_gate_verdict"] = "DEFORM_INADMISSIBLE" if gate_reasons else "DEFORM_REPORTABLE"
+    result["deform_gate_reasons"] = gate_reasons
+    result["deform_reportable"] = not gate_reasons
 
     # -------------------------------------------------------------------
     # 10. Optional two-rate sensitivity comparison

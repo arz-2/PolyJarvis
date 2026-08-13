@@ -1,0 +1,67 @@
+{
+  "_description": "Local modifications to the installed EMC field tree (~/emc/field). The stock/ copies are the vendor baseline; the .patch files reproduce the installed state from it. orchestration/scripts/emc_fields.py --verify checks the installed tree against these hashes; --patched-rows feeds ff_provenance.py the set of locally authored parameter rows.",
+  "emc_root_default": "~/emc",
+  "fields": {
+    "opls/2024/opls-aa": {
+      "files": {
+        "opls-aa.define": {
+          "stock": "emc_fields/stock/opls-2024-opls-aa.define",
+          "patch": "emc_fields/opls-2024-opls-aa.define.patch",
+          "sha256_stock": "834aa4789a92d5ca4f8a768de59959abad1db1e3406a52445d0bc160d83c8422",
+          "sha256_patched": "83380b23eb8c609f4cc57b82c0e7b964af9df169544bbe3f01a2dfe80a6c9e38"
+        },
+        "opls-aa.top": {
+          "stock": "emc_fields/stock/opls-2024-opls-aa.top",
+          "patch": "emc_fields/opls-2024-opls-aa.top.patch",
+          "sha256_stock": "982a10a5e5d8922ed757fe8c0750f71687ba77f86a36f2798cb195f1a67361fe",
+          "sha256_patched": "e1e627c72987f1e3081a2cae6ed7120079515bc092c882944cadfa3ce0d26611"
+        },
+        "opls-aa.prm": {
+          "stock": "emc_fields/stock/opls-2024-opls-aa.prm",
+          "patch": "emc_fields/opls-2024-opls-aa.prm.patch",
+          "sha256_stock": "19386ed3b4345d834a72f36f7cbae2e1c9fe60378e311e51e76906a48a0590ef",
+          "sha256_patched": "21d4c647c6cb116f25eabb3f9241e185a069b14797fe0750c2e989cec81caf73"
+        }
+      },
+      "hunks": [
+        {
+          "file": "opls-aa.top",
+          "section": "typing rules",
+          "rows": ["si4", "si4", "o2", "o2h", "h1o"],
+          "reason": "PDMS/PSIL typing. Without these, EMC assigns no type to Si or siloxane O and the build fails."
+        },
+        {
+          "file": "opls-aa.define",
+          "section": "ITEM RULES",
+          "rows": ["si4", "si4", "o2", "o2h", "h1o"],
+          "reason": "Same five rules mirrored into the .define RULES blocks."
+        },
+        {
+          "file": "opls-aa.prm",
+          "section": "ITEM INCREMENT",
+          "rows": ["o2 si4", "o2h si4"],
+          "reason": "Bond-increment charges for siloxane and silanol oxygen. Locally chosen values."
+        },
+        {
+          "file": "opls-aa.prm",
+          "section": "ITEM ANGLE",
+          "rows": ["c4 si4 o2h", "o2 si4 o2h", "o2 si4 h1n", "si4 o2h h1o"],
+          "reason": "Angle terms reaching the silanol chain terminus. Locally chosen values."
+        },
+        {
+          "file": "opls-aa.prm",
+          "section": "ITEM TORSION",
+          "rows": [
+            "c4 si4 o2h h1o", "h1 c4 si4 o2h", "o2 si4 o2h h1o",
+            "si4 o2 si4 o2h", "si4 o2 si4 h1n"
+          ],
+          "reason": "Zero-barrier terminal-cap torsions. These follow the stock field's own convention: stock opls-aa.prm already carries `o2 si4 o2 si4 0 1 0` and `c4 si4 o2 si4 0 1 0`, so the zero-barrier Si-O-Si backbone rotation in PDMS is STOCK OPLS-AA behaviour, not a local invention. The rows added here are the silanol/amine-terminated analogues of rows that already existed."
+        }
+      ],
+      "note": "Applied 2026-06-05 for PDMS/PSIL, which polymer_rules.json routes to this field as its only option. The installed EMC tree was updated 2026-08-05 and these edits survived; nothing guarantees the next update preserves them."
+    }
+  },
+  "unpatched_verified": {
+    "pcff/pcff_templates.dat": "identical to its .bak — PCFF, the field 32 of 36 archived runs used, carries no local modification"
+  }
+}

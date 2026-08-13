@@ -240,6 +240,17 @@ _OPLS_CLASSES   = {
 _TRAPPE_CLASSES = {"PHYC", "PDIE"}  # PSTR moved to _PCFF_CLASSES — PCFF preferred (see PSTR entry above)
 # PURA (polyurea): EMC build fails on pcff (missing {na,c_2} amide-N increment) — remains on RadonPy
 
+# Fields reachable by explicit field_override for force-field comparison. Class
+# defaults above are unchanged; these are candidates, not routes.
+#   compass   — Class II, parameterized for condensed-phase density/cohesive energy.
+#               Published/LAMMPS subset only: H,C,N,O,Si,P,S (no F, no Cl) and 96
+#               typing templates against pcff's 422. Fails to type many chemistries.
+#   pcff_ore  — same pcff base (#define cff91), larger .frc, full-size templates.
+_COMPARISON_FIELDS = {"compass", "pcff_ore", "trappe-eh", "opls/2012/opls-aa"}
+
+_ALL_FIELDS = {"pcff", "opls/2024/opls-aa", "trappe-ua"} | _COMPARISON_FIELDS
+
+
 def _select_field(polymer_class: str) -> str:
     if polymer_class in _PCFF_CLASSES:
         return "pcff"
@@ -253,10 +264,23 @@ def _select_field(polymer_class: str) -> str:
     )
 
 
+def _resolve_field(polymer_class: str, field_override: str = "") -> str:
+    """Class default, or a validated override for a comparison run."""
+    if not field_override:
+        return _select_field(polymer_class)
+    if field_override not in _ALL_FIELDS:
+        raise ValueError(
+            f"Unknown field_override '{field_override}'. Known: {sorted(_ALL_FIELDS)}"
+        )
+    return field_override
+
+
 def _lammps_flags(field: str) -> dict:
-    if field == "pcff":
+    # pcff_ore IS pcff, and compass shares the Class II functional form (9-6 LJ,
+    # quartic bonds, cross terms), so both take the class2 deck.
+    if field in ("pcff", "pcff_ore", "compass"):
         return {"use_pcff": True,  "use_opls": False}
-    if field == "trappe-ua":
+    if field in ("trappe-ua", "trappe-eh"):
         return {"use_pcff": False, "use_opls": False, "use_trappe": True}
     return {"use_pcff": False, "use_opls": True}
 
@@ -400,13 +424,14 @@ mcp = FastMCP(
 def submit_emc_cell_job(
     smiles: str,
     polymer_class: str,
-    dp: int = 20,
-    nchains: int = 10,
-    density_initial: float = 0.6,
+    dp: int,
+    nchains: int,
+    density_initial: float,
+    seed: int,
     ntotal: int = 3000,
     temperature: float = 300.0,
-    seed: int = -1,
     output_name: str = "polymer",
+    field_override: str = "",
 ) -> dict:
     """
     Build an amorphous polymer cell with EMC and return a LAMMPS .data file.
@@ -427,25 +452,39 @@ def submit_emc_cell_job(
         polymer_class:   PolyInfo class name — determines force field; required.
                          PCFF: PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL/PSTR
                          OPLS-AA: PHAL/PSIL.  TraPPE-UA: PHYC/PDIE.
-        dp:              Degree of polymerization (repeat units per chain). [20]
-        nchains:         Exact number of polymer chains to build (EMC "number"
+        dp:              REQUIRED. Degree of polymerization (repeat units per chain) —
+                         the class's own dp_typical, commonly 50.
+        nchains:         REQUIRED. Exact number of polymer chains to build (EMC "number"
                          mode). When > 0 this sets the chain count precisely and
-                         ntotal is ignored; pass 0 to size from ntotal instead. [10]
-        density_initial: Target packing density in g/cm³. Use ~0.5× experimental
+                         ntotal is ignored; pass 0 to size from ntotal instead.
+        density_initial: REQUIRED. Target packing density in g/cm³. Use ~0.5× experimental
                          to avoid steric clashes during initial build; LAMMPS
-                         equilibration will compress to target density. [0.6]
-        ntotal:          Fallback target total atom count — used only when
-                         nchains <= 0 (EMC sets chain count ≈ ntotal/sites). [3000]
+                         equilibration will compress to target density.
+        ntotal:          Fallback target total atom count — used ONLY when nchains <= 0
+                         (EMC sets chain count ≈ ntotal/sites). With the usual nchains > 0
+                         this argument is a no-op. [3000]
         temperature:     Build temperature in K (used for velocity assignment in
                          generated LAMMPS run script). [300.0]
-        seed:            Random seed. -1 selects a new random seed each run. [-1]
+        seed:            REQUIRED. Random seed pinning the packing RNG. Pass -1 only when
+                         you deliberately want a fresh cell: EMC then draws one and reports
+                         it, and that drawn value is what must reach the run log's Seeds
+                         line. Omitting the argument used to do the same draw silently,
+                         which produced an unreproducible cell under a run log claiming a
+                         pinned seed.
         output_name:     Prefix for all generated files. [polymer]
+        field_override:  FOR FORCE-FIELD COMPARISON RUNS ONLY — leave empty for
+                         normal builds, which must use the class default above.
+                         Accepts compass / pcff_ore / trappe-eh / opls/2012/opls-aa
+                         plus the three defaults. `compass` is the published subset:
+                         no F, no Cl, and 96 typing templates against pcff's 422, so
+                         it silently fails to type many chemistries — always check
+                         the build log rather than assuming a fallback. [""]
 
     Returns:
         {"status": "submitted", "job_id": ..., "output_dir": ..., "field": ...}
     """
     try:
-        field = _select_field(polymer_class)
+        field = _resolve_field(polymer_class, field_override)
     except ValueError as exc:
         return {"error": str(exc)}
 

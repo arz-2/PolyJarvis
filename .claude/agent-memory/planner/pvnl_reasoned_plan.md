@@ -24,3 +24,9 @@ PVNL is confidence=medium and IS in polymer_rules.json with class-specific tempe
 - Set `t_range_brackets_exp_tg: true` in tg success_criteria (150-550 brackets 354).
 
 See [[pstr-reasoned-plan]] (sibling medium/in-table PCFF class).
+
+**Superseded 2026-08-08:** the D-08 host claim above ("live host IS 4x NVIDIA A800... do NOT
+assume RTX 6000") no longer holds — the live box is confirmed RTX 6000x4/18-core (matching
+`hardware_policy.host`), and `hardware_policy.values_are_benchmarked` is now `true` (clean
+host-matched calibration on this exact box). The `confidence:medium` D-08 reasoning above was
+built on the old A800 assumption and no longer applies — see `hardware/HARDWARE_STUDY.md`.

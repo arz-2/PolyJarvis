@@ -25,3 +25,10 @@ PHAL is confidence=medium and IS in polymer_rules.json with class-specific tempe
 Also added on this revision (non-blocking advisories, worth doing on any reasoned PHAL/rubbery plan): a `D-05_convergence` row citing `policies.equilibration.require_rubbery` explicitly (T_workflow_K>exp Tg ⇒ rubbery gate, not the unconditional/glassy one) plus the class's hard density anchor (1.75-1.78 g/cm3 @283K; <1.70 flags param/charge error); a non-empty `D-03_electrostatics.alternatives` even when the only alternative is precluded by a hard `require` clause (state it as "precluded by require", not `[]`); and `exp_tg_K: <value>` alongside the bare `t_range_brackets_exp_tg: true` in `planned_stages[tg].success_criteria` (verified precedent: PVC1 run_plan.json has this exact shape; PVC4 uses bare `true` only — either is accepted, but PVC1's is strictly more machine-checkable).
 
 See [[pvnl-reasoned-plan]] (sibling medium-confidence class with a related Tg-ladder lesson) and [[psfo-reasoned-plan]] (sibling hardware-estimation pattern).
+
+**Superseded 2026-08-08:** `hardware_policy.values_are_benchmarked` is now `true` and
+`directional_probe.measured_on` now correctly reads "4x Quadro RTX 6000 / 18 phys cores" (this
+box) — the A800/32-core host-mismatch this run's D-08 reasoning was built on no longer exists.
+Since the ~3,600-atom cell was already within the OPLS probe's [0.5x,2x]=[1610,6440] window, a
+rerun today would land in the `cleanly_benchmarked and in_size_window` branch — **confidence:high**,
+not `low`. See `hardware/HARDWARE_STUDY.md`.

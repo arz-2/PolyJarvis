@@ -49,26 +49,52 @@ def parse_lammps_log(path):
     return pd.concat(all_dfs, ignore_index=True)
 
 
+def integrated_act(values):
+    """
+    Integrated autocorrelation time (frames) by summing the normalised ACF to its
+    first zero crossing.  Returns (tau_frames, n_effective).
+
+    tau is the statistical inefficiency s = 1 + 2*sum_k c(k): s == 1 means every
+    frame is independent, so n_effective = n / s with NO further factor of 2.
+    """
+    x = np.asarray(values, dtype=float)
+    n = len(x)
+    if n < 2:
+        return 1.0, float(n)
+    x = x - x.mean()
+    var = float(np.dot(x, x) / n)
+    if var < 1e-30:
+        return 1.0, float(n)
+    tau = 1.0
+    for k in range(1, n // 2):
+        c = float(np.dot(x[:-k], x[k:]) / ((n - k) * var))
+        if c <= 0:
+            break
+        tau += 2.0 * c
+    tau = max(tau, 1.0)
+    return tau, n / tau
+
+
 def compute_tau_eff(values):
     """
-    Estimate autocorrelation time via batch-means plateau.
-    Returns (tau_eff_frames, tau_eff_fraction).
-    Flyvbjerg & Petersen, JCP 91, 461 (1989).
+    Autocorrelation time of a thermo series, as the integrated statistical
+    inefficiency.  Returns (tau_eff_frames, tau_eff_fraction).
+
+    Flyvbjerg & Petersen, JCP 91, 461 (1989) motivates the blocking view, but the
+    blocking curve must be read at its PLATEAU.  Averaging its tail (largest block
+    sizes, where the number of blocks falls to 4-8) reads the noisiest end and
+    underestimates tau by 4-39x on this pipeline's own trajectories, so the
+    integrated ACF is used directly instead.
+
+    A flat series keeps the historical (0.0, 0.0) contract; otherwise tau >= 1.0.
     """
     n = len(values)
-    point_var = float(np.var(values, ddof=1))
-    if point_var < 1e-30:
+    if n < 2 or float(np.var(values, ddof=1)) < 1e-30:
         return 0.0, 0.0
-    inefficiencies = []
-    b = 2
-    while b <= n // 4:
-        nb = n // b
-        bm = [np.mean(values[i * b:(i + 1) * b]) for i in range(nb)]
-        sem_sq = float(np.var(bm, ddof=1) / nb)
-        inefficiencies.append(b * sem_sq / point_var)
-        b *= 2
-    if not inefficiencies:
-        return 0.0, 0.0
-    tau_frames = (float(np.mean(inefficiencies[-3:]))
-                  if len(inefficiencies) >= 3 else float(inefficiencies[-1]))
+    tau_frames, _ = integrated_act(values)
     return tau_frames, tau_frames / n
+
+
+def effective_sample_size(n, tau_frames):
+    """Independent-sample count for a series of n frames with inefficiency tau_frames."""
+    return int(n / max(1.0, float(tau_frames)))

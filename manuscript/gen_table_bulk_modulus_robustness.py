@@ -11,10 +11,9 @@ bulk modulus, computed from data already on disk:
                            5-pressure NPT series, depends on <V> not Var(V))
   - Uniaxial deformation K manuscript/data/<RUN>/raw/deform*/bulk_modulus_deform.json (NVT, no barostat)
 
-IMPORTANT: the pipeline's stored `tau_eff_frames` / `n_effective_samples` are
-UNRELIABLE (they underestimate tau by 5-25x; e.g. cis-PBD3 stores N_eff=902 but the
-integrated ACF of V(t) gives N_eff=36). We therefore recompute the integrated
-autocorrelation time directly from volume_timeseries.csv here and report THAT.
+Autocorrelation times are recomputed from volume_timeseries.csv via the shared
+`integrated_act` in the engine's analysis_utils, so this table and the pipeline's
+stored `tau_eff_frames` / `n_effective_samples` now use one estimator.
 
 Outputs:
   manuscript/csv/bulk_modulus_robustness.csv      (per-run)
@@ -26,31 +25,22 @@ import json
 import os
 import re
 
+import sys
+
 import numpy as np
 
 DATA = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "csv")
+_ENGINE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        "..", "mcp-servers", "mcp-lammps-engine",
+                                        "analysis_scripts"))
+if _ENGINE not in sys.path:
+    sys.path.insert(0, _ENGINE)
+from analysis_utils import integrated_act  # noqa: E402
+
 FAMILIES = ["cis-PBD", "PE", "PEG", "PLA", "PMMA", "PS", "PSU", "PVC", "PEEK"]
 RUN_RE = re.compile(r"^(?:cis-PBD|PE|PEG|PLA|PMMA|PS|PSU|PVC|PEEK)\d+$")
 FAM_RE = re.compile(r"\d+$")
-
-
-def integrated_act(x):
-    """Integrated autocorrelation time (frames) by summing the ACF to first
-    zero crossing; effective sample size N_eff = N / tau."""
-    x = np.asarray(x, float)
-    x = x - x.mean()
-    n = len(x)
-    var = np.dot(x, x) / n
-    if var == 0:
-        return 1.0, float(n)
-    tau = 1.0
-    for k in range(1, n // 2):
-        c = np.dot(x[:-k], x[k:]) / ((n - k) * var)
-        if c <= 0:
-            break
-        tau += 2.0 * c
-    return tau, n / tau
 
 
 def load(run):
