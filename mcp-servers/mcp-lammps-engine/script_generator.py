@@ -941,6 +941,25 @@ class ScriptGenerator:
         if velocity_seed is not None:
             cfg["_velocity_seed"] = int(velocity_seed)
 
+        # npt_deform: the strain the deck actually reaches is N_STEPS * STRAIN_RATE * TIMESTEP.
+        # The template has no STRAIN_MAX placeholder, so a caller that passes STRAIN_MAX and
+        # omits N_STEPS used to get the 300000-step default silently -- PSTR runs at 1e7 /s and
+        # every class's slow leg at ~10x below its primary rate, so those decks stopped at a
+        # tenth of the requested strain and the fit window sat in the noise floor. Derive the
+        # step count from STRAIN_MAX so the two cannot disagree, and refuse an inconsistent pair.
+        if template_name == "npt_deform" and params.get("STRAIN_MAX") is not None:
+            rate, dt = float(cfg["STRAIN_RATE"]), float(cfg["TIMESTEP"])
+            derived = int(round(float(params["STRAIN_MAX"]) / (rate * dt)))
+            if params.get("N_STEPS") is None:
+                cfg["N_STEPS"] = derived
+            elif abs(int(params["N_STEPS"]) - derived) > max(1, 0.01 * derived):
+                raise ValueError(
+                    f"npt_deform strain mismatch: N_STEPS={params['N_STEPS']} at "
+                    f"STRAIN_RATE={rate}/fs and TIMESTEP={dt} fs reaches strain "
+                    f"{int(params['N_STEPS']) * rate * dt:.4f}, but STRAIN_MAX="
+                    f"{params['STRAIN_MAX']} needs {derived} steps. Pass one or the other, "
+                    f"or a consistent pair.")
+
         # Data file path
         data_file = data_file_override or self.data_file
 

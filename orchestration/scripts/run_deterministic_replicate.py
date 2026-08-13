@@ -630,6 +630,9 @@ def _submit_deform(args, cls: dict, lammps, mode: str) -> dict:
         template_name="npt_deform", data_file=p["equil_data_path"],
         output_script=f"{p['work_dir']}/05_deform{suffix}.in",
         velocity_seed=p["velocity_seed"],
+        # STRAIN_MAX drives N_STEPS inside generate_script (N_STEPS = STRAIN_MAX /
+        # (STRAIN_RATE * TIMESTEP)); the template itself has no STRAIN_MAX placeholder, so
+        # passing it without N_STEPS used to leave the deck on the 300000-step default.
         params={"LOG_FILE": f"05_deform{suffix}.log", "STRAIN_RATE": strain_rate_per_fs,
                "STRAIN_MAX": p["K_strain_max"], "TIMESTEP": p["dt_fs"], "use_gpu": True,
                "engine": p["engine"], **p["lammps_flags"]},

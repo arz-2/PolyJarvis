@@ -295,3 +295,65 @@ def test_prompt_emits_the_value_the_tool_needs(stage, fields):
     text = gen_prompt.STAGE_MAP[stage](args, cls)
     for name in fields:
         assert f"{name}:" in text, f"--stage {stage} prompt omits {name}"
+
+
+# ── The params-dict hole ──────────────────────────────────────────────────────
+# generate_script's own signature is fully required, but the deck's protocol values ride
+# inside its `params` dict, where a missing key falls back to a template default and no
+# JSON schema can see it. The npt_deform strain is the sharp case: the template renders
+# `run {N_STEPS}` and has no STRAIN_MAX placeholder at all, so the strain actually reached
+# is N_STEPS * STRAIN_RATE * TIMESTEP and nothing tied that product to the requested
+# K_strain_max.
+
+def _generator():
+    sys.path.insert(0, str(LAMMPS_SERVER.parent))
+    from script_generator import ScriptGenerator
+    return ScriptGenerator
+
+
+def _deform_steps(tmp_path, **params):
+    # A path that does not exist: abspath still renders it into the deck, and the
+    # data-file FF auto-detection is guarded by os.path.exists, so use_pcff below stands.
+    data_file = str(tmp_path / "cell.data")
+    gen = _generator()(data_file=data_file)
+    out = tmp_path / "d.in"
+    base = {"STRAIN_RATE": 1e-7, "TIMESTEP": 1.0, "use_pcff": True, "DUMP_FILE": ""}
+    gen.generate(template_name="npt_deform", output_path=str(out),
+                 params={**base, **params}, velocity_seed=42)
+    # The deck runs twice: NVT pre-equilibration (N_EQ_STEPS) first, then the deformation.
+    # Anchor on the fix that starts straining, not on the first `run` in the file.
+    return int(re.search(r"fix def all deform[^\n]*\nrun (\d+)", out.read_text()).group(1))
+
+
+def test_strain_max_drives_the_step_count(tmp_path):
+    """PSTR deforms at 1e7 /s, a tenth of every other class. On the 300000-step default it
+    reached 0.003 strain, not the 0.03 it asked for -- and the extractor then fit a
+    0.002-0.03 window against data that stopped at 0.003."""
+    assert _deform_steps(tmp_path, STRAIN_RATE=1e-8, STRAIN_MAX=0.03) == 3_000_000
+    assert _deform_steps(tmp_path, STRAIN_RATE=1e-7, STRAIN_MAX=0.03) == 300_000
+    # dt=2 fs halves the steps needed for the same strain
+    assert _deform_steps(tmp_path, TIMESTEP=2.0, STRAIN_MAX=0.03) == 150_000
+
+
+def test_inconsistent_strain_pair_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="strain mismatch"):
+        _deform_steps(tmp_path, STRAIN_RATE=1e-8, STRAIN_MAX=0.03, N_STEPS=300000)
+
+
+def test_every_class_reaches_its_requested_strain(tmp_path):
+    """Both legs, every class that has a deform rate -- the slow leg is the one that was
+    uniformly short, since it drops the rate ~10x while N_STEPS stayed put."""
+    import json
+    classes = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())["classes"]
+    for name, cls in sorted(classes.items()):
+        smax, dt = cls.get("K_strain_max"), cls.get("dt_fs", 1.0)
+        if smax is None:
+            continue
+        for key in ("K_deform_rate_inv_s", "K_deform_rate_slow_inv_s"):
+            rate = cls.get(key)
+            if not rate:
+                continue
+            rate_fs = rate * 1e-15
+            steps = _deform_steps(tmp_path, STRAIN_RATE=rate_fs, TIMESTEP=dt, STRAIN_MAX=smax)
+            reached = steps * rate_fs * dt
+            assert abs(reached - smax) / smax < 0.01, f"{name} {key}: reached {reached}"
