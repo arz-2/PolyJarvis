@@ -46,6 +46,10 @@ work runs at `npt_prod300`; rubbery Murnaghan work runs at `npt_production`).
 
 1. **`check_equilibration_comprehensive`** on the hold's log/dump →
    `chain.ct.tau_relax_ps`, `chain.ct.beta`, `chain.ct.decay_fraction_at_end`, `chain.rg`.
+   Pass `timestep_fs`, `ct_min_decay`, and `cutoff_A` from the prompt on the call, including
+   nulls — omitting one is a schema error. `timestep_fs` sets the ps axis
+   (`dt_ps = timestep_fs * dump_every / 1000`) and is not auto-detected, so a wrong one scales
+   every `tau_relax_ps` you go on to write into the cache.
    **Reliability check** — `probe_tau_relax_reliable = True` only if BOTH:
    - `chain.ct.decay_fraction_at_end >= 0.15` (the KWW fit needs to see real curvature, not just
      noise; 0.15 is a floor above known degenerate-fit failure modes, not a guarantee of a great

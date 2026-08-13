@@ -58,10 +58,15 @@ def test_data_file_and_work_dir_stay_required():
 
 
 def test_the_optional_knobs_keep_their_defaults():
-    """Only the arguments that change how long a stage runs became required. Widening
-    this to force-field flags or temperatures would break every existing call site."""
+    """Originally this also guarded `temp`, `use_pcff`, and `engine`, on the grounds that
+    requiring them "would break every existing call site". A full trace of prompt ->
+    tool-call threading found those call sites already pass all three, and that their
+    defaults are the dangerous kind: `temp=300.0` builds a melt that never melts, and
+    all three FF flags defaulting False emits GAFF2 styles against a class2 cell. They
+    moved to required; see tests/test_tool_arg_threading.py, which owns that set now.
+    What stays optional here is what stays harmless."""
     sig, _ = _workflow_signature()
-    for name in ("polymer_name", "temp", "max_temp", "press", "use_pcff", "engine",
+    for name in ("polymer_name", "max_temp", "press", "max_press", "n_chains",
                  "add_melt_npt", "extend_only", "add_300k_production"):
         assert sig[name], f"{name} lost its default"
 

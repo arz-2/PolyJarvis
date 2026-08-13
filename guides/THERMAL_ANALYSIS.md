@@ -19,9 +19,9 @@
 re-deriving reportability from the numbers:
 - `TG_REPORTABLE` — report the Tg.
 - `TG_REVIEW` — `tg_method_gap_K` (|`Tg_K` − `Tg_alternative_K`|) exceeds 20 K: the transition region
-  is noisy or the sweep range too narrow. Investigate before reporting. When your prompt says
-  `method_gap_exempt: true`, pass `--method_gap_exempt` to `extract_thermal` — that class has
-  documented highest-rate degeneracy, so the gap is recorded as a reason without forcing REVIEW.
+  is noisy or the sweep range too narrow. Investigate before reporting. `method_gap_exempt` is
+  always passed to `extract_thermal` from the prompt's value; when that value is `true` the class
+  has documented highest-rate degeneracy, so the gap is recorded as a reason without forcing REVIEW.
 - `TG_NOT_REPORTABLE` — `fit_quality=POOR` or `primary_fit_invalid`. Do not report the Tg. This blocks
   *reporting* only; the `is_glassy` routing in THERMAL_TRACK.md may still fall back to the plan's
   experimental Tg.
@@ -38,11 +38,17 @@ Read `tg_gate_reasons` into the D-06 row verbatim. `dCp_weak_step_flag` is infor
 
 ### `extract_thermal`
 
+Pass every argument below on every call, including the ones whose value is null or false.
+Omitting one is a schema error, not a default.
+
 ```python
 extract_thermal(
     log_file=tg_log_path,        # the Tg sweep log (prompt key is tg_log_path)
-    tg_data_file=tg_data_file,   # for ΔCp mass normalisation
+    tg_data_file=tg_data_file,   # for ΔCp mass normalisation — omitted, ΔCp is skipped entirely
+    per_t_dump_file=per_t_dump_file,  # one frame per T step; with tg_data_file it enables the
+                                      # structural block (per-T Rg/P2, Rg-kink Tg)
     enthalpy_col=enthalpy_col,
+    method_gap_exempt=method_gap_exempt,   # pass the false too, never omit
     output_dir=output_dir,
     graphs_dir=graphs_dir,
 )

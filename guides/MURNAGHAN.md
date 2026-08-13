@@ -44,6 +44,8 @@ elif is_glassy:
 else:
     pressures = [-200, 0, 3000, 7000, 15000]    # rubbery PROBE ladder (Leg 1)
 
+# Pass every argument below on every call, including the ones whose value is null. Omitting one
+# is a schema error, not a default.
 result = run_bulk_modulus_series(
     data_file=equil_data_path,   # npt_prod300_out.data (glassy) or npt_production_out.data (rubbery)
     work_dir=work_dir,           # .../mechanical/bm_series/
@@ -54,6 +56,7 @@ result = run_bulk_modulus_series(
     mpi=mpi_ranks,
     velocity_seed=velocity_seed,   # from prompt — required, never null
     npt_steps=npt_steps,         # from prompt (default 500000 = 0.5 ns at 1 fs)
+    dt_fs=dt_fs,                 # from prompt — the 1.0 default silently halves a TraPPE-UA deck
     use_trappe=lammps_flags["use_trappe"],
     use_pcff=lammps_flags["use_pcff"],
     use_opls=lammps_flags["use_opls"],

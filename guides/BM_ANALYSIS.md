@@ -31,19 +31,25 @@ Inspect which inputs are non-null in your prompt to route:
 
 ### `extract_bulk_modulus_deform` (glassy fallback)
 
+Pass every argument below on every call, including the ones whose value is null. Omitting one is a
+schema error, not a default.
+
 ```python
 extract_bulk_modulus_deform(
     log_file=deform_log_path,
     strain_rate=strain_rate_per_fs,   # from prompt
     strain_max=K_strain_max,          # from prompt (~0.03)
+    timestep=dt_fs,                   # from prompt — the strain axis is strain_rate*steps*timestep,
+                                      # so the 1.0 default reports a dt_fs=2.0 deck at half strain
+                                      # and twice K
     eq_steps=200000,                  # N_EQ_STEPS from npt_deform.in
     strain_start=0.002,               # skip initial transient
     output_dir=output_dir,
     graphs_dir=graphs_dir,
     deform_direction="x",             # the axis the deck strained — see below
     # rate-sensitivity check — only when the orchestrator ran the paired slow-rate leg:
-    log_file_2=deform_log_path_slow,      # None if not present
-    strain_rate_2=strain_rate_slow_per_fs,  # None if not present
+    log_file_2=deform_log_path_slow,      # null if not present — pass the null
+    strain_rate_2=strain_rate_slow_per_fs,  # null if not present — pass the null
 )
 ```
 

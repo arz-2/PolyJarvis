@@ -69,7 +69,12 @@ Agent(subagent_type="system-characterization-analyzer", description="🟢 Charac
              "run_plan_path: PLAN_PATH\ndata_file: <npt_prod_data_path>\n"
              "backbone_types: <from inspect_data_file, on the ORIGINAL pre-simulation .data file>\n"
              "output_dir: data/<RUN>/raw\ngraphs_dir: data/<RUN>/graphs\n"
-             "log_file: <npt_prod_log_path>\ndump_file: <npt_prod_dump_path>")
+             "log_file: <npt_prod_log_path>\ndump_file: <npt_prod_dump_path>\n"
+             "cutoff_A: <decided_params.cutoff_A>   # pass as cutoff_A=\n"
+             "ct_min_decay: null   # pass the null, never omit\n"
+             "dt_fs: <decided_params.dt_fs>   # pass as timestep_fs= — sets the ps axis for tau_relax\n"
+             "Pass every field above to check_equilibration_comprehensive, including the nulls. "
+             "Omitting an argument is a schema error, not a default.")
   → RESULT → tau_relax_ps, tau_relax_reliable, K0_GPa, K0_reliable, fields_derived,
       fields_kept_as_class_default, cache_path, characterization_path
 ```

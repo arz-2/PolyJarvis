@@ -16,8 +16,10 @@ could be confused with a backbone one, cross-check with `awk '/^Bonds/,/^Angles/
 backbone types appear in chain-continuing bonds. E.g. PEEK = `[1,2,5]` (aromatic C + ether O);
 type names starting with `h` are never backbone.
 
-`ct_min_decay_melt` null ⇒ aromatic main chain: leave C(t) advisory, do NOT pass `ct_min_decay` to
-`check_equilibration_comprehensive`. C(t)/MSD/R_ee are computed on the melt dump regardless, so
+`ct_min_decay_melt` null ⇒ aromatic main chain: leave C(t) advisory by passing
+`ct_min_decay=None` to `check_equilibration_comprehensive`. Pass it explicitly — an omitted
+argument and a null one are the same to the tool but not to the record, and only the explicit null
+shows the advisory choice was made. C(t)/MSD/R_ee are computed on the melt dump regardless, so
 `ct_decay_fraction`/`ct_tau_relax_ps` are always populated — report the actual values even when
 `ct_min_decay_melt` was null (advisory-only, not N/A). For PHYC (PE): include `ct_decayed` +
 `tau_relax_ps` in the RESULT block even on passes.
@@ -79,8 +81,11 @@ Only if `backbone_types` isn't already given in the prompt — call on the origi
 
 ### `check_equilibration_comprehensive`
 
+Pass every argument below on every call, including the ones whose value is null. Omitting one is a
+schema error, not a default.
+
 ```python
-kwargs = dict(
+check_equilibration_comprehensive(
     log_file=npt_prod_log_path,   # production NPT log → thermo convergence (density/energy drift + block-SEM)
     dump_file=melt_dump_path,     # MELT nvt_production.dump (both phases) → C(t)/MSD/Rg/R_ee on mobile chains.
                                   # NOT the production dump: below Tg C(t) never decays (meaningless by construction)
@@ -88,11 +93,10 @@ kwargs = dict(
     backbone_types=backbone_types,
     output_dir=output_dir,
     graphs_dir=graphs_dir,
+    ct_min_decay=ct_min_decay_melt,   # null ⇒ C(t) advisory — pass the null, never omit
+    cutoff_A=cutoff_A,                # arms the minimum-image check L ≥ 2·cutoff_A
+    timestep_fs=dt_fs,                # must match the deck — sets the ps axis for τ_relax/MSD
 )
-if ct_min_decay_melt is not None:
-    kwargs["ct_min_decay"] = ct_min_decay_melt
-kwargs["cutoff_A"] = cutoff_A              # required — arms the minimum-image check
-check_equilibration_comprehensive(**kwargs)
 ```
 
 **Result fields for the RESULT block** (all from this single call):

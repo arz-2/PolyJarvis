@@ -376,16 +376,19 @@ work_dir:          {p['work_dir']}/cell
 polymer_class:     {args.polymer_class.upper()}
 preferred_builder: {p['preferred_builder']}
 preferred_ff:      {p['preferred_ff']}
-dp:                {p['dp']}
-nchain:            {p['nchain']}
-density_initial:   {p['density_initial_gcm3']}
-emc_seed:          {p['emc_seed'] if p['emc_seed'] is not None else 'null'}   # null = builder draws + reports a random seed
+dp:                {p['dp']}   # submit_emc_cell_job dp= — the 20 default is not this class's dp_typical
+nchain:            {p['nchain']}   # submit_emc_cell_job nchains= — default 10
+density_initial:   {p['density_initial_gcm3']}   # submit_emc_cell_job density_initial= — default 0.6
+emc_seed:          {p['emc_seed'] if p['emc_seed'] is not None else 'null'}   # submit_emc_cell_job seed= — null here means pass seed=-1, which makes EMC draw a random seed and REPORT it; report that drawn value back so the run log's Seeds line is real
 charge_method:     {p['charge_method']}
 electrostatics:    {p['electrostatics']}
-cutoff_A:          {p['cutoff_A']}
-dt_fs:             {p['dt_fs']}
+cutoff_A:          {p['cutoff_A']}   # downstream LAMMPS deck only — submit_emc_cell_job has no cutoff argument
+dt_fs:             {p['dt_fs']}   # downstream LAMMPS deck only — submit_emc_cell_job has no timestep argument
 phal_patch:        {str(p['phal_patch']).lower()}
 ff_confidence:     {p['ff_confidence']}
+
+Every field annotated `submit_emc_cell_job <arg>=` is an argument of that tool. Pass each one on
+the call. Omitting an argument is a schema error, not a default.
 
 --- Worker Guide (MOLECULE_BUILDER) ---
 {guide}
@@ -726,12 +729,16 @@ work_dir:          {p['work_dir']}
 is_glassy:         {str(p['is_glassy']).lower()}
 K_deform_rate_inv_s: {p['K_deform_rate_inv_s']}
 K_deform_rate_slow_inv_s: {p['K_deform_rate_slow_inv_s']}
-K_strain_max:      {p['K_strain_max']}
-dt_fs:             {p['dt_fs']}
-gpu_ids:           "{p['gpu_ids']}"
-mpi_ranks:         {p['mpi_ranks']}
-engine:            "{p['engine']}"
+K_strain_max:      {p['K_strain_max']}   # generate_script params STRAIN_MAX=
+dt_fs:             {p['dt_fs']}   # generate_script params TIMESTEP=
+gpu_ids:           "{p['gpu_ids']}"   # pass as gpu_ids= to run_lammps_script
+mpi_ranks:         {p['mpi_ranks']}   # pass as mpi= to run_lammps_script
+engine:            "{p['engine']}"   # pass as engine= to run_lammps_script AND in generate_script params — the "gpu" default silently ignores a KOKKOS build
 velocity_seed:     {p['velocity_seed']}   # pass as velocity_seed= — required by generate_script, never null
+
+Every field above is an argument of generate_script or run_lammps_script. Pass each one on the
+call, including the ones whose value is null. Omitting an argument is a schema error, not a
+default.
 
 --- Worker Guide (DEFORM) ---
 {guide}
@@ -768,11 +775,16 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     else:
         default_equil_data = f"{lammps_base}/equil/npt_prod300/npt_prod300_out.data"
     equil_data = args.equil_data_path or default_equil_data
+    # The Tg sweep deck writes one final frame per T step (tg_prompt sets WRITE_PER_T_DUMP=True).
+    # extract_thermal's structural block needs per_t_dump_file AND tg_data_file together; without
+    # the path the dump is written every run and never read.
+    per_t_dump = f"{lammps_base}/thermal/tg_sweep{rate_suffix}/per_t_structs.dump"
     return {
         "selected_rate_K_per_ns": selected_rate,
         "tg_rate_index": args.tg_rate_index,
         "tg_log_path": tg_log,
         "tg_data_file": equil_data,
+        "per_t_dump_file": per_t_dump,
         "enthalpy_col": getattr(args, "enthalpy_col", None) or "Enthalpy",
         "output_dir": output_dir,
         "graphs_dir": graphs_dir,
@@ -791,16 +803,21 @@ def analyze_tg_prompt(args, cls: dict) -> str:
                  f"record this (rate, Tg_K) pair — input to this run's multirate fit\n"
                  if p['selected_rate_K_per_ns'] is not None else "")
     return f"""\
-tg_log_path:       {p['tg_log_path']}
-tg_data_file:      {p['tg_data_file']}    # required for ΔCp mass normalisation
-enthalpy_col:      {p['enthalpy_col']}
+tg_log_path:       {p['tg_log_path']}    # pass as log_file=
+tg_data_file:      {p['tg_data_file']}    # pass as tg_data_file= — required for ΔCp mass normalisation
+per_t_dump_file:   {p['per_t_dump_file']}    # pass as per_t_dump_file= — with tg_data_file it enables the structural block
+enthalpy_col:      {p['enthalpy_col']}    # pass as enthalpy_col=
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 {rate_line}output_dir:        {p['output_dir']}
 graphs_dir:        {p['graphs_dir']}
-method_gap_exempt: {str(p['method_gap_exempt']).lower()}    # pass --method_gap_exempt to extract_thermal when true
+method_gap_exempt: {str(p['method_gap_exempt']).lower()}    # pass as method_gap_exempt= — pass the false too, never omit
 tasks:
   - extract_thermal
+
+Every field above annotated with `# pass as` is an argument of extract_thermal. Pass each one on
+the call, including the ones whose value is null or false. Omitting an argument is a schema error,
+not a default.
 
 --- Worker Guide (THERMAL_ANALYSIS) ---
 {guide}
@@ -936,6 +953,11 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
         "alpha_glass_per_K": cls.get('alpha_glass_per_K', 'null'),
         "alpha_melt_per_K": cls.get('alpha_melt_per_K', 'null'),
         "backbone_types": args.backbone_types,
+        # check_equilibration_comprehensive's ps axis: dt_ps = timestep_fs * dump_every / 1000.
+        # dump_every self-heals (auto-detected from the dump header); timestep_fs does not, so a
+        # dt_fs=2.0 class left on the 1.0 default reports tau_relax_ps and MSD 2x low -- and
+        # tau_relax_ps sizes the EXTEND and feeds the cached t_equil_ns.
+        "dt_fs": _pick(args.dt_fs, cls, 'dt_fs', 1.0),
     }
 
 
@@ -959,7 +981,15 @@ def equil_check_prompt(args, cls: dict) -> str:
 ###   dp                  = {p['dp'] if p['dp'] is not None else 'null'}
 ###   ct_gate_reliable    = {str(p['ct_gate_reliable']).lower()}
 ###   out_dir             = {p['output_dir']}
-### Deliberately OMIT exp_density_gcm3/tg_K/glass_data/melt_data — density_value_binding's
+###   exp_density_gcm3    = null
+###   tg_K                = null
+###   t_equil_K           = null
+###   glass_data          = null
+###   melt_data           = null
+###   alpha_glass_per_K   = null
+###   alpha_melt_per_K    = null
+### Pass every argument above, including the nulls — omitting one is a schema error, not a
+### default. The nulls are deliberate here: density_value_binding's
 ### melt-vs-glass cooling-contraction diagnosis (UNDER_ANNEALED_COOLING / MELT_STAGE_DEFICIT)
 ### cannot run without a post-cool glass state, which doesn't exist yet at this checkpoint. This
 ### gate only evaluates the structural/thermo gates that ARE meaningful on the melt trajectory
@@ -992,6 +1022,8 @@ def equil_check_prompt(args, cls: dict) -> str:
 ###   out_dir             = {p['output_dir']}
 ###   alpha_glass_per_K   = {p['alpha_glass_per_K']}
 ###   alpha_melt_per_K    = {p['alpha_melt_per_K']}
+### Pass every argument above, including the ones whose value is null — omitting one is a schema
+### error, not a default.
 ### alpha_glass_per_K/alpha_melt_per_K are curated per-class values (polymer_rules.json) or,
 ### for off-table/low-medium-confidence classes, planner-sourced from literature_grounding.json's
 ### CTE evidence — collected once at plan time, never searched live inside this gate. null means
@@ -1011,8 +1043,9 @@ equil_data_path:   {p['npt_prod_data_path']}
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 backbone_types:    {p['backbone_types'] or '<FILL from inspect_data_file>'}
-ct_min_decay_melt: {p['ct_min_decay_melt'] if p['ct_min_decay_melt'] is not None else 'null'}   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
+ct_min_decay_melt: {p['ct_min_decay_melt'] if p['ct_min_decay_melt'] is not None else 'null'}   # pass as ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only — pass the null, never omit
 cutoff_A:          {p['cutoff_A'] if p['cutoff_A'] is not None else 'null'}   # pass as cutoff_A= — arms the minimum-image check L >= 2*cutoff_A
+dt_fs:             {p['dt_fs']}   # pass as timestep_fs= — sets the ps axis (dt_ps = timestep_fs*dump_every/1000); NOT auto-detected, unlike dump_every
 is_glassy:         {str(p['is_glassy']).lower()}   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
 regime:            {p['regime']}   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<1% AND Poisson-corrected homogeneity signal CV<=0.11 AND n_eff_density>=20 AND energy drift/SEM AND finite size; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
 dp:                {p['dp'] if p['dp'] is not None else 'null'}   # DP≥30 required for require_glassy carve-out to apply. NOTE: a class with ct_gate_reliable=false (aromatic main chain) already has ct_min_decay=null above, so its melt-diffusion C(t) gate is suppressed INDEPENDENT of DP — a DP<30 aromatic cell still passes equil on the structural gates (density/SEM/CV/P2/Rg). The DP≥30 clause only bites classes that would otherwise arm ct_min_decay.
@@ -1020,6 +1053,9 @@ exp_density_range: {p['exp_density_range']}
 output_dir:        {p['output_dir']}
 graphs_dir:        {p['graphs_dir']}
 {tasks_block}
+
+Every field above is an argument of the tool named in its comment. Pass each one on the call,
+including the ones whose value is null. Omitting an argument is a schema error, not a default.
 
 {density_note}
 
@@ -1077,19 +1113,22 @@ def murnaghan_prompt(args, cls: dict) -> str:
     ) if (not p["is_glassy"] and not p["bm_pressures_atm"]) else ""
     return f"""\
 {glassy_assertion}{rubbery_probe_assertion}equil_data_path:   {p['equil_data_path']}
-lammps_flags:      {p['lammps_flags']}
+lammps_flags:      {p['lammps_flags']}   # pass as use_pcff=/use_trappe=/use_opls= — all default False, i.e. the wrong pair_style
 polymer_class:     {args.polymer_class.upper()}
 run_name:          {args.run_name}
 work_dir:          {p['work_dir']}/bm_series
 is_glassy:         {str(p['is_glassy']).lower()}
-bm_pressures_atm:  {p['bm_pressures_atm']}
-temp_K:            {p['temp_K']}
-npt_steps:         {p['npt_steps']}
-dt_fs:             {p['dt_fs']}
-gpu_ids:           "{p['gpu_ids']}"
-mpi_ranks:         {p['mpi_ranks']}
-engine:            "{p['engine']}"
+bm_pressures_atm:  {p['bm_pressures_atm']}   # pass as pressures_atm=
+temp_K:            {p['temp_K']}   # pass as temp_K=
+npt_steps:         {p['npt_steps']}   # pass as npt_steps=
+dt_fs:             {p['dt_fs']}   # pass as dt_fs=
+gpu_ids:           "{p['gpu_ids']}"   # pass as gpu_ids=
+mpi_ranks:         {p['mpi_ranks']}   # pass as mpi=
+engine:            "{p['engine']}"   # pass as engine= — the "gpu" default silently ignores a KOKKOS build
 velocity_seed:     {p['velocity_seed']}   # pass as velocity_seed= — required, never null
+
+Every field above is an argument of run_bulk_modulus_series. Pass each one on the call, including
+the ones whose value is null. Omitting an argument is a schema error, not a default.
 
 --- Worker Guide (MURNAGHAN) ---
 {guide}
@@ -1122,6 +1161,10 @@ def _resolve_analyze_bm_params(args, cls: dict) -> dict:
         "deform_log_path": getattr(args, 'deform_log', None),
         "deform_log_path_slow": getattr(args, 'deform_log_slow', None),
         "murnaghan_log_files": getattr(args, 'murnaghan_logs', None),
+        # extract_bulk_modulus_deform reconstructs strain as
+        # eps(step) = strain_rate * (step - step_0) * timestep, so timestep must be the deck's
+        # own dt. Left on the 1.0 default, a dt_fs=2.0 class reports half the strain and twice K.
+        "dt_fs": _pick(args.dt_fs, cls, "dt_fs", 1.0),
     }
 
 
@@ -1140,16 +1183,21 @@ def analyze_bm_prompt(args, cls: dict) -> str:
 {deform_log_line}
 {deform_log_slow_line}
 {murnaghan_line}
-npt_prod_log_path: {p['npt_prod_log_path']}
-bm_pressures_atm:  {p['bm_pressures_atm']}
+npt_prod_log_path: {p['npt_prod_log_path']}   # pass as npt_prod_log= to extract_bulk_modulus_murnaghan
+bm_pressures_atm:  {p['bm_pressures_atm']}   # pass as pressures_atm=
 exp_K_range:       {p['exp_K_range']}
-strain_rate_per_fs: {p['strain_rate_per_fs']:.2e}
-strain_rate_slow_per_fs: {f"{p['strain_rate_slow_per_fs']:.2e}" if p['strain_rate_slow_per_fs'] is not None else "null"}
-K_strain_max:      {p['K_strain_max']}
+strain_rate_per_fs: {p['strain_rate_per_fs']:.2e}   # pass as strain_rate=
+strain_rate_slow_per_fs: {f"{p['strain_rate_slow_per_fs']:.2e}" if p['strain_rate_slow_per_fs'] is not None else "null"}   # pass as strain_rate_2= (with log_file_2)
+K_strain_max:      {p['K_strain_max']}   # pass as strain_max=
+dt_fs:             {p['dt_fs']}   # pass as timestep= to extract_bulk_modulus_deform — the strain axis is strain_rate*steps*timestep
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
 output_dir:        {p['output_dir']}
 graphs_dir:        {p['graphs_dir']}
+
+Every field above annotated with `# pass as` is an argument of the routed tool. Pass each one on
+the call, including the ones whose value is null. Omitting an argument is a schema error, not a
+default.
 
 --- Worker Guide (BM_ANALYSIS) ---
 {guide}

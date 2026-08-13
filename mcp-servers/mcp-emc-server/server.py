@@ -424,12 +424,12 @@ mcp = FastMCP(
 def submit_emc_cell_job(
     smiles: str,
     polymer_class: str,
-    dp: int = 20,
-    nchains: int = 10,
-    density_initial: float = 0.6,
+    dp: int,
+    nchains: int,
+    density_initial: float,
+    seed: int,
     ntotal: int = 3000,
     temperature: float = 300.0,
-    seed: int = -1,
     output_name: str = "polymer",
     field_override: str = "",
 ) -> dict:
@@ -452,18 +452,25 @@ def submit_emc_cell_job(
         polymer_class:   PolyInfo class name — determines force field; required.
                          PCFF: PCBN/PAMD/PKTN/PSFO/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL/PPNL/PSTR
                          OPLS-AA: PHAL/PSIL.  TraPPE-UA: PHYC/PDIE.
-        dp:              Degree of polymerization (repeat units per chain). [20]
-        nchains:         Exact number of polymer chains to build (EMC "number"
+        dp:              REQUIRED. Degree of polymerization (repeat units per chain) —
+                         the class's own dp_typical, commonly 50.
+        nchains:         REQUIRED. Exact number of polymer chains to build (EMC "number"
                          mode). When > 0 this sets the chain count precisely and
-                         ntotal is ignored; pass 0 to size from ntotal instead. [10]
-        density_initial: Target packing density in g/cm³. Use ~0.5× experimental
+                         ntotal is ignored; pass 0 to size from ntotal instead.
+        density_initial: REQUIRED. Target packing density in g/cm³. Use ~0.5× experimental
                          to avoid steric clashes during initial build; LAMMPS
-                         equilibration will compress to target density. [0.6]
-        ntotal:          Fallback target total atom count — used only when
-                         nchains <= 0 (EMC sets chain count ≈ ntotal/sites). [3000]
+                         equilibration will compress to target density.
+        ntotal:          Fallback target total atom count — used ONLY when nchains <= 0
+                         (EMC sets chain count ≈ ntotal/sites). With the usual nchains > 0
+                         this argument is a no-op. [3000]
         temperature:     Build temperature in K (used for velocity assignment in
                          generated LAMMPS run script). [300.0]
-        seed:            Random seed. -1 selects a new random seed each run. [-1]
+        seed:            REQUIRED. Random seed pinning the packing RNG. Pass -1 only when
+                         you deliberately want a fresh cell: EMC then draws one and reports
+                         it, and that drawn value is what must reach the run log's Seeds
+                         line. Omitting the argument used to do the same draw silently,
+                         which produced an unreproducible cell under a run log claiming a
+                         pinned seed.
         output_name:     Prefix for all generated files. [polymer]
         field_override:  FOR FORCE-FIELD COMPARISON RUNS ONLY — leave empty for
                          normal builds, which must use the class default above.

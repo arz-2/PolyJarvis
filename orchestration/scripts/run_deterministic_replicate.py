@@ -457,7 +457,13 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
             # carbon types between CH2 backbone atoms and pendant methyl branches), so this is
             # never auto-derived into a backbone_types list — only ever an explicit
             # decided_params/CLI value, reviewed like any other protocol-lock decision.
-            diag = lammps.inspect_data_file(data_file=build_data_path)
+            # Diagnostics only — this call exists to surface atom_type_names in the halt
+            # below, not to run the size gate (do_build already ran that on this same file).
+            # The forecast args are passed as explicit nulls to say so.
+            diag = lammps.inspect_data_file(
+                data_file=build_data_path, lj_cutoff=p["cutoff_A"] or 12.0,
+                target_density_gcm3=None, nchain=None,
+            )
             state.halt("equil_check", "BACKBONE_TYPES_UNRESOLVED", {
                 "reason": "decided_params has no backbone_types for this class and none may be "
                           "auto-derived (atom-name-only lookup cannot distinguish backbone from "
@@ -475,6 +481,7 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
             log_file=p["npt_prod_log_path"], dump_file=p["melt_dump_path"],
             data_file=p["npt_prod_data_path"], backbone_types=backbone_types,
             ct_min_decay=p["ct_min_decay_melt"], output_dir=p["output_dir"], graphs_dir=p["graphs_dir"],
+            cutoff_A=p["cutoff_A"], timestep_fs=p["dt_fs"],
         ), "equil-check comprehensive")
         density = wait_for_analysis(lammps, lammps.extract_equilibrated_density(
             log_file=p["npt_prod_log_path"], target_temp=p["npt_prod_temp_K"], output_dir=p["output_dir"],
@@ -558,7 +565,11 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
                 template_name="npt_tg_step", data_file=p["equil_data_path"],
                 output_script=f"{p['tg_sweep_dir']}/tg_sweep.in",
                 velocity_seed=p["velocity_seed"],
+                # The per-T dump (one final frame per temperature) is what extract_thermal's
+                # structural block reads. The reasoned path's tg prompt already asks for it;
+                # emit it here too so both paths produce the same artifacts.
                 params={"LOG_FILE": "tg_sweep.log", "DUMP_FILE": "",
+                       "WRITE_PER_T_DUMP": True, "PER_T_DUMP_FILE": "per_t_structs.dump",
                        "T_START": p["T_start_K"], "T_END": p["T_end_K"], "T_STEP": p["T_step_K"],
                        "N_STEPS_PER_T": p["n_steps_per_t"], "P_START": 1.0, "P_FINAL": 1.0,
                        "T_DAMP": 100.0, "TIMESTEP": p["dt_fs"], "use_pppm": not p["lammps_flags"]["use_trappe"],
@@ -577,6 +588,7 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
         ap = resolve_stage_params("analyze-tg", args, cls)
         thermal = wait_for_analysis(lammps, lammps.extract_thermal(
             log_file=ap["tg_log_path"], tg_data_file=ap["tg_data_file"],
+            per_t_dump_file=ap["per_t_dump_file"],
             enthalpy_col=ap["enthalpy_col"], output_dir=ap["output_dir"], graphs_dir=ap["graphs_dir"],
             method_gap_exempt=ap["method_gap_exempt"],
         ), f"tg analysis rate={rate}")
@@ -705,6 +717,9 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
     deform_extract = wait_for_analysis(lammps, lammps.extract_bulk_modulus_deform(
         log_file=primary["log_path"], output_dir=bp["output_dir"], graphs_dir=bp["graphs_dir"],
         strain_rate=bp["strain_rate_per_fs"], strain_max=bp["K_strain_max"],
+        # eps(step) = strain_rate * (step - step_0) * timestep -- must be the deck's own dt,
+        # or a dt_fs != 1.0 class reports the strain, and hence K, off by that ratio.
+        timestep=bp["dt_fs"],
         **({"log_file_2": slow_log, "strain_rate_2": bp["strain_rate_slow_per_fs"]} if slow_log else {}),
     ), "bulk modulus (deform)")
     result = {"method": "deformation", "bulk_modulus_GPa": deform_extract.get("bulk_modulus_GPa"),

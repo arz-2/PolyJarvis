@@ -67,10 +67,10 @@ equilibrating longer. Catching this at the equil-check gate instead wastes the w
 
 ### Step 2: Generate the equilibration workflow
 
-`velocity_seed` and all five step counts are required arguments. Pass every one from the
-prompt on every call, including those whose value is `null` — omitting an argument is a schema
-error, not a default, and two runs of the same system that differ in which arguments were
-passed produce different decks.
+`velocity_seed`, all five step counts, `temp`, all three force-field flags, and `engine` are
+required arguments. Pass every one from the prompt on every call, including those whose value is
+`null` — omitting an argument is a schema error, not a default, and two runs of the same system
+that differ in which arguments were passed produce different decks.
 
 ```python
 workflow = generate_equilibration_workflow(
@@ -90,6 +90,7 @@ workflow = generate_equilibration_workflow(
     n_atoms=n_atoms,
     use_pcff=lammps_flags["use_pcff"],
     use_trappe=lammps_flags["use_trappe"],
+    use_opls=lammps_flags["use_opls"],           # required — PHAL/PSIL are OPLS-AA
     params_file="{work_dir}/emc_build.params",  # EMC only — omit for RadonPy
     engine=engine,                               # selects deck (kokkos: no `package gpu` line)
     add_melt_npt=add_melt_npt,                   # True for rubbery (auto-set when T_workflow_K ≤ 300)
