@@ -256,6 +256,25 @@ def _exp_tg_range(cls: dict, run_name: str | None = None) -> list:
     return ["<exp_tg_min>", "<exp_tg_max>"]
 
 
+def _melt_reference_db_name(cls: dict, run_name: str | None = None):
+    """Exact DB polymer name for THIS run's member, for the melt-density gate, or None.
+
+    Without it the lookup falls back to the class representative, which is a different
+    polymer for any run that is not the flagship member — POXI's representative is
+    polyoxymethylene while a PEO/PEG run belongs against polyoxyethylene (18% denser),
+    PVNL's is PVC against PVAc (16%), PHAL's is PTFE against PVDF (6%). Grading a correct
+    cell against the wrong polymer manufactures a STRUCTURAL_FAIL. Longest key first so
+    'Nylon-66' wins over a hypothetical 'Nylon-6' prefix.
+    """
+    names = cls.get("melt_reference_db_names") or {}
+    if not names or not run_name:
+        return None
+    for member in sorted(names, key=len, reverse=True):
+        if run_name.upper().startswith(member.upper()):
+            return names[member]
+    return None
+
+
 def _fox_flory_K(cls: dict, run_name: str | None = None):
     """Flory-Fox K for THIS run's member, or None.
 
@@ -1026,7 +1045,7 @@ def equil_check_prompt(args, cls: dict) -> str:
 ###   alpha_melt_per_K    = null
 ###   phase               = melt
 ###   polymer_class       = {args.polymer_class.upper()}
-###   polymer_name        = {_v(getattr(args, 'polymer_name', None), 'null')}
+###   polymer_name        = {_v(getattr(args, 'polymer_name', None) or _melt_reference_db_name(cls, args.run_name), 'null')}
 ### Pass every argument above, including the nulls — omitting one is a schema error, not a
 ### default. The nulls are deliberate here: density_value_binding's
 ### melt-vs-glass cooling-contraction diagnosis (UNDER_ANNEALED_COOLING / MELT_STAGE_DEFICIT)
@@ -1065,7 +1084,7 @@ def equil_check_prompt(args, cls: dict) -> str:
 ###   alpha_melt_per_K    = {p['alpha_melt_per_K']}
 ###   phase               = full
 ###   polymer_class       = {args.polymer_class.upper()}
-###   polymer_name        = {_v(getattr(args, 'polymer_name', None), 'null')}
+###   polymer_name        = {_v(getattr(args, 'polymer_name', None) or _melt_reference_db_name(cls, args.run_name), 'null')}
 ### Pass every argument above, including the ones whose value is null — omitting one is a schema
 ### error, not a default.
 ### alpha_glass_per_K/alpha_melt_per_K are curated per-class values (polymer_rules.json) or,

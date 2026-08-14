@@ -438,6 +438,7 @@
         "LDPE",
         "aPP"
       ],
+      "melt_reference_db_names": {"PE": "Polyethylene, linear", "HDPE": "Polyethylene, linear", "LDPE": "Polyethylene, branched", "PP": "Polypropylene, atactic", "aPP": "Polypropylene, atactic", "PIB": "Polyisobutylene"},
       "preferred_ff": "trappe-ua",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acs.macromol.5b00823",
@@ -542,6 +543,7 @@
         "SAN",
         "aPS"
       ],
+      "melt_reference_db_names": {"PS": "Polystyrene", "aPS": "Polystyrene"},
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/ja00086a030",
@@ -638,6 +640,7 @@
         "PVAc",
         "PVF"
       ],
+      "melt_reference_db_names": {"PVC": "Poly(vinylchloride)", "PVAc": "Poly(vinylacetate)"},
       "forcefield": "PCFF",
       "charge_method": "none",
       "dp_typical": 60,
@@ -716,6 +719,7 @@
         "PAA",
         "PEA"
       ],
+      "melt_reference_db_names": {"PMMA": "Poly(methylmethacrylate)"},
       "forcefield": "PCFF",
       "charge_method": "none",
       "dp_typical": 50,
@@ -817,6 +821,7 @@
         "PCTFE",
         "PVF"
       ],
+      "melt_reference_db_names": {"PTFE": "Polytetrafluoroethylene", "PVDF": "Poly(vinylidenefluoride)"},
       "preferred_ff": "opls/2024/opls-aa",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/jp004071w",
@@ -982,6 +987,7 @@
         "POM",
         "poly(tetrahydrofuran)"
       ],
+      "melt_reference_db_names": {"PEO": "Polyoxyethylene", "PEG": "Polyoxyethylene", "POM": "Polyoxymethylene", "PVME": "Poly(vinylmethylether)", "PTHF": "Polytetrahydrofuran"},
       "forcefield": "PCFF",
       "charge_method": "none",
       "dp_typical": 100,
@@ -1152,6 +1158,7 @@
         "PBS",
         "PHB"
       ],
+      "melt_reference_db_names": {"PET": "Poly(ethyleneterephthalate)", "PCL": "Poly(«-caprolactone)"},
       "forcefield": "PCFF",
       "charge_method": "none",
       "dp_typical": 50,
@@ -1245,6 +1252,7 @@
         "Nylon-46",
         "aramid"
       ],
+      "melt_reference_db_names": {"Nylon-6": "Polyamide, Nylon6", "Nylon6": "Polyamide, Nylon6", "Nylon-66": "Polyamide, Nylon6, 6", "Nylon66": "Polyamide, Nylon6, 6"},
       "forcefield": "PCFF",
       "charge_method": "none",
       "dp_typical": 50,
@@ -1567,6 +1575,7 @@
         "TMBPA-PC",
         "PC-PDMS"
       ],
+      "melt_reference_db_names": {"PC": "Polycarbonate, (with Bisphenol A)", "BPA-PC": "Polycarbonate, (with Bisphenol A)"},
       "forcefield": "PCFF",
       "charge_method": "none",
       "dp_typical": 40,
@@ -1702,6 +1711,7 @@
         "poly(methylphenylsiloxane)",
         "Q resin"
       ],
+      "melt_reference_db_names": {"PDMS": "Poly(dimethylsiloxane)"},
       "forcefield": "opls/2024/opls-aa",
       "charge_method": "opls-library",
       "dp_typical": 80,
@@ -1831,6 +1841,7 @@
         "PEKK",
         "poly(ether ketone)"
       ],
+      "melt_reference_db_names": {"PEEK": "Polyetheretherketone"},
       "forcefield": "PCFF",
       "charge_method": "none",
       "dp_typical": 32,
@@ -1914,6 +1925,7 @@
         "PPSU",
         "poly(aryl ether sulfone)"
       ],
+      "melt_reference_db_names": {"PSU": "Polysulfone, (with Bisphenol A)"},
       "forcefield": "PCFF",
       "charge_method": "none",
       "dp_typical": 25,

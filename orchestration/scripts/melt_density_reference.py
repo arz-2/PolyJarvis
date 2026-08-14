@@ -76,6 +76,12 @@ def _resolve_ids(conn, polymer_class, polymer_name):
                                   _name_variants, _normalize_loose, find_polymer_ids)
 
     ids, method, confidence = find_polymer_ids(conn, polymer_name, polymer_class)
+    if method == "name_match":
+        # An exact name identifies the polymer, and its answer stands whether or not it
+        # carries melt equations -- "this polymer has none" is the correct result, and
+        # falling through to the class representative would answer a question about a
+        # DIFFERENT polymer, which is the whole failure this function guards.
+        return ids, method, confidence
     if _melt_equation_rows(conn, ids):
         return ids, method, confidence
 
@@ -193,6 +199,26 @@ def melt_reference(polymer_class, polymer_name, t_equil_K, rho_melt=None, db_pat
     near = [e for e in ok
             if not e["in_range"] and (e["beyond_frac_of_width"] or 9.0) <= NEAR_RANGE_FRAC]
     usable = in_range or near
+
+    # A CLASS-REPRESENTATIVE match names the class's flagship polymer, not this run's
+    # member, and most classes hold several members with genuinely different densities:
+    # POXI's representative is polyoxymethylene while a PEO/PEG run belongs against
+    # polyoxyethylene, an 18% difference that would read as a large melt deficit on a
+    # correct cell. PVNL's PVC vs PVAc is 16%, PHAL's PTFE vs PVDF 6%. So a class-level
+    # match is REPORTED but never binds; only an exact-name match (from the class's
+    # melt_reference_db_names entry for this run's member) can fail a run.
+    if usable and match_confidence != "high":
+        out["status"] = "CLASS_MATCH_NOT_MEMBER_SPECIFIC"
+        out["evidence"] = "insufficient"
+        out["exp_density_extrapolated_gcm3"] = round(
+            sum(e["rho_exp_gcm3"] for e in usable) / len(usable), 4)
+        out["reason"] = (
+            f"resolved by {match_method} to the class representative, not to this run's "
+            "member — a different member of this class can differ by up to 18% in melt "
+            "density, so this reference cannot fail a run. Supply polymer_name (the class's "
+            "melt_reference_db_names entry) to arm the gate.")
+        out["verdict"] = "MELT_RHO_NO_REFERENCE"
+        return out
 
     if usable:
         out["status"] = "IN_RANGE" if in_range else "NEAR_RANGE"

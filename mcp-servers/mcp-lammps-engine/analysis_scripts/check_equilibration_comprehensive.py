@@ -749,16 +749,25 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     }
 
     # ── P2 ──
+    # P2 is built from backbone bond vectors, so with no measurable backbone every frame
+    # contributes 0.0 and the mean is a perfect 0.0 -- which passed this BINDING Class A
+    # gate on no evidence at all. Report it unavailable instead: collect_gates reads
+    # `pass` and a None leaves the gate unarmed, which is the honest state.
+    p2_available = bool(bb_mask.any())
     p2_mean = float(p2_arr.mean())
     p2_std = float(p2_arr.std())
     ordered_flag = p2_mean > 0.10
     p2_result = {
-        "pass": bool(not ordered_flag),
-        "p2_mean": r(p2_mean, 4),
-        "p2_std": r(p2_std, 4),
-        "p2_max": r(float(p2_arr.max()), 4),
-        "ordered_flag": ordered_flag,
+        "available": p2_available,
+        "pass": bool(not ordered_flag) if p2_available else None,
+        "p2_mean": r(p2_mean, 4) if p2_available else None,
+        "p2_std": r(p2_std, 4) if p2_available else None,
+        "p2_max": r(float(p2_arr.max()), 4) if p2_available else None,
+        "ordered_flag": ordered_flag if p2_available else None,
     }
+    if not p2_available:
+        p2_result["reason"] = ("no chain yielded a backbone path (no bond topology in the "
+                               "data file) — P2 cannot be measured, so it is not evaluated")
 
     # ── Density homogeneity ──
     # The raw voxel CV mixes real heterogeneity with counting shot noise, and the
@@ -933,7 +942,10 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
               "|-------|-------|-----------|--------|"]
 
     p2 = structural.get("p2", {})
-    lines.append(f"| P2 nematic order | {p2.get('p2_mean','?')} ± {p2.get('p2_std','?')} | <0.10 | {_gate(p2.get('pass',False))} |")
+    if p2.get("available", True):
+        lines.append(f"| P2 nematic order | {p2.get('p2_mean','?')} ± {p2.get('p2_std','?')} | <0.10 | {_gate(p2.get('pass',False))} |")
+    else:
+        lines.append("| P2 nematic order | — | <0.10 | NOT EVALUATED (no backbone path) |")
 
     dh = structural.get("density_homogeneity", {})
     grid_n = dh.get("grid_n")
@@ -1154,7 +1166,9 @@ def main():
         thermo.get("density", {}).get("block_sem", {}).get("pass", False),
         thermo.get("energy", {}).get("block_sem", {}).get("pass", False),
         structural["rg"].get("pass", False),
-        structural["p2"].get("pass", False),
+        # None (unmeasurable) is skipped, matching finite_size; enforce_gate sees the
+        # None and leaves the gate unarmed rather than silently passing it.
+        structural["p2"].get("pass") is not False,
         structural["density_homogeneity"].get("pass", False),
         # C(t) gate — only active when --ct_min_decay supplied; defaults True otherwise
         structural.get("ct", {}).get("pass", True),
