@@ -982,11 +982,16 @@ def equil_check_prompt(args, cls: dict) -> str:
     guide = load_worker_guide("equil-check")
     is_melt_phase = p["phase"] == "melt"
     if is_melt_phase:
-        tasks_block = "tasks:\n  - check_equilibration_comprehensive"
+        tasks_block = ("tasks:\n  - check_equilibration_comprehensive\n  - extract_equilibrated_density")
         density_note = (
-            "### phase=melt: SKIP extract_equilibrated_density — this checkpoint is at\n"
-            "### T_workflow_K (melt), not 300 K, so there is no experimental band to compare\n"
-            "### against yet. Density-vs-experiment is checked at the phase=full gate after cooldown."
+            "### phase=melt: run extract_equilibrated_density against the MELT production log\n"
+            "### (target_temp = T_workflow_K, not 300 K). Do NOT compare it to the 300 K\n"
+            "### experimental band — that is the phase=full gate. The mechanized gate below\n"
+            "### grades this melt density against experimental rho(T) evaluated at T_equil\n"
+            "### (Mark 2007 equations in db/polymer_db.sqlite); it reports\n"
+            "### melt_density_verdict = MELT_RHO_PASS | MELT_RHO_DEFICIT | MELT_RHO_NO_REFERENCE.\n"
+            "### MELT_RHO_NO_REFERENCE means no usable equation exists for this polymer at this\n"
+            "### temperature — the gate is UNARMED there, which is not a pass."
         )
         gate_block = f"""### MECHANIZED GATE (Step 2, replaces your own PASS/EXTEND/FAIL judgment — see EQUIL_CHECK guide):
 ### after Step 1 writes its JSON to output_dir, call the MCP tool
@@ -998,17 +1003,22 @@ def equil_check_prompt(args, cls: dict) -> str:
 ###   out_dir             = {p['output_dir']}
 ###   exp_density_gcm3    = null
 ###   tg_K                = null
-###   t_equil_K           = null
+###   t_equil_K           = {p['T_workflow_K']}
 ###   glass_data          = null
 ###   melt_data           = null
 ###   alpha_glass_per_K   = null
 ###   alpha_melt_per_K    = null
+###   phase               = melt
+###   polymer_class       = {args.polymer_class.upper()}
+###   polymer_name        = {_v(getattr(args, 'polymer_name', None), 'null')}
 ### Pass every argument above, including the nulls — omitting one is a schema error, not a
 ### default. The nulls are deliberate here: density_value_binding's
 ### melt-vs-glass cooling-contraction diagnosis (UNDER_ANNEALED_COOLING / MELT_STAGE_DEFICIT)
 ### cannot run without a post-cool glass state, which doesn't exist yet at this checkpoint. This
-### gate only evaluates the structural/thermo gates that ARE meaningful on the melt trajectory
-### alone (density/energy drift, block-SEM, Rg CV, P2, density-homogeneity CV, C(t)) — a
+### gate evaluates the structural/thermo gates that ARE meaningful on the melt trajectory alone
+### (density/energy drift, block-SEM, Rg CV, P2, density-homogeneity CV, chain dimensions, C(t))
+### plus melt_density_in_band, which compares the melt density directly against experimental
+### rho(T) at T_equil and so needs no glass state — a
 ### STRUCTURAL_FAIL here with a density_homogeneity-only remedy note is the melt-mixing signal
 ### /recover's MELT-MIXING procedure handles; it is NOT re_melt_slow_recool/heavy_melt_anneal_probe
 ### (those require the melt-vs-glass split this call can't perform).

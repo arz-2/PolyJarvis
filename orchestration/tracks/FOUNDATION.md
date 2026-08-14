@@ -96,17 +96,21 @@ Agent(subagent_type="equilibration-checker", description="🟠 Equil check {poly
 - `PASS` → proceed.
 - `EXTEND` / `STRUCTURAL_FAIL` / `FAIL` → RECOVERY (`track=foundation step=equil-check`)
 
-**`phase=melt`** (glassy only, before cooldown — structural/thermo gates only, no density
-extraction, no cooling-contraction diagnosis; see `guides/EQUIL_CHECK.md`'s Phase section):
+**`phase=melt`** (glassy only, before cooldown — structural/thermo gates plus the melt density
+vs experimental ρ(T) at `T_equil`; no cooling-contraction diagnosis. See
+`guides/EQUIL_CHECK.md`'s Phase section):
 ```
 Agent(subagent_type="equilibration-checker", description="🟠 Melt-mixing check {polymer_name}",
       prompt=<gen_prompt.py --stage equil-check --plan PLAN_PATH --phase melt
               --data_path npt_production_data_path
               --npt_prod_log npt_production_log_path --npt_prod_dump nvt_production_dump_path>)
-  → RESULT → equil_verdict, structural_fail_remedy, equilibration_warnings
+  → RESULT → equil_verdict, structural_fail_remedy, melt_density_verdict, equilibration_warnings
 ```
-- `PASS` → proceed to `[Equilibration]`'s cooldown phase.
-- `EXTEND` / `STRUCTURAL_FAIL` (remedy is a melt-mixing note, never
-  `re_melt_slow_recool`/`heavy_melt_anneal_probe`) / `FAIL` → RECOVERY (`track=foundation
-  step=equil-check`, MELT-MIXING procedure) — extends the melt checkpoint in place and re-runs
-  this same `phase=melt` gate; only PASS here reaches cooldown.
+- `PASS` → proceed to `[Equilibration]`'s cooldown phase. `melt_density_verdict=MELT_RHO_NO_REFERENCE`
+  still passes — the gate was unarmed, which is not evidence the melt is right; record it.
+- `STRUCTURAL_FAIL` with `melt_density_verdict=MELT_RHO_DEFICIT` → the melt is off experimental
+  ρ(T) before any cooling has happened. Remedy is `heavy_melt_anneal_probe`; a slower cooling
+  ramp cannot fix an equilibrium-state deficit.
+- `EXTEND` / other `STRUCTURAL_FAIL` (remedy is a melt-mixing note, never `re_melt_slow_recool`)
+  / `FAIL` → RECOVERY (`track=foundation step=equil-check`, MELT-MIXING procedure) — extends the
+  melt checkpoint in place and re-runs this same `phase=melt` gate; only PASS reaches cooldown.

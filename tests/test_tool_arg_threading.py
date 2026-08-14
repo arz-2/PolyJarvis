@@ -249,13 +249,21 @@ def test_no_guide_still_instructs_conditional_omission():
 def test_gen_prompt_melt_gate_passes_explicit_nulls():
     """The phase=melt branch used to say 'Deliberately OMIT exp_density_gcm3/tg_K/
     glass_data/melt_data'. Those are now required, so the branch has to name them as
-    nulls or every glassy run hard-fails at the melt gate."""
+    nulls or every glassy run hard-fails at the melt gate.
+
+    t_equil_K is named with a VALUE, not a null: it is the temperature the melt-density
+    gate reads experimental rho(T) at. The invariant this test protects is that nothing is
+    omitted, not that everything is null."""
     src = (REPO_ROOT / "orchestration" / "scripts" / "gen_prompt.py").read_text()
     assert "Deliberately OMIT" not in src
     melt = src[src.index('if p["phase"] == "melt"'):src.index("def _resolve_murnaghan_params")]
-    for name in ("exp_density_gcm3", "tg_K", "t_equil_K", "glass_data", "melt_data",
+    for name in ("exp_density_gcm3", "tg_K", "glass_data", "melt_data",
                  "alpha_glass_per_K", "alpha_melt_per_K"):
         assert re.search(rf"{name}\s+= null", melt), f"melt gate block omits {name} = null"
+    for name in ("t_equil_K", "phase", "polymer_class", "polymer_name"):
+        assert re.search(rf"{name}\s+=", melt), f"melt gate block omits {name}"
+    assert re.search(r"t_equil_K\s+= \{p\['T_workflow_K'\]\}", melt), (
+        "t_equil_K must carry the melt temperature — a null unarms the melt-density gate")
 
 
 def _stage_args(**overrides):

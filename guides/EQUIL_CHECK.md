@@ -45,6 +45,11 @@ from the raw numbers yourself.** The four possible verdicts:
     this is what `phase=melt`'s pre-cool gate exists to catch (see Phase below): extend melt-stage
     dwell in place, not the cooling ramp, and never re-melt from scratch. Owned by `/recover`'s
     MELT-MIXING procedure, not this worker.
+  - `heavy_melt_anneal_probe` (from `melt_density_verdict=MELT_RHO_DEFICIT`) — the melt itself is
+    off experimental ρ(T) by more than the spread across the independent equations for this
+    polymer. Cooling changes cannot recover an equilibrium-state deficit. Accepting it as
+    force-field bias requires the gap recorded in D-05, flagged unresolved, and at least one
+    anneal rung spent — a bare "known PCFF bias" caveat is not sufficient.
   - melt-anneal remedy (`chain_dimensions_verdict=CHAIN_COLLAPSED`) — chains never reached
     Gaussian statistics: `⟨R_ee²⟩/⟨Rg²⟩` is below `0.72×` the finite-N ideal `6N/(N+1)`. Re-run
     with a longer melt hold (`add_melt_npt=True`); a glassy chain does not change shape, so
@@ -66,9 +71,18 @@ completes, with density extraction and the cooling-contraction diagnosis availab
 `npt_cool300`/`npt_prod300` are even submitted. `phase=melt` cannot run `assess_cooling_contraction` (no glass state
 exists yet), so `UNDER_ANNEALED_COOLING`/`MELT_STAGE_DEFICIT` are unreachable verdicts there —
 only the structural/thermo gates that are meaningful on the melt trajectory alone (density/energy
-drift, block-SEM, `n_eff_density`, Rg CV, P2, density-homogeneity signal CV, finite size, C(t)) can
-fire. The prompt's `tasks:` list and MECHANIZED GATE args already reflect which phase you're in —
-follow them, don't infer.
+drift, block-SEM, `n_eff_density`, Rg CV, P2, density-homogeneity signal CV, finite size, chain
+dimensions, C(t)) can fire. The prompt's `tasks:` list and MECHANIZED GATE args already reflect
+which phase you're in — follow them, don't infer.
+
+**`phase=melt` DOES extract density** — against the melt production log at `T_workflow_K`, never
+300 K. The mechanized gate grades it against experimental ρ(T) at `T_equil` (Mark 2007 equations in
+`db/polymer_db.sqlite`), which needs no glass state, and returns `melt_density_verdict`:
+- `MELT_RHO_PASS` — melt density within the reference tolerance.
+- `MELT_RHO_DEFICIT` — binding; remedy is `heavy_melt_anneal_probe`, never a slower cooling ramp.
+- `MELT_RHO_NO_REFERENCE` — **the gate is UNARMED, which is not a pass.** No equation exists for
+  this polymer, or `T_equil` is too far past the fitted range. Common for PSFO/PKTN/PHAL/PIMD.
+  Report it as N/A; do not substitute the 300 K band.
 
 Always pass `cutoff_A` from the prompt to `check_equilibration_comprehensive` — it is required,
 never optional. It arms the minimum-image half of the finite-size gate (`L ≥ 2·cutoff_A`); omitted,

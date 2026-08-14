@@ -13,16 +13,18 @@ Prints a JSON verdict to stdout: PASS_CLEAN | PASS_CARVEOUT | VIOLATION | UNADJU
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 BINDING_GLASSY = {"density_drift", "density_sem", "energy_drift", "energy_sem",
                    "density_in_band", "density_homogeneity", "p2", "n_eff_density",
-                   "finite_size", "chain_dimensions"}
+                   "finite_size", "chain_dimensions", "melt_density_in_band"}
 ADVISORY_GLASSY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "residual_stress"}
 
 BINDING_RUBBERY = {"density_sem", "density_homogeneity", "energy_drift", "energy_sem",
-                   "n_eff_density", "finite_size", "chain_dimensions"}
+                   "n_eff_density", "finite_size", "chain_dimensions",
+                   "melt_density_in_band"}
 ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_drift",
                     "residual_stress"}
 # density_drift isn't in require_rubbery's binding text (density_sem is); treated advisory here.
@@ -111,6 +113,11 @@ def collect_gates(comp: dict) -> dict:
 
     Single source of truth for both enforce() and enforce_live() -- a gate key added to
     only one of them would be a silent no-op in the other path.
+
+    melt_density_in_band is the one deliberate exception: it is not derived from
+    equilibration_comprehensive.json at all, and it only exists at the phase=melt
+    checkpoint, so enforce_live() sets it directly. The retrospective enforce() audits a
+    completed run against its 300 K state, where the melt reference has no bearing.
     """
     thermo = comp.get("thermo", {})
     chain = comp.get("chain", {})
@@ -150,6 +157,56 @@ def finite_size_gate(spatial: dict):
     if not fs.get("available"):
         return None
     return fs.get("pass")
+
+
+def melt_density_reference(out_dir, polymer_class, polymer_name, t_equil_K, rho_melt):
+    """Experimental melt density at T_equil, via melt_density_reference.py.
+
+    Subprocess + JSON, matching the established contract with db/query_best_match.py, and
+    because this module must resolve from both enforce_gate's cwd and the MCP server's.
+    The result is cached beside the other analysis JSONs so a repeat call (after an EXTEND)
+    does not re-query.
+    """
+    if not (polymer_class or polymer_name) or t_equil_K is None or rho_melt is None:
+        return None
+    script = Path(__file__).resolve().parent / "melt_density_reference.py"
+    cmd = [sys.executable, str(script), "--t_equil_K", str(t_equil_K),
+           "--rho_melt", str(rho_melt)]
+    if polymer_class:
+        cmd += ["--polymer_class", polymer_class]
+    if polymer_name:
+        cmd += ["--polymer_name", polymer_name]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        ref = json.loads(proc.stdout) if proc.returncode == 0 else None
+    except Exception:
+        ref = None
+    if ref and out_dir:
+        try:
+            path = Path(out_dir) / "melt_density_reference.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(ref, indent=2))
+        except OSError:
+            pass
+    return ref
+
+
+def melt_density_gate(ref: dict):
+    """Pass-polarity entry for the pre-cool melt-density check. Class C (agreement).
+
+    None -- the gate is UNARMED, never a pass -- whenever the reference cannot adjudicate:
+    no equation for this polymer, T_equil beyond usable extrapolation, or a lone equation
+    facing a negative gap (reference uncertainty is unmeasurable there, so 'deficit' is not
+    separable from it). Only MELT_RHO_DEFICIT fails.
+    """
+    if not ref:
+        return None
+    verdict = ref.get("verdict")
+    if verdict == "MELT_RHO_PASS":
+        return True
+    if verdict == "MELT_RHO_DEFICIT":
+        return False
+    return None
 
 
 def chain_dimensions_gate(chain: dict):
@@ -209,7 +266,7 @@ EXTENDABLE_GATES = {"density_drift", "energy_drift", "density_sem", "energy_sem"
 # Gates whose failure means the cell is WRONG, not merely unconverged -- extending at 300K
 # cannot fix these (policy: "a glass cannot densify below Tg").
 STRUCTURAL_GATES = {"density_homogeneity", "density_in_band", "p2", "density_value_binding",
-                    "finite_size", "chain_dimensions"}
+                    "finite_size", "chain_dimensions", "melt_density_in_band"}
 
 
 def enforce(run_name, repo_root: Path):
@@ -340,6 +397,18 @@ def enforce_live(args) -> dict:
         gap_pct = 100.0 * (plateau_mean - exp_density) / exp_density
         gates["density_in_band"] = abs(gap_pct) <= 5.0
 
+    # --- melt density vs experimental rho(T), the PRE-COOL agreement gate ---
+    # Separate from density_in_band on purpose: that one is a fixed +/-5% band around a
+    # 300 K value routed through the cooling-contraction split, which cannot run here (no
+    # glass state exists yet). This compares the melt directly against Mark 2007 rho(T) at
+    # T_equil, with a tolerance measured from the spread across independent equations.
+    melt_ref = None
+    if getattr(args, "phase", "full") == "melt":
+        melt_ref = melt_density_reference(
+            args.out_dir, getattr(args, "polymer_class", None),
+            getattr(args, "polymer_name", None), args.t_equil_k, plateau_mean)
+        gates["melt_density_in_band"] = melt_density_gate(melt_ref)
+
     clause, binding_results, advisory_results = classify(gates, regime, dp_typical, ct_gate_reliable)
     failing_binding = [k for k, v in binding_results.items() if v is False]
 
@@ -437,6 +506,22 @@ def enforce_live(args) -> dict:
                       "phase=melt gate after each. The 1 ns default is ~100x short of the ~100 ns "
                       "melt anneal that reached PMMA 1.19 g/cm3 (NkepsuMbitou 2025). Still "
                       "under-band after rung 2 -> escalate to a different force field.")
+        elif "melt_density_in_band" in failing_binding:
+            _g = (melt_ref or {}).get("melt_gap_pct")
+            _t = (melt_ref or {}).get("tolerance_pp")
+            remedy = (
+                f"heavy_melt_anneal_probe — the MELT is already {_g}% off experimental rho(T) at "
+                f"T_equil (tolerance {_t} pp, measured as the spread across the independent "
+                "equations for this polymer), so the deficit is in the equilibrium state, not in "
+                "the cooling ramp — and no cooling change can recover it. Re-generate with "
+                "add_melt_npt=True and melt_npt_steps=10*int(1.0e6/dt_fs) (~10 ns) on attempt 1, "
+                "50x (~50 ns) on attempt 2, re-running the phase=melt gate after each. "
+                "ACCEPTANCE AS FORCE-FIELD BIAS is permitted ONLY with this melt gap recorded in "
+                "D-05, flagged unresolved, and after at least one anneal rung has been spent — "
+                "mirroring density_value_binding's MELT_STAGE_DEFICIT clause. Some deficits are "
+                "genuinely the force field (a1 measured PEG 5.5% under-dense as an equilibrium "
+                "liquid), and no anneal length fixes those; a bare 'known PCFF bias' caveat is "
+                "still not sufficient.")
         elif "chain_dimensions" in failing_binding:
             remedy = ("MELT-ANNEAL — chains are collapsed, not Gaussian: ⟨R_ee²⟩/⟨Rg²⟩ is below "
                       "0.72x the finite-N ideal, which no backbone stiffness produces. The builder "
@@ -478,6 +563,10 @@ def enforce_live(args) -> dict:
         "finite_size_min_image_unarmed": finite_size_min_image_unarmed(comp),
         "chain_dimensions_verdict": chain_dimensions_verdict(comp),
         "chain_dimensions": (comp.get("chain") or {}).get("dimensions"),
+        # MELT_RHO_PASS | MELT_RHO_DEFICIT | MELT_RHO_NO_REFERENCE | None (not phase=melt).
+        # NO_REFERENCE means the gate is UNARMED — never read it as a pass.
+        "melt_density_verdict": (melt_ref or {}).get("verdict"),
+        "melt_density_reference": melt_ref,
         "residual_stress": (comp.get("thermo") or {}).get("residual_stress"),
         "failing_binding_gates": failing_binding,
         "verdict": verdict,
@@ -497,7 +586,13 @@ def main():
     ap.add_argument("--ct-gate-reliable", type=lambda v: v.lower() != "false")
     ap.add_argument("--exp-density-gcm3", type=lambda v: None if v == "null" else float(v))
     ap.add_argument("--tg-k", type=lambda v: None if v == "null" else float(v))
-    ap.add_argument("--t-equil-k", type=float)
+    # Null-tolerant like --tg-k above it: phase=melt passes null for the cooling-contraction
+    # args, and a bare type=float made the --live CLI crash on exactly that call.
+    ap.add_argument("--t-equil-k", type=lambda v: None if v == "null" else float(v))
+    ap.add_argument("--phase", choices=["full", "melt"], default="full",
+                    help="melt arms the pre-cool melt-density-vs-experiment gate")
+    ap.add_argument("--polymer-class")
+    ap.add_argument("--polymer-name")
     ap.add_argument("--glass-data")
     ap.add_argument("--melt-data")
     ap.add_argument("--out-dir")

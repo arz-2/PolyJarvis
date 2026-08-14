@@ -306,3 +306,132 @@ def test_n_eff_remedy_scales_extension_with_deficit(tmp_path):
     result = enforce_gate.enforce_live(_live_args(comp_path, "glassy", 35, True))
     assert result["verdict"] == "EXTEND"
     assert "extend_ns=2.7" in result["remedy"]
+
+
+# ─── melt-density gate (item 6) ──────────────────────────────────────────────
+#
+# The phase=melt gate ran with exp_density_gcm3=null, so density_in_band was never
+# set and a melt deficit could only be found after the cooling ramp was paid for.
+# db/polymer_db.sqlite carries 53 Mark 2007 melt rho(T) equations; this reads one
+# off at the run's own T_equil.
+
+
+def test_melt_gate_binds_only_on_a_measured_deficit():
+    from enforce_gate import melt_density_gate
+
+    assert melt_density_gate({"verdict": "MELT_RHO_DEFICIT"}) is False
+    assert melt_density_gate({"verdict": "MELT_RHO_PASS"}) is True
+
+
+def test_no_reference_leaves_the_gate_unarmed_never_passing():
+    """PSFO runs at 427 C against a 371 C equation ceiling, PKTN 497 vs 400, PIMD has no
+    equation at all -- the rigid aromatics are exactly where the reference is worst. An
+    absent reference must not read as agreement."""
+    from enforce_gate import melt_density_gate
+
+    assert melt_density_gate({"verdict": "MELT_RHO_NO_REFERENCE"}) is None
+    assert melt_density_gate(None) is None
+    assert melt_density_gate({}) is None
+
+
+def test_melt_gate_is_binding_and_structural():
+    import enforce_gate as eg
+
+    assert "melt_density_in_band" in eg.BINDING_GLASSY
+    assert "melt_density_in_band" in eg.BINDING_RUBBERY
+    # No amount of extra NPT at the melt temperature moves an equilibrium density that the
+    # force field puts in the wrong place; the remedy is a longer anneal or a different FF.
+    assert "melt_density_in_band" in eg.STRUCTURAL_GATES
+    assert "melt_density_in_band" not in eg.EXTENDABLE_GATES
+
+
+def test_t_equil_k_accepts_the_null_the_melt_phase_passes():
+    """phase=melt passes null for every cooling-contraction arg. --t-equil-k was type=float
+    with no null lambda, so the --live CLI crashed on exactly that call -- invisible until
+    this item made the path live."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    script = Path(__file__).resolve().parents[1] / "orchestration" / "scripts" / "enforce_gate.py"
+    res = subprocess.run([sys.executable, str(script), "--live",
+                          "--comprehensive-json", "/nonexistent.json",
+                          "--t-equil-k", "null", "--tg-k", "null",
+                          "--exp-density-gcm3", "null"],
+                         capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr
+    assert "invalid" not in res.stderr.lower()
+
+
+def _melt_ref(cls, t_equil_K, rho):
+    import subprocess
+    import sys
+    from pathlib import Path
+    script = (Path(__file__).resolve().parents[1] / "orchestration" / "scripts"
+              / "melt_density_reference.py")
+    res = subprocess.run([sys.executable, str(script), "--polymer_class", cls,
+                          "--t_equil_K", str(t_equil_K), "--rho_melt", str(rho)],
+                         capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr
+    return json.loads(res.stdout)
+
+
+def test_reference_reproduces_the_a1_oracle():
+    """a1_experimental_melt.md is the frozen oracle this policy was promoted from. These
+    four rows carry its three distinct outcomes; a diff here is a promotion bug."""
+    pmma = _melt_ref("PACR", 277 + 273.15, 1.0483)
+    assert pmma["status"] == "NEAR_RANGE" and pmma["evidence"] == "decisive"
+    assert pmma["n_equations"] == 5                      # isotactic PMMA excluded
+    assert abs(pmma["melt_gap_pct"] - 1.03) < 0.06
+    assert pmma["verdict"] == "MELT_RHO_PASS"
+
+    ps1 = _melt_ref("PSTR", 277 + 273.15, 0.8815)
+    assert ps1["status"] == "IN_RANGE" and ps1["n_equations"] == 3
+    assert abs(ps1["melt_gap_pct"] - -3.95) < 0.06
+    # PS1's gap exceeds PS's own reference spread; PS2-4 do not. a1 reports the family as
+    # MIXED for exactly this reason and warns against collapsing it to a mean.
+    assert ps1["verdict"] == "MELT_RHO_DEFICIT"
+    assert _melt_ref("PSTR", 277 + 273.15, 0.9077)["verdict"] == "MELT_RHO_PASS"
+
+    psu = _melt_ref("PSFO", 427 + 273.15, 1.0451)
+    assert psu["status"] == "T_EQUIL_OUTSIDE_EQUATION_RANGE"
+    assert psu["evidence"] == "indicative"               # under half a fit-width past
+    assert psu["verdict"] == "MELT_RHO_NO_REFERENCE"
+
+    pla = _melt_ref("PEST", 347 + 273.15, 1.0878)
+    assert pla["status"] == "NO_EXPERIMENTAL_EQUATION"
+    assert pla["verdict"] == "MELT_RHO_NO_REFERENCE"
+
+
+def test_tolerance_is_measured_not_chosen():
+    """The deficit threshold is the spread among the independent equations for that
+    polymer -- how precisely experiment itself pins rho here. Below it, 'deficit' is not
+    separable from reference uncertainty."""
+    ref = _melt_ref("PACR", 277 + 273.15, 1.0483)
+    gaps = [e["gap_pct"] for e in ref["equations"] if e.get("gap_pct") is not None]
+    assert ref["tolerance_pp"] == round(max(gaps) - min(gaps), 2)
+
+
+def test_single_equation_cannot_adjudicate_a_negative_gap():
+    """With one equation there is no measured reference tolerance. A positive gap still
+    settles it; a negative one must be None, never False."""
+    pvc_low = _melt_ref("PVNL", 120 + 273.15, 1.20)      # in range, one equation
+    assert pvc_low["n_equations"] == 1 and pvc_low["tolerance_pp"] is None
+    assert pvc_low["melt_gap_pct"] < 0
+    assert pvc_low["melt_deficient"] is None
+    assert pvc_low["verdict"] == "MELT_RHO_NO_REFERENCE"
+
+    pvc_high = _melt_ref("PVNL", 120 + 273.15, 1.45)
+    assert pvc_high["melt_deficient"] is False
+    assert pvc_high["verdict"] == "MELT_RHO_PASS"
+
+
+def test_pvc_does_not_resolve_to_polystyrene():
+    """CLASS_CANONICAL_PATTERN["PVNL"] is ["Poly(vinyl chloride)", "Polystyrene"], and
+    "Poly(vinyl chloride)" never LIKE-matches the equation-bearing "Poly(vinylchloride)".
+    Without the loose-normalized pass, PVC falls through to the second pattern and is
+    graded against polystyrene's rho(T)."""
+    ref = _melt_ref("PVNL", 120 + 273.15, 1.20)
+    assert ref["n_equations"] == 1
+    exp = ref["exp_density_gcm3"]
+    assert exp is not None and exp > 1.2, f"PVC melt rho ~1.3, got {exp} (polystyrene is ~0.92)"

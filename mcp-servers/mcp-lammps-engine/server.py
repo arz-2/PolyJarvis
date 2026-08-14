@@ -2859,6 +2859,9 @@ def enforce_equilibration_gate(
     out_dir: Optional[str],
     alpha_glass_per_K: Optional[float],
     alpha_melt_per_K: Optional[float],
+    phase: str = "full",
+    polymer_class: Optional[str] = None,
+    polymer_name: Optional[str] = None,
 ) -> dict:
     """
     Mechanized equilibration gate verdict — replaces prose PASS/EXTEND/FAIL judgment with a
@@ -2899,6 +2902,12 @@ def enforce_equilibration_gate(
                             assess_cooling_contraction.py's generic default (2.5e-4/K).
         alpha_melt_per_K:   Same, above Tg (decided_params.alpha_melt_per_K). None falls back to
                             the generic default (6.0e-4/K).
+        phase:              "melt" arms the pre-cool melt-density gate, which compares the
+                            melt density against experimental rho(T) at T_equil (Mark 2007
+                            equations in db/polymer_db.sqlite). Requires polymer_class (or
+                            polymer_name) and t_equil_K. "full" (default) leaves it off.
+        polymer_class:      Class ID for the melt-density reference lookup (e.g. "PACR").
+        polymer_name:       Optional exact DB polymer name, preferred over the class fallback.
 
     Returns:
         dict: regime, applicable_clause, binding_gates, advisory_gates, density_gap_pct,
@@ -2928,6 +2937,9 @@ def enforce_equilibration_gate(
     live_args.out_dir = out_dir
     live_args.alpha_glass_per_k = alpha_glass_per_K
     live_args.alpha_melt_per_k = alpha_melt_per_K
+    live_args.phase = phase
+    live_args.polymer_class = polymer_class
+    live_args.polymer_name = polymer_name
 
     result = enforce_gate.enforce_live(live_args)
 
