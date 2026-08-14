@@ -60,47 +60,89 @@ def _synthetic_bilinear(noise, seed=0, Tg_true=400.0):
     return T, rho + np.random.default_rng(seed).normal(0, noise, len(T))
 
 
-def test_bilinear_curvefit_reports_tg_uncertainty():
-    """The physics-validity swap routinely makes bilinear the primary fit; without an
-    interval run_summary grades a bare point against a band and a near-miss reads FAIL."""
+def test_bilinear_tg_is_independent_of_the_seed():
+    """THE defect this rewrite exists for. curve_fit cannot move a np.where(T < Tg) breakpoint
+    -- the gradient is identically zero -- so the old fit returned its initial guess verbatim
+    (measured on archived data: PMMA2/tg_r40 and PS3/tg_r400 reproduce exactly as seeds).
+    The exhaustive search must give the same answer whatever hint it is handed."""
     from extract_thermal import curvefit_bilinear
 
-    T, rho = _synthetic_bilinear(1e-3)
-    res = curvefit_bilinear(T, rho, tg_hint=395.0)
-    assert res is not None
-    assert res.get("tg_alt_uncertainty_K") is not None
-    assert res["tg_alt_uncertainty_K"] > 0
+    T, rho = _synthetic_bilinear(5e-4)
+    answers = [curvefit_bilinear(T, rho, tg_hint=h)["Tg_K"]
+               for h in (320.0, 360.0, 390.0, 420.0, 460.0)]
+    assert max(answers) - min(answers) < 1e-6, f"Tg still tracks the seed: {answers}"
+    assert curvefit_bilinear(T, rho)["Tg_K"] == pytest.approx(answers[0], abs=1e-6)
+    # And it must land on the true breakpoint, not merely be self-consistent.
+    assert answers[0] == pytest.approx(400.0, abs=15.0)
 
 
-def test_bilinear_uncertainty_is_not_attached_to_the_seed_tg():
-    """Tg_K from this fit is the unrefined seed (curve_fit cannot move a np.where breakpoint),
-    so the sigma -- which describes Tg_alt_K -- must not be published under the name the
-    headline's error bar would be read from."""
+def test_bilinear_reports_tg_uncertainty_for_its_own_headline():
+    """With the breakpoint genuinely fitted, sigma describes Tg_K itself, so it is published
+    as tg_uncertainty_K again -- the interval run_summary needs to grade against a band."""
     from extract_thermal import curvefit_bilinear
 
-    T, rho = _synthetic_bilinear(1e-3)
-    res = curvefit_bilinear(T, rho, tg_hint=395.0)
-    assert "tg_uncertainty_K" not in res
-    # The seed really is returned verbatim -- pins the defect this naming guards against.
-    assert res["Tg_K"] == pytest.approx(395.0, abs=0.01)
-    assert abs(res["Tg_alt_K"] - res["Tg_K"]) > 1.0
+    res = curvefit_bilinear(*_synthetic_bilinear(1e-3))
+    assert res["tg_uncertainty_K"] is not None and res["tg_uncertainty_K"] > 0
+    assert "tg_alt_uncertainty_K" not in res, "the audit-only stopgap should be gone"
 
 
 def test_tg_uncertainty_scales_with_scatter_not_pinned_to_zero():
-    """Guards the actual defect: pcov[4,4] is structurally zero because bilinear_indep
-    switches on np.where(T < Tg), so reporting it claimed +/-0 K at any noise level. The
-    uncertainty must be propagated from the genuinely fitted line parameters instead."""
+    """pcov[4,4] was structurally zero, so reporting it claimed +/-0 K at any noise level."""
     from extract_thermal import curvefit_bilinear
 
     sigmas = []
     for noise in (2e-4, 1e-3, 3e-3):
-        T, rho = _synthetic_bilinear(noise)
-        res = curvefit_bilinear(T, rho, tg_hint=395.0)
-        assert res["tg_alt_uncertainty_K"] > 0, f"sigma collapsed to zero at noise={noise}"
-        sigmas.append(res["tg_alt_uncertainty_K"])
+        res = curvefit_bilinear(*_synthetic_bilinear(noise))
+        assert res["tg_uncertainty_K"] > 0, f"sigma collapsed to zero at noise={noise}"
+        sigmas.append(res["tg_uncertainty_K"])
 
     assert sigmas[0] < sigmas[1] < sigmas[2], "sigma must grow with scatter"
     assert sigmas[2] > 5 * sigmas[0], "sigma must scale with scatter, not be a constant"
+
+
+def test_physics_constraints_are_inside_the_search():
+    """Bare argmin-SSR picks near-parallel branches that fit well and intersect thousands of K
+    away (an unconstrained prototype returned -3644 K on real PMMA3 bins). Every returned fit
+    must satisfy the constraints _hard_violations checks, or be flagged as unconstrained."""
+    from extract_thermal import curvefit_bilinear
+
+    res = curvefit_bilinear(*_synthetic_bilinear(1e-3))
+    assert res["breakpoint_constrained"] is True
+    assert res["a_glassy"] < 0 and res["a_rubbery"] < 0
+    assert res["a_rubbery"] < res["a_glassy"], "rubbery branch must be the steeper one"
+    T, _ = _synthetic_bilinear(1e-3)
+    span = T.max() - T.min()
+    assert T.min() + 0.05 * span <= res["Tg_K"] <= T.max() - 0.05 * span
+
+
+def test_pure_noise_is_not_silently_reported_as_a_transition():
+    """No real breakpoint => many splits tie, or the winner's intersection is loose. Either
+    way the ambiguity measure must be large enough to route to TG_REVIEW."""
+    from extract_thermal import curvefit_bilinear
+
+    T = np.arange(250.0, 550.0, 10.0)
+    rho = 1.15 - 3.0e-4 * (T - 300.0) + np.random.default_rng(3).normal(0, 3e-3, len(T))
+    res = curvefit_bilinear(T, rho)
+    if res is None:
+        return  # no valid split at all is also an acceptable outcome
+    ambiguity = max(res["breakpoint_spread_K"], 2.0 * (res["tg_uncertainty_K"] or 0.0))
+    assert ambiguity > 20.0, f"a straight line was reported as a resolved transition: {res}"
+
+
+def test_no_valid_split_still_returns_a_fit_for_the_swap_path():
+    """Bilinear is the swap target when the hyperbola is rejected; returning None there would
+    leave the run with no fit at all. It must degrade to an unconstrained fit and say so."""
+    from extract_thermal import curvefit_bilinear
+
+    # Density RISING with T, with a kink so the branches are not collinear: every split
+    # violates the slope-sign constraint, but an intersection is still well defined.
+    T = np.arange(250.0, 450.0, 10.0)
+    rho = np.where(T < 350.0, 0.9 + 3.0e-4 * (T - 250.0), 0.93 + 9.0e-4 * (T - 350.0))
+    rho = rho + np.random.default_rng(7).normal(0, 1e-4, len(T))
+    res = curvefit_bilinear(T, rho)
+    assert res is not None, "must not strand the swap path"
+    assert res["breakpoint_constrained"] is False
+    assert res["a_glassy"] > 0, "the returned fit is the constraint-violating one, as flagged"
 
 
 # ── Bug 16: cache write must gate on derived output, not on the reliability flags ──
