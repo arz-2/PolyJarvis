@@ -45,6 +45,11 @@ from the raw numbers yourself.** The four possible verdicts:
     this is what `phase=melt`'s pre-cool gate exists to catch (see Phase below): extend melt-stage
     dwell in place, not the cooling ramp, and never re-melt from scratch. Owned by `/recover`'s
     MELT-MIXING procedure, not this worker.
+  - melt-anneal remedy (`chain_dimensions_verdict=CHAIN_COLLAPSED`) — chains never reached
+    Gaussian statistics: `⟨R_ee²⟩/⟨Rg²⟩` is below `0.72×` the finite-N ideal `6N/(N+1)`. Re-run
+    with a longer melt hold (`add_melt_npt=True`); a glassy chain does not change shape, so
+    extending at 300 K cannot fix it. `CHAIN_EXTENDED` is **not** a failure — backbone stiffness
+    legitimately raises the ratio (PSU/PEEK sit above ideal) and the gate binds collapse only.
   - rebuild remedy (`finite_size_verdict=SIZE_MIN_IMAGE_VIOLATION` or `SIZE_CHAIN_SELF_IMAGE`) — the
     box is too small for its own contents: below `2·cutoff_A` the pair potential is wrong, and below
     `2·Rg` every chain overlaps its own periodic images. Raise `nchain` and rebuild; no amount of
@@ -110,6 +115,7 @@ check_equilibration_comprehensive(
 - `result["chain"]["ct"]["tau_relax_ps"]` → `ct_tau_relax_ps`
 - `result["chain"]["ree"]["mean_R_ee_A"|"std_R_ee_A"|"n_chains"]` → `end_to_end_r_mean_A` / `_std_A` / `_n_chains`
 - `result["chain"]["backbone_path"]["n_backbone_atoms_mean"|"backbone_type_coverage"]`
+- `result["chain"]["dimensions"]["verdict"|"ree2_over_rg2"|"ratio_over_ideal"]`
 - `result["spatial"]["finite_size"]` → `L_min_A`, `L_over_2cutoff`, `L_over_2Rg`, `L_over_Ree`, `verdict`
 
 ### `extract_equilibrated_density`

@@ -176,3 +176,76 @@ def test_no_bond_topology_is_unavailable_not_guessed():
     chain.bonds = []
     _, idx = _backbone_atoms_sorted(chain, {1})
     assert idx is None
+
+
+# ─── chain-dimension gate polarity ───────────────────────────────────────────
+#
+# The gate binds COLLAPSE only. Stiffness raises <Ree^2>/<Rg^2> (a rod gives 12),
+# so CHAIN_EXTENDED is correct physics for the aromatic classes -- PSU1 measures
+# 1.22x the finite-N ideal. Writing pass as (verdict == "CHAIN_GAUSSIAN") would
+# silently make the gate two-sided and fail those cells for being what they are.
+
+
+def _verdict_for(norm):
+    """Replicate the classification for a given ratio/ideal, as the script does."""
+    from check_equilibration_comprehensive import (CHAIN_RATIO_EXTENDED,
+                                                   CHAIN_RATIO_MIN)
+    if norm < CHAIN_RATIO_MIN:
+        return "CHAIN_COLLAPSED"
+    if norm > CHAIN_RATIO_EXTENDED:
+        return "CHAIN_EXTENDED"
+    return "CHAIN_GAUSSIAN"
+
+
+def test_extended_chains_pass_the_gate():
+    from orchestration.scripts.enforce_gate import chain_dimensions_gate
+
+    for norm in (1.157, 1.220):                       # PEEK2, PSU1 as measured
+        verdict = _verdict_for(norm)
+        assert verdict == "CHAIN_EXTENDED"
+        chain = {"dimensions": {"available": True, "verdict": verdict,
+                                "pass": verdict != "CHAIN_COLLAPSED"}}
+        assert chain_dimensions_gate(chain) is True, f"{norm} must not fail a Class A gate"
+
+
+def test_collapsed_chains_fail_the_gate():
+    from orchestration.scripts.enforce_gate import chain_dimensions_gate
+
+    verdict = _verdict_for(0.634)                     # PMMA1 as measured
+    assert verdict == "CHAIN_COLLAPSED"
+    chain = {"dimensions": {"available": True, "verdict": verdict,
+                            "pass": verdict != "CHAIN_COLLAPSED"}}
+    assert chain_dimensions_gate(chain) is False
+
+
+def test_archive_calibration_separates_only_pmma1():
+    """0.72 is the midpoint of the one clean gap in the archive distribution. If a
+    future edit moves it, this pins what it was calibrated to separate."""
+    from check_equilibration_comprehensive import CHAIN_RATIO_MIN
+
+    archive = {"PMMA1": 0.637, "PLA3": 0.806, "PVC1": 0.895, "PEEK3": 0.898,
+               "PLA2": 0.901, "PMMA3": 0.911, "PLA1": 0.918, "cis-PBD2": 0.951,
+               "PE2": 0.982, "PSU2": 1.000, "PEEK1": 1.018, "cis-PBD4": 1.047,
+               "PLA4": 1.049, "cis-PBD3": 1.052, "cis-PBD1": 1.059, "PMMA2": 1.059,
+               "PE1": 1.076, "PSU4": 1.086, "PE3": 1.140, "PEEK2": 1.157,
+               "PSU1": 1.220}
+    below = {k for k, v in archive.items() if v < CHAIN_RATIO_MIN}
+    assert below == {"PMMA1"}
+
+
+def test_unavailable_is_none_not_a_pass():
+    from orchestration.scripts.enforce_gate import chain_dimensions_gate
+
+    assert chain_dimensions_gate({"dimensions": {"available": False}}) is None
+    assert chain_dimensions_gate({}) is None
+
+
+def test_gate_is_binding_and_structural_in_both_regimes():
+    from orchestration.scripts import enforce_gate as eg
+
+    assert "chain_dimensions" in eg.BINDING_GLASSY
+    assert "chain_dimensions" in eg.BINDING_RUBBERY
+    # No trajectory length reshapes a glassy chain, so EXTEND is the wrong remedy.
+    assert "chain_dimensions" in eg.STRUCTURAL_GATES
+    assert "chain_dimensions" not in eg.EXTENDABLE_GATES
+    assert "chain_dimensions" not in eg.ALWAYS_ADVISORY

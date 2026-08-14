@@ -53,6 +53,8 @@ RESULT:
   end_to_end_r_mean_A: <value or N/A>
   end_to_end_r_std_A: <value or N/A>
   end_to_end_n_chains: <value or N/A>
+  chain_dimensions_verdict: <CHAIN_GAUSSIAN | CHAIN_EXTENDED | CHAIN_COLLAPSED or N/A — CHAIN_EXTENDED passes, the gate binds collapse only>
+  ree2_over_rg2_ratio_over_ideal: <chain.dimensions.ratio_over_ideal or N/A>
   backbone_atoms_mean: <chain.backbone_path.n_backbone_atoms_mean or N/A>
   backbone_type_coverage: <chain.backbone_path.backbone_type_coverage or N/A — below 0.90 means the backbone_types you passed are mis-specified, not that the cell is bad>
   equilibration_warnings: <list or none>

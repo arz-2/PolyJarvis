@@ -10,7 +10,8 @@ Runs all convergence and structural checks in one pass and returns:
 
 Hard gates (block overall_pass):
   A. Density drift, energy drift, density SEM, energy SEM
-  B. Rg CV across chains (>30%)
+  B. Rg CV across chains (>30%), chain dimensions (<Ree^2>/<Rg^2> collapsed below
+     0.72x the finite-N ideal 6N/(N+1) -- one-sided, see run_structural_analysis)
   C. P2 nematic order (>0.10), Poisson-corrected density homogeneity CV (>cv_signal_max),
      finite size: minimum image (L >= 2*cutoff_A) and chain self-imaging (L >= 2*Rg)
 
@@ -243,6 +244,11 @@ def _mass_weighted_rg_sq(positions, masses):
 
 
 H_MASS_MAX = 2.0
+
+# ⟨R_ee²⟩/⟨Rg²⟩ as a fraction of the finite-N ideal 6N/(N+1). Binding below, advisory
+# above -- see the chain-dimension block in run_structural_analysis for the calibration.
+CHAIN_RATIO_MIN = 0.72
+CHAIN_RATIO_EXTENDED = 1.15
 
 
 def _backbone_atoms_sorted(chain, backbone_set):
@@ -568,6 +574,56 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "frames_analysed": n_frames,
     }
 
+    # ── Chain dimensions: did the chains reach Gaussian statistics? ──
+    # For an ideal chain of N backbone beads, ⟨R_ee²⟩/⟨Rg²⟩ = 6N/(N+1) -- the DISCRETE
+    # form, not the continuum 6, because at the DP this campaign runs (N = 85-500) the
+    # difference is real. Pooled over chains: the Gaussian prediction is a statement about
+    # ensemble means, and a mean of per-chain ratios is a biased estimator of it. Single
+    # chains scatter enormously (a per-chain minimum of 0.06 is expected for an ideal
+    # chain, not pathological), so nothing here reads a per-chain extremum.
+    #
+    # BINDING ONE-SIDED, LOW ONLY. Backbone stiffness raises the ratio -- a rigid rod gives
+    # 12 -- so a high value is correct physics for the aromatic classes, not an
+    # admissibility failure; PSU1 sits at 1.220x ideal and PEEK2 at 1.157x. Only collapse
+    # lowers it (a compact globule tends to ~2, i.e. ~0.33x), and no stiffness explains
+    # that. A symmetric band would have failed PSU1 and PEEK2 for being what they are.
+    #
+    # The 0.72 floor is calibrated on the 21 archived runs with a recoverable melt dump,
+    # not chosen: they span 0.637-1.220, and the single largest gap in that distribution
+    # is the 0.169 between PMMA1 (0.637) and the next run up (PLA3, 0.806), against a
+    # typical neighbour spacing below 0.02. 0.72 is the midpoint of that gap. PMMA1 is
+    # independently the archive's pathological cell -- density 6% low, under-annealed
+    # cooling, n_eff = 11 (the lowest recorded) -- so the separation is corroborated by
+    # evidence this metric does not use.
+    chain_dim_result = {"available": False}
+    rg2_chain = rg_sq_arr.mean(axis=0)
+    dim_ok = bb_mask & (n_bb_bonds > 0) & (rg2_chain > 0)
+    if int(dim_ok.sum()) >= 2:
+        n_backbone_atoms = float((n_bb_bonds[dim_ok] + 1.0).mean())
+        ratio = float(ree2_chain[dim_ok].mean() / rg2_chain[dim_ok].mean())
+        ideal = 6.0 * n_backbone_atoms / (n_backbone_atoms + 1.0)
+        norm = ratio / ideal
+        if norm < CHAIN_RATIO_MIN:
+            verdict = "CHAIN_COLLAPSED"
+        elif norm > CHAIN_RATIO_EXTENDED:
+            verdict = "CHAIN_EXTENDED"
+        else:
+            verdict = "CHAIN_GAUSSIAN"
+        chain_dim_result = {
+            "available": True,
+            # CHAIN_EXTENDED passes: the gate binds collapse only (see above). Reading
+            # `pass` off "verdict == CHAIN_GAUSSIAN" would silently make it two-sided.
+            "pass": verdict != "CHAIN_COLLAPSED",
+            "verdict": verdict,
+            "ree2_over_rg2": r(ratio, 3),
+            "ideal_ree2_over_rg2": r(ideal, 3),
+            "ratio_over_ideal": r(norm, 3),
+            "n_backbone_atoms": r(n_backbone_atoms, 1),
+            "n_chains_used": int(dim_ok.sum()),
+            "ratio_min": CHAIN_RATIO_MIN,
+            "ratio_extended": CHAIN_RATIO_EXTENDED,
+        }
+
     # ── Backbone path provenance ──
     # The path comes from bond topology, so backbone_types is a cross-check, not an input.
     # Low coverage means the declared types do not describe this chain's real backbone.
@@ -750,6 +806,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "ct": ct_result,
         "msd": msd_result,
         "p2": p2_result,
+        "dimensions": chain_dim_result,
         "backbone_path": backbone_path_result,
         "density_homogeneity": dh_result,
     }
@@ -818,6 +875,15 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
         cov_s = f"{cov:.0%}" if cov is not None else "—"
         lines.append(f"| Backbone path | {bbp.get('n_backbone_atoms_mean')} atoms "
                      f"(bond topology) | type coverage ≥90% | {cov_s} |")
+
+    cd = structural.get("dimensions", {})
+    if cd.get("available"):
+        label = {"CHAIN_GAUSSIAN": "PASS",
+                 "CHAIN_EXTENDED": "PASS — stiff (advisory)",
+                 "CHAIN_COLLAPSED": "FAIL — chains collapsed"}[cd["verdict"]]
+        lines.append(f"| Chain dimensions ⟨R_ee²⟩/⟨Rg²⟩ | {cd['ree2_over_rg2']} "
+                     f"({cd['ratio_over_ideal']}× ideal {cd['ideal_ree2_over_rg2']}, "
+                     f"N={cd['n_backbone_atoms']}) | ≥{cd['ratio_min']}× ideal | {label} |")
 
     c_inf = rg.get("C_inf")
     if c_inf is not None:
@@ -913,6 +979,12 @@ def collect_warnings(thermo, structural):
         w.append(f"backbone_types covers only {cov:.0%} of the measured backbone path "
                  f"({bbp.get('n_backbone_atoms_mean')} atoms) — the path itself comes from bond "
                  "topology and is unaffected, but backbone_types is mis-specified for this cell")
+
+    cd = structural.get("dimensions", {})
+    if cd.get("available") and cd["verdict"] == "CHAIN_EXTENDED":
+        w.append(f"⟨R_ee²⟩/⟨Rg²⟩ = {cd['ree2_over_rg2']} is {cd['ratio_over_ideal']}× the "
+                 f"finite-N ideal — chains are more extended than Gaussian. Expected for a "
+                 "stiff backbone; advisory, never blocking")
 
     c_inf = structural.get("rg", {}).get("C_inf")
     if c_inf is not None and (c_inf < 3.0 or c_inf > 15.0):
@@ -1085,6 +1157,9 @@ def main():
         structural.get("ct", {}).get("pass", True),
         # Finite-size: skipped (True) when the box or Rg could not be measured
         finite_size.get("pass", True),
+        # Chain dimensions: skipped (True) when fewer than two chains had a measurable
+        # backbone. Fails on CHAIN_COLLAPSED only — CHAIN_EXTENDED carries pass=True.
+        structural["dimensions"].get("pass", True),
     ]
     overall_pass = all(hard_checks)
 
@@ -1126,6 +1201,7 @@ def main():
             "msid": structural["msid"],
             "ct": structural["ct"],
             "msd": structural["msd"],
+            "dimensions": structural["dimensions"],
             "backbone_path": structural["backbone_path"],
         },
         "spatial": {

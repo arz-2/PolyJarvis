@@ -18,11 +18,11 @@ from pathlib import Path
 
 BINDING_GLASSY = {"density_drift", "density_sem", "energy_drift", "energy_sem",
                    "density_in_band", "density_homogeneity", "p2", "n_eff_density",
-                   "finite_size"}
+                   "finite_size", "chain_dimensions"}
 ADVISORY_GLASSY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "residual_stress"}
 
 BINDING_RUBBERY = {"density_sem", "density_homogeneity", "energy_drift", "energy_sem",
-                   "n_eff_density", "finite_size"}
+                   "n_eff_density", "finite_size", "chain_dimensions"}
 ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_drift",
                     "residual_stress"}
 # density_drift isn't in require_rubbery's binding text (density_sem is); treated advisory here.
@@ -127,6 +127,7 @@ def collect_gates(comp: dict) -> dict:
         "p2": spatial.get("p2", {}).get("pass"),
         "density_homogeneity": spatial.get("density_homogeneity", {}).get("pass"),
         "finite_size": finite_size_gate(spatial),
+        "chain_dimensions": chain_dimensions_gate(chain),
         **msd_msid_gates(chain),
     }
 
@@ -149,6 +150,27 @@ def finite_size_gate(spatial: dict):
     if not fs.get("available"):
         return None
     return fs.get("pass")
+
+
+def chain_dimensions_gate(chain: dict):
+    """Pass-polarity entry for the Gaussian-statistics check. None when fewer than two
+    chains carried a measurable backbone.
+
+    ONE-SIDED BY DESIGN: only CHAIN_COLLAPSED fails. Backbone stiffness raises
+    <Ree^2>/<Rg^2> (a rigid rod gives 12), so CHAIN_EXTENDED is correct physics for the
+    aromatic classes -- PSU1 measures 1.22x the finite-N ideal -- not an admissibility
+    failure. Binding the high side would fail those cells for being what they are.
+    """
+    cd = chain.get("dimensions") or {}
+    if not cd.get("available"):
+        return None
+    return cd.get("pass")
+
+
+def chain_dimensions_verdict(comp: dict):
+    """CHAIN_COLLAPSED | CHAIN_EXTENDED | CHAIN_GAUSSIAN | None."""
+    cd = (comp.get("chain") or {}).get("dimensions") or {}
+    return cd.get("verdict") if cd.get("available") else None
 
 
 def finite_size_verdict(comp: dict):
@@ -187,7 +209,7 @@ EXTENDABLE_GATES = {"density_drift", "energy_drift", "density_sem", "energy_sem"
 # Gates whose failure means the cell is WRONG, not merely unconverged -- extending at 300K
 # cannot fix these (policy: "a glass cannot densify below Tg").
 STRUCTURAL_GATES = {"density_homogeneity", "density_in_band", "p2", "density_value_binding",
-                    "finite_size"}
+                    "finite_size", "chain_dimensions"}
 
 
 def enforce(run_name, repo_root: Path):
@@ -415,6 +437,13 @@ def enforce_live(args) -> dict:
                       "phase=melt gate after each. The 1 ns default is ~100x short of the ~100 ns "
                       "melt anneal that reached PMMA 1.19 g/cm3 (NkepsuMbitou 2025). Still "
                       "under-band after rung 2 -> escalate to a different force field.")
+        elif "chain_dimensions" in failing_binding:
+            remedy = ("MELT-ANNEAL — chains are collapsed, not Gaussian: ⟨R_ee²⟩/⟨Rg²⟩ is below "
+                      "0.72x the finite-N ideal, which no backbone stiffness produces. The builder "
+                      "handed over an unrelaxed conformation and the melt hold did not open it up. "
+                      "Re-generate with add_melt_npt=True and melt_npt_steps=10*int(1.0e6/dt_fs), "
+                      "then re-run the phase=melt gate. Extending at 300 K cannot fix it — a glassy "
+                      "chain does not change shape.")
         elif "density_homogeneity" in failing_binding:
             remedy = ("MELT-MIXING — extend the melt stage in place (phase=melt extend_only at "
                       "T_workflow_K, cap 2), then re-run the phase=melt gate. Never re-melt from "
@@ -447,6 +476,8 @@ def enforce_live(args) -> dict:
         "finite_size_verdict": fs_verdict,
         "finite_size": (comp.get("spatial") or {}).get("finite_size"),
         "finite_size_min_image_unarmed": finite_size_min_image_unarmed(comp),
+        "chain_dimensions_verdict": chain_dimensions_verdict(comp),
+        "chain_dimensions": (comp.get("chain") or {}).get("dimensions"),
         "residual_stress": (comp.get("thermo") or {}).get("residual_stress"),
         "failing_binding_gates": failing_binding,
         "verdict": verdict,
