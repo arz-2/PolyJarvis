@@ -301,6 +301,29 @@ def test_wrapped_coordinates_withdraw_the_finite_size_check():
                                  "box unparseable")
 
 
+def test_unusable_coordinates_produce_no_verdict_at_all():
+    """Wrapped coordinates disarm chain_dimensions AND finite_size from one cause, and the
+    per-gate withdrawals would then hand back overall_pass on two dark Class A gates.
+    main() exits with status=failed instead -- the same exit an unanalysable trajectory
+    takes, because the remedy is re-running the analysis, not rebuilding the cell.
+
+    Verified end-to-end on archived PEEK1 with unwrap forced to raise: overall_pass=True
+    (finite_size and chain_dimensions both unarmed) before this exit existed."""
+    import inspect
+
+    import check_equilibration_comprehensive as cec
+
+    src = inspect.getsource(cec.main)
+    guard = src[src.index("# ── Coordinates unusable"):src.index("# ── Finite-size")]
+
+    # Keyed on the MEASURED bond length, so "unwrap raised but bonds are physical" still runs.
+    assert "coords_sane is False" in guard and "unwrap_error" in guard
+    assert '"status": "failed"' in guard and '"action_needed"' in guard
+    assert "atom_style" in guard, "the error must name the likely cause"
+    # Placed before the gates it invalidates, or it would grade on wrapped coordinates first.
+    assert src.index("# ── Coordinates unusable") < src.index("finite_size = check_finite_size")
+
+
 def test_p2_without_a_backbone_is_unarmed_not_passing():
     """P2 is built from backbone bond vectors, so with no backbone every frame contributes
     0.0 and the mean is a perfect 0.0 -- which passed a BINDING Class A gate on no

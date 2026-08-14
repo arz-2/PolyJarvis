@@ -169,7 +169,9 @@ def check_finite_size(data_file, cutoff_A, mean_rg_A, mean_ree_A,
     direction that manufactures a pass. Measured on the archive: PEEK1 Rg 24.62 A ->
     18.13 A wrapped, carrying L/2Rg 0.900 (SIZE_CHAIN_SELF_IMAGE) to 1.222 (SIZE_PASS).
     coords_sane is the same backbone-bond-length test that guards chain.dimensions;
-    unwrap_error is the fallback when no backbone was measurable to run it on.
+    unwrap_error is the fallback when no backbone was measurable to run it on. main() exits
+    before reaching this on wrapped coordinates, so the guard binds only direct callers --
+    it is the function's contract, not dead code.
     """
     if coords_sane is False:
         return {"available": False,
@@ -1211,6 +1213,36 @@ def main():
         graphs_dir=args.graphs_dir,
         cv_signal_max=args.cv_signal_max,
     )
+
+    # ── Coordinates unusable → no verdict at all ──
+    # Wrapped coordinates disarm chain_dimensions AND finite_size from ONE cause, and the
+    # per-gate withdrawal below would then return overall_pass on two dark Class A gates.
+    # This is a tooling failure, not a property of the cell: the remedy is re-running the
+    # analysis, not rebuilding, so it exits the same way an unanalysable trajectory does
+    # (see the n_prod/n_frames guards above) rather than emitting PASS or FAIL.
+    #
+    # Keyed on the MEASURED backbone bond length, not on unwrap_error: if unwrap raised but
+    # bonds still measure physical, no chain crossed a boundary and the run is analysable.
+    bbp = structural.get("backbone_path") or {}
+    coords_sane = bbp.get("coordinates_sane")
+    if coords_sane is False or (coords_sane is None and unwrap_error):
+        if coords_sane is False:
+            why = (f"backbone bond length {bbp.get('bond_length_rms_A')} Å is outside the "
+                   f"physical [{BACKBONE_BOND_A_MIN}, {BACKBONE_BOND_A_MAX}] Å window — the "
+                   "coordinates are wrapped")
+        else:
+            why = (f"coordinate unwrapping failed ({unwrap_error}) and no backbone was "
+                   "measurable to check the coordinates against")
+        print(json.dumps({
+            "status": "failed",
+            "error": f"{why}. Every coordinate-derived check (R_ee, C_inf, chain "
+                     "dimensions, finite size) is invalid, so no equilibration verdict was "
+                     "produced.",
+            "action_needed": f"re-run the analysis — atom_style {args.atom_style!r} may not "
+                             "match the .data file, which is what makes unwrapping fail. "
+                             "The cell itself is not implicated.",
+        }))
+        sys.exit(0)
 
     # ── Finite-size (periodic self-imaging) ──
     finite_size = check_finite_size(
