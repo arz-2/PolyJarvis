@@ -249,3 +249,41 @@ def test_gate_is_binding_and_structural_in_both_regimes():
     assert "chain_dimensions" in eg.STRUCTURAL_GATES
     assert "chain_dimensions" not in eg.EXTENDABLE_GATES
     assert "chain_dimensions" not in eg.ALWAYS_ADVISORY
+
+
+def test_wrapped_coordinates_are_unmeasurable_not_collapsed():
+    """The one path that could fail a good cell. If unwrap fails, R_ee is measured across
+    a periodic boundary and comes out hugely foreshortened while all-atom Rg barely moves
+    -- the ratio then reads as CHAIN_COLLAPSED and triggers a rebuild.
+
+    Measured on archived PMMA1: backbone bond length 1.585 A unwrapped vs 9.86 A wrapped.
+    That gap is what the window keys on, and every real backbone chemistry sits inside it
+    (aromatic C-C 1.40, C-C 1.54, Si-O 1.64, C-S 1.82)."""
+    from check_equilibration_comprehensive import (BACKBONE_BOND_A_MAX,
+                                                   BACKBONE_BOND_A_MIN)
+
+    for physical in (1.40, 1.54, 1.585, 1.64, 1.82):        # aromatic, C-C, PMMA, Si-O, C-S
+        assert BACKBONE_BOND_A_MIN <= physical <= BACKBONE_BOND_A_MAX, physical
+    for wrapped in (2.20, 3.37, 4.03, 9.86, 50.45):          # measured wrapped artifacts
+        assert not (BACKBONE_BOND_A_MIN <= wrapped <= BACKBONE_BOND_A_MAX), wrapped
+
+
+def test_unmeasurable_chain_dimensions_leave_the_gate_unarmed():
+    from orchestration.scripts.enforce_gate import chain_dimensions_gate
+
+    unmeasurable = {"dimensions": {"available": False,
+                                   "reason": "backbone bond length 9.86 A is outside ..."}}
+    assert chain_dimensions_gate(unmeasurable) is None, (
+        "wrapped coordinates must not fail the gate — they make it unmeasurable")
+
+
+def test_p2_without_a_backbone_is_unarmed_not_passing():
+    """P2 is built from backbone bond vectors, so with no backbone every frame contributes
+    0.0 and the mean is a perfect 0.0 -- which passed a BINDING Class A gate on no
+    evidence."""
+    from orchestration.scripts.enforce_gate import collect_gates
+
+    gates = collect_gates({"thermo": {}, "chain": {},
+                           "spatial": {"p2": {"available": False, "pass": None,
+                                              "p2_mean": None}}})
+    assert gates["p2"] is None

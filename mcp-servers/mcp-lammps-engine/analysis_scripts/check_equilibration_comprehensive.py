@@ -253,6 +253,18 @@ H_MASS_MAX = 2.0
 CHAIN_RATIO_MIN = 0.72
 CHAIN_RATIO_EXTENDED = 1.15
 
+# Physical backbone bond length window (Å). Every chain quantity built from the backbone
+# path -- R_ee, C_n, the shape ratio -- is meaningless if the coordinates are not unwrapped,
+# because a chain crossing a periodic boundary gets a hugely foreshortened R_ee while its
+# all-atom Rg barely moves. That reads as COLLAPSE and would fail a good cell.
+#
+# The measured bond length is the tell, and it is already computed: 1.42-1.59 Å across all
+# 21 archived runs, against 3-5 Å on wrapped coordinates. The window spans real backbone
+# chemistry with margin -- aromatic C-C 1.40, C-C 1.54, Si-O 1.64 (PSIL), C-S 1.82 (PSUL) --
+# so nothing physical trips it and the wrapped artifact cannot escape it.
+BACKBONE_BOND_A_MIN = 1.10
+BACKBONE_BOND_A_MAX = 2.10
+
 
 def _backbone_atoms_sorted(chain, backbone_set):
     """Return positions and indices of the chain's backbone, in BONDED order.
@@ -558,6 +570,17 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     ree2_chain = (ree_arr ** 2).sum(axis=-1).mean(axis=0)   # per chain, mean over frames
     l2_chain = l2_arr.mean(axis=0)
     ok = bb_mask & (n_bb_bonds > 0) & (l2_chain > 0)
+
+    # Coordinate sanity, checked BEFORE anything is derived from the path. A bond length
+    # outside the physical window means the trajectory is wrapped (unwrap failed), and then
+    # R_ee is foreshortened while Rg is not -- so C_n and the shape ratio are unmeasurable,
+    # NOT evidence of collapse. See BACKBONE_BOND_A_MIN/MAX.
+    bond_rms_A = float(np.sqrt(l2_chain[ok].mean())) if ok.any() else None
+    coords_sane = (bond_rms_A is not None
+                   and BACKBONE_BOND_A_MIN <= bond_rms_A <= BACKBONE_BOND_A_MAX)
+    if ok.any() and not coords_sane:
+        ok = np.zeros_like(ok)
+
     if ok.any():
         denom_chain = n_bb_bonds[ok] * l2_chain[ok]
         c_inf = float(ree2_chain[ok].mean() / denom_chain.mean())
@@ -601,7 +624,15 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     chain_dim_result = {"available": False}
     rg2_chain = rg_sq_arr.mean(axis=0)
     dim_ok = bb_mask & (n_bb_bonds > 0) & (rg2_chain > 0)
-    if int(dim_ok.sum()) >= 2:
+    if bb_mask.any() and not coords_sane:
+        # Unmeasurable, not collapsed. chain_dimensions_gate reads a missing `pass` as
+        # None and leaves the gate unarmed, which is the honest state.
+        chain_dim_result["reason"] = (
+            f"backbone bond length {bond_rms_A:.2f} A is outside the physical "
+            f"[{BACKBONE_BOND_A_MIN}, {BACKBONE_BOND_A_MAX}] A window — coordinates are "
+            "not unwrapped, so R_ee is foreshortened and the ratio would read as collapse")
+        chain_dim_result["bond_length_rms_A"] = r(bond_rms_A, 3)
+    elif int(dim_ok.sum()) >= 2:
         n_backbone_atoms = float((n_bb_bonds[dim_ok] + 1.0).mean())
         ratio = float(ree2_chain[dim_ok].mean() / rg2_chain[dim_ok].mean())
         ideal = 6.0 * n_backbone_atoms / (n_backbone_atoms + 1.0)
@@ -639,8 +670,10 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "n_backbone_atoms_mean": r(float(np.mean(path_lens)), 1) if path_lens else None,
         "n_chains_with_backbone": len(path_lens),
         "backbone_type_coverage": r(float(np.mean(covs)), 3) if covs else None,
-        "bond_length_rms_A": (r(float(np.sqrt(l2_chain[ok].mean())), 3)
-                              if ok.any() else None),
+        # Reported from the pre-sanity measurement, so the number that DISQUALIFIED a
+        # wrapped trajectory is still visible here rather than nulled along with it.
+        "bond_length_rms_A": r(bond_rms_A, 3) if bond_rms_A is not None else None,
+        "coordinates_sane": coords_sane if bond_rms_A is not None else None,
     }
 
     # ── MSID ──
@@ -988,6 +1021,10 @@ def collect_warnings(thermo, structural):
     if tau is not None and tau > 0.10:
         w.append(f"τ_eff = {tau*100:.1f}% of trajectory — short statistical sample; consider longer production run")
 
+    cd0 = structural.get("dimensions", {})
+    if not cd0.get("available") and cd0.get("reason"):
+        w.append(f"chain dimensions NOT EVALUATED: {cd0['reason']}")
+
     bbp = structural.get("backbone_path", {})
     cov = bbp.get("backbone_type_coverage")
     if bbp.get("available") and cov is not None and cov < 0.90:
@@ -1108,8 +1145,12 @@ def main():
     try:
         u.trajectory.add_transformations(trans.unwrap(u.atoms))
         print("  Coordinate unwrapping applied", flush=True)
+        unwrap_error = None
     except Exception as e:
         print(f"  WARNING: unwrap failed ({e})", flush=True)
+        # Recorded, not just printed: wrapped coordinates foreshorten R_ee and would
+        # otherwise surface only as a chain-dimension verdict with no stated cause.
+        unwrap_error = str(e)
 
     # Adaptive grid_n: target ~25 atoms/voxel, clamp [3, 10]
     grid_n = max(3, min(10, int(round((n_atoms / 25) ** (1 / 3)))))
@@ -1181,6 +1222,10 @@ def main():
     overall_pass = all(hard_checks)
 
     warnings_list = collect_warnings(thermo, structural)
+    if unwrap_error:
+        warnings_list.insert(0, f"coordinate unwrapping FAILED ({unwrap_error}) — every "
+                             "chain quantity built from the backbone path (R_ee, C_inf, "
+                             "chain dimensions) is unreliable on wrapped coordinates")
 
     d05 = build_d05_markdown(
         thermo=thermo, structural=structural,
