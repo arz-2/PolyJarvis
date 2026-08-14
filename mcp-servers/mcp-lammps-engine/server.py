@@ -2543,8 +2543,6 @@ def _run_check_equilibration_comprehensive(
     skip_frames: int,
     timestep_fs: float,
     dump_every: int,
-    n_backbone_bonds: Optional[int],
-    bond_length_A: float,
     eq_fraction: float,
     drift_threshold_pct: float,
     drift_pvalue: float,
@@ -2570,7 +2568,6 @@ def _run_check_equilibration_comprehensive(
         f"--skip_frames {skip_frames}",
         f"--timestep_fs {timestep_fs}",
         f"--dump_every {dump_every}",
-        f"--bond_length_A {bond_length_A}",
         f"--eq_fraction {eq_fraction}",
         f"--drift_threshold_pct {drift_threshold_pct}",
         f"--drift_pvalue {drift_pvalue}",
@@ -2583,8 +2580,6 @@ def _run_check_equilibration_comprehensive(
     ]
     if cutoff_A is not None:
         parts.append(f"--cutoff_A {cutoff_A}")
-    if n_backbone_bonds is not None:
-        parts.append(f"--n_backbone_bonds {n_backbone_bonds}")
     if graphs_dir:
         parts.append(f"--graphs_dir {graphs_dir}")
     if ct_min_decay is not None:
@@ -2623,8 +2618,6 @@ def check_equilibration_comprehensive(
     cutoff_A: Optional[float],
     skip_frames: int = 50,
     dump_every: int = 1000,
-    n_backbone_bonds: Optional[int] = None,
-    bond_length_A: float = 1.54,
     eq_fraction: float = 0.5,
     drift_threshold_pct: float = 1.0,
     drift_pvalue: float = 0.01,
@@ -2680,8 +2673,6 @@ def check_equilibration_comprehensive(
                              gate (L >= 2*cutoff_A). Null evaluates chain self-imaging only.
         skip_frames:         Frames to skip at start of dump (production window start).
         dump_every:          Dump frequency in steps (auto-detected from dump header if possible).
-        n_backbone_bonds:    Backbone bonds per chain (DP − 1); enables C∞ calculation.
-        bond_length_A:       Backbone bond length in Å for C∞ (default: 1.54 C-C).
         eq_fraction:         Fraction of thermo rows used as production window.
         drift_threshold_pct: Max allowed thermo drift as % of mean.
         drift_pvalue:        p-value threshold for drift significance.
@@ -2726,8 +2717,6 @@ def check_equilibration_comprehensive(
             skip_frames         = skip_frames,
             timestep_fs         = timestep_fs,
             dump_every          = dump_every,
-            n_backbone_bonds    = n_backbone_bonds,
-            bond_length_A       = bond_length_A,
             eq_fraction         = eq_fraction,
             drift_threshold_pct = drift_threshold_pct,
             drift_pvalue        = drift_pvalue,

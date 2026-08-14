@@ -141,7 +141,7 @@ def test_harmless_optionals_keep_their_defaults():
     do not, and forcing them would break every call site for no protocol gain."""
     sig = _signature(LAMMPS_SERVER, "check_equilibration_comprehensive")
     for name in ("skip_frames", "dump_every", "eq_fraction", "block_count",
-                 "temp_col", "density_col", "energy_col", "bond_length_A"):
+                 "temp_col", "density_col", "energy_col"):
         assert sig[name], f"{name} lost its default"
     bm = _signature(LAMMPS_SERVER, "run_bulk_modulus_series")
     for name in ("thermo_freq", "output_dir"):

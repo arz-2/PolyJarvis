@@ -28,9 +28,7 @@ Usage:
         [--output_dir /path/to/out] \
         [--skip_frames 50] \
         [--timestep_fs 1.0] \
-        [--dump_every 1000] \
-        [--n_backbone_bonds 118] \
-        [--bond_length_A 1.54]
+        [--dump_every 1000]
 """
 
 import argparse
@@ -394,14 +392,15 @@ def _kww_fit(lags_ps, ct_values):
 
 
 def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
-                            n_backbone_bonds, bond_length_A, timestep_fs, dump_every,
+                            timestep_fs, dump_every,
                             grid_n, trajectory_slice, ct_min_decay=None, graphs_dir=None,
-                            cv_signal_max=0.11):
+                            cv_signal_max=0.11, chain_ratio_min=None):
     """Single-pass over dump frames. Returns raw per-frame arrays for all checks."""
     # Storage
     rg_sq_per_frame = []   # (n_frames, n_chains)
     ree_per_frame = []     # (n_frames, n_chains, 3)  — end-to-end vectors
     com_per_frame = []     # (n_frames, n_chains, 3)  — CoMs for MSD
+    l2_per_frame = []      # (n_frames, n_chains)     — mean backbone bond length² per chain
     p2_per_frame = []
     cv_per_frame = []
     msid_accum = None      # shape (n_backbone_per_chain - 1,)
@@ -424,7 +423,12 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         bb_pos, bb_ix = _backbone_atoms_sorted(ch, backbone_set)
         chain_data[cid] = {"sel": ch, "masses": masses, "bb_ix": bb_ix,
                            "has_bb": bb_pos is not None,
-                           "type_coverage": backbone_type_coverage(u, bb_ix, backbone_set)}
+                           "type_coverage": backbone_type_coverage(u, bb_ix, backbone_set),
+                           # Backbone bonds per chain, MEASURED as the length of the
+                           # reconstructed path. Not DP-1: a repeat unit contributes as
+                           # many backbone bonds as it has backbone atoms, so the repeat
+                           # count is low by that factor and drives C_n up by it.
+                           "n_bb": (len(bb_ix) - 1) if bb_pos is not None else 0}
 
     # Initialise MSID accumulator
     first_bb_len = None
@@ -444,7 +448,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     for ts in trajectory_slice:
         box = ts.dimensions[:3]
 
-        rg_sq_row, ree_row, com_row = [], [], []
+        rg_sq_row, ree_row, com_row, l2_row = [], [], [], []
         bb_bond_vecs_all = []
 
         for cid in chain_ids:
@@ -471,10 +475,12 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
                 R = bb_pos_sorted[-1] - bb_pos_sorted[0]
                 ree_row.append(R)
 
-                # Backbone bond vectors for P2
-                for i in range(len(bb_pos_sorted) - 1):
-                    dr = bb_pos_sorted[i + 1] - bb_pos_sorted[i]
-                    bb_bond_vecs_all.append(dr)
+                # Backbone bond vectors for P2, and ⟨l²⟩ for C_n. The MEAN SQUARE is the
+                # quantity C_n needs — squaring a mean length would misstate it wherever a
+                # backbone mixes bond types (aromatic C–C 1.40 Å with ether C–O 1.43 Å).
+                bonds = bb_pos_sorted[1:] - bb_pos_sorted[:-1]
+                bb_bond_vecs_all.extend(bonds)
+                l2_row.append(float((bonds ** 2).sum(axis=1).mean()) if len(bonds) else 0.0)
 
                 # MSID accumulation
                 if msid_n_vals is not None and len(bb_pos_sorted) == first_bb_len:
@@ -484,10 +490,12 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
                         msid_count_arr[j] += 1
             else:
                 ree_row.append(np.zeros(3))
+                l2_row.append(0.0)
 
         rg_sq_per_frame.append(rg_sq_row)
         ree_per_frame.append(ree_row)
         com_per_frame.append(com_row)
+        l2_per_frame.append(l2_row)
 
         # P2
         if bb_bond_vecs_all:
@@ -506,9 +514,16 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     rg_sq_arr = np.array(rg_sq_per_frame)   # (n_frames, n_chains)
     ree_arr = np.array(ree_per_frame)        # (n_frames, n_chains, 3)
     com_arr = np.array(com_per_frame)        # (n_frames, n_chains, 3)
+    l2_arr = np.array(l2_per_frame)          # (n_frames, n_chains)
     p2_arr = np.array(p2_per_frame)
     cv_arr = np.array(cv_per_frame)
     n_frames = frame_idx
+
+    # Chains with no resolvable backbone carry a zero R_ee vector (see the frame loop), so
+    # every chain-conformation quantity must be restricted to this mask. Pooling the zeros
+    # would drag ⟨R_ee²⟩ down and read as chain collapse.
+    bb_mask = np.array([chain_data[cid]["has_bb"] for cid in chain_ids], dtype=bool)
+    n_bb_bonds = np.array([chain_data[cid]["n_bb"] for cid in chain_ids], dtype=float)
 
     # ── Rg ──
     chain_mean_rg = np.sqrt(rg_sq_arr).mean(axis=0)  # per chain, mean over frames
@@ -517,9 +532,29 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     rg_cv = float(np.std(chain_mean_rg) / np.mean(chain_mean_rg)) if len(chain_mean_rg) > 1 else 0.0
     rg_spread_flag = rg_cv > 0.30
 
+    # ── C_n (characteristic ratio) ──
+    # C_n = ⟨R_ee²⟩ / (n⟨l²⟩) — the textbook definition, and the one the [3, 15] window
+    # refers to. The Rg form 6⟨Rg²⟩/(n⟨l²⟩) equals it only for an ideal chain, which would
+    # make C_n and the shape ratio below the same measurement twice and bias C_n by exactly
+    # the non-Gaussianity that ratio exists to detect.
+    #
+    # Both inputs are MEASURED, never supplied: n is the bond count of the reconstructed
+    # backbone path (not DP-1, which counts repeat units and so runs low by the
+    # bonds-per-repeat factor), and ⟨l²⟩ is the mean square backbone bond length along that
+    # path (not an assumed 1.54 Å C-C, which is wrong for aromatic, ether and Si-O
+    # backbones). Averages are pooled over chains because the Gaussian prediction applies
+    # to ensemble means; the per-chain spread is reported separately as C_inf_cv.
     c_inf = None
-    if n_backbone_bonds is not None and bond_length_A > 0:
-        c_inf = float(6.0 * overall_mean_rg2 / (n_backbone_bonds * bond_length_A ** 2))
+    c_inf_cv = None
+    ree2_chain = (ree_arr ** 2).sum(axis=-1).mean(axis=0)   # per chain, mean over frames
+    l2_chain = l2_arr.mean(axis=0)
+    ok = bb_mask & (n_bb_bonds > 0) & (l2_chain > 0)
+    if ok.any():
+        denom_chain = n_bb_bonds[ok] * l2_chain[ok]
+        c_inf = float(ree2_chain[ok].mean() / denom_chain.mean())
+        c_per_chain = ree2_chain[ok] / denom_chain
+        c_inf_cv = (float(c_per_chain.std() / c_per_chain.mean())
+                    if len(c_per_chain) > 1 and c_per_chain.mean() > 0 else 0.0)
 
     rg_result = {
         "pass": bool(not rg_spread_flag),
@@ -528,6 +563,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "mean_Rg2_A2": r(overall_mean_rg2, 3),
         "rg_spread_flag": rg_spread_flag,
         "C_inf": r(c_inf, 3) if c_inf is not None else None,
+        "C_inf_cv": r(c_inf_cv, 3) if c_inf_cv is not None else None,
         "n_chains": len(chain_ids),
         "frames_analysed": n_frames,
     }
@@ -544,6 +580,8 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "n_backbone_atoms_mean": r(float(np.mean(path_lens)), 1) if path_lens else None,
         "n_chains_with_backbone": len(path_lens),
         "backbone_type_coverage": r(float(np.mean(covs)), 3) if covs else None,
+        "bond_length_rms_A": (r(float(np.sqrt(l2_chain[ok].mean())), 3)
+                              if ok.any() else None),
     }
 
     # ── MSID ──
@@ -878,7 +916,9 @@ def collect_warnings(thermo, structural):
 
     c_inf = structural.get("rg", {}).get("C_inf")
     if c_inf is not None and (c_inf < 3.0 or c_inf > 15.0):
-        w.append(f"C∞ = {c_inf} is outside broad expected range [3, 15] — verify backbone_types and n_backbone_bonds")
+        w.append(f"C∞ = {c_inf} is outside broad expected range [3, 15] — verify backbone_types; "
+                 "both n and ⟨l²⟩ are measured from the sorted backbone, so a wrong backbone "
+                 "selection is the remaining input error")
 
     msid = structural.get("msid", {})
     if msid.get("available") and not msid.get("gaussian_pass", True):
@@ -915,8 +955,6 @@ def main():
     parser.add_argument("--skip_frames",       type=int,   default=50)
     parser.add_argument("--timestep_fs",       type=float, default=1.0)
     parser.add_argument("--dump_every",        type=int,   default=1000)
-    parser.add_argument("--n_backbone_bonds",  type=int,   default=None)
-    parser.add_argument("--bond_length_A",     type=float, default=1.54)
     parser.add_argument("--eq_fraction",       type=float, default=0.5)
     parser.add_argument("--drift_threshold_pct", type=float, default=1.0)
     parser.add_argument("--drift_pvalue",      type=float, default=0.01)
@@ -1017,8 +1055,6 @@ def main():
         backbone_set=backbone_set,
         n_atoms=n_atoms,
         skip_frames=args.skip_frames,
-        n_backbone_bonds=args.n_backbone_bonds,
-        bond_length_A=args.bond_length_A,
         timestep_fs=args.timestep_fs,
         dump_every=dump_every,
         grid_n=grid_n,
@@ -1090,6 +1126,7 @@ def main():
             "msid": structural["msid"],
             "ct": structural["ct"],
             "msd": structural["msd"],
+            "backbone_path": structural["backbone_path"],
         },
         "spatial": {
             "p2": structural["p2"],
