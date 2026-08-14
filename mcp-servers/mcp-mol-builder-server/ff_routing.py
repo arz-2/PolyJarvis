@@ -45,7 +45,7 @@ def _fallback(reason: str) -> dict:
     return {
         "preferred_ff": None,
         "preferred_builder": None,
-        "ff_confidence": "low",
+        "ff_confidence": "uncited",
         "ff_justification": f"routing unavailable ({reason}); consult polymer_rules.json",
         "ff_justification_doi": None,
     }
@@ -69,7 +69,11 @@ def get_preferred_ff(class_name: str) -> dict:
     return {
         "preferred_ff": entry.get("preferred_ff"),
         "preferred_builder": entry.get("preferred_builder"),
-        "ff_confidence": entry.get("confidence", "low"),
+        # Derived from citation presence, the same rule gen_prompt.py applies when it writes
+        # ff_confidence into the build prompt. The old classes.<CLASS>.confidence field this
+        # read was retired in 49877fe; entry.get on a field no longer in the file silently
+        # graded every class "low" and contradicted the prompt the builder was handed.
+        "ff_confidence": "cited" if entry.get("ff_justification_doi") else "uncited",
         "ff_justification": entry.get("ff_note", ""),
         "ff_justification_doi": entry.get("ff_justification_doi"),
     }

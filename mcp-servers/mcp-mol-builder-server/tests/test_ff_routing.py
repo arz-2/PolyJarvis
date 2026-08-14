@@ -24,7 +24,9 @@ def test_routing_matches_polymer_rules(cid):
     e = CLASSES[cid]
     assert got["preferred_ff"] == e["preferred_ff"]
     assert got["preferred_builder"] == e["preferred_builder"]
-    assert got["ff_confidence"] == e["confidence"]
+    # classes.<CLASS>.confidence was retired in 49877fe; ff_confidence is now derived from
+    # citation presence, matching what gen_prompt.py writes into the build prompt.
+    assert got["ff_confidence"] == ("cited" if e.get("ff_justification_doi") else "uncited")
     assert got["ff_justification_doi"] == e.get("ff_justification_doi")
 
 
@@ -53,12 +55,11 @@ def test_opls_classes_use_canonical_field_string(cid):
 def test_pstr_routes_pcff():
     """PSTR (polystyrenics) uses PCFF via EMC: Class II explicitly parameterizes aromatic
     C-H charges and pi-dihedral cross-terms governing PS Tg (~373 K). OPLS-AA over-predicts
-    aPS Tg by ~+79 K (Afzal 2021) so PCFF is preferred for thermomechanical accuracy.
-    confidence=medium until a direct PCFF PS Tg paper is found."""
+    aPS Tg by ~+79 K (Afzal 2021) so PCFF is preferred for thermomechanical accuracy."""
     got = ff_routing.get_preferred_ff("PSTR")
     assert got["preferred_ff"] == "pcff"
     assert got["preferred_builder"] == "emc"
-    assert got["ff_confidence"] == "medium"
+    assert got["ff_confidence"] == "cited"
     assert CLASSES["PSTR"]["forcefield"] == "PCFF"
     assert CLASSES["PSTR"]["charge_method"] == "bond-increment"
     assert CLASSES["PSTR"]["electrostatics"] == "pppm"
@@ -68,4 +69,4 @@ def test_unknown_class_falls_back_without_raising():
     got = ff_routing.get_preferred_ff("UNKNOWN")
     assert got["preferred_builder"] is None
     assert got["preferred_ff"] is None
-    assert got["ff_confidence"] == "low"
+    assert got["ff_confidence"] == "uncited"

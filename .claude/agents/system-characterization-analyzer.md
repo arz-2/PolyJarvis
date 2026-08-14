@@ -138,8 +138,10 @@ work runs at `npt_prod300`; rubbery Murnaghan work runs at `npt_production`).
    refuses to write them. This step is the `characterized` half only (Phase-A timing knobs); the
    `validated` stamp is the separate bar the plan_mode gate actually reads.
 
-   It also enforces the reliability gate: no entry is written unless at least one of
-   `probe_tau_relax_reliable`/`probe_K0_reliable` is `true`, and it exits 1 saying so. That exit
+   It also enforces the write gate: no entry is written unless at least one `derived_*` field
+   is non-null, and it exits 1 saying so. A K0-reliable/tau-unreliable probe derives nothing
+   (every knob needs `probe_tau_relax_reliable`; the `K_deform` pair needs both flags), so
+   passing the flags alone is not sufficient. That exit
    is expected on a fully-failed probe, not an error to retry — the orchestrator's novelty gate
    (`orchestration/ORCHESTRATOR.md`) is a bare key-existence check, so an entry written when both
    flags failed would permanently mark this exact SMILES as no longer novel. Steps 4/5/7 still

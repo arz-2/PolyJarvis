@@ -921,7 +921,7 @@ def _get_preferred_ff(smiles: str, class_name: str) -> dict:
         return {
             "preferred_ff": None,
             "preferred_builder": None,
-            "ff_confidence": "low",
+            "ff_confidence": "uncited",
             "ff_justification": f"routing lookup failed: {exc}",
             "ff_justification_doi": None,
         }

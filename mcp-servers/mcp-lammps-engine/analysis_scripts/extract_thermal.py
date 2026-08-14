@@ -266,6 +266,21 @@ def curvefit_bilinear(T, rho, tg_hint=None):
         ss_tot = np.sum((rho - np.mean(rho))**2)
         r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
         Tg_alt = (b2 - b1) / (a1 - a2) if abs(a1 - a2) > 1e-12 else Tg
+        # Tg uncertainty. NOT pcov[4,4]: bilinear_indep switches on np.where(T < Tg), so the
+        # residual is piecewise-constant in Tg, curve_fit's finite-difference gradient for it is
+        # identically zero, and its variance comes back 0 -- a false claim of infinite precision,
+        # worse than reporting nothing. The four line parameters ARE genuinely fitted, so
+        # propagate them onto the intersection Tg_alt = (b2-b1)/(a1-a2) by the delta method.
+        # Without an interval run_summary grades a bare point against a band, and the
+        # physics-validity swap routinely makes this fit the primary one.
+        try:
+            D = a1 - a2
+            grad = np.array([-(b2 - b1) / D**2, -1.0 / D, (b2 - b1) / D**2, 1.0 / D])
+            tg_sigma = float(np.sqrt(abs(grad @ pcov[:4, :4] @ grad)))
+            if not np.isfinite(tg_sigma) or tg_sigma == 0.0:
+                tg_sigma = None
+        except Exception:
+            tg_sigma = None
         return {
             "Tg_K":      float(Tg),
             "Tg_alt_K":  float(Tg_alt),
@@ -274,6 +289,10 @@ def curvefit_bilinear(T, rho, tg_hint=None):
             "a_rubbery": float(a2),
             "b_rubbery": float(b2),
             "r_squared": float(r2),
+            # Deliberately NOT "tg_uncertainty_K": this sigma is about Tg_alt_K, and Tg_K from
+            # this fit is the unrefined seed (see above), so pairing them would centre a tight
+            # interval on a different number than the one graded.
+            "tg_alt_uncertainty_K": tg_sigma,
         }
     except Exception:
         return None
@@ -1044,6 +1063,11 @@ def main():
                                  if cf_result.get("transition_width_c_K") is not None else None),
         "tg_uncertainty_K":    (round(cf_result["tg_uncertainty_K"], 1)
                                 if cf_result.get("tg_uncertainty_K") is not None else None),
+        # Interval on Tg_alternative_K, not on Tg_K. Non-null only for bilinear_curvefit, whose
+        # Tg_K is an unrefined seed with no meaningful covariance -- so it must not be read as
+        # the headline's error bar.
+        "tg_alt_uncertainty_K": (round(cf_result["tg_alt_uncertainty_K"], 1)
+                                 if cf_result.get("tg_alt_uncertainty_K") is not None else None),
         "binning_method":      binning_method,
         "fit_params": {
             "a_glassy":  cf_result["a_glassy"],

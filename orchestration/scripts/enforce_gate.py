@@ -72,6 +72,17 @@ def density_in_band(plateau_mean, exp_field, polymer_key, band_pct=5.0):
     return abs(gap_pct) <= band_pct, gap_pct, exp_val
 
 
+def _stage_log_for(data_path):
+    """<stage>/<stage>_out.data -> <stage>/<stage>.log, or None if it isn't there."""
+    if not data_path:
+        return None
+    p = Path(data_path)
+    if not p.name.endswith("_out.data"):
+        return None
+    log = p.with_name(p.name[: -len("_out.data")] + ".log")
+    return str(log) if log.exists() else None
+
+
 def classify(gates: dict, regime: str, dp_typical, ct_gate_reliable):
     """Shared clause-selection + binding/advisory split, used by both the retrospective
     (enforce) and live (enforce_live) paths."""
@@ -333,6 +344,12 @@ def enforce_live(args) -> dict:
                 "assess_cooling_contraction_args": {
                     "glass_data": args.glass_data,
                     "melt_data": args.melt_data,
+                    # Stage logs carry the whole NPT plateau; the _out.data files carry one
+                    # fluctuating final frame. Derived from the data paths by the stage layout
+                    # (<stage>/<stage>_out.data -> <stage>/<stage>.log); assess_cooling_
+                    # contraction falls back to the final frame when the log is absent.
+                    "glass_log": _stage_log_for(args.glass_data),
+                    "melt_log": _stage_log_for(args.melt_data),
                     "exp_density_gcm3": exp_density,
                     "tg_K": args.tg_k,
                     "t_equil_K": args.t_equil_k,

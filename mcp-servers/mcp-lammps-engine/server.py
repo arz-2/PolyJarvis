@@ -1919,6 +1919,36 @@ def _require_output_dir(output_dir, tool: str, legacy: str):
             f"{tool}: output_dir is required (it used to default to {legacy}, which "
             f"generate_run_summary never reads — the JSON was written and silently lost)."
         )
+    # The analysis CLIs run with cwd=LAMBDA_WORKDIR, so a relative output_dir resolves under
+    # that operator-specific directory instead of the run's raw/ dir — the JSON lands outside
+    # the workspace and only a filesystem-wide find recovers it. Same failure as a null, so
+    # it is the same error.
+    if not os.path.isabs(output_dir):
+        raise ValueError(
+            f"{tool}: output_dir must be an absolute path (got {output_dir!r}); relative "
+            f"paths resolve against LAMBDA_WORKDIR ({LAMBDA_WORKDIR}), not the run directory."
+        )
+
+
+def _save_gate_verdict(out_dir, result: dict) -> dict:
+    """Persist the equilibration-gate verdict to <out_dir>/equilibration_gate.json.
+
+    The decision that authorises (or blocks) every downstream property extraction used to exist
+    only in the calling worker's reply, leaving nothing to audit — unlike every other stage,
+    which leaves a JSON in raw/. Failures are written too: a probe that blew up is the case most
+    worth having a record of.
+    """
+    if not out_dir:
+        return result
+    try:
+        verdict_path = Path(out_dir) / "equilibration_gate.json"
+        verdict_path.parent.mkdir(parents=True, exist_ok=True)
+        verdict_path.write_text(json.dumps(result, indent=2, default=str))
+        result["saved_to"] = str(verdict_path)
+    except Exception as e:  # never let an audit-trail write mask the verdict itself
+        logger.error(f"could not save equilibration gate verdict: {e}")
+        result["save_error"] = str(e)
+    return result
 
 
 def _analysis_run_background(run_id: str, func, kwargs: dict):
@@ -2921,6 +2951,10 @@ def enforce_equilibration_gate(
                  f"--t_equil_K {cc_args['t_equil_K']}"]
         if cc_args.get("melt_data"):
             parts.append(f"--melt_data {cc_args['melt_data']}")
+        if cc_args.get("melt_log"):
+            parts.append(f"--melt_log {cc_args['melt_log']}")
+        if cc_args.get("glass_log"):
+            parts.append(f"--glass_log {cc_args['glass_log']}")
         if cc_args.get("alpha_glass") is not None:
             parts.append(f"--alpha_glass {cc_args['alpha_glass']}")
         if cc_args.get("alpha_melt") is not None:
@@ -2930,15 +2964,16 @@ def enforce_equilibration_gate(
         stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=600)
         cooling_result = _parse_json_from_stdout(stdout, stderr)
         if cooling_result.get("status") == "failed":
-            return {"status": "failed",
-                    "error": "assess_cooling_contraction probe failed inside enforce_equilibration_gate",
-                    "detail": cooling_result}
+            failure = {"status": "failed",
+                       "error": "assess_cooling_contraction probe failed inside enforce_equilibration_gate",
+                       "detail": cooling_result}
+            return _save_gate_verdict(out_dir, failure)
         save_path = Path(result["save_result_to"])
         save_path.parent.mkdir(parents=True, exist_ok=True)
         save_path.write_text(json.dumps(cooling_result, indent=2))
         result = enforce_gate.enforce_live(live_args)  # re-run now that the cache exists
 
-    return result
+    return _save_gate_verdict(out_dir, result)
 
 
 @mcp.tool()
@@ -3589,6 +3624,8 @@ def extract_bulk_modulus_murnaghan(
             fluctuation_bulk_modulus_GPa, fluctuation_divergence_pct — cross-check
             warnings        — list of any quality flags
     """
+    _require_output_dir(output_dir, "extract_bulk_modulus_murnaghan", "<log_file dir>/bulk_analysis")
+
     run_id = run_manager.create(
         "extract_bulk_modulus_murnaghan",
         {"log_files": log_files, "output_dir": output_dir}
