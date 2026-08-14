@@ -26,7 +26,7 @@ Optional overrides (defaults come from polymer_rules.json):
   --dp N                  degree of polymerisation override
   --nchain N              number of chains override
   --lammps_flags JSON     e.g. '{"use_pcff":true,"use_opls":false}'
-  --is_glassy BOOL        true|false (deform, murnaghan, analyze-bm)
+  --is_glassy BOOL        true|false (deform, murnaghan). Omitted → derived from T_workflow.
   --tg_k FLOAT            Tg in K (from tg-analysis-worker RESULT)
   --tg_fit_quality STR    Tg fit quality (run-summary + analyze-bm)
   --deform_log PATH       npt_deform log (analyze-bm, glassy deform fallback)
@@ -36,7 +36,7 @@ Optional overrides (defaults come from polymer_rules.json):
   --npt_prod_dump PATH    structural-check dump override (equil-check); defaults to the
                           melt nvt_production.dump — NOT the production NPT dump
   --ff STR                force field string (run-summary, analyze-bm)
-  --backbone_types JSON   atom type IDs as JSON list (equil-check only)
+  --backbone_types JSON   atom type IDs as JSON list (equil-check, analyze-tg)
   --enthalpy_col STR      LAMMPS thermo column name for enthalpy (analyze-tg; default "Enthalpy")
   --output_dir PATH       raw/ output directory
 
@@ -437,6 +437,17 @@ def _regime(args, cls: dict) -> str:
     return "rubbery" if _resolve_t_workflow(args, cls) <= 300.0 else "glassy"
 
 
+def _is_glassy(args, cls: dict) -> bool:
+    """Whether the BM stages treat this cell as glassy. The orchestrator's `--is_glassy`, set from
+    the thermal track's measured Tg, wins; with the flag absent the regime oracle decides. An
+    argparse default cannot: it applies to every class alike, so a rubbery run silently reads as
+    glassy and takes the Murnaghan/deform glassy branch."""
+    flag = getattr(args, 'is_glassy', None)
+    if flag is not None:
+        return str(flag).lower() not in ("false", "0", "no")
+    return _regime(args, cls) == "glassy"
+
+
 def _velocity_seed(args) -> int:
     """The equilibration chain's `velocity all create` seed. generate_equilibration_workflow
     rejects a null seed, so resolve one here: the plan's pinned value if it has one, else a
@@ -704,7 +715,7 @@ def _resolve_deform_params(args, cls: dict) -> dict:
         "equil_data_path": args.data_path,
         "lammps_flags": _lammps_flags(args.lammps_flags, cls),
         "work_dir": args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/mechanical",
-        "is_glassy": args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else True,
+        "is_glassy": _is_glassy(args, cls),
         "K_deform_rate_inv_s": _pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 1e8),
         "K_deform_rate_slow_inv_s": cls.get('K_deform_rate_slow_inv_s', 'null'),
         "K_strain_max": _pick(args.K_strain_max, cls, 'K_strain_max', 0.03),
@@ -786,6 +797,9 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
         "tg_data_file": equil_data,
         "per_t_dump_file": per_t_dump,
         "enthalpy_col": getattr(args, "enthalpy_col", None) or "Enthalpy",
+        # Without it the structural block still runs, but every backbone bond vector is dropped and
+        # P2 comes back null at every temperature. Same list equil-check already resolved.
+        "backbone_types": args.backbone_types or cls.get("backbone_types"),
         "output_dir": output_dir,
         "graphs_dir": graphs_dir,
         # Classes carrying tg_slope_gate_fallback have documented highest-rate degeneracy on the
@@ -806,6 +820,7 @@ def analyze_tg_prompt(args, cls: dict) -> str:
 tg_log_path:       {p['tg_log_path']}    # pass as log_file=
 tg_data_file:      {p['tg_data_file']}    # pass as tg_data_file= — required for ΔCp mass normalisation
 per_t_dump_file:   {p['per_t_dump_file']}    # pass as per_t_dump_file= — with tg_data_file it enables the structural block
+backbone_types:    {p['backbone_types'] or 'null'}    # pass as backbone_types= — without it P2 is null at every T
 enthalpy_col:      {p['enthalpy_col']}    # pass as enthalpy_col=
 run_name:          {args.run_name}
 polymer_class:     {args.polymer_class.upper()}
@@ -952,7 +967,7 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
         # text byte-for-byte.
         "alpha_glass_per_K": cls.get('alpha_glass_per_K', 'null'),
         "alpha_melt_per_K": cls.get('alpha_melt_per_K', 'null'),
-        "backbone_types": args.backbone_types,
+        "backbone_types": args.backbone_types or cls.get("backbone_types"),
         # check_equilibration_comprehensive's ps axis: dt_ps = timestep_fs * dump_every / 1000.
         # dump_every self-heals (auto-detected from the dump header); timestep_fs does not, so a
         # dt_fs=2.0 class left on the 1.0 default reports tau_relax_ps and MSD 2x low -- and
@@ -1074,7 +1089,7 @@ def _resolve_murnaghan_params(args, cls: dict) -> dict:
     return {
         "lammps_flags": _lammps_flags(args.lammps_flags, cls),
         "work_dir": args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/mechanical",
-        "is_glassy": args.is_glassy.lower() not in ("false", "0", "no") if args.is_glassy else False,
+        "is_glassy": _is_glassy(args, cls),
         "bm_pressures_atm": cls.get("bm_pressures_atm", None),
         "dt_fs": _pick(args.dt_fs, cls, "dt_fs", 1.0),
         "equil_data_path": args.data_path or f"{lammps_base}/equil/npt_production/npt_production_out.data",
@@ -1450,7 +1465,9 @@ def main():
     p.add_argument("--d03", help="run-summary: D-03 electrostatics choice")
     p.add_argument("--d04", help="run-summary: D-04 system-size choice")
     p.add_argument("--lammps_flags")
-    p.add_argument("--is_glassy", default="true")
+    p.add_argument("--is_glassy", default=None,
+                   help="true|false (deform, murnaghan). Pass the thermal track's determination. "
+                        "If omitted, derived from the regime oracle (T_workflow > 300 K).")
     p.add_argument("--tg_k", type=float)
     p.add_argument("--tg_fit_quality")
     p.add_argument("--deform_log",
@@ -1469,7 +1486,8 @@ def main():
     p.add_argument("--npt_prod_dump")
     p.add_argument("--ff")
     p.add_argument("--backbone_types",
-                   help="Atom type IDs as JSON list (equil-check only)")
+                   help="Atom type IDs as JSON list (equil-check and analyze-tg). Same list for "
+                        "both — analyze-tg needs it for the per-T P2 nematic order.")
     p.add_argument("--enthalpy_col", default="Enthalpy",
                    help="LAMMPS thermo column name for enthalpy (analyze-tg; default 'Enthalpy')")
     p.add_argument("--out", action="store_true",

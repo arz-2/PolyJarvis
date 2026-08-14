@@ -33,7 +33,8 @@ offset baked into PASS/FAIL.
   [Tg analysis @ primary rate]
   Agent(subagent_type="tg-analysis-worker", description="🟢 Extract Tg {polymer_name}",
         prompt=<gen_prompt.py --stage analyze-tg --plan PLAN_PATH
-                --data_path {tg_log_path} --tg_rate_index {IDX}>)
+                --data_path {tg_log_path} --tg_rate_index {IDX}
+                --backbone_types '<same JSON list equil-check used>'>)
     → RESULT → Tg_K, Tg_fit_quality, Tg_r_squared, tg_gate_verdict, tg_method_gap_K,
                cooling_rate_K_per_ns, output_dir
   Hold (Tg_K, Tg_fit_quality, tg_gate_verdict, output_dir) in state and the D-06 run_log row.

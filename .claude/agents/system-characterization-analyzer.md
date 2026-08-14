@@ -47,7 +47,9 @@ work runs at `npt_prod300`; rubbery Murnaghan work runs at `npt_production`).
 1. **`check_equilibration_comprehensive`** on the hold's log/dump →
    `chain.ct.tau_relax_ps`, `chain.ct.beta`, `chain.ct.decay_fraction_at_end`, `chain.rg`.
    Pass `timestep_fs`, `ct_min_decay`, and `cutoff_A` from the prompt on the call, including
-   nulls — omitting one is a schema error. `timestep_fs` sets the ps axis
+   nulls — omitting one is a schema error. Pass `output_dir=<output_dir>/eq_comprehensive_probe`
+   and `graphs_dir` explicitly: `output_dir` is required, and a probe result must not land in
+   the flat `raw/` where `generate_run_summary` would read it as this run's headline value. `timestep_fs` sets the ps axis
    (`dt_ps = timestep_fs * dump_every / 1000`) and is not auto-detected, so a wrong one scales
    every `tau_relax_ps` you go on to write into the cache.
    **Reliability check** — `probe_tau_relax_reliable = True` only if BOTH:
@@ -64,7 +66,8 @@ work runs at `npt_prod300`; rubbery Murnaghan work runs at `npt_production`).
    an untrustworthy fit. Skip to step 4.
 
 2. **`extract_bulk_modulus`** (volume-fluctuation) on the same log → `bulk_modulus_GPa`,
-   `bulk_modulus_sem_GPa`. **Reliability check**: `probe_K0_reliable = True` only if
+   `bulk_modulus_sem_GPa`. Pass `output_dir=<output_dir>/bulk_modulus_probe` and `graphs_dir`
+   explicitly, for the same reason as step 1. **Reliability check**: `probe_K0_reliable = True` only if
    `bulk_modulus_sem_GPa / bulk_modulus_GPa <= 0.15`. If not reliable: set
    `probe_K0_reliable=false` and keep the class default `K_deform_rate_inv_s`/`_slow`
    (K-derived fields only — this does not affect the tau_relax-derived fields from step
@@ -117,24 +120,33 @@ work runs at `npt_prod300`; rubbery Murnaghan work runs at `npt_production`).
    on the prior decision's closing content, never on the bare `"planned_stages": [` string** — an
    anchor on that string inserts the new object *outside* the array (see agent memory).
 
-6. **Gate: write `guides/system_characterization_cache.json[canonical_smiles]` only if at least
-   one of `probe_tau_relax_reliable`/`probe_K0_reliable` is `true`** (equivalently: at least one
-   `derived_*` field from step 3 is non-null). The orchestrator's novelty gate
-   (`orchestration/ORCHESTRATOR.md`) is a bare key-existence check — writing an entry when both
-   flags failed would permanently mark this exact SMILES as no longer novel.
-   - **Both flags false → write nothing.** Leave the key absent. Steps 4/5/7 below still run
-     unconditionally regardless of this gate — they're per-run artifacts (diagnostic JSON, plan
-     patch, run_log note), not shared cross-run cache state, and stay valuable for
-     grading/debugging even on full failure.
-   - **At least one flag true → write/update the entry** (create the file with `{}` first if it
-     doesn't exist) with `source_run_name`, `generated_at`, `polymer_class`, every
-     `probe_*`/`derived_*` field from steps 1-3, `refined_from_full_run: true`, and:
-     - `reprobe_recommended: true` if exactly one of the two flags is true, else `false`.
-     - `note: <string>` (optional) — free text on what's missing/why, if `reprobe_recommended`.
-   - **Ownership boundary:** this entry also carries `protocol_validated`/`validated_properties`/
-     `validated_run_name`/`validated_at` fields, owned by `protocol-locker.md` — never write or
-     touch those fields here. This step's write is the `characterized` half only (Phase-A timing
-     knobs); the `validated` stamp is the separate bar the plan_mode gate actually reads.
+6. **Write the cache entry with the merge script — never with `Write`.** A full-file `Write`
+   overwrites every other SMILES key in the file.
+
+   ```
+   Bash: python3 orchestration/scripts/write_characterization_cache.py \
+       --smiles "<canonical_smiles>" --fields <output_dir>/system_characterization.json
+   ```
+
+   The `--fields` JSON must carry `source_run_name`, `generated_at`, `polymer_class`, every
+   `probe_*`/`derived_*` field from steps 1-3, `refined_from_full_run: true`, and:
+   - `reprobe_recommended: true` if exactly one of the two reliability flags is true, else `false`.
+   - `note: <string>` (optional) — free text on what's missing/why, if `reprobe_recommended`.
+
+   The script merges that one key, preserving the other SMILES entries and any
+   `protocol_validated`/`validated_*` fields — those belong to `protocol-locker.md` and it
+   refuses to write them. This step is the `characterized` half only (Phase-A timing knobs); the
+   `validated` stamp is the separate bar the plan_mode gate actually reads.
+
+   It also enforces the reliability gate: no entry is written unless at least one of
+   `probe_tau_relax_reliable`/`probe_K0_reliable` is `true`, and it exits 1 saying so. That exit
+   is expected on a fully-failed probe, not an error to retry — the orchestrator's novelty gate
+   (`orchestration/ORCHESTRATOR.md`) is a bare key-existence check, so an entry written when both
+   flags failed would permanently mark this exact SMILES as no longer novel. Steps 4/5/7 still
+   run unconditionally: they are per-run artifacts (diagnostic JSON, plan patch, run_log note),
+   not shared cross-run cache state.
+
+   Verify: `jq --arg s "<canonical_smiles>" '.[$s]' guides/system_characterization_cache.json`.
 
 7. **Log a `run_log.md` note** — which knobs were derived, which fell back to class
    defaults and why (cite the specific reliability check that failed, if any).
