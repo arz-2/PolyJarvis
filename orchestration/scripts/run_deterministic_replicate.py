@@ -275,7 +275,7 @@ def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNames
         smiles=None, data_path=None, tg_start_data=None, work_dir=None,
         gpu_ids=None, mpi_ranks=None, engine=None, emc_seed=None, velocity_seed=None,
         dp=None, nchain=None, n_atoms=None, charge_method=None, date_start=None, date_end=None,
-        d01=None, d02=None, d03=None, d04=None, lammps_flags=None, is_glassy="true",
+        d01=None, d02=None, d03=None, d04=None, lammps_flags=None, is_glassy=None,
         tg_k=None, tg_fit_quality=None, deform_log=None, deform_log_slow=None,
         deform_rate_mode="primary", murnaghan_logs=None, d05=None, npt_prod_log=None,
         npt_prod_dump=None, ff=None, backbone_types=None, enthalpy_col="Enthalpy",
@@ -449,7 +449,9 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
     while True:
         args.data_path = npt_prod_data_path
         p = resolve_stage_params("equil-check", args, cls)
-        backbone_types = args.backbone_types
+        # The resolver's value, not the raw CLI arg: the halt below says the list comes from
+        # decided_params, and only the resolver reads it from there (via the plan-overlaid cls).
+        backbone_types = p["backbone_types"]
         if backbone_types is None:
             # inspect_data_file only for diagnostics attached to the halt below — atom names
             # alone (e.g. "c"/"c1") don't determine which types are backbone vs. pendant branch
@@ -588,7 +590,7 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
         ap = resolve_stage_params("analyze-tg", args, cls)
         thermal = wait_for_analysis(lammps, lammps.extract_thermal(
             log_file=ap["tg_log_path"], tg_data_file=ap["tg_data_file"],
-            per_t_dump_file=ap["per_t_dump_file"],
+            per_t_dump_file=ap["per_t_dump_file"], backbone_types=ap["backbone_types"],
             enthalpy_col=ap["enthalpy_col"], output_dir=ap["output_dir"], graphs_dir=ap["graphs_dir"],
             method_gap_exempt=ap["method_gap_exempt"],
         ), f"tg analysis rate={rate}")

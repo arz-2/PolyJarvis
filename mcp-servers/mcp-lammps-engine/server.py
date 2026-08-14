@@ -1909,6 +1909,18 @@ def _parse_json_from_stdout(stdout: str, stderr: str) -> dict:
             "stdout": stdout, "stderr": stderr}
 
 
+def _require_output_dir(output_dir, tool: str, legacy: str):
+    """Every extraction tool used to fall back to a subdirectory of its own input file when
+    output_dir came in null. generate_run_summary reads only the flat output_dir, so those runs
+    wrote their JSON somewhere nothing ever looks (data/cis-PBD1/raw/bulk_analysis/bulk_modulus.json).
+    A null is now an error: the caller has the run's raw/ path and must pass it."""
+    if not output_dir:
+        raise ValueError(
+            f"{tool}: output_dir is required (it used to default to {legacy}, which "
+            f"generate_run_summary never reads — the JSON was written and silently lost)."
+        )
+
+
 def _analysis_run_background(run_id: str, func, kwargs: dict):
     """Background thread: runs an analysis helper function and updates run_manager."""
     try:
@@ -2080,14 +2092,13 @@ def extract_end_to_end_vectors(
         chain_ids:      Subset of chain resids to analyse; all chains if None.
         skip_frames:    Initial frames to skip (burn-in).
         max_frames:     Cap on frames to analyse after skip.
-        output_dir:     Output directory. Defaults to <dump_dir>/analysis.
+        output_dir:     Output directory. Required — the run's raw/ dir.
         atom_style:     LAMMPS atom_style column order for the data file.
 
     Returns:
         dict with run_id.  Completed result includes per_chain stats and csv_file path.
     """
-    if output_dir is None:
-        output_dir = str(Path(dump_file).parent / "analysis")
+    _require_output_dir(output_dir, "extract_end_to_end_vectors", "<dump_file dir>/analysis")
 
     run_id = run_manager.create("extract_end_to_end_vectors", {"dump_file": dump_file, "output_dir": output_dir})
     t = threading.Thread(
@@ -2190,15 +2201,14 @@ def calculate_rdf(
         nbins:            Histogram bin count (default 150).
         skip_frames:      Frames to skip at the start.
         max_frames:       Cap on frames after skip.
-        output_dir:       Output directory. Defaults to <dump_dir>/analysis.
+        output_dir:       Output directory. Required — the run's raw/ dir.
         atom_style:       LAMMPS atom_style column order for the data file.
 
     Returns:
         dict with run_id.  Completed result includes rdf_files paths and
         pairs_computed list.
     """
-    if output_dir is None:
-        output_dir = str(Path(dump_file).parent / "analysis")
+    _require_output_dir(output_dir, "calculate_rdf", "<dump_file dir>/analysis")
 
     run_id = run_manager.create("calculate_rdf", {"dump_file": dump_file, "output_dir": output_dir})
     t = threading.Thread(
@@ -2301,12 +2311,12 @@ def extract_thermal(
     tg_data_file: Optional[str],
     per_t_dump_file: Optional[str],
     method_gap_exempt: bool,
+    backbone_types: Optional[List[str]],
     initial_tg_guess: Optional[float] = None,
     equilibration_fraction: float = 0.5,
     temp_col: str = "Temp",
     density_col: str = "Density",
     enthalpy_col: str = "Enthalpy",
-    backbone_types: Optional[List[str]] = None,
 ) -> dict:
     """
     Extract thermal properties (Tg, CTE, ΔCp) from a LAMMPS MD temperature-sweep log.
@@ -2358,8 +2368,9 @@ def extract_thermal(
         method_gap_exempt:      REQUIRED. True records a >20 K primary-vs-alternative Tg gap
                                 as a reason without forcing TG_REVIEW (classes with
                                 documented highest-rate degeneracy). Pass the false too.
-        backbone_types:         Backbone atom type IDs (list of strings/ints).
-                                Used for P2 nematic order computation.
+        backbone_types:         REQUIRED. Backbone atom type IDs (list of strings/ints).
+                                Null is legal and leaves P2 null at every temperature —
+                                structural_p2_status records that it was not computable.
 
     Returns:
         dict with run_id.  Result includes Tg_K, Tg_alternative_K,
@@ -2372,8 +2383,7 @@ def extract_thermal(
         When per_t_dump_file is provided: also Tg_dynamic_K (Rg-kink),
         n_T_steps_p2_flag, n_T_steps_rg_cv_flag, structural_metrics_per_T.
     """
-    if output_dir is None:
-        output_dir = str(Path(log_file).parent / "tg_analysis")
+    _require_output_dir(output_dir, "extract_thermal", "<log_file dir>/tg_analysis")
 
     run_id = run_manager.create("extract_thermal", {"log_file": log_file, "output_dir": output_dir})
     t = threading.Thread(
@@ -2628,7 +2638,7 @@ def check_equilibration_comprehensive(
         data_file:           LAMMPS .data topology file.
         backbone_types:      List of LAMMPS atom type IDs that form the backbone.
                              Determine from inspect_data_file() — do not guess.
-        output_dir:          Output directory (default: <dump_dir>/eq_comprehensive).
+        output_dir:          Output directory. Required — the run's raw/ dir.
         timestep_fs:         REQUIRED. MD timestep in femtoseconds — must match the deck. The
                              dump time axis is dt_ps = timestep_fs * dump_every / 1000, and
                              unlike dump_every this is NOT auto-detected, so a dt=2 fs deck left
@@ -2668,8 +2678,8 @@ def check_equilibration_comprehensive(
             d05_markdown_path — path to saved d05_block.md
             summary_json      — path to full JSON
     """
-    if output_dir is None:
-        output_dir = str(Path(dump_file).parent / "eq_comprehensive")
+    _require_output_dir(output_dir, "check_equilibration_comprehensive",
+                        "<dump_file dir>/eq_comprehensive")
 
     run_id = run_manager.create(
         "check_equilibration_comprehensive",
@@ -2997,8 +3007,7 @@ def extract_equilibrated_density(
             plateau_step_range       — [start_step, end_step] of the plateau
             summary_json             — path to summary JSON
     """
-    if output_dir is None:
-        output_dir = str(Path(log_file).parent / "eq_analysis")
+    _require_output_dir(output_dir, "extract_equilibrated_density", "<log_file dir>/eq_analysis")
 
     run_id = run_manager.create("extract_equilibrated_density", {"log_file": log_file, "output_dir": output_dir})
     t = threading.Thread(
@@ -3106,8 +3115,7 @@ def extract_bulk_modulus(
 
     Args:
         log_file:     Full path to the LAMMPS log file (NPT run).
-        output_dir:   Output directory. Defaults to <log_dir>/bulk_analysis.
-                      Defaults to <log_dir>/bulk_analysis.
+        output_dir:   Output directory. Required — the run's raw/ dir.
         eq_fraction:  Fraction of rows used as production window
                       (0.5 = last 50%).
         block_count:  Number of blocks for block-average uncertainty.
@@ -3127,8 +3135,7 @@ def extract_bulk_modulus(
             diagnostics            — T, P, density means, drift check
             summary_json           — path to summary JSON
     """
-    if output_dir is None:
-        output_dir = str(Path(log_file).parent / "bulk_analysis")
+    _require_output_dir(output_dir, "extract_bulk_modulus", "<log_file dir>/bulk_analysis")
 
     run_id = run_manager.create("extract_bulk_modulus", {"log_file": log_file, "output_dir": output_dir})
     t = threading.Thread(
@@ -3247,7 +3254,7 @@ def extract_bulk_modulus_deform(
 
     Args:
         log_file:     Full path to the npt_deform LAMMPS log.
-        output_dir:   Output directory. Defaults to <log_dir>/deform_analysis.
+        output_dir:   Output directory. Required — the run's raw/ dir.
         strain_rate:  REQUIRED. Engineering strain rate in 1/fs (= K_deform_rate_inv_s × 1e-15).
         strain_max:   REQUIRED. Maximum strain for linear-regime fit (K_strain_max, ~0.03).
         timestep:     REQUIRED. MD timestep in fs — must match the deck. Strain is reconstructed
@@ -3280,8 +3287,7 @@ def extract_bulk_modulus_deform(
             stress_strain_csv       — path to stress-strain CSV
             summary_json            — path to summary JSON
     """
-    if output_dir is None:
-        output_dir = str(Path(log_file).parent / "deform_analysis")
+    _require_output_dir(output_dir, "extract_bulk_modulus_deform", "<log_file dir>/deform_analysis")
 
     run_id = run_manager.create("extract_bulk_modulus_deform", {"log_file": log_file, "output_dir": output_dir})
     t = threading.Thread(
@@ -3838,11 +3844,14 @@ def generate_run_summary(
 
     Call as the final step of Stage 4, after all analysis tools have run.
     All artifact paths in the summary are relative to data/[RUN]/ in the
-    PolyJarvis repo (e.g. "outputs/figures/tg_fit.png").
+    PolyJarvis repo (e.g. "graphs/tg_fit.png").
 
     Args:
-        output_dir:       Absolute path to data/[RUN]/outputs/.
-                          All analysis JSON files must already exist here.
+        output_dir:       Absolute path to data/[RUN]/raw/.
+                          Every analysis JSON must already exist directly here —
+                          only tg_summary.json is searched recursively. Anything an
+                          extractor wrote into a subdirectory is reported in
+                          artifacts_missing, not silently dropped.
         run_name:         Run directory name (e.g. "PS4").
         smiles:           SMILES string for the polymer.
         polymer_class:    Class ID (e.g. "PSTR").

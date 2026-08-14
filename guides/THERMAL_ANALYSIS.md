@@ -47,6 +47,8 @@ extract_thermal(
     tg_data_file=tg_data_file,   # for ΔCp mass normalisation — omitted, ΔCp is skipped entirely
     per_t_dump_file=per_t_dump_file,  # one frame per T step; with tg_data_file it enables the
                                       # structural block (per-T Rg/P2, Rg-kink Tg)
+    backbone_types=backbone_types,    # P2 is null at every T without it; Rg and Tg_dynamic_K
+                                      # still compute, so a null shows up as a partial block
     enthalpy_col=enthalpy_col,
     method_gap_exempt=method_gap_exempt,   # pass the false too, never omit
     output_dir=output_dir,
@@ -62,3 +64,4 @@ Non-obvious optional params (rest are schema defaults):
 - `cte_glassy_per_K`, `cte_rubbery_per_K`
 - `dCp_J_per_g_K`, `dCp_status` — if `dCp_status` is "skipped" (Enthalpy column absent), report N/A; do NOT re-run the sweep for this alone
 - `n_plateaus_skipped_drift`, `n_temperature_bins`, `temp_range_K`
+- `structural_analysis_status`, `Tg_dynamic_K` — report the status verbatim; "skipped"/"partial" means the block did not fully run, not that the structure is fine

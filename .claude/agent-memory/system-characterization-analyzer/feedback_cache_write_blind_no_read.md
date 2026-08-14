@@ -1,27 +1,22 @@
 ---
 name: feedback-cache-write-blind-no-read
-description: guides/system_characterization_cache.json is Read/Bash-denied for this agent too -- Write succeeds but is blind, verify prior emptiness from the run_plan's own assumptions note before overwriting
+description: never Write guides/system_characterization_cache.json directly -- use write_characterization_cache.py, which read-merges one SMILES key
 metadata:
   type: feedback
 ---
 
-`guides/system_characterization_cache.json` -- the exact file this agent's step 6 must write to
-every run -- is denied on both `Read` and `Bash` by the per-agent context-boundary hook ("outside
-your allowed context: guide + relevant rules JSON + your own data/** workspace + agent-memory").
-`Write` to it is NOT denied, so a full-file overwrite goes through with zero visibility into what
-was there before.
+Write the cache entry with `orchestration/scripts/write_characterization_cache.py --smiles ...
+--fields <output_dir>/system_characterization.json`, never with the `Write` tool.
 
-**Why:** on cis-PBD1 (2026-08-11) this meant writing the cache entry required trusting the
-run_plan.json's own `assumptions[]` note ("guides/system_characterization_cache.json is currently
-empty ({})", recorded by the planner minutes earlier at plan-generation time) as the only evidence
-of the file's prior state, since this agent cannot read it directly to confirm or to preserve
-other SMILES' existing entries.
+**Why:** a `Write` to `guides/system_characterization_cache.json` is a full-file overwrite, and
+this agent used to be denied `Read` and `Bash` on it — so the overwrite went through with zero
+visibility into the other SMILES entries it was destroying. On cis-PBD1 (2026-08-11) the only
+evidence of the file's prior state was the run_plan's own `assumptions[]` note. Both the script
+and the cache path are now on this agent's `bash_allow`, and the cache is on its
+`extra_read_allow`.
 
-**How to apply:** before writing this file, check the calling run_plan.json's `assumptions[]`/
-`critique.findings[]` for a recent statement of the cache's prior content (planner/critic usually
-already inspected it). If no such statement exists, treat the file as **unknown, not empty** --
-do not `Write` a bare `{"<key>": {...}}`; instead flag to the orchestrator that a read-verified
-merge is needed (e.g. via a script on the orchestrator's own allowlist) rather than risking
-clobbering other cached SMILES entries. [[feedback_bash_denied_guides_json]] covers the parallel
-Read-only-guides case; this is the stricter write-hazard variant for the one file this agent
-actually mutates.
+**How to apply:** the script merges one key and preserves everything else, including the
+`protocol_validated`/`validated_*` fields owned by `protocol-locker.md` — it refuses to write
+those. It also enforces the reliability gate: exit 1 with `no_reliable_measurement` is the
+expected outcome when both probe flags are false, not an error to retry. Verify with
+`jq --arg s "<smiles>" '.[$s]' guides/system_characterization_cache.json`.

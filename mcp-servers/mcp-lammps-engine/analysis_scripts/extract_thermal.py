@@ -203,8 +203,14 @@ def _analyze_per_t_dump(per_t_dump_file, tg_data_file, backbone_types_list, dete
         if rg_fit:
             tg_dynamic_K = round(rg_fit["Tg_K"], 1)
 
+    # Rg and Tg_dynamic_K need no atom-type list, so the block still succeeds without one — but
+    # every p2 comes back null. Say so, rather than emitting nulls that read as a measurement.
+    p2_status = ("ok" if backbone_set
+                 else "not computable (backbone_types not provided)")
+
     return {
-        "status":              "success",
+        "status":              "success" if backbone_set else "partial",
+        "p2_status":           p2_status,
         "n_frames":            len(metrics),
         "n_chains":            len(chain_ids),
         "Tg_dynamic_K":        tg_dynamic_K,
@@ -970,8 +976,14 @@ def main():
     # -------------------------------------------------------------------
     # 4b. Dump-based structural analysis (optional)
     # -------------------------------------------------------------------
-    structural_analysis = None
-    if per_t_dump_file and tg_data_file:
+    # A skipped block reports itself. Omitting the keys entirely made "we never ran this" and
+    # "we ran it and the structure is fine" indistinguishable in tg_summary.json.
+    if not (per_t_dump_file and tg_data_file):
+        _absent = " and ".join(n for n, v in (("per_t_dump_file", per_t_dump_file),
+                                              ("tg_data_file", tg_data_file)) if not v)
+        structural_analysis = {"status": f"skipped ({_absent} not provided)", "metrics": []}
+        print(f"  Structural analysis skipped: {_absent} not provided", flush=True)
+    else:
         print(f"  Running dump-based structural analysis: {per_t_dump_file}", flush=True)
         try:
             structural_analysis = _analyze_per_t_dump(
@@ -1073,6 +1085,7 @@ def main():
         result["n_T_steps_rg_cv_flag"]    = structural_analysis.get("n_T_steps_rg_cv_flag")
         result["structural_metrics_per_T"] = structural_analysis.get("metrics", [])
         result["structural_analysis_status"] = structural_analysis.get("status", "unknown")
+        result["structural_p2_status"]    = structural_analysis.get("p2_status")
         if structural_analysis.get("status") == "failed":
             result["structural_analysis_error"] = structural_analysis.get("error")
 
