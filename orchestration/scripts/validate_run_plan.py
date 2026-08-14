@@ -316,6 +316,36 @@ UNIMPLEMENTED_PARAMS = {
 }
 
 
+# decided_params that ARE wired, but that another decided_param silently overrides. The plan
+# then records a protocol the deck did not run. Keyed by the overridden param; the value is
+# (overriding param, why).
+OVERRIDDEN_PARAMS = {
+    "tg_steps_per_t": ("tg_rate_index",
+                       "gen_prompt._resolve_tg_params computes n_steps_per_t from the selected "
+                       "cooling rate (T_step / (rate*dt)) whenever a rate index is given, and "
+                       "ignores tg_steps_per_t entirely"),
+}
+
+
+def _overridden_param_findings(plan: dict) -> list:
+    """A recorded value the deck silently replaced is a false protocol record.
+
+    Info rather than structural: the executed deck is correct (the rate is the governing knob),
+    but the plan must not claim a step count that did not run.
+    """
+    findings = []
+    dp = plan.get("decided_params", {})
+    for key, (overrider, why) in sorted(OVERRIDDEN_PARAMS.items()):
+        if dp.get(key) in (None, "null") or dp.get(overrider) in (None, "null"):
+            continue
+        findings.append({
+            "check": "decided_param_overridden", "severity": "info",
+            "detail": (f"decided_params.{key}={dp[key]} is recorded but {overrider}="
+                       f"{dp[overrider]} overrides it: {why}. Drop {key} from the plan so the "
+                       "record matches the deck.")})
+    return findings
+
+
 def _unimplemented_param_findings(plan: dict) -> list:
     """A parameter that cannot reach the deck must not be usable as a remedy lever.
 
@@ -402,6 +432,7 @@ def validate_plan(plan: dict, policy: dict) -> list:
     findings += _forcefield_findings(plan)
     findings += _finite_size_findings(plan)
     findings += _unimplemented_param_findings(plan)
+    findings += _overridden_param_findings(plan)
     return findings
 
 

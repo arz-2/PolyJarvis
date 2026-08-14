@@ -61,18 +61,26 @@ def _save(cache_path: Path, cache: dict) -> None:
 
 
 def write_characterization(cache_path: Path, smiles: str, fields: dict) -> dict:
-    """Merge the characterized half. Gated on the same reliability rule the orchestrator's
-    novelty check depends on: that check is bare key existence, so writing an entry whose every
-    measurement failed would permanently mark this SMILES as no longer novel."""
+    """Merge the characterized half. Gated on at least one derived_* field being non-null: the
+    orchestrator's novelty check is bare key existence, so writing an entry that carries no
+    usable knob would permanently mark this SMILES as no longer novel."""
     offending = sorted(VALIDATED_KEYS & set(fields))
     if offending:
         return {"written": False, "reason": "validated_fields_are_protocol_locker_owned",
                 "offending_fields": offending}
 
-    if not any(fields.get(f) for f in RELIABILITY_FLAGS):
-        return {"written": False, "reason": "no_reliable_measurement",
-                "detail": f"none of {list(RELIABILITY_FLAGS)} is true — leaving the key absent "
-                          f"so this SMILES stays novel"}
+    # Gate on what was actually derived, not on the reliability flags. The two are not
+    # equivalent: every derivable knob needs probe_tau_relax_reliable (the K_deform pair needs
+    # both flags), so a K0-reliable/tau-unreliable probe derives nothing yet still satisfied
+    # any(flags) — writing an entry with no knobs in it and permanently marking this SMILES
+    # non-novel, since the orchestrator's novelty check is bare key existence.
+    derived = sorted(k for k in fields if k.startswith("derived_") and fields[k] is not None)
+    if not derived:
+        return {"written": False, "reason": "no_derived_field",
+                "detail": "no derived_* field was produced (every knob requires "
+                          "probe_tau_relax_reliable; the K_deform pair requires both flags) — "
+                          "leaving the key absent so this SMILES stays novel",
+                "reliability_flags": {f: fields.get(f) for f in RELIABILITY_FLAGS}}
 
     cache = _load(cache_path)
     existing = cache.get(smiles, {})

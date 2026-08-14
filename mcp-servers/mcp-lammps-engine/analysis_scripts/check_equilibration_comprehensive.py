@@ -580,7 +580,15 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     # signal CV so the criterion means the same thing at every cell size.
     cv_mean = float(cv_arr.mean())
     atoms_per_voxel = n_atoms / grid_n ** 3
-    poisson_cv = float(1.0 / math.sqrt(atoms_per_voxel)) if atoms_per_voxel > 0 else 1.0
+    # cv_mean is a MASS-density CV (_compute_density_cv bins by mass), so the shot-noise floor
+    # must be the compound-Poisson one: voxel mass is a random sum of atom masses, giving
+    # sqrt(<m^2>)/<m> / sqrt(atoms_per_voxel).  The count floor 1/sqrt(N) is only the special
+    # case of equal masses; on an H-rich cell it sits ~1.3x too low (PS: <m>=6.51,
+    # sqrt(<m^2>)=8.52), so subtracting it from a mass CV manufactured phantom signal.
+    m1 = float(np.mean(masses_all)) if len(masses_all) else 0.0
+    m2 = float(np.mean(np.square(masses_all))) if len(masses_all) else 0.0
+    mass_dispersion = (math.sqrt(m2) / m1) if m1 > 0 else 1.0
+    poisson_cv = (mass_dispersion / math.sqrt(atoms_per_voxel)) if atoms_per_voxel > 0 else 1.0
     cv_signal = math.sqrt(max(cv_mean ** 2 - poisson_cv ** 2, 0.0))
     # The adaptive grid targets ~25 atoms/voxel and is clamped to [3,10], so occupancy
     # never drops far below that -- poisson_cv only exceeds 0.30 below ~300 atoms, which
@@ -603,6 +611,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "grid_n": grid_n,
         "atoms_per_voxel": r(atoms_per_voxel, 1),
         "poisson_cv": r(poisson_cv, 3),
+        "mass_dispersion": r(mass_dispersion, 3),
         "heterogeneous_flag": heterogeneous_flag,
     }
 

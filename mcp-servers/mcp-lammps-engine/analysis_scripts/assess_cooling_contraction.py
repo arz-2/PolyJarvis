@@ -50,6 +50,31 @@ SECTIONS = {
 NA = 0.6022141  # amu/A^3 -> g/cm^3 conversion constant (Avogadro * 1e-24)
 
 
+def density_from_log(path, tail_fraction=0.5):
+    """Plateau-mean density (g/cm^3) from an NPT stage log's Density column.
+
+    Preferred over density_from_data: an NPT box fluctuates by ~0.2-1% frame to frame, so the
+    single final frame in the restart .data file is one draw from that distribution, not the
+    stage's density. Both ends of the contraction ratio carry that error independently, and the
+    melt-vs-cool split routes remedies on a few-percent gap. Averages the last tail_fraction of
+    the log. Returns (None, None) if unavailable.
+    """
+    if not path or not os.path.exists(path):
+        return None, None
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from analysis_utils import parse_lammps_log
+        df = parse_lammps_log(path)
+        if df is None or 'Density' not in df or len(df) < 4:
+            return None, None
+        vals = df['Density'].values[int(len(df) * (1.0 - tail_fraction)):]
+        if len(vals) == 0:
+            return None, None
+        return float(vals.mean()), float(vals.std())
+    except Exception:
+        return None, None
+
+
 def density_from_data(path):
     """Mass density (g/cm^3) from a LAMMPS data file: sum(type masses) / box volume.
 
@@ -199,6 +224,10 @@ def main():
     ap.add_argument('--glass_data', required=True, help='npt_prod300_out.data at 300 K (glass).')
     ap.add_argument('--rho_melt', type=float, help='Override: melt density g/cm^3 (skip --melt_data parse).')
     ap.add_argument('--rho_glass', type=float, help='Override: glass density g/cm^3 (skip --glass_data parse).')
+    ap.add_argument('--melt_log', help='npt_production.log — plateau-averaged melt density. '
+                                       'Preferred over --melt_data (single fluctuating frame).')
+    ap.add_argument('--glass_log', help='npt_prod300.log — plateau-averaged glass density. '
+                                        'Preferred over --glass_data (single fluctuating frame).')
     ap.add_argument('--exp_density_gcm3', type=float, required=True)
     ap.add_argument('--tg_K', type=float, required=True)
     ap.add_argument('--t_equil_K', type=float, required=True)
@@ -207,11 +236,28 @@ def main():
     ap.add_argument('--band_pct', type=float, default=5.0)
     args = ap.parse_args()
 
-    rho_melt = args.rho_melt if args.rho_melt is not None else density_from_data(args.melt_data)
-    rho_glass = args.rho_glass if args.rho_glass is not None else density_from_data(args.glass_data)
+    # Precedence: explicit override > plateau mean from the stage log > single final frame.
+    provenance = {}
+
+    def _resolve(override, log_path, data_path, label):
+        if override is not None:
+            provenance[label] = 'override'
+            return override, None
+        mean, sd = density_from_log(log_path)
+        if mean is not None:
+            provenance[label] = f'plateau_mean({os.path.basename(log_path)})'
+            return mean, sd
+        provenance[label] = ('final_frame(%s)' % os.path.basename(data_path)) if data_path else 'unavailable'
+        return density_from_data(data_path), None
+
+    rho_melt, melt_sd = _resolve(args.rho_melt, args.melt_log, args.melt_data, 'rho_melt')
+    rho_glass, glass_sd = _resolve(args.rho_glass, args.glass_log, args.glass_data, 'rho_glass')
 
     res = assess(rho_melt, rho_glass, args.exp_density_gcm3, args.tg_K, args.t_equil_K,
                  args.alpha_glass, args.alpha_melt, args.band_pct)
+    res['density_provenance'] = provenance
+    res['rho_melt_sd'] = melt_sd
+    res['rho_glass_sd'] = glass_sd
     res['markdown'] = make_markdown(res)
     print(json.dumps(res, indent=2))
 
