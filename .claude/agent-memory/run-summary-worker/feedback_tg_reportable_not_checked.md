@@ -20,7 +20,7 @@ silently grades a fit whose transition point isn't localized as though it were a
 `tg_reportable`/`tg_gate_verdict` fields, not just `run_summary.json`'s `results.tg.status`. If
 `tg_reportable=false`, the orchestrator's own run_log.md RESULTS table is authoritative — override
 `run_summary.json`'s Tg status/error_pct there rather than reporting it verbatim (density/K sections
-of `run_summary.json` are unaffected — this gap is Tg-specific). A related field on the same JSON,
-`md_offset_K`, also has no sourcing in `polymer_rules.json`'s PACR class and coincided with this
-run's `cooling_rate_K_per_ns` (100) — possible field-conflation, not confirmed; offset is
-annotation-only so it didn't affect status, but worth checking if it recurs.
+of `run_summary.json` are unaffected — this gap is Tg-specific). The `md_offset_K` /
+`tg_offset_corrected_K` fields this note also flagged are gone: multirate Tg is legacy/opt-in, the
+offset was annotation-only, and nothing ever passed `--tg_md_offset_K`, so it ran on its 100.0 K
+default. Archived `run_summary.json` still carry the keys; new ones do not.

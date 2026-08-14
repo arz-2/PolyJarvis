@@ -94,11 +94,6 @@ def main():
     # Experimental references
     p.add_argument("--exp_tg_min",      type=float, default=None)
     p.add_argument("--exp_tg_max",      type=float, default=None)
-    p.add_argument("--tg_md_offset_K",  type=float, default=100.0,
-                   help="MD cooling-rate Tg overestimate (K) added to the exp upper bound when "
-                        "grading a RAW single-rate MD Tg (documented 80-120 K, default 100). NOT "
-                        "applied to a rate-extrapolated Tg, which already removes the bias. Set 0 "
-                        "to grade strictly.")
     p.add_argument("--exp_density_min", type=float, default=None)
     p.add_argument("--exp_density_max", type=float, default=None)
     p.add_argument("--exp_K_min",       type=float, default=None)
@@ -225,15 +220,14 @@ def main():
     exp_tg, tg_band_widened = _floor_band(exp_tg, min_abs=10.0)   # >=10 K total (+/-5 K)
     tg_err = None
     tg_status = "no exp ref"
-    tg_offset_corrected_K = None
     if Tg_val is not None and exp_tg:
-        # Grade the raw value against the REAL exp band, always — a raw single-rate MD Tg
-        # overestimates experiment by ~80-120 K (cooling-rate artifact, Patrone 2016), but that
-        # offset must NEVER be folded into the PASS/FAIL band: doing so manufactures a false PASS
-        # (a prior PLA run did exactly this — feedback_pla_glassy_md_offset_gamed_pass.md). The
-        # rate-extrapolated Tg already removes this bias by construction; the raw single-rate Tg
-        # is graded exactly as strictly, with the offset reported only as an annotation
-        # (tg_offset_corrected_K below), never applied to lo/hi/status/error_pct.
+        # Grade the raw value against the REAL exp band, always. A raw single-rate MD Tg
+        # overestimates experiment by ~80-120 K (cooling-rate artifact, Patrone 2016), but a
+        # METHOD offset must NEVER be folded into the PASS/FAIL band: moving the measured
+        # value toward the reference manufactures a PASS, and a prior PLA run did exactly
+        # that (feedback_pla_glassy_md_offset_gamed_pass.md). The rate-extrapolated Tg
+        # already removes the bias by construction; the raw single-rate Tg is graded exactly
+        # as strictly, and the discrepancy is the finding, not something to correct away.
         lo, hi = exp_tg[0], exp_tg[1]
         tg_status = "PASS" if lo <= Tg_val <= hi else "FAIL"
         if tg_status == "PASS":
@@ -241,8 +235,6 @@ def main():
         else:
             nearest = lo if Tg_val < lo else hi
             tg_err = round((Tg_val - nearest) / nearest * 100, 1)
-        if tg_basis == "raw_MD":
-            tg_offset_corrected_K = round(Tg_val - float(args.tg_md_offset_K or 0.0), 1)
 
     rho_val = eq_dens.get("plateau_density_mean") or eq_dens.get("density_mean")
     exp_rho = ([args.exp_density_min, args.exp_density_max]
@@ -389,10 +381,6 @@ def main():
             "tg": {
                 "value_K":        Tg_val,
                 "grading_basis":  tg_basis,   # rate_extrapolated | raw_MD — both graded strictly, no offset in the band
-                "md_offset_K":    (0.0 if tg_basis == "rate_extrapolated" else args.tg_md_offset_K),
-                # Annotation only — the ~80-120 K cooling-rate-artifact-corrected value, for
-                # context. NEVER used for status/error_pct (feedback_pla_glassy_md_offset_gamed_pass.md).
-                "tg_offset_corrected_K": tg_offset_corrected_K,
                 "exp_range_K":    exp_tg,
                 "band_widened":   tg_band_widened,
                 "error_pct":      tg_err,
