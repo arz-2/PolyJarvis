@@ -152,6 +152,7 @@
       "charge_method": "Method for partial charge assignment: Gasteiger (apolar), AM1-BCC (moderately polar), RESP/HF/6-31G* (aromatic/strongly polar)",
       "dp_typical": "Degree of polymerization (repeat units per chain) for production runs",
       "dp_min": "Minimum DP for chain-length-independent Tg (Fox-Flory plateau)",
+      "tg_fox_flory_K": "Flory-Fox constant K (K·g/mol) in Tg(Mn) = Tg_inf - K/Mn, used to correct the EXPERIMENTAL Tg band down to the cell's finite Mn = dp x M_repeat. Present only where a primary measurement is citable — an absent entry means the band is graded uncorrected, never that a generic K is substituted. Corrects the reference for molecular weight; it is NOT a method offset on the simulated value (see generate_run_summary.py)",
       "nchain": "Number of chains in simulation cell",
       "density_initial_gcm3": "Starting density for amorphous cell construction (g/cm³); ~0.5x experimental RT density avoids atomic overlaps",
       "electrostatics": "Runtime long-range Coulomb treatment: pppm (required for any heteroatom) or lj_cut (purely apolar C/H only)",
@@ -599,6 +600,10 @@
         "P2VP": 374,
         "notes": "PS: ~100°C (373 K). P2VP similar to PS due to similar backbone rigidity."
       },
+      "tg_fox_flory_K": {
+        "K_K_g_per_mol": 108300,
+        "note": "Flory-Fox K for atactic PS: Tg = Tg_inf - K/Mn. 1.083e5 °C·g/mol measured by DSC over Mn 3,250-950,000 g/mol (Tg_inf = 109.22 °C), D'Amelia & Khanyan 2022, J. Polym. Biopolym. Phys. Chem. 10(1) 10-17, doi:10.12691/jpbpc-10-1-2; agrees with Fox & Flory's original 1.000e5 (J. Appl. Phys. 21, 581, 1950). Corrects the EXPERIMENTAL band down to the cell's finite Mn — the handbook Tg is a high-MW plateau value and Fox & Flory put that plateau near Mn ~30,000, far above this campaign's dp_typical=40 (Mn ~4,200)."
+      },
       "citations": [
         "Srivastava2026",
         "Tang2022",
@@ -765,6 +770,10 @@
         "PMA": 281,
         "PAA": 379,
         "notes": "PMMA: ~105°C (378 K); PMA: ~8°C (281 K); PAA: ~106°C (379 K)."
+      },
+      "tg_fox_flory_K": {
+        "K_K_g_per_mol": 140000,
+        "note": "Flory-Fox K for PMMA: Tg = Tg_inf - K/Mn. 1.4e5 °C·g/mol measured by DSC over 17 samples, Mn 3,000-1,500,000 g/mol (Tg_inf = 134.59 °C), D'Amelia & Kreth 2023, J. Polym. Biopolym. Phys. Chem. 11(1) 1-10, doi:10.12691/jpbpc-11-1-1. CAVEAT: that series is predominantly SYNDIOTACTIC while these cells are atactic — K is far less tacticity-sensitive than Tg_inf, but the value is not atactic-specific. A 2.1e5 figure circulates for PMMA; it was not traceable to a primary measurement and is not used. Applies to PMMA only, not PMA/PAA/PEA, which have no measured K here."
       },
       "citations": [
         "Hayashi2022",

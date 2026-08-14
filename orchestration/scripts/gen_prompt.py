@@ -1309,6 +1309,10 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
         "d04_system_size": d04,
         "slope_gate_pass": _slope_gate,
         "tg_path_label": tg_path_label,
+        # Flory-Fox K for the DP correction of the EXPERIMENTAL Tg band. Absent for most
+        # classes -- no citable primary measurement -- and absence means the band is graded
+        # uncorrected, never that a generic K is substituted.
+        "tg_fox_flory_K": (cls.get("tg_fox_flory_K") or {}).get("K_K_g_per_mol"),
     }
 
 
@@ -1336,6 +1340,7 @@ run_plan:          {p['run_plan']}   # always pass to generate_run_summary --run
 exp_tg_range:      {p['exp_tg_range']}
 exp_density_range: {p['exp_density_range']}
 exp_K_range:       {p['exp_K_range']}
+tg_fox_flory_K:    {_v(p['tg_fox_flory_K'], 'null')}   # Flory-Fox K (K*g/mol); pass to generate_run_summary --tg_fox_flory_K. null ⇒ omit the flag, band graded uncorrected
 n_replicates:      {_v(getattr(args, 'n_replicates', None), 'N/A')}   # replicate count for this run (single-run multirate protocol: 1); pass to generate_run_summary --n_replicates
 tg_path:           {_v(getattr(args, 'tg_path', None), 'null')}   # explicit canonical tg_summary.json path ({p['tg_path_label']}); pass to generate_run_summary --tg_path
 slope_gate_pass:   {_v(p['slope_gate_pass'], 'null')}   # False → single-rate fallback Tg; pass --tg_k with the fallback value

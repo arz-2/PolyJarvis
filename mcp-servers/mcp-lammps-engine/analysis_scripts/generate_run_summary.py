@@ -35,6 +35,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
 
 def _git_commit(cwd=None):
     try:
@@ -94,6 +96,10 @@ def main():
     # Experimental references
     p.add_argument("--exp_tg_min",      type=float, default=None)
     p.add_argument("--exp_tg_max",      type=float, default=None)
+    p.add_argument("--tg_fox_flory_K", type=float, default=None,
+                   help="Flory-Fox K (K*g/mol) from polymer_rules.json tg_fox_flory_K. Shifts the "
+                        "EXPERIMENTAL Tg band down to the cell's finite Mn = dp * M_repeat. Omit "
+                        "when the class has no citable K — the band is then graded uncorrected.")
     p.add_argument("--exp_density_min", type=float, default=None)
     p.add_argument("--exp_density_max", type=float, default=None)
     p.add_argument("--exp_K_min",       type=float, default=None)
@@ -215,8 +221,64 @@ def main():
         r = floor / 2.0
         return [round(mid - r, 4), round(mid + r, 4)], True
 
+    def _repeat_unit_mass(smiles):
+        """Molar mass of one repeat unit, from the * -terminated repeat SMILES.
+
+        Reuses estimate_tg_group_contribution._prepare_repeat_unit rather than calling
+        MolWt on the raw string: * carries no mass but leaves the H count on every
+        wildcard-adjacent atom one too high, turning each backbone CH2 into a CH3."""
+        if not smiles:
+            return None
+        try:
+            # Probe RDKit FIRST. estimate_tg_group_contribution calls sys.exit() at import
+            # when RDKit is missing, which prints its own error JSON to stdout and raises
+            # SystemExit -- neither is catchable as an ordinary import failure here.
+            from rdkit.Chem import Descriptors
+        except ImportError:
+            return None
+        try:
+            sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
+            from estimate_tg_group_contribution import _prepare_repeat_unit
+            mol = _prepare_repeat_unit(smiles)
+            return float(Descriptors.MolWt(mol)) if mol is not None else None
+        except Exception:
+            return None
+
+    def _dp_correction(K, dp, smiles):
+        """Flory-Fox shift of the EXPERIMENTAL band to the cell's finite Mn.
+
+        Tg(Mn) = Tg_inf - K/Mn, so the correction is negative and the band moves DOWN,
+        toward the simulated value. That direction is the same one md_offset_K moved in,
+        and the distinction is the whole justification for allowing it here: md_offset_K
+        corrected the SIMULATION for a method artifact (cooling rate), which manufactures a
+        PASS by discarding the discrepancy the grade exists to report. This corrects the
+        REFERENCE for molecular weight -- a handbook Tg is a high-MW plateau value and a
+        dp=40 cell has a genuinely different true Tg, so the comparison is otherwise not
+        like-for-like. Fox & Flory put the plateau near Mn ~30,000, an order of magnitude
+        above what this campaign builds.
+
+        Returns (correction_K, reason_when_absent, Mn). Any missing input yields
+        (None, reason, Mn-or-None) and the band is graded UNCORRECTED -- never a generic K.
+        """
+        mn = None
+        if K is None:
+            return None, "no citable tg_fox_flory_K for this class", None
+        if not dp:
+            return None, "dp unavailable", None
+        m_repeat = _repeat_unit_mass(smiles)
+        if not m_repeat:
+            return None, "repeat-unit mass unavailable (no SMILES or RDKit)", None
+        mn = dp * m_repeat
+        return -K / mn, None, round(mn, 1)
+
     exp_tg = ([args.exp_tg_min, args.exp_tg_max]
               if args.exp_tg_min is not None and args.exp_tg_max is not None else None)
+    exp_tg_uncorrected = list(exp_tg) if exp_tg else None
+    dp_correction_K, dp_correction_reason, tg_mn = _dp_correction(
+        args.tg_fox_flory_K, args.dp, args.smiles)
+    if exp_tg and dp_correction_K is not None:
+        exp_tg = [round(exp_tg[0] + dp_correction_K, 1),
+                  round(exp_tg[1] + dp_correction_K, 1)]
     exp_tg, tg_band_widened = _floor_band(exp_tg, min_abs=10.0)   # >=10 K total (+/-5 K)
     tg_err = None
     tg_status = "no exp ref"
@@ -395,6 +457,16 @@ def main():
                 "value_K":        Tg_val,
                 "grading_basis":  tg_basis,   # rate_extrapolated | raw_MD — both graded strictly, no offset in the band
                 "exp_range_K":    exp_tg,
+                # The raw handbook band, always emitted beside the graded one, so a shift is
+                # never invisible. Equal to exp_range_K when no correction applied.
+                "exp_range_K_uncorrected": exp_tg_uncorrected,
+                # Flory-Fox shift of the REFERENCE to the cell's finite Mn (negative K).
+                # Null + a reason means the band was graded UNCORRECTED — never that a
+                # generic K was substituted.
+                "dp_correction_K":        (round(dp_correction_K, 1)
+                                           if dp_correction_K is not None else None),
+                "dp_correction_reason":   dp_correction_reason,
+                "dp_correction_Mn_g_per_mol": tg_mn,
                 "band_widened":   tg_band_widened,
                 "error_pct":      tg_err,
                 # PASS | PASS_WITHIN_UNCERTAINTY | FAIL | no exp ref.

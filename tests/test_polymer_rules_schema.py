@@ -123,3 +123,32 @@ def test_tg_slope_gate_fallback_valid():
     assert found == expected
     for cid in found:
         assert isinstance(CLASSES[cid].get("_tg_slope_gate_note"), str), cid
+
+
+def test_tg_fox_flory_K_carries_a_primary_source():
+    """The DP correction shifts the graded band DOWN, toward the simulated value -- the
+    same direction md_offset_K moved before it was deleted. That is defensible only
+    because it corrects the REFERENCE for molecular weight rather than the simulation for
+    a method artifact, and only when the constant is a real measurement. A K without a
+    traceable source is exactly feedback_polymer_rules_sim_sourced_exp_bounds.md.
+
+    Absence is the normal case and must stay cheap: a class with no citable K grades its
+    band uncorrected. No generic fallback constant may be introduced."""
+    for cid, c in CLASSES.items():
+        ff = c.get("tg_fox_flory_K")
+        if ff is None:
+            continue
+        assert isinstance(ff, dict), f"{cid}: tg_fox_flory_K must be a dict, got {type(ff)}"
+        k = ff.get("K_K_g_per_mol")
+        assert isinstance(k, (int, float)) and k > 0, f"{cid}: K_K_g_per_mol must be positive"
+        # Measured Flory-Fox constants sit around 1e5 K*g/mol; anything orders away is a
+        # unit error, which would silently move a PASS/FAIL band.
+        assert 1e4 <= k <= 1e6, f"{cid}: K={k} is outside the physical 1e4-1e6 K*g/mol range"
+        note = ff.get("note", "")
+        assert "doi:" in note.lower(), f"{cid}: tg_fox_flory_K note must cite a DOI"
+
+
+def test_no_generic_fox_flory_fallback_exists():
+    """Coverage is deliberately partial. If a later edit adds a class-independent default,
+    every polymer's band shifts by a fabricated number."""
+    assert "tg_fox_flory_K" not in RULES.get("global_defaults", {})

@@ -3786,6 +3786,7 @@ def _run_generate_run_summary(
     exp_density_max: Optional[float],
     exp_K_min: Optional[float],
     exp_K_max: Optional[float],
+    tg_fox_flory_K: Optional[float] = None,
     graphs_dir: Optional[str] = None,
     n_replicates: Optional[int] = None,
     tg_path: Optional[str] = None,
@@ -3816,6 +3817,7 @@ def _run_generate_run_summary(
     if exp_density_max is not None: parts.append(f"--exp_density_max {exp_density_max}")
     if exp_K_min is not None:       parts.append(f"--exp_K_min {exp_K_min}")
     if exp_K_max is not None:       parts.append(f"--exp_K_max {exp_K_max}")
+    if tg_fox_flory_K is not None:  parts.append(f"--tg_fox_flory_K {tg_fox_flory_K}")
     if graphs_dir:                  parts.append(f"--graphs_dir {graphs_dir}")
     if n_replicates is not None:    parts.append(f"--n_replicates {n_replicates}")
     if tg_path:                     parts.append(f"--tg_path {tg_path}")
@@ -3856,6 +3858,7 @@ def generate_run_summary(
     exp_density_max: Optional[float] = None,
     exp_K_min: Optional[float] = None,
     exp_K_max: Optional[float] = None,
+    tg_fox_flory_K: Optional[float] = None,
     n_replicates: Optional[int] = None,
     tg_path: Optional[str] = None,
 ) -> dict:
@@ -3890,6 +3893,12 @@ def generate_run_summary(
         exp_tg_min/max:   Experimental Tg range (K) for PASS/FAIL status.
         exp_density_min/max: Experimental density range (g/cm³).
         exp_K_min/max:    Experimental bulk modulus range (GPa).
+        tg_fox_flory_K:   Flory-Fox K (K·g/mol) from polymer_rules.json's class
+                          tg_fox_flory_K. Shifts the EXPERIMENTAL Tg band down to the
+                          cell's finite Mn = dp × M_repeat, so a high-MW handbook value is
+                          not graded against a short-chain cell. Omit when the class has no
+                          citable K — the band is then graded uncorrected and
+                          results.tg.dp_correction_reason records why.
         n_replicates:     Replicate count reported in results.tg.n_replicates
                           (single-run protocol: 1).
         tg_path:          Explicit path to the canonical tg_summary.json (e.g.
@@ -3914,6 +3923,7 @@ def generate_run_summary(
             exp_tg_min=exp_tg_min, exp_tg_max=exp_tg_max,
             exp_density_min=exp_density_min, exp_density_max=exp_density_max,
             exp_K_min=exp_K_min, exp_K_max=exp_K_max,
+            tg_fox_flory_K=tg_fox_flory_K,
             graphs_dir=graphs_dir, n_replicates=n_replicates,
             tg_path=tg_path,
         )),
