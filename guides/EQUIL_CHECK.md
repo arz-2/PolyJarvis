@@ -16,6 +16,11 @@ could be confused with a backbone one, cross-check with `awk '/^Bonds/,/^Angles/
 backbone types appear in chain-continuing bonds. E.g. PEEK = `[1,2,5]` (aromatic C + ether O);
 type names starting with `h` are never backbone.
 
+`backbone_types` **validates** the backbone, it does not select it. The backbone path is measured
+from bond topology (heavy-atom graph diameter), so a wrong selection cannot corrupt P2, MSID,
+R_ee or C∞. Report `chain.backbone_path.backbone_type_coverage` — below 0.90 means the types you
+passed do not describe this chain's backbone, and the fix is the selection, not the cell.
+
 `ct_min_decay_melt` null ⇒ aromatic main chain: leave C(t) advisory by passing
 `ct_min_decay=None` to `check_equilibration_comprehensive`. Pass it explicitly — an omitted
 argument and a null one are the same to the tool but not to the record, and only the explicit null
@@ -104,6 +109,7 @@ check_equilibration_comprehensive(
 - `result["chain"]["ct"]["decay_fraction_at_end"]` → `ct_decay_fraction`
 - `result["chain"]["ct"]["tau_relax_ps"]` → `ct_tau_relax_ps`
 - `result["chain"]["ree"]["mean_R_ee_A"|"std_R_ee_A"|"n_chains"]` → `end_to_end_r_mean_A` / `_std_A` / `_n_chains`
+- `result["chain"]["backbone_path"]["n_backbone_atoms_mean"|"backbone_type_coverage"]`
 - `result["spatial"]["finite_size"]` → `L_min_A`, `L_over_2cutoff`, `L_over_2Rg`, `L_over_Ree`, `verdict`
 
 ### `extract_equilibrated_density`

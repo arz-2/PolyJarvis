@@ -53,6 +53,8 @@ RESULT:
   end_to_end_r_mean_A: <value or N/A>
   end_to_end_r_std_A: <value or N/A>
   end_to_end_n_chains: <value or N/A>
+  backbone_atoms_mean: <chain.backbone_path.n_backbone_atoms_mean or N/A>
+  backbone_type_coverage: <chain.backbone_path.backbone_type_coverage or N/A — below 0.90 means the backbone_types you passed are mis-specified, not that the cell is bad>
   equilibration_warnings: <list or none>
   d05_markdown_path: <result["d05_markdown_path"], absolute — or N/A on phase=melt>
   output_dir: <absolute path>

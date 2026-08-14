@@ -39,6 +39,7 @@ import math
 import re
 import sys
 import warnings
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 
@@ -243,18 +244,96 @@ def _mass_weighted_rg_sq(positions, masses):
     return float((masses * (delta ** 2).sum(axis=1)).sum() / total)
 
 
+H_MASS_MAX = 2.0
+
+
 def _backbone_atoms_sorted(chain, backbone_set):
-    """Return positions and indices of backbone atoms, sorted by atom index."""
+    """Return positions and indices of the chain's backbone, in BONDED order.
+
+    The backbone of a linear polymer is the graph diameter of its heavy-atom bond graph:
+    BFS from any heavy atom to its farthest peer, then BFS again from there. Both endpoints
+    are chain termini and the walk between them is the backbone; side groups are short
+    branches off it, and hydrogens are excluded so they cannot extend the walk.
+
+    Ordering by atom INDEX -- the previous behaviour -- assumes the backbone is a run of
+    consecutively-numbered atoms, which holds only for a straight aliphatic chain. Measured
+    on the archive, it gave PMMA1 160 "backbone" atoms against a true path of 81, with a
+    median consecutive separation of 4.03 A: fewer than half of those pairs were bonded at
+    all. Every quantity built from the list (P2 bond vectors, MSID separations, R_ee
+    termini, C_n) inherited that error.
+
+    `backbone_set` no longer selects the path -- it validates it. Restricting the graph to
+    backbone-typed atoms fails wherever the supplied types do not span the chain, and on
+    the archive they often do not: the selection fragments into 50-100 disconnected pieces
+    for 7 of 21 runs (cis-PBD3's types cover 49.8% of its real backbone, PLA3's 67.5%).
+    The diameter needs no types, agrees with the typed path to within 1-2 terminal atoms
+    wherever that path IS valid, and yields a median bond length of 1.40-1.58 A on every
+    archived class. Callers get the type coverage back via backbone_type_coverage() so a
+    mis-specified backbone_types stays visible instead of silently selecting the path.
+
+    Where a terminal repeat unit carries a side group, the diameter ends on that side
+    atom rather than the backbone terminus -- it sits one bond further from the far end.
+    The overshoot is at most one atom per end (PE1: 242 against a 240-atom backbone) and
+    is bounded by construction, not a failure mode.
+
+    Returns (None, None) when there is no bond topology or fewer than two heavy atoms.
+    """
     try:
-        types = np.array([int(t) for t in chain.types])
+        heavy = {int(a.index) for a in chain.atoms if float(a.mass) > H_MASS_MAX}
     except Exception:
         return None, None
-    mask = np.isin(types, list(backbone_set))
-    if mask.sum() < 2:
+    if len(heavy) < 2:
         return None, None
-    bb_atoms = chain.atoms[mask]
-    order = np.argsort(bb_atoms.indices)
-    return bb_atoms.positions[order], bb_atoms.indices[order]
+
+    adj = {i: [] for i in heavy}
+    try:
+        bonds = chain.bonds
+    except Exception:
+        return None, None
+    for b in bonds:
+        a1, a2 = int(b.atoms[0].index), int(b.atoms[1].index)
+        if a1 in heavy and a2 in heavy:
+            adj[a1].append(a2)
+            adj[a2].append(a1)
+
+    def _bfs(src):
+        dist, prev = {src: 0}, {}
+        queue = deque([src])
+        while queue:
+            node = queue.popleft()
+            for nxt in adj[node]:
+                if nxt not in dist:
+                    dist[nxt] = dist[node] + 1
+                    prev[nxt] = node
+                    queue.append(nxt)
+        return max(dist, key=dist.get), prev
+
+    end_a, _ = _bfs(next(iter(heavy)))
+    end_b, prev = _bfs(end_a)
+    path = [end_b]
+    while path[-1] != end_a:
+        path.append(prev[path[-1]])
+    path.reverse()
+
+    if len(path) < 2:
+        return None, None
+
+    idx = np.array(path, dtype=int)
+    return chain.universe.atoms[idx].positions, idx
+
+
+def backbone_type_coverage(universe, path_idx, backbone_set):
+    """Fraction of the reconstructed path carrying one of the declared backbone types.
+
+    Well below 1.0 means backbone_types does not describe this chain's actual backbone.
+    Advisory: the path is measured from bond topology and does not depend on it."""
+    if path_idx is None or len(path_idx) == 0 or not backbone_set:
+        return None
+    try:
+        types = np.array([int(t) for t in universe.atoms[path_idx].types])
+    except Exception:
+        return None
+    return float(np.isin(types, list(backbone_set)).mean())
 
 
 def _saupe_p2(bond_vectors):
@@ -344,7 +423,8 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
             masses = np.ones(ch.n_atoms)
         bb_pos, bb_ix = _backbone_atoms_sorted(ch, backbone_set)
         chain_data[cid] = {"sel": ch, "masses": masses, "bb_ix": bb_ix,
-                           "has_bb": bb_pos is not None}
+                           "has_bb": bb_pos is not None,
+                           "type_coverage": backbone_type_coverage(u, bb_ix, backbone_set)}
 
     # Initialise MSID accumulator
     first_bb_len = None
@@ -382,16 +462,12 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
             com = (masses[:, None] * pos).sum(axis=0) / total
             com_row.append(com)
 
-            # End-to-end vector (from sorted backbone termini)
+            # End-to-end vector (backbone path termini)
             if d["has_bb"]:
-                bb_pos_now = ch.positions[
-                    np.searchsorted(ch.atoms.indices, d["bb_ix"])
-                    if hasattr(ch, "atoms") else np.arange(len(d["bb_ix"]))
-                ]
-                # Re-fetch backbone positions in sorted order
-                bb_atoms = ch.atoms[np.isin(ch.atoms.indices, d["bb_ix"])]
-                srt = np.argsort(bb_atoms.indices)
-                bb_pos_sorted = bb_atoms.positions[srt]
+                # bb_ix is the bonded walk from _backbone_atoms_sorted, so index it
+                # directly. Re-sorting by atom index here would undo that ordering and put
+                # back the defect the path reconstruction exists to remove.
+                bb_pos_sorted = u.atoms[d["bb_ix"]].positions
                 R = bb_pos_sorted[-1] - bb_pos_sorted[0]
                 ree_row.append(R)
 
@@ -454,6 +530,20 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "C_inf": r(c_inf, 3) if c_inf is not None else None,
         "n_chains": len(chain_ids),
         "frames_analysed": n_frames,
+    }
+
+    # ── Backbone path provenance ──
+    # The path comes from bond topology, so backbone_types is a cross-check, not an input.
+    # Low coverage means the declared types do not describe this chain's real backbone.
+    covs = [chain_data[c]["type_coverage"] for c in chain_ids
+            if chain_data[c]["has_bb"] and chain_data[c]["type_coverage"] is not None]
+    path_lens = [len(chain_data[c]["bb_ix"]) for c in chain_ids if chain_data[c]["has_bb"]]
+    backbone_path_result = {
+        "available": bool(path_lens),
+        "method": "heavy_atom_graph_diameter",
+        "n_backbone_atoms_mean": r(float(np.mean(path_lens)), 1) if path_lens else None,
+        "n_chains_with_backbone": len(path_lens),
+        "backbone_type_coverage": r(float(np.mean(covs)), 3) if covs else None,
     }
 
     # ── MSID ──
@@ -622,6 +712,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "ct": ct_result,
         "msd": msd_result,
         "p2": p2_result,
+        "backbone_path": backbone_path_result,
         "density_homogeneity": dh_result,
     }
 
@@ -682,6 +773,13 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
 
     rg = structural.get("rg", {})
     lines.append(f"| Rg CV (chain–chain) | {rg.get('cv','?'):.1%} | <30% | {_gate(rg.get('pass',False))} |")
+
+    bbp = structural.get("backbone_path", {})
+    if bbp.get("available"):
+        cov = bbp.get("backbone_type_coverage")
+        cov_s = f"{cov:.0%}" if cov is not None else "—"
+        lines.append(f"| Backbone path | {bbp.get('n_backbone_atoms_mean')} atoms "
+                     f"(bond topology) | type coverage ≥90% | {cov_s} |")
 
     c_inf = rg.get("C_inf")
     if c_inf is not None:
@@ -770,6 +868,13 @@ def collect_warnings(thermo, structural):
     tau = thermo.get("tau_eff_density_fraction")
     if tau is not None and tau > 0.10:
         w.append(f"τ_eff = {tau*100:.1f}% of trajectory — short statistical sample; consider longer production run")
+
+    bbp = structural.get("backbone_path", {})
+    cov = bbp.get("backbone_type_coverage")
+    if bbp.get("available") and cov is not None and cov < 0.90:
+        w.append(f"backbone_types covers only {cov:.0%} of the measured backbone path "
+                 f"({bbp.get('n_backbone_atoms_mean')} atoms) — the path itself comes from bond "
+                 "topology and is unaffected, but backbone_types is mis-specified for this cell")
 
     c_inf = structural.get("rg", {}).get("C_inf")
     if c_inf is not None and (c_inf < 3.0 or c_inf > 15.0):
