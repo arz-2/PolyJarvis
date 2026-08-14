@@ -2859,9 +2859,9 @@ def enforce_equilibration_gate(
     out_dir: Optional[str],
     alpha_glass_per_K: Optional[float],
     alpha_melt_per_K: Optional[float],
-    phase: str = "full",
-    polymer_class: Optional[str] = None,
-    polymer_name: Optional[str] = None,
+    phase: str,
+    polymer_class: Optional[str],
+    polymer_name: Optional[str],
 ) -> dict:
     """
     Mechanized equilibration gate verdict — replaces prose PASS/EXTEND/FAIL judgment with a

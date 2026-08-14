@@ -164,8 +164,8 @@ def melt_density_reference(out_dir, polymer_class, polymer_name, t_equil_K, rho_
 
     Subprocess + JSON, matching the established contract with db/query_best_match.py, and
     because this module must resolve from both enforce_gate's cwd and the MCP server's.
-    The result is cached beside the other analysis JSONs so a repeat call (after an EXTEND)
-    does not re-query.
+    The result is written beside the other analysis JSONs for the record; the lookup itself
+    re-runs on every call (one sqlite read).
     """
     if not (polymer_class or polymer_name) or t_equil_K is None or rho_melt is None:
         return None

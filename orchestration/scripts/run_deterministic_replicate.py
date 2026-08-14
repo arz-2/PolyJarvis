@@ -496,6 +496,10 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
             melt_data=p["melt_data_path"], out_dir=p["output_dir"],
             alpha_glass_per_K=None if p["alpha_glass_per_K"] == "null" else p["alpha_glass_per_K"],
             alpha_melt_per_K=None if p["alpha_melt_per_K"] == "null" else p["alpha_melt_per_K"],
+            # This executor runs the whole chain in one go, so its gate call is always the
+            # post-cooldown one; the melt checkpoint is a reasoned-path split.
+            phase="full", polymer_class=args.polymer_class.upper(),
+            polymer_name=getattr(args, "polymer_name", None),
         )
         equil_verdict = verdict.get("verdict")
         if verdict.get("d05_markdown"):

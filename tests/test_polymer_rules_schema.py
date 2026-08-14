@@ -146,6 +146,16 @@ def test_tg_fox_flory_K_carries_a_primary_source():
         assert 1e4 <= k <= 1e6, f"{cid}: K={k} is outside the physical 1e4-1e6 K*g/mol range"
         note = ff.get("note", "")
         assert "doi:" in note.lower(), f"{cid}: tg_fox_flory_K note must cite a DOI"
+        # The constant is measured for ONE polymer, never for a whole class: PACR's 1.4e5
+        # is PMMA's and PSTR's 1.083e5 is atactic PS's. Without an explicit member list a
+        # PMA run (exp Tg 281 K) would take a -32 K band shift from a constant never
+        # measured for it -- the same fabricated-number-in-a-band failure as inventing one,
+        # reached by misapplication instead.
+        members = ff.get("members")
+        assert isinstance(members, list) and members, (
+            f"{cid}: tg_fox_flory_K must name the members it was measured for")
+        known = set(c.get("examples", []))
+        assert set(members) & known or all(isinstance(m, str) for m in members), cid
 
 
 def test_no_generic_fox_flory_fallback_exists():

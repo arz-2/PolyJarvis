@@ -245,8 +245,11 @@ def _mass_weighted_rg_sq(positions, masses):
 
 H_MASS_MAX = 2.0
 
-# ⟨R_ee²⟩/⟨Rg²⟩ as a fraction of the finite-N ideal 6N/(N+1). Binding below, advisory
-# above -- see the chain-dimension block in run_structural_analysis for the calibration.
+# ⟨R_ee²⟩/⟨Rg²⟩ as a fraction of the finite-N ideal 6N/(N+1). Binding below, advisory above.
+# CHAIN_RATIO_MIN is calibrated on the archive (see the chain-dimension block in
+# run_structural_analysis). CHAIN_RATIO_EXTENDED is NOT: it is a reporting convention that
+# labels the stiff-backbone classes, chosen to sit above the archive's spread rather than
+# derived from it. Nothing binds on it, so its exact value changes no verdict.
 CHAIN_RATIO_MIN = 0.72
 CHAIN_RATIO_EXTENDED = 1.15
 

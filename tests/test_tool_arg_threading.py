@@ -53,6 +53,9 @@ REQUIRED_ARGS = {
     "enforce_equilibration_gate": (LAMMPS_SERVER, [
         "dp", "ct_gate_reliable", "exp_density_gcm3", "tg_K", "t_equil_K",
         "glass_data", "melt_data", "out_dir", "alpha_glass_per_K", "alpha_melt_per_K",
+        # phase flips a Class C gate: omitted, the melt-density check never runs and the
+        # verdict is a clean PASS with no trace that it was skipped.
+        "phase", "polymer_class",
     ], None),  # call args live in gen_prompt's MECHANIZED GATE block, not a guide
     "extract_thermal": (LAMMPS_SERVER, [
         "tg_data_file", "per_t_dump_file", "method_gap_exempt", "backbone_types",

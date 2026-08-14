@@ -256,6 +256,22 @@ def _exp_tg_range(cls: dict, run_name: str | None = None) -> list:
     return ["<exp_tg_min>", "<exp_tg_max>"]
 
 
+def _fox_flory_K(cls: dict, run_name: str | None = None):
+    """Flory-Fox K for THIS run's member, or None.
+
+    The constant is measured for one polymer, not for a whole class: PACR's 1.4e5 is PMMA's
+    and PSTR's 1.083e5 is atactic PS's. Returning the class value unconditionally would give
+    a PMA run (exp Tg 281 K) a -32 K band shift from a constant never measured for it —
+    a fabricated number inside a PASS/FAIL band, arrived at by misapplication rather than
+    invention. Member resolution mirrors _exp_tg_range's run-name prefix match.
+    """
+    ff = cls.get("tg_fox_flory_K") or {}
+    K, members = ff.get("K_K_g_per_mol"), ff.get("members")
+    if K is None or not members or not run_name:
+        return None
+    return K if any(run_name.upper().startswith(m.upper()) for m in members) else None
+
+
 def _exp_tg_point(cls: dict, run_name: str | None = None):
     """Point exp_tg_K value (not a ±20 band) for assess_cooling_contraction's tg_K arg.
     Mirrors _exp_tg_range's member-resolution logic (fixes the class-mean-averaging bug
@@ -1047,6 +1063,9 @@ def equil_check_prompt(args, cls: dict) -> str:
 ###   out_dir             = {p['output_dir']}
 ###   alpha_glass_per_K   = {p['alpha_glass_per_K']}
 ###   alpha_melt_per_K    = {p['alpha_melt_per_K']}
+###   phase               = full
+###   polymer_class       = {args.polymer_class.upper()}
+###   polymer_name        = {_v(getattr(args, 'polymer_name', None), 'null')}
 ### Pass every argument above, including the ones whose value is null — omitting one is a schema
 ### error, not a default.
 ### alpha_glass_per_K/alpha_melt_per_K are curated per-class values (polymer_rules.json) or,
@@ -1322,7 +1341,7 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
         # Flory-Fox K for the DP correction of the EXPERIMENTAL Tg band. Absent for most
         # classes -- no citable primary measurement -- and absence means the band is graded
         # uncorrected, never that a generic K is substituted.
-        "tg_fox_flory_K": (cls.get("tg_fox_flory_K") or {}).get("K_K_g_per_mol"),
+        "tg_fox_flory_K": _fox_flory_K(cls, args.run_name),
     }
 
 
