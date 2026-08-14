@@ -1120,6 +1120,15 @@ def main():
                     f"fit exceeds {method_gap_max_K:.0f} K — transition region noisy or sweep too narrow"
                 )
 
+    # Half-width of the interval the run summary grades against the experimental band.
+    # Built from the same spread/sigma pair as method_gap_K, halved because that is a full
+    # width. Null when neither is available -- point grading then, never a zero interval.
+    _spread = cf_result.get("breakpoint_spread_K")
+    _sigma = cf_result.get("tg_uncertainty_K")
+    _halves = [h for h in (_spread / 2.0 if _spread is not None else None, _sigma)
+               if h is not None]
+    tg_interval_half_K = round(max(_halves), 1) if _halves else None
+
     result = {
         "status":              "success",
         "log_file":            log_file,
@@ -1137,11 +1146,15 @@ def main():
                                  if cf_result.get("transition_width_c_K") is not None else None),
         "tg_uncertainty_K":    (round(cf_result["tg_uncertainty_K"], 1)
                                 if cf_result.get("tg_uncertainty_K") is not None else None),
-        # Interval on Tg_alternative_K, not on Tg_K. Non-null only for bilinear_curvefit, whose
-        # Tg_K is an unrefined seed with no meaningful covariance -- so it must not be read as
-        # the headline's error bar.
-        "tg_alt_uncertainty_K": (round(cf_result["tg_alt_uncertainty_K"], 1)
-                                 if cf_result.get("tg_alt_uncertainty_K") is not None else None),
+        # HALF-width of the grading interval on Tg_K, in kelvin: max(spread/2, sigma).
+        # Deliberately the same two quantities the reportability gate above thresholds as
+        # method_gap_K = max(spread, 2*sigma) -- that is a FULL width, so halving it here
+        # keeps one definition of "how well is this breakpoint determined" rather than two.
+        # A separate combination would let a run be TG_REPORTABLE while the interval the
+        # summary grades with is wider than the gate's own tolerance.
+        # None when the breakpoint carries neither measure; consumers must fall back to
+        # point grading, never treat null as zero.
+        "tg_interval_half_width_K": tg_interval_half_K,
         "binning_method":      binning_method,
         "fit_params": {
             "a_glassy":  cf_result["a_glassy"],

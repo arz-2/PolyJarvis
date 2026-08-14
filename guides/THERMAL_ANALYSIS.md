@@ -30,6 +30,11 @@ Read `tg_gate_reasons` into the D-06 row verbatim. `dCp_weak_step_flag` is infor
 
 **CTE sanity:** α_r/α_g ≈ 2–3 (flag if outside 1.5–5).
 
+`tg_interval_half_width_K` = `max(breakpoint_spread_K/2, tg_uncertainty_K)` — the half-width the
+run summary grades against the experimental band, giving `PASS_WITHIN_UNCERTAINTY` when the point
+sits outside the band but the interval overlaps it. Same two quantities as `tg_method_gap_K`, which
+is the full width. Null on a rate-extrapolated Tg (no breakpoint σ) ⇒ graded as a point.
+
 **Delocalized transition:** when `tg_uncertainty_K ≈ transition_width_c_K` and both >150 K, a high-r²/EXCELLENT fit can still be a spurious primary fit to under-equilibrated high-T plateaus (e.g. PLA2 r100: primary 516 K vs alternative 379 K matching the density slope). Also check `relaxation_metrics`: high-T plateaus with `n_eff < 5` + `relax_warning=true` signal the same contamination. Cross-check the density slope; if the primary is >80 K from exp — or >50 K above exp with the alternative closer — flag SUSPECT, verdict WARNING, recommend the alternative + fresh equilibration.
 
 ---

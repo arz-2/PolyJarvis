@@ -220,6 +220,11 @@ def main():
     exp_tg, tg_band_widened = _floor_band(exp_tg, min_abs=10.0)   # >=10 K total (+/-5 K)
     tg_err = None
     tg_status = "no exp ref"
+    # Fit uncertainty applies to the raw bilinear breakpoint only. A rate-extrapolated Tg
+    # is a log-linear extrapolation across rates and carries no cf_result sigma, so it is
+    # graded as a point -- null is not zero, and must not be read as a tight interval.
+    tg_interval_half_K = (tg.get("tg_interval_half_width_K")
+                          if tg_basis == "raw_MD" else None)
     if Tg_val is not None and exp_tg:
         # Grade the raw value against the REAL exp band, always. A raw single-rate MD Tg
         # overestimates experiment by ~80-120 K (cooling-rate artifact, Patrone 2016), but a
@@ -228,13 +233,21 @@ def main():
         # that (feedback_pla_glassy_md_offset_gamed_pass.md). The rate-extrapolated Tg
         # already removes the bias by construction; the raw single-rate Tg is graded exactly
         # as strictly, and the discrepancy is the finding, not something to correct away.
+        # Three-valued, not a widened band. _floor_band has already widened the band once,
+        # so widening BOTH sides and testing containment would compound into a laundered
+        # PASS. Instead the overlap gets its own status, and error_pct keeps the POINT
+        # distance to the nearest edge -- zeroing it as PASS does would drop the number
+        # that makes the annotation readable.
         lo, hi = exp_tg[0], exp_tg[1]
-        tg_status = "PASS" if lo <= Tg_val <= hi else "FAIL"
-        if tg_status == "PASS":
-            tg_err = 0.0
+        if lo <= Tg_val <= hi:
+            tg_status, tg_err = "PASS", 0.0
         else:
             nearest = lo if Tg_val < lo else hi
             tg_err = round((Tg_val - nearest) / nearest * 100, 1)
+            half = tg_interval_half_K
+            overlaps = (half is not None and half > 0
+                        and Tg_val + half >= lo and Tg_val - half <= hi)
+            tg_status = "PASS_WITHIN_UNCERTAINTY" if overlaps else "FAIL"
 
     rho_val = eq_dens.get("plateau_density_mean") or eq_dens.get("density_mean")
     exp_rho = ([args.exp_density_min, args.exp_density_max]
@@ -384,7 +397,14 @@ def main():
                 "exp_range_K":    exp_tg,
                 "band_widened":   tg_band_widened,
                 "error_pct":      tg_err,
+                # PASS | PASS_WITHIN_UNCERTAINTY | FAIL | no exp ref.
+                # PASS_WITHIN_UNCERTAINTY means the POINT sits outside the band but the fit
+                # interval overlaps it — a distinct outcome, not a PASS. error_pct still
+                # carries the point distance to the nearest edge.
                 "status":         tg_status,
+                # Half-width of the graded interval (K). Null on a rate-extrapolated Tg,
+                # which has no breakpoint sigma and is graded as a point.
+                "tg_interval_half_width_K": tg_interval_half_K,
                 "r_squared":      tg_r2,
                 "fit_quality":    tg_quality,
                 # True when the headline raw-MD fit still violates a hard physics constraint
