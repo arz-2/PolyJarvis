@@ -228,74 +228,124 @@ def bilinear_indep(T, a1, b1, a2, b2, Tg):
     return np.where(T < Tg, a1 * T + b1, a2 * T + b2)
 
 
-def curvefit_bilinear(T, rho, tg_hint=None):
-    """Bilinear fit via curve_fit with independent-line parameterisation."""
-    idx = np.argsort(T)
-    T, rho = T[idx], rho[idx]
-    T_min, T_max = float(T[0]), float(T[-1])
-    T_mid = (T_min + T_max) / 2
+def _ols_line(x, y):
+    """Least-squares line plus parameter covariance. None if underdetermined.
 
-    mask_lo = T < T_mid
-    mask_hi = T >= T_mid
-    if mask_lo.sum() < 2 or mask_hi.sum() < 2:
+    Returns (a, b, var_a, var_b, cov_ab, ssr); the variances are None below 3 points, where
+    the residual is identically zero and the covariance undefined.
+    """
+    n = len(x)
+    if n < 2:
         return None
-
-    p_lo = np.polyfit(T[mask_lo], rho[mask_lo], 1)
-    p_hi = np.polyfit(T[mask_hi], rho[mask_hi], 1)
-
-    if abs(p_lo[0] - p_hi[0]) > 1e-12:
-        Tg_init = (p_hi[1] - p_lo[1]) / (p_lo[0] - p_hi[0])
+    xbar = float(x.mean())
+    Sxx = float(((x - xbar) ** 2).sum())
+    if Sxx <= 0:
+        return None
+    a = float(((x - xbar) * (y - y.mean())).sum() / Sxx)
+    b = float(y.mean() - a * xbar)
+    ssr = float(((y - (a * x + b)) ** 2).sum())
+    if n > 2:
+        s2 = ssr / (n - 2)
+        var_a, var_b = s2 / Sxx, s2 * (1.0 / n + xbar ** 2 / Sxx)
+        cov_ab = -s2 * xbar / Sxx
     else:
-        Tg_init = T_mid
-    Tg_init = np.clip(Tg_init, T_min + 5, T_max - 5)
+        var_a = var_b = cov_ab = None
+    return a, b, var_a, var_b, cov_ab, ssr
 
-    if tg_hint is not None:
-        Tg_init = np.clip(tg_hint, T_min + 5, T_max - 5)
 
-    p0 = [p_lo[0], p_lo[1], p_hi[0], p_hi[1], Tg_init]
-    try:
-        popt, pcov = optimize.curve_fit(
-            bilinear_indep, T, rho, p0=p0,
-            bounds=([-np.inf, -np.inf, -np.inf, -np.inf, T_min+5],
-                    [np.inf,  np.inf,  np.inf,  np.inf,  T_max-5]),
-            maxfev=20000,
-        )
-        a1, b1, a2, b2, Tg = popt
-        pred = bilinear_indep(T, *popt)
-        ss_res = np.sum((rho - pred)**2)
-        ss_tot = np.sum((rho - np.mean(rho))**2)
-        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-        Tg_alt = (b2 - b1) / (a1 - a2) if abs(a1 - a2) > 1e-12 else Tg
-        # Tg uncertainty. NOT pcov[4,4]: bilinear_indep switches on np.where(T < Tg), so the
-        # residual is piecewise-constant in Tg, curve_fit's finite-difference gradient for it is
-        # identically zero, and its variance comes back 0 -- a false claim of infinite precision,
-        # worse than reporting nothing. The four line parameters ARE genuinely fitted, so
-        # propagate them onto the intersection Tg_alt = (b2-b1)/(a1-a2) by the delta method.
-        # Without an interval run_summary grades a bare point against a band, and the
-        # physics-validity swap routinely makes this fit the primary one.
-        try:
-            D = a1 - a2
-            grad = np.array([-(b2 - b1) / D**2, -1.0 / D, (b2 - b1) / D**2, 1.0 / D])
-            tg_sigma = float(np.sqrt(abs(grad @ pcov[:4, :4] @ grad)))
-            if not np.isfinite(tg_sigma) or tg_sigma == 0.0:
-                tg_sigma = None
-        except Exception:
-            tg_sigma = None
-        return {
-            "Tg_K":      float(Tg),
-            "Tg_alt_K":  float(Tg_alt),
-            "a_glassy":  float(a1),
-            "b_glassy":  float(b1),
-            "a_rubbery": float(a2),
-            "b_rubbery": float(b2),
-            "r_squared": float(r2),
-            # Deliberately NOT "tg_uncertainty_K": this sigma is about Tg_alt_K, and Tg_K from
-            # this fit is the unrefined seed (see above), so pairing them would centre a tight
-            # interval on a different number than the one graded.
-            "tg_alt_uncertainty_K": tg_sigma,
-        }
-    except Exception:
+def curvefit_bilinear(T, rho, tg_hint=None, ssr_tol=1.10):
+    """Segmented fit by exhaustive breakpoint search under the physics constraints.
+
+    The breakpoint is a DISCRETE parameter -- which points land on which branch -- so a
+    gradient optimizer cannot fit it: nudging Tg leaves every point on its original branch,
+    the finite-difference gradient is identically zero, and Tg never moves off its seed
+    (measured: hint 320 -> Tg 320, hint 460 -> Tg 460, at every noise level). Enumerating the
+    candidate splits removes the seed dependence; each branch is then closed-form OLS.
+
+    The constraints are applied INSIDE the search, not after it: bare argmin-SSR selects
+    near-parallel line pairs that fit well and intersect thousands of K away.
+
+    breakpoint_spread_K is the span of Tg over every split within ssr_tol of the best. A wide
+    set means several very different breakpoints explain the data about equally well -- the
+    transition is unresolved, which is a property of the sweep, not of a rival method.
+
+    tg_hint only breaks ties between splits of equal SSR; it can no longer decide the result.
+    """
+    idx = np.argsort(T)
+    T = np.asarray(T, dtype=float)[idx]
+    rho = np.asarray(rho, dtype=float)[idx]
+    n = len(T)
+    if n < 4:
         return None
+    T_min, T_max = float(T[0]), float(T[-1])
+    span = T_max - T_min
+    lo_edge, hi_edge = T_min + 0.05 * span, T_max - 0.05 * span
+    min_pts = 3 if n >= 8 else 2
+
+    every, valid = [], []
+    for i in range(min_pts, n - min_pts + 1):
+        L, R = _ols_line(T[:i], rho[:i]), _ols_line(T[i:], rho[i:])
+        if L is None or R is None:
+            continue
+        a1, b1, va1, vb1, cab1, ssr1 = L
+        a2, b2, va2, vb2, cab2, ssr2 = R
+        if abs(a1 - a2) < 1e-12:
+            continue
+        rec = {"ssr": ssr1 + ssr2, "tg": (b2 - b1) / (a1 - a2),
+               "a1": a1, "b1": b1, "a2": a2, "b2": b2,
+               "va1": va1, "vb1": vb1, "cab1": cab1,
+               "va2": va2, "vb2": vb2, "cab2": cab2}
+        every.append(rec)
+        if a1 < 0 and a2 < 0 and a2 < a1 and lo_edge <= rec["tg"] <= hi_edge:
+            valid.append(rec)
+
+    # Fall back to the unconstrained pool rather than returning None: this fit is the swap
+    # target when the hyperbola is rejected, and handing the caller nothing would leave a run
+    # with no fit at all. _hard_violations flags it downstream exactly as before.
+    pool = valid or every
+    if not pool:
+        return None
+
+    ssr_min = min(r["ssr"] for r in pool)
+    def _key(r):
+        return (r["ssr"], abs(r["tg"] - tg_hint) if tg_hint is not None else 0.0)
+    best = min(pool, key=_key)
+
+    near = [r["tg"] for r in pool if r["ssr"] <= ssr_tol * ssr_min]
+    spread = float(max(near) - min(near)) if len(near) > 1 else 0.0
+    # Reported as the alternative so the existing method-gap gate reads worst-case breakpoint
+    # ambiguity instead of the distance to a discarded fit.
+    far = max(near, key=lambda t: abs(t - best["tg"])) if near else best["tg"]
+
+    a1, b1, a2, b2, Tg = best["a1"], best["b1"], best["a2"], best["b2"], best["tg"]
+    pred = bilinear_indep(T, a1, b1, a2, b2, Tg)
+    ss_tot = float(((rho - rho.mean()) ** 2).sum())
+    r2 = 1 - float(((rho - pred) ** 2).sum()) / ss_tot if ss_tot > 0 else 0.0
+
+    # Delta method on Tg = (b2-b1)/(a1-a2). Both branches are independent OLS fits, so the
+    # cross-branch covariances are zero and this now describes the reported headline.
+    tg_sigma = None
+    if None not in (best["va1"], best["vb1"], best["va2"], best["vb2"]):
+        D, N = a1 - a2, b2 - b1
+        d_a1, d_b1, d_a2, d_b2 = -N / D**2, -1.0 / D, N / D**2, 1.0 / D
+        var = (d_a1**2 * best["va1"] + d_b1**2 * best["vb1"] + 2 * d_a1 * d_b1 * best["cab1"]
+               + d_a2**2 * best["va2"] + d_b2**2 * best["vb2"] + 2 * d_a2 * d_b2 * best["cab2"])
+        if np.isfinite(var) and var > 0:
+            tg_sigma = float(np.sqrt(var))
+
+    return {
+        "Tg_K":      float(Tg),
+        "Tg_alt_K":  float(far),
+        "a_glassy":  float(a1),
+        "b_glassy":  float(b1),
+        "a_rubbery": float(a2),
+        "b_rubbery": float(b2),
+        "r_squared": float(r2),
+        "tg_uncertainty_K": tg_sigma,
+        "breakpoint_spread_K": spread,
+        "n_breakpoints_within_tol": len(near),
+        "breakpoint_constrained": bool(valid),
+    }
 
 
 def hyperbola_indep(T, rho0, m_bar, delta, Tg, c):
@@ -1024,8 +1074,23 @@ def main():
     # report", ">20 K primary/alternative disagreement — investigate"), so the orchestrator
     # routes on a field instead of re-deriving it. Distinct from the is_glassy routing
     # fallback in THERMAL_TRACK.md, which may still use the plan's experimental Tg.
-    Tg_alt = round(alt_result["Tg_K"], 1) if alt_result else round(cf_result["Tg_alt_K"], 1)
-    method_gap_K = round(abs(round(Tg_primary, 1) - Tg_alt), 1) if Tg_alt is not None else None
+    if (fit_method_used == "bilinear_curvefit"
+            and cf_result.get("breakpoint_spread_K") is not None):
+        # After a physics-validity swap alt_result IS the rejected hyperbola, so comparing
+        # against it measures how bad the discarded candidate was, not whether this Tg is
+        # determined. The segmented fit's own SSR profile answers that directly.
+        Tg_alt = round(cf_result["Tg_alt_K"], 1)
+        # Two independent ways the breakpoint can be undetermined, and either one disqualifies:
+        # several competing splits (spread), or one split whose intersection is itself loose
+        # (sigma -- near-parallel branches send it up without producing a rival split). Gating
+        # on spread alone let a lone valid split through at any sigma. 2*sigma so the criterion
+        # reads "the interval must be tighter than the experimental band we grade against".
+        _sig = cf_result.get("tg_uncertainty_K")
+        method_gap_K = round(max(cf_result["breakpoint_spread_K"],
+                                 2.0 * _sig if _sig is not None else 0.0), 1)
+    else:
+        Tg_alt = round(alt_result["Tg_K"], 1) if alt_result else round(cf_result["Tg_alt_K"], 1)
+        method_gap_K = round(abs(round(Tg_primary, 1) - Tg_alt), 1) if Tg_alt is not None else None
     gate_reasons = []
     if fit_quality == "POOR":
         gate_reasons.append(f"fit_quality=POOR ({', '.join(fit_warnings) or 'low r²'})")
@@ -1041,10 +1106,19 @@ def main():
             )
         else:
             gate_verdict = "TG_REVIEW"
-            gate_reasons.append(
-                f"method_gap={method_gap_K:.1f} K between {fit_method_used} and the alternative "
-                f"fit exceeds {method_gap_max_K:.0f} K — transition region noisy or sweep too narrow"
-            )
+            if fit_method_used == "bilinear_curvefit" and cf_result.get("breakpoint_spread_K") is not None:
+                gate_reasons.append(
+                    f"breakpoint_ambiguity={method_gap_K:.1f} K exceeds {method_gap_max_K:.0f} K "
+                    f"(spread={cf_result['breakpoint_spread_K']:.1f} K over "
+                    f"{cf_result.get('n_breakpoints_within_tol')} splits within 10% of best SSR; "
+                    f"sigma={cf_result.get('tg_uncertainty_K') or float('nan'):.1f} K) — the "
+                    "transition is not resolved by this sweep"
+                )
+            else:
+                gate_reasons.append(
+                    f"method_gap={method_gap_K:.1f} K between {fit_method_used} and the alternative "
+                    f"fit exceeds {method_gap_max_K:.0f} K — transition region noisy or sweep too narrow"
+                )
 
     result = {
         "status":              "success",
