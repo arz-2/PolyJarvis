@@ -134,12 +134,13 @@
       ],
       "bash_allow": [
         "orchestration/scripts/canon_smiles.py",
-        "orchestration/scripts/make_deterministic_plan.py"
+        "orchestration/scripts/make_deterministic_plan.py",
+        "orchestration/scripts/write_characterization_cache.py",
+        "guides/system_characterization_cache.json"
       ],
       "write_allow": [
         "data/**",
-        "guides/polymer_rules.json",
-        "guides/system_characterization_cache.json"
+        "guides/polymer_rules.json"
       ]
     },
     "recovery-agent": {
@@ -156,10 +157,14 @@
     },
     "system-characterization-analyzer": {
       "extra_read_allow": [
-        "guides/polymer_rules.json"
+        "guides/polymer_rules.json",
+        "guides/system_characterization_cache.json"
       ],
-      "bash_allow": [],
-      "write_allow": ["data/**", "guides/system_characterization_cache.json"]
+      "bash_allow": [
+        "orchestration/scripts/write_characterization_cache.py",
+        "guides/system_characterization_cache.json"
+      ],
+      "write_allow": ["data/**"]
     },
     "tg-analysis-worker": {
       "extra_read_allow": [],

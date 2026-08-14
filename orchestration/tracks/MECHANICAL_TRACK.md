@@ -16,7 +16,7 @@ GATE: do not spawn murnaghan-worker or deform-worker until the thermal track has
 
   Claim GPU: orchestration/scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
   Agent(subagent_type="murnaghan-worker", description="🟠 Murnaghan BM {polymer_name} (leg 1)",
-        prompt=<gen_prompt.py --stage murnaghan --plan PLAN_PATH
+        prompt=<gen_prompt.py --stage murnaghan --plan PLAN_PATH --is_glassy <is_glassy>
                 --data_path npt_prod_data_path --gpu_ids <claimed>>)
     → RESULT → chain_id_murnaghan, log_files (murnaghan_log_files), monitor_command_murnaghan,
                pressures_atm_murnaghan
@@ -46,7 +46,7 @@ GATE: do not spawn murnaghan-worker or deform-worker until the thermal track has
       pattern recover.md's RE-ANNEAL procedure already uses for npt_cool_steps).
     Claim GPU: orchestration/scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
     Agent(subagent_type="murnaghan-worker", description="🟠 Murnaghan BM {polymer_name} (leg 2)",
-          prompt=<gen_prompt.py --stage murnaghan --plan PLAN_PATH
+          prompt=<gen_prompt.py --stage murnaghan --plan PLAN_PATH --is_glassy <is_glassy>
                   --data_path npt_prod_data_path --gpu_ids <claimed>>)
       → RESULT → chain_id_leg2, log_files_leg2 (one new log, the -1000 atm point)
     Write SIMULATION STATE, BACKGROUND-WAIT on the leg-2 monitor_command.
@@ -75,7 +75,7 @@ GATE: do not spawn murnaghan-worker or deform-worker until the thermal track has
     Claim GPU: orchestration/scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
     Agent(subagent_type="deform-worker", description="🔵 Deform fallback {polymer_name}",
           prompt=<gen_prompt.py --stage deform --plan PLAN_PATH --data_path npt_prod_data_path
-                  --deform_rate_mode primary --gpu_ids <claimed>>)
+                  --is_glassy <is_glassy> --deform_rate_mode primary --gpu_ids <claimed>>)
       → RESULT → run_id_deform, deform_log_path, monitor_command_deform
     Write SIMULATION STATE, then BACKGROUND-WAIT on `monitor_command_deform`.
     # completion wakeup: orchestration/scripts/pick_gpu.py release --run <RUN>
@@ -85,7 +85,7 @@ GATE: do not spawn murnaghan-worker or deform-worker until the thermal track has
       Claim GPU: orchestration/scripts/pick_gpu.py --json claim --run <RUN> --need ${GPU_PER_RUN:-1}
       Agent(subagent_type="deform-worker", description="🔵 Deform rate-check {polymer_name}",
             prompt=<gen_prompt.py --stage deform --plan PLAN_PATH --data_path npt_prod_data_path
-                    --deform_rate_mode slow --gpu_ids <claimed>>)
+                    --is_glassy <is_glassy> --deform_rate_mode slow --gpu_ids <claimed>>)
         → RESULT → deform_log_path_slow, monitor_command_deform_slow
       If `monitor_command_deform_slow` is null: release the GPU immediately, proceed to
         extraction with deform_log_path_slow=null.

@@ -55,7 +55,7 @@ REQUIRED_ARGS = {
         "glass_data", "melt_data", "out_dir", "alpha_glass_per_K", "alpha_melt_per_K",
     ], None),  # call args live in gen_prompt's MECHANIZED GATE block, not a guide
     "extract_thermal": (LAMMPS_SERVER, [
-        "tg_data_file", "per_t_dump_file", "method_gap_exempt",
+        "tg_data_file", "per_t_dump_file", "method_gap_exempt", "backbone_types",
     ], "THERMAL_ANALYSIS.md"),
     "run_bulk_modulus_series": (LAMMPS_SERVER, [
         "velocity_seed", "npt_steps", "dt_fs", "use_trappe", "use_pcff", "use_opls",
@@ -258,10 +258,36 @@ def test_gen_prompt_melt_gate_passes_explicit_nulls():
         assert re.search(rf"{name}\s+= null", melt), f"melt gate block omits {name} = null"
 
 
+def _stage_args(**overrides):
+    """gen_prompt's argparse namespace with every flag at its default, as a stage function sees
+    it when the orchestrator passes nothing but the basics."""
+    class A:
+        pass
+
+    args = A()
+    defaults = dict(
+        run_name="PACR9", polymer_class="PACR", smiles="*CC(*)(C)C(=O)OC",
+        data_path="/x/cell.data", work_dir=None, output_dir=None, dt_fs=None,
+        gpu_ids="0", mpi_ranks=1, engine="kokkos", lammps_flags=None, nchain=None,
+        dp=None, backbone_types=None, velocity_seed=None, emc_seed=None,
+        density_initial=None, is_glassy=None, deform_rate_mode="primary",
+        K_deform_rate_inv_s=None, K_strain_max=None, tg_rate_index=None,
+        tg_t_high_K=None, tg_t_low_K=None, tg_t_step_K=None, tg_steps_per_t=None,
+        tg_start_data=None, T_equil_K=None, T_anneal_high_K=None, npt_prod_ns=None,
+        npt_cool_steps=None, npt_cool300_steps=None, add_melt_npt=False, phase="full",
+        pending_cooldown_path=None, deform_log="/x/d.log", deform_log_slow=None,
+        murnaghan_logs=None, npt_prod_log=None, npt_prod_dump=None, equil_data_path=None,
+        enthalpy_col=None, exp_K_min=None, exp_K_max=None, exp_tg_K=None,
+    )
+    for k, v in {**defaults, **overrides}.items():
+        setattr(args, k, v)
+    return args
+
+
 @pytest.mark.parametrize("stage,fields", [
     ("equil-check", ["cutoff_A", "ct_min_decay_melt", "dt_fs"]),
     ("analyze-bm", ["dt_fs", "strain_rate_per_fs", "K_strain_max", "npt_prod_log_path"]),
-    ("analyze-tg", ["tg_data_file", "per_t_dump_file", "method_gap_exempt"]),
+    ("analyze-tg", ["tg_data_file", "per_t_dump_file", "method_gap_exempt", "backbone_types"]),
     ("murnaghan", ["dt_fs", "npt_steps", "engine", "velocity_seed", "lammps_flags"]),
     ("deform", ["dt_fs", "engine", "gpu_ids", "mpi_ranks", "velocity_seed"]),
     ("build", ["dp", "nchain", "density_initial", "emc_seed"]),
@@ -271,30 +297,125 @@ def test_prompt_emits_the_value_the_tool_needs(stage, fields):
     one: it turns a silent wrong number into a hard failure with nothing to pass."""
     import gen_prompt
 
-    class A:
-        pass
-
-    args = A()
-    for k, v in dict(
-        run_name="PACR9", polymer_class="PACR", smiles="*CC(*)(C)C(=O)OC",
-        data_path="/x/cell.data", work_dir=None, output_dir=None, dt_fs=None,
-        gpu_ids="0", mpi_ranks=1, engine="kokkos", lammps_flags=None, nchain=None,
-        dp=None, backbone_types=None, velocity_seed=None, emc_seed=None,
-        density_initial=None, is_glassy="true", deform_rate_mode="primary",
-        K_deform_rate_inv_s=None, K_strain_max=None, tg_rate_index=None,
-        tg_t_high_K=None, tg_t_low_K=None, tg_t_step_K=None, tg_steps_per_t=None,
-        tg_start_data=None, T_equil_K=None, T_anneal_high_K=None, npt_prod_ns=None,
-        npt_cool_steps=None, npt_cool300_steps=None, add_melt_npt=False, phase="full",
-        pending_cooldown_path=None, deform_log="/x/d.log", deform_log_slow=None,
-        murnaghan_logs=None, npt_prod_log=None, npt_prod_dump=None, equil_data_path=None,
-        enthalpy_col=None, exp_K_min=None, exp_K_max=None, exp_tg_K=None,
-    ).items():
-        setattr(args, k, v)
     rules = gen_prompt.json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
     cls = rules["classes"]["PACR"]
-    text = gen_prompt.STAGE_MAP[stage](args, cls)
+    text = gen_prompt.STAGE_MAP[stage](_stage_args(), cls)
     for name in fields:
         assert f"{name}:" in text, f"--stage {stage} prompt omits {name}"
+
+
+def _agent_tools(doc: Path) -> set:
+    """The bare tool names in an agent .md's `tools:` frontmatter list."""
+    m = re.search(r"^tools:\n((?:\s*-\s.*\n)+)", doc.read_text(), re.M)
+    if not m:
+        return set()
+    return {line.split("__")[-1].strip()
+            for line in re.findall(r"^\s*-\s*(\S+)", m.group(1), re.M)}
+
+
+AGENT_DOCS = sorted((REPO_ROOT / ".claude" / "agents").glob("*.md"))
+
+
+@pytest.mark.parametrize("doc", AGENT_DOCS, ids=lambda p: p.name)
+def test_agent_md_arg_list_is_not_a_subset(doc):
+    """An agent .md that names *some* of a tool's required arguments must name them all.
+
+    The .md loads before its guide, and a worker follows the nearer instruction: tg-analysis-worker
+    said "always pass output_dir and graphs_dir" while THERMAL_ANALYSIS.md's call block also named
+    tg_data_file/per_t_dump_file, and the worker passed the .md's two. per_t_dump_file went unpassed
+    on every run, the Tg sweep wrote per_t_structs.dump nobody read, and P2/Rg/Tg_dynamic_K were
+    silently absent from tg_summary.json. A partial list is worse than no list -- an .md that
+    delegates wholly to its guide names none of them and is fine."""
+    lines = doc.read_text().splitlines()
+    tools = _agent_tools(doc)
+    for tool, (_srv, required, _g) in REQUIRED_ARGS.items():
+        if tool not in tools:
+            continue
+        # Only prose that tells the worker what to pass *to this tool* competes with the guide.
+        # A mention of an argument anywhere else in the .md does not.
+        instructions = [ln for ln in lines
+                        if re.search(r"\bpass(es|ing)?\b", ln, re.I) and tool in ln]
+        params = set(_signature(_srv, tool))
+        for ln in instructions:
+            # Any parameter of this tool, not just a required one: the tg-analysis-worker line
+            # that caused this named `output_dir` and `graphs_dir` only, and an enumeration that
+            # stops before the required arguments is exactly the failure.
+            named = {n for n in params if re.search(rf"`{n}[`=]|\b{n}\s*=", ln)}
+            if not named:
+                continue  # a general instruction, not an enumeration
+            missing = sorted(set(required) - named)
+            assert not missing, (
+                f"{doc.name} tells the worker to pass {sorted(named)} to {tool} but not "
+                f"{missing} -- a partial list overrides the guide's complete one:\n  {ln.strip()}")
+
+
+def test_is_glassy_has_no_argparse_default():
+    """The stage functions are tested through a namespace, which bypasses argparse entirely --
+    so the derivation can be correct while the CLI still hands every caller a literal "true".
+    That was the actual bug: `--is_glassy` defaulted to the string, so `_is_glassy`'s regime
+    branch was unreachable from the command line."""
+    tree = ast.parse((REPO_ROOT / "orchestration" / "scripts" / "gen_prompt.py").read_text())
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "add_argument"):
+            continue
+        if not (node.args and getattr(node.args[0], "value", None) == "--is_glassy"):
+            continue
+        default = next((k.value for k in node.keywords if k.arg == "default"), None)
+        assert default is not None, "--is_glassy lost its explicit default=None"
+        assert getattr(default, "value", "sentinel") is None, (
+            "--is_glassy must default to None so the regime oracle decides; a string default "
+            "makes every rubbery run's murnaghan/deform prompt claim glassy")
+        return
+    raise AssertionError("--is_glassy is no longer declared in gen_prompt.py")
+
+
+# ── is_glassy: derived, never defaulted ───────────────────────────────────────
+# `--is_glassy` defaulted to the string "true", so both consumers' `else` branches were dead code
+# and every rubbery run's murnaghan/deform prompt claimed glassy. The regime oracle already knew
+# better -- it drives the equil-check carve-out and the analyze-tg data path off the same
+# T_workflow.
+
+def _prompt(stage, polymer_class, is_glassy=None):
+    import gen_prompt
+
+    args = _stage_args(run_name="_probe", polymer_class=polymer_class, is_glassy=is_glassy)
+    rules = gen_prompt.json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
+    return gen_prompt.STAGE_MAP[stage](args, rules["classes"][polymer_class])
+
+
+@pytest.mark.parametrize("stage", ["murnaghan", "deform"])
+@pytest.mark.parametrize("polymer_class,expected", [("POXI", "false"), ("PDIE", "false"),
+                                                    ("PACR", "true"), ("PEST", "true")])
+def test_is_glassy_follows_the_regime_when_the_flag_is_absent(stage, polymer_class, expected):
+    assert f"is_glassy:         {expected}" in _prompt(stage, polymer_class)
+
+
+def test_explicit_is_glassy_overrides_the_derivation():
+    """The thermal track's value comes from this run's measured Tg and stays authoritative."""
+    assert "is_glassy:         false" in _prompt("murnaghan", "PACR", is_glassy="false")
+    assert "is_glassy:         true" in _prompt("murnaghan", "POXI", is_glassy="true")
+
+
+def test_rubbery_class_does_not_get_the_glassy_submit_assertion():
+    """The assertion is imperative and sits above the guide, so a wrong is_glassy does not merely
+    mislabel the prompt -- it orders the worker down the glassy branch."""
+    assert "is_glassy=true → SUBMIT" not in _prompt("murnaghan", "POXI")
+    assert "is_glassy=true → SUBMIT" in _prompt("murnaghan", "PACR")
+
+
+# ── output_dir: never derived from an input file ──────────────────────────────
+
+def test_no_tool_derives_output_dir_from_an_input_file():
+    """Seven tools silently redirected a null output_dir into a subdirectory of their own input
+    (<log dir>/bulk_analysis, <dump dir>/eq_comprehensive, ...). generate_run_summary reads only
+    the flat output_dir, so those JSONs were written and never read -- confirmed on cis-PBD1.
+
+    Scoped to input-file-derived paths on purpose: run_bulk_modulus_series defaults output_dir to
+    its own work_dir, which is a caller-supplied run directory, not a guess."""
+    src = LAMMPS_SERVER.read_text()
+    offenders = re.findall(r"output_dir\s*=\s*str\(Path\([^)]*\)\.parent[^\n]*", src)
+    assert not offenders, "output_dir derived from an input file: " + "; ".join(offenders)
 
 
 # ── The params-dict hole ──────────────────────────────────────────────────────

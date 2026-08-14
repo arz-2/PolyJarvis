@@ -73,18 +73,15 @@ you write, not in chat narration.
    `system-characterization-analyzer` never wrote one — its write gate can legitimately produce
    nothing if both reliability checks failed at Phase A, even though Phase C still fully PASSed):
    ```
-   Bash: jq --arg smi "$CANONICAL_SMILES" --arg run "$(jq -r .run_name <run_plan_path>)" \
-       --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-       --argjson props "$(jq -c .properties <run_plan_path>)" '
-     .[$smi] = ((.[$smi] // {}) + {
-       protocol_validated: true,
-       validated_properties: (((.[$smi].validated_properties // []) + $props) | unique),
-       validated_run_name: $run,
-       validated_at: $now
-     })
-   ' guides/system_characterization_cache.json > /tmp/schar_cache.json \
-     && mv /tmp/schar_cache.json guides/system_characterization_cache.json
+   Bash: python3 orchestration/scripts/write_characterization_cache.py --lock \
+       --smiles "$CANONICAL_SMILES" \
+       --run_name "$(jq -r .run_name <run_plan_path>)" \
+       --properties "$(jq -r '.properties | join(",")' <run_plan_path>)"
    ```
+   `--lock` is the only mode allowed to set `protocol_validated`/`validated_*`; it leaves every
+   `probe_*`/`derived_*` field `system-characterization-analyzer` wrote intact, and never touches
+   another SMILES' entry.
+
    `validated_properties` is a **union**, not an overwrite — a SMILES validated for
    density+tg in one run and bulk_modulus in a later run ends up validated for all three. This
    is what `planner.md`/`critic.md`'s gate reads: `plan_mode=deterministic` requires

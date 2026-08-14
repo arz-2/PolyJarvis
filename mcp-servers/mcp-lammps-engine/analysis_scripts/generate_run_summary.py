@@ -5,11 +5,13 @@ canonical run_summary.json that mirrors the run_log.md sections.
 
 Reads all JSON files in output_dir, assembles the summary, fills provenance
 from git and version strings already present in analysis JSON outputs, and
-writes run_summary.json to output_dir.
+writes run_summary.json to output_dir. Only tg_summary.json is searched
+recursively; anything else an extractor wrote into a subdirectory is reported
+in artifacts_missing rather than silently dropped.
 
 Usage:
     python generate_run_summary.py \
-        --output_dir /path/to/data/RUN/outputs \
+        --output_dir /path/to/data/RUN/raw \
         --run_name PS1 \
         --smiles "*CC(c1ccccc1)*" \
         --polymer_class PSTR \
@@ -123,22 +125,40 @@ def main():
     # -----------------------------------------------------------------------
     # Load all analysis JSON outputs
     # -----------------------------------------------------------------------
-    tg           = _load_json(output_dir / "tg_summary.json")
-    tg_mr        = _load_json(output_dir / "tg_multirate_result.json")
-    eq_dens      = _load_json(output_dir / "equilibrated_density.json")
-    eq_chk       = _load_json(output_dir / "equilibration_check.json")
+    artifacts_missing = []
+
+    def _load(name):
+        """Load output_dir/<name>, recording anything that did not load. _load_json returns {}
+        for missing, malformed and unreadable alike, so without this every gap reads as "the
+        analysis produced nothing". `found_in` separates the two cases that matter: a file an
+        extractor wrote into a subdirectory (stranded, never read) from one that was never
+        produced at all."""
+        path = output_dir / name
+        if path.exists():
+            return _load_json(path)
+        stray = next(iter(sorted(output_dir.rglob(name))), None)
+        artifacts_missing.append({
+            "file": name,
+            "found_in": str(stray.relative_to(output_dir)) if stray else None,
+        })
+        return {}
+
+    tg           = _load("tg_summary.json")
+    tg_mr        = _load("tg_multirate_result.json")
+    eq_dens      = _load("equilibrated_density.json")
+    eq_chk       = _load("equilibration_check.json")
     # check_equilibration_comprehensive actually writes equilibration_comprehensive.json
     # with a nested schema (thermo.*/chain.*/spatial.*); prefer it when present.
-    eq_comp      = _load_json(output_dir / "equilibration_comprehensive.json")
-    bulk         = _load_json(output_dir / "bulk_modulus.json")
-    bulk_deform  = _load_json(output_dir / "bulk_modulus_deform.json")
-    bulk_murnaghan = _load_json(output_dir / "bulk_modulus_murnaghan.json")
-    e2e     = _load_json(output_dir / "end_to_end_summary.json")
-    rdf     = _load_json(output_dir / "rdf_summary.json")
-    rg      = _load_json(output_dir / "rg_summary.json")
-    msd     = _load_json(output_dir / "msd_summary.json")
-    orient  = _load_json(output_dir / "orientation_summary.json")
-    dh      = _load_json(output_dir / "density_summary.json")
+    eq_comp      = _load("equilibration_comprehensive.json")
+    bulk         = _load("bulk_modulus.json")
+    bulk_deform  = _load("bulk_modulus_deform.json")
+    bulk_murnaghan = _load("bulk_modulus_murnaghan.json")
+    e2e     = _load("end_to_end_summary.json")
+    rdf     = _load("rdf_summary.json")
+    rg      = _load("rg_summary.json")
+    msd     = _load("msd_summary.json")
+    orient  = _load("orientation_summary.json")
+    dh      = _load("density_summary.json")
 
     # -----------------------------------------------------------------------
     # Results section
@@ -167,6 +187,10 @@ def main():
                 if j.get("Tg_K") is not None:
                     tg, Tg_raw = j, j.get("Tg_K")
                     break
+        if tg:
+            # Recovered from a per-rate subdir — the only artifact with its own discovery, so it
+            # is not stranded and does not belong in artifacts_missing.
+            artifacts_missing[:] = [m for m in artifacts_missing if m["file"] != "tg_summary.json"]
 
     Tg_val = tg_extrap if tg_extrap is not None else Tg_raw
     tg_basis = ("rate_extrapolated" if tg_extrap is not None
@@ -441,6 +465,7 @@ def main():
                                        default=dh.get("cv_mean")),
         },
         "artifacts":    artifacts,
+        "artifacts_missing": artifacts_missing,
         "provenance": {
             "simulation_dir":     args.simulation_dir,
             "git_commit":         _git_commit(cwd=str(output_dir)),
@@ -453,7 +478,12 @@ def main():
     with open(out_path, "w") as f:
         json.dump(summary, f, indent=2)
     print(f"  Wrote {out_path}", flush=True)
-    print(json.dumps({"status": "success", "summary_json": str(out_path)}))
+    for m in artifacts_missing:
+        if m["found_in"]:
+            print(f"  WARNING: {m['file']} is in {m['found_in']}, not {output_dir} — "
+                  f"not read into this summary", flush=True)
+    print(json.dumps({"status": "success", "summary_json": str(out_path),
+                      "artifacts_missing": artifacts_missing}))
 
 
 if __name__ == "__main__":
