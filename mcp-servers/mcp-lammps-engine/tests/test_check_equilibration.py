@@ -277,6 +277,30 @@ def test_unmeasurable_chain_dimensions_leave_the_gate_unarmed():
         "wrapped coordinates must not fail the gate — they make it unmeasurable")
 
 
+def test_wrapped_coordinates_withdraw_the_finite_size_check():
+    """The mirror-image failure to CHAIN_COLLAPSED, and the more dangerous direction.
+
+    check_finite_size takes Rg from the TRAJECTORY, not from the .data file's image flags,
+    so a failed unwrap shrinks Rg and INFLATES L/2Rg -- manufacturing a pass. Measured on
+    archived PEEK1: Rg 24.62 A -> 18.13 A wrapped, carrying L/2Rg 0.900
+    (SIZE_CHAIN_SELF_IMAGE) to 1.222 (SIZE_PASS)."""
+    from check_equilibration_comprehensive import check_finite_size
+    from orchestration.scripts.enforce_gate import finite_size_gate
+
+    for kwargs in ({"coords_sane": False},
+                   {"coords_sane": None, "unwrap_error": "AtomGroup has no fragments"}):
+        fs = check_finite_size(data_file="/nonexistent.data", cutoff_A=9.5,
+                               mean_rg_A=18.13, mean_ree_A=45.0, **kwargs)
+        assert fs["available"] is False, kwargs
+        assert "pass" not in fs, "an unmeasurable box check must not carry a verdict"
+        assert finite_size_gate({"finite_size": fs}) is None, kwargs
+
+    # Sane coordinates still evaluate: the guard withdraws, it does not disable.
+    assert check_finite_size(data_file="/nonexistent.data", cutoff_A=9.5, mean_rg_A=24.62,
+                             mean_ree_A=45.0, coords_sane=True)["reason"].startswith(
+                                 "box unparseable")
+
+
 def test_p2_without_a_backbone_is_unarmed_not_passing():
     """P2 is built from backbone bond vectors, so with no backbone every frame contributes
     0.0 and the mean is a perfect 0.0 -- which passed a BINDING Class A gate on no

@@ -150,7 +150,8 @@ def _residual_stress(prod, pressure_cols):
     }
 
 
-def check_finite_size(data_file, cutoff_A, mean_rg_A, mean_ree_A):
+def check_finite_size(data_file, cutoff_A, mean_rg_A, mean_ree_A,
+                      coords_sane=None, unwrap_error=None):
     """Post-equilibration periodic self-imaging check — the backstop.
 
     Shares its criteria with the PRE-SUBMISSION forecast in
@@ -162,7 +163,23 @@ def check_finite_size(data_file, cutoff_A, mean_rg_A, mean_ree_A):
     the tightest box the system occupies) while Rg/R_ee come from the melt dump where
     chains are mobile enough to measure. Chains do not relax appreciably on cooling below
     Tg, so pairing the two is sound and errs toward strictness.
+
+    WITHDRAWN ON WRAPPED COORDINATES. Rg here comes from the trajectory, not from the
+    .data file's image flags, so a failed unwrap SHRINKS it and INFLATES L/2Rg — the
+    direction that manufactures a pass. Measured on the archive: PEEK1 Rg 24.62 A ->
+    18.13 A wrapped, carrying L/2Rg 0.900 (SIZE_CHAIN_SELF_IMAGE) to 1.222 (SIZE_PASS).
+    coords_sane is the same backbone-bond-length test that guards chain.dimensions;
+    unwrap_error is the fallback when no backbone was measurable to run it on.
     """
+    if coords_sane is False:
+        return {"available": False,
+                "reason": "backbone bond length is outside the physical window — "
+                          "coordinates are not unwrapped, so Rg is under-measured and "
+                          "L/2Rg would read high"}
+    if coords_sane is None and unwrap_error:
+        return {"available": False,
+                "reason": f"coordinate unwrapping failed ({unwrap_error}) and no backbone "
+                          "was measurable to confirm the coordinates independently"}
     parsed = parse_data_box_mass_rg(data_file)
     if parsed is None:
         return {"available": False, "reason": f"box unparseable from {data_file}"}
@@ -999,6 +1016,9 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
             f"L/R_ee={fs.get('L_over_Ree')} | ≥1.0 | "
             f"{_fsmark.get(fs.get('verdict'), fs.get('verdict'))} |"
         )
+    else:
+        lines.append(
+            f"| Finite size | — | ≥1.0 | NOT EVALUATED ({fs.get('reason', 'no result')}) |")
 
     lines.append(
         f"| Density homogeneity CV (signal) | {sig:.1%} "
@@ -1198,6 +1218,8 @@ def main():
         cutoff_A=args.cutoff_A,
         mean_rg_A=(structural.get("rg") or {}).get("mean_Rg_A"),
         mean_ree_A=(structural.get("ree") or {}).get("mean_R_ee_A"),
+        coords_sane=(structural.get("backbone_path") or {}).get("coordinates_sane"),
+        unwrap_error=unwrap_error,
     )
 
     # ── overall_pass ──
@@ -1225,7 +1247,8 @@ def main():
     if unwrap_error:
         warnings_list.insert(0, f"coordinate unwrapping FAILED ({unwrap_error}) — every "
                              "chain quantity built from the backbone path (R_ee, C_inf, "
-                             "chain dimensions) is unreliable on wrapped coordinates")
+                             "chain dimensions) is unreliable on wrapped coordinates, and "
+                             "the finite-size check is withdrawn because Rg comes out low")
 
     d05 = build_d05_markdown(
         thermo=thermo, structural=structural,

@@ -131,6 +131,8 @@ check_equilibration_comprehensive(
 - `result["chain"]["backbone_path"]["n_backbone_atoms_mean"|"backbone_type_coverage"]`
 - `result["chain"]["dimensions"]["verdict"|"ree2_over_rg2"|"ratio_over_ideal"]`
 - `result["spatial"]["finite_size"]` → `L_min_A`, `L_over_2cutoff`, `L_over_2Rg`, `L_over_Ree`, `verdict`
+  — `available: false` means the box check was withdrawn (wrapped coordinates); report the
+  `reason`, never a size verdict
 
 ### `extract_equilibrated_density`
 
