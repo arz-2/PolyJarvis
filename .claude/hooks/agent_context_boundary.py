@@ -114,7 +114,11 @@ def check_read_like(tool_name: str, tool_input: dict, cwd: str, allow_entries: l
 _PATH_TOKEN_RE = re.compile(
     r"(?:/home/arz2/PolyJarvis/\S+)"
     r"|(?:/home/arz2/(?:simulations|polyjarvis_emc_jobs)/\S+)"
-    r"|\b(?:\.claude|mcp-servers|orchestration|guides|db|manuscript|manuscript_v2|docs|"
+    # (?<![\w./-]) not \b: a leading "." is not a word character, so \b never matched at the
+    # start of ".claude/..." or ".git/..." and those deny entries were dead on the Bash path
+    # (a plain `cat .claude/settings.json` passed). The lookbehind anchors on "start of token"
+    # instead, and still refuses to fire mid-path (foo/data/x) or mid-word.
+    r"|(?<![\w./-])(?:\.claude|mcp-servers|orchestration|guides|db|manuscript|manuscript_v2|docs|"
     r"hardware|tools|tests|literature|\.understand-anything|\.git|\.github|data)/\S+"
     r"|\bCLAUDE\.md\b|\bAGENTS\.md\b|\bREADME\.md\b|\bTask_TEMPLATE\.txt\b|\bLICENSE\b"
     r"|\.env\b|\.mcp\.json\S*|\bpytest\.ini\b|\brequirements-test\.txt\b"

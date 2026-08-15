@@ -242,13 +242,30 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
     }
 
 
+def _member_value(members: dict, run_name: str | None):
+    """The member entry a run name names, or None.
+
+    Matches the key anywhere in the run name, longest key first — startswith alone missed
+    every descriptive prefix, and the fallback below is a class MEDIAN: "cis-PBD1" failed
+    to match PBD and was graded against cis-polyisoprene's 200 K instead of PBD's 181 K.
+    Longest-first so PMMA1 takes PMMA, not PMA.
+    """
+    if not run_name:
+        return None
+    up = run_name.upper()
+    for key in sorted(members, key=len, reverse=True):
+        val = members[key]
+        if isinstance(val, (int, float)) and key.upper() in up:
+            return val
+    return None
+
+
 def _exp_tg_range(cls: dict, run_name: str | None = None) -> list:
     tg = cls.get("experimental_tg_K")
     if isinstance(tg, dict):
-        if run_name:
-            for key, val in tg.items():
-                if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                    return [round(val - 20), round(val + 20)]
+        hit = _member_value(tg, run_name)
+        if hit is not None:
+            return [round(hit - 20), round(hit + 20)]
         vals = sorted(v for v in tg.values() if isinstance(v, (int, float)))
         if vals:
             mid = vals[len(vals) // 2]
@@ -299,10 +316,9 @@ def _exp_tg_point(cls: dict, run_name: str | None = None):
     for multi-member classes — see memory feedback_genprompt_exp_tg_avg_bug.md)."""
     tg = cls.get("experimental_tg_K")
     if isinstance(tg, dict):
-        if run_name:
-            for key, val in tg.items():
-                if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                    return val
+        hit = _member_value(tg, run_name)
+        if hit is not None:
+            return hit
         vals = sorted(v for v in tg.values() if isinstance(v, (int, float)))
         return vals[len(vals) // 2] if vals else None
     if isinstance(tg, (int, float)):
@@ -314,10 +330,9 @@ def _exp_density_point(cls: dict, run_name: str | None = None):
     """Point exp_density_gcm3 value (not a ±5% band) for assess_cooling_contraction."""
     exp = cls.get("experimental_density_gcm3")
     if isinstance(exp, dict):
-        if run_name:
-            for key, val in exp.items():
-                if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                    return val
+        hit = _member_value(exp, run_name)
+        if hit is not None:
+            return hit
         vals = sorted(v for v in exp.values() if isinstance(v, (int, float)))
         return vals[len(vals) // 2] if vals else None
     if isinstance(exp, (int, float)):
@@ -864,6 +879,10 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
         # exceeds 20 K for a known, already-handled reason. Exempt records the gap without forcing
         # REVIEW -- otherwise the gate fires mostly where the artifact already has a carve-out.
         "method_gap_exempt": bool(cls.get("tg_slope_gate_fallback") == "slowest_rate"),
+        # Reference only — the worker's sandbox cannot read polymer_rules.json, and without
+        # the value in the prompt it either reports N/A or reaches for a remembered class
+        # mean. Polymer-specific via the run-name member match, never the class average.
+        "exp_tg_K": _exp_tg_point(cls, args.run_name),
     }
 
 
@@ -874,6 +893,7 @@ def analyze_tg_prompt(args, cls: dict) -> str:
                  f"record this (rate, Tg_K) pair — input to this run's multirate fit\n"
                  if p['selected_rate_K_per_ns'] is not None else "")
     return f"""\
+exp_tg_K:          {_v(p['exp_tg_K'], 'null')}   # REFERENCE ONLY — report it beside Tg_K; do not pass it to extract_thermal and never tune initial_tg_guess toward it. Null ⇒ report Tg_exp_K: N/A, never a remembered value
 tg_log_path:       {p['tg_log_path']}    # pass as log_file=
 tg_data_file:      {p['tg_data_file']}    # pass as tg_data_file= — required for ΔCp mass normalisation
 per_t_dump_file:   {p['per_t_dump_file']}    # pass as per_t_dump_file= — with tg_data_file it enables the structural block

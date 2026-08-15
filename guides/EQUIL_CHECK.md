@@ -103,6 +103,14 @@ RESULT block as-is; do not treat a large `z_max` as a failure or re-derive a ver
 Only if `backbone_types` isn't already given in the prompt — call on the original pre-simulation
 `.data` file per the Rules above.
 
+- Pass `params_file` on the **first** call for an EMC build — the coefficients live there, and
+  waiting for the "Coeffs section missing" errors costs a round trip.
+- The backbone is what bridges repeat units, not everything of that element: PLA is types
+  `[2,3,7]` (ester-bridging `o_2`), not `[2,3,6]` (`o_1` is the pendant carbonyl O). Decide by
+  coordination, not by element.
+- A `phase=melt` JSON already in `output_dir` is **not** reusable for the `phase=full` gate —
+  different `T_mean`, different stage. Rename it or write to a different dir.
+
 ### `check_equilibration_comprehensive`
 
 Pass every argument below on every call, including the ones whose value is null. Omitting one is a

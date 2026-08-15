@@ -195,6 +195,20 @@ else 1.5 ns flat — **except** when `n_eff_density` is the failing gate, where 
 floor of 20 → 2.7 ns); use that value. Cap 2 extensions **per gate** (`phase=full`/`phase=melt`
 independent budgets).
 
+Four things that make an EXTEND the wrong answer, or the wrong size:
+
+- **"when finite" means physically resolved, not non-null.** A KWW fit pinned at its bound
+  (`tau_ps` exactly 1e9, low β, <10% decayed) is numerically finite and useless — take the 1.5 ns
+  flat floor instead of scaling by it.
+- **A marginal (~1%) density drift is never settled by its p-value.** Those are OLS on correlated
+  samples. Break the tie on the P-vs-ρ quarter trajectory and size the extension from the
+  stationary-noise scale.
+- **`n_eff_density` fails on a raw τ that one random-walk excursion inflates ~3×.** Re-test with a
+  detrended τ and σ~1/√N before spending; the re-gate scores the extension stage alone.
+- **`UNDER_ANNEALED_COOLING` is a ramp-RATE defect, not a melt-anneal one** — no amount of melt
+  hold fixes it. Localize per-bin α_V in `npt_cool300` and calibrate the needed rate against the
+  run's own `npt_cool` leg.
+
 **MELT-MIXING** (`phase=melt` gate: `EXTEND`, or `STRUCTURAL_FAIL` from `density_homogeneity`
 alone — never `re_melt_slow_recool`/`heavy_melt_anneal_probe`, which need the post-cool glass
 state that doesn't exist yet): apply the EXTEND procedure's `phase=melt` branch. Cap 2 extensions;

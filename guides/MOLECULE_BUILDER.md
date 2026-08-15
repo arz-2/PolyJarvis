@@ -113,6 +113,15 @@ save_molecule(cell_output,     "./checkpoints/04_cell.json",            format="
 
 ## Known Failures
 
+- **Waiting on the build** — EMC exceeds the 600 s Bash cap. Poll `get_emc_job_status`, or arm a
+  `run_in_background` until-loop on `emc_build.data` and end the turn. A foreground until-loop or a
+  chained `sleep N; ls` will not survive.
+- **A rebuild's `nchain` can silently not take effect** — EMC falls back to `ntotal` mode. Confirm
+  from `natoms / atoms-per-chain` before reporting, never from the argument you passed.
+- **`cutoff`/`charge_cutoff` in `emc_build.params` are always 9.5 Å**, whatever the plan's
+  `cutoff_A`. Report the mismatch; it is not a rebuild trigger.
+- **Two output-contract footguns** — do not nest the cell dir inside itself, and do not copy the
+  RESULT template literally: it drops `use_trappe` from `lammps_flags`.
 - **EMC binary expiry** — instant fail (exit 255) with `Validity has run out`.
   Class/SMILES-independent — don't misdiagnose as SMILES/FF, don't retry with smaller `dp`.
   Fix: swap only `~/emc/bin/emc_linux_x86_64` from a fresh SourceForge `montecarlo` tarball;

@@ -59,6 +59,13 @@ not rediscovered a third time.
   member resolution; `exp_K_GPa` would need the same per-member shape.
 - **`PEST` carries no `experimental_density_gcm3`**, so every polyester run reports
   `no exp ref` for density. Needs a sourced amorphous value per member, not a class average.
+- **Three workers have no editable guide.** literature-grounding-worker, planner, critic and
+  system-characterization-analyzer carry their whole procedure in `.claude/agents/*.md`, which
+  memory ingest may not edit, so their recurring findings (paywalls are the practical ceiling for
+  numeric CTE values; WebSearch summaries misattribute numbers to the wrong paper; never
+  reconstruct a DOI from recall; a rung-3 re-plan is not automatically an FF swap) have nowhere
+  authoritative to land. Either give them `guides/` files like the simulation workers have, or
+  accept that those lessons re-cost a run each time.
 
 The engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`) live with the calibration
 toolchain and cells in [`hardware/`](../hardware/); they are machine-specific notes, local-only

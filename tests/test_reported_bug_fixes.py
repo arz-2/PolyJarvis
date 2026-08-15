@@ -317,3 +317,20 @@ def test_overall_pass_as_a_success_criterion_is_a_finding():
     # The binding form — a routed verdict — is fine.
     assert _gate_boolean_findings({"planned_stages": [
         {"stage": "equil", "success_criteria": {"equil_verdict": "PASS"}}]}) == []
+
+
+def test_member_match_finds_the_key_inside_a_prefixed_run_name():
+    """startswith missed every descriptive prefix and fell through to a class MEDIAN:
+    cis-PBD1 failed to match PBD and was graded against cis-polyisoprene's 200 K."""
+    import json
+    sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
+    import gen_prompt as g
+
+    classes = json.loads((REPO / "guides" / "polymer_rules.json").read_text())["classes"]
+    assert g._exp_tg_point(classes["PDIE"], "cis-PBD1") == 181     # was 200
+    assert g._exp_tg_range(classes["PDIE"], "cis-PBD3") == [161, 201]
+    # Longest key first, or PMMA1 takes PMA.
+    assert g._exp_tg_point(classes["PACR"], "PMMA1") == 378
+    assert g._exp_tg_point(classes["PACR"], "PMA2") == 281
+    # No member in the name still falls back to the class median, not a crash.
+    assert g._exp_tg_point(classes["PDIE"], "RUN9") in (181, 200)

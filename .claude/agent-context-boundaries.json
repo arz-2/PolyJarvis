@@ -59,9 +59,13 @@
       "write_allow": ["data/**"]
     },
     "critic": {
+      "_note": "polymer_rules.json / MURNAGHAN.md / enforce_gate.py are readable so a plan's default_source and gate-routing cites can be checked against their sources instead of recorded as unverifiable. Read only — bash_allow stays narrow, so the critic still cannot re-run a tool to substitute its own result for the planner's.",
       "extra_read_allow": [
         "orchestration/decision_policy.json",
-        "guides/system_characterization_cache.json"
+        "guides/system_characterization_cache.json",
+        "guides/polymer_rules.json",
+        "guides/MURNAGHAN.md",
+        "orchestration/scripts/enforce_gate.py"
       ],
       "bash_allow": [
         "orchestration/scripts/canon_smiles.py",
@@ -95,7 +99,9 @@
       "extra_read_allow": [
         "guides/polymer_rules.json"
       ],
-      "bash_allow": [],
+      "bash_allow": [
+        "guides/polymer_rules.json"
+      ],
       "write_allow": ["data/**", "guides/polymer_rules.json"]
     },
     "molecule-builder": {
@@ -116,9 +122,11 @@
       "extra_read_allow": [
         "orchestration/decision_policy.json",
         "guides/polymer_rules.json",
+        "guides/MURNAGHAN.md",
         "guides/system_characterization_cache.json"
       ],
       "bash_allow": [
+        "guides/polymer_rules.json",
         "orchestration/scripts/canon_smiles.py",
         "orchestration/scripts/validate_run_plan.py",
         "orchestration/scripts/make_deterministic_plan.py",
@@ -144,8 +152,10 @@
       ]
     },
     "recovery-agent": {
+      "_note": "Diagnosis needs the same guides the failing worker was running under — the gate field names and tool kwarg spellings it must verify live there, and without them it guesses. mcp-servers/** stays denied: reading a tool's source is re-deriving the pipeline, not diagnosing a run.",
       "extra_read_allow": [
-        ".claude/commands/recover.md"
+        ".claude/commands/recover.md",
+        "guides/**"
       ],
       "bash_allow": [],
       "write_allow": []
@@ -161,6 +171,7 @@
         "guides/system_characterization_cache.json"
       ],
       "bash_allow": [
+        "guides/polymer_rules.json",
         "orchestration/scripts/write_characterization_cache.py",
         "guides/system_characterization_cache.json"
       ],
