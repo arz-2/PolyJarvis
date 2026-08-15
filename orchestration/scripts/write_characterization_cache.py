@@ -60,26 +60,46 @@ def _save(cache_path: Path, cache: dict) -> None:
     cache_path.write_text(json.dumps(cache, indent=2) + "\n")
 
 
+def _flatten_derived(fields: dict) -> tuple:
+    """Lift derived_* knobs out of a nested sub-object up to the top level.
+
+    The diagnostic file this script is handed (`raw/system_characterization.json`) groups the
+    knobs under a sub-object whose name is the agent's choice — `derived` on some runs,
+    `step3_derived_fields` on others — while the gate below reads flat top-level keys. Without
+    this lift a run that legitimately derived a knob exits `no_derived_field` and the cache
+    write is lost silently. Returns (fields, names of the sub-objects lifted from)."""
+    if any(k.startswith("derived_") for k in fields):
+        return fields, []
+    lifted, sources = dict(fields), []
+    for key, value in fields.items():
+        if isinstance(value, dict) and any(k.startswith("derived_") for k in value):
+            lifted.update({k: v for k, v in value.items() if k not in lifted})
+            sources.append(key)
+    return lifted, sources
+
+
 def write_characterization(cache_path: Path, smiles: str, fields: dict) -> dict:
-    """Merge the characterized half. Gated on at least one derived_* field being non-null: the
-    orchestrator's novelty check is bare key existence, so writing an entry that carries no
-    usable knob would permanently mark this SMILES as no longer novel."""
+    """Merge the characterized half. Gated on at least one derived_* field being non-null: an
+    entry carrying no usable knob is worthless to a later run and only costs this SMILES its
+    novelty, which is what keeps system-characterization-analyzer eligible to fire."""
     offending = sorted(VALIDATED_KEYS & set(fields))
     if offending:
         return {"written": False, "reason": "validated_fields_are_protocol_locker_owned",
                 "offending_fields": offending}
 
+    fields, unwrapped_from = _flatten_derived(fields)
+
     # Gate on what was actually derived, not on the reliability flags. The two are not
     # equivalent: every derivable knob needs probe_tau_relax_reliable (the K_deform pair needs
     # both flags), so a K0-reliable/tau-unreliable probe derives nothing yet still satisfied
-    # any(flags) — writing an entry with no knobs in it and permanently marking this SMILES
-    # non-novel, since the orchestrator's novelty check is bare key existence.
+    # any(flags) — writing an entry with no knobs in it and costing this SMILES its novelty.
     derived = sorted(k for k in fields if k.startswith("derived_") and fields[k] is not None)
     if not derived:
         return {"written": False, "reason": "no_derived_field",
                 "detail": "no derived_* field was produced (every knob requires "
                           "probe_tau_relax_reliable; the K_deform pair requires both flags) — "
                           "leaving the key absent so this SMILES stays novel",
+                "unwrapped_from": unwrapped_from,
                 "reliability_flags": {f: fields.get(f) for f in RELIABILITY_FLAGS}}
 
     cache = _load(cache_path)
@@ -88,7 +108,8 @@ def write_characterization(cache_path: Path, smiles: str, fields: dict) -> dict:
     cache[smiles] = {**existing, **fields, **preserved}
     _save(cache_path, cache)
     return {"written": True, "smiles": smiles, "mode": "characterization",
-            "fields_written": sorted(fields), "validated_fields_preserved": sorted(preserved),
+            "fields_written": sorted(fields), "unwrapped_from": unwrapped_from,
+            "validated_fields_preserved": sorted(preserved),
             "other_keys_preserved": sorted(k for k in cache if k != smiles),
             "cache_path": str(cache_path)}
 

@@ -955,11 +955,11 @@
         "Very low experimental Tg (180-200 K): sweep must go down to 80 K to sample deep glassy state.",
         "MD Tg offset for PDIE: SMALL for flexible low-fragility rubbers. cis-PBD1 pilot at 40 K/ns got Tg_MD=172.5 K vs exp 181 K (−8.5 K, BELOW exp). Prior note '260-320 K overestimate' was based on rigid polymers; does NOT apply here. The 400 K upper sweep bound is still safe to bracket the 180-200 K experimental Tg.",
         "DP=50-200 studied by polyisoprene MD: mechanical properties converge above DP=50 (PMC9698502).",
-        "Microstructure matters: cis vs trans gives different Tg. Encode the target microstructure in the SMILES passed to EMC.",
+        "Microstructure matters: cis vs trans gives different Tg (~60 K). EMC silently discards SMILES double-bond stereo — the / and \\ markers survive into emc_build.esh and build.emc and are dropped at build. A *C/C=C\\C* build (dp=100, nchain=20) measured 47.9% cis / 52.1% trans, randomized per repeat unit, no chain uniform. An isomer-specific request needs a cis-lock MD stage, not a different seed or dp.",
         "Timestep: 2.0 fs (use_shake=False). TraPPE-UA removes explicit H atoms and their fast C-H stretch modes, so 2 fs is stable without bond constraints. LAMMPS fix shake cannot constrain a continuous backbone (every backbone atom has 2 bonds; cluster-build requires terminal atoms). The C=C torsional barrier is enforced by PCFF-style dihedral terms in the .params file, not SHAKE. Same logic as PHYC.",
         "Fewer annealing cycles needed due to flexible rubbery backbone (fast equilibration above Tg).",
         "Exp. RT density: PBD=0.90 g/cm³, PI=0.91 g/cm³. Initial density 0.57 g/cm³ = ~71% of PBD ρ_melt(400K)≈0.80 g/cm³; previous 0.45 required heavy compression.",
-        "TraPPE-UA includes validated alkene types for cis/trans-1,4 repeat units (Martin1998); verify RDF against experiment for new PDIE SMILES."
+        "The installed ~/emc/field/trappe/2014/ has ONE stereo-agnostic sp2 type (c3h, \"CH (SP2) 2-alkene\") and a symmetric C=C torsion (E=0 at both 0 deg and 180 deg, ~25.6 kcal/mol barrier at 90 deg), so MD never corrects the built cis/trans ratio. Never assert microstructure from atom-type names — measure the CH2-CH=CH-CH2 torsion from the built .data (measure_microstructure.py; |phi|<90 cis)."
       ],
       "bm_pressures_atm": [
         1,
@@ -1904,7 +1904,8 @@
         "SCREENING dp/nchain: dp_typical=15 nchain=8 for 48h-budget Tg sweep (4,800 atoms, ~40h/4GPU). τ_Rouse at dp=15 T_equil=770K ≈ 2.2 ns; tg_steps_per_t=2M = 2ns ≈ 0.91×τ_Rouse — borderline adequate for screening. Tg may be overestimated by ~5-15% beyond standard MD bias. Original nchain=10 dp=32 MW ~9,216 g/mol crossed Klajmon2023 density convergence threshold (~9,000 g/mol); dp=15 nchain=8 MW ~3,456 g/mol is below threshold but acceptable for Tg screening.",
         "Exp. RT density: amorphous PEEK=1.263 g/cm³; semicrystalline=1.30–1.32 g/cm³ (NOT the comparator for MD amorphous cells). Initial packing 0.66 g/cm³ = ~0.5x amorphous density.",
         "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. Verify density ~1.26 g/cm³ at 298 K (amorphous ref) before Tg sweep; 1.30–1.32 indicates partial crystallinity.",
-        "DENSITY SYSTEMATIC: PCFF MD systematically underestimates amorphous PEEK density by ~5% (rho_sim ~= 1.194 vs amorphous-ref 1.263 g/cm^3, band [1.199,1.326]). The run-summary density warning is ANTICIPATED, not a failure - accept rho_sim near the lower bound as a valid amorphous baseline. No band widening (1.263 stays the amorphous comparator; widening would mask a real FF systematic)."
+        "DENSITY SYSTEMATIC: PCFF MD systematically underestimates amorphous PEEK density by ~5% (rho_sim ~= 1.194 vs amorphous-ref 1.263 g/cm^3, band [1.199,1.326]). The run-summary density warning is ANTICIPATED, not a failure - accept rho_sim near the lower bound as a valid amorphous baseline. No band widening (1.263 stays the amorphous comparator; widening would mask a real FF systematic).",
+        "FINITE-SIZE SIZING (measured): dp=32/nchain=8 at density_initial 0.66 builds a 57.1 A box that equilibrates to L=46.71 A and FAILS the finite_size gate with SIZE_CHAIN_SELF_IMAGE (2*Rg = 56.83 A). nchain=17 at the same dp/density gives 18,530 atoms and a 73.35 A build box. Treat nchain>=17 as the floor at dp=32; the rigid aromatic backbone makes Rg large for the chain count, so size any PKTN cell against L >= 2*Rg rather than atom count."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
@@ -1984,7 +1985,8 @@
         "Rigid aromatic backbone: 15 ns and 8 cycles essential for equilibration.",
         "dp_typical=25, dp_min=20 (Fox-Flory hard floor: decision_policy.json requires DP≥20 for Tg/bulk_modulus targets). nchain=8 → ~11,000 atoms at ~442 g/mol repeat unit. At dp=25 MW~11,050 g/mol ≈ 1 M_e for PSU; adequate for Tg but short of entanglement plateau for K. Prior dp_min=15 (MW~5,304) was below the Fox-Flory floor for Tg — bumped to 20.",
         "Exp. RT density: PSF=1.24 g/cm³. Initial 0.62 g/cm³ = ~0.5x PSF density.",
-        "WARNING: DP≥15 minimum; stiff backbone means very short chains behave differently. Aim for DP=20 if budget allows."
+        "WARNING: DP≥15 minimum; stiff backbone means very short chains behave differently. Aim for DP=20 if budget allows.",
+        "LITERATURE: the only PSU-specific MD simulation paper is Fan & Hsu, Macromolecules 1992, 25, 266-270 (10.1021/ma00027a044). The DOI resolves and CrossRef confirms the bibliography, but ACS full text is 403 and no abstract is recoverable anywhere — zero numeric content is extractable. It can back only a \"such a paper exists\" claim, never a density/Tg/CTE target. Do not re-search it; fall back to general PCFF class-II precedent (Sun1994, Bejagam2020) plus handbook ranges, annotated as not literature-MD-confirmed."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",

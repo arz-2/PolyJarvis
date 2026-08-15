@@ -59,13 +59,24 @@ not rediscovered a third time.
   member resolution; `exp_K_GPa` would need the same per-member shape.
 - **`PEST` carries no `experimental_density_gcm3`**, so every polyester run reports
   `no exp ref` for density. Needs a sourced amorphous value per member, not a class average.
-- **Three workers have no editable guide.** literature-grounding-worker, planner, critic and
+- **Four workers have no editable guide.** literature-grounding-worker, planner, critic and
   system-characterization-analyzer carry their whole procedure in `.claude/agents/*.md`, which
   memory ingest may not edit, so their recurring findings (paywalls are the practical ceiling for
   numeric CTE values; WebSearch summaries misattribute numbers to the wrong paper; never
-  reconstruct a DOI from recall; a rung-3 re-plan is not automatically an FF swap) have nowhere
-  authoritative to land. Either give them `guides/` files like the simulation workers have, or
-  accept that those lessons re-cost a run each time.
+  reconstruct a DOI from recall; a rung-3 re-plan is not automatically an FF swap; arbitrate
+  `literature_grounding.json` against `polymer_rules.json` field by field and adopt only
+  `verified: true` fields; at critic round 2 either branch of a round-1 either/or finding is
+  resolution, and `critique.findings` is replaced, never appended) have nowhere authoritative to
+  land. Either give them `guides/` files like the simulation workers have, or accept that those
+  lessons re-cost a run each time.
+- **Async MCP analysis tools have no polling tool in the worker toolsets.**
+  `check_equilibration_comprehensive` and `generate_run_summary` both return
+  `"Poll with get_run_status(run_id)"`, but neither equilibration-checker nor run-summary-worker
+  carries `get_run_status`. Both workers reached the result anyway (filesystem monitoring of
+  `output_dir`; `Read()` of the canonical output path), so this is friction, not a defect — but
+  the fallbacks cannot distinguish "still running" from "failed, nothing written". Fixing it means
+  a `tools:` frontmatter change in two agent descriptors, which is a runtime behavior change for
+  every campaign on the host.
 
 The engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`) live with the calibration
 toolchain and cells in [`hardware/`](../hardware/); they are machine-specific notes, local-only

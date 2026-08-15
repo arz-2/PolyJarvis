@@ -45,7 +45,7 @@ import time
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 # Load root .env (PolyJarvis/.env) — single source of truth for all MCP servers
 try:
@@ -2399,7 +2399,7 @@ def extract_thermal(
     tg_data_file: Optional[str],
     per_t_dump_file: Optional[str],
     method_gap_exempt: bool,
-    backbone_types: Optional[List[str]],
+    backbone_types: Optional[List[Union[str, int]]],
     initial_tg_guess: Optional[float] = None,
     equilibration_fraction: float = 0.5,
     temp_col: str = "Temp",
