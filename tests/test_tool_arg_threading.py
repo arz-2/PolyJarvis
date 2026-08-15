@@ -282,7 +282,7 @@ def _stage_args(**overrides):
         gpu_ids="0", mpi_ranks=1, engine="kokkos", lammps_flags=None, nchain=None,
         dp=None, backbone_types=None, velocity_seed=None, emc_seed=None,
         density_initial=None, is_glassy=None, deform_rate_mode="primary",
-        K_deform_rate_inv_s=None, K_strain_max=None, tg_rate_index=None,
+        K_deform_rate_inv_s=None, K_strain_max=None, tg_rate_index=None, bm_npt_steps=None,
         tg_t_high_K=None, tg_t_low_K=None, tg_t_step_K=None, tg_steps_per_t=None,
         tg_start_data=None, T_equil_K=None, T_anneal_high_K=None, npt_prod_ns=None,
         npt_cool_steps=None, npt_cool300_steps=None, add_melt_npt=False, phase="full",
@@ -489,3 +489,64 @@ def test_every_class_reaches_its_requested_strain(tmp_path):
             steps = _deform_steps(tmp_path, STRAIN_RATE=rate_fs, TIMESTEP=dt, STRAIN_MAX=smax)
             reached = steps * rate_fs * dt
             assert abs(reached - smax) / smax < 0.01, f"{name} {key}: reached {reached}"
+
+
+# ── The remedy that has nowhere to put its value ──────────────────────────────
+# The failures above are a value that reaches the wrong place. These are a value with no
+# route at all: recover.md tunes the Murnaghan series' npt_steps in both directions (x2 to
+# re-run a non-monotonic point, 200000 after a GPU OOM) and gen_prompt emitted a literal
+# 500000 whatever the recovery asked for.
+
+def test_bm_npt_steps_override_reaches_the_murnaghan_prompt():
+    import gen_prompt
+
+    rules = gen_prompt.json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
+    cls = rules["classes"]["PACR"]
+    assert "npt_steps:         500000" in gen_prompt.murnaghan_prompt(_stage_args(), cls)
+    assert "npt_steps:         1000000" in gen_prompt.murnaghan_prompt(
+        _stage_args(bm_npt_steps=1000000), cls)
+
+
+def test_leg_two_submits_its_single_pressure_point(tmp_path, monkeypatch):
+    """MURNAGHAN.md's rubbery two-leg protocol submits `[-1000]` alone and merges its log
+    with Leg 1's compression points. The submitter refused anything under 3 points as
+    unfittable -- a fit-side rule enforced in the one tool that never fits anything, so
+    Leg 2 could not be launched at all. extract_bulk_modulus_murnaghan still enforces it."""
+    pytest.importorskip("mcp")
+    sys.path.insert(0, str(LAMMPS_SERVER.parent))
+    import server
+
+    monkeypatch.setattr(server, "generate_script", lambda **kw: {"status": "ok"})
+    monkeypatch.setattr(server, "run_lammps_chain", lambda **kw: {"chain_id": "c1"})
+    call = dict(data_file=str(tmp_path / "cell.data"), work_dir=str(tmp_path),
+                temp_K=300.0, run_name="R", gpu_ids="0", mpi=1, velocity_seed=1,
+                npt_steps=500000, dt_fs=1.0, use_trappe=False, use_pcff=True,
+                use_opls=False, engine="kokkos")
+
+    r = server.run_bulk_modulus_series(pressures_atm=[-1000], **call)
+    assert r["status"] == "submitted"
+    assert "not fittable alone" in r["warning"]
+    assert len(r["log_files"]) == 1
+
+    assert "warning" not in server.run_bulk_modulus_series(
+        pressures_atm=[-1000, 0, 3000], **call)
+    assert server.run_bulk_modulus_series(pressures_atm=[], **call)["status"] == "error"
+
+
+def test_tg_steps_per_t_is_refused_when_the_rate_derives_it():
+    """Every thermal-track sweep passes --tg_rate_index, and the staircase then derives
+    N = tg_t_step_K/(rate*dt). recover.md's TG_REVIEW remedy said "double tg_steps_per_t",
+    which rebuilt a byte-identical deck. validate_run_plan already reports the same
+    conflict for a plan that records both (OVERRIDDEN_PARAMS); this is the CLI half, which
+    is the one a recovery uses."""
+    import gen_prompt
+
+    rules = gen_prompt.json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
+    cls = rules["classes"]["PACR"]
+    with pytest.raises(SystemExit, match="tg_steps_per_t"):
+        gen_prompt.tg_prompt(_stage_args(tg_rate_index=0, tg_steps_per_t=999999), cls)
+
+    # Neither alone is an error: without a rate index the flag is the knob.
+    assert "n_steps_per_t:   999999" in gen_prompt.tg_prompt(
+        _stage_args(tg_steps_per_t=999999), cls)
+    gen_prompt.tg_prompt(_stage_args(tg_rate_index=0), cls)

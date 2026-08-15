@@ -207,7 +207,7 @@ still failing → `MELT_STAGE_DEFICIT`-equivalent, escalate to rung 3. Only `pha
 |---|---|---|
 | R² < 0.80 or fewer than 4 bins | T range too narrow | re-run: `T_start+50K`, `T_end−50K` |
 | R² 0.80–0.90 | Borderline bilinear fit | re-run with `T_step` halved |
-| Sweep killed mid-run | Process death (OOM, GPU preemption) | restart from last completed T (max 2 attempts); still failing → return error to orchestrator |
+| Sweep killed mid-run | Process death (OOM, GPU preemption) | there is nothing to restart from — the staircase runs one deck with a `variable temps` loop, writes no restart files, and reaches its single `write_data` only after the last T. If ≥60% of the planned T points completed, take the analyze-tg partial-log row below instead. Otherwise re-run the whole sweep (max 2 attempts), moving the partial `tg_sweep.log` aside first: the deck opens it with `log … append`, so a re-run concatenates two quench histories into one file and `extract_thermal` bins them together. Still failing → return error to orchestrator |
 | Tg above the exp band, one rate measured | Cooling-rate offset, slope not yet measured | price at step 5b (`--lever cooling_rate_K_per_ns --lever-direction lower`); a one-rate history returns `SPEND`, `spend_limit: one rung` → add rates, then re-price before any slower single rate |
 | `tg_gate_verdict=TG_REVIEW` from `tg_method_gap_K` | Two admissible fits disagree on the same data | **not a rung-pricing question** — no amount of sampling resolves it. Halt to human per THERMAL_TRACK.md; never spend a slower rate to break the tie |
 
@@ -215,7 +215,7 @@ still failing → `MELT_STAGE_DEFICIT`-equivalent, escalate to rung 3. Only `pha
 
 | Condition | Root cause | Action |
 |---|---|---|
-| `tg_gate_verdict=TG_REVIEW` (`tg_method_gap_K` > 20 K) | Noisy density or sweep range doesn't bracket the transition | double `tg_steps_per_t` (class value 250k–2M), or widen the sweep beyond the class `tg_t_low_K`/`tg_t_high_K` by 50 K on the side nearer the fitted Tg. PKTN/PSFO carry `method_gap_exempt` — for those the gap is recorded, not a REVIEW |
+| `tg_gate_verdict=TG_REVIEW` (`tg_method_gap_K` > 20 K) | Noisy density or sweep range doesn't bracket the transition | widen the sweep beyond the class `tg_t_low_K`/`tg_t_high_K` by 50 K on the side nearer the fitted Tg (`--tg_t_high_K`/`--tg_t_low_K`). Do NOT reach for `tg_steps_per_t`: the staircase derives N from the rate (`N = tg_t_step_K/(rate·dt)`), so `gen_prompt` rejects the flag whenever `--tg_rate_index` is set — and more time per T *is* a slower rate, which the Thermal → tg row forbids for this verdict. PKTN/PSFO carry `method_gap_exempt` — for those the gap is recorded, not a REVIEW |
 | `tg_gate_verdict=TG_NOT_REPORTABLE`, `transition_width_c_K` < 5 K | Sweep resolved no crossover — a sharp-kink artifact that can still score r²>0.997 (PMMA1: 0.1 K width, EXCELLENT) | halve `tg_t_step_K` (20 K → 10 K for every class except PSIL, already 10) and re-run at the next-slower `tg_rates_K_per_ns` entry; `tg_min_steps_per_T` still applies |
 | `tg_gate_verdict=TG_NOT_REPORTABLE`, `slope_signs_valid=false` or `slope_ordering_valid=false` | Non-physical fit: density must fall with T on both branches and α_rubbery must exceed α_glassy | the sweep did not capture a transition — widen the T range and re-run; do not tune `initial_tg_guess` |
 | `fit_quality` POOR despite a clean log | Velocity re-init discontinuity or excessive plateau drift exclusion | plot `tg_density_bins.csv`; check velocity re-init + `n_plateaus_skipped_drift` |
@@ -228,11 +228,11 @@ still failing → `MELT_STAGE_DEFICIT`-equivalent, escalate to rung 3. Only `pha
 |---|---|---|
 | `fit_converged=False` or `K<0` | EOS curvature not resolved at this pressure range | check `volume_equilibrated` per pressure; glassy: narrow to ±500 atm if ±1000 causes creep; add pressure points and re-submit |
 | `B0_prime` outside [4, 20] with `fit_converged=True` | **[INFO]** — `guides/BM_ANALYSIS.md`: WARNING annotation only (EOS-nonlinearity artifact or under-constrained curvature at this span); K stays correct. Never triggers deform-worker fallback by itself. |
-| `bm_gate_verdict=BM_INADMISSIBLE`, `volume_monotonic=false` | dV/dP > 0 somewhere — violates mechanical stability; one point's mean volume is out of sequence | re-run **only** the offending pressure point at `npt_steps`×2; never re-fit the existing series |
+| `bm_gate_verdict=BM_INADMISSIBLE`, `volume_monotonic=false` | dV/dP > 0 somewhere — violates mechanical stability; one point's mean volume is out of sequence | re-run **only** the offending pressure point at `npt_steps`×2 (`--bm_npt_steps`); `run_bulk_modulus_series` accepts a one-element `pressures_atm` and returns a `warning` that the log is not fittable alone — pass it to `extract_bulk_modulus_murnaghan` together with the series' other logs. Never re-fit the existing series |
 | `bm_gate_verdict=BM_INADMISSIBLE`, `V0_A3` outside the sampled range | The ladder brackets the wrong zero-pressure reference state | re-submit with the class `bm_pressures_atm` if set (PDIE/PHYC `[1,1000,2500,5000,10000,15000]`, PEST `[-1000,0,1500,3000,5000]`, POXI `[-1000,0,3000,7000,15000]`, PSIL `[1,100,300,600,1000]`), else `guides/MURNAGHAN.md`'s default — glassy `[-1000,0,3000,7000,15000]`, rubbery PROBE `[-200,0,3000,7000,15000]` |
 | `bm_gate_verdict=BM_INADMISSIBLE`, `r_squared` < 0.99 | Murnaghan form does not describe this P–V data at all (model breakdown, not imprecision) | widen the pressure span per the ladders above; if it persists the cell is not in a single elastic regime — check `volume_equilibrated` per point |
 | `r_squared` < 0.999 with `bm_gate_verdict=BM_REPORTABLE` | **[INFO]** — precision annotation only. r² at 0.999 does not predict B0 accuracy (4.39% vs 4.37% mean deviation, Welch p=0.990). Spend no attempt. |
-| `run_bulk_modulus_series`: a pressure point fails / GPU OOM / empty `log_files` | `npt_steps` too large for available VRAM | reduce `npt_steps` to 200000, re-submit (check `nvidia-smi`) |
+| `run_bulk_modulus_series`: a pressure point fails / GPU OOM / empty `log_files` | `npt_steps` too large for available VRAM | reduce `npt_steps` to 200000 (`--bm_npt_steps 200000`), re-submit (check `nvidia-smi`) |
 | Rubbery PROBE ladder's `-200 atm` point crashes / log missing or truncated | **[INFO]** — deliberate outcome of the shallow safety probe (`guides/MURNAGHAN.md`'s two-leg protocol), already handled inline by `MECHANICAL_TRACK.md`: re-run `analyze-bm` on the remaining compression-only logs, never resubmit the probe or attempt Leg 2. Note tension untested; never write a class-level `bm_pressures_atm` from it. |
 | BACKGROUND-WAIT never returns after murnaghan-worker's `watch_run` call | Worker passed `run_bulk_modulus_series`'s placeholder string instead of the real `chain_id` — no sentinel created | re-run `watch_run(chain_id)` as a real MCP call with the actual `chain_id` |
 | `K` negative or at melt-value density (~0.8–0.9 g/cm³) for a glassy polymer | Worker received `npt_production` (melt) data instead of `npt_prod300` (300 K) data | verify `equil_data_path` is `npt_prod300_out.data`; run the cool+prod300 phase first if missing; re-spawn |
@@ -245,7 +245,7 @@ still failing → `MELT_STAGE_DEFICIT`-equivalent, escalate to rung 3. Only `pha
 | `G_GPa` < 0 on a y/z leg | `deform_direction` not passed (defaults to `x`), so a loading slope entered the transverse average | re-run extraction with `deform_direction` matching the deck's strain axis — not a physics result |
 | `rate_sensitivity` present, `verdict=WARNING`, slow-rate `fit_r2 ≥ 0.90` | **[INFO]** — `guides/BM_ANALYSIS.md`: tool already auto-substitutes the slow-rate fit into `K_GPa`/`method`; just surface the flag. |
 | `deform_gate_verdict=DEFORM_INADMISSIBLE`, `isotropy_delta_pct` ≥ 20% | Cell genuinely anisotropic, so a single-direction Voigt K is biased | do NOT report this K; re-submit murnaghan-worker with a wider/adjusted pressure series (first confirm `deform_direction` was correct) |
-| `npt_deform` run crashes | `dt_fs` too large for SHAKE + deform | re-spawn `dt_fs=1.0`; still crashes → reduce `STRAIN_RATE` 10× |
+| `npt_deform` run crashes | `dt_fs` too large for SHAKE + deform | re-spawn `dt_fs=1.0` (passed as the deck's `TIMESTEP`); still crashes → reduce `STRAIN_RATE` 10×. `N_STEPS` is derived from `STRAIN_MAX`, so a 10× slower rate is a 10× longer run — price the wall time before spending it, and never pin `N_STEPS` to keep it short (that ends the run at a tenth of `K_strain_max`, inside the noise floor) |
 
 ## Mechanical → aggregate-replicates (cross-replicate)
 
@@ -256,10 +256,14 @@ still failing → `MELT_STAGE_DEFICIT`-equivalent, escalate to rung 3. Only `pha
 
 ## Mechanical → analyze-bm (bulk-modulus-extractor, fluctuation path)
 
+`eq_fraction` is the fraction of thermo rows **kept** as the production window (`n_discard =
+n_total·(1−eq_fraction)`, taken off the front). Raising it discards less burn-in. K = k_BT⟨V⟩/Var(V),
+so the two failure directions want opposite moves:
+
 | Condition | Root cause | Action |
 |---|---|---|
-| `K < 0.1` or `> 20` GPa | Not fully equilibrated (`diagnostics.drift_check` warns) | re-spawn with `eq_fraction=0.7` |
-| `volume_equilibrated=false` | Volume hasn't settled in the production window | re-spawn with `eq_fraction=0.25`; bracket K against the original `K_block_mean_GPa` |
+| `K < 0.1` GPa, `volume_equilibrated=false` | Var(V) inflated by drift still inside the window | re-spawn with `eq_fraction=0.25` (discard 75% as burn-in); bracket K against the original `K_block_mean_GPa` |
+| `K > 20` GPa | Var(V) under-sampled — window too short, or τ_eff a large fraction of it (`warning_autocorrelation`) | `eq_fraction=0.7` only if `volume_equilibrated=true`; if it drifts too, the window cannot be both longer and clean — extend the NPT run instead |
 
 ---
 

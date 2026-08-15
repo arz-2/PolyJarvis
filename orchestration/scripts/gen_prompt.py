@@ -53,7 +53,9 @@ Physics knob overrides (all optional; defaults from polymer_rules.json):
   --tg_t_high_K FLOAT     Tg sweep start temperature (K)
   --tg_t_low_K FLOAT      Tg sweep end temperature (K)
   --tg_t_step_K FLOAT     Tg sweep temperature step (K); halve for BORDERLINE recovery
-  --tg_steps_per_t INT    MD steps per temperature window; increase for better statistics
+  --tg_steps_per_t INT    MD steps per temperature window; rejected with --tg_rate_index,
+                          which derives it from the rate
+  --bm_npt_steps INT      MD steps per Murnaghan pressure point (default 500000)
   --K_strain_max FLOAT    Max engineering strain for uniaxial deformation
   --K_deform_rate_inv_s FLOAT  Engineering strain rate (s⁻¹)
   --dt_fs FLOAT           MD timestep (fs); set 0.5 for "lost atoms" recovery
@@ -648,6 +650,18 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     floor = cls.get('tg_min_steps_per_T', 200000)
     if selected_rate is not None:
         # rate = T_step / (n_steps * dt * 1e-6)
+        # In a staircase deck the rate IS the steps/T knob, so --tg_steps_per_t is silently
+        # replaced here -- and every thermal-track sweep passes --tg_rate_index. A recovery
+        # that "doubles tg_steps_per_t" would rebuild a byte-identical deck, so refuse the
+        # pair rather than ignore one half of it. validate_run_plan's OVERRIDDEN_PARAMS
+        # reports the same conflict for a plan that records both.
+        if getattr(args, 'tg_steps_per_t', None) is not None:
+            raise SystemExit(
+                f"ERROR: --tg_steps_per_t={args.tg_steps_per_t} is ignored when --tg_rate_index "
+                f"selects a rate ({selected_rate} K/ns): the staircase deck derives "
+                f"N = tg_t_step_K/(rate*dt) = {int(t_step / (selected_rate * dt * 1e-6))} steps/T. "
+                "To change time-per-T, change the rate (--tg_rate_index, or the plan's "
+                "tg_rates_K_per_ns); to change resolution, change --tg_t_step_K.")
         n_steps_per_t = int(t_step / (selected_rate * dt * 1e-6))
     else:
         n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
@@ -1142,7 +1156,10 @@ def _resolve_murnaghan_params(args, cls: dict) -> dict:
         "dt_fs": _pick(args.dt_fs, cls, "dt_fs", 1.0),
         "equil_data_path": args.data_path or f"{lammps_base}/equil/npt_production/npt_production_out.data",
         "temp_K": 300.0,
-        "npt_steps": 500000,
+        # recover.md tunes this both ways -- npt_steps x2 to re-run a non-monotonic pressure
+        # point, 200000 to fit a GPU that OOM'd on the default. A literal here made both
+        # remedies unreachable: the prompt emitted 500000 whatever the recovery asked for.
+        "npt_steps": _pick(getattr(args, "bm_npt_steps", None), cls, "bm_npt_steps", 500000),
         "gpu_ids": args.gpu_ids,
         "mpi_ranks": args.mpi_ranks,
         "engine": args.engine,
@@ -1572,7 +1589,9 @@ def main():
     p.add_argument("--tg_t_step_K", type=float,
                    help="Tg sweep step (K); halve for BORDERLINE R² recovery")
     p.add_argument("--tg_steps_per_t", type=int,
-                   help="MD steps per temperature window")
+                   help="MD steps per temperature window; rejected with --tg_rate_index")
+    p.add_argument("--bm_npt_steps", type=int,
+                   help="MD steps per Murnaghan pressure point (default 500000)")
     p.add_argument("--tg_rate_index", type=int,
                    help="Index into tg_rates_K_per_ns list for multi-rate sweeps (0=slowest)")
     p.add_argument("--mr_rates",

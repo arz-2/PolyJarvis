@@ -3414,7 +3414,12 @@ def run_bulk_modulus_series(
     Args:
         data_file:      Equilibrated .data file (e.g. 07_npt_production_out.data).
         work_dir:       Base directory; subdirs bm_P{P}/ are created per pressure.
-        pressures_atm:  List of target pressures in atm (at least 3).
+        pressures_atm:  List of target pressures in atm. Fewer than 3 is allowed and is a
+                        real protocol: MURNAGHAN.md's Leg 2 submits [-1000] alone to merge
+                        with Leg 1's compression logs, and recover.md re-runs one offending
+                        pressure point of an existing series. This tool only submits NPT
+                        runs — the >= 3 requirement belongs to the fit, and
+                        extract_bulk_modulus_murnaghan enforces it there.
         temp_K:         Simulation temperature (K). Use 300 K for property measurement.
         run_name:       NO-OP — accepted and required for backward compatibility, but never
                         read in the body. Do not treat it as a protocol knob.
@@ -3447,12 +3452,8 @@ def run_bulk_modulus_series(
         extract_bulk_modulus_murnaghan after the chain completes.
     """
     try:
-        if len(pressures_atm) < 3:
-            return {
-                "status": "error",
-                "error": f"At least 3 pressure points required for Murnaghan fit "
-                         f"(got {len(pressures_atm)})."
-            }
+        if not pressures_atm:
+            return {"status": "error", "error": "pressures_atm is empty — nothing to submit."}
         if velocity_seed is None:
             return {
                 "status": "error",
@@ -3526,9 +3527,15 @@ def run_bulk_modulus_series(
             return chain_result
 
         chain_id = chain_result["chain_id"]
+        partial_series = (
+            f"{len(pressures_atm)} pressure point(s) — not fittable alone. Pass these logs to "
+            "extract_bulk_modulus_murnaghan together with the parent series' logs; it needs at "
+            "least 3. bm_series_manifest.json in this work_dir now records only this call."
+        ) if len(pressures_atm) < 3 else None
         return {
             "status":        "submitted",
             "chain_id":      chain_id,
+            **({"warning": partial_series} if partial_series else {}),
             "run_name":      run_name,
             "pressures_atm": pressures_atm,
             "log_files":     log_files,

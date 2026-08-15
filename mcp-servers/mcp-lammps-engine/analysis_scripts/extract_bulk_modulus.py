@@ -417,8 +417,10 @@ def main():
     if not volume_equilibrated:
         result["warning_drift"] = (
             f"Volume drift {drift_pct:.2f}% (p={p_val:.2e}) exceeds threshold. "
-            "The simulation may not be fully equilibrated — consider using a "
-            "larger eq_fraction or running longer."
+            "The simulation may not be fully equilibrated — consider a SMALLER "
+            "eq_fraction or running longer. eq_fraction is the fraction of rows "
+            "kept as the production window, so raising it discards less burn-in "
+            "and keeps more of the drifting head."
         )
     if tau_frac > 0.1:
         result["warning_autocorrelation"] = (
