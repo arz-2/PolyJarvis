@@ -19,6 +19,11 @@ result rather than from the RESULT template.
    "use_opls": false, "use_trappe": true}` (seen on PDIE). That third key is the only TraPPE routing
    signal downstream gets; transcribing the two-key template drops it.
 
+3. The coordinator may ask for fields the RESULT template omits — on the PSU1 rebuild it required
+   `natoms` and the box edge in addition to the eight templated fields. The template is a floor,
+   not a closed set: append extra requested fields (e.g. `natoms:`, `box_edge_A:`) inside the same
+   block rather than putting them in prose, since the final message must be the block alone.
+
 **How to apply:** on every EMC build — `mkdir -p {work_dir}` then copy to `{work_dir}/cell.data` and
 `{work_dir}/emc_build.params`, never appending another `/cell`. Paste `out["result"]["lammps_flags"]`
 into the RESULT block as returned, treating the template as shape-only. Also note `cell.data` from

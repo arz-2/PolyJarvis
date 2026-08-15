@@ -19,3 +19,11 @@ never carries that figure/table data — it's always in the full-text figures.
 multiple WebFetch retries chasing a paywalled numeric value. Try PubMed's own page and Google
 Scholar cache before ResearchGate/publisher pages — ResearchGate is reliably 403 in this
 environment.
+
+Update (PLA1, 2026-08-14): for JCTC/ACS articles, try the NCBI PMC mirror
+(`pmc.ncbi.nlm.nih.gov/articles/PMC<id>`) before giving up — it fetched clean full text (incl.
+exact numeric density/Tg/CTE targets and cooling-rate list) for a paper whose `pubs.acs.org` DOI
+redirect 403'd. `ncbi.nlm.nih.gov/pmc/articles/...` itself just 301-redirects to the `pmc.ncbi.nlm.nih.gov`
+host — fetch that directly to save a round trip. sciencedirect.com and a second pubs.acs.org
+article both still 403'd with no PMC mirror available, so this is a partial workaround, not a
+general fix.

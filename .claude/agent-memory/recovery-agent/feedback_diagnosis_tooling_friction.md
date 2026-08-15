@@ -148,6 +148,20 @@ that stage's own protocol regenerates. Compare the failing stage's own density/�
 foundation track's numbers before accepting "distinct issue" framing, and put the correction in
 `root_cause`, not `notes` — it changes which recover.md row governs.
 
+**6d. `.claude/agents/` is denied too — get the `worker` slug from the staged prompt, not the agent
+registry.** On PSU1 (2026-08-14) `ls /home/arz2/PolyJarvis/.claude/agents/` was denied with the same
+"outside your allowed Bash scope (own data/** workspace + your specific allowlisted scripts)"
+message, so the `subagent_type` that RESULT's `worker:` field requires cannot be looked up at its
+source. It is recoverable from `data/<RUN>/raw/prompts/<stage>-<hash>.txt`, which `gen_prompt.py`
+writes into the run workspace: the inlined guide header names it verbatim
+(`**Worker:** molecule-builder — return RESULT block to orchestrator when done.`). Those prompt
+files are also the cheapest source for the failing step's exact tool-call contract and argument
+values — PSU1's `equil-*.txt` carried the whole `inspect_data_file(...)` size-gate block and the
+"a SIZE_* error there means REBUILD, do not submit" annotation, which is what confirmed the remedy
+without reading `guides/EQUILIBRATION.md`. **How to apply:** on any diagnosis, `ls
+data/<RUN>/raw/prompts/` early — it is the in-scope mirror of the out-of-scope `guides/` and agent
+`.md` files. See [[worker-prompts-must-live-under-data]] for why they are there at all.
+
 **7. recover.md rows are keyed by error string but their *action* can be step-specific.** The
 `emc_build.params` row lives under Foundation → equil and says `{work_dir}/emc_build.params`;
 applied literally to the Thermal → tg failure with the identical error string it would have staged

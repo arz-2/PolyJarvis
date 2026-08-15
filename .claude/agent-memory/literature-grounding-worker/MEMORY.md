@@ -5,3 +5,4 @@
 - [Search-snippet misattribution](feedback_search_snippet_misattribution.md) — WebSearch summary attributed a PEEK Tg number to Suter2025 (epoxy-only paper, no PEEK); always WebFetch the real source, ignore self-referential PolyJarvis arxiv hits
 - [Bash scope blocks polymer_rules.json reads](feedback_bash_scope_blocks_polymer_rules_grep.md) — jq/grep/python3 on guides/polymer_rules.json denied even read-only; use Read tool with offset/limit paging for step 7's class-existence check
 - [docs/ output path unvalidatable](feedback_docs_output_path_unvalidatable.md) — Write to output_path outside data/** succeeds but Read/Bash(jq) on that same path denied; no self-verify loop possible for non-data/ output_path
+- [PSU-only MD paper paywalled](feedback_psu_only_md_paper_paywalled.md) — Fan&Hsu 1992 (10.1021/ma00027a044) is the sole PSU-specific MD hit, DOI resolves but zero content extractable anywhere; back FF/electrostatics via general PCFF precedent instead

@@ -1,9 +1,24 @@
 ---
 name: tg-sweep-params-file-lammps-root
-description: tg-sweep decks render the emc_build.params include at the run's lammps/ ROOT, not work_dir — recover.md's literal "{work_dir}/emc_build.params" prescription does not fix the tg stage
+description: the tg deck's emc_build.params include is deterministically <work_dir>/emc_build.params from the THERMAL_SWEEP guide, and no stage ever populates that dir — read work_dir out of the run's tg_prompt.txt
 metadata:
   type: feedback
 ---
+
+**Resolved (PLA1, 2026-08-14): the path is deterministic, not unpredictable.** The THERMAL_SWEEP
+guide inlined into `data/<RUN>/tg_prompt.txt` hardcodes
+`params_file: "<work_dir>/emc_build.params"`, and `generate_script` passes that string through
+verbatim into the deck's `include`. PLA1 was given `work_dir=<run>/lammps/thermal` and rendered
+`thermal/emc_build.params`; PMMA1 was given `work_dir=<run>/lammps/` and rendered the lammps root.
+Same rule, different `work_dir` — nothing is caller-*random*. The real defect is that `work_dir` for
+the tg stage is a directory no stage ever writes a params copy into (the only copies are `cell/` and
+`equil/`, byte-identical), so the tg deck fails at parse time on every EMC run.
+
+So: read `work_dir` from `data/<RUN>/tg_prompt.txt`, predict the include path, and recommend staging
+the file **there**. Prefer copying the file over an injected `params_file` override: a re-spawned
+tg-sweep-worker re-runs the guide from step 1 and re-substitutes `<work_dir>` mechanically, so a
+file on disk at the rendered path is robust to a re-render in a way the override is not. The
+shotgun-all-candidates advice below is now belt-and-braces, not the mechanism.
 
 `recover.md`'s Foundation → equil row *"Cannot open input script .../emc_build.params: No such file
 or directory"* prescribes *copy `emc_params_path` into `{work_dir}/emc_build.params`*. That is

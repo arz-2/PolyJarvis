@@ -31,6 +31,21 @@ context hook**, each with a working substitute:
    STRUCTURAL_FAIL-ladder re-plan requires recover.md (the rung definitions live only there), so
    reach for Bash `sed`/`grep` on it rather than concluding it is unreadable.
 
+5. PSU1 (2026-08-13) reconfirmed item 1's denials (Bash `jq` on both `decision_policy.json` and
+   `guides/system_characterization_cache.json` denied, `Read` on both allowed) and added a new one:
+   `Bash: python3 orchestration/scripts/select_forcefield.py` is **denied** to the critic, so D-01
+   admissibility cannot be measured from this side either — judge it on the planner's uncertainty
+   entry plus a build-stage companion criterion, not by re-running the tool.
+
+6. PSU1 round 2 (2026-08-13): `Read` on `/home/arz2/PolyJarvis/orchestration/scripts/enforce_gate.py`
+   is **denied**, so a planner cite to its line numbers (the require_glassy / BINDING_GLASSY /
+   ADVISORY_GLASSY routing) cannot be checked from this side. In-scope substitute for verdict
+   semantics: `decision_policy.json:policies.equilibration.gate_classes.verdict_vocabulary`
+   (establishes `equil_verdict` as a routed Foundation token distinct from
+   `check_equilibration_comprehensive.overall_pass`) plus `gate_classes.D_advisory` membership.
+   Approve on the readable corroboration and say in the finding that the implementation cite was
+   not verified — do not let an unreadable file become an implicit dependency of the verdict.
+
 **Why:** items 1-3 each cost a failed tool call on the cis-PBD1 review (2026-08-11). `Bash` and `Read`
 scopes are configured independently, so "the doc says run this" is not evidence the command will
 be permitted. Item 2 recurred verbatim on the PEEK1 review the same day — critic.md step 1's
