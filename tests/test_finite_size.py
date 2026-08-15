@@ -110,10 +110,21 @@ def test_denser_target_gives_smaller_box():
 # ─── nchain remedy ─────────────────────────────────────────────────────────────
 
 def test_nchain_scale_is_inverse_cube():
-    """L grows as nchain^(1/3) at fixed density, so closing a ratio needs (1/ratio)^3."""
-    out = nchain_scale_for(0.5, current_nchain=8)
+    """L grows as nchain^(1/3) at fixed density, so closing a ratio needs (target/ratio)^3."""
+    out = nchain_scale_for(0.5, current_nchain=8, target_ratio=1.0)
     assert out["nchain_factor"] == 8.0
     assert out["nchain_suggested"] == 64
+
+
+def test_rebuild_target_carries_margin_over_the_gate_bound():
+    """Solving for exactly 1.0 lands inside the ~7% SEM of the <Rg> it came from. PSU1
+    was told nchain=24 (forecast ratio 1.005) and failed the same gate again; the
+    recovery agent re-derived 32 by hand, which is what the default must produce."""
+    out = nchain_scale_for(0.946, current_nchain=20)
+    assert out["nchain_suggested"] == 32
+    assert out["target_ratio"] == 1.10
+    # The forecast ratio the suggestion actually buys, via ratio * (n/n0)^(1/3).
+    assert 0.946 * (out["nchain_suggested"] / 20) ** (1 / 3) >= 1.08
 
 
 def test_nchain_scale_none_when_already_passing():

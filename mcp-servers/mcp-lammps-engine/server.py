@@ -33,6 +33,7 @@ Tools exposed:
 """
 
 import os
+import re
 import sys
 import json
 import uuid
@@ -985,6 +986,26 @@ def run_lammps_chain(
                     logger.warning(f"Pre-flight warnings for {data_file}: {preflight_warnings}")
             except Exception as ve:
                 logger.warning(f"Pre-flight validation skipped (error reading data file): {ve}")
+
+        # A saved stage slice (the glassy melt/cooldown split) carries input_data in the dict
+        # AND read_data baked into the .in at generation time. Repointing one and not the other
+        # is invisible until LAMMPS reads the wrong cell: PEEK1's cooldown chain ran 2 minutes
+        # off the pre-extend checkpoint because only the JSON had been edited. Refuse the
+        # mismatch here rather than launching a chain that is wrong from its first step.
+        for st in stages:
+            declared, script_path = st.get("input_data"), st.get("script")
+            if not declared or not script_path or not Path(script_path).exists():
+                continue
+            m = re.search(r"^\s*read_data\s+(\S+)", Path(script_path).read_text(), re.M)
+            if m and os.path.abspath(m.group(1)) != os.path.abspath(declared):
+                return {
+                    "status": "error",
+                    "error": (
+                        f"stage {st.get('name')!r}: input_data is {declared!r} but its script "
+                        f"reads {m.group(1)!r}. The .in bakes read_data at generation time, so "
+                        "editing input_data alone changes nothing — patch the read_data line, or "
+                        "regenerate the stage from the cell you actually mean to continue from."),
+                }
 
         chain_id = str(uuid.uuid4())[:8]
 

@@ -42,6 +42,24 @@ orchestrator `Read`s the phase docs on phase entry.
 |---|---|
 | `RECOVERY_PLAYBOOK.md` | Failure-diagnosis playbook consulted by `/recover`. Generated + local-only (gitignored); regenerate via `python -m tools.runlog_miner --playbook -o guides/RECOVERY_PLAYBOOK.md` |
 
+## Backlog
+
+Findings from ingested worker memory that need a decision, not a patch — recorded so they are
+not rediscovered a third time.
+
+- **Glassy characterization can never cache a τ-derived knob.** The procedure takes
+  `chain.ct.tau_relax_ps` from the `npt_prod300` hold, which is below Tg by design, so
+  `decay_fraction_at_end` ≈ 0 and the KWW fit rails — the 0.15 reliability floor (calibrated on
+  melt-state C(t)) fails structurally and `write_characterization_cache.py`'s ≥1-derived-field
+  gate always exits 1. PLA1 measured both on one chain: melt hold τ=102,645 ps / 5% decayed /
+  α=0.33, `npt_prod300` τ=2.275e9 ps / 0.1% / α=0.042. Fixing it means sourcing glassy τ from
+  the melt hold, which is a protocol change in the agent descriptor.
+- **`PDIE.exp_K_GPa` pools two members** (cis-PBD 1.38, cis-PI 1.94) into one span, so a
+  single-member run grades against a band no member has. `_exp_tg_range` already does run-name
+  member resolution; `exp_K_GPa` would need the same per-member shape.
+- **`PEST` carries no `experimental_density_gcm3`**, so every polyester run reports
+  `no exp ref` for density. Needs a sourced amorphous value per member, not a class average.
+
 The engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`) live with the calibration
 toolchain and cells in [`hardware/`](../hardware/); they are machine-specific notes, local-only
 (gitignored) — rebuild them from `/calibrate-hardware` results on a new box.

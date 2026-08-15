@@ -181,16 +181,30 @@ def classify_finite_size(L_A, cutoff_A, mean_rg_A, mean_ree_A=None):
     return out
 
 
-def nchain_scale_for(ratio, current_nchain=None):
-    """How much to grow nchain to reach a ratio of 1.0.
+# Margin the rebuild target aims past 1.0. The ratio is a point estimate of a noisy
+# quantity: <Rg> over ~20 chains carries a ~7% SEM (PSU1: 35.24 A, CV 31%, n=20), and the
+# gate that re-checks it measures Rg again on the relaxed melt, where it can also drift up.
+# Solving for exactly 1.0 spent a rebuild to land at 1.005 and failed the same gate twice.
+# L grows only as nchain^(1/3), so this margin costs (1.10)^3 = 1.33x the atoms -- bought
+# once, deliberately, against a rebuild that is minutes versus an 8-15 h equil chain.
+SIZE_TARGET_RATIO = 1.10
+
+
+def nchain_scale_for(ratio, current_nchain=None, target_ratio=SIZE_TARGET_RATIO):
+    """How much to grow nchain to reach target_ratio (not 1.0 — see SIZE_TARGET_RATIO).
 
     Cell volume is proportional to nchain at fixed density, so L grows as nchain^(1/3)
-    and the required factor is (1/ratio)^3.
+    and the required factor is (target_ratio/ratio)^3.
     """
     if not ratio or ratio <= 0 or ratio >= 1.0:
         return None
-    factor = (1.0 / ratio) ** 3
-    out = {"nchain_factor": round(factor, 2)}
+    factor = (target_ratio / ratio) ** 3
+    out = {"nchain_factor": round(factor, 2), "target_ratio": target_ratio,
+           "target_ratio_note": (
+               f"sized for L/2Rg >= {target_ratio}, not 1.0 — the ratio is a point estimate "
+               "with a ~7% SEM on <Rg> and Rg can grow on equilibration. Re-run this forecast "
+               "on the rebuilt pack and re-target from its own numbers if it lands below "
+               f"{target_ratio}.")}
     if current_nchain:
         out["nchain_suggested"] = int(math.ceil(current_nchain * factor))
     return out

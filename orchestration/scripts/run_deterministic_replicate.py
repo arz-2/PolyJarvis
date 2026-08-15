@@ -580,7 +580,12 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
                        "T_START": p["T_start_K"], "T_END": p["T_end_K"], "T_STEP": p["T_step_K"],
                        "N_STEPS_PER_T": p["n_steps_per_t"], "P_START": 1.0, "P_FINAL": 1.0,
                        "T_DAMP": 100.0, "TIMESTEP": p["dt_fs"], "use_pppm": not p["lammps_flags"]["use_trappe"],
-                       "use_gpu": True, "engine": p["engine"], **{f"use_{k.split('_')[1]}": v
+                       "use_gpu": True, "engine": p["engine"],
+                       # An EMC cell carries no inline Coeffs, so a deck without this include
+                       # dies at parse time. Resolved to the cell dir's copy, not work_dir --
+                       # nothing writes a params copy into the thermal dir.
+                       **({"params_file": p["emc_params_path"]} if p["emc_params_path"] else {}),
+                       **{f"use_{k.split('_')[1]}": v
                        for k, v in p["lammps_flags"].items()}},
             )
             run = lammps.run_lammps_script(

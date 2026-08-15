@@ -281,3 +281,39 @@ def test_overridden_tg_steps_per_t_is_flagged():
 
     # Only fires when the overriding knob is actually set.
     assert _overridden_param_findings({"decided_params": {"tg_steps_per_t": 500000}}) == []
+
+
+# ── Two semantic plan checks the validator scored 0 on ────────────────────────
+# validate_run_plan does stage schema and coverage, not semantics. Both of these were
+# real critic findings the script missed: PLA1 argued in two places that PEST's
+# PET-derived exp_K_GPa must not grade PLA and armed nothing, and PSU1 asserted
+# overall_pass=true on a class whose own policy calls it unsatisfiable by construction.
+
+def test_prose_against_a_class_band_must_be_armed_in_decided_params():
+    from validate_run_plan import _prose_prohibition_findings
+
+    plan = {"decided_params": {},
+            "assumptions": ["PEST exp_K_GPa is PET-derived and must not grade PLA"]}
+    f = _prose_prohibition_findings(plan)
+    assert len(f) == 1 and f[0]["severity"] == "structural"
+    assert "exp_K_GPa" in f[0]["detail"]
+
+    # An explicit null shadows the class value in {**cls, **decided_params} — armed.
+    assert _prose_prohibition_findings(
+        {"decided_params": {"exp_K_GPa": None},
+         "assumptions": ["PEST exp_K_GPa must not grade PLA"]}) == []
+    # Prose that makes no claim about a band is not a finding.
+    assert _prose_prohibition_findings(
+        {"decided_params": {}, "assumptions": ["dp=40 chosen for Rg"]}) == []
+
+
+def test_overall_pass_as_a_success_criterion_is_a_finding():
+    from validate_run_plan import _gate_boolean_findings
+
+    f = _gate_boolean_findings({"planned_stages": [
+        {"stage": "equil",
+         "success_criteria": {"check_equilibration_comprehensive.overall_pass": True}}]})
+    assert len(f) == 1 and f[0]["severity"] == "structural"
+    # The binding form — a routed verdict — is fine.
+    assert _gate_boolean_findings({"planned_stages": [
+        {"stage": "equil", "success_criteria": {"equil_verdict": "PASS"}}]}) == []

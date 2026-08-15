@@ -416,7 +416,7 @@ preferred_ff:      {p['preferred_ff']}
 dp:                {p['dp']}   # submit_emc_cell_job dp= — the 20 default is not this class's dp_typical
 nchain:            {p['nchain']}   # submit_emc_cell_job nchains= — default 10
 density_initial:   {p['density_initial_gcm3']}   # submit_emc_cell_job density_initial= — default 0.6
-emc_seed:          {p['emc_seed'] if p['emc_seed'] is not None else 'null'}   # submit_emc_cell_job seed= — null here means pass seed=-1, which makes EMC draw a random seed and REPORT it; report that drawn value back so the run log's Seeds line is real
+emc_seed:          {p['emc_seed'] if p['emc_seed'] is not None else 'null'}   # submit_emc_cell_job seed= — null here means DRAW an integer yourself and pass it; never seed=-1 (irreproducible, and the guide forbids it). get_emc_job_output echoes it as resolved_seed; report that integer so the run log's Seeds line is both real and reproducible
 charge_method:     {p['charge_method']}
 electrostatics:    {p['electrostatics']}
 cutoff_A:          {p['cutoff_A']}   # downstream LAMMPS deck only — submit_emc_cell_job has no cutoff argument
@@ -666,9 +666,16 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     else:
         n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
     work_dir = args.work_dir or f"{REPO_ROOT}/data/{args.run_name}/lammps/thermal"
+    # The deck's `include` line. THERMAL_SWEEP.md used to hardcode "<work_dir>/emc_build.params",
+    # which generate_script passes through verbatim -- and the tg work_dir is a directory no stage
+    # ever writes a params copy into (the copies live in cell/ and equil/), so every EMC tg deck
+    # failed at parse time. Emit the real path instead. Null on a RadonPy build, where the .data
+    # carries its own coefficients and params_file must be omitted.
+    _cell_params = Path(f"{REPO_ROOT}/data/{args.run_name}/lammps/cell/emc_build.params")
     return {
         "lammps_flags": _lammps_flags(args.lammps_flags, cls),
         "work_dir": work_dir,
+        "emc_params_path": str(_cell_params) if _cell_params.exists() else None,
         "dt_fs": dt,
         "tg_rates_K_per_ns": tg_rates,
         "tg_rate_index": rate_idx,
@@ -727,6 +734,7 @@ polymer_class:     {args.polymer_class.upper()}
 run_name:          {args.run_name}
 work_dir:          {p['work_dir']}
 tg_sweep_dir:      {p['tg_sweep_dir']}
+emc_params_path:   {_v(p['emc_params_path'], 'null')}   # generate_script params params_file= — null ⇒ omit params_file entirely (RadonPy cell, coefficients are inline). Never substitute work_dir here; nothing writes a params copy into the thermal dir
 tg_params:
   T_start:         {p['T_start_K']}
   T_end:           {p['T_end_K']}
@@ -1408,7 +1416,7 @@ exp_K_range:       {p['exp_K_range']}
 tg_fox_flory_K:    {_v(p['tg_fox_flory_K'], 'null')}   # Flory-Fox K (K*g/mol); pass to generate_run_summary --tg_fox_flory_K. null ⇒ omit the flag, band graded uncorrected
 n_replicates:      {_v(getattr(args, 'n_replicates', None), 'N/A')}   # replicate count for this run (single-run multirate protocol: 1); pass to generate_run_summary --n_replicates
 tg_path:           {_v(getattr(args, 'tg_path', None), 'null')}   # explicit canonical tg_summary.json path ({p['tg_path_label']}); pass to generate_run_summary --tg_path
-slope_gate_pass:   {_v(p['slope_gate_pass'], 'null')}   # False → single-rate fallback Tg; pass --tg_k with the fallback value
+slope_gate_pass:   {_v(p['slope_gate_pass'], 'null')}   # False → single-rate fallback Tg; point --tg_path at that rate's tg_summary.json. generate_run_summary has no --tg_k flag — passing one fails schema validation
 output_dir:        {p['output_dir']}
 graphs_dir:        {p['graphs_dir']}
 

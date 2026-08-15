@@ -149,6 +149,12 @@ result = run_lammps_chain(stages=cooldown_stages, gpu_ids=gpu_ids, mpi=mpi, engi
 w = watch_run(result["chain_id"])
 ```
 
+**If the melt phase was extended after this file was saved, the slice is stale.** The first
+stage still reads the pre-extend `npt_production_out.data`. Editing the JSON's `input_data`
+is a no-op — `read_data` is baked into the `.in` at generation time (`run_lammps_chain` now
+errors on the disagreement instead of running off the wrong cell). Regenerate the tail from
+the extended checkpoint; do not hand-patch.
+
 Return the standard RESULT block (`npt_prod300_data`/`npt_prod300_log`/`npt_prod300_dump`, etc.)
 exactly as `phase=full` does.
 

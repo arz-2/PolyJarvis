@@ -287,7 +287,18 @@ def main():
     # graded as a point -- null is not zero, and must not be read as a tight interval.
     tg_interval_half_K = (tg.get("tg_interval_half_width_K")
                           if tg_basis == "raw_MD" else None)
-    if Tg_val is not None and exp_tg:
+    # extract_thermal's own admissibility verdict. TG_REVIEW/TG_NOT_REPORTABLE means the
+    # transition was never localized -- two admissible fits disagreeing, or a sweep that
+    # resolved no crossover -- so the distance from an experimental band is not a
+    # measurement of anything. Grading it anyway produced a clean-looking FAIL with an
+    # error_pct on PMMA1, which the orchestrator then had to overwrite by hand in run_log.
+    # A rate-extrapolated headline is graded on its own basis; the per-rate verdict below
+    # it does not gate it.
+    tg_gate_verdict = tg.get("tg_gate_verdict")
+    tg_not_reportable = (tg_basis == "raw_MD" and tg.get("tg_reportable") is False)
+    if tg_not_reportable:
+        tg_status = f"NOT_GRADED ({tg_gate_verdict or 'tg_reportable=false'})"
+    elif Tg_val is not None and exp_tg:
         # Grade the raw value against the REAL exp band, always. A raw single-rate MD Tg
         # overestimates experiment by ~80-120 K (cooling-rate artifact, Patrone 2016), but a
         # METHOD offset must NEVER be folded into the PASS/FAIL band: moving the measured
@@ -314,6 +325,7 @@ def main():
     rho_val = eq_dens.get("plateau_density_mean") or eq_dens.get("density_mean")
     exp_rho = ([args.exp_density_min, args.exp_density_max]
                if args.exp_density_min is not None and args.exp_density_max is not None else None)
+    exp_rho_supplied = list(exp_rho) if exp_rho else None
     exp_rho, rho_band_widened = _floor_band(exp_rho, min_rel=0.06)   # >=6% total (+/-3%)
     rho_err = None
     rho_status = "no exp ref"
@@ -345,6 +357,7 @@ def main():
 
     exp_K = ([args.exp_K_min, args.exp_K_max]
              if args.exp_K_min is not None and args.exp_K_max is not None else None)
+    exp_K_supplied = list(exp_K) if exp_K else None
     exp_K, K_band_widened = _floor_band(exp_K, min_rel=0.20)   # >=20% total (+/-10%)
     K_status = "no exp ref"
     K_err = None
@@ -474,6 +487,10 @@ def main():
                 # interval overlaps it — a distinct outcome, not a PASS. error_pct still
                 # carries the point distance to the nearest edge.
                 "status":         tg_status,
+                # extract_thermal's admissibility verdict, carried through so a reader never
+                # has to open tg_summary.json to find out the value was not gradeable.
+                "tg_gate_verdict": tg_gate_verdict,
+                "tg_reportable":   tg.get("tg_reportable"),
                 # Half-width of the graded interval (K). Null on a rate-extrapolated Tg,
                 # which has no breakpoint sigma and is graded as a point.
                 "tg_interval_half_width_K": tg_interval_half_K,
@@ -501,6 +518,11 @@ def main():
             "density": {
                 "value_g_cm3":    rho_val,
                 "exp_range_g_cm3": exp_rho,
+                # The band as passed in. _floor_band widens a too-narrow band to a physical
+                # minimum, which also overrides a deliberately tight operator band (cis-PBD1:
+                # +/-5% supplied, +/-10% graded), so band_widened alone does not tell the
+                # reader what was asked for. Equal to exp_range when nothing was widened.
+                "exp_range_g_cm3_supplied": exp_rho_supplied,
                 "band_widened":   rho_band_widened,
                 "error_pct":      rho_err,
                 "status":         rho_status,
@@ -509,6 +531,7 @@ def main():
                 "value_GPa":      K_val,
                 "sem_GPa":        K_sem,
                 "exp_range_GPa":  exp_K,
+                "exp_range_GPa_supplied": exp_K_supplied,
                 "band_widened":   K_band_widened,
                 "error_pct":      K_err,
                 "status":         K_status,

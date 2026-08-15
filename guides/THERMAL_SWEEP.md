@@ -55,7 +55,7 @@ result = generate_script(
         # with "FF flag mismatch" rather than silently emitting a corrupt GAFF2 deck.
         "use_shake":           False,    # False for TraPPE-UA and PCFF; True for GAFF2
         "shake_bond_type_ids": <omit for TraPPE-UA and PCFF; only for GAFF2>,
-        "params_file":         "<work_dir>/emc_build.params",  # EMC only; omit for RadonPy
+        "params_file":         <emc_params_path from prompt>,  # omit the key entirely when null
         "PROGRESS_FILE":       progress_file,   # per-T PROGRESS lines in the watch_run monitor_command
     }
 )

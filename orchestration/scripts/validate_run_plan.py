@@ -346,6 +346,89 @@ def _overridden_param_findings(plan: dict) -> list:
     return findings
 
 
+# Class exp bands a plan can argue against. Overridable ONLY by a decided_params key of the
+# same name: gen_prompt.apply_plan merges {**cls, **decided_params} and every exp-band helper
+# reads that dict, so prose in assumptions[] or a stage note reaches no worker prompt.
+_EXP_BAND_KEYS = ("exp_K_GPa", "experimental_density_gcm3", "experimental_tg_K")
+_NEGATION = ("not ", "never", "must not", "should not", "wrong", "mis-scoped", "misscoped",
+             "do not", "don't", "inapplicable", "does not apply")
+
+
+def _plan_prose(plan: dict):
+    """Every free-text string a planner writes, with the field it came from."""
+    for i, a in enumerate(plan.get("assumptions", []) or []):
+        if isinstance(a, str):
+            yield f"assumptions[{i}]", a
+    for d in plan.get("decisions", []) or []:
+        for k in ("evidence", "rationale", "alternatives_considered", "note"):
+            v = d.get(k)
+            if isinstance(v, str):
+                yield f"decisions[{d.get('id')}].{k}", v
+    for s in plan.get("planned_stages", []) or []:
+        sc = s.get("success_criteria")
+        if isinstance(sc, dict) and isinstance(sc.get("note"), str):
+            yield f"planned_stages[{s.get('stage')}].success_criteria.note", sc["note"]
+        if isinstance(s.get("note"), str):
+            yield f"planned_stages[{s.get('stage')}].note", s["note"]
+
+
+def _prose_prohibition_findings(plan: dict) -> list:
+    """A plan that argues a class exp band is wrong for this member must disarm it in
+    decided_params. Prose alone leaves the band armed and grades against it anyway.
+
+    Structural: PLA1 said in two places that PEST's PET-derived exp_K_GPa must not grade PLA,
+    carried no decided_params key, and would have graded K against it regardless.
+    """
+    findings = []
+    dp = plan.get("decided_params", {})
+    for key in _EXP_BAND_KEYS:
+        if key in dp:                       # present-and-null is a deliberate disarm
+            continue
+        for where, text in _plan_prose(plan):
+            low = text.lower()
+            if key.lower() in low and any(n in low for n in _NEGATION):
+                findings.append({
+                    "check": "prose_prohibition_not_armed", "severity": "structural",
+                    "detail": (f"{where} argues against the class {key}, but decided_params has "
+                               f"no {key} key. gen_prompt reads the band off "
+                               f"{{**cls, **decided_params}}, so prose disarms nothing and the "
+                               f"run grades against the band the plan rejected. Set "
+                               f"decided_params.{key} (an explicit null shadows the class "
+                               "value) or drop the argument.")})
+                break
+    return findings
+
+
+def _gate_boolean_findings(plan: dict) -> list:
+    """`overall_pass` is not what the gate binds.
+
+    It is check_equilibration_comprehensive's own 10-check AND; enforce_gate reads it only to
+    split PASS_CLEAN from PASS_CARVEOUT and never to produce a VIOLATION. On the classes that
+    take the glassy carve-out (dp_typical >= 30, or ct_gate_reliable false) decision_policy
+    calls it "unsatisfiable by construction". A plan listing it as a success criterion is
+    gating on a boolean that gates nothing — name the binding gates instead.
+    """
+    findings = []
+    for s in plan.get("planned_stages", []) or []:
+        sc = s.get("success_criteria")
+        if not isinstance(sc, dict):
+            continue
+        for k, v in sc.items():
+            if k.split(".")[-1] == "overall_pass" and v in (True, "true"):
+                findings.append({
+                    "check": "success_criteria_gates_on_overall_pass", "severity": "structural",
+                    "detail": (
+                        f"planned_stages[{s.get('stage')}].success_criteria.{k}=true gates on "
+                        "check_equilibration_comprehensive's own AND of 10 checks, which "
+                        "enforce_gate never turns into a VIOLATION (it only separates "
+                        "PASS_CLEAN from PASS_CARVEOUT) and which the glassy carve-out classes "
+                        "cannot satisfy by construction. Replace it with the binding gates the "
+                        "run's own require_* branch selects — density plateau in band, "
+                        "density_homogeneity_signal_cv_max, P2, n_eff_density, energy drift/SEM "
+                        "— and name the advisory metrics as non-blocking.")})
+    return findings
+
+
 def _unimplemented_param_findings(plan: dict) -> list:
     """A parameter that cannot reach the deck must not be usable as a remedy lever.
 
@@ -433,6 +516,8 @@ def validate_plan(plan: dict, policy: dict) -> list:
     findings += _finite_size_findings(plan)
     findings += _unimplemented_param_findings(plan)
     findings += _overridden_param_findings(plan)
+    findings += _prose_prohibition_findings(plan)
+    findings += _gate_boolean_findings(plan)
     return findings
 
 
