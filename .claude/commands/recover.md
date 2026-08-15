@@ -144,7 +144,10 @@ a `STOP_ANNOTATE` verdict ends the ladder earlier, and no verdict extends it pas
 **melt** cell (`npt_production_out.data` at `T_equil_K`, not the 300 K cell) via
 `generate_equilibration_workflow`, with `npt_cool_steps`/`npt_cool300_steps` overridden to **2×**
 baseline (attempt 1) then **4×** (attempt 2; max 2 — still under-band → re-classify as
-`MELT_STAGE_DEFICIT`, rung 3, not a third loop). Baseline: `npt_cool300_steps` (glassy
+`MELT_STAGE_DEFICIT`, rung 3, not a third loop). For a glass the load-bearing leg is
+`npt_cool300` (`T_equil_K`→300 K, 250–470 K by class); `npt_cool` spans only
+`annealing_T_high_K`→`T_equil_K` = 80 K, so raising `npt_cool_steps` alone does not slow the
+quench that forms the glass. Baseline: `npt_cool300_steps` (glassy
 T_workflow→300K leg) = `int(1.0e6/dt_fs)`; `npt_cool_steps` (rubbery, or melt→target when
 `add_melt_npt=True`) = the atom-count tier `generate_equilibration_workflow` already picks
 (`n_atoms<5000`→1e6, `<15000`→2e6, else 3e6). Pass as `--npt_cool_steps`/`--npt_cool300_steps` on
@@ -158,8 +161,10 @@ default melt hold is `melt_npt_steps = int(1.0e6/dt_prod)` ≈ **1 ns**, roughly
 
 ```
 generate_equilibration_workflow(
-    add_melt_npt   = True,                       # inserts npt_cool_melt → npt_melt → npt_cool
-    t_equil_K      = <class T_equil_K>,          # 350–800 K depending on class
+    add_melt_npt   = True,                       # inserts npt_cool_melt → npt_melt (→ npt_cool
+                                                 # only when temp < t_equil_K, i.e. rubbery)
+    t_equil_K      = <class T_equil_K>,          # 350–800 K depending on class; must satisfy
+                                                 # temp <= t_equil_K <= max_temp or the call errors
     melt_npt_steps = MULT * int(1.0e6/dt_fs),    # MULT = 10 (attempt 1), 50 (attempt 2)
 )   # changed args only. `velocity_seed`, all five step counts, `temp`, the three force-field
     # flags, and `engine` are required on every call — pass them from the prompt, `null` included

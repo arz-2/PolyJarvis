@@ -496,7 +496,10 @@ def enforce_live(args) -> dict:
         elif cooling_verdict == "UNDER_ANNEALED_COOLING":
             remedy = ("re_melt_slow_recool — re-melt from npt_production_out.data at T_equil_K "
                       "(never the 300 K cell) and slow the ramp: npt_cool300_steps and "
-                      "npt_cool_steps x2 on attempt 1, x4 on attempt 2 (max 2). Baselines: "
+                      "npt_cool_steps x2 on attempt 1, x4 on attempt 2 (max 2). npt_cool300 "
+                      "is the leg that matters for a glass: it spans T_equil->300 K (250-470 K "
+                      "by class) while npt_cool spans only annealing_T_high_K->T_equil_K = 80 K, "
+                      "so a 4x on npt_cool_steps alone is not a 4x slower quench. Baselines: "
                       "npt_cool300_steps=int(1.0e6/dt_fs); npt_cool_steps from the atom tier "
                       "(<5000->1e6, <15000->2e6, else 3e6). Do NOT extend at 300 K.")
         elif cooling_verdict == "MELT_STAGE_DEFICIT":

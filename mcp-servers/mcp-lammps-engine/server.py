@@ -1694,13 +1694,32 @@ def generate_equilibration_workflow(
         stages.append(s4)
 
         # npt_cool — NPT cool to target temp.
-        # With add_melt_npt=True (rubbery validation runs): split into npt_cool_melt/npt_melt/npt_cool
-        # to capture an isothermal NPT run at t_equil_K for melt density extraction.
+        # With add_melt_npt=True: split into npt_cool_melt/npt_melt/npt_cool to capture an
+        # isothermal NPT hold at t_equil_K. That hold is the melt-density extraction target for
+        # rubbery chains and the heavy-melt-anneal knob for glassy ones.
+        #
+        # temp <= t_equil_K, not <. A GLASSY chain runs at temp == t_equil_K (gen_prompt sets
+        # T_workflow = T_equil_K), and under a strict < the flag was accepted, ignored, and the
+        # identical 9-stage deck returned -- making heavy_melt_anneal_probe and the CHAIN_COLLAPSED
+        # melt-anneal silent no-ops on the only runs that issue them. At equality there is nothing
+        # left to cool afterwards, so the trailing npt_cool is dropped rather than emitted with a
+        # zero-width ramp.
         _use_melt_npt = (
             add_melt_npt
             and t_equil_K is not None
-            and temp < t_equil_K
+            and temp <= t_equil_K
+            and t_equil_K <= max_temp
         )
+        if add_melt_npt and not _use_melt_npt:
+            return {
+                "status": "error",
+                "error": (
+                    f"add_melt_npt=True but the melt split cannot be built: needs "
+                    f"temp <= t_equil_K <= max_temp, got temp={temp}, t_equil_K={t_equil_K}, "
+                    f"max_temp={max_temp}. Silently ignoring the flag would return a deck "
+                    "identical to the baseline, so this is an error, not a fallback."
+                ),
+            }
         _cool_steps = npt_cool_steps if npt_cool_steps is not None else steps_npt
         if _use_melt_npt:
             _melt_steps = melt_npt_steps or int(1.0e6 / dt_prod)
@@ -1732,20 +1751,23 @@ def generate_equilibration_workflow(
                 "write_restart": True,
             }, s5a["output_data"])
             stages.append(s5b)
-            s5 = _stage("npt_cool", "npt", {
-                "T_START":   t_equil_K,
-                "T_FINAL":   temp,
-                "T_DAMP":    100.0,
-                "P_START":   press,
-                "P_FINAL":   press,
-                "P_DAMP":    1000.0,
-                "TIMESTEP":  dt_prod,
-                "N_STEPS":   _cool_steps,
-                "use_pppm":  True,
-                "use_gpu":   True,
-                "write_restart": True,
-            }, s5b["output_data"])
-            stages.append(s5)
+            if temp < t_equil_K:
+                s5 = _stage("npt_cool", "npt", {
+                    "T_START":   t_equil_K,
+                    "T_FINAL":   temp,
+                    "T_DAMP":    100.0,
+                    "P_START":   press,
+                    "P_FINAL":   press,
+                    "P_DAMP":    1000.0,
+                    "TIMESTEP":  dt_prod,
+                    "N_STEPS":   _cool_steps,
+                    "use_pppm":  True,
+                    "use_gpu":   True,
+                    "write_restart": True,
+                }, s5b["output_data"])
+                stages.append(s5)
+            else:
+                s5 = s5b   # temp == t_equil_K: the melt hold IS the last stage before production
         else:
             s5 = _stage("npt_cool", "npt", {
                 "T_START":   max_temp,
@@ -1836,7 +1858,7 @@ def generate_equilibration_workflow(
 
         # Tg sweep starting cell (Option C): rubbery polymers start from npt_melt (at T_equil_K),
         # not npt_production (300 K). Glassy polymers use npt_prod300 (existing path, unchanged).
-        if _use_melt_npt:
+        if _use_melt_npt and temp <= 300.0:
             _npt_tg_prep = s5b["output_data"]     # npt_melt at t_equil_K — well-relaxed melt
         elif temp <= 300.0:
             _npt_tg_prep = s4["output_data"]       # fallback: npt_pppm at max_temp
