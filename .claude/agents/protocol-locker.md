@@ -46,12 +46,26 @@ you write, not in chat narration.
    the planning gate.
    - `Bash: jq -r '.plan_mode' <run_plan_path>` must be `"reasoned"`. If not, refuse — a
      `deterministic` plan is already a locked replay, there is nothing to graduate.
-   - Find this run's `run_summary.json` (sibling of `run_plan_path`, same `raw/` dir) and
-     independently re-check every property in `run_plan_path`'s `properties` array actually
-     PASSed: `Bash: jq -r '[.properties[] as $p | .results[$p].status] | all(. == "PASS")' ...`
-     (restrict to `properties`, the run's own requested set — a property this run never
-     requested/reported is not part of the pass/fail question). If not all-PASS, refuse and name
-     which property didn't pass — do not lock a partially-diagnosed protocol.
+   - **Re-check the PHYSICAL VALIDITY gates, not agreement with experiment.** `run_summary.json`'s
+     `results[<prop>].status` measures whether a number matched an experimental band. That is the
+     wrong question for freezing a protocol: PCFF glassy density runs 4.5–6.2% low as a cooling
+     artifact, and a replicate should reproduce that deficit; conversely a run can land inside
+     every band while violating minimum image. Read the run's own `raw/*.json` instead:
+
+     | Track | Gate | Field |
+     |---|---|---|
+     | foundation | equilibration | `equilibration_gate_full.json:verdict == "PASS"` |
+     | foundation | finite size | `finite_size_verdict == "SIZE_PASS"` |
+     | foundation | homogeneity | `homogeneity_verdict == "HOMOG_PASS"` |
+     | thermal | Tg reportability | `tg_summary.json:tg_reportable` |
+     | mechanical | Murnaghan | `bulk_modulus_murnaghan.json:bm_reportable` |
+     | mechanical | deform (fallback route) | `bulk_modulus_deform.json:deform_gate_verdict == "DEFORM_REPORTABLE"` |
+
+     `BM_FALLBACK_DEFORM` is a **route**, not a failure. `HOMOG_PASS` already subtracts Poisson
+     counting noise — read the verdict, never re-derive from `cv_mean`. Step 2b's script computes
+     all of this; your job is to sanity-check its per-track verdict, not to recompute it by hand.
+     Freezing is **per track**: a run whose thermal gates pass and mechanical gates fail freezes
+     thermal and leaves mechanical unfrozen. Foundation is a prerequisite for both.
    - Derive `CANONICAL_SMILES`: `Bash: python3 orchestration/scripts/canon_smiles.py "$(jq -r .smiles
      <run_plan_path>)"` → `.canonical_smiles`. This is the key for step 2b below (same
      canonicalization `orchestration/ORCHESTRATOR.md`'s Novelty Gate and `critic.md` step 1a use).
@@ -76,8 +90,23 @@ you write, not in chat narration.
    Bash: python3 orchestration/scripts/write_characterization_cache.py --lock \
        --smiles "$CANONICAL_SMILES" \
        --run_name "$(jq -r .run_name <run_plan_path>)" \
-       --properties "$(jq -r '.properties | join(",")' <run_plan_path>)"
+       --properties "$(jq -r '.properties | join(",")' <run_plan_path>)" \
+       --plan <run_plan_path>
    ```
+
+   `--plan` also **freezes the protocol this molecule actually ran**, per track, so a later
+   replicate reproduces it with different seeds instead of falling back to class defaults. It
+   applies two gates and reports both; it exits 1 and writes nothing if no track survives:
+   - the physical validity gates in step 1
+   - a **deck-replay diff** (`verify_protocol_replay.py`): the run's decks are regenerated from
+     its own plan and compared. A track whose plan values never reached its decks does not
+     freeze. This is not hypothetical — PLA1's plan records `tg_steps_per_t=500000` while its
+     sweep ran `200000`, a 2.5× cooling-rate error, and `cutoff_A` shipped as 12.0 while 9.5 ran
+     in 32/36 runs.
+
+   A plan carrying `amendments` or `revision_history` is **ineligible**: `decided_params` was
+   mutated mid-run, so no single deck set corresponds to it. Report the refusal; do not work
+   around it.
    `--lock` is the only mode allowed to set `protocol_validated`/`validated_*`; it leaves every
    `probe_*`/`derived_*` field `system-characterization-analyzer` wrote intact, and never touches
    another SMILES' entry.
@@ -125,6 +154,8 @@ RESULT:
   reason: <if refused — which gate failed>
   validated_properties: <this SMILES's full validated_properties list after the merge>
   changes: <one-line summary of the SNAPSHOT_KEYS fields step 2 actually changed, or "none — no decided_params diverged from prior class defaults">
+  protocol_tracks_frozen: <tracks step 2b froze, or "none — <reason>">
+  protocol_tracks_refused: <track: reason for each track that did NOT freeze (validity gate or deck-replay divergence), naming the offending field>
   note_written: true | false
   rules_path: <absolute path to guides/polymer_rules.json>
   cache_path: <absolute path to guides/system_characterization_cache.json>

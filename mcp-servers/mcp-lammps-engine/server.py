@@ -1922,6 +1922,21 @@ def generate_equilibration_workflow(
         if _use_melt_npt:
             ret["melt_npt_log"] = f"{s5b['work_dir']}/{s5b['params']['LOG_FILE']}"
             ret["melt_npt_dir"] = s5b["work_dir"]
+
+        # Persist the RESOLVED workflow. Step counts passed as null are filled from the
+        # atom-count tier above, and T_DAMP/P_DAMP are set inside the stage builders — so
+        # without this file those values exist nowhere but the generated .in decks, and a
+        # replicate whose cell lands in a different atom-count tier silently runs a different
+        # equilibration. Protocol freezing reads this to pin what actually ran.
+        # Written here rather than by a caller so every path gets it: the scripted executor,
+        # the agent-driven reasoned path, and any future caller alike.
+        try:
+            wf_path = Path(work_dir_base) / "equil_workflow.json"
+            wf_path.parent.mkdir(parents=True, exist_ok=True)
+            wf_path.write_text(json.dumps(ret, indent=2) + "\n")
+            ret["workflow_json"] = str(wf_path)
+        except OSError as e:
+            logger.warning(f"could not persist equil_workflow.json: {e}")
         return ret
 
     except Exception as e:

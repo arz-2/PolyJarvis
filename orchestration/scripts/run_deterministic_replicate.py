@@ -69,6 +69,7 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 from gen_prompt import resolve_stage_params, apply_plan, resolve_hardware, load_plan  # noqa: E402
 from hw_common import load_rules, get_class_entry  # noqa: E402
+import execution_chain  # noqa: E402
 
 LAMMPS_ENGINE_DIR = REPO_ROOT / "mcp-servers" / "mcp-lammps-engine"
 EMC_SERVER_DIR = REPO_ROOT / "mcp-servers" / "mcp-emc-server"
@@ -269,25 +270,102 @@ def log_recovery(run_log_path: Path, stage: str, attempt: int, trigger: str, act
 
 # ─── Base args namespace (mirrors gen_prompt.py's argparse defaults) ──────────
 
-def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNamespace:
-    return SimpleNamespace(
-        run_name=run_name, polymer_class=polymer_class, plan=str(plan_path),
-        smiles=None, data_path=None, tg_start_data=None, work_dir=None,
-        gpu_ids=None, mpi_ranks=None, engine=None, emc_seed=None, velocity_seed=None,
-        dp=None, nchain=None, n_atoms=None, charge_method=None, date_start=None, date_end=None,
-        d01=None, d02=None, d03=None, d04=None, lammps_flags=None, is_glassy=None,
-        tg_k=None, tg_fit_quality=None, deform_log=None, deform_log_slow=None,
-        deform_rate_mode="primary", murnaghan_logs=None, d05=None, npt_prod_log=None,
-        npt_prod_dump=None, ff=None, backbone_types=None, enthalpy_col="Enthalpy",
-        output_dir=None, equil_data_path=None, npt_prod_ns=None, add_melt_npt=False,
-        T_equil_K=None, T_anneal_high_K=None, tg_t_high_K=None, tg_t_low_K=None,
-        tg_t_step_K=None, tg_steps_per_t=None, tg_rate_index=None, mr_rates=None,
-        mr_tg_values=None, n_replicates=1, bm_npt_steps=None,
-        K_strain_max=None, K_deform_rate_inv_s=None,
-        dt_fs=None, density_initial=None, properties="all", exp_K_min=None, exp_K_max=None,
-        exp_tg_K=None, exp_tg_min=None, exp_tg_max=None, exp_density_min=None,
-        exp_density_max=None, polymer_name=None, tg_path=None, slope_gate_pass=None,
-    )
+# Single definition, shared with the plan writer so the chain a plan records and the chain this
+# executor runs are resolved from identical starting args.
+_base_args = execution_chain.base_args
+
+
+# ─── Frozen protocol accessors ────────────────────────────────────────────────
+
+def _frozen(args) -> dict:
+    """The plan's frozen_protocol block: what this exact molecule ACTUALLY RAN, per track."""
+    return getattr(args, "_frozen_protocol", None) or {}
+
+
+def _frozen_seeds(args) -> dict:
+    return (_frozen(args).get("foundation") or {}).get("seeds_used") or {}
+
+
+def _frozen_route(args, track: str) -> dict:
+    return (_frozen(args).get(track) or {}).get("route") or {}
+
+
+def _pinned_steps(args, p: dict) -> dict:
+    """Equilibration step counts to actually submit: the frozen protocol's resolved integers where
+    it has them, the resolver's values otherwise.
+
+    Load-bearing. Without this the executor would fall back to generate_equilibration_workflow's
+    atom-count tier (5,000/15,000 boundaries) while the plan's execution_chain advertised the
+    pinned counts — the plan would record a protocol the run did not execute, which is the exact
+    failure this whole feature exists to prevent. Both this executor and --emit-decks go through
+    here, and both share execution_chain's mapping so there is one definition of the pinning."""
+    pinned = execution_chain._pin_steps_from_frozen(
+        (_frozen(args).get("foundation") or {}).get("equil_stages"))
+    return {
+        "npt_prod_steps": pinned.get("npt_production", p["npt_prod_steps"]),
+        "npt_cool_steps": pinned.get("npt_cool", p["npt_cool_steps"]),
+        "npt_cool300_steps": pinned.get("npt_cool300", p["npt_cool300_steps"]),
+        "melt_npt_steps": pinned.get("npt_melt", p["melt_npt_steps"]),
+    }
+
+
+def _assert_chain_matches_execution(args, cls: dict, plan: dict) -> dict:
+    """The plan advertises an `execution_chain`; this executor then runs its own control flow.
+    If the two ever disagree, the chain becomes exactly the kind of decorative artifact this
+    whole feature exists to eliminate — a recorded protocol that is not the executed one.
+
+    So compare them before submitting anything: re-resolve the chain from these same args and
+    check the physics arguments of every stage against what the executor is about to pass.
+    Halts on a mismatch rather than running a protocol the plan misdescribes."""
+    recorded = plan.get("execution_chain")
+    if not recorded:
+        return {"checked": False, "reason": "plan carries no execution_chain"}
+
+    properties = ({"density", "tg", "bulk_modulus"} if args.properties in (None, "all")
+                  else {p.strip().lower() for p in args.properties.split(",") if p.strip()})
+    live = execution_chain.build_execution_chain(args, cls, plan, properties, _frozen(args))
+
+    rec_steps = [(s["stage"], s["tool"]) for s in recorded]
+    live_steps = [(s["stage"], s["tool"]) for s in live]
+    if rec_steps != live_steps:
+        raise SystemExit(
+            "Halting: the plan's execution_chain does not match what this executor would run.\n"
+            f"  plan:     {rec_steps}\n  executor: {live_steps}\n"
+            "Regenerate the plan (make_deterministic_plan.py) — never run against a stale chain.")
+
+    # The equilibration step counts are the ones with two independent resolution paths (the
+    # chain's _pin_steps_from_frozen and the executor's _pinned_steps), so check them by value.
+    rec_equil = next((s["args"] for s in recorded
+                      if s["tool"] == "generate_equilibration_workflow"), {})
+    p = resolve_stage_params("equil", args, cls)
+    live_equil = _pinned_steps(args, p)
+    mismatched = {k: {"plan": rec_equil.get(k), "executor": v}
+                  for k, v in live_equil.items() if rec_equil.get(k) != v}
+    if mismatched:
+        raise SystemExit(
+            "Halting: the plan's execution_chain and this executor disagree on equilibration "
+            f"step counts: {json.dumps(mismatched)}. The plan would record a protocol the run "
+            "did not execute. Regenerate the plan.")
+    return {"checked": True, "stages": len(live_steps)}
+
+
+def _cis_lock_guard(plan: dict) -> dict:
+    """Refuse to replicate a SMILES whose cache entry says its numbers only hold behind a
+    microstructure lock stage this executor cannot reproduce. Previously written into the cache
+    and read by nothing."""
+    smiles = plan.get("canonical_smiles") or plan.get("smiles")
+    cache_path = REPO_ROOT / "guides" / "system_characterization_cache.json"
+    try:
+        entry = json.loads(cache_path.read_text()).get(smiles) or {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not entry.get("requires_cis_lock"):
+        return {}
+    return {"reason": "REQUIRES_MICROSTRUCTURE_LOCK", "canonical_smiles": smiles,
+            "cis_lock_deck": entry.get("cis_lock_deck"),
+            "detail": entry.get("note", "")[:400],
+            "action": "This executor's EMC build path cannot reproduce the lock stage. Run this "
+                      "SMILES through the agent-driven pipeline, or re-measure after locking."}
 
 
 # ─── Stage: build ───────────────────────────────────────────────────────────
@@ -304,6 +382,10 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
     p = resolve_stage_params("build", args, cls)
     work_dir = Path(p["work_dir"])
     emc_seed = p["emc_seed"] if p["emc_seed"] is not None else random.randint(1, 999_999)
+    frozen_seeds = _frozen_seeds(args)
+    if frozen_seeds.get("emc_seed") is not None and emc_seed == frozen_seeds["emc_seed"]:
+        # Redraw once rather than halt -- a chance collision in a 1e6 space is not an error.
+        emc_seed = random.randint(1, 999_999)
 
     job = emc.submit_emc_cell_job(
         smiles=p["smiles"], polymer_class=args.polymer_class.upper(),
@@ -326,6 +408,24 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
         raise SystemExit(f"EMC build job {job_id} failed: {status}")
 
     out = emc.get_emc_job_output(job_id)["result"]
+    # EMC echoes the seed it actually used. Trust that, not what we asked for: it has returned a
+    # PREVIOUS run's seed while reporting a fresh draw (cis-PBD1 received cis-PBD4's 482913 with
+    # a matching 68.178 A box). A replicate sharing the source run's packing is not a replicate,
+    # and every downstream error bar computed from it would be understated.
+    resolved_seed = out.get("resolved_seed", emc_seed)
+    if frozen_seeds.get("emc_seed") is not None and resolved_seed == frozen_seeds["emc_seed"]:
+        state.halt("build", "EMC_SEED_COLLISION", {
+            "requested_seed": emc_seed, "resolved_seed": resolved_seed,
+            "source_run_seed": frozen_seeds["emc_seed"],
+            "reason": "EMC returned the seed the frozen protocol's source run used, so this "
+                      "replicate would reuse that run's packing instead of sampling an "
+                      "independent configuration.",
+        })
+        raise SystemExit(
+            f"Halting: EMC resolved_seed={resolved_seed} equals the source run's seed. "
+            "This is a known EMC failure mode (a reuse reported as a draw), not a coincidence "
+            "to retry blindly — inspect the EMC job before re-running.")
+    emc_seed = resolved_seed
     cell_dir = work_dir / "cell"
     cell_dir.mkdir(parents=True, exist_ok=True)
     dest_data = cell_dir / "cell.data"
@@ -380,14 +480,15 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
     flags = p["lammps_flags"]
     velocity_seed = p["velocity_seed"]
     if extend_from_data is None:
+        steps = _pinned_steps(args, p)
         workflow = lammps.generate_equilibration_workflow(
             data_file=p["data_path"], work_dir_base=p["work_dir"],
             polymer_name=args.run_name, temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
             press=p["P_equil_atm"], use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"],
-            use_opls=flags["use_opls"], npt_prod_steps=p["npt_prod_steps"],
+            use_opls=flags["use_opls"], npt_prod_steps=steps["npt_prod_steps"],
             add_melt_npt=p["add_melt_npt"], t_equil_K=p["T_equil_K"] if p["add_melt_npt"] else None,
-            melt_npt_steps=p["melt_npt_steps"], engine=p["engine"], velocity_seed=velocity_seed,
-            npt_cool_steps=p["npt_cool_steps"], npt_cool300_steps=p["npt_cool300_steps"],
+            melt_npt_steps=steps["melt_npt_steps"], engine=p["engine"], velocity_seed=velocity_seed,
+            npt_cool_steps=steps["npt_cool_steps"], npt_cool300_steps=steps["npt_cool300_steps"],
             extend_steps=None,
         )
     else:
@@ -662,6 +763,18 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
     gpu_per_run = cls.get("gpu_per_run") or 1
     p = resolve_stage_params("murnaghan", args, cls)
 
+    # Force the frozen route. A K from the deform fallback and a K from Murnaghan are different
+    # measurements, so a replicate has to reproduce the branch the source run took rather than
+    # re-decide it from its own fit. The forced branch is recorded either way -- forcing must
+    # never silently discard the acceptance signal this run's own gate would have given.
+    forced = _frozen_route(args, "mechanical").get("bm_method")
+    if forced == "deform" and is_glassy:
+        result = _run_deform_pair(state, args, cls, lammps, gpu_per_run, raw_dir, graphs_dir)
+        result["route_forced"] = True
+        result["own_gate_said"] = "not evaluated — frozen route went straight to deform"
+        state.mark("mechanical", "done", result=result)
+        return result
+
     if not (is_glassy or p["bm_pressures_atm"]):
         # rubbery + no pressures — fluctuation path, no submission
         bp = resolve_stage_params("analyze-bm", args, cls)
@@ -710,7 +823,22 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
         state.mark("mechanical", "done", result=result)
         return result
 
-    # Deform fallback: primary rate, then slow rate for the rate-sensitivity check
+    result = _run_deform_pair(state, args, cls, lammps, gpu_per_run, raw_dir, graphs_dir)
+    if forced == "murnaghan":
+        # The frozen route says the source run reported Murnaghan, but this replicate's fit was
+        # rejected. Surfaced rather than swallowed: the two runs are no longer measuring K the
+        # same way, so the comparison between them needs a human eye.
+        result["route_diverged"] = True
+        result["frozen_route"] = "murnaghan"
+        result["own_gate_said"] = "fit_converged=False — fell back to deform"
+    state.mark("mechanical", "done", result=result)
+    return result
+
+
+def _run_deform_pair(state: ExecutorState, args, cls: dict, lammps, gpu_per_run: int,
+                     raw_dir: Path, graphs_dir: Path) -> dict:
+    """Deform at the primary rate, then the slow rate for the rate-sensitivity check. Reached
+    either as the Murnaghan fallback or because the frozen protocol's route says deform."""
     with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
         args.gpu_ids = gpu_ids
         primary = _submit_deform(args, cls, lammps, "primary")
@@ -737,11 +865,9 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
         timestep=bp["dt_fs"],
         **({"log_file_2": slow_log, "strain_rate_2": bp["strain_rate_slow_per_fs"]} if slow_log else {}),
     ), "bulk modulus (deform)")
-    result = {"method": "deformation", "bulk_modulus_GPa": deform_extract.get("bulk_modulus_GPa"),
-             "shear_modulus_GPa": deform_extract.get("shear_modulus_GPa"),
-             "youngs_modulus_GPa": deform_extract.get("youngs_modulus_GPa")}
-    state.mark("mechanical", "done", result=result)
-    return result
+    return {"method": "deformation", "bulk_modulus_GPa": deform_extract.get("bulk_modulus_GPa"),
+            "shear_modulus_GPa": deform_extract.get("shear_modulus_GPa"),
+            "youngs_modulus_GPa": deform_extract.get("youngs_modulus_GPa")}
 
 
 # ─── Stage: summary ─────────────────────────────────────────────────────────
@@ -797,6 +923,52 @@ def do_summary(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool, t
 
 # ─── Dry-run mode ───────────────────────────────────────────────────────────
 
+def _emit_decks(args, cls: dict, properties: set, out_dir: Path,
+                data_file: str = None, params_file: str = None):
+    """Generate every LAMMPS deck without submitting anything. This is the acceptance test for
+    "same protocol, different seed": emit a replicate's decks and diff them against the source
+    run's — the only differences may be seeds and paths. In particular the resolved N_STEPS must
+    match even when the replicate's n_atoms falls in a different atom-count tier, which is exactly
+    what the frozen protocol's pinned step counts guarantee."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    lammps = _load_server_module("lammps_engine_server", LAMMPS_ENGINE_DIR / "server.py",
+                                 LAMMPS_ENGINE_DIR, _mcp_env("mcp-lammps-engine"))
+    emitted, errors = [], []
+
+    p = resolve_stage_params("equil", args, cls)
+    flags = p["lammps_flags"]
+    # No build has run yet, so there is no cell of our own to point at. The source run's cell is
+    # the right stand-in: this mode compares DECKS, and the deck's physics must not depend on
+    # which packing produced the cell — only its atom count feeds the tier, and pinned step
+    # counts make even that immaterial.
+    src = data_file or args.data_path or p.get("data_path")
+    if not src:
+        raise SystemExit("--emit-decks needs a starting .data file: pass --data-file "
+                         "(e.g. the source run's lammps/equil/cell.data).")
+    steps = _pinned_steps(args, p)
+    wf = lammps.generate_equilibration_workflow(
+        data_file=src, params_file=params_file or "",
+        work_dir_base=str(out_dir / "equil"), polymer_name=args.run_name,
+        temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"], press=p["P_equil_atm"],
+        use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
+        npt_prod_steps=steps["npt_prod_steps"], add_melt_npt=p["add_melt_npt"],
+        t_equil_K=p["T_equil_K"] if p["add_melt_npt"] else None,
+        melt_npt_steps=steps["melt_npt_steps"], npt_cool_steps=steps["npt_cool_steps"],
+        npt_cool300_steps=steps["npt_cool300_steps"], extend_steps=None,
+        engine=p["engine"], velocity_seed=p["velocity_seed"],
+    )
+    if wf.get("status") == "success":
+        emitted += [f"{s['work_dir']}/{s['name']}.in" for s in wf["stages"]]
+    else:
+        errors.append({"stage": "equil", "error": wf.get("error"),
+                       "validation_errors": wf.get("validation_errors")})
+
+    print(json.dumps({"status": "emitted" if not errors else "partial",
+                      "out_dir": str(out_dir), "decks": emitted, "errors": errors,
+                      "note": "seeds and absolute paths are expected to differ; nothing else may"},
+                     indent=2, default=str))
+
+
 def _print_dry_run(args, cls: dict, properties: set):
     """Resolve every applicable stage's params without submitting anything — the test this
     file's own resolve_stage_params() consumption is checked against
@@ -825,8 +997,27 @@ def main():
     ap.add_argument("--plan", required=True, help="Path to run_plan.json")
     ap.add_argument("--dry-run", action="store_true",
                     help="Resolve every stage's params without submitting anything; print JSON and exit.")
+    ap.add_argument("--emit-decks", metavar="DIR",
+                    help="Generate every LAMMPS deck into DIR without submitting anything, then "
+                         "exit. Use to diff a replicate's decks against the source run's — the "
+                         "acceptance test for 'same protocol, different seed'. (--dry-run only "
+                         "resolves params; it writes no decks.)")
+    ap.add_argument("--seed-mode", choices=["both", "velocity"], default="both",
+                    help="both (default): rebuild the cell with a fresh EMC seed AND redraw "
+                         "velocities — independent configurations, so the spread across "
+                         "replicates is an honest uncertainty estimate. velocity: reuse the "
+                         "source run's equilibrated cell and vary only the velocity seed "
+                         "(requires --source-run).")
+    ap.add_argument("--data-file", default=None,
+                    help="--emit-decks only: starting .data file (no build has run yet).")
+    ap.add_argument("--params-file", default=None,
+                    help="--emit-decks only: EMC .params for a cell with no inline Coeffs.")
+    ap.add_argument("--source-run", default=None,
+                    help="--seed-mode velocity only: the run whose equilibrated .data to branch from.")
     ap.add_argument("--properties", default=None, help="Override properties_requested (else from plan).")
     args_cli = ap.parse_args()
+    if args_cli.seed_mode == "velocity" and not args_cli.source_run:
+        ap.error("--seed-mode velocity requires --source-run")
 
     if VENV_PY.exists() and Path(sys.executable).resolve() != VENV_PY.resolve():
         os.execv(str(VENV_PY), [str(VENV_PY), str(Path(__file__).resolve())] + sys.argv[1:])
@@ -840,12 +1031,20 @@ def main():
         args.properties = args_cli.properties
     cls = apply_plan(cls_raw, plan, args)
     resolve_hardware(args, cls, rules)
+    # What this exact molecule actually ran, if it has been frozen. Drives seed-collision
+    # detection and mechanical route forcing.
+    args._frozen_protocol = plan.get("frozen_protocol") or {}
 
     properties = ({"density", "tg", "bulk_modulus"} if args.properties in (None, "all")
                   else {p.strip().lower() for p in args.properties.split(",") if p.strip()})
 
     if args_cli.dry_run:
         _print_dry_run(args, cls, properties)
+        return
+
+    if args_cli.emit_decks:
+        _emit_decks(args, cls, properties, Path(args_cli.emit_decks),
+                    args_cli.data_file, args_cli.params_file)
         return
 
     run_name = args_cli.run_name
@@ -866,7 +1065,32 @@ def main():
     emc = _load_server_module("emc_server_module", EMC_SERVER_DIR / "server.py",
                               EMC_SERVER_DIR, _mcp_env("mcp-emc-server"))
 
-    if not state.is_done("build"):
+    # A SMILES whose cache entry demands a microstructure lock (cis-PBD: EMC does NOT honour
+    # SMILES double-bond stereo, so a plain build yields a ~48:52 cis/trans mixture, and that
+    # entry's own numbers do not apply to it) must not be replicated by a plain rebuild.
+    chain_check = _assert_chain_matches_execution(args, cls, plan)
+    print(json.dumps({"status": "chain_verified", **chain_check}), flush=True)
+
+    guard = _cis_lock_guard(plan)
+    if guard:
+        state.halt("build", "REQUIRES_MICROSTRUCTURE_LOCK", guard)
+        print(json.dumps({"status": "halted", "stage": "build", "detail": guard}))
+        return
+
+    if args_cli.seed_mode == "velocity":
+        # Branch from the source run's equilibrated cell: same packing, new velocities. Isolates
+        # thermal-trajectory noise, so the spread understates true uncertainty -- deliberate,
+        # and recorded here so a downstream aggregate cannot mistake it for --seed-mode both.
+        src = REPO_ROOT / "data" / args_cli.source_run / "lammps" / "equil"
+        src_data = next(iter(sorted(src.glob("npt_prod300/npt_prod300_out.data"))
+                              or sorted(src.glob("npt_production/npt_production_out.data"))), None)
+        if src_data is None:
+            raise SystemExit(f"--seed-mode velocity: no equilibrated .data under {src}")
+        state.mark("build", "done", result={"data_path": str(src_data), "emc_seed": None,
+                                            "seed_mode": "velocity",
+                                            "branched_from": args_cli.source_run})
+        build_result = state.stage("build")["result"]
+    elif not state.is_done("build"):
         build_result = do_build(state, args, cls, emc, lammps, run_log_path)
     else:
         build_result = state.stage("build")["result"]

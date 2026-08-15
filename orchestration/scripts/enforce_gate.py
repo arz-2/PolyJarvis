@@ -546,7 +546,7 @@ def enforce_live(args) -> dict:
                        "treat this remedy as a starting hypothesis, not a firm diagnosis. Lean on "
                        "the absolute glass-vs-experiment density gap as the trustworthy signal.]")
 
-    return {
+    result = {
         "regime": regime,
         "applicable_clause": clause,
         "binding_gates": binding_results,
@@ -576,6 +576,18 @@ def enforce_live(args) -> dict:
         "remedy": remedy,
         "remedy_confidence": remedy_confidence,
     }
+    # Persist the foundation validity verdict. It was previously stdout-only, so the only durable
+    # record was run_log.md prose -- and protocol freezing has to READ it (verdict,
+    # finite_size_verdict, homogeneity_verdict) to decide whether a protocol is physically sound.
+    # Same out_dir this function already writes melt_density_reference.json into.
+    if args.out_dir:
+        try:
+            path = Path(args.out_dir) / f"equilibration_gate_{args.phase}.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(result, indent=2) + "\n")
+        except OSError:
+            pass  # provenance nicety -- must never fail the gate itself
+    return result
 
 
 def main():

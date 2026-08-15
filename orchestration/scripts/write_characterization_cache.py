@@ -43,7 +43,7 @@ CACHE_PATH = REPO_ROOT / "guides" / "system_characterization_cache.json"
 # the whole reason this script exists: system-characterization-analyzer.md states the boundary in
 # prose, and prose cannot stop a full-file Write from carrying a stale validated stamp forward.
 VALIDATED_KEYS = {"protocol_validated", "validated_properties", "validated_run_name",
-                  "validated_at"}
+                  "validated_at", "protocol"}
 
 RELIABILITY_FLAGS = ("probe_tau_relax_reliable", "probe_K0_reliable")
 
@@ -93,21 +93,32 @@ def write_characterization(cache_path: Path, smiles: str, fields: dict) -> dict:
             "cache_path": str(cache_path)}
 
 
-def write_validated(cache_path: Path, smiles: str, run_name: str, properties: list) -> dict:
+def write_validated(cache_path: Path, smiles: str, run_name: str, properties: list,
+                    protocol: dict = None) -> dict:
     """Merge the validated half. validated_properties is a union, not an overwrite — a SMILES
     validated for density+tg in one run and bulk_modulus in a later one ends up validated for all
-    three, which is what planner/critic's plan_mode gate reads."""
+    three, which is what planner/critic's plan_mode gate reads.
+
+    `protocol` is the per-track frozen protocol (make_deterministic_plan.build_frozen_protocol):
+    what this molecule ACTUALLY RAN, so a replicate can reproduce it with different seeds. Merged
+    per track, not wholesale — a run that freezes only `thermal` must not drop a `mechanical`
+    block an earlier run of the same SMILES already froze."""
     cache = _load(cache_path)
     existing = cache.get(smiles, {})
     merged_props = sorted(set(existing.get("validated_properties") or []) | set(properties))
+    merged_protocol = {**(existing.get("protocol") or {}), **(protocol or {})}
     cache[smiles] = {**existing,
                      "protocol_validated": True,
                      "validated_properties": merged_props,
                      "validated_run_name": run_name,
                      "validated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    if merged_protocol:
+        cache[smiles]["protocol"] = merged_protocol
     _save(cache_path, cache)
     return {"written": True, "smiles": smiles, "mode": "lock", "validated_run_name": run_name,
             "validated_properties": merged_props,
+            "protocol_tracks_frozen": sorted(protocol or {}),
+            "protocol_tracks_total": sorted(merged_protocol),
             "characterization_fields_preserved": sorted(set(existing) - VALIDATED_KEYS),
             "other_keys_preserved": sorted(k for k in cache if k != smiles),
             "cache_path": str(cache_path)}
@@ -130,6 +141,13 @@ def main():
     p.add_argument("--run_name", help="--lock only: the run that validated this SMILES.")
     p.add_argument("--properties", default="",
                    help="--lock only: comma-separated properties validated by this run.")
+    p.add_argument("--plan", metavar="RUN_PLAN_JSON",
+                   help="--lock only: the finished run's run_plan.json. Given this, the lock also "
+                        "freezes the protocol this molecule ACTUALLY RAN, per track, gated on each "
+                        "track's PHYSICAL VALIDITY verdicts (equil/SIZE/HOMOG, TG_REPORTABLE, "
+                        "BM_/DEFORM_REPORTABLE) read from the run's own raw/*.json — never on "
+                        "agreement with experiment.")
+    p.add_argument("--raw-dir", help="--lock only: the run's raw/ dir (default: sibling of --plan).")
     args = p.parse_args()
 
     cache_path = Path(args.cache).resolve()
@@ -142,7 +160,30 @@ def main():
         if not args.run_name:
             p.error("--lock requires --run_name")
         props = [s for s in (x.strip() for x in args.properties.split(",")) if s]
-        result = write_validated(cache_path, args.smiles, args.run_name, props)
+        protocol, gates = {}, None
+        if args.plan:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from make_deterministic_plan import build_frozen_protocol
+            from verify_protocol_replay import verify
+            plan_path = Path(args.plan)
+            raw_dir = Path(args.raw_dir) if args.raw_dir else plan_path.parent
+            # Deck-replay gate: regenerate this run's decks from its own plan and diff. A track
+            # whose plan values never reached its decks is not frozen, however good its physics.
+            replay = verify(raw_dir.parent)
+            protocol, gates = build_frozen_protocol(
+                json.loads(plan_path.read_text()), raw_dir, args.run_name, replay)
+            if not protocol:
+                # Foundation is a prerequisite for every other track, so an unadjudicated or
+                # failing foundation means nothing is freezable. Refuse loudly rather than
+                # stamping a validated flag with no reproducible protocol behind it.
+                print(json.dumps({"written": False, "reason": "no_freezable_track",
+                                  "detail": "no track passed its physical validity gates "
+                                            "(foundation is a prerequisite for all others)",
+                                  "validity_gates": gates}, indent=2))
+                sys.exit(1)
+        result = write_validated(cache_path, args.smiles, args.run_name, props, protocol)
+        if gates is not None:
+            result["validity_gates"] = gates
     else:
         if not args.fields:
             p.error("--fields is required unless --lock is given")

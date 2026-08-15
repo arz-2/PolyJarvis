@@ -7,13 +7,71 @@ Read this instead of `FOUNDATION.md`/`THERMAL_TRACK.md`/`MECHANICAL_TRACK.md` fo
 unchanged either way; the executor produces the same `raw/*.json` artifacts those steps already
 consume.
 
+## One command, validated run → completed replicate
+
+```
+chain_validated_run.py --source-run <VALIDATED_RUN> --run_name <RUN> \
+    --polymer_class <CLASS> --smiles "<smiles>" [--properties ...] [--no-run]
+```
+
+Chains every link: **replay-verify** the source run's decks against its own plan →
+**freeze** the protocol per track → **write** the deterministic plan → **execute** it.
+A refusal at any link stops the chain and names the reason; a replay or freeze refusal means the
+source run's recorded protocol is not the one it executed, which is exactly when a replicate must
+not launch. `--no-run` stops after the plan. `--emit-decks DIR` runs all four links but generates
+decks instead of submitting.
+
+It canonicalizes the SMILES for you. Never hand-type a cache key — `*OC(C)C(=O)*` and
+`*OC(=O)C(*)C` are different molecules.
+
+The steps below are what that command runs; use them directly only to re-do one link.
+
+## Protocol source
+
+Generate the plan with `--canonical_smiles`. When this exact SMILES has a frozen `protocol` block
+in `guides/system_characterization_cache.json`, the plan is built from what that molecule
+**actually ran** — resolved equilibration step counts and the executed route — instead of from
+`polymer_rules.json` class defaults:
+
+```
+make_deterministic_plan.py --run_name <RUN> --polymer_class <CLASS> --smiles "<smiles>" \
+    --canonical_smiles "<canonical>" --properties <props>
+```
+
+The plan carries `execution_chain`: every stage in order with fully-resolved arguments, and
+placeholders for what is deliberately not frozen — `<VARY:*>` (seeds, which must differ per
+replicate) and `<HOST:*>` (engine/mpi/gpu, re-derived from `hardware_policy`).
+
+Freezing is per track and per exact SMILES, so a class's second validated molecule never
+overwrites its first. An unfrozen track falls back to class defaults.
+
 ## Invocation
 
 One invocation, end to end:
 ```
 <repo>/mcp-servers/.venv/bin/python orchestration/scripts/run_deterministic_replicate.py \
-    --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH
+    --run_name <RUN> --polymer_class <CLASS> --plan PLAN_PATH [--seed-mode both|velocity]
 ```
+
+`--seed-mode both` (default) rebuilds the cell with a fresh EMC seed and redraws velocities —
+independent configurations, so the spread across replicates is an honest uncertainty estimate.
+`--seed-mode velocity --source-run <RUN>` branches from that run's equilibrated cell and varies
+only the velocity seed; the shared packing makes the spread understate true uncertainty.
+
+The executor halts if EMC's echoed `resolved_seed` equals the frozen protocol's seed — EMC has
+returned a previous run's seed while reporting a fresh draw, which silently destroys replicate
+independence.
+
+`--emit-decks DIR` generates every deck without submitting, for diffing a replicate's decks
+against the source run's. (`--dry-run` only resolves params; it writes no decks.)
+
+## Route forcing
+
+`frozen_protocol.<track>.route` records the branch the source run took. The replicate reproduces
+it rather than re-deciding — a K from the deform fallback and a K from Murnaghan are not the same
+measurement. Where the replicate's own gate disagrees, `route_forced` / `route_diverged` and
+`own_gate_said` are written to `executor_state.json`, so forcing never silently discards the
+acceptance signal.
 Write SIMULATION STATE to run_log.md (status=monitoring), launch this detached
 (`Bash(command="nohup <cmd> & disown", run_in_background=true)`), then **BACKGROUND-WAIT**
 (canonical pattern, `ORCHESTRATOR.md`) on its own completion — the script blocks internally through

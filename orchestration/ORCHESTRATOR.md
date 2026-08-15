@@ -35,15 +35,26 @@ SETUP
 
 GATE & PLAN — gate per exact canonical SMILES, never per class.
   CANONICAL_SMILES = canon_smiles.py "<smiles>".
-  IS_NOVEL = `guides/system_characterization_cache.json` has no key CANONICAL_SMILES (file/key
-    absent ⇒ true). Independent of VALIDATED below.
+  IS_NOVEL = `guides/system_characterization_cache.json[CANONICAL_SMILES]` has no non-null
+    `derived_*` field (file/key absent ⇒ true). Independent of VALIDATED below.
+    `jq -e --arg s "$CANONICAL_SMILES" '(.[$s]//{})|[to_entries[]|select(.key|startswith("derived_"))|
+    .value]|any(.!=null)' guides/system_characterization_cache.json` — exit 1 ⇒ IS_NOVEL=true.
+    Bare key existence is NOT the test: protocol-locker creates the key, so a run that froze a
+    protocol without deriving timing knobs would otherwise be marked non-novel forever and
+    `system-characterization-analyzer` could never measure them.
   VALIDATED = system_characterization_cache.json[CANONICAL_SMILES].protocol_validated==true AND
     validated_properties ⊇ properties_requested.
 
-  VALIDATED → known SMILES, reproduce as before:
+  VALIDATED → known SMILES. One command chains freeze → plan → execute:
+    `chain_validated_run.py --source-run <VALIDATED_RUN> --run_name <RUN>
+     --polymer_class <CLASS> --smiles "<smiles>" [--no-run]`
+    (see DETERMINISTIC_REPLICATE.md). The individual steps below are what it runs.
     `make_deterministic_plan.py --run_name <RUN> --polymer_class <CLASS> --smiles "<smiles>"
-    --properties <props>` then, if IS_NOVEL=false,
+    --canonical_smiles CANONICAL_SMILES --properties <props>` then, if IS_NOVEL=false,
     `apply_cached_characterization.py --run_plan PLAN_PATH --canonical_smiles CANONICAL_SMILES`.
+    `--canonical_smiles` is what makes this a replicate rather than a fresh class-default run:
+    it builds the plan from this molecule's frozen `protocol` (resolved step counts + executed
+    route) and emits the resolved `execution_chain`.
     No agent spawn, critic auto-approved. Phase A/B: read orchestration/tracks/DETERMINISTIC_REPLICATE.md
     instead of FOUNDATION/THERMAL_TRACK/MECHANICAL_TRACK.md.
 
@@ -55,6 +66,10 @@ GATE & PLAN — gate per exact canonical SMILES, never per class.
     If IS_NOVEL=false (characterized by an earlier run, but not validated for these properties):
       `apply_cached_characterization.py --run_plan PLAN_PATH --canonical_smiles CANONICAL_SMILES`
       reuses that run's measured timing knobs instead of guessed class defaults, before Phase A.
+    Pass `--canonical_smiles` to the planner's scaffold generation too: when a `protocol.foundation`
+      block exists for this SMILES, the reasoned plan starts from the equilibration this molecule
+      actually ran rather than a class average, so a later per-track freeze cannot end up
+      describing two different equilibrations of the same molecule.
     Recover failures via RECOVERY (below), up to 5 attempts or until every requested property
     completes.
 

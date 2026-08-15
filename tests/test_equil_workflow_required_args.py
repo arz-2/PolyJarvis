@@ -150,15 +150,17 @@ def test_prompts_for_every_seeded_stage_carry_one():
 
 
 def test_deterministic_executor_passes_every_required_arg():
-    """run_deterministic_replicate has two call sites -- the full chain and the EXTEND
-    continuation -- and each must name all six, including the ones it passes as None."""
+    """EVERY call site in run_deterministic_replicate must name all six, including the ones it
+    passes as None -- the full chain, the EXTEND continuation, and --emit-decks. Asserted per
+    call rather than against a fixed call count, so adding a call site cannot make this test
+    fail for a reason unrelated to what it checks."""
     src = (REPO_ROOT / "orchestration" / "scripts" / "run_deterministic_replicate.py").read_text()
     tree = ast.parse(src)
     calls = [n for n in ast.walk(tree)
              if isinstance(n, ast.Call)
              and isinstance(n.func, ast.Attribute)
              and n.func.attr == "generate_equilibration_workflow"]
-    assert len(calls) == 2
+    assert calls, "no generate_equilibration_workflow call sites found"
     for call in calls:
         passed = {kw.arg for kw in call.keywords}
         assert set(REQUIRED) <= passed, f"missing {set(REQUIRED) - passed}"
