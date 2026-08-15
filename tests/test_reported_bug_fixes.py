@@ -183,6 +183,44 @@ def test_cache_ignores_null_derived_fields(tmp_path):
     assert res["written"] is False
 
 
+@pytest.mark.parametrize("wrapper", ["derived", "step3_derived_fields"])
+def test_cache_lifts_derived_knobs_out_of_a_nested_sub_object(tmp_path, wrapper):
+    """The diagnostic file this script is handed groups the knobs under a sub-object whose name
+    is the agent's choice — both spellings exist on disk. Reading only flat top-level keys made a
+    run that DID derive a knob exit no_derived_field: a silently lost cache write."""
+    res = _write_cache(tmp_path, {
+        "probe_tau_relax_reliable": True,
+        wrapper: {"derived_t_equil_ns": 12.5},
+    })
+    assert res["written"] is True
+    assert res["unwrapped_from"] == [wrapper]
+    assert "derived_t_equil_ns" in res["fields_written"]
+
+
+def test_cache_reports_the_lift_even_when_the_nested_knobs_are_all_null(tmp_path):
+    """The gate must still refuse, but name the sub-object it read — otherwise the refusal is
+    indistinguishable from having been handed the wrong file."""
+    res = _write_cache(tmp_path, {
+        "probe_tau_relax_reliable": False,
+        "derived": {"derived_t_equil_ns": None, "derived_K_deform_rate_inv_s": None},
+    })
+    assert res["written"] is False
+    assert res["reason"] == "no_derived_field"
+    assert res["unwrapped_from"] == ["derived"]
+
+
+def test_cache_does_not_lift_when_the_fields_are_already_flat(tmp_path):
+    """A flat payload must reach the gate untouched — the lift is a fallback, not a rewrite."""
+    res = _write_cache(tmp_path, {
+        "probe_tau_relax_reliable": True,
+        "derived_t_equil_ns": 12.5,
+        "measured": {"tau_relax_ns": 4.0},
+    })
+    assert res["written"] is True
+    assert res["unwrapped_from"] == []
+    assert "tau_relax_ns" not in res["fields_written"]
+
+
 # ── Bug 7: a relative output_dir silently resolved against LAMBDA_WORKDIR ──
 
 def test_require_output_dir_rejects_relative_path():
