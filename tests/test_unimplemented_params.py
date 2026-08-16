@@ -1,11 +1,12 @@
 """decided_params that no executor consumes.
 
-`eq_annealing_cycles` was raised as a remedy twice (PACR 5->10, PKTN 8->12) on the
-strength of assess_cooling_contraction's UNDER_ANNEALED_COOLING verdicts, with notes
-citing NkepsuMbitou's 10-cycle precedent. `generate_equilibration_workflow` has no
-annealing-cycles parameter, so neither raise changed anything that ran. The failure is
-silent in both directions: the plan records a protocol that did not happen, and the
-remedy produces no behaviour change to explain its own ineffectiveness.
+eq_annealing_cycles was the original example here (raised as a remedy twice on
+assess_cooling_contraction's UNDER_ANNEALED_COOLING verdicts, with no
+annealing-cycles parameter anywhere in generate_equilibration_workflow to receive it)
+until generate_equilibration_workflow gained npt_anneal_cycles/npt_anneal_cycle_steps
+and the key was wired through gen_prompt._resolve_equil_params. dp_min is the current
+example: checked against dp_typical only inside test_polymer_rules_schema.py's JSON
+self-consistency test, never against a plan's actual dp.
 """
 import sys
 from pathlib import Path
@@ -22,27 +23,26 @@ from validate_run_plan import (  # noqa: E402
 
 
 def test_set_unimplemented_param_is_structural():
-    f = _unimplemented_param_findings({"decided_params": {"eq_annealing_cycles": 10}})
+    f = _unimplemented_param_findings({"decided_params": {"dp_min": 30}})
     assert len(f) == 1
     assert f[0]["severity"] == "structural"
     assert f[0]["check"] == "decided_param_not_executed"
-    assert "10" in f[0]["detail"]
+    assert "30" in f[0]["detail"]
 
 
 def test_unset_and_null_are_silent():
     """A plan that never claims the parameter has nothing to answer for."""
     assert _unimplemented_param_findings({"decided_params": {}}) == []
     assert _unimplemented_param_findings(
-        {"decided_params": {"eq_annealing_cycles": None}}) == []
+        {"decided_params": {"dp_min": None}}) == []
     assert _unimplemented_param_findings(
-        {"decided_params": {"eq_annealing_cycles": "null"}}) == []
+        {"decided_params": {"dp_min": "null"}}) == []
 
 
 def test_zero_still_reports():
-    """0 is a claim about protocol, not an absence of one -- and it is also wrong,
-    since the workflow always runs exactly one heat/compress/cool pass."""
+    """0 is a claim about protocol, not an absence of one."""
     assert len(_unimplemented_param_findings(
-        {"decided_params": {"eq_annealing_cycles": 0}})) == 1
+        {"decided_params": {"dp_min": 0}})) == 1
 
 
 def test_missing_decided_params_does_not_crash():
@@ -58,8 +58,9 @@ def test_every_entry_carries_a_traced_reason():
 
 def test_implemented_params_are_not_listed():
     """cutoff_A does reach the deck (as a hardcoded style constant, which is a
-    separate reporting bug) -- it must not be flagged as unimplemented."""
-    for k in ("cutoff_A", "dp_typical", "nchain", "tg_rates_K_per_ns"):
+    separate reporting bug) -- it must not be flagged as unimplemented.
+    eq_annealing_cycles is wired as of npt_anneal_cycles/npt_anneal_cycle_steps."""
+    for k in ("cutoff_A", "dp_typical", "nchain", "tg_rates_K_per_ns", "eq_annealing_cycles"):
         assert k not in UNIMPLEMENTED_PARAMS
 
 
@@ -94,7 +95,9 @@ def _workflow(tmp_path, **kw):
 
     data, params = _minimal_cell(tmp_path)
     args = dict(data_file=data, work_dir_base=str(tmp_path), velocity_seed=1,
-                npt_prod_steps=None, npt_cool_steps=None, npt_cool300_steps=None,
+                npt_prod_steps=None, nvt_prod_steps=None, npt_cool_steps=None,
+                npt_cool300_steps=None, npt_prod300_steps=None,
+                npt_anneal_cycles=None, npt_anneal_cycle_steps=None,
                 melt_npt_steps=None, extend_steps=None, temp=770.0, use_pcff=False,
                 use_trappe=False, use_opls=False, engine="kokkos", max_temp=800.0,
                 params_file=params)
@@ -136,3 +139,33 @@ def test_unarmable_melt_split_is_an_error_not_a_silent_baseline(tmp_path):
     r = _workflow(tmp_path, temp=900.0, add_melt_npt=True, t_equil_K=770.0)
     assert r["status"] == "error"
     assert "add_melt_npt" in r["error"]
+
+
+def test_npt_anneal_cycles_inserts_cool_heat_pairs(tmp_path):
+    baseline = [s["name"] for s in _workflow(tmp_path)["stages"]]
+    assert "npt_anneal_cool_1" not in baseline
+
+    r = _workflow(tmp_path, npt_anneal_cycles=3, npt_anneal_cycle_steps=500_000)
+    stages = {s["name"]: s["params"] for s in r["stages"]}
+    order = [s["name"] for s in r["stages"]]
+    for i in (1, 2, 3):
+        cool, heat = f"npt_anneal_cool_{i}", f"npt_anneal_heat_{i}"
+        assert cool in stages and heat in stages
+        assert stages[cool]["N_STEPS"] == stages[heat]["N_STEPS"] == 500_000
+        assert stages[cool]["T_START"] == 800.0 and stages[cool]["T_FINAL"] == 770.0
+        assert stages[heat]["T_START"] == 770.0 and stages[heat]["T_FINAL"] == 800.0
+        assert order.index("npt_pppm") < order.index(cool) < order.index(heat)
+    assert order.index("npt_anneal_heat_3") < order.index("npt_cool")
+
+    # Existing measurement stages must be unaffected -- same invariant as the melt-anneal remedy.
+    base_stages = {s["name"]: s["params"] for s in _workflow(tmp_path)["stages"]}
+    for stage in ("npt_cool", "npt_production", "npt_cool300", "npt_prod300"):
+        assert stages[stage]["N_STEPS"] == base_stages[stage]["N_STEPS"]
+        assert stages[stage]["T_START"] == base_stages[stage]["T_START"]
+
+
+def test_npt_anneal_cycles_zero_or_null_is_the_baseline(tmp_path):
+    baseline = [s["name"] for s in _workflow(tmp_path)["stages"]]
+    zero = [s["name"] for s in _workflow(tmp_path, npt_anneal_cycles=0)["stages"]]
+    null = [s["name"] for s in _workflow(tmp_path, npt_anneal_cycles=None)["stages"]]
+    assert baseline == zero == null

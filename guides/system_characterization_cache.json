@@ -19,5 +19,243 @@
     "note": "WARNING -- these values were measured on a 100% cis cell produced by a cis-microstructure lock stage (cis_lock_deck above). EMC does NOT honour SMILES double-bond stereo: a plain build/equil for this SMILES yields a ~48:52 cis/trans MIXTURE, and these numbers do NOT apply to it. Any future run of this SMILES must reproduce the cis-lock before reusing anything here, and must re-measure if it does not. protocol_validated is deliberately NOT set. probe_tau_relax_reliable=false: decay_fraction_at_end=0.03 < 0.15 floor on the 300 K/2902 ps npt_production rubbery hold (DP=100, 20-chain TraPPE-UA melt) -- tau_relax fit (296013.8 ps) is not trustworthy for deriving t_equil_ns/eq_annealing_cycles/ct_min_decay_melt/K_deform_rate_inv_s. probe_K0_reliable=true (sem/mean=6.62%) from NPT volume-fluctuation on the same hold; recorded for Murnaghan cross-check use only, not used for K-rate derivation since that needs tau_relax too. A longer production hold on this exact SMILES would likely raise decay_fraction_at_end enough to unlock the tau-derived fields on a future run.",
     "requires_cis_lock": true,
     "cis_lock_deck": "data/cis-PBD1/lammps/cis_lock/cis_lock.in"
+  },
+  "*C[C@H](Cl)C[C@@H](*)Cl": {
+    "source_run_name": "i-PVC1",
+    "canonical_smiles": "*C[C@H](Cl)C[C@@H](*)Cl",
+    "polymer_class": "PVNL",
+    "generated_at": "2026-08-15T16:13:00+00:00",
+    "refined_from_full_run": true,
+    "hold_used": {
+      "regime": "glassy",
+      "stage": "npt_prod300",
+      "temp_K": 300,
+      "log_file": "/home/arz2/PolyJarvis/data/i-PVC1/lammps/equil/npt_prod300/npt_prod300.log",
+      "dump_file": "/home/arz2/PolyJarvis/data/i-PVC1/lammps/equil/npt_prod300/npt_prod300.dump",
+      "data_file": "/home/arz2/PolyJarvis/data/i-PVC1/lammps/equil/npt_prod300/npt_prod300_out.data",
+      "note": "Not npt_pppm (pressure ramp). Distinct dump from the equil-check gate's own probe, which used nvt_production.dump (951 ps); this probe used the full npt_prod300.dump (1951 ps), so tau_relax/decay numbers differ from the gate's D-05 block by construction, not by contradiction."
+    },
+    "tau_relax_ps": 3790838577.8,
+    "beta": 0.382,
+    "decay_fraction_at_end": 0.005,
+    "trajectory_ps": 1951.0,
+    "rg_cv": 0.2082,
+    "rg_mean_A": 14.55,
+    "probe_tau_relax_reliable": false,
+    "probe_tau_relax_rationale": "decay_fraction_at_end=0.005 << 0.15 floor -- the C(t) KWW fit saw essentially no curvature (chains are sub-Tg / kinetically trapped at 300 K, corroborated by msd.kinetic_trap_flag=true). ct_gate_reliable for PVNL is true in polymer_rules.json (not an aromatic-backbone exemption case), so this fails purely on decay fraction. Expected for any glassy 300 K hold, not a class-specific miscalibration.",
+    "K0_GPa": 2.8448,
+    "K0_sem_GPa": 0.1708,
+    "K0_sem_over_mean": 0.06004,
+    "probe_K0_reliable": true,
+    "probe_K0_rationale": "sem/mean = 6.0% <= 15% threshold -- reliable. B_def cross-check (2.271 GPa, r2=0.024) disagrees by 20.2%, flagged by the tool as B_def-unreliable (nonlinear P vs lnV, expected for a soft glassy vinyl); this does not affect the sem/mean reliability gate used here, which is on B_dyn only.",
+    "derived_t_equil_ns": null,
+    "derived_eq_annealing_cycles": null,
+    "derived_ct_min_decay_melt": null,
+    "derived_K_deform_rate_inv_s": null,
+    "derived_K_deform_rate_slow_inv_s": null,
+    "derived_rationale": "probe_tau_relax_reliable=false -- per procedure step 1, every tau_relax-derived field (including K_deform, which needs both flags) is skipped and the class default is kept. Zero derived_* fields this run. eq_annealing_cycles derivation would additionally have been undefined for PVNL independent of reliability: implied_per_cycle_ns = melt_npt_ns / eq_annealing_cycles = null / 7 (polymer_rules.json:classes.PVNL.melt_npt_ns is null).",
+    "class_defaults_kept": {
+      "t_equil_ns": 8.0,
+      "eq_annealing_cycles": 7,
+      "ct_min_decay_melt": 0.1,
+      "K_deform_rate_inv_s": 100000000.0,
+      "K_deform_rate_slow_inv_s": 10000000.0
+    },
+    "equil_underrun_warning": null,
+    "bm_pressures_atm_note": "Not derived by this agent -- Murnaghan ladder is class/universal, unchanged.",
+    "reprobe_recommended": true,
+    "note": "K0 reliable, tau_relax unreliable (decay_fraction_at_end=0.005 < 0.15 floor on a glassy 300 K hold -- chains sub-Tg/kinetically trapped, cannot resolve C(t) decay on MD timescales). Zero derived_* fields produced this run. The cache entry was still WRITTEN (write_characterization_cache.py exit 0, matching the cis-PBD1 2026-08-11 precedent for the identical K0-reliable/tau-unreliable/all-derived-null shape) -- do not assume a K0-reliable/tau-unreliable probe is a cache no-op. A much longer npt_prod300 (300 K glassy) hold of this exact SMILES -- the same state point Murnaghan work already runs at -- is what would raise decay_fraction_at_end enough to unlock the tau-derived fields on a future run."
+  },
+  "*CC*": {
+    "protocol_validated": false,
+    "validated_properties": [
+      "bulk_modulus",
+      "density",
+      "tg"
+    ],
+    "validated_run_name": "PE1",
+    "validated_at": "2026-08-16T03:37:41Z",
+    "_locker_scope_note": "tg is deliberately EXCLUDED from validated_properties. Not because Tg=226.6 K missed the experimental band (a 40 K/ns rate artifact, the wrong question for a protocol gate) but because the thermal protocol as recorded was never executed: decided_params.tg_rates_K_per_ns=[10,25,40] while only tg_sweep_r40/ exists (run_summary tg.n_rates=null, n_replicates=1), and D-06b states single-rate was the intent all along -- decided_params was never corrected to match. The deck-replay gate independently refused to freeze thermal (no_deck_compared), so no tg_* value propagates from here. A PE run that actually executes a multirate ladder can add tg later; validated_properties is a union. The MECHANICAL track also did not freeze, for a different and weaker reason: verify_protocol_replay regenerates no BM-series decks at all, so it returned no_deck_compared -- absence of coverage, not evidence of divergence. bulk_modulus is therefore validated on bm_gate_verdict=BM_REPORTABLE plus band agreement (1.8632 +/- 0.0803 GPa in [1.5, 2.0]), but nothing about its protocol is pinned here: a deterministic replicate of this SMILES will draw bm_pressures_atm / K_deform_rate_inv_s / K_strain_max from the PHYC class entry. As of this lock those class values are identical to PE1's decided_params, but the class entry is mutable by any future PHYC --lock-from, so that agreement is not guaranteed to hold. Also note: the frozen foundation block carries alpha_glass_per_K=8.7e-5 (a literature-grounding input to the equil-check cooling-contraction test), which THIS run's own sweep falsified -- cte_glassy_per_K=1.853e-4, 2.1x higher. It is frozen because a replicate must reproduce what ran, not because it is correct. Foundation also carries nchain=36, a cell with ree_self_image_flag=true (L=61.77 A < R_ee=66.85 A, ~51% of chains exceed the box edge); it clears the binding SIZE_PASS gate (L/2r_cut=2.206, L/2Rg=1.127) and is frozen for reproducibility of this molecule only. For the same two reasons the class-level PHYC backfill was declined -- see the protocol-locker report for PE1.",
+    "protocol": {
+      "foundation": {
+        "source_run_name": "PE1",
+        "frozen_at": "2026-08-16T03:37:41.150793+00:00",
+        "verified_by_deck_replay": true,
+        "validity_gates": {
+          "equil_verdict": "PASS",
+          "finite_size_verdict": "SIZE_PASS",
+          "homogeneity_verdict": "HOMOG_PASS"
+        },
+        "decided_params": {
+          "preferred_ff": "trappe-ua",
+          "preferred_builder": "emc",
+          "charge_method": "none",
+          "electrostatics": "lj_cut",
+          "cutoff_A": 14.0,
+          "dt_fs": 2.0,
+          "dp_typical": 120,
+          "nchain": 36,
+          "density_initial_gcm3": 0.65,
+          "T_equil_K": 550.0,
+          "annealing_T_high_K": 620.0,
+          "P_equil_atm": 1.0,
+          "t_equil_ns": 5.0,
+          "npt_prod_ns": 5.0,
+          "melt_npt_ns": 1.0,
+          "ct_min_decay_melt": 0.25,
+          "alpha_glass_per_K": 8.7e-05,
+          "alpha_melt_per_K": 0.000857,
+          "experimental_tg_K": 195
+        },
+        "route": {
+          "is_glassy": false,
+          "npt_prod_total_ns": 5.0
+        },
+        "agreed_with_experiment": {
+          "bulk_modulus": "PASS",
+          "density": "PASS",
+          "tg": "FAIL"
+        },
+        "equil_stages": [
+          {
+            "name": "minimize",
+            "params": {
+              "use_pppm": false,
+              "use_trappe": true,
+              "use_shake": false
+            }
+          },
+          {
+            "name": "nvt_softheat",
+            "params": {
+              "T_START": 300.0,
+              "T_FINAL": 620.0,
+              "T_DAMP": 50.0,
+              "TIMESTEP": 0.5,
+              "N_STEPS": 500000,
+              "use_pppm": false,
+              "use_shake": false,
+              "use_trappe": true
+            }
+          },
+          {
+            "name": "npt_compress",
+            "params": {
+              "T_START": 620.0,
+              "T_FINAL": 620.0,
+              "T_DAMP": 100.0,
+              "P_START": 1.0,
+              "P_FINAL": 50000.0,
+              "P_DAMP": 1000.0,
+              "TIMESTEP": 0.5,
+              "N_STEPS": 500000,
+              "use_pppm": false,
+              "use_trappe": true,
+              "use_shake": false
+            }
+          },
+          {
+            "name": "npt_pppm",
+            "params": {
+              "T_START": 620.0,
+              "T_FINAL": 620.0,
+              "T_DAMP": 100.0,
+              "P_START": 50000.0,
+              "P_FINAL": 1.0,
+              "P_DAMP": 1000.0,
+              "TIMESTEP": 2.0,
+              "N_STEPS": 500000,
+              "use_pppm": false,
+              "use_trappe": true,
+              "use_shake": false
+            }
+          },
+          {
+            "name": "npt_cool_melt",
+            "params": {
+              "T_START": 620.0,
+              "T_FINAL": 550.0,
+              "T_DAMP": 100.0,
+              "P_START": 1.0,
+              "P_FINAL": 1.0,
+              "P_DAMP": 1000.0,
+              "TIMESTEP": 2.0,
+              "N_STEPS": 1000000,
+              "use_pppm": false,
+              "use_trappe": true,
+              "use_shake": false
+            }
+          },
+          {
+            "name": "npt_melt",
+            "params": {
+              "T_START": 550.0,
+              "T_FINAL": 550.0,
+              "T_DAMP": 100.0,
+              "P_START": 1.0,
+              "P_FINAL": 1.0,
+              "P_DAMP": 1000.0,
+              "TIMESTEP": 2.0,
+              "N_STEPS": 500000,
+              "use_pppm": false,
+              "use_trappe": true,
+              "use_shake": false
+            }
+          },
+          {
+            "name": "npt_cool",
+            "params": {
+              "T_START": 550.0,
+              "T_FINAL": 300.0,
+              "T_DAMP": 100.0,
+              "P_START": 1.0,
+              "P_FINAL": 1.0,
+              "P_DAMP": 1000.0,
+              "TIMESTEP": 2.0,
+              "N_STEPS": 2000000,
+              "use_pppm": false,
+              "use_trappe": true,
+              "use_shake": false
+            }
+          },
+          {
+            "name": "nvt_production",
+            "params": {
+              "T_START": 300.0,
+              "T_FINAL": 300.0,
+              "T_DAMP": 100.0,
+              "TIMESTEP": 2.0,
+              "N_STEPS": 2000000,
+              "use_pppm": false,
+              "use_trappe": true,
+              "use_shake": false
+            }
+          },
+          {
+            "name": "npt_production",
+            "params": {
+              "T_START": 300.0,
+              "T_FINAL": 300.0,
+              "T_DAMP": 100.0,
+              "P_START": 1.0,
+              "P_FINAL": 1.0,
+              "P_DAMP": 1000.0,
+              "TIMESTEP": 2.0,
+              "N_STEPS": 2500000,
+              "use_pppm": false,
+              "use_trappe": true,
+              "use_shake": false
+            }
+          }
+        ],
+        "n_atoms": 8712,
+        "seeds_used": {
+          "emc_seed": null,
+          "velocity_seed": 156486,
+          "velocity_seed_source": "derived_from_run_name"
+        }
+      }
+    },
+    "_invalidated_reason": "eq_annealing_cycles was wired live in generate_equilibration_workflow. PHYC's class default (5 cycles) now applies to any new PHYC plan, but PE1's frozen foundation block predates the feature and never ran any -- a replicate would silently diverge from what this lock certifies. Re-validation required before this SMILES can take the deterministic path again; the frozen protocol/validated_* fields below are retained for provenance only."
   }
 }

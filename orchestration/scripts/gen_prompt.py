@@ -48,6 +48,11 @@ Physics knob overrides (all optional; defaults from polymer_rules.json):
                           re_melt_slow_recool lever — larger = slower cool ramp.
   --npt_cool300_steps INT Override npt_cool300 step count (default: ~1ns, glassy only).
                           re_melt_slow_recool lever — larger = slower cool to 300K.
+  --npt_prod300_steps INT Override npt_prod300 step count (default: ~2ns, glassy only).
+                          The 300K density/K_T/deform measurement hold.
+  --npt_anneal_cycles INT Override the class's decided_params.eq_annealing_cycles (default: 0).
+                          N cool/heat pairs inserted between npt_pppm and npt_cool.
+  --npt_anneal_cycle_steps INT  Override each annealing-cycle leg's step count (default: ~1ns/leg).
   --T_equil_K FLOAT       Equilibration temperature — maps to temp= in generate_equilibration_workflow
   --T_anneal_high_K FLOAT Peak annealing temperature — maps to max_temp=
   --tg_t_high_K FLOAT     Tg sweep start temperature (K)
@@ -518,6 +523,38 @@ def _resolve_equil_params(args, cls: dict) -> dict:
     T_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
     npt_prod_ns_val = _pick(args.npt_prod_ns, cls, 'npt_prod_ns', None)
     npt_prod_steps = int(npt_prod_ns_val * 1e6 / dt) if npt_prod_ns_val is not None else None
+    t_equil_ns_val = cls.get('t_equil_ns', 5.0)
+    nvt_prod_steps = int(t_equil_ns_val * 1e6 / dt) if t_equil_ns_val is not None else None
+    # npt_cool/npt_cool300/npt_prod300: a raw *_steps override (recovery's re_melt_slow_recool
+    # lever, or an explicit decided_params integer) always wins; else derive from the matching
+    # ns-based class field (t_cool_ns/t_cool300_ns/t_prod300_ns) the same way t_equil_ns derives
+    # nvt_prod_steps; else None (unchanged atom-count-tier / hardcoded fallback).
+    npt_cool_steps_val = _pick(getattr(args, 'npt_cool_steps', None), cls, 'npt_cool_steps', None)
+    if npt_cool_steps_val is None:
+        t_cool_ns_val = cls.get('t_cool_ns')
+        if t_cool_ns_val is not None:
+            npt_cool_steps_val = int(t_cool_ns_val * 1e6 / dt)
+    npt_cool300_steps_val = _pick(getattr(args, 'npt_cool300_steps', None), cls, 'npt_cool300_steps', None)
+    if npt_cool300_steps_val is None:
+        t_cool300_ns_val = cls.get('t_cool300_ns')
+        if t_cool300_ns_val is not None:
+            npt_cool300_steps_val = int(t_cool300_ns_val * 1e6 / dt)
+    npt_prod300_steps_val = _pick(getattr(args, 'npt_prod300_steps', None), cls, 'npt_prod300_steps', None)
+    if npt_prod300_steps_val is None:
+        t_prod300_ns_val = cls.get('t_prod300_ns')
+        if t_prod300_ns_val is not None:
+            npt_prod300_steps_val = int(t_prod300_ns_val * 1e6 / dt)
+    # eq_annealing_cycles: the class's own count, unless overridden (recovery lever or an
+    # explicit decided_params int). No ns-derived fallback exists yet — npt_anneal_cycle_steps
+    # falls back to generate_equilibration_workflow's own ~1 ns/leg default.
+    npt_anneal_cycles_val = _pick(getattr(args, 'npt_anneal_cycles', None), cls,
+                                   'eq_annealing_cycles', 0)
+    npt_anneal_cycle_steps_val = _pick(getattr(args, 'npt_anneal_cycle_steps', None), cls,
+                                        'npt_anneal_cycle_steps', None)
+    if npt_anneal_cycle_steps_val is None:
+        t_anneal_cycle_ns_val = cls.get('t_anneal_cycle_ns')
+        if t_anneal_cycle_ns_val is not None:
+            npt_anneal_cycle_steps_val = int(t_anneal_cycle_ns_val * 1e6 / dt)
     T_workflow = _resolve_t_workflow(args, cls)
     add_melt_npt = getattr(args, 'add_melt_npt', False) or (T_workflow <= 300.0)
     melt_npt_ns_val = _pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None
@@ -541,9 +578,13 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         "T_anneal_high_K": _pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0),
         "T_workflow_K": T_workflow,
         "P_equil_atm": cls.get('P_equil_atm', 1.0),
-        "t_equil_ns": cls.get('t_equil_ns', 5.0),
-        "npt_cool_steps": _pick(getattr(args, 'npt_cool_steps', None), cls, 'npt_cool_steps', None),
-        "npt_cool300_steps": _pick(getattr(args, 'npt_cool300_steps', None), cls, 'npt_cool300_steps', None),
+        "t_equil_ns": t_equil_ns_val,
+        "nvt_prod_steps": nvt_prod_steps,
+        "npt_cool_steps": npt_cool_steps_val,
+        "npt_cool300_steps": npt_cool300_steps_val,
+        "npt_prod300_steps": npt_prod300_steps_val,
+        "npt_anneal_cycles": npt_anneal_cycles_val,
+        "npt_anneal_cycle_steps": npt_anneal_cycle_steps_val,
         "npt_prod_ns": npt_prod_ns_val,
         "npt_prod_steps": npt_prod_steps,
         "add_melt_npt": add_melt_npt,
@@ -572,7 +613,14 @@ def equil_prompt(args, cls: dict) -> str:
     else:
         npt_prod_line = (
             "t_npt_prod_ns:     null\n"
-            "npt_prod_steps:    null  # pass as npt_prod_steps=None — null = atom-count-tier default"
+            "npt_prod_steps:    null  # pass as npt_prod_steps=None — null = atom-count-tier default\n"
+            "#   ^ WITH npt_prod_ns UNSET, npt_production (the K_T/density measurement hold)\n"
+            "#     falls to generate_equilibration_workflow's atom-count tier (steps_npt // 2,\n"
+            "#     tiered on n_atoms at <5000 / <15000 / else) — set npt_prod_ns in the plan's\n"
+            "#     decided_params to control it explicitly. nvt_production (the isothermal hold\n"
+            "#     BEFORE this one) is separately governed by t_equil_ns/nvt_prod_steps above —\n"
+            "#     that path is unaffected by npt_prod_ns being unset.\n"
+            "#     Report the executed dwell from the stages' own STAGE COMPLETE step counts."
         )
     if p["add_melt_npt"] and p["melt_npt_ns"] is not None:
         melt_npt_line = (
@@ -593,8 +641,11 @@ def equil_prompt(args, cls: dict) -> str:
             "melt_npt_steps:    null  # pass as melt_npt_steps=None — unused when add_melt_npt=false"
         )
     cool_steps_line = (
-        f"npt_cool_steps:    {_v(p['npt_cool_steps'], 'null')}  # pass as npt_cool_steps= — override, null = atom-count-tier default\n"
-        f"npt_cool300_steps: {_v(p['npt_cool300_steps'], 'null')}  # pass as npt_cool300_steps= — override, null = ~1ns default"
+        f"npt_cool_steps:    {_v(p['npt_cool_steps'], 'null')}  # pass as npt_cool_steps= — raw override (recovery lever) or derived from decided_params.t_cool_ns; null = atom-count-tier default\n"
+        f"npt_cool300_steps: {_v(p['npt_cool300_steps'], 'null')}  # pass as npt_cool300_steps= — raw override or derived from decided_params.t_cool300_ns; null = ~1ns default\n"
+        f"npt_prod300_steps: {_v(p['npt_prod300_steps'], 'null')}  # pass as npt_prod300_steps= — glassy 300K density/K_T/deform measurement hold; raw override or derived from decided_params.t_prod300_ns; null = hardcoded ~2ns default (unchanged for every class today — no class sets t_prod300_ns yet)\n"
+        f"npt_anneal_cycles: {_v(p['npt_anneal_cycles'], 0)}  # pass as npt_anneal_cycles= — class's decided_params.eq_annealing_cycles (0 = standard workflow, no cycles); inserts N cool/heat pairs between npt_pppm and npt_cool\n"
+        f"npt_anneal_cycle_steps: {_v(p['npt_anneal_cycle_steps'], 'null')}  # pass as npt_anneal_cycle_steps= — raw override or derived from decided_params.t_anneal_cycle_ns; null = ~1ns/leg default. Ignored when npt_anneal_cycles is 0."
     )
     if p["phase"] == "melt":
         phase_line = (
@@ -622,6 +673,7 @@ T_equil_K:         {p['T_equil_K']}
 T_workflow_K:      {p['T_workflow_K']}   # pass as temp=
 P_equil_atm:       {p['P_equil_atm']}
 t_equil_ns:        {p['t_equil_ns']}
+nvt_prod_steps:    {p['nvt_prod_steps']}  # pass as nvt_prod_steps= — sizes nvt_production, the isothermal hold at T_equil before any Tg sweep/production measurement. Derived from t_equil_ns above (int(t_equil_ns*1e6/dt_fs)); null only if t_equil_ns itself is null, which takes the atom-count tier default. This is the real knob — set decided_params.t_equil_ns in the plan to control it, never quote t_equil_ns alone as what a run performed.
 T_anneal_high_K:   {p['T_anneal_high_K']}
 {cool_steps_line}
 dt_fs:             {p['dt_fs']}
@@ -1604,6 +1656,14 @@ def main():
     p.add_argument("--npt_cool300_steps", type=int,
                    help="Override npt_cool300 stage step count (default: ~1ns, glassy only). "
                         "re_melt_slow_recool recovery lever — larger = slower cool to 300K")
+    p.add_argument("--npt_prod300_steps", type=int,
+                   help="Override npt_prod300 stage step count (default: ~2ns, glassy only). "
+                        "The 300K density/K_T/deform measurement hold")
+    p.add_argument("--npt_anneal_cycles", type=int,
+                   help="Override the class's decided_params.eq_annealing_cycles (default: 0, "
+                        "no cycles). N cool/heat pairs inserted between npt_pppm and npt_cool")
+    p.add_argument("--npt_anneal_cycle_steps", type=int,
+                   help="Override each annealing-cycle leg's step count (default: ~1ns/leg)")
     p.add_argument("--add_melt_npt", action="store_true", default=False,
                    help="Inject 05b melt isothermal NPT stage for rubbery classes (FF validation only)")
     p.add_argument("--T_equil_K", type=float,

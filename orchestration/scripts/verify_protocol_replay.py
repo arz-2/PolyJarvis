@@ -207,10 +207,14 @@ def verify(run_dir: Path) -> dict:
             polymer_name=run_name, temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
             press=p["P_equil_atm"], use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"],
             use_opls=flags["use_opls"], npt_prod_steps=p["npt_prod_steps"],
+            nvt_prod_steps=p["nvt_prod_steps"],
             add_melt_npt=p["add_melt_npt"],
             t_equil_K=p["T_equil_K"] if p["add_melt_npt"] else None,
             melt_npt_steps=p["melt_npt_steps"], npt_cool_steps=p["npt_cool_steps"],
-            npt_cool300_steps=p["npt_cool300_steps"], extend_steps=None,
+            npt_cool300_steps=p["npt_cool300_steps"], npt_prod300_steps=p["npt_prod300_steps"],
+            npt_anneal_cycles=p["npt_anneal_cycles"],
+            npt_anneal_cycle_steps=p["npt_anneal_cycle_steps"],
+            extend_steps=None,
             engine=p["engine"], velocity_seed=p["velocity_seed"],
         )
         if wf.get("status") != "success":
@@ -223,6 +227,17 @@ def verify(run_dir: Path) -> dict:
                 new = Path(stage["work_dir"]) / f"{name}.in"
                 if orig and new.exists():
                     results.append(compare(orig, new))
+                elif new.exists():
+                    # The plan's decided_params regenerate a stage this run never had on disk —
+                    # a decided_param that changes the deck shape without the original run ever
+                    # having executed it. Report it as divergence, not a silent skip: this is the
+                    # same failure verify_protocol_replay exists to catch, just at the stage-count
+                    # level instead of the per-line level.
+                    results.append({
+                        "deck": f"{name}.in", "clean": False, "kind": "extra_stage",
+                        "diff": [f"+ (new stage, not present in original run at {equil_orig})"],
+                        "n_differences": 1,
+                    })
 
     # ── Tg sweep deck ──
     tg_orig = _newest(list((lammps_dir / "thermal").rglob("tg_sweep.in"))) \

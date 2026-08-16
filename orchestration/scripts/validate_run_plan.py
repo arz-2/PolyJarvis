@@ -306,13 +306,19 @@ def _hardware_findings(plan: dict) -> list:
 
 
 # decided_params that no executor consumes, so setting them changes nothing that runs.
-# Entries require a traced call path, not a name grep: eq_annealing_cycles is listed
-# because generate_equilibration_workflow's signature has no such parameter at all --
-# the workflow performs exactly one heat/compress/cool pass regardless of the value.
+# Entries require a traced call path, not a name grep.
 UNIMPLEMENTED_PARAMS = {
-    "eq_annealing_cycles": ("generate_equilibration_workflow takes no annealing-cycles "
-                            "argument; the workflow runs one heat/compress/cool pass "
-                            "regardless of this value"),
+    "dp_min": ("gen_prompt.py resolves dp only from dp_typical/--dp; dp_min is checked "
+               "against dp_typical solely inside tests/test_polymer_rules_schema.py for "
+               "internal JSON self-consistency, never against a plan's actual dp"),
+    "tg_rates_validation_K_per_ns": ("no script anywhere in the repo reads this key "
+                                     "(gen_prompt.py's tg sweep only reads tg_rates_K_per_ns); "
+                                     "it is class-entry documentation of a wider literature "
+                                     "rate set, never executed"),
+    "tacticity": ("gen_prompt.py never reads a class or decided_params 'tacticity' key; "
+                  "stereoregularity is controlled only by @/@@ markers in the literal SMILES "
+                  "the planner writes, so a decided_params.tacticity value changes nothing "
+                  "the builder does"),
 }
 
 

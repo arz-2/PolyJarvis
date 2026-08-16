@@ -222,8 +222,9 @@ def test_executor_and_chain_agree_on_pinned_steps():
     ]
     args = ec.base_args("X", "PEST", "<none>")
     args._frozen_protocol = {"foundation": {"equil_stages": frozen_stages}}
-    resolver_values = {"npt_prod_steps": None, "npt_cool_steps": None,
-                       "npt_cool300_steps": None, "melt_npt_steps": None}
+    resolver_values = {"npt_prod_steps": None, "nvt_prod_steps": None, "npt_cool_steps": None,
+                       "npt_cool300_steps": None, "npt_prod300_steps": None, "melt_npt_steps": None,
+                       "npt_anneal_cycles": None, "npt_anneal_cycle_steps": None}
 
     executor = rdr._pinned_steps(args, resolver_values)
     chain = ec._pin_steps_from_frozen(frozen_stages)
@@ -288,10 +289,13 @@ def test_reordered_chain_halts():
 def test_pinned_steps_falls_back_without_a_freeze():
     args = ec.base_args("X", "PEST", "<none>")
     args._frozen_protocol = {}
-    out = rdr._pinned_steps(args, {"npt_prod_steps": 7, "npt_cool_steps": 8,
-                                   "npt_cool300_steps": 9, "melt_npt_steps": 10})
-    assert out == {"npt_prod_steps": 7, "npt_cool_steps": 8,
-                   "npt_cool300_steps": 9, "melt_npt_steps": 10}
+    out = rdr._pinned_steps(args, {"npt_prod_steps": 7, "nvt_prod_steps": 11, "npt_cool_steps": 8,
+                                   "npt_cool300_steps": 9, "npt_prod300_steps": 12,
+                                   "melt_npt_steps": 10, "npt_anneal_cycles": 0,
+                                   "npt_anneal_cycle_steps": None})
+    assert out == {"npt_prod_steps": 7, "nvt_prod_steps": 11, "npt_cool_steps": 8,
+                   "npt_cool300_steps": 9, "npt_prod300_steps": 12, "melt_npt_steps": 10,
+                   "npt_anneal_cycles": 0, "npt_anneal_cycle_steps": None}
 
 
 # ── Execution chain ──────────────────────────────────────────────────────────

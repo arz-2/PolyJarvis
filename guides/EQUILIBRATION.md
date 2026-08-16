@@ -67,10 +67,10 @@ equilibrating longer. Catching this at the equil-check gate instead wastes the w
 
 ### Step 2: Generate the equilibration workflow
 
-`velocity_seed`, all five step counts, `temp`, all three force-field flags, and `engine` are
-required arguments. Pass every one from the prompt on every call, including those whose value is
-`null` — omitting an argument is a schema error, not a default, and two runs of the same system
-that differ in which arguments were passed produce different decks.
+`velocity_seed`, all eight step counts, `npt_anneal_cycles`, `temp`, all three force-field flags,
+and `engine` are required arguments. Pass every one from the prompt on every call, including those
+whose value is `null` — omitting an argument is a schema error, not a default, and two runs of the
+same system that differ in which arguments were passed produce different decks.
 
 ```python
 workflow = generate_equilibration_workflow(
@@ -78,8 +78,18 @@ workflow = generate_equilibration_workflow(
     work_dir_base="{work_dir}",
     velocity_seed=velocity_seed,                 # required, never null
     npt_prod_steps=npt_prod_steps,               # required; null = atom-count-tier default
+    nvt_prod_steps=nvt_prod_steps,               # required; sizes nvt_production (the isothermal
+                                                  # hold at T_equil, derived from t_equil_ns);
+                                                  # null = atom-count-tier default
     npt_cool_steps=npt_cool_steps,               # required; null = atom-count-tier default
     npt_cool300_steps=npt_cool300_steps,         # required; null = ~1 ns default
+    npt_prod300_steps=npt_prod300_steps,         # required; sizes npt_prod300 (glassy 300K
+                                                  # density/K_T/deform measurement hold);
+                                                  # null = ~2 ns hardcoded default
+    npt_anneal_cycles=npt_anneal_cycles,         # required; class's decided_params.
+                                                  # eq_annealing_cycles; 0/null = no cycles
+    npt_anneal_cycle_steps=npt_anneal_cycle_steps,  # required; null = ~1 ns/leg default;
+                                                     # ignored when npt_anneal_cycles is 0
     melt_npt_steps=melt_npt_steps,               # required; null = ~1 ns default
     extend_steps=None,                           # required; only extend_only=True calls set it
     polymer_name=polymer_name,
@@ -171,8 +181,9 @@ workflow = generate_equilibration_workflow(
     work_dir_base=work_dir,
     velocity_seed=velocity_seed,          # same seed as the original run
     extend_steps=int(extend_ns * 1e6 / dt_fs),
-    npt_prod_steps=None, npt_cool_steps=None,   # required; unused on this path
-    npt_cool300_steps=None, melt_npt_steps=None,
+    npt_prod_steps=None, nvt_prod_steps=None, npt_cool_steps=None,   # required; unused on this path
+    npt_cool300_steps=None, npt_prod300_steps=None, melt_npt_steps=None,
+    npt_anneal_cycles=None, npt_anneal_cycle_steps=None,             # required; unused on this path
     use_pcff=..., use_opls=..., use_trappe=...,
     temp=npt_prod_temp_K,   # see Rules above — NOT T_equil_K/T_workflow_K
     press=<same as original run>,

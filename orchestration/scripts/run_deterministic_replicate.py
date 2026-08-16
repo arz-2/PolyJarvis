@@ -303,9 +303,13 @@ def _pinned_steps(args, p: dict) -> dict:
         (_frozen(args).get("foundation") or {}).get("equil_stages"))
     return {
         "npt_prod_steps": pinned.get("npt_production", p["npt_prod_steps"]),
+        "nvt_prod_steps": pinned.get("nvt_production", p["nvt_prod_steps"]),
         "npt_cool_steps": pinned.get("npt_cool", p["npt_cool_steps"]),
         "npt_cool300_steps": pinned.get("npt_cool300", p["npt_cool300_steps"]),
+        "npt_prod300_steps": pinned.get("npt_prod300", p["npt_prod300_steps"]),
         "melt_npt_steps": pinned.get("npt_melt", p["melt_npt_steps"]),
+        "npt_anneal_cycles": p["npt_anneal_cycles"],
+        "npt_anneal_cycle_steps": pinned.get("npt_anneal_cool_1", p["npt_anneal_cycle_steps"]),
     }
 
 
@@ -486,9 +490,13 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             polymer_name=args.run_name, temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
             press=p["P_equil_atm"], use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"],
             use_opls=flags["use_opls"], npt_prod_steps=steps["npt_prod_steps"],
+            nvt_prod_steps=steps["nvt_prod_steps"],
             add_melt_npt=p["add_melt_npt"], t_equil_K=p["T_equil_K"] if p["add_melt_npt"] else None,
             melt_npt_steps=steps["melt_npt_steps"], engine=p["engine"], velocity_seed=velocity_seed,
             npt_cool_steps=steps["npt_cool_steps"], npt_cool300_steps=steps["npt_cool300_steps"],
+            npt_prod300_steps=steps["npt_prod300_steps"],
+            npt_anneal_cycles=steps["npt_anneal_cycles"],
+            npt_anneal_cycle_steps=steps["npt_anneal_cycle_steps"],
             extend_steps=None,
         )
     else:
@@ -499,8 +507,9 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             temp=extend_temp, press=p["P_equil_atm"], use_pcff=flags["use_pcff"],
             use_trappe=flags["use_trappe"], use_opls=flags["use_opls"], engine=p["engine"],
             velocity_seed=velocity_seed, extend_only=True, extend_steps=extend_steps,
-            npt_prod_steps=None, npt_cool_steps=None, npt_cool300_steps=None,
-            melt_npt_steps=None,
+            npt_prod_steps=None, nvt_prod_steps=None, npt_cool_steps=None, npt_cool300_steps=None,
+            npt_prod300_steps=None, melt_npt_steps=None,
+            npt_anneal_cycles=None, npt_anneal_cycle_steps=None,
         )
     if workflow.get("status") == "error":
         raise SystemExit(f"generate_equilibration_workflow failed: {workflow}")
@@ -951,10 +960,14 @@ def _emit_decks(args, cls: dict, properties: set, out_dir: Path,
         work_dir_base=str(out_dir / "equil"), polymer_name=args.run_name,
         temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"], press=p["P_equil_atm"],
         use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
-        npt_prod_steps=steps["npt_prod_steps"], add_melt_npt=p["add_melt_npt"],
+        npt_prod_steps=steps["npt_prod_steps"], nvt_prod_steps=steps["nvt_prod_steps"],
+        add_melt_npt=p["add_melt_npt"],
         t_equil_K=p["T_equil_K"] if p["add_melt_npt"] else None,
         melt_npt_steps=steps["melt_npt_steps"], npt_cool_steps=steps["npt_cool_steps"],
-        npt_cool300_steps=steps["npt_cool300_steps"], extend_steps=None,
+        npt_cool300_steps=steps["npt_cool300_steps"], npt_prod300_steps=steps["npt_prod300_steps"],
+        npt_anneal_cycles=steps["npt_anneal_cycles"],
+        npt_anneal_cycle_steps=steps["npt_anneal_cycle_steps"],
+        extend_steps=None,
         engine=p["engine"], velocity_seed=p["velocity_seed"],
     )
     if wf.get("status") == "success":

@@ -1366,8 +1366,12 @@ def generate_equilibration_workflow(
     work_dir_base: str,
     velocity_seed: int,
     npt_prod_steps: Optional[int],
+    nvt_prod_steps: Optional[int],
     npt_cool_steps: Optional[int],
     npt_cool300_steps: Optional[int],
+    npt_prod300_steps: Optional[int],
+    npt_anneal_cycles: Optional[int],
+    npt_anneal_cycle_steps: Optional[int],
     melt_npt_steps: Optional[int],
     extend_steps: Optional[int],
     temp: float,
@@ -1413,6 +1417,10 @@ def generate_equilibration_workflow(
       npt_cool         - NPT cool t_equil_K → temp  (replaces standard npt_cool)
       Runs 6–7: unchanged
 
+    With npt_anneal_cycles=N (N>0): N cool/heat pairs (npt_anneal_cool_i, npt_anneal_heat_i)
+      inserted between npt_pppm and npt_cool (or npt_cool_melt, if add_melt_npt also fires).
+      Chain ends back at max_temp, so the existing cooling stage's T_START is unaffected.
+
     Required args — no defaults. Every step count and the velocity seed must be passed on
     every call, including as an explicit null where the value does not apply to this path.
     Omitting one is what let two identically-prompted runs of the same system emit different
@@ -1427,6 +1435,11 @@ def generate_equilibration_workflow(
         npt_prod_steps: REQUIRED. Step count for npt_production. Pass null to take the
                         atom-count tier default (steps_npt // 2). Convert from ns:
                         int(t_ns * 1e6 / dt_fs).
+        nvt_prod_steps: REQUIRED. Step count for nvt_production — the isothermal hold at
+                        `temp` before any Tg sweep or production measurement begins
+                        (`t_equil_ns` in polymer_rules.json: "Equilibration time at T_equil
+                        before Tg sweep begins"). Pass null to take the atom-count tier
+                        default (steps_nvt). Convert from ns: int(t_equil_ns * 1e6 / dt_fs).
         npt_cool_steps: REQUIRED. Step count for the npt_cool stage (max_temp→temp, or the
                         t_equil_K→temp leg when add_melt_npt=True). Pass null to take
                         steps_npt from the atom-count tier — the cooling ramp then runs at the
@@ -1438,6 +1451,19 @@ def generate_equilibration_workflow(
                         T_workflow→300 K). Pass null to take int(1.0e6/dt_prod) (~1 ns), fixed
                         regardless of cell size or T_workflow. Pass a larger value to slow the
                         final cool to 300 K — the other re_melt_slow_recool lever.
+        npt_prod300_steps: REQUIRED. Step count for npt_prod300 (glassy only, the 300 K
+                        density/K_T/deform measurement hold — analogous to npt_prod_steps for
+                        rubbery). Pass null to take int(2.0e6/dt_prod) (~2 ns), fixed regardless
+                        of cell size, T_workflow, or class. Convert from ns:
+                        int(t_ns * 1e6 / dt_fs).
+        npt_anneal_cycles: REQUIRED. Number of heat/cool annealing cycles inserted between
+                        npt_pppm and npt_cool. Pass null or 0 for the standard workflow (no
+                        cycles). Each cycle is a cool leg (max_temp→temp) followed by a heat
+                        leg (temp→max_temp), so the chain returns to max_temp before the
+                        existing npt_cool stage runs its own final descent.
+        npt_anneal_cycle_steps: REQUIRED. Step count for each leg of each annealing cycle.
+                        Pass null to take int(1.0e6/dt_prod) (~1 ns/leg). Ignored when
+                        npt_anneal_cycles is null or 0.
         melt_npt_steps: REQUIRED. Step count for the npt_melt isothermal run. Pass null to
                         take int(1.0e6 / dt_prod) (≈1 ns at the production timestep). Ignored
                         unless add_melt_npt=True.
@@ -1714,6 +1740,46 @@ def generate_equilibration_workflow(
         }, s3["output_data"])
         stages.append(s4)
 
+        # npt_anneal cycles — N cool/heat pairs at max_temp<->temp, inserted while the chain is
+        # still at max_temp (end of npt_pppm) and before the cooling stage(s) below. Each cycle
+        # returns the chain to max_temp, so npt_cool/npt_cool_melt's own T_START is unaffected —
+        # this only adds thermal cycling ahead of the existing single descent.
+        _n_anneal = int(npt_anneal_cycles) if npt_anneal_cycles else 0
+        _anneal_steps = (int(npt_anneal_cycle_steps) if npt_anneal_cycle_steps is not None
+                          else int(1.0e6 / dt_prod))
+        _anneal_input = s4["output_data"]
+        for _i in range(1, _n_anneal + 1):
+            s_ac = _stage(f"npt_anneal_cool_{_i}", "npt", {
+                "T_START":   max_temp,
+                "T_FINAL":   temp,
+                "T_DAMP":    100.0,
+                "P_START":   press,
+                "P_FINAL":   press,
+                "P_DAMP":    1000.0,
+                "TIMESTEP":  dt_prod,
+                "N_STEPS":   _anneal_steps,
+                "use_pppm":  True,
+                "use_gpu":   True,
+                "write_restart": False,
+            }, _anneal_input)
+            stages.append(s_ac)
+            s_ah = _stage(f"npt_anneal_heat_{_i}", "npt", {
+                "T_START":   temp,
+                "T_FINAL":   max_temp,
+                "T_DAMP":    100.0,
+                "P_START":   press,
+                "P_FINAL":   press,
+                "P_DAMP":    1000.0,
+                "TIMESTEP":  dt_prod,
+                "N_STEPS":   _anneal_steps,
+                "use_pppm":  True,
+                "use_gpu":   True,
+                "write_restart": False,
+            }, s_ac["output_data"])
+            stages.append(s_ah)
+            _anneal_input = s_ah["output_data"]
+        s4_data = _anneal_input
+
         # npt_cool — NPT cool to target temp.
         # With add_melt_npt=True: split into npt_cool_melt/npt_melt/npt_cool to capture an
         # isothermal NPT hold at t_equil_K. That hold is the melt-density extraction target for
@@ -1756,7 +1822,7 @@ def generate_equilibration_workflow(
                 "use_pppm":  True,
                 "use_gpu":   True,
                 "write_restart": True,
-            }, s4["output_data"])
+            }, s4_data)
             stages.append(s5a)
             s5b = _stage("npt_melt", "npt", {
                 "T_START":   t_equil_K,
@@ -1802,16 +1868,18 @@ def generate_equilibration_workflow(
                 "use_pppm":  True,
                 "use_gpu":   True,
                 "write_restart": True,
-            }, s4["output_data"])
+            }, s4_data)
             stages.append(s5)
 
-        # nvt_production — NVT production, GPU + PPPM
+        # nvt_production — NVT production, GPU + PPPM. This is the isothermal hold at T_equil
+        # before any Tg sweep/production measurement — the quantity t_equil_ns names.
+        steps_nvt_prod = nvt_prod_steps if nvt_prod_steps is not None else steps_nvt
         s6 = _stage("nvt_production", "nvt", {
             "T_START":   temp,
             "T_FINAL":   temp,
             "T_DAMP":    100.0,
             "TIMESTEP":  dt_prod,
-            "N_STEPS":   steps_nvt,
+            "N_STEPS":   steps_nvt_prod,
             "use_pppm":  True,
             "use_gpu":   True,
             "write_restart": False,
@@ -1844,7 +1912,7 @@ def generate_equilibration_workflow(
         s8 = s9 = None
         if _add_300k:
             steps_cool300 = npt_cool300_steps if npt_cool300_steps is not None else int(1.0e6 / dt_prod)   # ~1 ns default
-            steps_prod300 = int(2.0e6 / dt_prod)   # ~2 ns
+            steps_prod300 = npt_prod300_steps if npt_prod300_steps is not None else int(2.0e6 / dt_prod)   # ~2 ns default
             s8 = _stage("npt_cool300", "npt", {
                 "T_START":       temp,
                 "T_FINAL":       300.0,
@@ -1882,7 +1950,7 @@ def generate_equilibration_workflow(
         if _use_melt_npt and temp <= 300.0:
             _npt_tg_prep = s5b["output_data"]     # npt_melt at t_equil_K — well-relaxed melt
         elif temp <= 300.0:
-            _npt_tg_prep = s4["output_data"]       # fallback: npt_pppm at max_temp
+            _npt_tg_prep = s4_data       # fallback: npt_pppm (or post-anneal) at max_temp
         else:
             _npt_tg_prep = None                    # glassy: use npt_prod300 (separate key)
 
