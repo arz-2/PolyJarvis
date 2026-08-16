@@ -33,36 +33,84 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "dp_typical": (20, 1000),
     "nchain": (1, 500),
     "density_initial_gcm3": (0.05, 3.0),
+    "build_temperature_K": (1, 2000),
     "dt_fs": (0.1, 5.0),
     "T_equil_K": (100, 1500),
     "annealing_T_high_K": (100, 2000),
     "T_workflow_K": (100, 1500),
+    "P_equil_atm": (0.01, 100000),
+    "t_equil_ns": (0.01, 1000),
+    "eq_annealing_cycles": (0, 50),
+    "anneal_cycle_ns": (0.001, 1000),
+    "compression_max_pressure_atm": (1, 1_000_000),
     "npt_prod_ns": (0.05, 1000),
+    "npt_prod300_ns": (0.01, 1000),
     "npt_cool_steps": (1, 2_000_000_000),
     "npt_cool300_steps": (1, 2_000_000_000),
     "melt_hold_ns": (0.01, 1000),
     "melt_only_continuation_ns": (0.01, 1000),
+    "melt_npt_ns": (0.01, 1000),
+    "thermostat_damp_fs": (1, 100000),
+    "barostat_damp_fs": (1, 1_000_000),
+    "alpha_glass_per_K": (0.0, 0.1),
+    "alpha_melt_per_K": (0.0, 0.1),
+    "ct_min_decay_melt": (0.0, 1.0),
     "tg_t_high_K": (100, 2000),
     "tg_t_low_K": (1, 1500),
     "tg_t_step_K": (1, 200),
     "tg_min_steps_per_T": (1, 2_000_000_000),
     "tg_steps_per_t": (1, 2_000_000_000),
+    "tg_primary_rate_index": (0, 100),
     "K_strain_max": (0.001, 0.25),
     "K_deform_rate_inv_s": (1e3, 1e12),
     "K_deform_rate_slow_inv_s": (1e3, 1e12),
+    "deform_eq_steps": (0, 2_000_000_000),
+    "deform_strain_start": (0.0, 0.25),
+    "deform_avg_window": (1, 10_000_000),
+    "bm_npt_steps": (1, 2_000_000_000),
+    "bm_temperature_K": (1, 2000),
+    "bm_thermo_freq": (1, 10_000_000),
     "cutoff_A": (3, 30),
+    "emc_seed": (1, 999_999_999),
+    "velocity_seed": (1, 999_999_999),
     "gpu_per_run": (0, 16),
     "mpi_ranks": (1, 256),
 }
 ENUM_OVERRIDES = {
     "preferred_builder": frozenset({"emc", "radonpy"}),
     "preferred_ff": frozenset({"pcff", "pcff_ore", "compass", "opls/2024/opls-aa", "trappe", "gaff2", "gaff2_mod"}),
-    "charge_method": frozenset({"none", "embedded", "gasteiger", "am1bcc", "resp"}),
+    "charge_method": frozenset({"none", "embedded", "bond-increment", "opls-library",
+                                  "gasteiger", "am1bcc", "am1-bcc", "resp"}),
     "electrostatics": frozenset({"pppm", "lj_cut"}),
     "engine": frozenset({"gpu", "kokkos", "cpu"}),
+    "tg_slope_gate_fallback": frozenset({"highest_rate", "slowest_rate"}),
+    "mechanical_method": frozenset({"murnaghan", "deformation"}),
 }
 SEQUENCE_OVERRIDES = frozenset({"tg_rates_K_per_ns", "bm_pressures_atm", "backbone_types"})
-ALLOWED_OVERRIDES = frozenset(OVERRIDE_RANGES) | frozenset(ENUM_OVERRIDES) | SEQUENCE_OVERRIDES
+BOOLEAN_OVERRIDES = frozenset({"add_melt_npt", "add_300k_production", "ct_gate_reliable"})
+INTEGER_OVERRIDES = frozenset({
+    "dp_typical", "nchain", "eq_annealing_cycles", "npt_cool_steps",
+    "npt_cool300_steps", "tg_min_steps_per_T", "tg_steps_per_t",
+    "deform_eq_steps", "deform_avg_window", "bm_npt_steps", "bm_thermo_freq",
+    "emc_seed", "velocity_seed", "gpu_per_run", "mpi_ranks", "tg_primary_rate_index",
+})
+ALLOWED_OVERRIDES = (frozenset(OVERRIDE_RANGES) | frozenset(ENUM_OVERRIDES) |
+                     SEQUENCE_OVERRIDES | BOOLEAN_OVERRIDES)
+
+
+def planning_parameter_contract() -> dict[str, dict[str, Any]]:
+    """Machine-readable scientific knobs available to planning and recovery agents."""
+    contract = {
+        key: {"type": "integer" if key in INTEGER_OVERRIDES else "number",
+              "minimum": bounds[0], "maximum": bounds[1]}
+        for key, bounds in OVERRIDE_RANGES.items()
+    }
+    contract.update({key: {"type": "enum", "values": sorted(values)}
+                     for key, values in ENUM_OVERRIDES.items()})
+    contract.update({key: {"type": "number_list", "nonempty": True}
+                     for key in SEQUENCE_OVERRIDES})
+    contract.update({key: {"type": "boolean"} for key in BOOLEAN_OVERRIDES})
+    return contract
 
 
 @dataclass(frozen=True)
@@ -189,7 +237,7 @@ class SubprocessPlanningAgent:
                 "polymer_class": "configured class id",
                 "properties": sorted(VALID_PROPERTIES),
                 "rationale": ["scientific decision rationale"],
-                "overrides": {"allowed_keys": sorted(ALLOWED_OVERRIDES)},
+                "overrides": planning_parameter_contract(),
                 "decision_evaluations": {
                     "D-01_ff": {
                         "criteria_evaluated": ["policy criterion"],
@@ -218,7 +266,7 @@ class SubprocessRecoveryAgent:
             "output_contract": {
                 "action": sorted(VALID_RECOVERY_ACTIONS),
                 "rationale": "diagnosis and justification",
-                "modifications": {"allowed_keys": sorted(ALLOWED_OVERRIDES)},
+                "modifications": planning_parameter_contract(),
             },
         })
         return RecoveryDecision.from_dict(result)
@@ -269,6 +317,7 @@ def planning_context(intent: ScientificIntent) -> dict[str, Any]:
             "Prefer class defaults unless the goal or chemistry justifies an override.",
             "Name assumptions and one dominant uncertainty.",
         ],
+        "planning_parameters": planning_parameter_contract(),
     }
 
 
@@ -280,6 +329,7 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     rules = load_rules()
     class_entry = dict(get_class_entry(rules, decision.polymer_class, warn_on_miss=False))
     effective_class = {**class_entry, **decision.overrides}
+    _validate_protocol_relationships(effective_class, set(decision.overrides))
     plan["decided_params"].update(decision.overrides)
     if "T_equil_K" in decision.overrides and "T_workflow_K" not in decision.overrides:
         plan["decided_params"]["T_workflow_K"] = decision.overrides["T_equil_K"]
@@ -346,6 +396,7 @@ def apply_recovery(plan: dict, decision: RecoveryDecision) -> dict:
         )
     class_entry = dict(get_class_entry(load_rules(), revised["polymer_class"], warn_on_miss=False))
     effective_class = {**class_entry, **decided_params}
+    _validate_protocol_relationships(effective_class, set(decision.modifications))
     revised["planned_stages"] = build_planned_stages(
         effective_class, set(revised.get("properties", []))
     )
@@ -560,16 +611,73 @@ def _validate_overrides(overrides: dict[str, Any]) -> None:
         if key in OVERRIDE_RANGES:
             if not isinstance(value, (int, float)) or isinstance(value, bool):
                 raise ValueError(f"{key} must be numeric")
+            if key in INTEGER_OVERRIDES and not isinstance(value, int):
+                raise ValueError(f"{key} must be an integer")
             lower, upper = OVERRIDE_RANGES[key]
             if lower is not None and value < lower or upper is not None and value > upper:
                 raise ValueError(f"{key}={value} outside allowed range [{lower}, {upper}]")
         elif key in ENUM_OVERRIDES and value not in ENUM_OVERRIDES[key]:
             raise ValueError(f"{key}={value!r} not in {sorted(ENUM_OVERRIDES[key])}")
+        elif key in BOOLEAN_OVERRIDES and not isinstance(value, bool):
+            raise ValueError(f"{key} must be boolean")
         elif key in SEQUENCE_OVERRIDES:
             if not isinstance(value, list) or not value:
                 raise ValueError(f"{key} must be a non-empty JSON list")
             if not all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value):
                 raise ValueError(f"{key} values must be numeric")
+            if key in {"tg_rates_K_per_ns", "backbone_types"} and any(item <= 0 for item in value):
+                raise ValueError(f"{key} values must be positive")
+
+
+def _validate_protocol_relationships(parameters: dict[str, Any], changed: set[str]) -> None:
+    """Reject internally inconsistent plans before any files or jobs are created."""
+    t_low = parameters.get("tg_t_low_K")
+    t_high = parameters.get("tg_t_high_K")
+    if ({"tg_t_low_K", "tg_t_high_K"} & changed and
+            t_low is not None and t_high is not None and t_low >= t_high):
+        raise ValueError("tg_t_low_K must be lower than tg_t_high_K")
+
+    strain_start = parameters.get("deform_strain_start")
+    strain_max = parameters.get("K_strain_max")
+    if ({"deform_strain_start", "K_strain_max"} & changed and
+            strain_start is not None and strain_max is not None and strain_start >= strain_max):
+        raise ValueError("deform_strain_start must be lower than K_strain_max")
+
+    fast_rate = parameters.get("K_deform_rate_inv_s")
+    slow_rate = parameters.get("K_deform_rate_slow_inv_s")
+    if ({"K_deform_rate_inv_s", "K_deform_rate_slow_inv_s"} & changed and
+            fast_rate is not None and slow_rate is not None and slow_rate > fast_rate):
+        raise ValueError("K_deform_rate_slow_inv_s cannot exceed K_deform_rate_inv_s")
+
+    rates = parameters.get("tg_rates_K_per_ns") or []
+    primary_index = parameters.get("tg_primary_rate_index")
+    if ({"tg_primary_rate_index", "tg_rates_K_per_ns"} & changed and
+            primary_index is not None and not 0 <= primary_index < len(rates)):
+        raise ValueError(
+            f"tg_primary_rate_index={primary_index} outside planned rate list of length {len(rates)}"
+        )
+    if rates and ({"tg_rates_K_per_ns", "dt_fs", "tg_t_step_K",
+                   "tg_min_steps_per_T"} & changed):
+        dt_fs = parameters.get("dt_fs", 1.0)
+        t_step = parameters.get("tg_t_step_K", 20.0)
+        minimum_steps = parameters.get("tg_min_steps_per_T", 200000)
+        infeasible = [rate for rate in rates
+                      if t_step / (rate * dt_fs * 1e-6) < minimum_steps - 1]
+        if infeasible:
+            raise ValueError(
+                "tg_rates_K_per_ns contains rates that violate tg_min_steps_per_T: "
+                f"{infeasible}"
+            )
+
+    pressures = parameters.get("bm_pressures_atm")
+    if pressures is not None and "bm_pressures_atm" in changed:
+        unique = set(pressures)
+        positive = {pressure for pressure in unique if pressure > 0}
+        if len(unique) < 4 or 0 not in unique or len(positive) < 2:
+            raise ValueError(
+                "bm_pressures_atm must contain at least four unique points, including zero "
+                "and at least two positive pressures"
+            )
 
 
 def _plan_summary(plan: dict) -> dict:

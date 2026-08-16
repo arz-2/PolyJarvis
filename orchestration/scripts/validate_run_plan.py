@@ -298,15 +298,10 @@ def _hardware_findings(plan: dict) -> list:
     return findings
 
 
-# decided_params that no executor consumes, so setting them changes nothing that runs.
-# Entries require a traced call path, not a name grep: eq_annealing_cycles is listed
-# because generate_equilibration_workflow's signature has no such parameter at all --
-# the workflow performs exactly one heat/compress/cool pass regardless of the value.
-UNIMPLEMENTED_PARAMS = {
-    "eq_annealing_cycles": ("generate_equilibration_workflow takes no annealing-cycles "
-                            "argument; the workflow runs one heat/compress/cool pass "
-                            "regardless of this value"),
-}
+# Parameters may be listed here only after a complete plan→resolver→executor trace proves
+# that the declared value cannot affect a generated deck. Keep the map empty while every
+# currently advertised planning parameter has an executable consumer.
+UNIMPLEMENTED_PARAMS = {}
 
 
 # decided_params that ARE wired, but that another decided_param silently overrides. The plan

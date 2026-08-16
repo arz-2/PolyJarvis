@@ -1335,10 +1335,15 @@ def generate_equilibration_workflow(
     work_dir_base: str,
     velocity_seed: int,
     npt_prod_steps: Optional[int],
+    nvt_prod_steps: Optional[int],
+    npt_prod300_steps: Optional[int],
     npt_cool_steps: Optional[int],
     npt_cool300_steps: Optional[int],
     melt_npt_steps: Optional[int],
     extend_steps: Optional[int],
+    anneal_cycles: int,
+    anneal_cycle_steps: Optional[int],
+    use_long_range: bool,
     temp: float,
     use_pcff: bool,
     use_trappe: bool,
@@ -1355,6 +1360,8 @@ def generate_equilibration_workflow(
     t_equil_K: Optional[float] = None,
     add_300k_production: bool = True,
     extend_only: bool = False,
+    thermostat_damp_fs: float = 100.0,
+    barostat_damp_fs: float = 1000.0,
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
@@ -1396,6 +1403,14 @@ def generate_equilibration_workflow(
         npt_prod_steps: REQUIRED. Step count for npt_production. Pass null to take the
                         atom-count tier default (steps_npt // 2). Convert from ns:
                         int(t_ns * 1e6 / dt_fs).
+        nvt_prod_steps: REQUIRED. NVT production/equilibration steps. Pass null for the
+                        deterministic atom-count tier default.
+        npt_prod300_steps: REQUIRED. Final 300 K NPT production steps for glassy systems.
+                           Pass null for the documented ~2 ns default.
+        anneal_cycles: REQUIRED. Number of complete 300 K→max_temp→300 K NVT annealing
+                       cycles before the final heat/compression sequence. Zero disables them.
+        anneal_cycle_steps: REQUIRED, may be null. Steps in each heat and cool leg; null
+                            selects the deterministic atom-count heat tier.
         npt_cool_steps: REQUIRED. Step count for the npt_cool stage (max_temp→temp, or the
                         t_equil_K→temp leg when add_melt_npt=True). Pass null to take
                         steps_npt from the atom-count tier — the cooling ramp then runs at the
@@ -1477,6 +1492,10 @@ def generate_equilibration_workflow(
                          "chain cannot be reproduced. Draw one seed per run, pass it here, and "
                          "record it in run_log.md.",
             }
+        if not isinstance(anneal_cycles, int) or isinstance(anneal_cycles, bool) or anneal_cycles < 0:
+            return {"status": "error", "error": "anneal_cycles must be a non-negative integer"}
+        if thermostat_damp_fs <= 0 or barostat_damp_fs <= 0:
+            return {"status": "error", "error": "thermostat/barostat damping must be positive"}
 
         # Parse data file to get system info
         content = Path(data_file).read_text(encoding="utf-8")
@@ -1593,10 +1612,11 @@ def generate_equilibration_workflow(
         if extend_only:
             ext_steps = int(extend_steps) if extend_steps else int(1.0e6 / dt_prod)  # ~1 ns default
             sx = _stage("npt_extend", "npt", {
-                "T_START": temp, "T_FINAL": temp, "T_DAMP": 100.0,
-                "P_START": press, "P_FINAL": press, "P_DAMP": 1000.0,
+                "T_START": temp, "T_FINAL": temp, "T_DAMP": thermostat_damp_fs,
+                "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
                 "TIMESTEP": dt_prod, "N_STEPS": ext_steps,
-                "use_pppm": not use_trappe, "use_gpu": True, "write_restart": False,
+                "use_pppm": use_long_range and not use_trappe,
+                "use_gpu": True, "write_restart": False,
             }, data_file)
             stages.append(sx)
             return {
@@ -1625,25 +1645,47 @@ def generate_equilibration_workflow(
 
         # minimize
         s1 = _stage("minimize", "minimize", {
-            "use_pppm":  True,
+            "use_pppm":  use_long_range and not use_trappe,
             "use_gpu":   True,
             "MIN_STYLE": "cg",
             "MAXITER":   50000,
         }, data_file)
         stages.append(s1)
 
+        # Complete, explicitly counted thermal-annealing cycles. Each cycle returns to
+        # 300 K; the existing nvt_softheat stage then performs the final heat to max_temp
+        # before compression. Names are stable and unique for immutable attempt manifests.
+        anneal_prev = s1
+        anneal_steps = int(anneal_cycle_steps) if anneal_cycle_steps else steps_heat
+        for cycle_index in range(1, anneal_cycles + 1):
+            heat = _stage(f"anneal_{cycle_index:02d}_heat", "nvt", {
+                "T_START": 300.0, "T_FINAL": max_temp,
+                "T_DAMP": thermostat_damp_fs, "TIMESTEP": dt_prod,
+                "N_STEPS": anneal_steps, "use_pppm": use_long_range and not use_trappe,
+                "use_gpu": True, "write_restart": True,
+            }, anneal_prev["output_data"])
+            stages.append(heat)
+            cool = _stage(f"anneal_{cycle_index:02d}_cool", "nvt", {
+                "T_START": max_temp, "T_FINAL": 300.0,
+                "T_DAMP": thermostat_damp_fs, "TIMESTEP": dt_prod,
+                "N_STEPS": anneal_steps, "use_pppm": use_long_range and not use_trappe,
+                "use_gpu": True, "write_restart": True,
+            }, heat["output_data"])
+            stages.append(cool)
+            anneal_prev = cool
+
         # nvt_softheat — GPU + PPPM throughout
         s2 = _stage("nvt_softheat", "nvt", {
             "T_START":    300.0,
             "T_FINAL":    max_temp,
-            "T_DAMP":     50.0,
+            "T_DAMP":     thermostat_damp_fs,
             "TIMESTEP":   0.5,
             "N_STEPS":    steps_comp,
-            "use_pppm":   True,
+            "use_pppm":   use_long_range and not use_trappe,
             "use_gpu":    True,
             "use_shake":  False,
             "init_velocity": 300.0,
-        }, s1["output_data"])
+        }, anneal_prev["output_data"])
         stages.append(s2)
 
         # npt_compress — NPT compression to target density.
@@ -1655,10 +1697,10 @@ def generate_equilibration_workflow(
         s3 = _stage("npt_compress", "npt_compress", {
             "T_START":   max_temp,
             "T_FINAL":   max_temp,
-            "T_DAMP":    100.0,
+            "T_DAMP":    thermostat_damp_fs,
             "P_START":   1.0,
             "P_FINAL":   max_press,
-            "P_DAMP":    1000.0,
+            "P_DAMP":    barostat_damp_fs,
             "TIMESTEP":  0.5,
             "N_STEPS":   steps_comp,
             "use_pppm":  False,
@@ -1671,13 +1713,13 @@ def generate_equilibration_workflow(
         s4 = _stage("npt_pppm", "npt", {
             "T_START":   max_temp,
             "T_FINAL":   max_temp,
-            "T_DAMP":    100.0,
+            "T_DAMP":    thermostat_damp_fs,
             "P_START":   max_press,
             "P_FINAL":   press,
-            "P_DAMP":    1000.0,
+            "P_DAMP":    barostat_damp_fs,
             "TIMESTEP":  dt_prod,
             "N_STEPS":   steps_comp,
-            "use_pppm":  True,
+            "use_pppm":  use_long_range and not use_trappe,
             "use_gpu":   True,
             "write_restart": True,
         }, s3["output_data"])
@@ -1697,13 +1739,13 @@ def generate_equilibration_workflow(
             s5a = _stage("npt_cool_melt", "npt", {
                 "T_START":   max_temp,
                 "T_FINAL":   t_equil_K,
-                "T_DAMP":    100.0,
+                "T_DAMP":    thermostat_damp_fs,
                 "P_START":   press,
                 "P_FINAL":   press,
-                "P_DAMP":    1000.0,
+                "P_DAMP":    barostat_damp_fs,
                 "TIMESTEP":  dt_prod,
                 "N_STEPS":   steps_npt // 2,
-                "use_pppm":  True,
+                "use_pppm":  use_long_range and not use_trappe,
                 "use_gpu":   True,
                 "write_restart": True,
             }, s4["output_data"])
@@ -1711,13 +1753,13 @@ def generate_equilibration_workflow(
             s5b = _stage("npt_melt", "npt", {
                 "T_START":   t_equil_K,
                 "T_FINAL":   t_equil_K,
-                "T_DAMP":    100.0,
+                "T_DAMP":    thermostat_damp_fs,
                 "P_START":   press,
                 "P_FINAL":   press,
-                "P_DAMP":    1000.0,
+                "P_DAMP":    barostat_damp_fs,
                 "TIMESTEP":  dt_prod,
                 "N_STEPS":   _melt_steps,
-                "use_pppm":  True,
+                "use_pppm":  use_long_range and not use_trappe,
                 "use_gpu":   True,
                 "write_restart": True,
             }, s5a["output_data"])
@@ -1725,13 +1767,13 @@ def generate_equilibration_workflow(
             s5 = _stage("npt_cool", "npt", {
                 "T_START":   t_equil_K,
                 "T_FINAL":   temp,
-                "T_DAMP":    100.0,
+                "T_DAMP":    thermostat_damp_fs,
                 "P_START":   press,
                 "P_FINAL":   press,
-                "P_DAMP":    1000.0,
+                "P_DAMP":    barostat_damp_fs,
                 "TIMESTEP":  dt_prod,
                 "N_STEPS":   _cool_steps,
-                "use_pppm":  True,
+                "use_pppm":  use_long_range and not use_trappe,
                 "use_gpu":   True,
                 "write_restart": True,
             }, s5b["output_data"])
@@ -1740,13 +1782,13 @@ def generate_equilibration_workflow(
             s5 = _stage("npt_cool", "npt", {
                 "T_START":   max_temp,
                 "T_FINAL":   temp,
-                "T_DAMP":    100.0,
+                "T_DAMP":    thermostat_damp_fs,
                 "P_START":   press,
                 "P_FINAL":   press,
-                "P_DAMP":    1000.0,
+                "P_DAMP":    barostat_damp_fs,
                 "TIMESTEP":  dt_prod,
                 "N_STEPS":   _cool_steps,
-                "use_pppm":  True,
+                "use_pppm":  use_long_range and not use_trappe,
                 "use_gpu":   True,
                 "write_restart": True,
             }, s4["output_data"])
@@ -1756,10 +1798,10 @@ def generate_equilibration_workflow(
         s6 = _stage("nvt_production", "nvt", {
             "T_START":   temp,
             "T_FINAL":   temp,
-            "T_DAMP":    100.0,
+            "T_DAMP":    thermostat_damp_fs,
             "TIMESTEP":  dt_prod,
-            "N_STEPS":   steps_nvt,
-            "use_pppm":  True,
+            "N_STEPS":   nvt_prod_steps if nvt_prod_steps is not None else steps_nvt,
+            "use_pppm":  use_long_range and not use_trappe,
             "use_gpu":   True,
             "write_restart": False,
         }, s5["output_data"])
@@ -1772,13 +1814,13 @@ def generate_equilibration_workflow(
         s7 = _stage("npt_production", "npt", {
             "T_START":       temp,
             "T_FINAL":       temp,
-            "T_DAMP":        100.0,
+            "T_DAMP":        thermostat_damp_fs,
             "P_START":       press,
             "P_FINAL":       press,
-            "P_DAMP":        1000.0,
+            "P_DAMP":        barostat_damp_fs,
             "TIMESTEP":      dt_prod,
             "N_STEPS":       steps_npt_prod,
-            "use_pppm":      True,
+            "use_pppm":      use_long_range and not use_trappe,
             "use_gpu":       True,
             "write_restart": False,
         }, s6["output_data"])
@@ -1791,17 +1833,18 @@ def generate_equilibration_workflow(
         s8 = s9 = None
         if _add_300k:
             steps_cool300 = npt_cool300_steps if npt_cool300_steps is not None else int(1.0e6 / dt_prod)   # ~1 ns default
-            steps_prod300 = int(2.0e6 / dt_prod)   # ~2 ns
+            steps_prod300 = (npt_prod300_steps if npt_prod300_steps is not None
+                             else int(2.0e6 / dt_prod))
             s8 = _stage("npt_cool300", "npt", {
                 "T_START":       temp,
                 "T_FINAL":       300.0,
-                "T_DAMP":        100.0,
+                "T_DAMP":        thermostat_damp_fs,
                 "P_START":       press,
                 "P_FINAL":       press,
-                "P_DAMP":        1000.0,
+                "P_DAMP":        barostat_damp_fs,
                 "TIMESTEP":      dt_prod,
                 "N_STEPS":       steps_cool300,
-                "use_pppm":      not use_trappe,
+                "use_pppm":      use_long_range and not use_trappe,
                 "use_gpu":       True,
                 "write_restart": False,
             }, s7["output_data"])
@@ -1809,13 +1852,13 @@ def generate_equilibration_workflow(
             s9 = _stage("npt_prod300", "npt", {
                 "T_START":       300.0,
                 "T_FINAL":       300.0,
-                "T_DAMP":        100.0,
+                "T_DAMP":        thermostat_damp_fs,
                 "P_START":       press,
                 "P_FINAL":       press,
-                "P_DAMP":        1000.0,
+                "P_DAMP":        barostat_damp_fs,
                 "TIMESTEP":      dt_prod,
                 "N_STEPS":       steps_prod300,
-                "use_pppm":      not use_trappe,
+                "use_pppm":      use_long_range and not use_trappe,
                 "use_gpu":       True,
                 "write_restart": False,
             }, s8["output_data"])
@@ -3363,6 +3406,9 @@ def run_bulk_modulus_series(
     use_opls: bool,
     engine: str,
     thermo_freq: int = 100,
+    thermostat_damp_fs: float = 100.0,
+    barostat_damp_fs: float = 1000.0,
+    use_long_range: bool = True,
     output_dir: Optional[str] = None,
 ) -> dict:
     """
@@ -3381,7 +3427,8 @@ def run_bulk_modulus_series(
     Args:
         data_file:      Equilibrated .data file (e.g. 07_npt_production_out.data).
         work_dir:       Base directory; subdirs bm_P{P}/ are created per pressure.
-        pressures_atm:  List of target pressures in atm (at least 3).
+        pressures_atm:  One or more target pressures in atm. EOS analysis still requires
+                        at least three; single-point calls support independently retried points.
         temp_K:         Simulation temperature (K). Use 300 K for property measurement.
         run_name:       NO-OP — accepted and required for backward compatibility, but never
                         read in the body. Do not treat it as a protocol knob.
@@ -3414,11 +3461,10 @@ def run_bulk_modulus_series(
         extract_bulk_modulus_murnaghan after the chain completes.
     """
     try:
-        if len(pressures_atm) < 3:
+        if len(pressures_atm) < 1:
             return {
                 "status": "error",
-                "error": f"At least 3 pressure points required for Murnaghan fit "
-                         f"(got {len(pressures_atm)})."
+                "error": "At least one pressure point is required."
             }
         if velocity_seed is None:
             return {
@@ -3449,11 +3495,14 @@ def run_bulk_modulus_series(
                     "T_FINAL":     temp_K,
                     "P_START":     float(p_atm),
                     "P_FINAL":     float(p_atm),
+                    "T_DAMP":      thermostat_damp_fs,
+                    "P_DAMP":      barostat_damp_fs,
                     "N_STEPS":     npt_steps,
                     "TIMESTEP":    dt_fs,
                     "THERMO_FREQ": thermo_freq,
                     "LOG_FILE":    log_path,
                     "use_gpu":     True,
+                    "use_pppm":    use_long_range and not use_trappe,
                     "engine":      engine,
                     "use_trappe":  use_trappe,
                     "use_pcff":    use_pcff,

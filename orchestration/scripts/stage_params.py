@@ -194,7 +194,7 @@ def _exp_density_range(cls: dict) -> list:
 
 def _resolve_build_params(args, cls: dict) -> dict:
     """Resolve deterministic molecule-builder arguments."""
-    return {'smiles': args.smiles, 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps', 'preferred_builder': cls.get('preferred_builder', 'emc'), 'preferred_ff': cls.get('preferred_ff', 'gaff2_mod'), 'dp': args.dp or cls.get('dp_typical', 50), 'nchain': args.nchain or cls.get('nchain', 10), 'density_initial_gcm3': _pick(args.density_initial, cls, 'density_initial_gcm3', 0.6), 'emc_seed': args.emc_seed if getattr(args, 'emc_seed', None) is not None else None, 'charge_method': cls.get('charge_method', 'am1bcc').lower(), 'electrostatics': cls.get('electrostatics', 'pppm'), 'cutoff_A': cls.get('cutoff_A', 12.0), 'dt_fs': cls.get('dt_fs', 1.0), 'phal_patch': args.polymer_class.upper() == 'PHAL', 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'ff_confidence': 'cited' if cls.get('ff_justification_doi') else 'uncited'}
+    return {'smiles': args.smiles, 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps', 'preferred_builder': cls.get('preferred_builder', 'emc'), 'preferred_ff': cls.get('preferred_ff', 'gaff2_mod'), 'dp': args.dp or cls.get('dp_typical', 50), 'nchain': args.nchain or cls.get('nchain', 10), 'density_initial_gcm3': _pick(args.density_initial, cls, 'density_initial_gcm3', 0.6), 'build_temperature_K': cls.get('build_temperature_K', 300.0), 'emc_seed': args.emc_seed if getattr(args, 'emc_seed', None) is not None else None, 'charge_method': cls.get('charge_method', 'am1bcc').lower(), 'electrostatics': cls.get('electrostatics', 'pppm'), 'cutoff_A': cls.get('cutoff_A', 12.0), 'dt_fs': cls.get('dt_fs', 1.0), 'phal_patch': args.polymer_class.upper() == 'PHAL', 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'ff_confidence': 'cited' if cls.get('ff_justification_doi') else 'uncited'}
 
 def _resolve_t_workflow(args, cls: dict) -> float:
     """Equilibration workflow temperature (K). Plan's T_workflow_K wins; otherwise 300 K for
@@ -262,8 +262,16 @@ def _resolve_equil_params(args, cls: dict) -> dict:
     T_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
     npt_prod_ns_val = _pick(args.npt_prod_ns, cls, 'npt_prod_ns', None)
     npt_prod_steps = int(npt_prod_ns_val * 1000000.0 / dt) if npt_prod_ns_val is not None else None
+    t_equil_ns = cls.get('t_equil_ns', 5.0)
+    nvt_prod_steps = int(t_equil_ns * 1000000.0 / dt)
+    npt_prod300_ns = cls.get('npt_prod300_ns', 2.0)
+    npt_prod300_steps = int(npt_prod300_ns * 1000000.0 / dt)
+    anneal_cycle_ns = cls.get('anneal_cycle_ns')
+    anneal_cycle_steps = (int(anneal_cycle_ns * 1000000.0 / dt)
+                          if anneal_cycle_ns is not None else None)
     T_workflow = _resolve_t_workflow(args, cls)
-    add_melt_npt = getattr(args, 'add_melt_npt', False) or T_workflow <= 300.0
+    add_melt_npt = (getattr(args, 'add_melt_npt', False) or
+                    bool(cls.get('add_melt_npt', False)) or T_workflow <= 300.0)
     remedy_melt_ns = (getattr(args, 'melt_hold_ns', None) or cls.get('melt_hold_ns') or
                       getattr(args, 'melt_only_continuation_ns', None) or
                       cls.get('melt_only_continuation_ns'))
@@ -273,7 +281,46 @@ def _resolve_equil_params(args, cls: dict) -> dict:
     phase = getattr(args, 'phase', 'full') or 'full'
     if T_workflow <= 300.0:
         phase = 'full'
-    return {'data_path': args.data_path, 'phase': phase, 'pending_cooldown_path': getattr(args, 'pending_cooldown_path', None), 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/equil', 'dt_fs': dt, 'T_equil_K': T_equil, 'T_anneal_high_K': _pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0), 'T_workflow_K': T_workflow, 'P_equil_atm': cls.get('P_equil_atm', 1.0), 't_equil_ns': cls.get('t_equil_ns', 5.0), 'npt_cool_steps': _pick(getattr(args, 'npt_cool_steps', None), cls, 'npt_cool_steps', None), 'npt_cool300_steps': _pick(getattr(args, 'npt_cool300_steps', None), cls, 'npt_cool300_steps', None), 'npt_prod_ns': npt_prod_ns_val, 'npt_prod_steps': npt_prod_steps, 'add_melt_npt': add_melt_npt, 'melt_npt_ns': melt_npt_ns_val, 'melt_npt_steps': melt_npt_steps, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0), 'nchain': args.nchain or cls.get('nchain', 10), 'exp_density_gcm3': _exp_density_point(cls, args.run_name)}
+    return {
+        'data_path': args.data_path,
+        'phase': phase,
+        'pending_cooldown_path': getattr(args, 'pending_cooldown_path', None),
+        'lammps_flags': _lammps_flags(args.lammps_flags, cls),
+        'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm',
+        'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/equil',
+        'dt_fs': dt,
+        'T_equil_K': T_equil,
+        'T_anneal_high_K': _pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0),
+        'T_workflow_K': T_workflow,
+        'P_equil_atm': cls.get('P_equil_atm', 1.0),
+        'compression_max_pressure_atm': cls.get('compression_max_pressure_atm', 50000.0),
+        't_equil_ns': t_equil_ns,
+        'nvt_prod_steps': nvt_prod_steps,
+        'npt_prod300_ns': npt_prod300_ns,
+        'npt_prod300_steps': npt_prod300_steps,
+        'eq_annealing_cycles': int(cls.get('eq_annealing_cycles', 0)),
+        'anneal_cycle_ns': anneal_cycle_ns,
+        'anneal_cycle_steps': anneal_cycle_steps,
+        'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0),
+        'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0),
+        'npt_cool_steps': _pick(getattr(args, 'npt_cool_steps', None), cls,
+                                'npt_cool_steps', None),
+        'npt_cool300_steps': _pick(getattr(args, 'npt_cool300_steps', None), cls,
+                                   'npt_cool300_steps', None),
+        'npt_prod_ns': npt_prod_ns_val,
+        'npt_prod_steps': npt_prod_steps,
+        'add_melt_npt': add_melt_npt,
+        'add_300k_production': bool(cls.get('add_300k_production', True)),
+        'melt_npt_ns': melt_npt_ns_val,
+        'melt_npt_steps': melt_npt_steps,
+        'gpu_ids': args.gpu_ids,
+        'mpi_ranks': args.mpi_ranks,
+        'engine': args.engine,
+        'velocity_seed': _velocity_seed(args),
+        'cutoff_A': cls.get('cutoff_A', 12.0),
+        'nchain': args.nchain or cls.get('nchain', 10),
+        'exp_density_gcm3': _exp_density_point(cls, args.run_name),
+    }
 
 def _resolve_tg_rate(args, cls: dict):
     """Resolve the selected cooling rate + a per-rate output-dir suffix for multi-rate
@@ -299,11 +346,11 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     else:
         n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
     work_dir = args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/thermal'
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600), 'T_end_K': _pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200), 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'equil_data_path': getattr(args, 'tg_start_data', None) or args.data_path, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600), 'T_end_K': _pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200), 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': getattr(args, 'tg_start_data', None) or args.data_path, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
 
 def _resolve_deform_params(args, cls: dict) -> dict:
     """Resolve deterministic deformation arguments."""
-    return {'deform_rate_mode': args.deform_rate_mode, 'equil_data_path': args.data_path, 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'K_deform_rate_inv_s': _pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 100000000.0), 'K_deform_rate_slow_inv_s': cls.get('K_deform_rate_slow_inv_s', 'null'), 'K_strain_max': _pick(args.K_strain_max, cls, 'K_strain_max', 0.03), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
+    return {'deform_rate_mode': args.deform_rate_mode, 'equil_data_path': args.data_path, 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'K_deform_rate_inv_s': _pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 100000000.0), 'K_deform_rate_slow_inv_s': cls.get('K_deform_rate_slow_inv_s', 'null'), 'K_strain_max': _pick(args.K_strain_max, cls, 'K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
 
 def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     """Resolve deterministic per-rate Tg analysis arguments."""
@@ -347,7 +394,7 @@ def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
     sampling_factor = int(cls.get('mechanical_sampling_factor', 1))
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'equil_data_path': args.data_path or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'temp_K': 300.0, 'npt_steps': 500000 * sampling_factor, 'mechanical_sampling_factor': sampling_factor, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'equil_data_path': args.data_path or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'temp_K': cls.get('bm_temperature_K', 300.0), 'npt_steps': int(cls.get('bm_npt_steps', 500000)) * sampling_factor, 'thermo_freq': int(cls.get('bm_thermo_freq', 100)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'mechanical_sampling_factor': sampling_factor, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
 
 def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     """Resolve deterministic bulk-modulus extraction arguments."""
@@ -357,7 +404,7 @@ def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     _k_from_cls = _exp_K_range(cls)
     exp_K = [args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0], args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1]]
     K_deform_rate_slow_inv_s = cls.get('K_deform_rate_slow_inv_s', None)
-    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'npt_prod_log_path': args.npt_prod_log or f'{lammps_base}/equil/npt_prod300/npt_prod300.log', 'exp_K_range': exp_K, 'bm_pressures_atm': cls.get('bm_pressures_atm', None), 'strain_rate_per_fs': cls.get('K_deform_rate_inv_s', 100000000.0) * 1e-15, 'strain_rate_slow_per_fs': K_deform_rate_slow_inv_s * 1e-15 if K_deform_rate_slow_inv_s is not None else None, 'K_strain_max': cls.get('K_strain_max', 0.03), 'deform_log_path': getattr(args, 'deform_log', None), 'deform_log_path_slow': getattr(args, 'deform_log_slow', None), 'murnaghan_log_files': getattr(args, 'murnaghan_logs', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'npt_prod_log_path': args.npt_prod_log or f'{lammps_base}/equil/npt_prod300/npt_prod300.log', 'exp_K_range': exp_K, 'bm_pressures_atm': cls.get('bm_pressures_atm', None), 'strain_rate_per_fs': cls.get('K_deform_rate_inv_s', 100000000.0) * 1e-15, 'strain_rate_slow_per_fs': K_deform_rate_slow_inv_s * 1e-15 if K_deform_rate_slow_inv_s is not None else None, 'K_strain_max': cls.get('K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'deform_log_path': getattr(args, 'deform_log', None), 'deform_log_path_slow': getattr(args, 'deform_log_slow', None), 'murnaghan_log_files': getattr(args, 'murnaghan_logs', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_run_summary_params(args, cls: dict) -> dict:
     """Resolve deterministic run-summary arguments.

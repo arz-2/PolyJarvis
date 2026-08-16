@@ -25,11 +25,18 @@ SERVER_PY = REPO_ROOT / "mcp-servers" / "mcp-lammps-engine" / "server.py"
 REQUIRED = [
     "velocity_seed",
     "npt_prod_steps",
+    "nvt_prod_steps",
+    "npt_prod300_steps",
     "npt_cool_steps",
     "npt_cool300_steps",
     "melt_npt_steps",
     "extend_steps",
+    "anneal_cycles",
+    "anneal_cycle_steps",
+    "use_long_range",
 ]
+REQUIRED_INTEGER = {"velocity_seed", "anneal_cycles"}
+REQUIRED_BOOLEAN = {"use_long_range"}
 
 
 def _workflow_signature():
@@ -93,9 +100,11 @@ def test_mcp_schema_marks_them_required():
     tools = asyncio.run(server.mcp.list_tools())
     schema = next(t for t in tools if t.name == "generate_equilibration_workflow").inputSchema
     assert set(REQUIRED) <= set(schema["required"])
-    # A null seed must fail at the schema, not just in the body.
-    assert schema["properties"]["velocity_seed"]["type"] == "integer"
-    for name in REQUIRED[1:]:
+    for name in REQUIRED_INTEGER:
+        assert schema["properties"][name]["type"] == "integer"
+    for name in REQUIRED_BOOLEAN:
+        assert schema["properties"][name]["type"] == "boolean"
+    for name in set(REQUIRED) - REQUIRED_INTEGER - REQUIRED_BOOLEAN:
         types = {b["type"] for b in schema["properties"][name]["anyOf"]}
         assert types == {"integer", "null"}, name
 

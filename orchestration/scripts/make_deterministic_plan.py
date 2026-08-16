@@ -33,16 +33,11 @@ from hw_common import load_rules, get_class_entry  # shared rules access (single
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 # Decision-relevant class keys consumed by stage_params.py. Only keys that
 # EXIST in the class entry are snapshotted, so the overlay stays an exact identity.
-#
-# eq_annealing_cycles is deliberately ABSENT: generate_equilibration_workflow has no
-# annealing-cycles argument, so snapshotting it into decided_params records a protocol
-# that never runs. The class-level values stay in polymer_rules.json as a documented
-# hypothesis; they just no longer masquerade as executed protocol.
 SNAPSHOT_KEYS = [
     "preferred_ff", "preferred_builder", "charge_method", "electrostatics",
     "cutoff_A", "dt_fs",
     "dp_typical", "nchain", "density_initial_gcm3",
-    "T_equil_K", "annealing_T_high_K", "P_equil_atm",
+    "T_equil_K", "annealing_T_high_K", "P_equil_atm", "eq_annealing_cycles",
     "t_equil_ns", "npt_prod_ns", "melt_npt_ns",
     "tg_t_high_K", "tg_t_low_K", "tg_t_step_K", "tg_steps_per_t", "tg_rates_K_per_ns",
     "tg_min_steps_per_T", "tg_slope_gate_fallback",

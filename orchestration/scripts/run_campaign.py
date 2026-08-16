@@ -266,7 +266,8 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
     job = emc.submit_emc_cell_job(
         smiles=p["smiles"], polymer_class=args.polymer_class.upper(),
         dp=p["dp"], nchains=p["nchain"], density_initial=p["density_initial_gcm3"],
-        temperature=300.0, seed=emc_seed, output_name="polymer",
+        temperature=p["build_temperature_K"], seed=emc_seed, output_name="polymer",
+        field_override=p["preferred_ff"],
     )
     if job.get("error"):
         state.mark("build", "failed", error=job["error"])
@@ -343,9 +344,17 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             polymer_name=args.run_name, temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
             press=p["P_equil_atm"], use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"],
             use_opls=flags["use_opls"], npt_prod_steps=p["npt_prod_steps"],
+            nvt_prod_steps=p["nvt_prod_steps"], npt_prod300_steps=p["npt_prod300_steps"],
             add_melt_npt=p["add_melt_npt"], t_equil_K=p["T_equil_K"] if p["add_melt_npt"] else None,
+            add_300k_production=p["add_300k_production"],
             melt_npt_steps=p["melt_npt_steps"], engine=p["engine"], velocity_seed=velocity_seed,
             npt_cool_steps=p["npt_cool_steps"], npt_cool300_steps=p["npt_cool300_steps"],
+            anneal_cycles=p["eq_annealing_cycles"],
+            anneal_cycle_steps=p["anneal_cycle_steps"],
+            thermostat_damp_fs=p["thermostat_damp_fs"],
+            barostat_damp_fs=p["barostat_damp_fs"],
+            max_press=p["compression_max_pressure_atm"],
+            use_long_range=p["use_long_range_electrostatics"],
             extend_steps=None,
         )
     else:
@@ -356,8 +365,13 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             temp=extend_temp, press=p["P_equil_atm"], use_pcff=flags["use_pcff"],
             use_trappe=flags["use_trappe"], use_opls=flags["use_opls"], engine=p["engine"],
             velocity_seed=velocity_seed, extend_only=True, extend_steps=extend_steps,
-            npt_prod_steps=None, npt_cool_steps=None, npt_cool300_steps=None,
+            npt_prod_steps=None, nvt_prod_steps=None, npt_prod300_steps=None,
+            npt_cool_steps=None, npt_cool300_steps=None,
             melt_npt_steps=None,
+            anneal_cycles=0, anneal_cycle_steps=None,
+            thermostat_damp_fs=p["thermostat_damp_fs"],
+            barostat_damp_fs=p["barostat_damp_fs"],
+            use_long_range=p["use_long_range_electrostatics"],
         )
     if workflow.get("status") == "error":
         raise SystemExit(f"generate_equilibration_workflow failed: {workflow}")
@@ -531,7 +545,12 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
     per_rate = []
     if tg_rates:
         fallback = cls.get("tg_slope_gate_fallback")
-        idx = 0 if fallback == "slowest_rate" else len(tg_rates) - 1
+        planned_index = cls.get("tg_primary_rate_index")
+        idx = (int(planned_index) if planned_index is not None else
+               (0 if fallback == "slowest_rate" else len(tg_rates) - 1))
+        if not 0 <= idx < len(tg_rates):
+            return {"halted": True, "reason": "TG_PRIMARY_RATE_INDEX_INVALID",
+                    "detail": {"index": idx, "n_rates": len(tg_rates)}}
         rate = tg_rates[idx]
         args.tg_rate_index = idx
         p = resolve_stage_params("tg", args, cls)
@@ -547,8 +566,12 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
                 params={"LOG_FILE": "tg_sweep.log", "DUMP_FILE": "",
                        "WRITE_PER_T_DUMP": True, "PER_T_DUMP_FILE": "per_t_structs.dump",
                        "T_START": p["T_start_K"], "T_END": p["T_end_K"], "T_STEP": p["T_step_K"],
-                       "N_STEPS_PER_T": p["n_steps_per_t"], "P_START": 1.0, "P_FINAL": 1.0,
-                       "T_DAMP": 100.0, "TIMESTEP": p["dt_fs"], "use_pppm": not p["lammps_flags"]["use_trappe"],
+                       "N_STEPS_PER_T": p["n_steps_per_t"],
+                       "T_DAMP": p["thermostat_damp_fs"],
+                       "P_DAMP": p["barostat_damp_fs"],
+                       "P_START": p["pressure_atm"], "P_FINAL": p["pressure_atm"],
+                       "TIMESTEP": p["dt_fs"],
+                       "use_pppm": p["use_long_range_electrostatics"] and not p["lammps_flags"]["use_trappe"],
                        "use_gpu": True, "engine": p["engine"], **{f"use_{k.split('_')[1]}": v
                        for k, v in p["lammps_flags"].items()}},
             )
@@ -612,7 +635,11 @@ def _submit_deform(args, cls: dict, lammps, mode: str) -> dict:
         # (STRAIN_RATE * TIMESTEP)); the template itself has no STRAIN_MAX placeholder, so
         # passing it without N_STEPS used to leave the deck on the 300000-step default.
         params={"LOG_FILE": f"05_deform{suffix}.log", "STRAIN_RATE": strain_rate_per_fs,
-               "STRAIN_MAX": p["K_strain_max"], "TIMESTEP": p["dt_fs"], "use_gpu": True,
+               "STRAIN_MAX": p["K_strain_max"], "N_EQ_STEPS": p["deform_eq_steps"],
+               "T_DAMP": p["thermostat_damp_fs"],
+               "use_pppm": cls.get("electrostatics", "pppm") == "pppm"
+                           and not p["lammps_flags"]["use_trappe"],
+               "TIMESTEP": p["dt_fs"], "use_gpu": True,
                "engine": p["engine"], **p["lammps_flags"]},
     )
     run = lammps.run_lammps_script(
@@ -647,6 +674,10 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
                     pressures_atm=[pressure], temp_K=p["temp_K"], run_name=args.run_name,
                     gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"], velocity_seed=p["velocity_seed"],
                     npt_steps=p["npt_steps"], dt_fs=p["dt_fs"],
+                    thermo_freq=p["thermo_freq"],
+                    thermostat_damp_fs=p["thermostat_damp_fs"],
+                    barostat_damp_fs=p["barostat_damp_fs"],
+                    use_long_range=cls.get("electrostatics", "pppm") == "pppm",
                     use_trappe=p["lammps_flags"]["use_trappe"],
                     use_pcff=p["lammps_flags"]["use_pcff"],
                     use_opls=p["lammps_flags"]["use_opls"], engine=p["engine"],
@@ -739,6 +770,8 @@ def do_deformation(state: ExecutorState, args, cls: dict, lammps) -> dict:
         # eps(step) = strain_rate * (step - step_0) * timestep -- must be the deck's own dt,
         # or a dt_fs != 1.0 class reports the strain, and hence K, off by that ratio.
         timestep=bp["dt_fs"],
+        eq_steps=bp["deform_eq_steps"], strain_start=bp["deform_strain_start"],
+        avg_window=bp["deform_avg_window"],
         **({"log_file_2": slow_log, "strain_rate_2": bp["strain_rate_slow_per_fs"]} if slow_log else {}),
     ), "bulk modulus (deform)")
     result = {"method": "deformation", "bulk_modulus_GPa": deform_extract.get("bulk_modulus_GPa"),
@@ -934,6 +967,13 @@ class CampaignStageExecutor:
                 details["nchain"] = cls.get("nchain")
             return StageResult("failed", (Finding(code, stage, details=details),),
                                self._artifacts(attempt_dir))
+        if outputs and outputs.get("halted"):
+            details = outputs.get("detail") or {}
+            finding = Finding(outputs.get("reason") or "STAGE_HALTED", stage,
+                              confidence=details.get("remedy_confidence", "high"),
+                              details=details)
+            return StageResult("escalation_required", (finding,),
+                               self._artifacts(attempt_dir), outputs)
         if outputs and outputs.get("workflow_finding"):
             finding = Finding.from_value(outputs["workflow_finding"], stage)
             return StageResult("escalation_required", (finding,), self._artifacts(attempt_dir),
