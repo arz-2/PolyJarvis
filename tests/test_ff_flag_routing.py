@@ -1,6 +1,6 @@
 """Force-field flag routing for the Class II comparison fields.
 
-`gen_prompt._lammps_flags` and `hw_common.resolve_ff_family` both classify a field by
+`stage_params._lammps_flags` and `hw_common.resolve_ff_family` both classify a field by
 substring. That works for the routed defaults by accident of naming -- "pcff_ore" contains
 "pcff" -- but **compass** shares no token with any family. It silently returned
 all-False flags (so the deck fell back to GAFF2 styles: lj/charmm/coul/long with
@@ -17,7 +17,7 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 
-from gen_prompt import _lammps_flags  # noqa: E402
+from stage_params import _lammps_flags  # noqa: E402
 from hw_common import resolve_ff_family  # noqa: E402
 
 

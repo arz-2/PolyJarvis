@@ -1,6 +1,6 @@
 {
   "hardware_policy": {
-    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for the gen_prompt mpi default and the planner hardware decision; specific gpu_ids stay runtime (orchestration/scripts/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default \u2014 for pcff/opls/trappe this is mpi=1 (KOKKOS/GPU-resident kspace, 1 core/run, up to 4 concurrent runs on 4 GPUs); gaff is the outlier at mpi=4. `mpi_single_run_hint` equals `mpi` (both 1) for pcff/opls/trappe, confirmed by the 2026-08-08 clean host-matched /calibrate-hardware pass (values_are_benchmarked=true, see hardware/HARDWARE_STUDY.md); gaff's mpi_single_run_hint=8 remains a provisional GUESS \u2014 no calibration cell exists for it yet. See memory feedback_mpi1_pcff_gpu_starvation and feedback_small_ua_cpu_faster.",
+    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for stage parameter resolution and hardware validation; specific gpu_ids stay runtime (orchestration/scripts/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default \u2014 for pcff/opls/trappe this is mpi=1 (KOKKOS/GPU-resident kspace, 1 core/run, up to 4 concurrent runs on 4 GPUs); gaff is the outlier at mpi=4. `mpi_single_run_hint` equals `mpi` (both 1) for pcff/opls/trappe, confirmed by the 2026-08-08 clean host-matched calibration pass (values_are_benchmarked=true, see hardware/HARDWARE_STUDY.md); gaff's mpi_single_run_hint=8 remains a provisional GUESS because no calibration cell exists for it yet.",
     "host": {
       "gpus": 4,
       "gpu_model": "Quadro RTX 6000",
@@ -12,7 +12,7 @@
     "directional_probe": {
       "kokkos_offload_study": {
         "date": "2026-06-20",
-        "what": "KOKKOS full-offload arm (pair+class2 bonded+pppm+neigh on GPU via -sf kk -pk kokkos) vs the GPU-package baseline. Engine is wired as a selectable engine=\"kokkos\" end-to-end (server.py run tools, script_generator deck, gen_prompt). by_forcefield defaults intentionally UNCHANGED until the 40k-step accuracy parity passes.",
+        "what": "KOKKOS full-offload arm (pair+class2 bonded+pppm+neigh on GPU via -sf kk -pk kokkos) vs the GPU-package baseline. Engine is wired as a selectable engine=\"kokkos\" end-to-end through server tools and generated decks. by_forcefield defaults intentionally UNCHANGED until the 40k-step accuracy parity passes.",
         "cell": "hardware/CALIB_PCFF/emc_build.data",
         "cell_atoms": 3020,
         "pcff_ns_per_day_mpi1_contended": {
@@ -1132,7 +1132,7 @@
     },
     "PEST": {
       "name": "Polyester",
-      "_tg_rate_note": "steps_per_T = tg_t_step_K / (rate * dt_fs * 1e-6). Floor = tg_min_steps_per_T (200000 steps = 200 ps at dt=1fs). Rates [40,80,100] K/ns -> 500k/250k/200k steps, all at or above the floor. Retired [25,50,100]: r25 gives delocalized bilinear fit for stiff ester backbones (PLA3: r25 primary=464.8K vs alt=360K, 105K gap; negative multirate slope b=-35.1 K/dec -> slope_gate_pass=False). Plan-time feasibility filter (make_deterministic_plan._feasible_tg_rates) + gen_prompt warning enforce this.",
+      "_tg_rate_note": "steps_per_T = tg_t_step_K / (rate * dt_fs * 1e-6). Floor = tg_min_steps_per_T (200000 steps = 200 ps at dt=1fs). Rates [40,80,100] K/ns -> 500k/250k/200k steps, all at or above the floor. Retired [25,50,100]: r25 gives delocalized bilinear fit for stiff ester backbones (PLA3: r25 primary=464.8K vs alt=360K, 105K gap; negative multirate slope b=-35.1 K/dec -> slope_gate_pass=False). The plan-time feasibility filter in make_deterministic_plan.py enforces this.",
       "examples": [
         "PET",
         "PLA",

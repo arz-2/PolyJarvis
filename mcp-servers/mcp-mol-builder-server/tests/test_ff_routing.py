@@ -25,7 +25,7 @@ def test_routing_matches_polymer_rules(cid):
     assert got["preferred_ff"] == e["preferred_ff"]
     assert got["preferred_builder"] == e["preferred_builder"]
     # classes.<CLASS>.confidence was retired in 49877fe; ff_confidence is now derived from
-    # citation presence, matching what gen_prompt.py writes into the build prompt.
+    # citation presence, matching stage_params.py's deterministic build arguments.
     assert got["ff_confidence"] == ("cited" if e.get("ff_justification_doi") else "uncited")
     assert got["ff_justification_doi"] == e.get("ff_justification_doi")
 

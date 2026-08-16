@@ -125,34 +125,10 @@ def test_no_seed_is_drawn_at_random_once_one_is_given():
             assert "_velocity_seed" in line or "else random.randint" in line, line
 
 
-def test_prompts_for_every_seeded_stage_carry_one():
-    import gen_prompt
-
-    class A:
-        pass
-
-    args = A()
-    for k, v in dict(
-        run_name="PEGX1", polymer_class="POXI", data_path="/x/cell.data", work_dir=None,
-        dt_fs=1.0, gpu_ids="0", mpi_ranks=1, engine="kokkos", lammps_flags=None,
-        velocity_seed=None, is_glassy="false", deform_rate_mode="primary",
-        K_deform_rate_inv_s=None, K_strain_max=None, tg_rate_index=0,
-        tg_t_high_K=None, tg_t_low_K=None, tg_t_step_K=None, tg_steps_per_t=None,
-        tg_rate_K_per_ns=None, tg_start_data=None, nchain=10, dp=50, output_dir=None,
-        T_equil_K=None, T_anneal_high_K=None, npt_prod_ns=None, T_workflow_K=None,
-    ).items():
-        setattr(args, k, v)
-    cls = {"experimental_tg_K": 206.0, "dt_fs": 1.0, "T_equil_K": 500.0}
-    for prompt in (gen_prompt.tg_prompt, gen_prompt.deform_prompt, gen_prompt.murnaghan_prompt):
-        text = prompt(args, cls)
-        assert "velocity_seed:" in text, prompt.__name__
-        assert "velocity_seed:     null" not in text, prompt.__name__
-
-
 def test_deterministic_executor_passes_every_required_arg():
-    """run_deterministic_replicate has two call sites -- the full chain and the EXTEND
+    """run_campaign has two call sites -- the full chain and the EXTEND
     continuation -- and each must name all six, including the ones it passes as None."""
-    src = (REPO_ROOT / "orchestration" / "scripts" / "run_deterministic_replicate.py").read_text()
+    src = (REPO_ROOT / "orchestration" / "scripts" / "run_campaign.py").read_text()
     tree = ast.parse(src)
     calls = [n for n in ast.walk(tree)
              if isinstance(n, ast.Call)
@@ -164,35 +140,8 @@ def test_deterministic_executor_passes_every_required_arg():
         assert set(REQUIRED) <= passed, f"missing {set(REQUIRED) - passed}"
 
 
-def test_prompt_always_names_the_seed_and_every_step_count():
-    """The prompt's old `npt_prod_ns: null` branch printed 'auto-sized by atom count',
-    which reads as permission to omit the argument. Both branches must now spell out a
-    value to pass."""
-    import gen_prompt
-
-    class A:
-        pass
-
-    for npt_prod_ns in (2.0, None):
-        args = A()
-        for k, v in dict(
-            run_name="PEGX1", polymer_class="POXI", data_path="/x/cell.data",
-            work_dir=None, dt_fs=1.0, T_equil_K=500.0, T_anneal_high_K=700.0,
-            npt_prod_ns=npt_prod_ns, gpu_ids="0", mpi_ranks=1, engine="kokkos",
-            lammps_flags=None, nchain=10, dp=50, backbone_types=None,
-            velocity_seed=None, T_workflow_K=None,
-        ).items():
-            setattr(args, k, v)
-        cls = {"experimental_tg_K": 206.0, "dt_fs": 1.0, "T_equil_K": 500.0}
-        text = gen_prompt.equil_prompt(args, cls)
-        for name in REQUIRED:
-            assert f"{name}:" in text, f"{name} absent from the prompt (npt_prod_ns={npt_prod_ns})"
-        assert "auto-sized by atom count" not in text
-        assert "velocity_seed:     null" not in text
-
-
-def test_prompt_seed_is_stable_across_regenerations_and_distinct_per_run():
-    import gen_prompt
+def test_stage_seed_is_stable_across_resolutions_and_distinct_per_run():
+    import stage_params
 
     class A:
         pass
@@ -200,7 +149,7 @@ def test_prompt_seed_is_stable_across_regenerations_and_distinct_per_run():
     def seed(run_name, pinned=None):
         a = A()
         a.run_name, a.velocity_seed = run_name, pinned
-        return gen_prompt._velocity_seed(a)
+        return stage_params._velocity_seed(a)
 
     assert seed("PEG1") == seed("PEG1")
     assert seed("PEG1") != seed("PEG2")

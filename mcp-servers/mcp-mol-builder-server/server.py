@@ -44,7 +44,7 @@ logging.basicConfig(
     stream=__import__("sys").stderr,
 )
 logger = logging.getLogger("mol_builder_mcp")
-# Also log to file so we can confirm subprocess launch even from Claude Code
+# Also log to file so detached subprocess launches remain observable.
 _fh = logging.FileHandler("/tmp/mol-builder-startup.log", mode='a')
 _fh.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
 logger.addHandler(_fh)

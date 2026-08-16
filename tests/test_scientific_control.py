@@ -1,0 +1,325 @@
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
+
+from scientific_control import (  # noqa: E402
+    DeterministicScriptChain,
+    PlanDecision,
+    RecoveryDecision,
+    ScientificControlPlane,
+    ScientificIntent,
+    WorkflowIssue,
+    WorkflowOutcome,
+    JsonSubprocessAgent,
+    SubprocessPlanningAgent,
+    materialize_plan,
+)
+
+
+INTENT = ScientificIntent(
+    run_name="CONTROL_TEST",
+    goal="Compute density and bulk modulus at 300 K",
+    smiles="*CC(c1ccccc1)*",
+    requested_properties=("density", "bulk_modulus"),
+    polymer_class_hint="PSTR",
+)
+
+
+class SpyPlanningAgent:
+    def __init__(self):
+        self.calls = 0
+
+    def decide(self, intent, context):
+        self.calls += 1
+        assert "PSTR" in context["available_classes"]
+        return PlanDecision(
+            polymer_class="PSTR",
+            properties=("density", "bulk_modulus"),
+            rationale=("The requested state is a glassy polystyrenic workflow at 300 K.",),
+            decision_evaluations={
+                "D-02_charges": {
+                    "criteria_evaluated": [
+                        "backbone_polarity", "charge_method_cost", "ff_embedded_vs_qm"
+                    ],
+                },
+                "D-03_electrostatics": {
+                    "criteria_evaluated": [
+                        "backbone_heteroatoms", "max_partial_charge", "computational_cost"
+                    ],
+                    "evidence": [{
+                        "claim": "Long-range electrostatics follow the selected PCFF protocol.",
+                        "citation": "class-configured force-field evidence",
+                    }],
+                    "alternatives": ["short-range Coulomb treatment"],
+                },
+            },
+            dominant_uncertainty="forcefield_transferability",
+            confidence="medium",
+        )
+
+
+class SpyRecoveryAgent:
+    def __init__(self, decision=None):
+        self.calls = 0
+        self.decision = decision or RecoveryDecision("retry", "Transient failure; resume state.")
+
+    def diagnose(self, intent, plan, issue):
+        self.calls += 1
+        assert issue.code == "TENSION_RUN_FAILED"
+        return self.decision
+
+
+class SequenceWorkflow:
+    def __init__(self, outcomes):
+        self.outcomes = list(outcomes)
+        self.calls = 0
+
+    def execute(self, plan_path, dry_run=False, attempt=0):
+        self.calls += 1
+        assert json.loads(plan_path.read_text())["plan_mode"] == "reasoned"
+        return self.outcomes.pop(0)
+
+
+def completed_outcome():
+    return WorkflowOutcome(
+        status="complete",
+        result={"status": "complete", "run_summary": "/tmp/run_summary.json"},
+        steps=({"step": "validate_run_plan"}, {"step": "run_campaign"}),
+    )
+
+
+def failed_outcome(attempt=0):
+    issue = WorkflowIssue(
+        stage="mechanical",
+        code="TENSION_RUN_FAILED",
+        detail={"failure_pressure_atm": -800},
+        attempt=attempt,
+    )
+    return WorkflowOutcome("issue", {"status": "halted"}, issue)
+
+
+def test_success_never_triggers_recovery_agent(tmp_path):
+    planning = SpyPlanningAgent()
+    recovery = SpyRecoveryAgent()
+    workflow = SequenceWorkflow([completed_outcome()])
+
+    result = ScientificControlPlane(planning, workflow, recovery, tmp_path).run(INTENT)
+
+    assert result["status"] == "complete"
+    assert planning.calls == 1
+    assert workflow.calls == 1
+    assert recovery.calls == 0
+    assert result["recovery_agent_calls"] == 0
+    event_names = [event["event"] for event in result["events"]]
+    assert event_names == [
+        "scientific_agent_called",
+        "plan_materialized",
+        "deterministic_chain_finished",
+    ]
+
+
+def test_issue_is_the_only_trigger_for_recovery_agent(tmp_path):
+    planning = SpyPlanningAgent()
+    recovery = SpyRecoveryAgent()
+    workflow = SequenceWorkflow([failed_outcome(), completed_outcome()])
+
+    result = ScientificControlPlane(planning, workflow, recovery, tmp_path).run(INTENT)
+
+    assert result["status"] == "complete"
+    assert recovery.calls == 1
+    assert workflow.calls == 2
+    event_names = [event["event"] for event in result["events"]]
+    assert event_names.count("issue_detected") == 1
+    assert event_names.count("recovery_agent_called") == 1
+
+
+def test_issue_without_recovery_agent_stops_at_structured_boundary(tmp_path):
+    result = ScientificControlPlane(
+        SpyPlanningAgent(), SequenceWorkflow([failed_outcome()]), None, tmp_path
+    ).run(INTENT)
+
+    assert result["status"] == "needs_recovery_agent"
+    assert result["issue"]["code"] == "TENSION_RUN_FAILED"
+    assert result["recovery_agent_calls"] == 0
+
+
+def test_recovery_agent_cannot_modify_paths_or_commands(tmp_path):
+    recovery = SpyRecoveryAgent(RecoveryDecision(
+        "revise_plan",
+        "Attempted unsafe edit",
+        {"work_dir": "/tmp/agent-owned"},
+    ))
+    control = ScientificControlPlane(
+        SpyPlanningAgent(), SequenceWorkflow([failed_outcome()]), recovery, tmp_path
+    )
+
+    with pytest.raises(ValueError, match="unsupported overrides"):
+        control.run(INTENT)
+
+
+def test_materializer_applies_bounded_scientific_overrides():
+    decision = PlanDecision(
+        polymer_class="PSTR",
+        properties=("density",),
+        rationale=("Use a longer NPT production window for the requested precision.",),
+        overrides={"npt_prod_ns": 8.0, "nchain": 12},
+        decision_evaluations={
+            "D-02_charges": {
+                "criteria_evaluated": [
+                    "backbone_polarity", "charge_method_cost", "ff_embedded_vs_qm"
+                ],
+            },
+            "D-03_electrostatics": {
+                "criteria_evaluated": [
+                    "backbone_heteroatoms", "max_partial_charge", "computational_cost"
+                ],
+                "evidence": [{"claim": "PCFF electrostatics", "citation": "class evidence"}],
+                "alternatives": ["short-range Coulomb treatment"],
+            },
+        },
+        dominant_uncertainty="sampling",
+        confidence="high",
+    )
+
+    plan = materialize_plan(INTENT, decision)
+
+    assert plan["plan_mode"] == "reasoned"
+    assert plan["decided_params"]["npt_prod_ns"] == 8.0
+    assert plan["decided_params"]["nchain"] == 12
+    assert plan["uncertainties"] == [{
+        "name": "sampling", "dominant": True, "reduction_probe": "none"
+    }]
+    assert "decision_sha256" in plan["provenance"]
+
+
+def test_materializer_rejects_unknown_polymer_class():
+    decision = PlanDecision(
+        polymer_class="NOT_CONFIGURED",
+        properties=("density",),
+        rationale=("Attempt an unsupported class.",),
+    )
+
+    with pytest.raises(ValueError, match="unknown polymer class"):
+        materialize_plan(INTENT, decision)
+
+
+def test_real_script_chain_dry_run(tmp_path):
+    decision = SpyPlanningAgent().decide(INTENT, {"available_classes": {"PSTR": {}}})
+    plan = materialize_plan(INTENT, decision)
+    plan_path = tmp_path / "run_plan.json"
+    plan_path.write_text(json.dumps(plan))
+
+    outcome = DeterministicScriptChain(python=sys.executable).execute(plan_path, dry_run=True)
+
+    assert outcome.status == "complete", outcome.issue
+    assert [step["step"] for step in outcome.steps] == [
+        "validate_run_plan", "resolve_stage_params"
+    ]
+    assert "build" in outcome.result
+    assert "murnaghan" in outcome.result
+
+
+def test_subprocess_scientific_agent_uses_json_contract(tmp_path):
+    script = tmp_path / "planning_agent.py"
+    script.write_text(
+        "import json, sys\n"
+        "payload = json.load(sys.stdin)\n"
+        "assert payload['task'] == 'plan_polymer_simulation'\n"
+        "assert 'decision_framework' in payload['context']\n"
+        "json.dump({"
+        "'polymer_class':'PSTR',"
+        "'properties':['density'],"
+        "'rationale':['Use the configured PSTR density protocol.'],"
+        "'confidence':'medium'"
+        "}, sys.stdout)\n"
+    )
+    agent = SubprocessPlanningAgent(JsonSubprocessAgent([sys.executable, str(script)]))
+
+    decision = agent.decide(INTENT, {
+        "available_classes": {"PSTR": {}},
+        "decision_framework": {"D-01_ff": {}},
+    })
+
+    assert decision.polymer_class == "PSTR"
+    assert decision.properties == ("density",)
+    assert decision.rationale == ("Use the configured PSTR density protocol.",)
+
+
+def test_real_chain_launches_each_requested_stage_as_a_separate_command(tmp_path, monkeypatch):
+    decision = SpyPlanningAgent().decide(INTENT, {"available_classes": {"PSTR": {}}})
+    plan = materialize_plan(INTENT, decision)
+    plan_path = tmp_path / "run_plan.json"
+    plan_path.write_text(json.dumps(plan))
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        if "validate_run_plan.py" in command[1]:
+            stdout = json.dumps({"findings": [], "count": 0})
+        else:
+            stage = command[command.index("--stage") + 1]
+            stdout = json.dumps({"status": "complete", "stage": stage})
+        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr("scientific_control.subprocess.run", fake_run)
+
+    outcome = DeterministicScriptChain(python=sys.executable).execute(plan_path)
+
+    assert outcome.status == "complete"
+    assert [step["step"] for step in outcome.steps] == [
+        "validate_run_plan", "build", "equilibration", "mechanical", "summary"
+    ]
+    assert all("--stage" in command for command in commands[1:])
+
+
+def test_real_chain_includes_persisted_executor_failure_context(tmp_path, monkeypatch):
+    decision = SpyPlanningAgent().decide(INTENT, {"available_classes": {"PSTR": {}}})
+    plan = materialize_plan(INTENT, decision)
+    plan_path = tmp_path / "run_plan.json"
+    plan_path.write_text(json.dumps(plan))
+
+    def fake_run(command, **kwargs):
+        if "validate_run_plan.py" in command[1]:
+            return subprocess.CompletedProcess(
+                command, 0, stdout=json.dumps({"findings": [], "count": 0}), stderr=""
+            )
+        return subprocess.CompletedProcess(command, 1, stdout="", stderr="LAMMPS failed")
+
+    persisted = {
+        "halted": {
+            "stage": "equil_check",
+            "reason": "BACKBONE_TYPES_UNRESOLVED",
+            "detail": {"atom_type_names": {"1": "c4"}},
+        }
+    }
+    monkeypatch.setattr("scientific_control.subprocess.run", fake_run)
+    monkeypatch.setattr("scientific_control._read_executor_state", lambda run_name: persisted)
+
+    outcome = DeterministicScriptChain(python=sys.executable).execute(plan_path)
+
+    assert outcome.status == "issue"
+    assert outcome.issue.code == "BACKBONE_TYPES_UNRESOLVED"
+    assert outcome.issue.detail["executor_state"] == persisted
+
+
+def test_recovery_agent_is_never_called_more_than_twice(tmp_path):
+    recovery = SpyRecoveryAgent()
+    workflow = SequenceWorkflow([
+        failed_outcome(0),
+        failed_outcome(1),
+        failed_outcome(2),
+    ])
+
+    result = ScientificControlPlane(SpyPlanningAgent(), workflow, recovery, tmp_path).run(INTENT)
+
+    assert result["status"] == "unresolved"
+    assert recovery.calls == 2
+    assert workflow.calls == 3
+    assert result["recovery_agent_calls"] == 2

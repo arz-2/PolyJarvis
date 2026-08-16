@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 validate_run_plan.py — mechanical structural checks for a run_plan.json against
-decision_policy.json, extracted from critic.md step 3.
+decision_policy.json.
 
 Covers only what's actually mechanical: criteria-coverage (criteria_evaluated ⊇ the matching
 policy's evaluate list), evidence_required presence, stage schema (required fields / valid
@@ -9,15 +9,9 @@ track / stage->track mapping), loose stage-vs-properties coverage, dominant-unce
 naming, reduction_probe validity, and the arithmetic/require-clause parts of D-08 hardware
 safety (delegated to select_hardware.py so the numbers live in exactly one place).
 
-Deliberately NOT covered (stays critic.md prose, per its own step 3): whether cited evidence
-substantively supports its claim, directional-probe "evidence inconsistency" judgment calls,
-the "no boilerplate bounce" carve-out (a finding here tagged severity=advisory may still be a
-legitimate approve — critic.md decides), and verdict/escalation sequencing.
-
-planner.md also calls this as a self-check before finalizing a reasoned plan, to catch schema
-mistakes before they cost a critic round-trip. Checks schema only, not runtime consumption --
-also smoke-render `gen_prompt.py --stage <X> --plan <path>` for touched stages and grep the
-cited field before finalizing.
+Substantive scientific support remains the planning agent's responsibility. The deterministic
+control plane blocks on structural findings and preserves advisory findings in control-state
+provenance.
 
 Usage:
   python3 orchestration/validate_run_plan.py --run_plan data/<RUN>/raw/run_plan.json
@@ -107,9 +101,8 @@ def _criteria_and_evidence_findings(plan: dict, policy: dict) -> list:
                 findings.append({"check": "alternatives_empty", "decision_id": d["id"],
                                  "severity": "advisory",
                                  "detail": "evidence_required decision has empty alternatives "
-                                           "-- critic.md's no-boilerplate-bounce carve-out may "
-                                           "apply for a carried-over validated default; judge "
-                                           "in context, do not auto-revise on this alone"})
+                                           "-- the planning agent should record alternatives "
+                                           "when scientifically meaningful"})
     return findings
 
 
@@ -321,7 +314,7 @@ UNIMPLEMENTED_PARAMS = {
 # (overriding param, why).
 OVERRIDDEN_PARAMS = {
     "tg_steps_per_t": ("tg_rate_index",
-                       "gen_prompt._resolve_tg_params computes n_steps_per_t from the selected "
+                       "stage_params._resolve_tg_params computes n_steps_per_t from the selected "
                        "cooling rate (T_step / (rate*dt)) whenever a rate index is given, and "
                        "ignores tg_steps_per_t entirely"),
 }

@@ -287,7 +287,7 @@ def enforce(run_name, repo_root: Path):
 def enforce_live(args) -> dict:
     """Live-run gate enforcement for equilibration-checker (Step 3), called via
     `enforce_gate.py --live` with explicit values already present in the worker's
-    prompt (regime/dp/exp density/tg from gen_prompt.py) -- does not depend on
+    runtime arguments (regime/dp/exp density/tg from stage_params.py) -- does not depend on
     run_plan.json having been fully written yet.
 
     Emits a 4-way verdict the orchestrator can route directly:

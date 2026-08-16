@@ -150,7 +150,7 @@ def host_matches(rules: dict | None = None) -> bool:
 def resolve_ff_family(ff_raw: str, hp: dict) -> str:
     """Map a class's preferred_ff string to a by_forcefield family key
     (pcff | opls | trappe | gaff) via hardware_policy.ff_aliases, with a substring
-    fallback. Used by gen_prompt.resolve_hardware and any consumer keying on FF family."""
+    fallback. Used by stage_params.resolve_hardware and any consumer keying on FF family."""
     fam = hp.get("ff_aliases", {}).get(ff_raw) or hp.get("ff_aliases", {}).get(ff_raw.upper())
     if fam is None:
         fl = ff_raw.lower()

@@ -25,7 +25,7 @@ Commands (prepend --json to any for one structured JSON object on stdout):
 parses it) and `budget`'s 0/1 exit code is unchanged. pick_gpu is the only agent-facing
 script that printed prose; the others already emit structured output (make_deterministic_plan
 -> JSON, estimate_tg_group_contribution --output json, benchmark_hardware -> benchmark.json,
-gen_prompt -> the worker prompt).
+stage_params -> the deterministic runner).
 """
 from __future__ import annotations
 

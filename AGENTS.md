@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-PolyJarvis is a Python framework for orchestrating polymer molecular-dynamics workflows. Core orchestration helpers live in `orchestration/scripts/`, while policy and track definitions are in `orchestration/decision_policy.json` and `orchestration/tracks/`. The three service implementations and their LAMMPS templates/analysis utilities are under `mcp-servers/`. Worker-facing configuration belongs in `guides/`; human documentation belongs in `docs/`. Database schema and import utilities live in `db/`, hardware calibration tools in `hardware/`, and run-log tooling in `tools/runlog_miner/`. Treat `data/<run_name>/` as generated per-run workspace. Manuscript figures, tables, provenance, and recovery benchmarks stay in `manuscript/`.
+PolyJarvis is a deterministic polymer molecular-dynamics platform. The agent-facing contract, campaign runner, parameter resolution, and protocol policy live in `orchestration/scripts/`. Machine-readable polymer configuration stays in `guides/polymer_rules.json`; human documentation belongs in `docs/`. Builder, LAMMPS, parser, and analysis implementations live under `mcp-servers/`. Treat `data/<run_name>/` as generated per-run workspace. Agents must not write simulation files or own runtime state.
 
 ## Build, Test, and Development Commands
 
@@ -13,7 +13,7 @@ python -m venv .venv
 .venv/bin/pip install -r requirements-test.txt
 ```
 
-Run `pytest -v` for the default pure-logic suite; `pytest.ini` automatically excludes tests requiring EMC, LAMMPS, or RadonPy. Run a focused test with `pytest tests/test_select_tg_path.py -v`. Use `pytest -m requires_binaries` only on a configured simulation host. Recovery tests are separate: `pytest manuscript/recovery/tests/`. Preview hardware calibration safely with `python3 hardware/calibrate_hardware.py --dry-run`.
+Run `pytest -v` for the default pure-logic suite; `pytest.ini` automatically excludes tests requiring EMC, LAMMPS, or RadonPy. Run a focused test with `pytest tests/test_protocol_policy.py -v`. Use `pytest -m requires_binaries` only on a configured simulation host. Preview hardware calibration safely with `python3 hardware/calibrate_hardware.py --dry-run`.
 
 ## Coding Style & Naming Conventions
 

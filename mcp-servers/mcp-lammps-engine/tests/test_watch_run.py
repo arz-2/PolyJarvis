@@ -5,6 +5,7 @@ run in the base test env without fastmcp. The chain-script tests import server.p
 and are skipped where the `mcp` dependency is unavailable (e.g. the base env).
 """
 import subprocess
+import shutil
 
 import pytest
 
@@ -69,6 +70,8 @@ def test_pidfile_dollar_pid_survives_setsid_nohup(tmp_path):
     """Regression for the original bug: $! captured the short-lived setsid launcher
     (dead within ~1 s). The long-lived wrapper's own $$ written to a pidfile must
     be alive and kill -0-able while the inner command runs."""
+    if shutil.which("setsid") is None:
+        pytest.skip("setsid is unavailable on this platform")
     pf = tmp_path / "pid_x"
     subprocess.run(
         ["bash", "-c", f"setsid nohup bash -c 'echo $$ > {pf}; sleep 5' </dev/null & disown"],

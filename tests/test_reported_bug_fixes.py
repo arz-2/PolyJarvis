@@ -144,45 +144,6 @@ def test_no_valid_split_still_returns_a_fit_for_the_swap_path():
     assert res["breakpoint_constrained"] is False
     assert res["a_glassy"] > 0, "the returned fit is the constraint-violating one, as flagged"
 
-
-# ── Bug 16: cache write must gate on derived output, not on the reliability flags ──
-
-def _write_cache(tmp_path, fields):
-    from write_characterization_cache import write_characterization
-    return write_characterization(tmp_path / "cache.json", "C=C", fields)
-
-
-def test_cache_not_written_when_k0_reliable_but_nothing_derived(tmp_path):
-    """K0-reliable + tau-unreliable derives zero knobs (every knob needs tau), but satisfied
-    the old any(flags) gate — writing an empty entry that permanently marked the SMILES
-    non-novel, since the novelty check is bare key existence."""
-    res = _write_cache(tmp_path, {
-        "probe_tau_relax_reliable": False,
-        "probe_K0_reliable": True,
-        "bulk_modulus_GPa": 3.1,
-    })
-    assert res["written"] is False
-    assert res["reason"] == "no_derived_field"
-
-
-def test_cache_written_when_a_knob_was_actually_derived(tmp_path):
-    res = _write_cache(tmp_path, {
-        "probe_tau_relax_reliable": True,
-        "probe_K0_reliable": False,
-        "derived_t_equil_ns": 12.5,
-    })
-    assert res["written"] is True
-    assert "derived_t_equil_ns" in res["fields_written"]
-
-
-def test_cache_ignores_null_derived_fields(tmp_path):
-    res = _write_cache(tmp_path, {
-        "probe_tau_relax_reliable": True,
-        "derived_t_equil_ns": None,
-    })
-    assert res["written"] is False
-
-
 # ── Bug 7: a relative output_dir silently resolved against LAMBDA_WORKDIR ──
 
 def test_require_output_dir_rejects_relative_path():
@@ -235,7 +196,7 @@ def test_ff_confidence_derived_from_citation_not_retired_field():
 
     got = ff_routing.get_preferred_ff("PSTR")
     assert got["ff_confidence"] == "cited"
-    # And it must agree with what gen_prompt writes into the build prompt.
+    # It must agree with deterministic build-parameter resolution.
     expected = "cited" if rules["PSTR"].get("ff_justification_doi") else "uncited"
     assert got["ff_confidence"] == expected
 

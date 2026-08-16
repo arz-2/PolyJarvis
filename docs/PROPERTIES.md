@@ -2,7 +2,7 @@
 
 PolyJarvis reports three properties — **density**, **Tg**, and **bulk modulus** — each validated against experimental ranges from `guides/polymer_rules.json`.
 
-To request a subset, pass `--properties density,tg` (or `all`) to `gen_prompt.py`, or set `TARGET_PROPERTIES` in the task. Omitting the field runs all three.
+To request a subset, pass `--properties density,tg` to `run_campaign.py`. Omitting the field uses the properties recorded in `run_plan.json`.
 
 ---
 
@@ -134,7 +134,7 @@ K_T = kB·T·<V> / Var(V)
 
 ## Future Tracks (Taxonomy — No Workers Implemented)
 
-These tracks are named for future development. No simulation workers or gen_prompt stages exist yet.
+These tracks are named for future deterministic workflow development and are not implemented yet.
 
 | Track | Properties | Simulation type |
 |-------|-----------|----------------|

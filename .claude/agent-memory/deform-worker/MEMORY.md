@@ -1,2 +1,0 @@
-# Deform-Worker Memory Index
-

@@ -3,15 +3,9 @@
 select_hardware.py — D-08 hardware selection, mechanically, from decision_policy.json's
 `policies.hardware` require/prefer clauses and polymer_rules.json's hardware_policy.
 
-Extracted from planner.md's D-08 procedure (steps 1/2/3/5/6 there were pure policy lookup +
-arithmetic; only step 4's evidence-citation prose needed genuine agent judgment). The Planner
-calls this once per reasoned plan and transcribes its output verbatim into `decisions[]` /
-`decided_params` / `uncertainties[]` — it does not re-derive these thresholds in prose, so
-decision_policy.json:policies.hardware stays the single source of truth for the numbers.
-
-Deterministic plans (an already protocol_validated SMILES) never call this — D-08 is not in
-SNAPSHOT_KEYS and make_deterministic_plan.py leaves hardware to gen_prompt.py's runtime
-by_forcefield fallback (resolve_hardware()), keeping worker prompts byte-identical.
+The validator and runtime use this shared policy implementation instead of re-deriving hardware
+thresholds. `decision_policy.json:policies.hardware` remains the source of truth for the numbers;
+runtime GPU allocation remains separate.
 
 Usage:
   python3 orchestration/select_hardware.py --polymer_class PACR --smiles "*CC(C)(C(=O)OC)*" \

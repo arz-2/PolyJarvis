@@ -183,7 +183,7 @@ def test_unparseable_file_is_unavailable():
 
 def test_all_failure_verdicts_share_the_size_prefix():
     """server.inspect_data_file prefixes its blocking error with the verdict, and
-    run_deterministic_replicate.do_build filters validation.errors on 'SIZE_'. Both depend on
+    run_campaign.do_build filters validation.errors on 'SIZE_'. Both depend on
     every failing verdict starting with that token."""
     fails = [
         classify_finite_size(20.0, 12.0, 15.0)["verdict"],       # min image

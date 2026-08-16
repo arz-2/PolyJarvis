@@ -1,0 +1,43 @@
+{
+  "polymer_class": "PSTR",
+  "properties": [
+    "density",
+    "tg",
+    "bulk_modulus"
+  ],
+  "rationale": [
+    "The repeat unit is a polystyrenic thermoplastic.",
+    "At 300 K, the configured workflow treats this system as glassy and uses Murnaghan with deformation fallback."
+  ],
+  "overrides": {},
+  "decision_evaluations": {
+    "D-02_charges": {
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ]
+    },
+    "D-03_electrostatics": {
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "Use the long-range electrostatics treatment paired with the configured PCFF protocol.",
+          "citation": "class-configured force-field evidence"
+        }
+      ],
+      "alternatives": [
+        "short-range Coulomb treatment"
+      ]
+    }
+  },
+  "assumptions": [
+    "The supplied repeat-unit SMILES represents the intended atactic material."
+  ],
+  "dominant_uncertainty": "forcefield_transferability",
+  "confidence": "medium"
+}

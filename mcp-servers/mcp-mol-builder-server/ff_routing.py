@@ -69,7 +69,7 @@ def get_preferred_ff(class_name: str) -> dict:
     return {
         "preferred_ff": entry.get("preferred_ff"),
         "preferred_builder": entry.get("preferred_builder"),
-        # Derived from citation presence, the same rule gen_prompt.py applies when it writes
+        # Derived from citation presence, the same rule stage_params.py applies when it resolves
         # ff_confidence into the build prompt. The old classes.<CLASS>.confidence field this
         # read was retired in 49877fe; entry.get on a field no longer in the file silently
         # graded every class "low" and contradicted the prompt the builder was handed.

@@ -198,9 +198,7 @@ def _double_launch_error(conflict: list) -> dict:
 
 
 # ─── Completion sentinels ─────────────────────────────────────────────────────
-# Each completed (or failed) run writes a small JSON file here.
-# Claude watches this directory via the Monitor tool so it is re-invoked
-# automatically when a simulation finishes, without polling.
+# Each completed or failed run writes a small JSON file here for deterministic consumers.
 SENTINEL_DIR = Path("/tmp/polyjarvis/sentinels")
 SENTINEL_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -1029,9 +1027,7 @@ def run_lammps_chain(
         run_manager.create_with_id(chain_id, "lammps_nohup_chain", meta)
         run_manager.start(chain_id)
 
-        # Start a background thread that polls the remote progress file and writes
-        # a local sentinel when the nohup chain finishes — enabling Monitor-based
-        # auto-continuation without Claude polling.
+        # Poll remote progress and write a local completion sentinel.
         threading.Thread(
             target=_chain_completion_monitor,
             args=(chain_id, progress_file),
@@ -1083,8 +1079,7 @@ def _cleanup_chain_files(chain_id: str, progress_file: str, keep_log: bool = Fal
 def _chain_completion_monitor(chain_id: str, progress_file: str, poll_interval: int = 60):
     """
     Background thread: polls chain_progress.jsonl every poll_interval seconds.
-    Writes a sentinel file when the chain completes or fails so Claude can
-    be notified via the Monitor tool without polling get_run_status().
+    Writes a sentinel file when the chain completes or fails.
     """
     logger.info(f"[{chain_id}] Chain monitor started (polling every {poll_interval}s)")
     while True:
@@ -1294,20 +1289,15 @@ def list_runs(status_filter: Optional[str] = None) -> dict:
 @mcp.tool()
 def watch_run(run_id: str) -> dict:
     """
-    Return a shell command Claude can pass to the Monitor tool to be notified
-    automatically when a run completes — no polling required.
+    Return completion-sentinel metadata for a submitted run.
 
-    Call this immediately after run_lammps_chain(), run_lammps_script(), or
-    any analysis tool. Then invoke the Monitor tool with the returned command.
-    The Monitor will block until the sentinel file appears and print its
-    contents; the harness re-invokes Claude at that point to continue the
-    workflow.
+    Deterministic callers can poll the sentinel path or process-liveness command.
 
     Args:
         run_id: The run_id or chain_id to watch.
 
     Returns:
-        monitor_command:        pass to the Monitor tool with timeout_ms=3600000.
+        monitor_command:        shell command that waits for the sentinel.
         recommended_timeout_ms: 3600000 (the Monitor max; runs may exceed it —
                                 re-arm by calling watch_run again on a bare timeout).
         sentinel_path:          completion sentinel JSON (status: completed|failed).

@@ -3,8 +3,8 @@
 The helper picks which per-rate tg_summary.json feeds run-summary: the slowest
 rate when the multirate slope gate passed, else the class fallback rate from
 decided_params.tg_slope_gate_fallback (highest_rate default; slowest_rate for
-rigid aromatics PKTN/PSFO). orchestration/ORCHESTRATOR.md Phase C evals its two stdout lines
-(TG_PATH=..., SLOPE_GATE=...), so that contract is pinned here too.
+rigid aromatics PKTN/PSFO). Its two stdout lines (TG_PATH=..., SLOPE_GATE=...)
+form the deterministic CLI contract pinned here.
 """
 import json
 import subprocess
