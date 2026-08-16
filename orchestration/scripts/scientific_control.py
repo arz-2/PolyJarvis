@@ -40,10 +40,13 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "npt_prod_ns": (0.05, 1000),
     "npt_cool_steps": (1, 2_000_000_000),
     "npt_cool300_steps": (1, 2_000_000_000),
+    "melt_hold_ns": (0.01, 1000),
+    "melt_only_continuation_ns": (0.01, 1000),
     "tg_t_high_K": (100, 2000),
     "tg_t_low_K": (1, 1500),
     "tg_t_step_K": (1, 200),
     "tg_min_steps_per_T": (1, 2_000_000_000),
+    "tg_steps_per_t": (1, 2_000_000_000),
     "K_strain_max": (0.001, 0.25),
     "K_deform_rate_inv_s": (1e3, 1e12),
     "K_deform_rate_slow_inv_s": (1e3, 1e12),
@@ -356,12 +359,14 @@ def apply_recovery(plan: dict, decision: RecoveryDecision) -> dict:
 
 
 class DeterministicScriptChain:
-    """Validate a plan, then launch each deterministic stage as a separate process."""
+    """Validate a plan, then run the in-process durable workflow engine."""
 
-    def __init__(self, python: str = sys.executable):
+    def __init__(self, python: str = sys.executable, repo_root: Path = REPO_ROOT,
+                 recovery_agent: Optional[RecoveryAgent] = None):
         self.python = python
+        self.repo_root = repo_root
+        self.recovery_agent = recovery_agent
         self.validator = SCRIPT_DIR / "validate_run_plan.py"
-        self.runner = SCRIPT_DIR / "run_campaign.py"
 
     def execute(self, plan_path: Path, dry_run: bool = False, attempt: int = 0) -> WorkflowOutcome:
         plan = json.loads(plan_path.read_text())
@@ -385,50 +390,24 @@ class DeterministicScriptChain:
             )
             return WorkflowOutcome("issue", validation_result, issue, tuple(steps))
 
-        if dry_run:
-            commands = [("resolve_stage_params", ["--dry-run"])]
-        else:
-            stages = ["build", "equilibration"]
-            properties = set(plan.get("properties", []))
-            if "tg" in properties:
-                stages.append("thermal")
-            if "bulk_modulus" in properties:
-                stages.append("mechanical")
-            stages.append("summary")
-            commands = [(stage, ["--stage", stage]) for stage in stages]
+        from run_campaign import run_campaign_workflow
 
-        last_result = {}
-        for stage_name, stage_args in commands:
-            command = [
-                self.python,
-                str(self.runner),
-                "--run_name", plan["run_name"],
-                "--polymer_class", plan["polymer_class"],
-                "--plan", str(plan_path),
-                *stage_args,
-            ]
-            execution = subprocess.run(command, capture_output=True, text=True)
-            execution_result = _last_json_value(execution.stdout) or {}
-            executor_state = _read_executor_state(plan["run_name"])
-            steps.append({"step": stage_name, "returncode": execution.returncode,
-                          "result": execution_result})
-            status = execution_result.get("status")
-            if execution.returncode != 0 or status in {"failed", "halted"}:
-                persisted_halt = executor_state.get("halted") or {}
-                detail = execution_result.get("detail") or persisted_halt
-                issue = WorkflowIssue(
-                    stage=execution_result.get("stage", stage_name),
-                    code=detail.get("reason", "CAMPAIGN_FAILED"),
-                    detail={
-                        "result": execution_result,
-                        "executor_state": executor_state,
-                        "stderr": execution.stderr.strip(),
-                    },
-                    attempt=attempt,
-                )
-                return WorkflowOutcome("issue", execution_result, issue, tuple(steps))
-            last_result = execution_result
-        return WorkflowOutcome("complete", last_result, None, tuple(steps))
+        execution_result = run_campaign_workflow(
+            plan_path, dry_run=dry_run, repo_root=self.repo_root,
+            recovery_agent=self.recovery_agent,
+        )
+        steps.append({"step": "resolve_stage_params" if dry_run else "workflow_engine",
+                      "result": execution_result})
+        if dry_run or execution_result.get("status") == "accepted":
+            return WorkflowOutcome("complete", execution_result, None, tuple(steps))
+        finding = execution_result.get("finding") or {}
+        issue = WorkflowIssue(
+            stage=execution_result.get("stage", "workflow"),
+            code=finding.get("code", execution_result.get("reason", "CAMPAIGN_FAILED")),
+            detail={"result": execution_result, "finding": finding},
+            attempt=attempt,
+        )
+        return WorkflowOutcome("issue", execution_result, issue, tuple(steps))
 
 
 class ScientificControlPlane:
@@ -446,9 +425,25 @@ class ScientificControlPlane:
 
     def run(self, intent: ScientificIntent, dry_run: bool = False) -> dict:
         events = []
-        decision = self.planning_agent.decide(intent, planning_context(intent))
-        events.append({"event": "scientific_agent_called"})
-        plan = materialize_plan(intent, decision)
+        context = planning_context(intent)
+        for planning_attempt in range(2):
+            try:
+                decision = self.planning_agent.decide(intent, context)
+                events.append({"event": "scientific_agent_called",
+                               "attempt": planning_attempt + 1})
+                plan = materialize_plan(intent, decision)
+                break
+            except Exception as exc:
+                events.append({"event": "scientific_agent_contract_error",
+                               "attempt": planning_attempt + 1, "error": str(exc)})
+                if planning_attempt:
+                    raise ValueError(
+                        "PLAN_AGENT_CONTRACT_ERROR: planning agent failed validation twice"
+                    ) from exc
+                context = {**context, "validation_feedback": {
+                    "code": "PLAN_AGENT_CONTRACT_ERROR", "error": str(exc),
+                    "instruction": "Return one JSON decision satisfying the output contract.",
+                }}
         run_dir = self.repo_root / "data" / intent.run_name / "raw"
         run_dir.mkdir(parents=True, exist_ok=True)
         plan_path = run_dir / "run_plan.json"
@@ -460,26 +455,44 @@ class ScientificControlPlane:
             events.append({"event": "deterministic_chain_finished", "attempt": attempt,
                            "status": outcome.status, "steps": list(outcome.steps)})
             if outcome.issue is None:
+                engine_calls = 0
+                state_path = outcome.result.get("state_path") if isinstance(outcome.result, dict) else None
+                if state_path and Path(state_path).exists():
+                    try:
+                        engine_calls = len(json.loads(Path(state_path).read_text()).get(
+                            "agent_escalations", []))
+                    except (OSError, json.JSONDecodeError):
+                        pass
                 result = {
                     "status": "complete",
                     "run_name": intent.run_name,
                     "plan_path": str(plan_path),
                     "result": outcome.result,
                     "events": events,
-                    "recovery_agent_calls": 0,
+                    "recovery_agent_calls": engine_calls,
                 }
                 self._save_control_state(intent.run_name, result)
                 return result
 
             events.append({"event": "issue_detected", "issue": outcome.issue.to_dict()})
             if self.recovery_agent is None:
+                engine_calls = 0
+                state_path = outcome.result.get("state_path") if isinstance(outcome.result, dict) else None
+                if state_path and Path(state_path).exists():
+                    try:
+                        engine_calls = len(json.loads(Path(state_path).read_text()).get(
+                            "agent_escalations", []))
+                    except (OSError, json.JSONDecodeError):
+                        pass
+                engine_terminal = outcome.result.get("status") in {"failed", "escalation_required"}
                 result = {
-                    "status": "needs_recovery_agent",
+                    "status": ("unresolved" if engine_calls and engine_terminal
+                               else "needs_recovery_agent"),
                     "run_name": intent.run_name,
                     "plan_path": str(plan_path),
                     "issue": outcome.issue.to_dict(),
                     "events": events,
-                    "recovery_agent_calls": 0,
+                    "recovery_agent_calls": engine_calls,
                 }
                 self._save_control_state(intent.run_name, result)
                 return result

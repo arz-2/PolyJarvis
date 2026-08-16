@@ -12,7 +12,9 @@ import agent_api  # noqa: E402
 def test_contract_enforces_scientific_planning_and_conditional_recovery():
     contract = agent_api.interface_contract()
 
-    assert contract["available_actions"] == ("run_scientific_campaign", "inspect_run")
+    assert contract["available_actions"] == (
+        "start", "resume", "inspect", "run_scientific_campaign"
+    )
     assert any("planning agent must decide" in rule for rule in contract["rules"])
     assert any("only after a structured issue" in rule for rule in contract["rules"])
 

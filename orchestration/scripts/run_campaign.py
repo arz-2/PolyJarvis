@@ -1,38 +1,16 @@
 #!/usr/bin/env python3
-"""
-Execute a PolyJarvis campaign as a deterministic, resumable workflow.
+"""Run a complete PolyJarvis campaign through the durable workflow engine.
 
-The runner calls builder, LAMMPS, validation, and analysis functions directly. Agent
-participation is limited to selecting plans and interpreting structured halts.
-
-MCP server tools are imported as plain Python functions. Async jobs report completion through
-filesystem sentinels, which this process polls directly.
-
-Scope of this version: EMC build path only (18 of ~19 supported classes). PURA (the one
-RadonPy-only class) is out of scope for now — do_build() raises a clear error rather than
-attempting it; see the deferred build_via_radonpy.py cross-interpreter driver in the plan.
-
-Resumability: data/<RUN>/raw/executor_state.json tracks per-stage status, so a crash (reboot,
-OOM-killed wrapper) doesn't discard hours of completed work — just re-running with the same
---plan skips any stage already marked "done".
-
-Safe EXTEND recovery is capped at two attempts. Structural and protocol-changing failures halt
-with machine-readable diagnostics.
-
-Usage:
-  <repo>/mcp-servers/.venv/bin/python orchestration/scripts/run_campaign.py \\
-      --run_name RUN --polymer_class CLASS --plan data/RUN/raw/run_plan.json \\
-      [--dry-run] [--properties density,tg,bulk_modulus]
-
-  (Invoking via a different interpreter is fine — the script re-execs itself under the venv
-  python needed for fastmcp/numpy/scipy/MDAnalysis before importing the MCP servers.)
+The public CLI accepts a plan, never an individual stage. Builder, LAMMPS, validation,
+and analysis functions are in-process adapters; workflow state and recovery belong to
+``workflow_engine``.
 """
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
-import random
 import shutil
 import subprocess
 import sys
@@ -47,6 +25,10 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 from stage_params import resolve_stage_params, apply_plan, resolve_hardware, load_plan  # noqa: E402
 from hw_common import load_rules, get_class_entry  # noqa: E402
 from protocol_policy import select_pressure_ladder  # noqa: E402
+from workflow_engine import (  # noqa: E402
+    Finding, StageResult, WorkflowEngine, atomic_write_json, pressure_point_drop_allowed,
+)
+from validate_run_plan import validate_plan  # noqa: E402
 
 LAMMPS_ENGINE_DIR = REPO_ROOT / "mcp-servers" / "mcp-lammps-engine"
 EMC_SERVER_DIR = REPO_ROOT / "mcp-servers" / "mcp-emc-server"
@@ -256,6 +238,8 @@ def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNames
         deform_rate_mode="primary", murnaghan_logs=None, d05=None, npt_prod_log=None,
         npt_prod_dump=None, ff=None, backbone_types=None, enthalpy_col="Enthalpy",
         output_dir=None, equil_data_path=None, npt_prod_ns=None, add_melt_npt=False,
+        melt_hold_ns=None, melt_only_continuation_ns=None, phase="full",
+        pending_cooldown_path=None,
         T_equil_K=None, T_anneal_high_K=None, tg_t_high_K=None, tg_t_low_K=None,
         tg_t_step_K=None, tg_steps_per_t=None, tg_rate_index=None, mr_rates=None,
         mr_tg_values=None, n_replicates=1, K_strain_max=None, K_deform_rate_inv_s=None,
@@ -276,7 +260,8 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
 
     p = resolve_stage_params("build", args, cls)
     work_dir = Path(p["work_dir"])
-    emc_seed = p["emc_seed"] if p["emc_seed"] is not None else random.randint(1, 999_999)
+    emc_seed = (p["emc_seed"] if p["emc_seed"] is not None else
+                1 + int(hashlib.sha256(args.run_name.encode()).hexdigest(), 16) % 999_999)
 
     job = emc.submit_emc_cell_job(
         smiles=p["smiles"], polymer_class=args.polymer_class.upper(),
@@ -395,7 +380,7 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
     # below — the original pre-simulation .data file is the only one whose Masses section still
     # has the "# <name>" comments inspect_data_file's atom_type_names parsing needs; a write_data
     # output (which npt_prod_data_path always is) has stripped them.
-    build_data_path = args.data_path
+    build_data_path = getattr(args, "build_data_path", None) or args.data_path
 
     # generate_equilibration_workflow rejects a null seed; stage_params resolves one (pinned, else
     # derived from run_name) for the chain and every EXTEND continuation below. Log it like EMC's.
@@ -404,7 +389,15 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
     gpu_per_run = cls.get("gpu_per_run") or 1
     with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
         args.gpu_ids = gpu_ids
-        submission = _submit_equil_chain(args, cls, lammps)
+        continuation_path = getattr(args, "pending_continuation_path", None)
+        if continuation_path:
+            submission = _submit_equil_chain(
+                args, cls, lammps, extend_from_data=continuation_path,
+                extend_temp=getattr(args, "continuation_temp_K", 300.0),
+                extend_ns=float(getattr(args, "npt_continuation_ns", 1.5)),
+            )
+        else:
+            submission = _submit_equil_chain(args, cls, lammps)
         result = wait_for_run(lammps, submission["chain_id"], "equilibration chain")
     if result.get("status") != "completed":
         state.mark("equil_check", "failed", result=result)
@@ -483,6 +476,14 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
             return result
 
         if equil_verdict == "EXTEND":
+            tau_relax_ps = (((comp or {}).get("chain") or {}).get("ct") or {}).get("tau_relax_ps")
+            if getattr(args, "engine_owned_recovery", False):
+                detail = dict(verdict)
+                if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
+                    detail["relaxation_time_ns"] = tau_relax_ps / 1000.0
+                return {"halted": True, "reason": "EXTEND", "detail": detail,
+                        "npt_prod_data_path": p["npt_prod_data_path"],
+                        "npt_prod_dump_path": npt_prod_dump_path}
             attempts += 1
             if attempts > EXTEND_MAX_ATTEMPTS:
                 state.halt("equil_check", "EXTEND_EXHAUSTED", {"attempts": attempts})
@@ -491,7 +492,6 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
                 return {"halted": True, "reason": "EXTEND_EXHAUSTED"}
             # A measured relaxation signal from this run's own data beats a blind flat guess —
             # tau_relax_ps comes from the comprehensive check's KWW fit.
-            tau_relax_ps = (((comp or {}).get("chain") or {}).get("ct") or {}).get("tau_relax_ps")
             extend_ns = 1.5
             if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
                 extend_ns = max(1.5, round(1.5 * tau_relax_ps / 1000, 2))
@@ -570,7 +570,8 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
         ), f"tg analysis rate={rate}")
         per_rate.append({"rate": rate, "Tg_K": thermal.get("Tg_K"),
                          "fit_quality": thermal.get("fit_quality"), "r_squared": thermal.get("r_squared"),
-                         "output_dir": ap["output_dir"], "used_highest_rate": idx == len(tg_rates) - 1})
+                         "output_dir": ap["output_dir"], "used_highest_rate": idx == len(tg_rates) - 1,
+                         "tg_gate_verdict": thermal.get("tg_gate_verdict")})
 
     highest = per_rate[-1] if per_rate else None
 
@@ -586,7 +587,8 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
     else:
         is_glassy = bool(highest and isinstance(highest["Tg_K"], (int, float)) and highest["Tg_K"] > 300)
 
-    result = {"per_rate": per_rate, "is_glassy": is_glassy}
+    result = {"per_rate": per_rate, "is_glassy": is_glassy,
+              "tg_gate_verdict": (highest or {}).get("tg_gate_verdict")}
     state.mark("thermal", "done", result=result)
     return result
 
@@ -630,47 +632,89 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
         ced_mpa=state.stage("equil_check").get("result", {}).get("ced_mpa"),
     )
 
-    with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
-        args.gpu_ids = gpu_ids
-        series = lammps.run_bulk_modulus_series(
-            data_file=p["equil_data_path"], work_dir=f"{p['work_dir']}/bm_series",
-            pressures_atm=list(pressure_selection.pressures_atm), temp_K=p["temp_K"],
-            run_name=args.run_name, gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"],
-            velocity_seed=p["velocity_seed"], npt_steps=p["npt_steps"],
-            dt_fs=p["dt_fs"], use_trappe=p["lammps_flags"]["use_trappe"],
-            use_pcff=p["lammps_flags"]["use_pcff"], use_opls=p["lammps_flags"]["use_opls"], engine=p["engine"],
-        )
-        if series.get("status") == "error":
-            raise SystemExit(f"run_bulk_modulus_series failed: {series}")
-        m_result = wait_for_run(lammps, series["chain_id"], "murnaghan series")
-    if m_result.get("status") != "completed":
-        state.mark("mechanical", "failed", result=m_result)
-        raise SystemExit(f"Murnaghan series did not complete: {m_result}")
+    point_status = {}
+    analysis_logs = []
+    analysis_pressures = []
+    point_state_path = Path(p["work_dir"]) / "pressure_points.json"
+    for pressure in dict.fromkeys(pressure_selection.pressures_atm):
+        point = {"pressure_atm": pressure, "status": "failed", "attempts": []}
+        for point_attempt in range(1, 3):
+            with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
+                args.gpu_ids = gpu_ids
+                series = lammps.run_bulk_modulus_series(
+                    data_file=p["equil_data_path"],
+                    work_dir=f"{p['work_dir']}/bm_series/p_{pressure:g}/attempt_{point_attempt}",
+                    pressures_atm=[pressure], temp_K=p["temp_K"], run_name=args.run_name,
+                    gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"], velocity_seed=p["velocity_seed"],
+                    npt_steps=p["npt_steps"], dt_fs=p["dt_fs"],
+                    use_trappe=p["lammps_flags"]["use_trappe"],
+                    use_pcff=p["lammps_flags"]["use_pcff"],
+                    use_opls=p["lammps_flags"]["use_opls"], engine=p["engine"],
+                )
+                if series.get("status") == "error":
+                    point["attempts"].append({"attempt": point_attempt, "status": "failed",
+                                              "detail": series})
+                    continue
+                m_result = wait_for_run(lammps, series["chain_id"],
+                                        f"murnaghan pressure={pressure:g}")
+            point["attempts"].append({"attempt": point_attempt,
+                                      "status": m_result.get("status"), "detail": m_result})
+            if m_result.get("status") == "completed":
+                point["status"] = "accepted"
+                point["log_file"] = series["log_files"][0]
+                analysis_logs.append(series["log_files"][0])
+                analysis_pressures.append(pressure)
+                break
+        point_status[str(pressure)] = point
+        atomic_write_json(point_state_path, {"points": point_status})
+
+    status_for_policy = {float(key): value["status"] for key, value in point_status.items()}
+    if any(value != "accepted" for value in status_for_policy.values()) and not pressure_point_drop_allowed(status_for_policy):
+        result = {"method": "murnaghan", "point_status": point_status,
+                  "workflow_finding": {"code": "MECHANICAL_IDENTIFIABILITY_FAILED",
+                                       "details": {"point_status": point_status}}}
+        state.mark("mechanical", "failed", result=result)
+        return result
 
     bp = resolve_stage_params("analyze-bm", args, cls)
+    prior_murn = cls.get("_prior_murnaghan_result") or {}
+    if prior_murn and cls.get("mechanical_resample_points"):
+        combined = dict(zip(prior_murn.get("pressures_atm") or (),
+                            prior_murn.get("log_files") or ()))
+        combined.update(zip(analysis_pressures, analysis_logs))
+        analysis_pressures = sorted(combined)
+        analysis_logs = [combined[pressure] for pressure in analysis_pressures]
     murn = wait_for_analysis(lammps, lammps.extract_bulk_modulus_murnaghan(
-        log_files=series["log_files"], pressures_atm=series["pressures_atm"],
+        log_files=analysis_logs, pressures_atm=analysis_pressures,
         output_dir=bp["output_dir"], graphs_dir=bp["graphs_dir"],
         npt_prod_log=bp["npt_prod_log_path"],
     ), "bulk modulus (murnaghan)")
-    accepted = bool(murn.get("fit_converged"))
+    # Optimizer convergence is diagnostic only. Scientific acceptance is owned by the
+    # reportability gate emitted by the analysis.
+    accepted = murn.get("bm_gate_verdict") == "BM_REPORTABLE"
 
     if accepted:
         result = {"method": "murnaghan", "bulk_modulus_GPa": murn.get("bulk_modulus_GPa"),
                   "B0_prime": murn.get("B0_prime"),
+                  "bm_gate_verdict": murn.get("bm_gate_verdict"),
+                  "bm_gate_reasons": murn.get("bm_gate_reasons"),
+                  "murnaghan_result": murn,
                   "pressure_selection": pressure_selection.to_dict()}
         state.mark("mechanical", "done", result=result)
         return result
 
-    if not is_glassy:
-        # rubbery Murnaghan rejection has no deform fallback in this pipeline — report as-is
-        result = {"method": "murnaghan", "bulk_modulus_GPa": murn.get("bulk_modulus_GPa"),
-                  "accepted": False, "reason": "fit_converged=False",
-                  "pressure_selection": pressure_selection.to_dict()}
-        state.mark("mechanical", "done", result=result)
-        return result
+    result = {"method": "murnaghan", "bulk_modulus_GPa": murn.get("bulk_modulus_GPa"),
+              "accepted": False, "reason": murn.get("bm_gate_verdict") or "BM_INADMISSIBLE",
+              "bm_gate_verdict": murn.get("bm_gate_verdict"),
+              "bm_gate_reasons": murn.get("bm_gate_reasons"), "is_glassy": is_glassy,
+              "murnaghan_result": murn, "pressure_selection": pressure_selection.to_dict()}
+    state.mark("mechanical", "failed", result=result)
+    return result
 
-    # Deform fallback: primary rate, then slow rate for the rate-sensitivity check
+
+def do_deformation(state: ExecutorState, args, cls: dict, lammps) -> dict:
+    """Run and gate the deformation fallback selected by the workflow engine."""
+    gpu_per_run = cls.get("gpu_per_run") or 1
     with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
         args.gpu_ids = gpu_ids
         primary = _submit_deform(args, cls, lammps, "primary")
@@ -699,7 +743,10 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
     ), "bulk modulus (deform)")
     result = {"method": "deformation", "bulk_modulus_GPa": deform_extract.get("bulk_modulus_GPa"),
              "shear_modulus_GPa": deform_extract.get("shear_modulus_GPa"),
-             "youngs_modulus_GPa": deform_extract.get("youngs_modulus_GPa")}
+             "youngs_modulus_GPa": deform_extract.get("youngs_modulus_GPa"),
+             "deform_gate_verdict": deform_extract.get("deform_gate_verdict"),
+             "deform_gate_reasons": deform_extract.get("deform_gate_reasons"),
+             "rate_sensitivity": deform_extract.get("rate_sensitivity")}
     state.mark("mechanical", "done", result=result)
     return result
 
@@ -773,157 +820,189 @@ def _print_dry_run(args, cls: dict, properties: set):
     print(json.dumps(out, indent=2, default=str))
 
 
-# ─── Main ───────────────────────────────────────────────────────────────────
+# ─── In-process engine adapter and CLI ──────────────────────────────────────
 
-def main():
-    ap = argparse.ArgumentParser(description="Execute a deterministic PolyJarvis campaign.")
-    ap.add_argument("--run_name", required=True)
-    ap.add_argument("--polymer_class", required=True)
-    ap.add_argument("--plan", required=True, help="Path to run_plan.json")
-    ap.add_argument("--dry-run", action="store_true",
-                    help="Resolve every stage's params without submitting anything; print JSON and exit.")
-    ap.add_argument("--properties", default=None, help="Override properties_requested (else from plan).")
-    ap.add_argument(
-        "--stage",
-        choices=("all", "build", "equilibration", "thermal", "mechanical", "summary"),
-        default="all",
-        help="Execute one resumable workflow stage; default executes the complete chain.",
-    )
-    args_cli = ap.parse_args()
+class CampaignStageExecutor:
+    """Adapt the deterministic simulation functions to :class:`WorkflowEngine`.
 
-    if VENV_PY.exists() and Path(sys.executable).resolve() != VENV_PY.resolve():
-        os.execv(str(VENV_PY), [str(VENV_PY), str(Path(__file__).resolve())] + sys.argv[1:])
+    All writable resolver paths are redirected into the current attempt. Dependencies are
+    taken exclusively from accepted manifests supplied by the engine.
+    """
 
+    def __init__(self, args, cls: dict, emc, lammps, plan_path: str):
+        self.args = args
+        self.base_cls = dict(cls)
+        self.emc = emc
+        self.lammps = lammps
+        self.plan_path = plan_path
+
+    @staticmethod
+    def _outputs(context: dict, stage: str) -> dict:
+        return dict(context.get("dependencies", {}).get(stage, {}).get("outputs") or {})
+
+    def execute(self, stage: str, context: dict) -> StageResult:
+        attempt_dir = Path(context["attempt_dir"])
+        args = self.args
+        cls = {**self.base_cls, **context["parameters"]}
+        args.engine_owned_recovery = True
+        if stage == "mechanical" and context["parameters"].get("mechanical_resample_points"):
+            for prior in reversed(context.get("prior_attempts") or ()):
+                manifest_path = prior.get("manifest")
+                if not manifest_path or not Path(manifest_path).is_file():
+                    continue
+                prior_outputs = json.loads(Path(manifest_path).read_text()).get("outputs") or {}
+                if prior_outputs.get("murnaghan_result"):
+                    cls["_prior_murnaghan_result"] = prior_outputs["murnaghan_result"]
+                    break
+        for key, value in context["parameters"].items():
+            if hasattr(args, key):
+                setattr(args, key, value)
+        args.work_dir = str(attempt_dir / "work")
+        args.output_dir = str(attempt_dir / "raw")
+        graphs_dir = attempt_dir / "graphs"
+        graphs_dir.mkdir(parents=True, exist_ok=True)
+        run_log = attempt_dir / "run_log.md"
+        legacy = ExecutorState(attempt_dir / "executor_state.json", args.run_name,
+                               args.polymer_class, self.plan_path)
+        build = self._outputs(context, "build")
+        equil = self._outputs(context, "equilibration")
+        thermal = self._outputs(context, "thermal") or None
+        if build:
+            args.data_path = build.get("data_path")
+            args.build_data_path = build.get("data_path")
+            args.n_atoms = build.get("n_atoms")
+        if equil:
+            args.data_path = equil.get("npt_prod_data_path")
+        if stage == "equilibration" and context["parameters"].get("npt_continuation_ns"):
+            for prior in reversed(context.get("prior_attempts") or ()):
+                manifest_path = prior.get("manifest")
+                if not manifest_path or not Path(manifest_path).is_file():
+                    continue
+                prior_outputs = json.loads(Path(manifest_path).read_text()).get("outputs") or {}
+                if prior_outputs.get("npt_prod_data_path"):
+                    args.pending_continuation_path = prior_outputs["npt_prod_data_path"]
+                    args.npt_continuation_ns = context["parameters"]["npt_continuation_ns"]
+                    break
+        try:
+            if stage == "build":
+                outputs = do_build(legacy, args, cls, self.emc, self.lammps, run_log)
+            elif stage == "equilibration":
+                outputs = do_equil_and_check(legacy, args, cls, self.lammps, run_log)
+                if outputs.get("halted"):
+                    code = outputs.get("reason") or "STRUCTURAL_FAIL"
+                    detail = outputs.get("detail") or (legacy.data.get("halted") or {}).get("detail") or {}
+                    if code == "STRUCTURAL_FAIL":
+                        code = (detail.get("finite_size_verdict") or
+                                detail.get("cooling_verdict") or
+                                ("DENSITY_HETEROGENEITY"
+                                 if detail.get("homogeneity_verdict") == "HOMOG_HETEROGENEOUS"
+                                 else code))
+                    confidence = detail.get("remedy_confidence") or "high"
+                    return StageResult("remedy_required",
+                                       (Finding(code, stage, confidence=confidence,
+                                                details=detail),),
+                                       self._artifacts(attempt_dir), outputs)
+            elif stage == "thermal":
+                outputs = do_thermal(legacy, args, cls, self.lammps, attempt_dir / "raw",
+                                     graphs_dir, run_log)
+            elif stage == "mechanical":
+                is_glassy = (thermal.get("is_glassy") if thermal else
+                              resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0)
+                if context["parameters"].get("mechanical_method") == "deformation":
+                    args.is_glassy = "true" if is_glassy else "false"
+                    outputs = do_deformation(legacy, args, cls, self.lammps)
+                else:
+                    outputs = do_mechanical(legacy, args, cls, self.lammps, is_glassy,
+                                            args.data_path, attempt_dir / "raw", graphs_dir)
+            elif stage == "summary":
+                is_glassy = (thermal.get("is_glassy") if thermal else
+                              resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0)
+                outputs = do_summary(legacy, args, cls, self.lammps, is_glassy, thermal,
+                                     attempt_dir / "raw", graphs_dir, self.plan_path, run_log)
+            else:
+                raise ValueError(f"unknown workflow stage {stage!r}")
+        except SystemExit as exc:
+            message = str(exc)
+            code = "PROCESS_FAILED"
+            details = {"error": message}
+            if "preferred_builder" in message:
+                code = "UNSUPPORTED_BUILDER"
+            elif "SIZE_" in message:
+                code = next((token.strip(".,:") for token in message.split()
+                             if token.startswith("SIZE_")), "FINITE_SIZE_FAILED")
+                details.update((legacy.stage("build").get("result") or {}))
+                details["nchain"] = cls.get("nchain")
+            return StageResult("failed", (Finding(code, stage, details=details),),
+                               self._artifacts(attempt_dir))
+        if outputs and outputs.get("workflow_finding"):
+            finding = Finding.from_value(outputs["workflow_finding"], stage)
+            return StageResult("escalation_required", (finding,), self._artifacts(attempt_dir),
+                               outputs)
+        return StageResult("accepted", (), self._artifacts(attempt_dir), outputs or {})
+
+    @staticmethod
+    def _artifacts(attempt_dir: Path) -> tuple[str, ...]:
+        excluded = {"manifest.json", "executor_state.json"}
+        return tuple(str(path) for path in sorted(attempt_dir.rglob("*"))
+                     if path.is_file() and path.name not in excluded)
+
+
+def run_campaign_workflow(plan_path: Path, *, dry_run: bool = False,
+                          repo_root: Path = REPO_ROOT, recovery_agent=None) -> dict:
+    """Start or resume an entire campaign; stages are never externally selectable."""
+    plan_path = Path(plan_path)
+    plan = load_plan(str(plan_path))
+    run_name = plan["run_name"]
+    polymer_class = plan["polymer_class"]
     rules = load_rules()
-    cls_raw = get_class_entry(rules, args_cli.polymer_class, warn_on_miss=False)
-    plan = load_plan(args_cli.plan)
-
-    args = _base_args(args_cli.run_name, args_cli.polymer_class, args_cli.plan)
-    if args_cli.properties:
-        args.properties = args_cli.properties
+    cls_raw = get_class_entry(rules, polymer_class, warn_on_miss=False)
+    args = _base_args(run_name, polymer_class, str(plan_path))
     cls = apply_plan(cls_raw, plan, args)
     resolve_hardware(args, cls, rules)
-
-    properties = ({"density", "tg", "bulk_modulus"} if args.properties in (None, "all")
-                  else {p.strip().lower() for p in args.properties.split(",") if p.strip()})
-
-    if args_cli.dry_run:
-        _print_dry_run(args, cls, properties)
-        return
-
-    run_name = args_cli.run_name
-    raw_dir = REPO_ROOT / "data" / run_name / "raw"
-    graphs_dir = REPO_ROOT / "data" / run_name / "graphs"
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    graphs_dir.mkdir(parents=True, exist_ok=True)
-    run_log_path = REPO_ROOT / "data" / run_name / "run_log.md"
-    if not run_log_path.exists():
-        template = REPO_ROOT / "data" / "TEMPLATE" / "run_log.md"
-        if template.exists():
-            run_log_path.write_text(template.read_text())
-
-    state = ExecutorState(raw_dir / "executor_state.json", run_name, args_cli.polymer_class, args_cli.plan)
-
+    properties = set(plan.get("properties") or ())
+    args.properties = ",".join(sorted(properties))
+    if dry_run:
+        stages = ["build", "equil", "equil-check"]
+        if "tg" in properties:
+            stages += ["tg", "analyze-tg"]
+        if "bulk_modulus" in properties:
+            stages += ["murnaghan", "deform", "analyze-bm"]
+        stages.append("run-summary")
+        return {name: resolve_stage_params(name, args, cls) for name in stages}
     lammps = _load_server_module("lammps_engine_server", LAMMPS_ENGINE_DIR / "server.py",
                                  LAMMPS_ENGINE_DIR, _mcp_env("mcp-lammps-engine"))
     emc = _load_server_module("emc_server_module", EMC_SERVER_DIR / "server.py",
                               EMC_SERVER_DIR, _mcp_env("mcp-emc-server"))
-
-    selected_stage = args_cli.stage
-
-    if selected_stage in ("all", "build") and not state.is_done("build"):
-        build_result = do_build(state, args, cls, emc, lammps, run_log_path)
-    elif state.is_done("build"):
-        build_result = state.stage("build")["result"]
-    else:
-        _print_missing_dependency("build", selected_stage)
-        return
-    args.data_path = build_result["data_path"]
-    args.n_atoms = build_result.get("n_atoms")
-    if selected_stage == "build":
-        _print_stage_complete("build", build_result)
-        return
-
-    if selected_stage in ("all", "equilibration") and not state.is_done("equil_check"):
-        equil_result = do_equil_and_check(state, args, cls, lammps, run_log_path)
-        if equil_result.get("halted"):
-            print(json.dumps({"status": "halted", "stage": "equil_check",
-                              "detail": state.data.get("halted") or equil_result}, default=str))
-            return
-    elif state.is_done("equil_check"):
-        equil_result = state.stage("equil_check")["result"]
-    else:
-        _print_missing_dependency("equil_check", selected_stage)
-        return
-    args.data_path = equil_result["npt_prod_data_path"]
-    if selected_stage == "equilibration":
-        _print_stage_complete("equilibration", equil_result)
-        return
-
-    thermal_result = None
-    is_glassy = None
-    if "tg" in properties:
-        if selected_stage in ("all", "thermal") and not state.is_done("thermal"):
-            thermal_result = do_thermal(state, args, cls, lammps, raw_dir, graphs_dir, run_log_path)
-            if thermal_result.get("halted"):
-                print(json.dumps({"status": "halted", "stage": "thermal",
-                                  "detail": state.data.get("halted") or thermal_result}, default=str))
-                return
-        elif state.is_done("thermal"):
-            thermal_result = state.stage("thermal")["result"]
-        else:
-            _print_missing_dependency("thermal", selected_stage)
-            return
-        is_glassy = thermal_result["is_glassy"]
-    else:
-        is_glassy = resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0
-    if selected_stage == "thermal":
-        _print_stage_complete("thermal", thermal_result or {"status": "not_requested"})
-        return
-
-    if "bulk_modulus" in properties:
-        if selected_stage in ("all", "mechanical") and not state.is_done("mechanical"):
-            mechanical_result = do_mechanical(
-                state, args, cls, lammps, is_glassy, args.data_path, raw_dir, graphs_dir
-            )
-        elif state.is_done("mechanical"):
-            mechanical_result = state.stage("mechanical")["result"]
-        else:
-            _print_missing_dependency("mechanical", selected_stage)
-            return
-        # mechanical result not otherwise consumed here — generate_run_summary reads its JSON directly
-    else:
-        mechanical_result = {"status": "not_requested"}
-    if selected_stage == "mechanical":
-        _print_stage_complete("mechanical", mechanical_result)
-        return
-
-    summary_result = do_summary(
-        state, args, cls, lammps, is_glassy, thermal_result,
-        raw_dir, graphs_dir, args_cli.plan, run_log_path,
-    )
-
-    if selected_stage == "summary":
-        _print_stage_complete("summary", summary_result)
-        return
-
-    print(json.dumps({"status": "complete", "run_name": run_name,
-                      "run_summary": str(raw_dir / "run_summary.json")}))
+    run_dir = repo_root / "data" / run_name
+    policy_hashes = {}
+    for path in (repo_root / "guides" / "polymer_rules.json",
+                 repo_root / "orchestration" / "decision_policy.json"):
+        if path.exists():
+            policy_hashes[str(path.relative_to(repo_root))] = hashlib.sha256(path.read_bytes()).hexdigest()
+    executor = CampaignStageExecutor(args, cls, emc, lammps, str(plan_path))
+    decision_policy = json.loads((repo_root / "orchestration" / "decision_policy.json").read_text())
+    return WorkflowEngine(run_dir, plan, executor, recovery_agent=recovery_agent,
+                          policy_hashes=policy_hashes, plan_path=plan_path,
+                          plan_validator=lambda candidate: validate_plan(candidate, decision_policy)).run()
 
 
-def _print_missing_dependency(required_stage: str, selected_stage: str) -> None:
-    print(json.dumps({
-        "status": "halted",
-        "stage": selected_stage,
-        "detail": {
-            "reason": "DEPENDENCY_MISSING",
-            "required_stage": required_stage,
-        },
-    }))
-
-
-def _print_stage_complete(stage: str, result: dict) -> None:
-    print(json.dumps({"status": "complete", "stage": stage, "result": result}, default=str))
+def main():
+    ap = argparse.ArgumentParser(description="Start or resume a deterministic PolyJarvis workflow.")
+    ap.add_argument("--plan", required=True, help="Path to run_plan.json")
+    ap.add_argument("--run_name", help="Optional consistency check against plan.run_name")
+    ap.add_argument("--polymer_class", help="Optional consistency check against plan.polymer_class")
+    ap.add_argument("--dry-run", action="store_true")
+    args_cli = ap.parse_args()
+    if VENV_PY.exists() and Path(sys.executable).resolve() != VENV_PY.resolve() and not args_cli.dry_run:
+        os.execv(str(VENV_PY), [str(VENV_PY), str(Path(__file__).resolve())] + sys.argv[1:])
+    plan_identity = load_plan(args_cli.plan)
+    if args_cli.run_name and args_cli.run_name != plan_identity.get("run_name"):
+        ap.error("--run_name does not match the plan")
+    if (args_cli.polymer_class and
+            args_cli.polymer_class.upper() != str(plan_identity.get("polymer_class", "")).upper()):
+        ap.error("--polymer_class does not match the plan")
+    print(json.dumps(run_campaign_workflow(Path(args_cli.plan), dry_run=args_cli.dry_run),
+                     indent=2, default=str))
 
 
 if __name__ == "__main__":

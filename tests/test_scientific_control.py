@@ -252,34 +252,36 @@ def test_subprocess_scientific_agent_uses_json_contract(tmp_path):
     assert decision.rationale == ("Use the configured PSTR density protocol.",)
 
 
-def test_real_chain_launches_each_requested_stage_as_a_separate_command(tmp_path, monkeypatch):
+def test_real_chain_invokes_in_process_workflow_once(tmp_path, monkeypatch):
     decision = SpyPlanningAgent().decide(INTENT, {"available_classes": {"PSTR": {}}})
     plan = materialize_plan(INTENT, decision)
     plan_path = tmp_path / "run_plan.json"
     plan_path.write_text(json.dumps(plan))
     commands = []
+    engine_calls = []
 
     def fake_run(command, **kwargs):
         commands.append(command)
         if "validate_run_plan.py" in command[1]:
             stdout = json.dumps({"findings": [], "count": 0})
         else:
-            stage = command[command.index("--stage") + 1]
-            stdout = json.dumps({"status": "complete", "stage": stage})
+            raise AssertionError("campaign stages must not launch subprocesses")
         return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
     monkeypatch.setattr("scientific_control.subprocess.run", fake_run)
+    monkeypatch.setattr("run_campaign.run_campaign_workflow", lambda *args, **kwargs: (
+        engine_calls.append((args, kwargs)) or {"status": "accepted", "state_path": ""}
+    ))
 
     outcome = DeterministicScriptChain(python=sys.executable).execute(plan_path)
 
     assert outcome.status == "complete"
-    assert [step["step"] for step in outcome.steps] == [
-        "validate_run_plan", "build", "equilibration", "mechanical", "summary"
-    ]
-    assert all("--stage" in command for command in commands[1:])
+    assert [step["step"] for step in outcome.steps] == ["validate_run_plan", "workflow_engine"]
+    assert len(commands) == 1
+    assert len(engine_calls) == 1
 
 
-def test_real_chain_includes_persisted_executor_failure_context(tmp_path, monkeypatch):
+def test_real_chain_normalizes_engine_failure_context(tmp_path, monkeypatch):
     decision = SpyPlanningAgent().decide(INTENT, {"available_classes": {"PSTR": {}}})
     plan = materialize_plan(INTENT, decision)
     plan_path = tmp_path / "run_plan.json"
@@ -290,23 +292,23 @@ def test_real_chain_includes_persisted_executor_failure_context(tmp_path, monkey
             return subprocess.CompletedProcess(
                 command, 0, stdout=json.dumps({"findings": [], "count": 0}), stderr=""
             )
-        return subprocess.CompletedProcess(command, 1, stdout="", stderr="LAMMPS failed")
+        raise AssertionError("campaign stages must not launch subprocesses")
 
-    persisted = {
-        "halted": {
-            "stage": "equil_check",
-            "reason": "BACKBONE_TYPES_UNRESOLVED",
-            "detail": {"atom_type_names": {"1": "c4"}},
-        }
-    }
     monkeypatch.setattr("scientific_control.subprocess.run", fake_run)
-    monkeypatch.setattr("scientific_control._read_executor_state", lambda run_name: persisted)
+    engine_result = {
+        "status": "escalation_required", "stage": "equilibration",
+        "finding": {"code": "BACKBONE_TYPES_UNRESOLVED",
+                    "details": {"atom_type_names": {"1": "c4"}}},
+        "state_path": str(tmp_path / "workflow_state.json"),
+    }
+    monkeypatch.setattr("run_campaign.run_campaign_workflow",
+                        lambda *args, **kwargs: engine_result)
 
     outcome = DeterministicScriptChain(python=sys.executable).execute(plan_path)
 
     assert outcome.status == "issue"
     assert outcome.issue.code == "BACKBONE_TYPES_UNRESOLVED"
-    assert outcome.issue.detail["executor_state"] == persisted
+    assert outcome.issue.detail["result"] == engine_result
 
 
 def test_recovery_agent_is_never_called_more_than_twice(tmp_path):

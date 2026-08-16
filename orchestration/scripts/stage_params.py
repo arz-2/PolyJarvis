@@ -264,7 +264,11 @@ def _resolve_equil_params(args, cls: dict) -> dict:
     npt_prod_steps = int(npt_prod_ns_val * 1000000.0 / dt) if npt_prod_ns_val is not None else None
     T_workflow = _resolve_t_workflow(args, cls)
     add_melt_npt = getattr(args, 'add_melt_npt', False) or T_workflow <= 300.0
-    melt_npt_ns_val = _pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None
+    remedy_melt_ns = (getattr(args, 'melt_hold_ns', None) or cls.get('melt_hold_ns') or
+                      getattr(args, 'melt_only_continuation_ns', None) or
+                      cls.get('melt_only_continuation_ns'))
+    melt_npt_ns_val = (remedy_melt_ns if remedy_melt_ns is not None else
+                       (_pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None))
     melt_npt_steps = int(melt_npt_ns_val * 1000000.0 / dt) if add_melt_npt and melt_npt_ns_val is not None else None
     phase = getattr(args, 'phase', 'full') or 'full'
     if T_workflow <= 300.0:
@@ -342,7 +346,8 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
 def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'bm_pressures_atm': cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'equil_data_path': args.data_path or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'temp_K': 300.0, 'npt_steps': 500000, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
+    sampling_factor = int(cls.get('mechanical_sampling_factor', 1))
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'equil_data_path': args.data_path or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'temp_K': 300.0, 'npt_steps': 500000 * sampling_factor, 'mechanical_sampling_factor': sampling_factor, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
 
 def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     """Resolve deterministic bulk-modulus extraction arguments."""
