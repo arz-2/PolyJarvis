@@ -360,7 +360,19 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
         (prod, npt_prod_temp) = ('npt_production', T_workflow)
     else:
         (prod, npt_prod_temp) = ('npt_prod300', 300.0)
-    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'exp_density_range': _exp_density_range(cls, run_name=args.run_name), 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': args.npt_prod_log or f'{lammps_base}/equil/{prod}/{prod}.log', 'npt_prod_data_path': args.data_path or f'{lammps_base}/equil/{prod}/{prod}_out.data', 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, args.run_name), 'exp_density_point_gcm3': _exp_density_point(cls, args.run_name), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'alpha_glass_per_K': cls.get('alpha_glass_per_K', 'null'), 'alpha_melt_per_K': cls.get('alpha_melt_per_K', 'null'), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+    npt_prod_data_path = args.data_path or f'{lammps_base}/equil/{prod}/{prod}_out.data'
+    # npt_prod_log_path used to fall to a flat data/<run>/lammps/... convention whenever
+    # args.npt_prod_log was unset -- which is always, in real execution (nothing ever sets it).
+    # That path doesn't exist under the attempt-based layout (data/<run>/attempts/equilibration/
+    # attempt-N/work/...), so check_equilibration_comprehensive's log_file (the BINDING density/
+    # energy drift and block-SEM gate, not an advisory check) would fail to parse any thermo rows
+    # on every real run -- args.data_path IS the correct, real npt_prod_data_path at this point
+    # (do_equil_and_check sets it just before calling this resolver), so derive the sibling .log
+    # in the same directory instead of re-deriving a path independently.
+    npt_prod_log_path = args.npt_prod_log or (
+        npt_prod_data_path[:-len('_out.data')] + '.log' if npt_prod_data_path.endswith('_out.data')
+        else f'{lammps_base}/equil/{prod}/{prod}.log')
+    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'exp_density_range': _exp_density_range(cls, run_name=args.run_name), 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, args.run_name), 'exp_density_point_gcm3': _exp_density_point(cls, args.run_name), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'alpha_glass_per_K': cls.get('alpha_glass_per_K', 'null'), 'alpha_melt_per_K': cls.get('alpha_melt_per_K', 'null'), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""
@@ -376,7 +388,17 @@ def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     _k_from_cls = _exp_K_range(cls)
     exp_K = [args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0], args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1]]
     K_deform_rate_slow_inv_s = cls.get('K_deform_rate_slow_inv_s', None)
-    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'npt_prod_log_path': args.npt_prod_log or f'{lammps_base}/equil/npt_prod300/npt_prod300.log', 'exp_K_range': exp_K, 'bm_pressures_atm': cls.get('bm_pressures_atm', None), 'strain_rate_per_fs': cls.get('K_deform_rate_inv_s', 100000000.0) * 1e-15, 'strain_rate_slow_per_fs': K_deform_rate_slow_inv_s * 1e-15 if K_deform_rate_slow_inv_s is not None else None, 'K_strain_max': cls.get('K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'deform_log_path': getattr(args, 'deform_log', None), 'deform_log_path_slow': getattr(args, 'deform_log_slow', None), 'murnaghan_log_files': getattr(args, 'murnaghan_logs', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+    # Same bug and fix as _resolve_equil_check_params: args.npt_prod_log is never set in real
+    # execution, so this always fell to a nonexistent flat-convention path -- silently disabling
+    # the fluctuation cross-check (PE1's real bulk_modulus_murnaghan.json carried
+    # fluctuation_bulk_modulus_GPa=null, 2026-08-17). args.data_path IS the equilibration
+    # attempt's real npt_prod_data_path here (the mechanical stage's dependency mapping sets it
+    # from the accepted equilibration manifest) -- derive the sibling .log the same way.
+    npt_prod_log_path = args.npt_prod_log or (
+        args.data_path[:-len('_out.data')] + '.log'
+        if args.data_path and args.data_path.endswith('_out.data')
+        else f'{lammps_base}/equil/npt_prod300/npt_prod300.log')
+    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'npt_prod_log_path': npt_prod_log_path, 'exp_K_range': exp_K, 'bm_pressures_atm': cls.get('bm_pressures_atm', None), 'strain_rate_per_fs': cls.get('K_deform_rate_inv_s', 100000000.0) * 1e-15, 'strain_rate_slow_per_fs': K_deform_rate_slow_inv_s * 1e-15 if K_deform_rate_slow_inv_s is not None else None, 'K_strain_max': cls.get('K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'deform_log_path': getattr(args, 'deform_log', None), 'deform_log_path_slow': getattr(args, 'deform_log_slow', None), 'murnaghan_log_files': getattr(args, 'murnaghan_logs', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_run_summary_params(args, cls: dict) -> dict:
     """Resolve deterministic run-summary arguments.
