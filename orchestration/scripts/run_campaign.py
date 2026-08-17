@@ -254,7 +254,7 @@ def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNames
         d01=None, d02=None, d03=None, d04=None, lammps_flags=None, is_glassy=None,
         tg_k=None, tg_fit_quality=None, deform_log=None, deform_log_slow=None,
         deform_rate_mode="primary", murnaghan_logs=None, d05=None, npt_prod_log=None,
-        npt_prod_dump=None, ff=None, backbone_types=None, enthalpy_col="Enthalpy",
+        npt_prod_dump=None, melt_data_path=None, ff=None, backbone_types=None, enthalpy_col="Enthalpy",
         output_dir=None, equil_data_path=None, npt_prod_ns=None, add_melt_npt=False,
         melt_hold_ns=None, melt_only_continuation_ns=None, phase="full",
         pending_cooldown_path=None,
@@ -445,6 +445,22 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
     # workflow's own return-shape logic in server.py).
     npt_prod_data_path = workflow.get("npt_prod300_data") or workflow["stages"][-1]["output_data"]
     npt_prod_dump_path = workflow.get("npt_prod300_dump") or _stage_dump_path(workflow["stages"][-1])
+
+    # melt_dump_path/melt_data_path (the CHAIN-structural checks' source -- rg/msd/ct/msid --
+    # and the assess_cooling_contraction melt reference) had the same flat-convention bug as
+    # npt_prod_log_path above, but couldn't be fixed the same way (a data_path suffix swap):
+    # they name two DIFFERENT stages (nvt_production's dump, npt_production's data), neither of
+    # which is npt_prod_data_path/_dump_path (the terminal stage, npt_prod300 for glassy chains).
+    # Locate them by name in the real workflow, same as npt_prod_data_path/_dump_path do for the
+    # terminal stage above, instead of guessing a path.
+    def _find_stage(name):
+        return next((s for s in workflow["stages"] if s.get("name") == name), None)
+    _nvt_stage = _find_stage("nvt_production")
+    if _nvt_stage:
+        args.npt_prod_dump = _stage_dump_path(_nvt_stage)
+    _melt_stage = _find_stage("npt_production")
+    if _melt_stage:
+        args.melt_data_path = _melt_stage.get("output_data")
 
     attempts = 0
     while True:

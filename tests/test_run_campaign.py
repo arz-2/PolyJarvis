@@ -173,7 +173,7 @@ class _FakeEquilLammps:
     (covered separately above)."""
 
     def __init__(self, tmp_path, comp_results, gate_verdicts, atom_type_names=None,
-                 derived_backbone_types=None):
+                 derived_backbone_types=None, workflow_stages=None):
         self.tmp_path = tmp_path
         self._comp_results = list(comp_results)
         self._gate_verdicts = list(gate_verdicts)
@@ -181,11 +181,17 @@ class _FakeEquilLammps:
         self.generate_equilibration_workflow_calls = []
         self.inspect_data_file_calls = []
         self.derive_backbone_types_calls = []
+        self.check_equilibration_comprehensive_calls = []
+        self.enforce_equilibration_gate_calls = []
         self._inspect_errors = []
         self._inspect_forecast = {"available": False}
         self._atom_type_names = atom_type_names or {}
         # None -> derivation fails (genuine last resort); a list -> derivation succeeds with it.
         self._derived_backbone_types = derived_backbone_types
+        # None -> the default single anonymous stage below; a list of named stage dicts (e.g.
+        # nvt_production/npt_production) -> returned verbatim, for tests of the name-based
+        # melt_dump_path/melt_data_path stage lookup.
+        self._workflow_stages = workflow_stages
 
     def _sentinel(self):
         self._chain_n += 1
@@ -195,6 +201,8 @@ class _FakeEquilLammps:
 
     def generate_equilibration_workflow(self, **kwargs):
         self.generate_equilibration_workflow_calls.append(kwargs)
+        if self._workflow_stages is not None:
+            return {"stages": self._workflow_stages}
         stage = {"output_data": f"{self.tmp_path}/npt_prod_{self._chain_n}_out.data",
                  "work_dir": str(self.tmp_path), "params": {"DUMP_FILE": "npt_prod.dump"}}
         return {"stages": [stage]}
@@ -224,12 +232,14 @@ class _FakeEquilLammps:
                 "method": "heavy_atom_graph_diameter", "n_chains": 1, "n_chains_resolved": 1}
 
     def check_equilibration_comprehensive(self, **kwargs):
+        self.check_equilibration_comprehensive_calls.append(kwargs)
         return self._comp_results.pop(0)
 
     def extract_equilibrated_density(self, **kwargs):
         return {"plateau_density_mean": 1.18}
 
     def enforce_equilibration_gate(self, **kwargs):
+        self.enforce_equilibration_gate_calls.append(kwargs)
         return self._gate_verdicts.pop(0)
 
 
@@ -385,3 +395,44 @@ def test_do_summary_waits_for_generate_run_summary_completion(tmp_path):
     assert fake.get_run_status_calls >= 1, "generate_run_summary's result was never polled"
     assert result == {"status": "success", "summary_json": str(tmp_path / "raw" / "run_summary.json")}
     assert result.get("status") != "submitted"
+
+
+# ─── do_equil_and_check(): melt_dump_path/melt_data_path stage lookup ──────────────
+
+def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_check_args_cls, monkeypatch):
+    """melt_dump_path (nvt_production's dump) and melt_data_path (npt_production's data) must
+    come from the real workflow's own named stages, not the flat-convention guess -- same bug
+    class as npt_prod_log_path, fixed the same way analyze-tg's per_t_dump_file was: look up
+    the real path instead of re-deriving one independently."""
+    args, cls = equil_check_args_cls
+    args.backbone_types = [1, 2]  # skip the halt path
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
+
+    nvt_dir = tmp_path / "work" / "nvt_production"
+    npt_dir = tmp_path / "work" / "npt_production"
+    nvt_dir.mkdir(parents=True)
+    npt_dir.mkdir(parents=True)
+    workflow_stages = [
+        {"name": "nvt_production", "work_dir": str(nvt_dir),
+         "params": {"DUMP_FILE": "nvt_production.dump"},
+         "output_data": str(nvt_dir / "nvt_production_out.data")},
+        {"name": "npt_production", "work_dir": str(npt_dir),
+         "params": {"DUMP_FILE": "npt_production.dump"},
+         "output_data": str(npt_dir / "npt_production_out.data")},
+    ]
+    fake = _FakeEquilLammps(
+        tmp_path,
+        comp_results=[{"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}}],
+        gate_verdicts=[{"verdict": "PASS"}],
+        workflow_stages=workflow_stages,
+    )
+    state = _fake_state(tmp_path)
+
+    result = do_equil_and_check(state, args, cls, fake, tmp_path / "run_log.md")
+
+    assert result["equil_verdict"] == "PASS"
+    comp_call = fake.check_equilibration_comprehensive_calls[0]
+    assert comp_call["dump_file"] == str(nvt_dir / "nvt_production.dump")
+    gate_call = fake.enforce_equilibration_gate_calls[0]
+    assert gate_call["melt_data"] == str(npt_dir / "npt_production_out.data")
