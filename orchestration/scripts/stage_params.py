@@ -103,25 +103,10 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
     class_ii = 'pcff' in ff or ff in ('compass', 'pcff_ore')
     return {'use_pcff': class_ii, 'use_opls': 'opls' in ff, 'use_trappe': 'trappe' in ff}
 
-def _exp_tg_range(cls: dict, run_name: str | None=None) -> list:
-    tg = cls.get('experimental_tg_K')
-    if isinstance(tg, dict):
-        if run_name:
-            for (key, val) in tg.items():
-                if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                    return [round(val - 20), round(val + 20)]
-        vals = sorted((v for v in tg.values() if isinstance(v, (int, float))))
-        if vals:
-            mid = vals[len(vals) // 2]
-            return [round(mid - 20), round(mid + 20)]
-    if isinstance(tg, (int, float)):
-        return [round(tg - 20), round(tg + 20)]
-    return ['<exp_tg_min>', '<exp_tg_max>']
-
 def _exp_tg_point(cls: dict, run_name: str | None=None):
-    """Point exp_tg_K value (not a ±20 band) for assess_cooling_contraction's tg_K arg.
-    Mirrors _exp_tg_range's member-resolution logic (fixes the class-mean-averaging bug
-    for multi-member classes)."""
+    """Point exp_tg_K value for assess_cooling_contraction's tg_K arg and the tg stage's
+    planning-time bracket. Resolves per-member via run_name (fixes the class-mean-averaging
+    bug for multi-member classes)."""
     tg = cls.get('experimental_tg_K')
     if isinstance(tg, dict):
         if run_name:
@@ -154,34 +139,9 @@ def _exp_K_range(cls: dict) -> list:
         return [exp['min'], exp['max']]
     return [None, None]
 
-def _db_exp_lookup(cls_id: str, polymer_name: str | None=None) -> dict:
-    """Query polymer_db.sqlite for polymer-specific experimental values.
-
-    Priority in callers:
-      --exp_tg_K (CLI)  >  this function (DB)  >  polymer_rules.json median
-    Returns dict with tg_median_K, density_gcm3, K_range_GPa (any may be None).
-    Never raises — a broken or missing DB just returns all-None.
-    """
-    try:
-        import sys as _sys
-        _repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        if _repo_root not in _sys.path:
-            _sys.path.insert(0, _repo_root)
-        from db.query_best_match import _connect, find_polymer_ids, get_tg_data, get_density_data, get_bulk_modulus_data
-        conn = _connect()
-        (ids, _method, _conf) = find_polymer_ids(conn, polymer_name, cls_id)
-        if not ids:
-            return {'tg_median_K': None, 'density_gcm3': None, 'K_range_GPa': None}
-        tg = get_tg_data(conn, ids)
-        dens = get_density_data(conn, ids, 300.0)
-        bm = get_bulk_modulus_data(conn, ids, is_glassy=True)
-        return {'tg_median_K': tg['agg_median_K'] if tg else None, 'density_gcm3': dens.get('value_gcm3') if dens else None, 'K_range_GPa': bm['agg_range_GPa'] if bm else None}
-    except Exception:
-        return {'tg_median_K': None, 'density_gcm3': None, 'K_range_GPa': None}
-
 def _exp_density_range(cls: dict, run_name: str | None=None) -> list:
-    """Mirrors _exp_tg_range's member-resolution logic (same class-mean-averaging bug,
-    fixed here for multi-member classes like PHYC's PE/PP/PIB)."""
+    """Resolves per-member via run_name (same class-mean-averaging bug fixed here for
+    multi-member classes like PHYC's PE/PP/PIB)."""
     exp = cls.get('experimental_density_gcm3')
     if isinstance(exp, dict):
         if run_name:
@@ -366,13 +326,24 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/{raw_suffix}'
     graphs_dir = output_dir.replace('/raw/', '/graphs/').replace('/raw', '/graphs')
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
-    tg_log = args.data_path or f'{lammps_base}/thermal/tg_sweep{rate_suffix}/tg_sweep.log'
+    # tg_sweep_dir mirrors _resolve_tg_params' own formula exactly -- analyze-tg reads the same
+    # attempt work_dir the tg stage just wrote its sweep into, not a flat-convention guess.
+    # (Previously this read args.data_path -- the EQUILIBRATION attempt's structure file, always
+    # non-null during real execution -- so it never fell through to the intended tg_sweep.log
+    # path at all; extract_thermal then failed parsing a .data file for thermo rows. PE1 hit
+    # this live, 2026-08-17.)
+    tg_work_dir = args.work_dir or f'{lammps_base}/thermal'
+    tg_sweep_dir = f'{tg_work_dir}/tg_sweep{rate_suffix}'
+    tg_log = f'{tg_sweep_dir}/tg_sweep.log'
     if _regime(args, cls) == 'rubbery':
         default_equil_data = f'{lammps_base}/equil/npt_production/npt_production_out.data'
     else:
         default_equil_data = f'{lammps_base}/equil/npt_prod300/npt_prod300_out.data'
-    equil_data = args.equil_data_path or default_equil_data
-    per_t_dump = f'{lammps_base}/thermal/tg_sweep{rate_suffix}/per_t_structs.dump'
+    # args.data_path holds the equilibration attempt's real accepted output during execution
+    # (CampaignStageExecutor sets it from the equilibration manifest); the flat-convention guess
+    # is a --dry-run-only fallback, since no real attempt path exists yet at preview time.
+    equil_data = args.equil_data_path or args.data_path or default_equil_data
+    per_t_dump = f'{tg_sweep_dir}/per_t_structs.dump'
     return {'selected_rate_K_per_ns': selected_rate, 'tg_rate_index': args.tg_rate_index, 'tg_log_path': tg_log, 'tg_data_file': equil_data, 'per_t_dump_file': per_t_dump, 'enthalpy_col': getattr(args, 'enthalpy_col', None) or 'Enthalpy', 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'output_dir': output_dir, 'graphs_dir': graphs_dir, 'method_gap_exempt': bool(cls.get('tg_slope_gate_fallback') == 'slowest_rate')}
 
 def _resolve_equil_check_params(args, cls: dict) -> dict:
@@ -415,43 +386,13 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
     path — so a deterministic plan still produces byte-identical output to the no-plan path
     The plan provenance is carried by reading raw/run_plan.json at the convention path below.
     """
+    # No experimental comparison here -- most runs are novel systems with no curated
+    # experimental reference, so a PASS/FAIL grading column would be blank far more often than
+    # not. See db/query_best_match.py's exp_lookup.json (written separately, for provenance)
+    # for a human to compare against literature by hand when a reference happens to exist.
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
     graphs_dir = output_dir.replace('/raw/', '/graphs/').replace('/raw', '/graphs')
     run_plan = f"{output_dir.rstrip('/')}/run_plan.json"
-    _db = _db_exp_lookup(args.polymer_class, getattr(args, 'polymer_name', None))
-    (_tg_min, _tg_max) = (getattr(args, 'exp_tg_min', None), getattr(args, 'exp_tg_max', None))
-    _tg_override = getattr(args, 'exp_tg_K', None)
-    _cls_tg_range = _exp_tg_range(cls, run_name=args.run_name)
-    # polymer_rules.json's own class/member-specific value wins over a raw DB aggregate --
-    # query_best_match.py pools every DB row filed under a matched polymer_id, including ones
-    # that are not the polymer's true Tg (e.g. PE's own sub-Tg gamma-relaxation rows), which
-    # neither name-resolution nor the existing note/form filters catch. polymer_rules.json's
-    # value is cited and curated specifically to avoid that contamination -- prefer it whenever
-    # it resolved to real numbers (not the '<exp_tg_min>'/'<exp_tg_max>' no-data sentinel).
-    _cls_tg_numeric = all(isinstance(v, (int, float)) for v in _cls_tg_range)
-    if _tg_min is not None and _tg_max is not None:
-        exp_tg = [_tg_min, _tg_max]
-    elif _tg_override is not None:
-        exp_tg = [round(_tg_override - 20), round(_tg_override + 20)]
-    elif _cls_tg_numeric:
-        exp_tg = _cls_tg_range
-    elif _db.get('tg_median_K') is not None:
-        exp_tg = [round(_db['tg_median_K'] - 20), round(_db['tg_median_K'] + 20)]
-    else:
-        exp_tg = _cls_tg_range
-    (_dens_min, _dens_max) = (getattr(args, 'exp_density_min', None), getattr(args, 'exp_density_max', None))
-    if _dens_min is not None and _dens_max is not None:
-        exp_density = [_dens_min, _dens_max]
-    elif _db.get('density_gcm3') is not None:
-        _d = _db['density_gcm3']
-        exp_density = [round(_d * 0.95, 3), round(_d * 1.05, 3)]
-    else:
-        exp_density = _exp_density_range(cls, run_name=args.run_name)
-    _k_from_cls = _exp_K_range(cls)
-    _k_from_db = _db.get('K_range_GPa')
-    if _k_from_db and _k_from_db[1] - _k_from_db[0] < 0.01:
-        _k_from_db = None
-    exp_K = [args.exp_K_min if args.exp_K_min is not None else _k_from_db[0] if _k_from_db else _k_from_cls[0], args.exp_K_max if args.exp_K_max is not None else _k_from_db[1] if _k_from_db else _k_from_cls[1]]
     dp = args.dp if args.dp is not None else cls.get('dp_typical')
     nchain = args.nchain if args.nchain is not None else cls.get('nchain')
     charge_method = args.charge_method or cls.get('charge_method')
@@ -460,7 +401,7 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
     d02 = args.d02 or charge_method
     d03 = args.d03 or cls.get('electrostatics')
     d04 = args.d04 or (f'DP={dp}, {nchain} chains' if dp and nchain else None)
-    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'run_plan': run_plan, 'exp_tg_range': exp_tg, 'exp_density_range': exp_density, 'exp_K_range': exp_K, 'dp': dp, 'nchain': nchain, 'charge_method': charge_method, 'ff': ff, 'd01_ff': d01, 'd02_charges': d02, 'd03_electrostatics': d03, 'd04_system_size': d04}
+    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'run_plan': run_plan, 'dp': dp, 'nchain': nchain, 'charge_method': charge_method, 'ff': ff, 'd01_ff': d01, 'd02_charges': d02, 'd03_electrostatics': d03, 'd04_system_size': d04}
 _STAGE_RESOLVERS = {'build': _resolve_build_params, 'equil': _resolve_equil_params, 'tg': _resolve_tg_params, 'deform': _resolve_deform_params, 'analyze-tg': _resolve_analyze_tg_params, 'equil-check': _resolve_equil_check_params, 'murnaghan': _resolve_murnaghan_params, 'analyze-bm': _resolve_analyze_bm_params, 'run-summary': _resolve_run_summary_params}
 
 def resolve_stage_params(stage: str, args, cls: dict) -> dict:

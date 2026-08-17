@@ -846,17 +846,14 @@ def do_summary(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool, t
 
     args.d05 = "PASS"  # do_summary is only reached after equil_check returned PASS
     sp = resolve_stage_params("run-summary", args, cls)
-    summary = lammps.generate_run_summary(
+    summary = wait_for_analysis(lammps, lammps.generate_run_summary(
         output_dir=sp["output_dir"], graphs_dir=sp["graphs_dir"], run_name=args.run_name,
         smiles=args.smiles or "", polymer_class=args.polymer_class.upper(), ff=sp["ff"],
         charge_method=sp["charge_method"] or "", dp=sp["dp"], n_chains=sp["nchain"],
         d01=sp["d01_ff"], d02=sp["d02_charges"], d03=sp["d03_electrostatics"], d04=sp["d04_system_size"],
         d05=args.d05, d06=args.tg_fit_quality or "N/A (not requested)",
-        exp_tg_min=sp["exp_tg_range"][0], exp_tg_max=sp["exp_tg_range"][1],
-        exp_density_min=sp["exp_density_range"][0], exp_density_max=sp["exp_density_range"][1],
-        exp_K_min=sp["exp_K_range"][0], exp_K_max=sp["exp_K_range"][1],
         n_replicates=args.n_replicates, tg_path=tg_path,
-    )
+    ), "run-summary generation")
     state.mark("summary", "done", result={"run_summary_path": str(Path(sp["output_dir"]) / "run_summary.json")})
     return summary
 

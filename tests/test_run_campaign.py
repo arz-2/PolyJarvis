@@ -19,7 +19,7 @@ from stage_params import resolve_stage_params, apply_plan, resolve_hardware, loa
 from hw_common import load_rules, get_class_entry  # noqa: E402
 import run_campaign as rdr  # noqa: E402
 from run_campaign import (  # noqa: E402
-    _base_args, wait_for_analysis, do_equil_and_check, ExecutorState,
+    _base_args, wait_for_analysis, do_equil_and_check, do_summary, ExecutorState,
 )
 
 RULES = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
@@ -332,3 +332,56 @@ def test_do_equil_and_check_sizes_extend_off_measured_tau_relax(tmp_path, equil_
     assert extend_ns_used == pytest.approx(expected_extend_ns, rel=1e-6)
     # sanity: the measured signal actually moved the knob away from the old flat 1.5 ns default
     assert extend_ns_used > 1.5
+
+
+# ─── do_summary(): generate_run_summary must be waited on, not read as a submission stub ──
+
+class _FakeSummaryLammps:
+    """generate_run_summary is a background-threaded analysis tool (same submitted/run_id
+    shape as check_equilibration_comprehensive et al.) -- this fake returns the submission
+    stub from the tool call itself and only returns the real completed result from
+    get_run_status, so a caller that reads the tool's own return value directly (skipping
+    wait_for_analysis) gets the stub, not the finished summary."""
+
+    def __init__(self, completed_result):
+        self._completed_result = completed_result
+        self.generate_run_summary_calls = []
+        self.get_run_status_calls = 0
+
+    def generate_run_summary(self, **kwargs):
+        self.generate_run_summary_calls.append(kwargs)
+        return {"status": "submitted", "run_id": "summary-1",
+                "message": "Poll with get_run_status(run_id)"}
+
+    def get_run_status(self, run_id):
+        self.get_run_status_calls += 1
+        assert run_id == "summary-1"
+        return {"status": "completed", "result": self._completed_result}
+
+
+def test_do_summary_waits_for_generate_run_summary_completion(tmp_path):
+    """PE1 2026-08-17: do_summary called generate_run_summary bare and returned its immediate
+    {"status": "submitted", ...} stub as the stage's own result -- the workflow engine accepted
+    the "summary" stage as done, and run_summary.json was never actually confirmed written."""
+    cls = {
+        "preferred_ff": "trappe-ua", "charge_method": "none", "electrostatics": "lj_cut",
+        "dp_typical": 120, "nchain": 20, "experimental_tg_K": 195,
+        "experimental_density_gcm3": 0.855, "exp_K_GPa": {"min": 1.5, "max": 2.0},
+    }
+    args = _base_args("SUMTEST1", "PHYC", "fake_plan.json")
+    args.output_dir = str(tmp_path / "raw")
+    args.smiles = "*CC*"
+    args.n_replicates = 1
+    (tmp_path / "raw").mkdir()
+    fake = _FakeSummaryLammps(completed_result={
+        "status": "success", "summary_json": str(tmp_path / "raw" / "run_summary.json"),
+    })
+    state = _fake_state(tmp_path)
+
+    result = do_summary(state, args, cls, fake, is_glassy=False, thermal_result=None,
+                        raw_dir=tmp_path / "raw", graphs_dir=tmp_path / "graphs",
+                        plan_path="fake_plan.json", run_log_path=tmp_path / "run_log.md")
+
+    assert fake.get_run_status_calls >= 1, "generate_run_summary's result was never polled"
+    assert result == {"status": "success", "summary_json": str(tmp_path / "raw" / "run_summary.json")}
+    assert result.get("status") != "submitted"

@@ -161,17 +161,24 @@ def _uncertainty_findings(plan: dict, policy: dict) -> list:
 
 
 def _exp_tg_companion_findings(plan: dict) -> list:
-    """Check C: multi-member tg stage (t_range_brackets_exp_tg=true) should carry a
-    companion success_criteria.exp_tg_K -- flag if missing."""
+    """Check C: a tg stage's t_range_brackets_exp_tg is the pinned experimental Tg target
+    (a number) once build_planned_stages resolves it via run_name -- None means it genuinely
+    never resolved (run_name didn't match any member of a multi-member experimental_tg_K dict,
+    or no run_name was available, e.g. the scaffold path). Flag that unresolved case: without a
+    pinned target, the tg stage's accuracy gate has nothing to check the sweep range against.
+
+    (Previously this tested `is True`, a value build_planned_stages could never produce --
+    the field has only ever held a number or None -- so this check could never fire for any
+    plan, single- or multi-member.)"""
     findings = []
     for s in plan.get("planned_stages", []):
         if s.get("stage") != "tg":
             continue
         sc = s.get("success_criteria", {})
-        if sc.get("t_range_brackets_exp_tg") is True and "exp_tg_K" not in sc:
+        if "t_range_brackets_exp_tg" in sc and sc.get("t_range_brackets_exp_tg") is None:
             findings.append({"check": "exp_tg_companion", "stage": "tg", "severity": "advisory",
-                             "detail": "t_range_brackets_exp_tg=true with no companion "
-                                       "success_criteria.exp_tg_K"})
+                             "detail": "t_range_brackets_exp_tg is unresolved (None) -- no "
+                                       "pinned experimental Tg target for this run's member"})
     return findings
 
 

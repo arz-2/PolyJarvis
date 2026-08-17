@@ -22,9 +22,12 @@ Usage:
         [--date_start 2026-06-02] [--date_end 2026-06-03] \
         [--d01 "TraPPE-UA"] [--d02 "embedded in FF"] \
         [--d03 "lj/cut 12 Å"] [--d04 "DP=50, 10 chains, 5320 atoms"] \
-        [--d05 "PASS"] [--d06 "ACCEPTABLE"] \
-        [--exp_tg_min 370] [--exp_tg_max 380] \
-        [--exp_density_min 1.04] [--exp_density_max 1.06]
+        [--d05 "PASS"] [--d06 "ACCEPTABLE"]
+
+Reports measured values only -- no experimental comparison. Most runs are novel systems with no
+curated experimental reference, so a PASS/FAIL grading column would be blank far more often than
+not; compare a run's results.tg/density/bulk_modulus values against literature by hand (or via
+exp_lookup.json, written separately for provenance) when a reference happens to exist.
 """
 
 import argparse
@@ -90,18 +93,6 @@ def main():
     p.add_argument("--d04", default=None, help="D-04 System size choice")
     p.add_argument("--d05", default=None, help="D-05 Convergence verdict")
     p.add_argument("--d06", default=None, help="D-06 Tg fit quality")
-    # Experimental references
-    p.add_argument("--exp_tg_min",      type=float, default=None)
-    p.add_argument("--exp_tg_max",      type=float, default=None)
-    p.add_argument("--tg_md_offset_K",  type=float, default=100.0,
-                   help="MD cooling-rate Tg overestimate (K) added to the exp upper bound when "
-                        "grading a RAW single-rate MD Tg (documented 80-120 K, default 100). NOT "
-                        "applied to a rate-extrapolated Tg, which already removes the bias. Set 0 "
-                        "to grade strictly.")
-    p.add_argument("--exp_density_min", type=float, default=None)
-    p.add_argument("--exp_density_max", type=float, default=None)
-    p.add_argument("--exp_K_min",       type=float, default=None)
-    p.add_argument("--exp_K_max",       type=float, default=None)
     p.add_argument("--graphs_dir",      default=None,
                    help="Directory where PNG figures were saved (default: <output_dir>/figures/)")
     p.add_argument("--run_plan",        default=None,
@@ -183,60 +174,16 @@ def main():
             # is not stranded and does not belong in artifacts_missing.
             artifacts_missing[:] = [m for m in artifacts_missing if m["file"] != "tg_summary.json"]
 
+    # Measured values only -- no experimental comparison. Most runs are novel systems with no
+    # curated experimental reference, so a PASS/FAIL grading column would be blank far more often
+    # than not; compare against literature by hand (or via exp_lookup.json, written separately
+    # for provenance) when a reference happens to exist for a given polymer.
     Tg_val = Tg_raw
     tg_basis = "raw_MD" if Tg_raw is not None else None
     tg_r2 = tg.get("r_squared")
     tg_quality = tg.get("fit_quality")
-    def _floor_band(band, *, min_abs=None, min_rel=None):
-        """Widen a too-narrow exp band symmetrically to a physical minimum width, so a
-        degenerate/single-point or hand-entered tight band can't cause a false FAIL
-        (PVC2 0.07% density; PSU4 0.1 K Tg). The floor is set BELOW MD/FF systematic
-        error, so it can never mask a genuine method failure. Returns (band, widened)."""
-        if not band or band[0] is None or band[1] is None:
-            return band, False
-        lo, hi = float(band[0]), float(band[1])
-        mid = 0.5 * (lo + hi)
-        floor = max(min_abs or 0.0, (min_rel or 0.0) * abs(mid))
-        if (hi - lo) >= floor or floor <= 0:
-            return [lo, hi], False
-        r = floor / 2.0
-        return [round(mid - r, 4), round(mid + r, 4)], True
-
-    exp_tg = ([args.exp_tg_min, args.exp_tg_max]
-              if args.exp_tg_min is not None and args.exp_tg_max is not None else None)
-    exp_tg, tg_band_widened = _floor_band(exp_tg, min_abs=10.0)   # >=10 K total (+/-5 K)
-    tg_err = None
-    tg_status = "no exp ref"
-    tg_offset_corrected_K = None
-    if Tg_val is not None and exp_tg:
-        # Grade the raw value against the REAL exp band, always — a raw single-rate MD Tg
-        # overestimates experiment by ~80-120 K (cooling-rate artifact, Patrone 2016), but that
-        # offset must NEVER be folded into the PASS/FAIL band: doing so manufactures a false PASS
-        # (a prior PLA run did exactly this — feedback_pla_glassy_md_offset_gamed_pass.md). The
-        # offset is reported only as an annotation (tg_offset_corrected_K below), never applied
-        # to lo/hi/status/error_pct.
-        lo, hi = exp_tg[0], exp_tg[1]
-        tg_status = "PASS" if lo <= Tg_val <= hi else "FAIL"
-        if tg_status == "PASS":
-            tg_err = 0.0
-        else:
-            nearest = lo if Tg_val < lo else hi
-            tg_err = round((Tg_val - nearest) / nearest * 100, 1)
-        tg_offset_corrected_K = round(Tg_val - float(args.tg_md_offset_K or 0.0), 1)
 
     rho_val = eq_dens.get("plateau_density_mean") or eq_dens.get("density_mean")
-    exp_rho = ([args.exp_density_min, args.exp_density_max]
-               if args.exp_density_min is not None and args.exp_density_max is not None else None)
-    exp_rho, rho_band_widened = _floor_band(exp_rho, min_rel=0.06)   # >=6% total (+/-3%)
-    rho_err = None
-    rho_status = "no exp ref"
-    if rho_val is not None and exp_rho:
-        rho_status = "PASS" if exp_rho[0] <= rho_val <= exp_rho[1] else "FAIL"
-        if rho_status == "PASS":
-            rho_err = 0.0
-        else:
-            nearest = exp_rho[0] if rho_val < exp_rho[0] else exp_rho[1]
-            rho_err = round((rho_val - nearest) / nearest * 100, 1)
 
     # K-source precedence: murnaghan > deform > fluctuation
     # Murnaghan is the primary glassy (300 K) and rubbery (T>Tg) method.
@@ -255,19 +202,6 @@ def main():
         K_val    = bulk.get("bulk_modulus_GPa")
         K_sem    = bulk.get("bulk_modulus_sem_GPa")
         K_method = "fluctuation" if K_val is not None else None
-
-    exp_K = ([args.exp_K_min, args.exp_K_max]
-             if args.exp_K_min is not None and args.exp_K_max is not None else None)
-    exp_K, K_band_widened = _floor_band(exp_K, min_rel=0.20)   # >=20% total (+/-10%)
-    K_status = "no exp ref"
-    K_err = None
-    if K_val is not None and exp_K:
-        K_status = "PASS" if exp_K[0] <= K_val <= exp_K[1] else "FAIL"
-        if K_status == "PASS":
-            K_err = 0.0
-        else:
-            nearest = exp_K[0] if K_val < exp_K[0] else exp_K[1]
-            K_err = round((K_val - nearest) / nearest * 100, 1)
 
     # -----------------------------------------------------------------------
     # Artifact pointers (relative to data/[RUN]/)
@@ -365,15 +299,7 @@ def main():
         "results": {
             "tg": {
                 "value_K":        Tg_val,
-                "grading_basis":  tg_basis,   # raw_MD — graded strictly, no offset in the band
-                "md_offset_K":    args.tg_md_offset_K,
-                # Annotation only — the ~80-120 K cooling-rate-artifact-corrected value, for
-                # context. NEVER used for status/error_pct (feedback_pla_glassy_md_offset_gamed_pass.md).
-                "tg_offset_corrected_K": tg_offset_corrected_K,
-                "exp_range_K":    exp_tg,
-                "band_widened":   tg_band_widened,
-                "error_pct":      tg_err,
-                "status":         tg_status,
+                "grading_basis":  tg_basis,   # raw_MD, no rate-extrapolation applied
                 "r_squared":      tg_r2,
                 "fit_quality":    tg_quality,
                 # True when the headline raw-MD fit still violates a hard physics constraint
@@ -384,18 +310,10 @@ def main():
             },
             "density": {
                 "value_g_cm3":    rho_val,
-                "exp_range_g_cm3": exp_rho,
-                "band_widened":   rho_band_widened,
-                "error_pct":      rho_err,
-                "status":         rho_status,
             },
             "bulk_modulus": {
                 "value_GPa":      K_val,
                 "sem_GPa":        K_sem,
-                "exp_range_GPa":  exp_K,
-                "band_widened":   K_band_widened,
-                "error_pct":      K_err,
-                "status":         K_status,
                 "method":         K_method,
             },
         },

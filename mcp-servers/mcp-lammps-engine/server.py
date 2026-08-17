@@ -248,15 +248,46 @@ class RunManager:
                         r["meta"] = {}
                 logger.info(f"Loaded {len(self.runs)} runs from {STATE_FILE}")
             except Exception as e:
-                logger.warning(f"Could not load run state: {e}")
+                # Preserve the unreadable file instead of silently discarding it -- resetting
+                # straight to {} means the very next _save() overwrites it for good, turning a
+                # corrupt-but-often-partially-recoverable file into unconditional, permanent
+                # loss with no trace it ever happened. Never block startup on this: a run-state
+                # cache is diagnostic bookkeeping, not the actual simulation results (those live
+                # under each run's own data/<run>/ directory, untouched by this file).
+                quarantine = STATE_FILE.with_name(
+                    f"{STATE_FILE.name}.corrupt.{datetime.now():%Y%m%dT%H%M%S}"
+                )
+                try:
+                    STATE_FILE.rename(quarantine)
+                    logger.warning(f"Could not load run state ({e}); quarantined unreadable "
+                                    f"file to {quarantine} and starting from empty run history")
+                except Exception as rename_err:
+                    logger.warning(f"Could not load run state ({e}); also failed to quarantine "
+                                    f"it ({rename_err}) -- starting from empty run history")
                 self.runs = {}
 
     def _save(self):
-        """Persist run state to disk (call inside lock)."""
+        """Persist run state to disk (call inside lock).
+
+        Writes to a temp file in the same directory then os.replace()s it onto STATE_FILE --
+        the rename is atomic on POSIX, so a reader always sees either the old or the new
+        complete file, never a partial write. The previous plain open(STATE_FILE, "w") + dump
+        truncated the target immediately and streamed into it; a process killed or crashed
+        mid-write left a syntactically invalid, truncated file on disk. Multiple processes each
+        importing this module (e.g. several short-lived diagnostic scripts run alongside a live
+        orchestrator, all pointed at this one shared, cross-checkout file) each hold their own
+        in-memory `runs` snapshot and can race to save around the same moment; a non-atomic
+        write turns that ordinary race into disk corruption instead of just a lost update. Hit
+        live 2026-08-17: corrupted this exact file, and _load()'s silent except-and-reset-to-{}
+        meant the next load would have silently discarded the corrupted (but structurally
+        recoverable) run history entirely on its next save had it not been manually recovered.
+        """
         try:
             STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(STATE_FILE, "w") as f:
+            tmp_path = STATE_FILE.with_name(f".{STATE_FILE.name}.{os.getpid()}.tmp")
+            with open(tmp_path, "w") as f:
                 json.dump(self.runs, f, indent=2)
+            os.replace(tmp_path, STATE_FILE)
         except Exception as e:
             logger.warning(f"Could not save run state: {e}")
 
@@ -3796,12 +3827,6 @@ def _run_generate_run_summary(
     d04: Optional[str],
     d05: Optional[str],
     d06: Optional[str],
-    exp_tg_min: Optional[float],
-    exp_tg_max: Optional[float],
-    exp_density_min: Optional[float],
-    exp_density_max: Optional[float],
-    exp_K_min: Optional[float],
-    exp_K_max: Optional[float],
     graphs_dir: Optional[str] = None,
     n_replicates: Optional[int] = None,
     tg_path: Optional[str] = None,
@@ -3826,12 +3851,6 @@ def _run_generate_run_summary(
     if d04 is not None: parts.append(f"--d04 '{d04}'")
     if d05 is not None: parts.append(f"--d05 '{d05}'")
     if d06 is not None: parts.append(f"--d06 '{d06}'")
-    if exp_tg_min is not None:      parts.append(f"--exp_tg_min {exp_tg_min}")
-    if exp_tg_max is not None:      parts.append(f"--exp_tg_max {exp_tg_max}")
-    if exp_density_min is not None: parts.append(f"--exp_density_min {exp_density_min}")
-    if exp_density_max is not None: parts.append(f"--exp_density_max {exp_density_max}")
-    if exp_K_min is not None:       parts.append(f"--exp_K_min {exp_K_min}")
-    if exp_K_max is not None:       parts.append(f"--exp_K_max {exp_K_max}")
     if graphs_dir:                  parts.append(f"--graphs_dir {graphs_dir}")
     if n_replicates is not None:    parts.append(f"--n_replicates {n_replicates}")
     if tg_path:                     parts.append(f"--tg_path {tg_path}")
@@ -3866,12 +3885,6 @@ def generate_run_summary(
     d04: Optional[str] = None,
     d05: Optional[str] = None,
     d06: Optional[str] = None,
-    exp_tg_min: Optional[float] = None,
-    exp_tg_max: Optional[float] = None,
-    exp_density_min: Optional[float] = None,
-    exp_density_max: Optional[float] = None,
-    exp_K_min: Optional[float] = None,
-    exp_K_max: Optional[float] = None,
     n_replicates: Optional[int] = None,
     tg_path: Optional[str] = None,
 ) -> dict:
@@ -3883,6 +3896,11 @@ def generate_run_summary(
     run metadata, decisions (D-01 through D-06), results (Tg, density,
     bulk modulus), convergence, structural checks, artifact paths, and
     provenance (git commit, MDAnalysis version, timestamp).
+
+    Reports measured values only — no experimental PASS/FAIL grading. Most runs are novel
+    systems with no curated experimental reference, so compare results.tg/density/bulk_modulus
+    against literature by hand (or via exp_lookup.json, written separately for provenance) when
+    a reference happens to exist.
 
     Call as the final step of Stage 4, after all analysis tools have run.
     All artifact paths in the summary are relative to data/[RUN]/ in the
@@ -3903,9 +3921,6 @@ def generate_run_summary(
         dp, n_chains, n_atoms: System size parameters.
         date_start, date_end: ISO date strings (e.g. "2026-06-04").
         d01–d06:          Decision strings from run_log.md.
-        exp_tg_min/max:   Experimental Tg range (K) for PASS/FAIL status.
-        exp_density_min/max: Experimental density range (g/cm³).
-        exp_K_min/max:    Experimental bulk modulus range (GPa).
         n_replicates:     Replicate count reported in results.tg.n_replicates
                           (single-run protocol: 1).
         tg_path:          Explicit path to the canonical tg_summary.json (e.g.
@@ -3927,9 +3942,6 @@ def generate_run_summary(
             charge_method=charge_method, dp=dp, n_chains=n_chains, n_atoms=n_atoms,
             date_start=date_start, date_end=date_end,
             d01=d01, d02=d02, d03=d03, d04=d04, d05=d05, d06=d06,
-            exp_tg_min=exp_tg_min, exp_tg_max=exp_tg_max,
-            exp_density_min=exp_density_min, exp_density_max=exp_density_max,
-            exp_K_min=exp_K_min, exp_K_max=exp_K_max,
             graphs_dir=graphs_dir, n_replicates=n_replicates,
             tg_path=tg_path,
         )),

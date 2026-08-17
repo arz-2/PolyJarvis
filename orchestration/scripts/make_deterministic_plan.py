@@ -29,6 +29,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hw_common import load_rules, get_class_entry  # shared rules access (single source of truth)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from stage_params import _exp_tg_point  # reuse the proven run_name-member resolver, don't duplicate it
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 # Decision-relevant class keys consumed by stage_params.py. Only keys that
@@ -55,16 +57,6 @@ def _exp_tg_scalar(cls: dict):
     if isinstance(tg, dict):
         vals = sorted(v for v in tg.values() if isinstance(v, (int, float)))
         return vals[len(vals) // 2] if vals else None
-    return tg if isinstance(tg, (int, float)) else None
-
-
-def _exp_tg_bracket(cls: dict):
-    """Tg ACCURACY success_criterion (t_range_brackets_exp_tg). A multi-member dict has no
-    SMILES->member mapping, so the scaffold cannot tell which member this run is — leave the
-    bracket UNPINNED (None) rather than silently picking a wrong member (the old median pick
-    gave PEKK/433 for a PEEK/418 run). The planner must pin the member from the SMILES (see each
-    class's experimental_tg_K.multi_member_note in polymer_rules.json). Single-member passes through."""
-    tg = cls.get("experimental_tg_K")
     return tg if isinstance(tg, (int, float)) else None
 
 
@@ -117,11 +109,16 @@ STAGE_TRACK = {
 }
 
 
-def build_planned_stages(cls: dict, properties: set) -> list:
+def build_planned_stages(cls: dict, properties: set, run_name: str | None = None) -> list:
     """Experiment DAG with per-stage success_criteria the Validator enforces."""
     exp_tg = _exp_tg_scalar(cls)                 # regime/temperature (median ok for multi-member)
     glassy_hint = (exp_tg is not None and exp_tg > 300)
-    exp_tg_bracket = _exp_tg_bracket(cls)        # accuracy gate (None for multi-member → planner pins)
+    # accuracy gate: resolves per-member via run_name (same resolver stage_params.py uses for
+    # the real runtime grading target), so it's no longer permanently None for a multi-member
+    # class -- None now only means run_name genuinely didn't match any member (or wasn't given,
+    # e.g. the scaffold path), which is exactly the case worth flagging (see validate_run_plan's
+    # Check C). Previously this was hardcoded to always return None for multi-member classes.
+    exp_tg_bracket = _exp_tg_point(cls, run_name)
 
     def _s(stage, criteria, **extra):
         return {"stage": stage, "track": STAGE_TRACK[stage],
@@ -211,7 +208,7 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
         "uncertainties": uncertainties,
         "decided_params": decided_params,
         "decisions": build_decisions(cls),
-        "planned_stages": build_planned_stages(cls, properties),
+        "planned_stages": build_planned_stages(cls, properties, run_name),
         "critique": {"status": "pending_scientific_review", "rounds": 0, "findings": []},
         "provenance": {"generator": "make_deterministic_plan.py",
                        "generated_at": datetime.now(timezone.utc).isoformat()},

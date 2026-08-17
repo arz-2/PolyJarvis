@@ -50,8 +50,7 @@ def test_run_summary_populates_from_comprehensive_and_subdir_tg(tmp_path):
          "--output_dir", str(tmp_path), "--run_name", "TEST",
          "--smiles", "*CCO*", "--polymer_class", "POXI", "--ff", "pcff",
          "--charge_method", "AM1-BCC", "--dp", "100", "--n_chains", "10", "--n_atoms", "7020",
-         "--d01", "PCFF", "--d05", "PASS", "--d06", "EXCELLENT",
-         "--exp_tg_min", "186", "--exp_tg_max", "226"],
+         "--d01", "PCFF", "--d05", "PASS", "--d06", "EXCELLENT"],
         capture_output=True, text=True,
     )
     assert res.returncode == 0, res.stderr
@@ -73,10 +72,9 @@ def test_run_summary_populates_from_comprehensive_and_subdir_tg(tmp_path):
     assert sc["density_cv_mean"] == 0.2198
     assert sc["heterogeneous_flag"] is False
 
-    # per-rate subdir fallback: headline value_K + status/error vs exp range
+    # per-rate subdir fallback: headline value_K, no experimental comparison
     tg = summary["results"]["tg"]
     assert abs(tg["value_K"] - 207.39) < 1e-6
-    assert tg["status"] == "PASS"
-    assert tg["error_pct"] is not None and tg["error_pct"] < 2.0
+    assert "status" not in tg and "exp_range_K" not in tg
     assert tg["fit_quality"] == "EXCELLENT"
     assert abs(tg["r_squared"] - 0.9998) < 1e-6

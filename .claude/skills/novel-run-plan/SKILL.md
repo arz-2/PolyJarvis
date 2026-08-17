@@ -3,7 +3,12 @@ name: novel-run-plan
 description: Act as PolyJarvis's scientific planning agent to produce a run_plan.json for a polymer SMILES that is not yet protocol_validated (novel or partially-validated) — reasons each decision against orchestration/decision_policy.json, writes a decision file matching docs/AGENT_CONTRACT.md's schema, and materializes + dry-run-previews the plan via scientific_control.py. Use when the user wants to simulate a new polymer/SMILES not already covered by guides/system_characterization_cache.json. Never submits a real simulation itself.
 ---
 
-$ARGUMENTS may give run_name, SMILES, and properties (density/tg/bulk_modulus). Ask for whatever is missing.
+This skill takes three arguments, parsed from $ARGUMENTS:
+- `run_name` — identifier for this run (used as `data/<run_name>/`)
+- `smiles` — the repeat-unit SMILES string, with exactly two `*` chain-end connection points
+- `properties` — comma-separated subset of `density`, `tg`, `bulk_modulus`
+
+State which of the three were parsed from $ARGUMENTS and which are missing, then ask the user to fill in whatever is missing before proceeding.
 
 ## 1. Determine novelty
 
@@ -69,4 +74,11 @@ This validates the decision, materializes `run_plan.json`, and resolves every st
 
 Summarize: class + why, properties, overrides + rationale, any literature gaps found or unresolved, dominant uncertainty + confidence, dry-run stage output. Flag anything `scientific_control.py`/`validate_run_plan.py` rejected and fix the decision file before retrying.
 
-**Only drop `--dry-run` after the user explicitly confirms** — it submits real jobs and claims GPU resources.
+**Only drop `--dry-run` after the user explicitly confirms** — it submits real jobs and claims GPU resources. Give the user this exact command to run when ready:
+
+```bash
+python3 orchestration/scripts/scientific_control.py \
+  --run-name <name> --goal '<the user's stated scientific goal>' --smiles '<smiles>' \
+  --properties <comma-separated> --polymer-class-hint <CLASS> \
+  --decision-file data/<name>/raw/decision.json
+```

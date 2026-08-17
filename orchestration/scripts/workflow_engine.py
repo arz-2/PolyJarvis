@@ -51,10 +51,23 @@ PARAMETER_STAGE: dict[str, str] = {
     "npt_cool300_steps": "equilibration", "npt_continuation_ns": "equilibration",
     "melt_hold_ns": "equilibration", "melt_only_continuation_ns": "equilibration",
     "equilibration_phase": "equilibration", "cooling_resume_source": "equilibration",
+    # Ladder bookkeeping the equilibration remedies (_continue_npt, _cooling, _melt_hold,
+    # _melt_homogeneity) write into effective_parameters alongside their real scientific
+    # knob -- these carry no scientific weight of their own, but MUST still be mapped to their
+    # owning stage. An unmapped key falls through PARAMETER_STAGE.get(key, "build") and, on the
+    # next engine reconstruction (a resume, exactly this case), reads as a changed "build"
+    # parameter -- invalidating the ENTIRE pipeline back to build, discarding every already-
+    # accepted stage's bookkeeping (though not its on-disk manifest/artifacts). Hit live on PE1
+    # 2026-08-17 via tg_sampling's baseline_tg_steps_per_t below, which cascaded equilibration's
+    # already-verified PASS back to "stale" on repair-script reconstruction.
+    "npt_continuation_attempt": "equilibration", "baseline_npt_cool_steps": "equilibration",
+    "baseline_eq_annealing_cycles": "equilibration", "rerun_homogeneity_gate": "equilibration",
     "tg_t_high_K": "thermal", "tg_t_low_K": "thermal", "tg_t_step_K": "thermal",
     "tg_primary_rate_index": "thermal", "tg_rates_K_per_ns": "thermal",
     "tg_slope_gate_fallback": "thermal",
     "tg_steps_per_t": "thermal", "tg_min_steps_per_T": "thermal",
+    # tg_sampling's own ladder-bookkeeping key -- see the equilibration block's comment above.
+    "baseline_tg_steps_per_t": "thermal",
     "K_strain_max": "mechanical", "K_deform_rate_inv_s": "mechanical",
     "K_deform_rate_slow_inv_s": "mechanical", "bm_pressures_atm": "mechanical",
     "deform_eq_steps": "mechanical", "deform_strain_start": "mechanical",
