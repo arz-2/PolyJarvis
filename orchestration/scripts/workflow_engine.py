@@ -437,7 +437,8 @@ class WorkflowEngine:
                  recovery_agent: Any = None, policy_hashes: Optional[Mapping[str, str]] = None,
                  implementation_version: str = ENGINE_VERSION,
                  plan_path: Optional[Path] = None,
-                 plan_validator: Optional[Callable[[Mapping[str, Any]], list[Mapping[str, Any]]]] = None):
+                 plan_validator: Optional[Callable[[Mapping[str, Any]], list[Mapping[str, Any]]]] = None,
+                 override_validator: Optional[Callable[[Mapping[str, Any]], None]] = None):
         self.run_dir = Path(run_dir)
         self.plan = json.loads(json.dumps(plan))
         self.executor = executor
@@ -447,6 +448,11 @@ class WorkflowEngine:
         self.implementation_version = implementation_version
         self.plan_path = Path(plan_path) if plan_path else None
         self.plan_validator = plan_validator
+        # Bounds/whitelist check for agent-proposed `modifications` (raises ValueError on an
+        # out-of-range value or an unsupported key); injected rather than imported so this
+        # module stays stdlib-only and independently testable. scientific_control.py's
+        # validate_overrides is the production value.
+        self.override_validator = override_validator
         self.state_path = self.run_dir / "workflow_state.json"
         self.attempts_dir = self.run_dir / "attempts"
         self.state = self._load_or_create_state()
@@ -734,12 +740,21 @@ class WorkflowEngine:
                                       finding.details, selected)
             return "resume" if self._apply_remedy(revised_finding) else "escalation_required"
         if action in {"revise_plan", "retry"}:
-            modifications = dict(decision.get("modifications") or {})
+            # retry means unchanged params by definition; ignore any modifications a
+            # non-conforming agent attaches to it rather than reject the whole decision.
+            modifications = dict(decision.get("modifications") or {}) if action == "revise_plan" else {}
             forbidden = {"path", "dir", "command", "script", "state", "artifact", "file"}
             unsafe = [key for key in modifications
                       if any(token in key.lower() for token in forbidden)]
             if unsafe:
                 return "escalation_required"
+            if self.override_validator is not None:
+                try:
+                    self.override_validator(modifications)
+                except ValueError as exc:
+                    escalations[-1]["validation_error"] = str(exc)
+                    self._save()
+                    return "escalation_required"
             candidate = json.loads(json.dumps(self.plan))
             candidate.setdefault("decided_params", {}).update(modifications)
             if self.plan_validator is not None:

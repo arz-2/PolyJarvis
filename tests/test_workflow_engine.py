@@ -8,12 +8,14 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 from workflow_engine import (  # noqa: E402
     ACTIVE_BLOCKING_CODES,
+    MAX_AGENT_DECISIONS,
     Finding,
     RemedyRegistry,
     StageResult,
     WorkflowEngine,
     pressure_point_drop_allowed,
 )
+from scientific_control import validate_overrides  # noqa: E402
 
 
 class FakeExecutor:
@@ -71,6 +73,79 @@ def test_low_confidence_escalates_before_plan_mutation(tmp_path):
     assert result["status"] == "escalation_required"
     assert engine.state["effective_parameters"]["tg_steps_per_t"] == 100
     assert engine.state["remedy_counters"]["total"] == 0
+
+
+class RevisePlanRecovery:
+    """Matches production SubprocessRecoveryAgent's 3-arg diagnose(intent, plan, issue) --
+    _escalate's first attempt (a 1-arg diagnose(payload) call) raises TypeError against this
+    signature and falls back to the 3-arg call, exactly like the real subprocess adapter."""
+
+    def __init__(self, modifications, action="revise_plan"):
+        self.modifications = modifications
+        self.action = action
+        self.calls = []
+
+    def diagnose(self, intent, plan, issue):
+        self.calls.append((intent, plan, issue))
+        return {"action": self.action, "modifications": dict(self.modifications),
+                "rationale": "test"}
+
+
+def test_escalation_applies_revise_plan_and_resumes(tmp_path):
+    finding = Finding("TG_NOT_REPORTABLE", "thermal", confidence="low")
+    fake = FakeExecutor({"thermal": [StageResult("remedy_required", (finding,))]})
+    recovery = RevisePlanRecovery({"tg_t_step_K": 10})
+    engine = WorkflowEngine(tmp_path, plan(tg_t_step_K=20), fake,
+                            recovery_agent=recovery, override_validator=validate_overrides)
+
+    result = engine.run()
+
+    assert result["status"] == "accepted"
+    assert len(recovery.calls) == 1
+    thermal_calls = [call for call in fake.calls if call[0] == "thermal"]
+    assert len(thermal_calls) == 2
+    assert thermal_calls[-1][1]["parameters"]["tg_t_step_K"] == 10
+    assert engine.state["agent_escalations"][0]["decision"]["action"] == "revise_plan"
+
+
+def test_escalation_rejects_out_of_range_modification(tmp_path):
+    finding = Finding("TG_NOT_REPORTABLE", "thermal", confidence="low")
+    fake = FakeExecutor({"thermal": [StageResult("remedy_required", (finding,))]})
+    recovery = RevisePlanRecovery({"tg_t_step_K": 99999})
+    engine = WorkflowEngine(tmp_path, plan(tg_t_step_K=20), fake,
+                            recovery_agent=recovery, override_validator=validate_overrides)
+
+    result = engine.run()
+
+    assert result["status"] == "escalation_required"
+    assert engine.state["effective_parameters"]["tg_t_step_K"] == 20
+    assert "validation_error" in engine.state["agent_escalations"][0]
+
+
+def test_escalation_stops_after_max_agent_decisions(tmp_path):
+    finding = Finding("TG_NOT_REPORTABLE", "thermal", confidence="low")
+    fake = FakeExecutor({"thermal": [StageResult("remedy_required", (finding,))] * 3})
+    recovery = RevisePlanRecovery({"tg_t_step_K": 10})
+    engine = WorkflowEngine(tmp_path, plan(tg_t_step_K=20), fake,
+                            recovery_agent=recovery, override_validator=validate_overrides)
+
+    result = engine.run()
+
+    assert result["status"] == "escalation_required"
+    assert len(recovery.calls) == MAX_AGENT_DECISIONS
+
+
+def test_retry_ignores_any_attached_modifications(tmp_path):
+    finding = Finding("TG_NOT_REPORTABLE", "thermal", confidence="low")
+    fake = FakeExecutor({"thermal": [StageResult("remedy_required", (finding,))]})
+    recovery = RevisePlanRecovery({"tg_t_step_K": 999999}, action="retry")
+    engine = WorkflowEngine(tmp_path, plan(tg_t_step_K=20), fake,
+                            recovery_agent=recovery, override_validator=validate_overrides)
+
+    result = engine.run()
+
+    assert result["status"] == "accepted"
+    assert engine.state["effective_parameters"]["tg_t_step_K"] == 20
 
 
 def test_tg_gate_cannot_be_accepted_from_process_completion(tmp_path):

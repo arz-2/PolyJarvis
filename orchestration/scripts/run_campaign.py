@@ -31,6 +31,7 @@ from workflow_engine import (  # noqa: E402
     Finding, StageResult, WorkflowEngine, atomic_write_json, pressure_point_drop_allowed,
 )
 from validate_run_plan import validate_plan  # noqa: E402
+from scientific_control import validate_overrides  # noqa: E402
 
 LAMMPS_ENGINE_DIR = REPO_ROOT / "mcp-servers" / "mcp-lammps-engine"
 EMC_SERVER_DIR = REPO_ROOT / "mcp-servers" / "mcp-emc-server"
@@ -1063,7 +1064,8 @@ def run_campaign_workflow(plan_path: Path, *, dry_run: bool = False,
     decision_policy = json.loads((repo_root / "orchestration" / "decision_policy.json").read_text())
     return WorkflowEngine(run_dir, plan, executor, recovery_agent=recovery_agent,
                           policy_hashes=policy_hashes, plan_path=plan_path,
-                          plan_validator=lambda candidate: validate_plan(candidate, decision_policy)).run()
+                          plan_validator=lambda candidate: validate_plan(candidate, decision_policy),
+                          override_validator=validate_overrides).run()
 
 
 def main():

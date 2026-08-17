@@ -14,7 +14,7 @@ from scientific_control import (  # noqa: E402
     ALLOWED_OVERRIDES,
     PlanDecision,
     ScientificIntent,
-    _validate_overrides,
+    validate_overrides,
     materialize_plan,
     planning_context,
     planning_parameter_contract,
@@ -113,7 +113,7 @@ def test_agent_can_materialize_new_protocol_controls():
 
 def test_integer_protocol_controls_reject_fractional_values():
     with pytest.raises(ValueError, match="eq_annealing_cycles must be an integer"):
-        _validate_overrides({"eq_annealing_cycles": 2.5})
+        validate_overrides({"eq_annealing_cycles": 2.5})
 
 
 @pytest.mark.parametrize(("overrides", "message"), [

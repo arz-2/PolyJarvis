@@ -75,6 +75,11 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "velocity_seed": (1, 999_999_999),
     "gpu_per_run": (0, 16),
     "mpi_ranks": (1, 256),
+    # Recovery-only levers the automatic remedy ladder itself writes (workflow_engine.py's
+    # _continue_npt/_murnaghan_resample) -- an agent picking a different value for the same
+    # lever needs the same bounds the ladder is held to.
+    "npt_continuation_ns": (0.01, 1000),
+    "mechanical_sampling_factor": (1, 10),
 }
 ENUM_OVERRIDES = {
     "preferred_builder": frozenset({"emc", "radonpy"}),
@@ -85,15 +90,24 @@ ENUM_OVERRIDES = {
     "engine": frozenset({"gpu", "kokkos", "cpu"}),
     "tg_slope_gate_fallback": frozenset({"highest_rate", "slowest_rate"}),
     "mechanical_method": frozenset({"murnaghan", "deformation"}),
+    # The only values workflow_engine.py's _melt_hold/_cooling/_melt_homogeneity remedies
+    # themselves ever set -- an agent has no sanctioned reason to pick a different one.
+    "equilibration_phase": frozenset({"melt_then_cool", "melt_only"}),
+    "cooling_resume_source": frozenset({"accepted_melt", "remedied_melt"}),
 }
-SEQUENCE_OVERRIDES = frozenset({"tg_rates_K_per_ns", "bm_pressures_atm", "backbone_types"})
+SEQUENCE_OVERRIDES = frozenset({"tg_rates_K_per_ns", "bm_pressures_atm", "backbone_types",
+                                "mechanical_resample_points"})
 BOOLEAN_OVERRIDES = frozenset({"add_melt_npt", "add_300k_production", "ct_gate_reliable"})
 INTEGER_OVERRIDES = frozenset({
     "dp_typical", "nchain", "eq_annealing_cycles", "npt_cool_steps",
     "npt_cool300_steps", "tg_min_steps_per_T", "tg_steps_per_t",
     "deform_eq_steps", "deform_avg_window", "bm_npt_steps", "bm_thermo_freq",
     "emc_seed", "velocity_seed", "gpu_per_run", "mpi_ranks", "tg_primary_rate_index",
+    "mechanical_sampling_factor",
 })
+# Ladder bookkeeping (baseline_*, *_attempt, rerun_homogeneity_gate) is deliberately excluded
+# from every table above: an agent may pick a lever's value, never rewrite the ladder's own
+# accounting of what it already spent.
 ALLOWED_OVERRIDES = (frozenset(OVERRIDE_RANGES) | frozenset(ENUM_OVERRIDES) |
                      SEQUENCE_OVERRIDES | BOOLEAN_OVERRIDES)
 
@@ -379,7 +393,7 @@ def apply_recovery(plan: dict, decision: RecoveryDecision) -> dict:
     """Apply only validated protocol modifications; agents never edit run files."""
     if decision.action not in VALID_RECOVERY_ACTIONS:
         raise ValueError(f"invalid recovery action {decision.action!r}")
-    _validate_overrides(decision.modifications)
+    validate_overrides(decision.modifications)
     revised = json.loads(json.dumps(plan))
     revised["decided_params"].update(decision.modifications)
     by_id = {row.get("id"): row for row in revised.get("decisions", [])}
@@ -594,7 +608,7 @@ def _validate_decision(decision: PlanDecision) -> None:
     rules = load_rules()
     if decision.polymer_class not in rules.get("classes", {}):
         raise ValueError(f"unknown polymer class {decision.polymer_class!r}")
-    _validate_overrides(decision.overrides)
+    validate_overrides(decision.overrides)
     known_decisions = {row["id"] for row in build_decisions(
         get_class_entry(rules, decision.polymer_class, warn_on_miss=False)
     )}
@@ -603,7 +617,7 @@ def _validate_decision(decision: PlanDecision) -> None:
         raise ValueError(f"unknown decision evaluations: {sorted(unknown_decisions)}")
 
 
-def _validate_overrides(overrides: dict[str, Any]) -> None:
+def validate_overrides(overrides: dict[str, Any]) -> None:
     unknown = set(overrides) - ALLOWED_OVERRIDES
     if unknown:
         raise ValueError(f"agent attempted unsupported overrides: {sorted(unknown)}")
