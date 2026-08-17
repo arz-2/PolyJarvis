@@ -283,6 +283,7 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         phase = 'full'
     return {
         'data_path': args.data_path,
+        'emc_params_path': getattr(args, 'emc_params_path', None),
         'phase': phase,
         'pending_cooldown_path': getattr(args, 'pending_cooldown_path', None),
         'lammps_flags': _lammps_flags(args.lammps_flags, cls),

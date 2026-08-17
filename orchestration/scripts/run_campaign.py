@@ -12,6 +12,7 @@ import importlib.util
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -135,19 +136,34 @@ def _pick_gpu(action: str, run_name: str, need: int = None) -> dict:
 class gpu_claim:
     """Context manager: claim `need` GPUs under `run_name`'s label, yield the comma-joined
     gpu_ids string, always release on exit (even on exception) — rule 4 (log the exact claim
-    label, verify release) enforced structurally rather than by convention."""
+    label, verify release) enforced structurally rather than by convention.
+
+    A bare `kill`/SIGTERM skips __exit__ entirely (Python does not unwind `with` blocks on
+    SIGTERM by default), leaving a stale claim in pick_gpu.py's ledger — observed directly:
+    killing a test run left GPU 0 permanently marked busy under its run_name until released
+    by hand. A SIGTERM handler released for the claim's lifetime closes that gap.
+    """
 
     def __init__(self, run_name: str, need: int):
         self.run_name, self.need = run_name, need
+        self._prev_sigterm = None
 
     def __enter__(self) -> str:
         result = _pick_gpu("claim", self.run_name, self.need)
         if "claimed" not in result:
             raise RuntimeError(f"GPU claim failed for {self.run_name} (need={self.need}): {result}")
         self.claimed = result["claimed"]
+        self._prev_sigterm = signal.signal(signal.SIGTERM, self._on_sigterm)
         return ",".join(str(i) for i in self.claimed)
 
+    def _on_sigterm(self, signum, frame):
+        _pick_gpu("release", self.run_name)
+        signal.signal(signal.SIGTERM, self._prev_sigterm)
+        os._exit(128 + signum)
+
     def __exit__(self, exc_type, exc, tb):
+        if self._prev_sigterm is not None:
+            signal.signal(signal.SIGTERM, self._prev_sigterm)
         rel = _pick_gpu("release", self.run_name)
         if "released" not in rel:
             print(f"WARNING: GPU release may have failed for {self.run_name}: {rel}", file=sys.stderr)
@@ -356,6 +372,7 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             max_press=p["compression_max_pressure_atm"],
             use_long_range=p["use_long_range_electrostatics"],
             extend_steps=None,
+            params_file=p.get("emc_params_path") or "",
         )
     else:
         dt = p["dt_fs"]
@@ -379,6 +396,7 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
     chain = lammps.run_lammps_chain(
         stages=workflow["stages"], gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"],
         data_file=extend_from_data or p["data_path"], engine=p["engine"],
+        params_file=(p.get("emc_params_path") or "") if extend_from_data is None else "",
     )
     if chain.get("status") == "error":
         raise SystemExit(f"run_lammps_chain failed: {chain}")
@@ -903,6 +921,7 @@ class CampaignStageExecutor:
         if build:
             args.data_path = build.get("data_path")
             args.build_data_path = build.get("data_path")
+            args.emc_params_path = build.get("emc_params_path")
             args.n_atoms = build.get("n_atoms")
         if equil:
             args.data_path = equil.get("npt_prod_data_path")
