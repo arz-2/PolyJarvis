@@ -9,6 +9,8 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 import recovery_agent_cli as rac  # noqa: E402
 
 
+MODIFICATION_CONTRACT = {"nchain": {"type": "integer", "minimum": 1, "maximum": 500}}
+
 OUTER_PAYLOAD = {
     "task": "diagnose_polymer_simulation_issue",
     "intent": {"run_name": "PP", "goal": "test"},
@@ -16,7 +18,7 @@ OUTER_PAYLOAD = {
     "issue": {"stage": "equilibration", "code": "PROCESS_FAILED",
               "detail": {"error": "boom"}, "attempt": 0},
     "output_contract": {"action": ["retry", "revise_plan", "stop"], "rationale": "...",
-                         "modifications": {}},
+                         "modifications": MODIFICATION_CONTRACT},
 }
 
 INNER_PAYLOAD = {
@@ -26,7 +28,7 @@ INNER_PAYLOAD = {
     "issue": {"code": "PROCESS_FAILED", "stage": "equilibration", "severity": "blocking",
               "confidence": "high", "details": {"error": "boom"}, "remedy_id": None},
     "output_contract": {"action": ["retry", "revise_plan", "stop"], "rationale": "...",
-                         "modifications": {}},
+                         "modifications": MODIFICATION_CONTRACT},
 }
 
 
@@ -36,6 +38,8 @@ def test_trim_payload_handles_outer_shape():
     assert trimmed["code"] == "PROCESS_FAILED"
     assert trimmed["detail"] == {"error": "boom"}
     assert "recovery_history" not in trimmed  # empty list dropped
+    assert trimmed["valid_actions"] == ["retry", "revise_plan", "stop"]
+    assert trimmed["modification_contract"] == MODIFICATION_CONTRACT
 
 
 def test_trim_payload_handles_inner_finding_shape():
@@ -44,39 +48,83 @@ def test_trim_payload_handles_inner_finding_shape():
     assert trimmed["code"] == "PROCESS_FAILED"
     assert trimmed["detail"] == {"error": "boom"}
     assert trimmed["severity"] == "blocking"
+    assert trimmed["valid_actions"] == ["retry", "revise_plan", "stop"]
+    assert trimmed["modification_contract"] == MODIFICATION_CONTRACT
 
 
-def test_diagnose_always_returns_stop_on_success():
+def test_diagnose_passes_through_revise_plan_with_modifications():
     with patch.object(rac, "_run_headless_claude", return_value={
-        "decision": "params_file not threaded", "remedies_prescribed": "thread emc_params_path",
-        "rationale": "cell.data has no embedded Coeffs sections",
+        "action": "revise_plan", "modifications": {"nchain": 320},
+        "rationale": "finite-size violation, rebuilding larger",
+    }):
+        decision = rac.diagnose(OUTER_PAYLOAD)
+    assert decision["action"] == "revise_plan"
+    assert decision["modifications"] == {"nchain": 320}
+    assert "finite-size violation" in decision["rationale"]
+
+
+def test_diagnose_passes_through_retry():
+    with patch.object(rac, "_run_headless_claude", return_value={
+        "action": "retry", "modifications": {},
+        "rationale": "stale orphan process confirmed killed",
+    }):
+        decision = rac.diagnose(OUTER_PAYLOAD)
+    assert decision["action"] == "retry"
+    assert decision["modifications"] == {}
+    assert "stale orphan" in decision["rationale"]
+
+
+def test_diagnose_stop_still_works():
+    with patch.object(rac, "_run_headless_claude", return_value={
+        "action": "stop", "modifications": {},
+        "rationale": "novel failure mode, needs human review",
     }):
         decision = rac.diagnose(OUTER_PAYLOAD)
     assert decision["action"] == "stop"
     assert decision["modifications"] == {}
-    assert "params_file not threaded" in decision["rationale"]
+    assert "novel failure mode" in decision["rationale"]
+
+
+def test_diagnose_zeroes_modifications_when_action_not_revise_plan():
+    with patch.object(rac, "_run_headless_claude", return_value={
+        "action": "retry", "modifications": {"nchain": 320},
+        "rationale": "misbehaving model sent modifications with retry",
+    }):
+        decision = rac.diagnose(OUTER_PAYLOAD)
+    assert decision["action"] == "retry"
+    assert decision["modifications"] == {}
+
+
+def test_diagnose_falls_back_to_stop_on_invalid_action():
+    with patch.object(rac, "_run_headless_claude", return_value={
+        "action": "do_something_unlisted", "modifications": {"nchain": 320},
+        "rationale": "model invented an action",
+    }):
+        decision = rac.diagnose(OUTER_PAYLOAD)
+    assert decision["action"] == "stop"
+    assert decision["modifications"] == {}
 
 
 def test_run_headless_claude_retries_once_then_succeeds():
     calls = {"n": 0}
 
-    def flaky(prompt, timeout_s):
+    def flaky(prompt, schema, timeout_s):
         calls["n"] += 1
         if calls["n"] == 1:
             raise RuntimeError("aborted_streaming")
-        return {"decision": "d", "remedies_prescribed": "r", "rationale": "x"}
+        return {"action": "stop", "modifications": {}, "rationale": "x"}
 
     with patch.object(rac, "_run_headless_claude_once", side_effect=flaky):
-        result = rac._run_headless_claude("prompt", retries=1)
+        result = rac._run_headless_claude("prompt", rac._output_schema(rac.DEFAULT_ACTIONS), retries=1)
     assert calls["n"] == 2
-    assert result["decision"] == "d"
+    assert result["action"] == "stop"
 
 
 def test_run_headless_claude_gives_up_after_retries_exhausted():
     with patch.object(rac, "_run_headless_claude_once",
                        side_effect=RuntimeError("aborted_streaming")):
         try:
-            rac._run_headless_claude("prompt", retries=1)
+            rac._run_headless_claude("prompt", rac._output_schema(rac.DEFAULT_ACTIONS), retries=1)
             assert False, "expected RuntimeError"
         except RuntimeError as exc:
             assert "aborted_streaming" in str(exc)
@@ -93,7 +141,7 @@ def test_diagnose_fails_closed_on_headless_error():
 def test_main_reads_stdin_writes_one_json_line(capsys, monkeypatch):
     monkeypatch.setattr(sys, "stdin", __import__("io").StringIO(json.dumps(OUTER_PAYLOAD)))
     with patch.object(rac, "_run_headless_claude", return_value={
-        "decision": "d", "remedies_prescribed": "r", "rationale": "x",
+        "action": "stop", "modifications": {}, "rationale": "x",
     }):
         rac.main()
     out = capsys.readouterr().out.strip()

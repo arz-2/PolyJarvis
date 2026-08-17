@@ -6,8 +6,12 @@ allowed-tools: Read, Bash(find:*), Bash(grep:*), Bash(ls:*), Bash(ps:*), Bash(ca
 Source of truth for headless `/recover` diagnosis, invoked by
 `orchestration/scripts/recovery_agent_cli.py` — itself called from `WorkflowEngine._escalate`
 (inner ladder, `orchestration/scripts/workflow_engine.py`) and `ScientificControlPlane`'s outer
-loop (`orchestration/scripts/scientific_control.py`). **Diagnosis only.** You never write, edit,
-resubmit, or claim/release any resource — a human or the calling engine acts on your RESULT.
+loop (`orchestration/scripts/scientific_control.py`). **You recommend, you never apply.** You
+never write, edit, resubmit, or claim/release any resource yourself — but you may decide
+`action: retry` or `revise_plan` (with concrete `modifications`), not just `stop`. The calling
+engine re-validates and applies whatever you return through its own bounded machinery (forbidden
+overrides rejected, `plan_validator`/`_validate_overrides`/`_validate_protocol_relationships`
+re-checked, capped at `MAX_AGENT_DECISIONS`/`MAX_RECOVERY_ATTEMPTS`=2 escalations per run).
 
 You are reached only when the automatic ladder below could **not** resolve the failure itself:
 either the `Finding.code` has no registered remedy (`agent_only`), or its per-route cap
@@ -96,13 +100,19 @@ reads them; this file doesn't restate them.
 Return exactly one JSON object matching `recovery_agent_cli.py`'s schema — no free text:
 
 ```json
-{"decision": "one-line root-cause diagnosis",
- "remedies_prescribed": "the specific rung/action recommended, verbatim",
- "rationale": "why, citing the workflow_state.json evidence or remedy_economics verdict"}
+{"action": "retry | revise_plan | stop",
+ "modifications": {"decided_params key": "value, ... — only when action is revise_plan, else {}"},
+ "rationale": "root cause and why this action, citing the workflow_state.json evidence or remedy_economics verdict"}
 ```
 
-`action` is fixed to `"stop"` by the caller regardless of what you write here — you diagnose, you
-never apply.
+Choose `revise_plan` only when you're confident of both the root cause and the fix, and the
+modification is a single, well-evidenced `decided_params` override — e.g. `FORCE_FIELD_TYPING_
+AMBIGUOUS` → `{"preferred_ff": "<the alternative you picked>"}`. Choose `retry` only when you've
+confirmed the cause was transient (stale process, disk, GPU claim) and is now resolved — never as
+a third blind attempt. Choose `stop` for anything genuinely novel or ambiguous, or any row above
+marked `agent_only` with no clear single fix (`UNSAFE_HARDWARE_PIN`, `DEFORM_ANISOTROPIC`/
+`DEFORM_INADMISSIBLE`, the cross-cutting rows). The engine re-validates `modifications` against
+its own parameter whitelist and rejects unsafe keys regardless of what you send.
 
 ## Session reattach
 
