@@ -238,9 +238,21 @@ def _cooling(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[st
 
 
 def _melt_hold(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[str, Any]:
-    return _merge(params, melt_hold_ns=(10.0, 50.0)[attempt - 1],
-                  add_melt_npt=True, equilibration_phase="melt_then_cool",
-                  cooling_resume_source="remedied_melt")
+    """MELT_STAGE_DEFICIT ladder: try the cheaper, more-targeted lever first. Attempt 1 escalates
+    thermal-cycling depth (more chance to escape a bad initial pack); attempt 2 adds a bounded
+    isothermal melt hold, the fallback for systems no amount of annealing fixes (genuine FF
+    underbinding) -- assess_cooling_contraction.py cannot separate the two causes on its own.
+    5 ns, not the ~100 ns NkepsuMbitou2025 cites for full convergence: PolyJarvis is a quick
+    survey tool, not a per-polymer optimizer -- this rung is a bounded diagnostic probe, not
+    meant to brute-force convergence. A deficit that doesn't resolve within it should escalate to
+    agent_only for human review rather than keep spending wall-clock chasing the literature value."""
+    baseline = int(params.get("baseline_eq_annealing_cycles") or params.get("eq_annealing_cycles") or 0)
+    revised = _merge(params, eq_annealing_cycles=max(baseline * 2, baseline + 2, 2),
+                      baseline_eq_annealing_cycles=baseline)
+    if attempt > 1:
+        revised = _merge(revised, melt_hold_ns=5.0, add_melt_npt=True,
+                          equilibration_phase="melt_then_cool", cooling_resume_source="remedied_melt")
+    return revised
 
 
 def _melt_homogeneity(params: dict[str, Any], finding: Finding, attempt: int) -> dict[str, Any]:

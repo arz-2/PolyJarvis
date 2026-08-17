@@ -21,31 +21,23 @@ To request a subset, pass `--properties density,tg` to `run_campaign.py`. Omitti
 
 ## 2. Glass Transition Temperature (Tg)
 
-Tg is measured **multirate**: one stepped cooling sweep is run per cooling rate, each sweep yields a per-rate Tg, and the per-rate Tg values are extrapolated to the experimental (DSC-equivalent) rate.
+Tg is measured **single-rate-primary**: one stepped cooling sweep runs at the class's primary
+configured rate (the highest entry in `tg_rates_K_per_ns` by default; `tg_slope_gate_fallback:
+"slowest_rate"` classes — rigid aromatics whose highest-rate fit is documented as
+degenerate/inverted — run `tg_rates_K_per_ns[0]` instead).
 
-### Per-rate sweep
+### Sweep
 
 | Field | Value |
 |-------|-------|
 | Units | K (MD value) |
-| Source log | `thermal/tg_sweep_r<rate>/tg_sweep.log` (one per rate in `tg_rates_K_per_ns`, e.g. [25, 50, 100]) |
+| Source log | `thermal/tg_sweep/tg_sweep.log` |
 | Tool | `extract_thermal` |
-| Method | Stepped cooling sweep from high T to ≤200 K; bilinear fit of density vs T; breakpoint = Tg_MD at that rate. CTE (α_g, α_r) and ΔCp come from the same fit's branch slopes |
+| Method | Stepped cooling sweep from high T to ≤200 K; bilinear fit of density vs T; breakpoint = Tg_MD. CTE (α_g, α_r) and ΔCp come from the same fit's branch slopes |
 | Fit quality | PASS / WARN / ABORT; R² and segment slopes reported |
-| Outputs | per-rate `tg_summary.json`, `tg_density_vs_T.png` |
-
-### Multirate aggregation → DSC-equivalent Tg
-
-| Field | Value |
-|-------|-------|
-| Tool | `extract_tg_multirate` |
-| Method | Fit Tg vs ln(cooling rate); extrapolate to `dsc_equiv_rate_K_per_ns` (~1.67e-10 K/ns) → headline DSC-equivalent Tg |
-| Inputs | This run's three per-rate (rate, Tg) pairs, filtered to fit_quality ≥ ACCEPTABLE (single-run protocol — no cross-run pooling) |
-| Slope gate (glassy) | Tg must rise with rate (slope > 0); a non-positive slope marks the per-rate data contaminated → re-run with a new seed |
-| Rubbery regime | When T_workflow ≫ Tg the rate-dependence is ~flat: `is_flat_rate_regime=True`, `tg_method=flat_rate_mean` reports the mean across rates (not an extrapolation), slope gate exempted |
-| Validation | `experimental_tg_K` from polymer_rules.json; MD Tg overestimates experiment by ~80–120 K (fast cooling rate artifact — Patrone 2016, Webb 2024) |
-| Outputs | `tg_multirate_result.json` |
-| Side effect | `is_glassy` selects the bulk modulus path — decided from the **highest-rate** MD Tg (`is_glassy = Tg_highest_rate > 300`); on a degenerate highest-rate fit it falls back to `experimental_tg_K > 300` |
+| Outputs | `tg_summary.json`, `tg_density_vs_T.png` |
+| Validation | `experimental_tg_K` from polymer_rules.json, graded strictly (no offset in the band); MD Tg overestimates experiment by ~80–120 K (fast cooling rate artifact — Patrone 2016, Webb 2024), reported as an annotation only (`tg_offset_corrected_K`), never folded into PASS/FAIL |
+| Side effect | `is_glassy` is decided from this sweep's MD Tg (`is_glassy = Tg_MD > 300`) when it ran at the class's highest configured rate; a degenerate fit or a deliberately slowest-rate sweep (PKTN, PSFO) falls back to `experimental_tg_K > 300` |
 
 **If Tg is not requested:** `is_glassy` is inferred from `experimental_tg_K` in polymer_rules.json (glassy_hint). Tg_K is reported as N/A.
 

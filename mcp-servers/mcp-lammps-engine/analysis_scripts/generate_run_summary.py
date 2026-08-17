@@ -29,7 +29,6 @@ Usage:
 
 import argparse
 import json
-import math
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -144,7 +143,6 @@ def main():
         return {}
 
     tg           = _load("tg_summary.json")
-    tg_mr        = _load("tg_multirate_result.json")
     eq_dens      = _load("equilibrated_density.json")
     eq_chk       = _load("equilibration_check.json")
     # check_equilibration_comprehensive actually writes equilibration_comprehensive.json
@@ -163,16 +161,9 @@ def main():
     # -----------------------------------------------------------------------
     # Results section
     # -----------------------------------------------------------------------
-    # Tg resolution: prefer the rate-extrapolated value (cooling-rate bias removed) over the raw
-    # single-rate MD Tg. Multi-rate runs may write per-rate tg_summary.json into subdirs, so search
-    # recursively when the top-level file is absent (else Tg silently drops from the summary).
-    tg_extrap = (tg_mr or {}).get("tg_at_slow_rate_K")
-    try:
-        tg_extrap = float(tg_extrap)
-        if not math.isfinite(tg_extrap):
-            tg_extrap = None
-    except (TypeError, ValueError):
-        tg_extrap = None
+    # Tg resolution: single-rate MD Tg. A run may write tg_summary.json into a per-rate
+    # subdir (tg_r<rate>/), so search recursively when the top-level file is absent (else
+    # Tg silently drops from the summary).
     Tg_raw = tg.get("Tg_K")
     if Tg_raw is None and not tg:
         # Explicit canonical path wins over rglob to avoid alphabetical-order bugs
@@ -192,19 +183,10 @@ def main():
             # is not stranded and does not belong in artifacts_missing.
             artifacts_missing[:] = [m for m in artifacts_missing if m["file"] != "tg_summary.json"]
 
-    Tg_val = tg_extrap if tg_extrap is not None else Tg_raw
-    tg_basis = ("rate_extrapolated" if tg_extrap is not None
-                else ("raw_MD" if Tg_raw is not None else None))
-    # Fit-quality fields for the results dict: per-rate bilinear r²/quality for a raw single-rate
-    # headline, or the multirate log-linear r² when the rate-extrapolated value is reported.
+    Tg_val = Tg_raw
+    tg_basis = "raw_MD" if Tg_raw is not None else None
     tg_r2 = tg.get("r_squared")
     tg_quality = tg.get("fit_quality")
-    if tg_extrap is not None:
-        tg_r2 = tg_mr.get("loglinear_r_squared")
-        # Per-rate bilinear fit quality (the D-06 metric) lives in any tg_r*/tg_summary.json.
-        for sub in sorted(output_dir.glob("tg_r*/tg_summary.json")):
-            tg_quality = _load_json(sub).get("fit_quality")
-            break
     def _floor_band(band, *, min_abs=None, min_rel=None):
         """Widen a too-narrow exp band symmetrically to a physical minimum width, so a
         degenerate/single-point or hand-entered tight band can't cause a false FAIL
@@ -231,9 +213,8 @@ def main():
         # overestimates experiment by ~80-120 K (cooling-rate artifact, Patrone 2016), but that
         # offset must NEVER be folded into the PASS/FAIL band: doing so manufactures a false PASS
         # (a prior PLA run did exactly this — feedback_pla_glassy_md_offset_gamed_pass.md). The
-        # rate-extrapolated Tg already removes this bias by construction; the raw single-rate Tg
-        # is graded exactly as strictly, with the offset reported only as an annotation
-        # (tg_offset_corrected_K below), never applied to lo/hi/status/error_pct.
+        # offset is reported only as an annotation (tg_offset_corrected_K below), never applied
+        # to lo/hi/status/error_pct.
         lo, hi = exp_tg[0], exp_tg[1]
         tg_status = "PASS" if lo <= Tg_val <= hi else "FAIL"
         if tg_status == "PASS":
@@ -241,8 +222,7 @@ def main():
         else:
             nearest = lo if Tg_val < lo else hi
             tg_err = round((Tg_val - nearest) / nearest * 100, 1)
-        if tg_basis == "raw_MD":
-            tg_offset_corrected_K = round(Tg_val - float(args.tg_md_offset_K or 0.0), 1)
+        tg_offset_corrected_K = round(Tg_val - float(args.tg_md_offset_K or 0.0), 1)
 
     rho_val = eq_dens.get("plateau_density_mean") or eq_dens.get("density_mean")
     exp_rho = ([args.exp_density_min, args.exp_density_max]
@@ -305,9 +285,6 @@ def main():
         "tg_summary":              rel("tg_summary.json"),
         "tg_density_bins":         rel("tg_density_bins.csv"),
         "tg_fit_fig":              rel_fig("tg_fit.png"),
-        "tg_multirate_result":     rel("tg_multirate_result.json"),
-        "tg_multirate_d06":        rel("d06_multirate_block.md"),
-        "tg_multirate_fig":        rel("tg_multirate.png"),
         "equilibrated_density":    rel("equilibrated_density.json"),
         "equilibration_check":     rel("equilibration_check.json"),
         "equilibration_comprehensive": rel("equilibration_comprehensive.json"),
@@ -388,8 +365,8 @@ def main():
         "results": {
             "tg": {
                 "value_K":        Tg_val,
-                "grading_basis":  tg_basis,   # rate_extrapolated | raw_MD — both graded strictly, no offset in the band
-                "md_offset_K":    (0.0 if tg_basis == "rate_extrapolated" else args.tg_md_offset_K),
+                "grading_basis":  tg_basis,   # raw_MD — graded strictly, no offset in the band
+                "md_offset_K":    args.tg_md_offset_K,
                 # Annotation only — the ~80-120 K cooling-rate-artifact-corrected value, for
                 # context. NEVER used for status/error_pct (feedback_pla_glassy_md_offset_gamed_pass.md).
                 "tg_offset_corrected_K": tg_offset_corrected_K,
@@ -402,21 +379,8 @@ def main():
                 # True when the headline raw-MD fit still violates a hard physics constraint
                 # (no valid alternative existed to swap in, per extract_thermal). Surfaced so the
                 # headline Tg is not graded silently — treat the value as unreliable when set.
-                "primary_fit_invalid": (tg.get("primary_fit_invalid", False)
-                                        if tg_basis == "raw_MD" else False),
-                # Multi-rate DSC extrapolation (log-linear Tg(Γ) → DSC-equivalent rate).
-                # tg_dsc_equiv_K is the reported "theoretical DSC-equivalent experimental Tg".
-                "tg_dsc_equiv_K":      tg_mr.get("tg_at_slow_rate_K"),
-                "loglinear_slope_K":   tg_mr.get("loglinear_slope_K"),
-                # Per e-fold above; the per-decade value is the one to grade against the
-                # 3-5 K/decade physical expectation. Older artifacts lack it -> None.
-                "loglinear_slope_K_per_decade": tg_mr.get("loglinear_slope_K_per_decade"),
-                "loglinear_r_squared": tg_mr.get("loglinear_r_squared"),
-                "vf_fit_quality":      tg_mr.get("vf_fit_quality"),
-                "n_rates":             tg_mr.get("n_points"),
+                "primary_fit_invalid": tg.get("primary_fit_invalid", False),
                 "n_replicates":        args.n_replicates,
-                "rates_span_decades":  tg_mr.get("rates_span_decades"),
-                "slow_rate_ref_K_per_ns": tg_mr.get("slow_rate_ref_K_per_ns"),
             },
             "density": {
                 "value_g_cm3":    rho_val,

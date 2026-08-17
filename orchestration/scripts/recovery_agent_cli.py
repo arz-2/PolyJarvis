@@ -29,7 +29,6 @@ STAGE_TRACK = {
     "equil-check": ("foundation", "equil"),
     "tg": ("thermal", "tg"),
     "analyze-tg": ("thermal", "analyze-tg"),
-    "analyze-tg-multirate": ("thermal", "analyze-tg"),
     "deform": ("mechanical", "deform"),
     "murnaghan": ("mechanical", "murnaghan"),
     "analyze-bm": ("mechanical", "analyze-bm"),

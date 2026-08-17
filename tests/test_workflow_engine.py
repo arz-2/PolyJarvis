@@ -86,6 +86,27 @@ def test_tg_gate_cannot_be_accepted_from_process_completion(tmp_path):
     assert thermal_calls[-1][1]["parameters"]["tg_t_step_K"] == 10
 
 
+def test_melt_stage_deficit_escalates_anneal_cycles_before_melt_hold(tmp_path):
+    finding = Finding("MELT_STAGE_DEFICIT", "equilibration")
+    fake = FakeExecutor({"equilibration": [
+        StageResult("remedy_required", (finding,)),
+        StageResult("remedy_required", (finding,)),
+    ]})
+    engine = WorkflowEngine(tmp_path, plan(eq_annealing_cycles=3), fake)
+
+    result = engine.run()
+
+    assert result["status"] == "accepted"
+    equil_calls = [call for call in fake.calls if call[0] == "equilibration"]
+    assert len(equil_calls) == 3
+    # attempt 1: cheaper lever only -- more thermal-cycling depth, no melt hold yet
+    assert equil_calls[1][1]["parameters"]["eq_annealing_cycles"] == 6
+    assert "melt_hold_ns" not in equil_calls[1][1]["parameters"]
+    # attempt 2: cycles stay escalated, bounded melt hold added as the fallback
+    assert equil_calls[2][1]["parameters"]["eq_annealing_cycles"] == 6
+    assert equil_calls[2][1]["parameters"]["melt_hold_ns"] == 5.0
+
+
 def test_thermal_change_invalidates_mechanical_and_summary_not_build(tmp_path):
     first = WorkflowEngine(tmp_path, plan(tg_t_step_K=20), FakeExecutor())
     assert first.run()["status"] == "accepted"

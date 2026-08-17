@@ -64,6 +64,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from plot_style import apply_style, save_fig
 from analysis_utils import parse_lammps_log
+from backbone_topology import backbone_path
 
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -166,12 +167,11 @@ def _analyze_per_t_dump(per_t_dump_file, tg_data_file, backbone_types_list, dete
 
             if backbone_set:
                 try:
-                    types = np.array([int(t) for t in chain.types])
-                    mask = np.isin(types, list(backbone_set))
-                    if mask.sum() >= 2:
-                        bb = chain.atoms[mask]
-                        order = np.argsort(bb.indices)
-                        bb_pos = bb.positions[order]
+                    # Bond-topology graph diameter, not a declared-type mask sorted by atom
+                    # index: index order != bond order for a branched or aromatic-backbone
+                    # chain, which silently corrupted every bond vector built from it.
+                    bb_pos, bb_idx = backbone_path(chain)
+                    if bb_idx is not None and len(bb_idx) >= 2:
                         for k in range(len(bb_pos) - 1):
                             bb_bond_vecs.append(bb_pos[k + 1] - bb_pos[k])
                 except Exception:

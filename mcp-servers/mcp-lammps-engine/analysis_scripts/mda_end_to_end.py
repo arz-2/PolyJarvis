@@ -3,8 +3,8 @@
 End-to-end vector extraction using MDAnalysis.
 
 Computes per-chain end-to-end distance R and vector (rx, ry, rz)
-for every frame, using MDAnalysis topology and sort_backbone for
-robust terminal atom identification.
+for every frame. Backbone termini are found from bond topology alone (the graph diameter of
+each chain's heavy-atom bond graph), not from declared atom types.
 
 Output:
     end_to_end_vectors.csv   — columns: frame, timestep, chain, rx, ry, rz, distance
@@ -24,7 +24,8 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 import MDAnalysis as mda
-from MDAnalysis.analysis.polymer import sort_backbone
+
+from backbone_topology import backbone_path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import matplotlib
@@ -119,31 +120,27 @@ def main():
         chain_list = all_resids
     print(f"  Analysing {len(chain_list)} chains: {chain_list[:10]}{'...' if len(chain_list)>10 else ''}", flush=True)
 
-    # Build backbone type selection string
-    type_sel = ' or '.join(f'type {t}' for t in args.backbone_types)
-
-    # Pre-compute sorted backbone terminal atoms for each chain
+    # Pre-compute each chain's backbone, in bonded order, from bond topology alone — declared
+    # types can't reliably select the backbone (a class can reuse one type between a backbone
+    # atom and a pendant branch) or order it (atom index != bond order for a branched chain).
+    # args.backbone_types is no longer used to select atoms here; it stays a required CLI arg
+    # for interface compatibility with existing callers.
     chain_termini = {}  # resid -> (first_atom_id, last_atom_id)
-    chain_sorted_bb = {}  # resid -> sorted AtomGroup
+    chain_sorted_bb = {}  # resid -> backbone AtomGroup, bonded order
 
-    print(f"  Identifying backbone termini (types: {args.backbone_types})...", flush=True)
+    print("  Identifying backbone termini (bond-topology graph diameter)...", flush=True)
     for cid in chain_list:
-        bb = u.select_atoms(f'resid {cid} and ({type_sel})')
-        if len(bb) < 2:
-            print(f"    Chain {cid}: only {len(bb)} backbone atoms, skipping", flush=True)
+        chain = u.select_atoms(f'resid {cid}')
+        _, idx = backbone_path(chain)
+        if idx is None:
+            print(f"    Chain {cid}: fewer than 2 heavy atoms or no bond topology, skipping",
+                  flush=True)
             continue
-        try:
-            sorted_bb = sort_backbone(bb)
-            chain_sorted_bb[cid] = sorted_bb
-            chain_termini[cid] = (int(sorted_bb[0].id), int(sorted_bb[-1].id))
-            print(f"    Chain {cid}: {len(sorted_bb)} backbone atoms, "
-                  f"termini ids={sorted_bb[0].id} - {sorted_bb[-1].id}", flush=True)
-        except Exception as e:
-            print(f"    Chain {cid}: sort_backbone failed ({e}), "
-                  f"falling back to first/last atom id", flush=True)
-            ids_sorted = sorted(int(x) for x in bb.ids)
-            chain_termini[cid] = (ids_sorted[0], ids_sorted[-1])
-            chain_sorted_bb[cid] = bb
+        sorted_bb = u.atoms[idx]
+        chain_sorted_bb[cid] = sorted_bb
+        chain_termini[cid] = (int(sorted_bb[0].id), int(sorted_bb[-1].id))
+        print(f"    Chain {cid}: {len(sorted_bb)} backbone atoms, "
+              f"termini ids={sorted_bb[0].id} - {sorted_bb[-1].id}", flush=True)
 
     if not chain_termini:
         result = {
@@ -230,7 +227,7 @@ def main():
         "per_chain": per_chain,
         "overall_mean_R": float(df_out["distance"].mean()) if len(df_out) > 0 else 0.0,
         "overall_mean_R2": float((df_out["rx"]**2 + df_out["ry"]**2 + df_out["rz"]**2).mean()) if len(df_out) > 0 else 0.0,
-        "method": "MDAnalysis.analysis.polymer.sort_backbone",
+        "method": "heavy_atom_graph_diameter",
         "mdanalysis_version": mda.__version__,
     })
 

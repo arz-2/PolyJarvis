@@ -11,6 +11,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -257,11 +258,11 @@ def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNames
         melt_hold_ns=None, melt_only_continuation_ns=None, phase="full",
         pending_cooldown_path=None,
         T_equil_K=None, T_anneal_high_K=None, tg_t_high_K=None, tg_t_low_K=None,
-        tg_t_step_K=None, tg_steps_per_t=None, tg_rate_index=None, mr_rates=None,
-        mr_tg_values=None, n_replicates=1, K_strain_max=None, K_deform_rate_inv_s=None,
+        tg_t_step_K=None, tg_steps_per_t=None, tg_rate_index=None,
+        n_replicates=1, K_strain_max=None, K_deform_rate_inv_s=None,
         dt_fs=None, density_initial=None, properties="all", exp_K_min=None, exp_K_max=None,
         exp_tg_K=None, exp_tg_min=None, exp_tg_max=None, exp_density_min=None,
-        exp_density_max=None, polymer_name=None, tg_path=None, slope_gate_pass=None,
+        exp_density_max=None, polymer_name=None, tg_path=None,
     )
 
 
@@ -452,31 +453,42 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
         # decided_params, and only the resolver reads it from there (via the plan-overlaid cls).
         backbone_types = p["backbone_types"]
         if backbone_types is None:
-            # inspect_data_file only for diagnostics attached to the halt below — atom names
-            # alone (e.g. "c"/"c1") don't determine which types are backbone vs. pendant branch
-            # for a branched-backbone class (confirmed live: PACR/PMMA shares generic aliphatic
-            # carbon types between CH2 backbone atoms and pendant methyl branches), so this is
-            # never auto-derived into a backbone_types list — only ever an explicit
-            # decided_params/CLI value, reviewed like any other protocol-lock decision.
-            # Diagnostics only — this call exists to surface atom_type_names in the halt
-            # below, not to run the size gate (do_build already ran that on this same file).
-            # The forecast args are passed as explicit nulls to say so.
-            diag = lammps.inspect_data_file(
-                data_file=build_data_path, lj_cutoff=p["cutoff_A"] or 12.0,
-                target_density_gcm3=None, nchain=None,
-            )
-            state.halt("equil_check", "BACKBONE_TYPES_UNRESOLVED", {
-                "reason": "decided_params has no backbone_types for this class and none may be "
-                          "auto-derived (atom-name-only lookup cannot distinguish backbone from "
-                          "pendant-branch atoms sharing the same type ID)",
-                "atom_type_names": diag.get("info", {}).get("atom_type_names"),
-                "build_data_path": build_data_path,
-            })
-            log_recovery(run_log_path, "equilibration", attempts, "backbone_types unresolved",
-                        "none — requires human/agent review of atom_type_names to populate "
-                        "decided_params.backbone_types for this class",
-                        "UNRESOLVED — human review")
-            return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED"}
+            # Atom-name-only lookup can't tell backbone from pendant-branch atoms (confirmed
+            # live: PACR/PMMA shares a generic aliphatic carbon type between CH2 backbone atoms
+            # and pendant methyl branches) — but bond TOPOLOGY can: derive_backbone_types walks
+            # the heavy-atom bond graph's diameter, which needs no types at all and excludes
+            # branches by construction (they're shorter than continuing along the main path).
+            derived = wait_for_analysis(lammps, lammps.derive_backbone_types(
+                data_file=build_data_path,
+            ), "backbone_types derivation")
+            if derived.get("status") == "success" and derived.get("backbone_types"):
+                backbone_types = derived["backbone_types"]
+                cls["backbone_types"] = backbone_types
+                plan_on_disk = load_plan(args.plan)
+                plan_on_disk.setdefault("decided_params", {})["backbone_types"] = backbone_types
+                atomic_write_json(Path(args.plan), plan_on_disk)
+                log_recovery(run_log_path, "equilibration", attempts, "backbone_types unresolved",
+                            f"auto-derived {backbone_types} from build_data_path bond topology "
+                            "(heavy_atom_graph_diameter) and persisted to decided_params",
+                            "RESOLVED — automatic")
+            else:
+                # Genuine last resort — the chain itself has fewer than 2 heavy atoms, or no bond
+                # topology at all. inspect_data_file only for diagnostics attached to this halt.
+                diag = lammps.inspect_data_file(
+                    data_file=build_data_path, lj_cutoff=p["cutoff_A"] or 12.0,
+                    target_density_gcm3=None, nchain=None,
+                )
+                state.halt("equil_check", "BACKBONE_TYPES_UNRESOLVED", {
+                    "reason": "bond-topology derivation could not resolve a backbone for this "
+                              "cell: " + str(derived.get("error", "unknown")),
+                    "atom_type_names": diag.get("info", {}).get("atom_type_names"),
+                    "build_data_path": build_data_path,
+                })
+                log_recovery(run_log_path, "equilibration", attempts, "backbone_types unresolved",
+                            "none — bond-topology derivation failed; requires human/agent review "
+                            "to populate decided_params.backbone_types for this class",
+                            "UNRESOLVED — human review")
+                return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED"}
 
         comp = wait_for_analysis(lammps, lammps.check_equilibration_comprehensive(
             log_file=p["npt_prod_log_path"], dump_file=p["melt_dump_path"],
@@ -556,8 +568,7 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
                run_log_path: Path) -> dict:
     """Single-rate-primary: run one sweep at the class's primary configured rate (highest by
     default; tg_slope_gate_fallback="slowest_rate" classes — PKTN, PSFO — run rates[0] instead,
-    since their highest-rate fit is documented as degenerate/inverted). Multirate extrapolation
-    is a legacy/opt-in capability (extract_tg_multirate.py, select_tg_path.py) not exercised here."""
+    since their highest-rate fit is documented as degenerate/inverted)."""
     tg_rates = cls.get("tg_rates_K_per_ns", [])
     gpu_per_run = cls.get("gpu_per_run") or 1
     per_rate = []
@@ -809,26 +820,23 @@ def do_summary(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool, t
     exp_lookup_path = raw_dir / "exp_lookup.json"
     properties = ({"density", "tg", "bulk_modulus"} if args.properties in (None, "all")
                   else {x.strip().lower() for x in args.properties.split(",") if x.strip()})
+    # Provenance only: writes exp_lookup.json (the same artifact the exp-lookup-worker
+    # produces) for a human to review. Deliberately NOT auto-applied into args.exp_*_min/max --
+    # query_best_match.py's raw aggregates (pooled medians, single-point K rows at the wrong
+    # condition) need human judgment before they can override a class's own cited
+    # polymer_rules.json values; _resolve_run_summary_params's own priority chain (CLI >
+    # polymer_rules > DB fallback) is what actually grades the run.
     subprocess.run([
         sys.executable, str(REPO_ROOT / "db" / "query_best_match.py"),
         "--polymer_name", args.polymer_name or args.run_name, "--polymer_class", args.polymer_class.upper(),
         "--T_sim_K", "300.0", "--is_glassy", "true" if is_glassy else "false",
         "--properties", ",".join(sorted(properties)), "--output_path", str(exp_lookup_path),
     ], check=False)
-    exp_lookup = json.loads(exp_lookup_path.read_text()) if exp_lookup_path.exists() else {}
-
-    def _range(key_min, key_max):
-        return exp_lookup.get(key_min), exp_lookup.get(key_max)
-
-    args.exp_tg_min, args.exp_tg_max = _range("exp_tg_min_K", "exp_tg_max_K")
-    args.exp_density_min, args.exp_density_max = _range("exp_density_min_gcm3", "exp_density_max_gcm3")
-    args.exp_K_min, args.exp_K_max = _range("exp_K_min_GPa", "exp_K_max_GPa")
 
     tg_path = None
     if thermal_result is not None:
         # Single-rate-primary: the one sweep's tg_summary.json path is already known from the
-        # analyze-tg stage's own output_dir — no rate ambiguity to resolve, no select_tg_path.py
-        # call (that helper is kept for the legacy/opt-in multirate path only).
+        # analyze-tg stage's own output_dir — no rate ambiguity to resolve.
         if thermal_result.get("per_rate"):
             tg_path = str(Path(thermal_result["per_rate"][-1]["output_dir"]) / "tg_summary.json")
         args.tg_path = tg_path
@@ -999,11 +1007,24 @@ class CampaignStageExecutor:
                                outputs)
         return StageResult("accepted", (), self._artifacts(attempt_dir), outputs or {})
 
-    @staticmethod
-    def _artifacts(attempt_dir: Path) -> tuple[str, ...]:
+    # mcp-lammps-engine's own chain-completion housekeeping (_cleanup_chain_files in
+    # server.py) unconditionally deletes these once a chain reaches "completed" -- they are
+    # transient launcher scaffolding (the wrapper shell script, its progress feed, and its
+    # captured stdout log on success), never a real simulation artifact. A live rglob() here
+    # can still catch one moments before that async cleanup removes it, and _finish_attempt's
+    # later re-check of the same declared path then crashes on a file that was never meant to
+    # persist -- a real TOCTOU race hit on the PE1 2026-08-17 run. Exclude by the exact naming
+    # convention _cleanup_chain_files uses, not by directory, so real per-stage LAMMPS logs
+    # (which live nested one level down, e.g. work/npt_production/npt_production.log) are
+    # unaffected.
+    _TRANSIENT_CHAIN_FILE = re.compile(r"^chain_[^/]+(\.sh|\.log|_progress\.jsonl)$")
+
+    @classmethod
+    def _artifacts(cls, attempt_dir: Path) -> tuple[str, ...]:
         excluded = {"manifest.json", "executor_state.json"}
         return tuple(str(path) for path in sorted(attempt_dir.rglob("*"))
-                     if path.is_file() and path.name not in excluded)
+                     if path.is_file() and path.name not in excluded
+                     and not cls._TRANSIENT_CHAIN_FILE.match(path.name))
 
 
 def run_campaign_workflow(plan_path: Path, *, dry_run: bool = False,

@@ -28,7 +28,6 @@ Tools exposed:
   14. check_equilibration_comprehensive - All convergence + structural checks, one call, one verdict
   15. extract_equilibrated_density      - Plateau density via reverse-cumulative-mean
   16. extract_thermal                   - Tg, CTE (α_g, α_r), ΔCp via bilinear curve_fit (standard polymer MD method)
-  16b. extract_tg_multirate             - Multi-rate Tg: log-linear + VF fit across cooling rates
   17. extract_bulk_modulus              - Isothermal K via NPT volume fluctuations
 """
 
@@ -2478,93 +2477,6 @@ def extract_thermal(
     }
 
 
-# ── Tool: extract_tg_multirate ───────────────────────────────────────────────
-
-def _run_extract_tg_multirate(
-    rates: list,
-    tg_values: list,
-    output_dir: str,
-    polymer_name: str,
-    slow_rate_ref: float,
-) -> dict:
-    """Background worker — runs extract_tg_multirate.py via CLI."""
-    rate_args = " ".join(str(r) for r in rates)
-    tg_args   = " ".join(str(t) for t in tg_values)
-    parts = [
-        f"python {MDA_SCRIPTS_DIR}/extract_tg_multirate.py",
-        f"--rates {rate_args}",
-        f"--tg_values {tg_args}",
-        f"--output_dir {output_dir}",
-        f"--polymer_name {polymer_name}",
-        f"--slow_rate_ref {slow_rate_ref}",
-        "--no_plot",
-    ]
-    command = " ".join(parts)
-    logger.info(f"Running multi-rate Tg analysis: {command}")
-    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=120)
-    if exit_code != 0:
-        return {"status": "failed", "error": stderr, "stdout": stdout}
-    return _parse_json_from_stdout(stdout, stderr)
-
-
-@mcp.tool()
-def extract_tg_multirate(
-    rates_K_per_ns: list,
-    tg_values_K: list,
-    output_dir: str,
-    polymer_name: str = "polymer",
-    slow_rate_ref_K_per_ns: float = 5.0,
-) -> dict:
-    """
-    Fit a log-linear trend and attempt a Vogel-Fulcher (VF) extrapolation
-    across multiple cooling-rate Tg_MD values.
-
-    Primary output: log-linear slope (K per ln(K/ns)) and Tg at the
-    reference slow rate — this is the reliable deliverable for comparing
-    trend vs. Ramos 2015 Fig. 3.
-
-    Secondary output: VF extrapolated Tg0 (at Γ → 0).  Note that < 2 decades
-    of rate coverage gives a poorly-constrained VF fit; CI > 100 K is flagged
-    POORLY_CONSTRAINED.
-
-    The job runs in the background — poll with get_run_status(run_id).
-
-    Args:
-        rates_K_per_ns:          List of cooling rates in K/ns (same order as tg_values_K).
-        tg_values_K:             Tg_MD values in K from extract_thermal runs at each rate.
-        output_dir:              Directory for JSON, markdown, and plot outputs.
-        polymer_name:            Label for outputs and plot title.
-        slow_rate_ref_K_per_ns:  Reference rate for log-linear Tg reporting (default 5.0).
-
-    Returns:
-        dict with run_id.  Result includes loglinear_slope_K, loglinear_r_squared,
-        tg_at_slow_rate_K, vf_fit_quality, tg0_K (if VF converged), d06_markdown.
-    """
-    run_id = run_manager.create(
-        "extract_tg_multirate",
-        {"output_dir": output_dir, "n_rates": len(rates_K_per_ns)},
-    )
-    t = threading.Thread(
-        target=_analysis_run_background,
-        args=(run_id, _run_extract_tg_multirate, dict(
-            rates       = rates_K_per_ns,
-            tg_values   = tg_values_K,
-            output_dir  = output_dir,
-            polymer_name = polymer_name,
-            slow_rate_ref = slow_rate_ref_K_per_ns,
-        )),
-        daemon=True,
-    )
-    t.start()
-    return {
-        "status":     "submitted",
-        "run_id":     run_id,
-        "run_type":   "extract_tg_multirate",
-        "output_dir": output_dir,
-        "message":    "Poll with get_run_status(run_id)",
-    }
-
-
 # ── Tool: check_equilibration_comprehensive ───────────────────────────────────
 
 def _run_check_equilibration_comprehensive(
@@ -2821,6 +2733,60 @@ def _run_extract_equilibrated_density(
     if exit_code != 0:
         return {"status": "failed", "error": stderr, "stdout": stdout}
     return _parse_json_from_stdout(stdout, stderr)
+
+
+# ── Tool: derive_backbone_types ───────────────────────────────────────────────
+
+def _run_derive_backbone_types(data_file: str) -> dict:
+    """Background worker — runs derive_backbone_types.py via CLI."""
+
+    command = f"python {MDA_SCRIPTS_DIR}/derive_backbone_types.py --data_file {data_file}"
+    logger.info(f"Running backbone_types derivation via CLI: {command}")
+
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=300)
+
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def derive_backbone_types(data_file: str) -> dict:
+    """
+    Derive backbone_types from a .data file's bond topology alone — no simulation,
+    no atom-type-name guessing.
+
+    Finds each chain's backbone as the graph diameter of its heavy-atom bond graph
+    (BFS twice: farthest atom from an arbitrary start, then farthest atom from
+    there — the walk between them is the backbone; side branches are excluded by
+    construction since they're shorter than continuing along the main path).
+    Unions the atom type IDs found along every chain's backbone path.
+
+    Args:
+        data_file: Path to the .data file (the original pre-simulation cell, so
+                   Masses/Bonds are intact).
+
+    Returns:
+        dict with run_id. When completed, result includes:
+            backbone_types     — sorted list of backbone atom type IDs
+            method              — "heavy_atom_graph_diameter"
+            n_chains            — chains found (resids)
+            n_chains_resolved   — chains with >= 2 heavy atoms and bond topology
+    """
+    run_id = run_manager.create("derive_backbone_types", {"data_file": data_file})
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_derive_backbone_types, dict(data_file=data_file)),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":    "submitted",
+        "run_id":    run_id,
+        "run_type":  "derive_backbone_types",
+        "data_file": data_file,
+        "message":   "Poll with get_run_status(run_id). Result includes backbone_types.",
+    }
 
 
 @mcp.tool()

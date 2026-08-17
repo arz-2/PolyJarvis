@@ -134,7 +134,7 @@ def _stage_properties_findings(plan: dict) -> list:
         if base not in stages_present:
             findings.append({"check": "stage_properties", "severity": "structural",
                              "detail": f"missing always-required stage {base!r}"})
-    if "tg" in props and not (stages_present & {"tg", "analyze-tg", "analyze-tg-multirate"}):
+    if "tg" in props and not (stages_present & {"tg", "analyze-tg"}):
         findings.append({"check": "stage_properties", "severity": "structural",
                          "detail": "tg requested but no tg/analyze-tg stage present"})
     if "bulk_modulus" in props and not (stages_present & {"murnaghan", "deform", "analyze-bm"}):

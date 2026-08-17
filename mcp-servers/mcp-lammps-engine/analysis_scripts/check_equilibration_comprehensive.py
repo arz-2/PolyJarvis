@@ -55,6 +55,7 @@ import matplotlib.pyplot as plt
 from analysis_utils import (compute_tau_eff, effective_sample_size, integrated_act,
                             parse_lammps_log)
 from finite_size import classify_finite_size, parse_data_box_mass_rg
+from backbone_topology import backbone_path, backbone_type_coverage
 
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -244,17 +245,16 @@ def _mass_weighted_rg_sq(positions, masses):
 
 
 def _backbone_atoms_sorted(chain, backbone_set):
-    """Return positions and indices of backbone atoms, sorted by atom index."""
-    try:
-        types = np.array([int(t) for t in chain.types])
-    except Exception:
-        return None, None
-    mask = np.isin(types, list(backbone_set))
-    if mask.sum() < 2:
-        return None, None
-    bb_atoms = chain.atoms[mask]
-    order = np.argsort(bb_atoms.indices)
-    return bb_atoms.positions[order], bb_atoms.indices[order]
+    """Return positions and indices of the chain's backbone, in BONDED order.
+
+    The backbone is the graph diameter of the chain's heavy-atom bond graph (see
+    backbone_topology.backbone_path) — declared types cannot select it reliably (a class can
+    reuse one type between a backbone atom and a pendant branch), and sorting a type selection
+    by atom INDEX silently assumes the backbone is a run of consecutively numbered atoms, true
+    only for a straight aliphatic chain. `backbone_set` no longer selects the path here; it's
+    left as a parameter only so callers can still report backbone_type_coverage as a cross-check.
+    """
+    return backbone_path(chain)
 
 
 def _saupe_p2(bond_vectors):
@@ -336,6 +336,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
 
     # Precompute chain slices and backbone indices (constant across frames)
     chain_data = {}
+    coverages = []
     for cid in chain_ids:
         ch = u.select_atoms(f"resid {cid}")
         try:
@@ -345,6 +346,13 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         bb_pos, bb_ix = _backbone_atoms_sorted(ch, backbone_set)
         chain_data[cid] = {"sel": ch, "masses": masses, "bb_ix": bb_ix,
                            "has_bb": bb_pos is not None}
+        cov = backbone_type_coverage(u, bb_ix, backbone_set)
+        if cov is not None:
+            coverages.append(cov)
+    # Advisory cross-check: does backbone_types (declared) describe the bond-topology-measured
+    # path? Low coverage means backbone_types under- or mis-describes this chain's backbone —
+    # it does not affect the path itself, which comes from bond topology regardless.
+    backbone_type_coverage_mean = float(np.mean(coverages)) if coverages else None
 
     # Initialise MSID accumulator
     first_bb_len = None
@@ -623,6 +631,8 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "msd": msd_result,
         "p2": p2_result,
         "density_homogeneity": dh_result,
+        "backbone_type_coverage": r(backbone_type_coverage_mean, 3)
+                                   if backbone_type_coverage_mean is not None else None,
     }
 
 
@@ -985,6 +995,7 @@ def main():
             "msid": structural["msid"],
             "ct": structural["ct"],
             "msd": structural["msd"],
+            "backbone_type_coverage": structural["backbone_type_coverage"],
         },
         "spatial": {
             "p2": structural["p2"],

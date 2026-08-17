@@ -172,16 +172,20 @@ class _FakeEquilLammps:
     unchanged -- this test is about do_equil_and_check()'s own logic, not the polling helper
     (covered separately above)."""
 
-    def __init__(self, tmp_path, comp_results, gate_verdicts, atom_type_names=None):
+    def __init__(self, tmp_path, comp_results, gate_verdicts, atom_type_names=None,
+                 derived_backbone_types=None):
         self.tmp_path = tmp_path
         self._comp_results = list(comp_results)
         self._gate_verdicts = list(gate_verdicts)
         self._chain_n = 0
         self.generate_equilibration_workflow_calls = []
         self.inspect_data_file_calls = []
+        self.derive_backbone_types_calls = []
         self._inspect_errors = []
         self._inspect_forecast = {"available": False}
         self._atom_type_names = atom_type_names or {}
+        # None -> derivation fails (genuine last resort); a list -> derivation succeeds with it.
+        self._derived_backbone_types = derived_backbone_types
 
     def _sentinel(self):
         self._chain_n += 1
@@ -211,6 +215,13 @@ class _FakeEquilLammps:
                            "warnings": [], "stats": {}},
             "finite_size_forecast": self._inspect_forecast,
         }
+
+    def derive_backbone_types(self, **kwargs):
+        self.derive_backbone_types_calls.append(kwargs)
+        if self._derived_backbone_types is None:
+            return {"status": "failed", "error": "no chain yielded a resolvable backbone"}
+        return {"status": "success", "backbone_types": self._derived_backbone_types,
+                "method": "heavy_atom_graph_diameter", "n_chains": 1, "n_chains_resolved": 1}
 
     def check_equilibration_comprehensive(self, **kwargs):
         return self._comp_results.pop(0)
@@ -247,20 +258,49 @@ def _fake_state(tmp_path):
 
 
 def test_do_equil_and_check_halts_when_backbone_types_unresolved(tmp_path, equil_check_args_cls, monkeypatch):
+    """Genuine last resort: bond-topology derivation is attempted first and fails (e.g. the
+    chain has fewer than 2 heavy atoms, or no bond topology at all), so the halt still fires."""
     args, cls = equil_check_args_cls
     assert args.backbone_types is None  # default -- nothing explicit configured for this test
     monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
         {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
     fake = _FakeEquilLammps(tmp_path, comp_results=[], gate_verdicts=[],
-                            atom_type_names={"1": "c", "2": "c1"})
+                            atom_type_names={"1": "c", "2": "c1"}, derived_backbone_types=None)
     state = _fake_state(tmp_path)
 
     result = do_equil_and_check(state, args, cls, fake, tmp_path / "run_log.md")
 
     assert result == {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED"}
     assert state.data["halted"]["reason"] == "BACKBONE_TYPES_UNRESOLVED"
-    # halted before ever calling the async analysis tools -- no guessed [] silently submitted
+    assert fake.derive_backbone_types_calls == [{"data_file": "/fake/original/cell.data"}]
+    # halted only after derivation itself failed -- no guessed [] silently submitted
     assert fake.inspect_data_file_calls == ["/fake/original/cell.data"]
+
+
+def test_do_equil_and_check_auto_derives_backbone_types(tmp_path, equil_check_args_cls, monkeypatch):
+    """The routine case: bond-topology derivation succeeds, so the halt never fires -- the
+    derived value is used immediately and persisted into decided_params for future stages/runs."""
+    args, cls = equil_check_args_cls
+    assert args.backbone_types is None
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
+    fake = _FakeEquilLammps(
+        tmp_path,
+        comp_results=[{"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}}],
+        gate_verdicts=[{"verdict": "PASS"}],
+        derived_backbone_types=[1, 2],
+    )
+    state = _fake_state(tmp_path)
+
+    result = do_equil_and_check(state, args, cls, fake, tmp_path / "run_log.md")
+
+    assert result["equil_verdict"] == "PASS"
+    assert state.data["halted"] is None
+    assert fake.derive_backbone_types_calls == [{"data_file": "/fake/original/cell.data"}]
+    assert fake.inspect_data_file_calls == []  # never reached -- derivation succeeded
+    assert cls["backbone_types"] == [1, 2]
+    persisted = load_plan(args.plan)
+    assert persisted["decided_params"]["backbone_types"] == [1, 2]
 
 
 def test_do_equil_and_check_sizes_extend_off_measured_tau_relax(tmp_path, equil_check_args_cls, monkeypatch):

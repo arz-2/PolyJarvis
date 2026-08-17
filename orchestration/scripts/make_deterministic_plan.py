@@ -110,7 +110,6 @@ STAGE_TRACK = {
     "equil-check": "foundation",
     "tg":          "thermal",
     "analyze-tg":  "thermal",
-    "analyze-tg-multirate": "thermal",
     "deform":      "mechanical",
     "murnaghan":   "mechanical",
     "analyze-bm":  "mechanical",
@@ -136,9 +135,7 @@ def build_planned_stages(cls: dict, properties: set) -> list:
     if "tg" in properties:
         # Single-rate-primary: one sweep at the class's primary configured rate (highest by
         # default; tg_slope_gate_fallback="slowest_rate" classes run rates[0] instead — their
-        # highest-rate fit is documented as degenerate/inverted). Multirate extrapolation
-        # (extract_tg_multirate.py, select_tg_path.py, the analyze-tg-multirate stage) remains
-        # available as a legacy/opt-in capability but is not part of the default plan DAG.
+        # highest-rate fit is documented as degenerate/inverted).
         stages.append(_s("tg", {"bilinear_fit_r_squared_min": 0.80,
                                 "t_range_brackets_exp_tg": exp_tg_bracket}))
         stages.append(_s("analyze-tg", {}))
@@ -156,7 +153,7 @@ def build_planned_stages(cls: dict, properties: set) -> list:
 
 
 def _assert_tg_rates_feasible(cls: dict, polymer_class: str) -> None:
-    """Reject a multirate Tg set where any rate gives too few steps per temperature.
+    """Reject a configured Tg rate set where any rate gives too few steps per temperature.
 
     Per-T simulation TIME (not step count) sets bilinear-fit quality: too few ps at each
     temperature collapses the Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400 degenerate).
@@ -192,10 +189,6 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
     exp_tg = _exp_tg_scalar(cls)
     T_equil = decided_params.get("T_equil_K", 600.0)
     decided_params["T_workflow_K"] = 300.0 if (exp_tg is not None and exp_tg < 300) else T_equil
-    # Derived constant (like T_workflow_K, not snapshotted from cls): the DSC-equivalent
-    # cooling rate (10 K/min = 1.6667e-10 K/ns) that the multirate Tg fit extrapolates to.
-    # Class entries may override via polymer_rules.json; otherwise this default applies.
-    decided_params["dsc_equiv_rate_K_per_ns"] = cls.get("dsc_equiv_rate_K_per_ns", 1.6667e-10)
     uncertainties = [{
         "name": "scientific_review_pending",
         "dominant": True,

@@ -3,7 +3,8 @@
 Locks in the fix where run_summary.json came out under-populated (PEG1):
   * convergence + structural_checks were null because the generator read non-existent
     equilibration_check.json / rg_summary.json etc. instead of equilibration_comprehensive.json.
-  * results.tg.value_K was null for multi-rate runs (no fallback to the log-linear slow-rate Tg).
+  * results.tg.value_K was null when tg_summary.json only exists in a per-rate subdir
+    (tg_r<rate>/) and not at the top level (no rglob fallback).
 """
 import json
 import subprocess
@@ -15,7 +16,7 @@ SCRIPT = (Path(__file__).resolve().parent.parent
 
 
 def _write_fixtures(d: Path):
-    """Write the minimal analysis JSONs a multi-rate rubbery run produces."""
+    """Write the minimal analysis JSONs a single-rate-primary rubbery run produces."""
     (d / "equilibration_comprehensive.json").write_text(json.dumps({
         "overall_pass": True,
         "thermo": {
@@ -32,21 +33,17 @@ def _write_fixtures(d: Path):
             "density_homogeneity": {"pass": True, "cv_mean": 0.2198},
         },
     }))
-    (d / "tg_multirate_result.json").write_text(json.dumps({
-        "tg_at_slow_rate_K": 207.39, "loglinear_slope_K": 5.45,
-        "loglinear_r_squared": 0.9996, "vf_fit_quality": "POOR_POORLY_CONSTRAINED",
-        "n_points": 3, "rates_span_decades": 1.2, "slow_rate_ref_K_per_ns": 5.0,
-    }))
+    # Tg sweep output lands in a per-rate subdir; top-level tg_summary.json is absent.
     (d / "tg_r40").mkdir()
     (d / "tg_r40" / "tg_summary.json").write_text(json.dumps(
-        {"fit_quality": "EXCELLENT", "r_squared": 0.9998}))
+        {"Tg_K": 207.39, "fit_quality": "EXCELLENT", "r_squared": 0.9998}))
     (d / "equilibrated_density.json").write_text(json.dumps(
         {"plateau_density_mean": 1.057698}))
     (d / "bulk_modulus.json").write_text(json.dumps(
         {"bulk_modulus_GPa": 3.14, "bulk_modulus_sem_GPa": 0.11}))
 
 
-def test_run_summary_populates_from_comprehensive_and_multirate(tmp_path):
+def test_run_summary_populates_from_comprehensive_and_subdir_tg(tmp_path):
     _write_fixtures(tmp_path)
     res = subprocess.run(
         [sys.executable, str(SCRIPT),
@@ -76,10 +73,10 @@ def test_run_summary_populates_from_comprehensive_and_multirate(tmp_path):
     assert sc["density_cv_mean"] == 0.2198
     assert sc["heterogeneous_flag"] is False
 
-    # multi-rate Tg fallback: headline value_K + status/error vs exp range
+    # per-rate subdir fallback: headline value_K + status/error vs exp range
     tg = summary["results"]["tg"]
     assert abs(tg["value_K"] - 207.39) < 1e-6
     assert tg["status"] == "PASS"
     assert tg["error_pct"] is not None and tg["error_pct"] < 2.0
     assert tg["fit_quality"] == "EXCELLENT"
-    assert abs(tg["r_squared"] - 0.9996) < 1e-6
+    assert abs(tg["r_squared"] - 0.9998) < 1e-6

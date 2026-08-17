@@ -467,7 +467,6 @@
       "cutoff_A": 14.0,
       "dt_fs": 2.0,
       "T_equil_K": 550.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 5.0,
       "npt_prod_ns": 5.0,
       "melt_npt_ns": 1.0,
@@ -484,7 +483,6 @@
         40
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.25,
       "experimental_tg_K": {
         "PE": 195,
@@ -510,12 +508,6 @@
         "Timestep: 2.0 fs (use_shake=False). TraPPE-UA removes explicit H atoms and their fast C-H stretch modes (period ~10 fs), so 2 fs is stable WITHOUT bond constraints. LAMMPS fix shake builds bond clusters requiring terminal atoms; interior CH2 atoms each have 2 bonds so cluster-build fails on a continuous backbone. The 2× throughput gain comes from the timestep increase alone and offsets the nchain=20 cost increase.",
         "Exp. RT density: PE=0.95 g/cm³, PP=0.91 g/cm³, PIB=0.92 g/cm³. Initial density 0.65 g/cm³ = ~94% of ρ_melt(550K)=0.691 g/cm³ (Ramos2015 Table 3); previous 0.48 required heavy compression. Validation target (TraPPE-UA): volumetric thermal expansion α=8.57×10⁻⁴ K⁻¹ vs experimental HDPE ~7.7–7.9×10⁻⁴ K⁻¹ (+7%; Ramos2015 Table 2). Characteristic ratio C∞=8.2 at 500 K vs experimental 7.4–8.1 (Ramos2015).",
         "VdW cutoff: 14.0 Å (1.4 nm) used in Ramos2015 TraPPE-UA PE study; gives density within ~7% of experiment. 12 Å is a safe minimum but 14 Å is more accurate for long-chain UA alkanes."
-      ],
-      "tg_rates_validation_K_per_ns": [
-        10,
-        40,
-        160,
-        640
       ],
       "bm_pressures_atm": [
         1,
@@ -575,7 +567,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 550.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 5.0,
       "annealing_T_high_K": 630.0,
       "eq_annealing_cycles": 5,
@@ -592,7 +583,6 @@
         100
       ],
       "K_deform_rate_inv_s": 10000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
         "PS": 373,
@@ -652,7 +642,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 530.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 8.0,
       "annealing_T_high_K": 610.0,
       "eq_annealing_cycles": 7,
@@ -668,7 +657,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
         "PVA": 303,
@@ -740,7 +728,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 550.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 5.0,
       "annealing_T_high_K": 630.0,
       "eq_annealing_cycles": 10,
@@ -758,7 +745,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
         "PMMA": 378,
@@ -830,7 +816,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 700.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 5.0,
       "annealing_T_high_K": 780.0,
       "eq_annealing_cycles": 5,
@@ -844,7 +829,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.2,
       "experimental_tg_K": {
         "PVDF": 233,
@@ -903,7 +887,6 @@
       "cutoff_A": 14.0,
       "dt_fs": 2.0,
       "T_equil_K": 400.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 3.0,
       "npt_prod_ns": 3.0,
       "melt_npt_ns": 1.0,
@@ -920,7 +903,6 @@
         40
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.25,
       "experimental_tg_K": {
         "PBD": 181,
@@ -996,7 +978,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 500.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 4.0,
       "npt_prod_ns": 2.0,
       "melt_npt_ns": 1.0,
@@ -1012,7 +993,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.2,
       "bm_pressures_atm": [
         -1000,
@@ -1079,7 +1059,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 560.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 8.0,
       "annealing_T_high_K": 640.0,
       "eq_annealing_cycles": 8,
@@ -1093,7 +1072,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
       "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
@@ -1132,7 +1110,7 @@
     },
     "PEST": {
       "name": "Polyester",
-      "_tg_rate_note": "steps_per_T = tg_t_step_K / (rate * dt_fs * 1e-6). Floor = tg_min_steps_per_T (200000 steps = 200 ps at dt=1fs). Rates [40,80,100] K/ns -> 500k/250k/200k steps, all at or above the floor. Retired [25,50,100]: r25 gives delocalized bilinear fit for stiff ester backbones (PLA3: r25 primary=464.8K vs alt=360K, 105K gap; negative multirate slope b=-35.1 K/dec -> slope_gate_pass=False). The plan-time feasibility filter in make_deterministic_plan.py enforces this.",
+      "_tg_rate_note": "steps_per_T = tg_t_step_K / (rate * dt_fs * 1e-6). Floor = tg_min_steps_per_T (200000 steps = 200 ps at dt=1fs). Rates [40,80,100] K/ns -> 500k/250k/200k steps, all at or above the floor. Retired [25,50,100]: r25 gives delocalized bilinear fit for stiff ester backbones (PLA3: r25 primary=464.8K vs alt=360K, 105K gap). The plan-time feasibility filter in make_deterministic_plan.py enforces this.",
       "examples": [
         "PET",
         "PLA",
@@ -1157,7 +1135,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 620.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 5.0,
       "annealing_T_high_K": 700.0,
       "eq_annealing_cycles": 5,
@@ -1174,7 +1151,6 @@
       "tg_slope_gate_fallback": "highest_rate",
       "_tg_slope_gate_note": "Slope-gate FAIL is structural for stiff ester backbones: the transition delocalizes at slow rates, so every tested rate set fails the b>0 gate. Headline Tg = HIGHEST rate (cleanest, least delocalized bilinear fit). Do not spend /recover attempts on seed rerolls or rate changes.",
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.15,
       "experimental_tg_K": {
         "PET": 342,
@@ -1250,7 +1226,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 650.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 8.0,
       "annealing_T_high_K": 730.0,
       "eq_annealing_cycles": 8,
@@ -1264,7 +1239,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.15,
       "experimental_tg_K": {
         "Nylon6": 323,
@@ -1321,7 +1295,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 570.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 8.0,
       "annealing_T_high_K": 650.0,
       "eq_annealing_cycles": 8,
@@ -1335,7 +1308,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
         "soft_segment": 220,
@@ -1380,7 +1352,6 @@
       "cutoff_A": 12.0,
       "dt_fs": 1.0,
       "T_equil_K": 620.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 10.0,
       "annealing_T_high_K": 700.0,
       "eq_annealing_cycles": 10,
@@ -1394,7 +1365,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
         "hard_segment": 400,
@@ -1438,7 +1408,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 800.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 15.0,
       "annealing_T_high_K": 900.0,
       "eq_annealing_cycles": 8,
@@ -1452,7 +1421,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
       "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
@@ -1507,7 +1475,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 530.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 5.0,
       "annealing_T_high_K": 610.0,
       "eq_annealing_cycles": 5,
@@ -1521,7 +1488,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.15,
       "experimental_tg_K": {
         "poly_sebacic_anhydride": 319,
@@ -1566,7 +1532,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 600.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 8.0,
       "annealing_T_high_K": 680.0,
       "eq_annealing_cycles": 5,
@@ -1580,7 +1545,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
       "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
@@ -1638,7 +1602,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 550.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 8.0,
       "annealing_T_high_K": 630.0,
       "eq_annealing_cycles": 8,
@@ -1652,7 +1615,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
         "PEI_Ultem": 488,
@@ -1701,7 +1663,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 350.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 3.0,
       "npt_prod_ns": 2.0,
       "melt_npt_ns": 1.0,
@@ -1717,7 +1678,6 @@
         50
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.25,
       "bm_pressures_atm": [
         1,
@@ -1771,7 +1731,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 440.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 5.0,
       "annealing_T_high_K": 520.0,
       "eq_annealing_cycles": 5,
@@ -1785,7 +1744,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
         "range": "173-373",
@@ -1830,7 +1788,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 770.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 15.0,
       "annealing_T_high_K": 850.0,
       "eq_annealing_cycles": 12,
@@ -1850,7 +1807,6 @@
       "tg_slope_gate_fallback": "slowest_rate",
       "_tg_slope_gate_note": "Slope-gate FAIL is structural for rigid aromatics: the staircase cold-starts from the 300 K glassy cell, so the highest-T plateaus under-equilibrate at fast rates and invert the Tg-vs-rate trend. Headline Tg = SLOWEST (most-equilibrated) rate + degeneracy caveat; seed rerolls cannot fix this. Root fix (backlog): melt-start sweep.",
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
       "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
@@ -1913,7 +1869,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 700.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 20.0,
       "_t_equil_ns_note": "Raised 15->20 (2026-08-04) per assess_cooling_contraction on PSU2/3/4: bulk glass density is OK (unlike PMMA), so the density-homogeneity CV failure is a melt-stage MIXING defect, not a cooling-ramp defect. t_equil_ns controls the isothermal melt-hold (nvt_production) duration that the homogeneity check runs against -- eq_annealing_cycles (unchanged, governs the heat/compress/cool portion) is not the right lever here. Hypothesis for the _R2 pilot to validate, not yet empirically confirmed at n>0.",
       "annealing_T_high_K": 780.0,
@@ -1933,7 +1888,6 @@
       "tg_slope_gate_fallback": "slowest_rate",
       "_tg_slope_gate_note": "Slope-gate FAIL is structural for rigid aromatics: the staircase cold-starts from the 300 K glassy cell, so the highest-T plateaus under-equilibrate at fast rates and invert the Tg-vs-rate trend. Headline Tg = SLOWEST (most-equilibrated) rate + degeneracy caveat; seed rerolls cannot fix this. Root fix (backlog): melt-start sweep.",
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
       "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
@@ -1993,7 +1947,6 @@
       "cutoff_A": 9.5,
       "dt_fs": 1.0,
       "T_equil_K": 650.0,
-      "P_equil_atm": 1.0,
       "t_equil_ns": 12.0,
       "annealing_T_high_K": 730.0,
       "eq_annealing_cycles": 8,
@@ -2007,7 +1960,6 @@
         100
       ],
       "K_deform_rate_inv_s": 100000000.0,
-      "K_strain_max": 0.03,
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
       "_ct_note": "aromatic main chain — C(t)/C∞ undefined via atom-type backbone; advisory only, not a gate",
@@ -2071,7 +2023,6 @@
       50,
       100
     ],
-    "dsc_equiv_rate_K_per_ns": 1.6667e-10,
     "K_deform_rate_inv_s": 100000000.0,
     "K_strain_max": 0.03,
     "notes": [
@@ -2142,7 +2093,7 @@
     "dt_fs": 1.0,
     "time_per_point_ns": 0.8,
     "cooling_rate_K_per_ns_equivalent": 25,
-    "note_on_steps": "Per-T simulation TIME (not step count) sets fit quality: too few ps at each temperature collapses the bilinear Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400 degenerate). Uniform floor = 200 ps/T = tg_min_steps_per_T (PCFF/OPLS dt=1fs -> 200000 steps; TraPPE-UA dt=2fs -> 100000 steps). Feasible multirate set [25,50,100] K/ns clears the floor at every rate (PCFF: 800k/400k/200k steps = 800/400/200 ps; TraPPE: 400k/200k/100k steps = 800/400/200 ps). The old [40,160,400] set is RETIRED: at T_STEP=20K it gave 500/125/50 ps, and rate is the same knob as per-T sampling (run n_steps), so the two fast rates were degenerate by construction. PSIL (T_STEP=10K) uses [10,25,50]. Fit log-linear Tg(G)=a+b*ln(G) and extrapolate to dsc_equiv_rate_K_per_ns=1.6667e-10 K/ns (10 K/min); VF Tg(G)=Tg0+A/ln(B*G) secondary diagnostic. Webb2024 recommends up to 4 ns/point where budget allows. Validation only (PHYC): tg_rates_validation_K_per_ns is a separate manual path and is not feasibility-filtered. RESIDUAL: [25,50,100] spans only 0.6 decades — DSC-equiv extrapolation has wide slope uncertainty. If a polymer still shows Tg FAIL after this fix, the knob is WIDENING the slowest rate (e.g. [10,32,100] = 1.0 decade, all clear the floor) at ~4x slowest-rate budget — NOT lowering the floor.",
+    "note_on_steps": "Per-T simulation TIME (not step count) sets fit quality: too few ps at each temperature collapses the bilinear Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400 degenerate). Uniform floor = 200 ps/T = tg_min_steps_per_T (PCFF/OPLS dt=1fs -> 200000 steps; TraPPE-UA dt=2fs -> 100000 steps). Configured set [25,50,100] K/ns clears the floor at every rate (PCFF: 800k/400k/200k steps = 800/400/200 ps; TraPPE: 400k/200k/100k steps = 800/400/200 ps). The old [40,160,400] set is RETIRED: at T_STEP=20K it gave 500/125/50 ps, and rate is the same knob as per-T sampling (run n_steps), so the two fast rates were degenerate by construction. PSIL (T_STEP=10K) uses [10,25,50]. If a polymer still shows Tg FAIL, the knob is WIDENING the slowest rate (e.g. [10,32,100], all clear the floor) at ~4x slowest-rate budget — NOT lowering the floor; relevant to tg_slope_gate_fallback=slowest_rate classes, which run tg_rates_K_per_ns[0] as primary.",
     "analysis": "Bilinear fit of density vs T; Tg at breakpoint. Recommended: slope-temperature method (rolling 50 K window) to reduce fitting bias (Webb2024).",
     "pre_sweep_equilibration": [
       "1. Energy minimization (CG, FTOL=1e-6)",

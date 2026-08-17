@@ -179,9 +179,15 @@ def _db_exp_lookup(cls_id: str, polymer_name: str | None=None) -> dict:
     except Exception:
         return {'tg_median_K': None, 'density_gcm3': None, 'K_range_GPa': None}
 
-def _exp_density_range(cls: dict) -> list:
+def _exp_density_range(cls: dict, run_name: str | None=None) -> list:
+    """Mirrors _exp_tg_range's member-resolution logic (same class-mean-averaging bug,
+    fixed here for multi-member classes like PHYC's PE/PP/PIB)."""
     exp = cls.get('experimental_density_gcm3')
     if isinstance(exp, dict):
+        if run_name:
+            for (key, val) in exp.items():
+                if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
+                    return [round(val * 0.95, 3), round(val * 1.05, 3)]
         vals = sorted((v for v in exp.values() if isinstance(v, (int, float))))
         if vals:
             mid = vals[len(vals) // 2]
@@ -230,8 +236,8 @@ def _regime(args, cls: dict) -> str:
     Defined as T_workflow ≤ 300 K (⇔ exp_Tg < 300, via _resolve_t_workflow) so it agrees by
     construction with which equilibration chain was built (rubbery = 7-run ending at
     npt_production; glassy = 9-run with npt_prod300) and with the property-track routing.
-    Consumed by the equil-check carve-out (require_rubbery), the analyze-tg data path, the
-    multirate slope-gate exemption, and rubbery-K routing — one definition, fed everywhere.
+    Consumed by the equil-check carve-out (require_rubbery), the analyze-tg data path,
+    the single-rate slope-gate exemption, and rubbery-K routing — one definition, fed everywhere.
     NOTE: do NOT redefine as `T_workflow > exp_Tg + margin`; for a glassy polymer T_workflow is
     the melt-equilibration temperature (~T_equil), which would mis-label glassy melts as rubbery."""
     return 'rubbery' if _resolve_t_workflow(args, cls) <= 300.0 else 'glassy'
@@ -369,12 +375,6 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     per_t_dump = f'{lammps_base}/thermal/tg_sweep{rate_suffix}/per_t_structs.dump'
     return {'selected_rate_K_per_ns': selected_rate, 'tg_rate_index': args.tg_rate_index, 'tg_log_path': tg_log, 'tg_data_file': equil_data, 'per_t_dump_file': per_t_dump, 'enthalpy_col': getattr(args, 'enthalpy_col', None) or 'Enthalpy', 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'output_dir': output_dir, 'graphs_dir': graphs_dir, 'method_gap_exempt': bool(cls.get('tg_slope_gate_fallback') == 'slowest_rate')}
 
-def _resolve_analyze_tg_multirate_params(args, cls: dict) -> dict:
-    """Resolve deterministic multirate Tg aggregation arguments."""
-    output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
-    script = str(REPO_ROOT / 'mcp-servers/mcp-lammps-engine' / 'analysis_scripts/extract_tg_multirate.py')
-    return {'output_dir': output_dir, 'script': script, 'dsc_equiv_rate_K_per_ns': cls.get('dsc_equiv_rate_K_per_ns', 1.6667e-10), 'mr_rates': (args.mr_rates or '').replace(',', ' ').strip(), 'mr_tg_values': (args.mr_tg_values or '').replace(',', ' ').strip(), 'polymer_name': args.run_name, 'regime': _regime(args, cls)}
-
 def _resolve_equil_check_params(args, cls: dict) -> dict:
     """Resolve deterministic equilibration validation arguments."""
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
@@ -389,7 +389,7 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
         (prod, npt_prod_temp) = ('npt_production', T_workflow)
     else:
         (prod, npt_prod_temp) = ('npt_prod300', 300.0)
-    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'exp_density_range': _exp_density_range(cls), 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': args.npt_prod_log or f'{lammps_base}/equil/{prod}/{prod}.log', 'npt_prod_data_path': args.data_path or f'{lammps_base}/equil/{prod}/{prod}_out.data', 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, args.run_name), 'exp_density_point_gcm3': _exp_density_point(cls, args.run_name), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'alpha_glass_per_K': cls.get('alpha_glass_per_K', 'null'), 'alpha_melt_per_K': cls.get('alpha_melt_per_K', 'null'), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'exp_density_range': _exp_density_range(cls, run_name=args.run_name), 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': args.npt_prod_log or f'{lammps_base}/equil/{prod}/{prod}.log', 'npt_prod_data_path': args.data_path or f'{lammps_base}/equil/{prod}/{prod}_out.data', 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, args.run_name), 'exp_density_point_gcm3': _exp_density_point(cls, args.run_name), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'alpha_glass_per_K': cls.get('alpha_glass_per_K', 'null'), 'alpha_melt_per_K': cls.get('alpha_melt_per_K', 'null'), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""
@@ -421,14 +421,24 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
     _db = _db_exp_lookup(args.polymer_class, getattr(args, 'polymer_name', None))
     (_tg_min, _tg_max) = (getattr(args, 'exp_tg_min', None), getattr(args, 'exp_tg_max', None))
     _tg_override = getattr(args, 'exp_tg_K', None)
+    _cls_tg_range = _exp_tg_range(cls, run_name=args.run_name)
+    # polymer_rules.json's own class/member-specific value wins over a raw DB aggregate --
+    # query_best_match.py pools every DB row filed under a matched polymer_id, including ones
+    # that are not the polymer's true Tg (e.g. PE's own sub-Tg gamma-relaxation rows), which
+    # neither name-resolution nor the existing note/form filters catch. polymer_rules.json's
+    # value is cited and curated specifically to avoid that contamination -- prefer it whenever
+    # it resolved to real numbers (not the '<exp_tg_min>'/'<exp_tg_max>' no-data sentinel).
+    _cls_tg_numeric = all(isinstance(v, (int, float)) for v in _cls_tg_range)
     if _tg_min is not None and _tg_max is not None:
         exp_tg = [_tg_min, _tg_max]
     elif _tg_override is not None:
         exp_tg = [round(_tg_override - 20), round(_tg_override + 20)]
+    elif _cls_tg_numeric:
+        exp_tg = _cls_tg_range
     elif _db.get('tg_median_K') is not None:
         exp_tg = [round(_db['tg_median_K'] - 20), round(_db['tg_median_K'] + 20)]
     else:
-        exp_tg = _exp_tg_range(cls, run_name=args.run_name)
+        exp_tg = _cls_tg_range
     (_dens_min, _dens_max) = (getattr(args, 'exp_density_min', None), getattr(args, 'exp_density_max', None))
     if _dens_min is not None and _dens_max is not None:
         exp_density = [_dens_min, _dens_max]
@@ -436,7 +446,7 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
         _d = _db['density_gcm3']
         exp_density = [round(_d * 0.95, 3), round(_d * 1.05, 3)]
     else:
-        exp_density = _exp_density_range(cls)
+        exp_density = _exp_density_range(cls, run_name=args.run_name)
     _k_from_cls = _exp_K_range(cls)
     _k_from_db = _db.get('K_range_GPa')
     if _k_from_db and _k_from_db[1] - _k_from_db[0] < 0.01:
@@ -450,10 +460,8 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
     d02 = args.d02 or charge_method
     d03 = args.d03 or cls.get('electrostatics')
     d04 = args.d04 or (f'DP={dp}, {nchain} chains' if dp and nchain else None)
-    _slope_gate = getattr(args, 'slope_gate_pass', None)
-    tg_path_label = 'single-rate fallback (slope_gate=False; class fallback rate — plan tg_slope_gate_fallback, default highest)' if _slope_gate is False else 'slowest-rate folder (slope_gate=True or N/A)'
-    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'run_plan': run_plan, 'exp_tg_range': exp_tg, 'exp_density_range': exp_density, 'exp_K_range': exp_K, 'dp': dp, 'nchain': nchain, 'charge_method': charge_method, 'ff': ff, 'd01_ff': d01, 'd02_charges': d02, 'd03_electrostatics': d03, 'd04_system_size': d04, 'slope_gate_pass': _slope_gate, 'tg_path_label': tg_path_label}
-_STAGE_RESOLVERS = {'build': _resolve_build_params, 'equil': _resolve_equil_params, 'tg': _resolve_tg_params, 'deform': _resolve_deform_params, 'analyze-tg': _resolve_analyze_tg_params, 'analyze-tg-multirate': _resolve_analyze_tg_multirate_params, 'equil-check': _resolve_equil_check_params, 'murnaghan': _resolve_murnaghan_params, 'analyze-bm': _resolve_analyze_bm_params, 'run-summary': _resolve_run_summary_params}
+    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'run_plan': run_plan, 'exp_tg_range': exp_tg, 'exp_density_range': exp_density, 'exp_K_range': exp_K, 'dp': dp, 'nchain': nchain, 'charge_method': charge_method, 'ff': ff, 'd01_ff': d01, 'd02_charges': d02, 'd03_electrostatics': d03, 'd04_system_size': d04}
+_STAGE_RESOLVERS = {'build': _resolve_build_params, 'equil': _resolve_equil_params, 'tg': _resolve_tg_params, 'deform': _resolve_deform_params, 'analyze-tg': _resolve_analyze_tg_params, 'equil-check': _resolve_equil_check_params, 'murnaghan': _resolve_murnaghan_params, 'analyze-bm': _resolve_analyze_bm_params, 'run-summary': _resolve_run_summary_params}
 
 def resolve_stage_params(stage: str, args, cls: dict) -> dict:
     """Resolve routing and physics decisions into concrete tool arguments."""
