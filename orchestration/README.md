@@ -17,5 +17,7 @@ guides or generate worker prompts.
 | `select_hardware.py` | Hardware-policy resolution |
 
 Control events live in `data/<run>/raw/control_state.json`; execution state lives in
-`data/<run>/raw/executor_state.json`. Completed stages are skipped on resume. The recovery agent
+`data/<run>/workflow_state.json` (per-stage status/attempts) and each attempt's own
+`data/<run>/attempts/<stage>/<attempt_id>/executor_state.json` (that attempt's resolved
+parameters + computed outputs). Completed stages are skipped on resume. The recovery agent
 is never called unless validation or a deterministic stage returns a structured issue.

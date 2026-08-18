@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 from hw_common import load_rules, resolve_ff_family, get_class_entry, host_matches, live_host
@@ -103,37 +104,91 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
     class_ii = 'pcff' in ff or ff in ('compass', 'pcff_ore')
     return {'use_pcff': class_ii, 'use_opls': 'opls' in ff, 'use_trappe': 'trappe' in ff}
 
-def _exp_tg_point(cls: dict, run_name: str | None=None):
+def _estimate_tg_group_contribution(smiles: str, timeout: int = 30) -> dict | None:
+    """Shell into the `radonpy` conda env to run estimate_tg_group_contribution.py -- RDKit
+    lives there, not in `base` (same subprocess pattern as canon_smiles.py; the SMILES is
+    passed via an env var, never interpolated into the shell command text, so shell-meaningful
+    characters in a SMILES string can't corrupt the quoting). Returns the parsed result dict,
+    or None on any failure (missing rdkit/conda, timeout, unparseable SMILES, no motif match)
+    -- this is an advisory low-confidence estimate, never worth crashing plan resolution over."""
+    script = REPO_ROOT / 'orchestration' / 'scripts' / 'estimate_tg_group_contribution.py'
+    bash_script = (
+        "source ~/miniforge3/etc/profile.d/conda.sh\n"
+        "conda activate radonpy\n"
+        f'python3 {script} --smiles "$TG_ESTIMATE_SMILES" --output json\n'
+    )
+    run_env = dict(os.environ)
+    run_env['TG_ESTIMATE_SMILES'] = smiles
+    try:
+        r = subprocess.run(["bash", "-c", bash_script], capture_output=True, text=True,
+                            stdin=subprocess.DEVNULL, timeout=timeout, env=run_env)
+        result = json.loads(r.stdout.strip())
+    except Exception:
+        return None
+    return result if isinstance(result, dict) and 'error' not in result else None
+
+def _exp_tg_point(cls: dict, run_name: str | None=None, smiles: str | None=None):
     """Point exp_tg_K value for assess_cooling_contraction's tg_K arg and the tg stage's
-    planning-time bracket. Resolves per-member via run_name (fixes the class-mean-averaging
-    bug for multi-member classes)."""
+    planning-time bracket. A scalar experimental_tg_K (single-member class, or a planning
+    agent's overrides.experimental_tg_K pin -- see OVERRIDE_RANGES) always wins outright.
+    Otherwise resolves per-member via run_name (fixes the class-mean-averaging bug for
+    multi-member classes). Nothing concrete resolved -- run_name matched no member, or
+    experimental_tg_K is absent entirely (a genuinely novel polymer/class: no experimental Tg
+    exists for ANY member, let alone this one) -> a group-contribution estimate from the
+    SMILES itself (low confidence, ~+/-80K), NOT another member's value: run_name='a-PS'
+    against experimental_tg_K={'PS':373,'P2VP':374} used to silently return 374 (the class
+    median) because the 'a-' prefix breaks the 'PS' startswith match -- an unrelated member's
+    number standing in for this molecule's own property. Estimating from the actual SMILES is
+    honest about what's known and what isn't; borrowing a sibling member's exact value is not."""
     tg = cls.get('experimental_tg_K')
-    if isinstance(tg, dict):
-        if run_name:
-            for (key, val) in tg.items():
-                if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                    return val
-        vals = sorted((v for v in tg.values() if isinstance(v, (int, float))))
-        return vals[len(vals) // 2] if vals else None
     if isinstance(tg, (int, float)):
         return tg
+    if isinstance(tg, dict) and run_name:
+        for (key, val) in tg.items():
+            if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
+                return val
+    if smiles:
+        est = _estimate_tg_group_contribution(smiles) or {}
+        est_tg = est.get('tg_estimated_K')
+        if isinstance(est_tg, (int, float)):
+            if isinstance(tg, dict):
+                members = sorted(k for k, v in tg.items() if isinstance(v, (int, float)))
+                reason = f"no run_name match among {members} for run_name={run_name!r}"
+            else:
+                reason = "experimental_tg_K is not set for this class"
+            print(f"INFO: {reason} -- using group-contribution estimate {est_tg}K "
+                  f"(confidence={est.get('confidence')}, motifs={est.get('motifs_matched')}) "
+                  f"instead of another class member's measured value.", file=sys.stderr)
+            return est_tg
     return None
 
 def _exp_density_point(cls: dict, run_name: str | None=None):
-    """Point exp_density_gcm3 value (not a ±5% band) for assess_cooling_contraction."""
+    """Point exp_density_gcm3 value (not a ±5% band) for assess_cooling_contraction. A scalar
+    (single-member class, or a planning agent's overrides.experimental_density_gcm3 pin -- see
+    OVERRIDE_RANGES) always wins outright. Otherwise resolves per-member via run_name. No
+    run_name match -> None, NOT another member's measured density (no group-contribution
+    density estimator exists, unlike Tg; matches validate_run_plan.py's _target_density, which
+    already refuses rather than guesses here). Pin overrides.experimental_density_gcm3 if you've
+    reasoned out which member this SMILES actually is."""
     exp = cls.get('experimental_density_gcm3')
-    if isinstance(exp, dict):
-        if run_name:
-            for (key, val) in exp.items():
-                if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                    return val
-        vals = sorted((v for v in exp.values() if isinstance(v, (int, float))))
-        return vals[len(vals) // 2] if vals else None
     if isinstance(exp, (int, float)):
         return exp
+    if isinstance(exp, dict) and run_name:
+        for (key, val) in exp.items():
+            if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
+                return val
     return None
 
 def _exp_K_range(cls: dict) -> list:
+    """exp_K_GPa is a flat {min,max} PER CLASS, not per-member -- e.g. PACR's is scoped to
+    PMMA specifically even though PACR also covers PMA (see the class's own note field). There
+    is no per-member resolution to get wrong here, only a class-wide range that may be scoped
+    to the wrong member of a multi-member class. overrides.exp_K_min_GPa/exp_K_max_GPa (see
+    OVERRIDE_RANGES) let the agent pin the correct range once it has checked which member the
+    note actually describes; they win outright over the class default when set."""
+    lo, hi = cls.get('exp_K_min_GPa'), cls.get('exp_K_max_GPa')
+    if isinstance(lo, (int, float)) and isinstance(hi, (int, float)):
+        return [lo, hi]
     exp = cls.get('exp_K_GPa')
     if isinstance(exp, dict) and 'min' in exp and ('max' in exp):
         return [exp['min'], exp['max']]
@@ -141,19 +196,18 @@ def _exp_K_range(cls: dict) -> list:
 
 def _exp_density_range(cls: dict, run_name: str | None=None) -> list:
     """Resolves per-member via run_name (same class-mean-averaging bug fixed here for
-    multi-member classes like PHYC's PE/PP/PIB)."""
+    multi-member classes like PHYC's PE/PP/PIB). No run_name match -> the generic
+    density_initial_gcm3-derived band, NOT another member's measured density -- guessing a
+    sibling member's real value here previously banded PE1 (own density 0.855) against PP's
+    median 0.91, sitting PE's true value at the wrong band's edge. Pin
+    overrides.experimental_density_gcm3 if you've reasoned out which member this SMILES is."""
     exp = cls.get('experimental_density_gcm3')
-    if isinstance(exp, dict):
-        if run_name:
-            for (key, val) in exp.items():
-                if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                    return [round(val * 0.95, 3), round(val * 1.05, 3)]
-        vals = sorted((v for v in exp.values() if isinstance(v, (int, float))))
-        if vals:
-            mid = vals[len(vals) // 2]
-            return [round(mid * 0.95, 3), round(mid * 1.05, 3)]
     if isinstance(exp, (int, float)):
         return [round(exp * 0.95, 3), round(exp * 1.05, 3)]
+    if isinstance(exp, dict) and run_name:
+        for (key, val) in exp.items():
+            if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
+                return [round(val * 0.95, 3), round(val * 1.05, 3)]
     d0 = cls.get('density_initial_gcm3', 0.6)
     implied_rt = d0 / 0.55
     return [round(implied_rt * 0.85, 3), round(implied_rt * 1.15, 3)]
@@ -319,12 +373,21 @@ def _resolve_deform_params(args, cls: dict) -> dict:
     """Resolve deterministic deformation arguments."""
     return {'deform_rate_mode': args.deform_rate_mode, 'equil_data_path': args.data_path, 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'K_deform_rate_inv_s': _pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 100000000.0), 'K_deform_rate_slow_inv_s': cls.get('K_deform_rate_slow_inv_s', 'null'), 'K_strain_max': _pick(args.K_strain_max, cls, 'K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
 
+def _run_graphs_dir(args) -> str:
+    """Run-level graphs directory, shared by every plotting stage -- NOT output_dir with its
+    /raw/ leaf swapped, which (output_dir being per-attempt) only ever produced another
+    per-attempt path. Stages that never plot (build, summary) never call this."""
+    return f'{REPO_ROOT}/data/{args.run_name}/graphs'
+
 def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     """Resolve deterministic per-rate Tg analysis arguments."""
     (selected_rate, rate_suffix) = _resolve_tg_rate(args, cls)
     raw_suffix = f'tg_r{int(selected_rate)}/' if selected_rate is not None else ''
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/{raw_suffix}'
-    graphs_dir = output_dir.replace('/raw/', '/graphs/').replace('/raw', '/graphs')
+    # Flat, unlike output_dir -- generate_run_summary's rel_fig() looks for tg_fit.png directly
+    # under the run-level graphs/ dir; a rate-suffixed graphs/tg_r40/ would hide it from summary
+    # the same way the old per-attempt scoping did.
+    graphs_dir = _run_graphs_dir(args)
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
     # tg_sweep_dir mirrors _resolve_tg_params' own formula exactly -- analyze-tg reads the same
     # attempt work_dir the tg stage just wrote its sweep into, not a flat-convention guess.
@@ -349,7 +412,7 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
 def _resolve_equil_check_params(args, cls: dict) -> dict:
     """Resolve deterministic equilibration validation arguments."""
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
-    graphs_dir = output_dir.replace('/raw/', '/graphs/').replace('/raw', '/graphs')
+    graphs_dir = _run_graphs_dir(args)
     ct_decay = cls.get('ct_min_decay_melt', 0.1) if cls.get('ct_gate_reliable', True) else None
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
     T_workflow = _resolve_t_workflow(args, cls)
@@ -372,18 +435,27 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
     npt_prod_log_path = args.npt_prod_log or (
         npt_prod_data_path[:-len('_out.data')] + '.log' if npt_prod_data_path.endswith('_out.data')
         else f'{lammps_base}/equil/{prod}/{prod}.log')
-    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'exp_density_range': _exp_density_range(cls, run_name=args.run_name), 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, args.run_name), 'exp_density_point_gcm3': _exp_density_point(cls, args.run_name), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'alpha_glass_per_K': cls.get('alpha_glass_per_K', 'null'), 'alpha_melt_per_K': cls.get('alpha_melt_per_K', 'null'), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'exp_density_range': _exp_density_range(cls, run_name=args.run_name), 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, args.run_name, getattr(args, 'smiles', None)), 'exp_density_point_gcm3': _exp_density_point(cls, args.run_name), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'alpha_glass_per_K': cls.get('alpha_glass_per_K', 'null'), 'alpha_melt_per_K': cls.get('alpha_melt_per_K', 'null'), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
     sampling_factor = int(cls.get('mechanical_sampling_factor', 1))
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'equil_data_path': args.data_path or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'temp_K': cls.get('bm_temperature_K', 300.0), 'npt_steps': int(cls.get('bm_npt_steps', 500000)) * sampling_factor, 'thermo_freq': int(cls.get('bm_thermo_freq', 100)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'mechanical_sampling_factor': sampling_factor, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
+    is_glassy = _is_glassy(args, cls)
+    # args.data_path IS the equilibration attempt's real npt_prod_data_path in real execution
+    # (run_campaign.py sets it from the accepted equilibration manifest before this resolver
+    # runs); the fallback below is a --dry-run-only preview default and must branch on regime
+    # like _resolve_analyze_tg_params/_resolve_analyze_bm_params do -- unbranched, it showed a
+    # glassy preview compressing the 550K melt endpoint instead of the 300K target (a-PS dry-run,
+    # 2026-08-17).
+    default_equil_data = (f'{lammps_base}/equil/npt_prod300/npt_prod300_out.data' if is_glassy
+                           else f'{lammps_base}/equil/npt_production/npt_production_out.data')
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': is_glassy, 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'equil_data_path': args.data_path or default_equil_data, 'temp_K': cls.get('bm_temperature_K', 300.0), 'npt_steps': int(cls.get('bm_npt_steps', 500000)) * sampling_factor, 'thermo_freq': int(cls.get('bm_thermo_freq', 100)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'mechanical_sampling_factor': sampling_factor, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
 
 def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     """Resolve deterministic bulk-modulus extraction arguments."""
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
-    graphs_dir = output_dir.replace('/raw/', '/graphs/').replace('/raw', '/graphs')
+    graphs_dir = _run_graphs_dir(args)
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
     _k_from_cls = _exp_K_range(cls)
     exp_K = [args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0], args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1]]
@@ -413,7 +485,7 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
     # not. See db/query_best_match.py's exp_lookup.json (written separately, for provenance)
     # for a human to compare against literature by hand when a reference happens to exist.
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
-    graphs_dir = output_dir.replace('/raw/', '/graphs/').replace('/raw', '/graphs')
+    graphs_dir = _run_graphs_dir(args)
     run_plan = f"{output_dir.rstrip('/')}/run_plan.json"
     dp = args.dp if args.dp is not None else cls.get('dp_typical')
     nchain = args.nchain if args.nchain is not None else cls.get('nchain')

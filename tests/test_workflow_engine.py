@@ -59,7 +59,7 @@ def test_success_accepts_attempt_manifests_and_never_escalates(tmp_path):
     assert result["status"] == "accepted"
     state = json.loads((tmp_path / "workflow_state.json").read_text())
     assert all(row["status"] == "accepted" for row in state["stages"].values())
-    assert all((tmp_path / "attempts" / stage / attempt / "manifest.json").is_file()
+    assert all((tmp_path / "attempts" / stage / attempt / "executor_state.json").is_file()
                for stage, attempt in result["accepted_attempts"].items())
 
 
@@ -201,7 +201,7 @@ def test_changed_accepted_artifact_invalidates_producer_and_descendants(tmp_path
     engine = WorkflowEngine(tmp_path, plan(), fake)
     engine.run()
     manifest_path = (tmp_path / "attempts" / "build" /
-                     engine.state["stages"]["build"]["accepted_attempt"] / "manifest.json")
+                     engine.state["stages"]["build"]["accepted_attempt"] / "executor_state.json")
     artifact = Path(json.loads(manifest_path.read_text())["artifacts"][0]["path"])
     artifact.write_text("changed")
 

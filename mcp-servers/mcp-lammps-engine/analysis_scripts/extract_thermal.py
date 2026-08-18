@@ -816,7 +816,7 @@ def main():
     # 3b. Hard physics-validity gate on the PRIMARY fit.
     # A fit that violates a hard constraint (slope signs not both negative, a degenerate
     # near-zero crossover width, or a Tg pinned to the sweep endpoints) is physically invalid
-    # and must NOT headline tg_summary.json as Tg_K — it poisons the multi-rate extrapolation
+    # and must NOT headline thermal.json as Tg_K — it poisons the multi-rate extrapolation
     # and the run-summary (PSU1/PVC2: a 578 K endpoint-pinned hyperbola masked a valid ~437 K
     # bilinear). If the primary is invalid but the alternative fit is valid, swap it in.
     # If neither is valid, keep the primary but flag primary_fit_invalid so downstream guards.
@@ -1046,7 +1046,7 @@ def main():
     # 4b. Dump-based structural analysis (optional)
     # -------------------------------------------------------------------
     # A skipped block reports itself. Omitting the keys entirely made "we never ran this" and
-    # "we ran it and the structure is fine" indistinguishable in tg_summary.json.
+    # "we ran it and the structure is fine" indistinguishable in thermal.json.
     if not (per_t_dump_file and tg_data_file):
         _absent = " and ".join(n for n, v in (("per_t_dump_file", per_t_dump_file),
                                               ("tg_data_file", tg_data_file)) if not v)
@@ -1195,7 +1195,7 @@ def main():
         print(f"  WARNING: tg_fit plot failed: {_pe}", flush=True)
     result["tg_fit_png"] = tg_fig_png
 
-    summary_json = str(output_dir / "tg_summary.json")
+    summary_json = str(output_dir / "thermal.json")
     with open(summary_json, "w") as jf:
         json.dump(result, jf, indent=2)
     result["summary_json"] = summary_json

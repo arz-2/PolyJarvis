@@ -71,30 +71,35 @@ def resume_campaign(run_name: str, recovery_agent: Optional[RecoveryAgent] = Non
 
 
 def inspect_run(run_name: str, repo_root: Path = REPO_ROOT) -> dict:
-    """Read structured control and executor state without parsing prose logs."""
+    """Read structured control and per-stage executor state without parsing prose logs.
+
+    `executor` is assembled from each enabled stage's most recent attempt manifest (the
+    `executor_state.json` written by workflow_engine._finish_attempt), located via
+    workflow_state.json's own stored attempt["manifest"] path — never a flat run-level
+    executor_state.json, which nothing in this engine writes.
+    """
     run_dir = repo_root / "data" / run_name
     workflow_result = inspect_workflow(run_dir)
     raw_dir = run_dir / "raw"
     control_path = raw_dir / "control_state.json"
-    executor_path = raw_dir / "executor_state.json"
-    if (workflow_result["status"] == "not_found" and not control_path.exists()
-            and not executor_path.exists()):
+    if workflow_result["status"] == "not_found" and not control_path.exists():
         return {
             "status": "not_found",
             "run_name": run_name,
             "control_state_path": str(control_path),
-            "executor_state_path": str(executor_path),
+            "workflow_state_path": workflow_result["state_path"],
         }
     control = json.loads(control_path.read_text()) if control_path.exists() else None
-    executor = json.loads(executor_path.read_text()) if executor_path.exists() else None
-    if workflow_result["status"] != "not_found":
-        status = workflow_result["status"]
-    elif control:
-        status = control.get("status", "unknown")
-    elif executor and executor.get("halted"):
-        status = "halted"
-    else:
-        status = "active_or_complete"
+    executor = {}
+    for stage, record in ((workflow_result.get("state") or {}).get("stages") or {}).items():
+        attempts = record.get("attempts") or ()
+        if not attempts:
+            continue
+        manifest_path = attempts[-1].get("manifest")
+        if manifest_path and Path(manifest_path).is_file():
+            executor[stage] = json.loads(Path(manifest_path).read_text())
+    status = (workflow_result["status"] if workflow_result["status"] != "not_found"
+             else (control.get("status", "unknown") if control else "active_or_complete"))
     return {
         "status": status,
         "run_name": run_name,
@@ -103,7 +108,6 @@ def inspect_run(run_name: str, repo_root: Path = REPO_ROOT) -> dict:
         "workflow": workflow_result.get("state"),
         "workflow_state_path": workflow_result["state_path"],
         "control_state_path": str(control_path),
-        "executor_state_path": str(executor_path),
     }
 
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 generate_run_summary.py — Aggregate all Stage 4 analysis outputs into a single
-canonical run_summary.json that mirrors the run_log.md sections.
+canonical run_summary.json.
 
 Reads all JSON files in output_dir, assembles the summary, fills provenance
 from git and version strings already present in analysis JSON outputs, and
-writes run_summary.json to output_dir. Only tg_summary.json is searched
+writes run_summary.json to output_dir. Only thermal.json is searched
 recursively; anything else an extractor wrote into a subdirectory is reported
 in artifacts_missing rather than silently dropped.
 
@@ -103,7 +103,7 @@ def main():
                    help="Number of replicates contributing to the multi-rate Tg registry "
                         "(distinct replicate rows). Reported in results.tg for the DSC extrapolation.")
     p.add_argument("--tg_path",         default=None,
-                   help="Explicit path to the canonical tg_summary.json (e.g. the slowest-rate "
+                   help="Explicit path to the canonical thermal.json (e.g. the slowest-rate "
                         "folder). When supplied, skips rglob discovery and uses this file directly. "
                         "Prevents alphabetical-order bugs when multiple rate folders coexist.")
     args = p.parse_args()
@@ -133,26 +133,20 @@ def main():
         })
         return {}
 
-    tg           = _load("tg_summary.json")
-    eq_dens      = _load("equilibrated_density.json")
-    eq_chk       = _load("equilibration_check.json")
-    # check_equilibration_comprehensive actually writes equilibration_comprehensive.json
-    # with a nested schema (thermo.*/chain.*/spatial.*); prefer it when present.
-    eq_comp      = _load("equilibration_comprehensive.json")
-    bulk         = _load("bulk_modulus.json")
+    tg           = _load("thermal.json")
+    # equilibration.json holds check_equilibration_comprehensive's own nested schema
+    # (thermo.*/chain.*/spatial.*) at its top level, plus "density" (extract_equilibrated_
+    # density's result) and "gate" (enforce_equilibration_gate's verdict) as sibling keys.
+    eq_comp      = _load("equilibration.json")
+    eq_dens      = eq_comp.get("density") or {}
+    eq_gate      = eq_comp.get("gate") or {}
     bulk_deform  = _load("bulk_modulus_deform.json")
-    bulk_murnaghan = _load("bulk_modulus_murnaghan.json")
-    e2e     = _load("end_to_end_summary.json")
-    rdf     = _load("rdf_summary.json")
-    rg      = _load("rg_summary.json")
-    msd     = _load("msd_summary.json")
-    orient  = _load("orientation_summary.json")
-    dh      = _load("density_summary.json")
+    bulk_murnaghan = _load("mechanical.json")
 
     # -----------------------------------------------------------------------
     # Results section
     # -----------------------------------------------------------------------
-    # Tg resolution: single-rate MD Tg. A run may write tg_summary.json into a per-rate
+    # Tg resolution: single-rate MD Tg. A run may write thermal.json into a per-rate
     # subdir (tg_r<rate>/), so search recursively when the top-level file is absent (else
     # Tg silently drops from the summary).
     Tg_raw = tg.get("Tg_K")
@@ -164,7 +158,7 @@ def main():
             if j.get("Tg_K") is not None:
                 tg, Tg_raw = j, j.get("Tg_K")
         else:
-            for cand in sorted(output_dir.rglob("tg_summary.json")):
+            for cand in sorted(output_dir.rglob("thermal.json")):
                 j = _load_json(cand)
                 if j.get("Tg_K") is not None:
                     tg, Tg_raw = j, j.get("Tg_K")
@@ -172,7 +166,7 @@ def main():
         if tg:
             # Recovered from a per-rate subdir — the only artifact with its own discovery, so it
             # is not stranded and does not belong in artifacts_missing.
-            artifacts_missing[:] = [m for m in artifacts_missing if m["file"] != "tg_summary.json"]
+            artifacts_missing[:] = [m for m in artifacts_missing if m["file"] != "thermal.json"]
 
     # Measured values only -- no experimental comparison. Most runs are novel systems with no
     # curated experimental reference, so a PASS/FAIL grading column would be blank far more often
@@ -185,11 +179,10 @@ def main():
 
     rho_val = eq_dens.get("plateau_density_mean") or eq_dens.get("density_mean")
 
-    # K-source precedence: murnaghan > deform > fluctuation
+    # K-source precedence: murnaghan > deform.
     # Murnaghan is the primary glassy (300 K) and rubbery (T>Tg) method.
     # Deform (3-direction) is the fallback when Murnaghan EOS fails.
     # Born+NVT has been removed (PCFF+PPPM virial incompatibility, 2026-06-21).
-    # Fluctuation (B_dyn) is a diagnostic cross-check for rubbery systems.
     if bulk_murnaghan.get("B0_GPa") is not None:
         K_val    = bulk_murnaghan.get("B0_GPa")
         K_sem    = bulk_murnaghan.get("B0_sem_GPa")
@@ -199,9 +192,7 @@ def main():
         K_sem    = bulk_deform.get("K_sem_GPa")
         K_method = "deformation"
     else:
-        K_val    = bulk.get("bulk_modulus_GPa")
-        K_sem    = bulk.get("bulk_modulus_sem_GPa")
-        K_method = "fluctuation" if K_val is not None else None
+        K_val = K_sem = K_method = None
 
     # -----------------------------------------------------------------------
     # Artifact pointers (relative to data/[RUN]/)
@@ -216,16 +207,13 @@ def main():
         return f"graphs/{fname}" if full.exists() else None
 
     artifacts = {
-        "tg_summary":              rel("tg_summary.json"),
+        "thermal":                 rel("thermal.json"),
         "tg_density_bins":         rel("tg_density_bins.csv"),
         "tg_fit_fig":              rel_fig("tg_fit.png"),
-        "equilibrated_density":    rel("equilibrated_density.json"),
-        "equilibration_check":     rel("equilibration_check.json"),
-        "equilibration_comprehensive": rel("equilibration_comprehensive.json"),
+        "equilibration":           rel("equilibration.json"),
         "equilibration_fig":       rel_fig("equilibration_convergence.png"),
-        "bulk_modulus":            rel("bulk_modulus.json"),
         "bulk_modulus_deform":     rel("bulk_modulus_deform.json"),
-        "bulk_modulus_murnaghan":  rel("bulk_modulus_murnaghan.json"),
+        "mechanical":              rel("mechanical.json"),
         "volume_timeseries":       rel("volume_timeseries.csv"),
         "volume_fig":              rel_fig("volume_fluctuations.png"),
         "murnaghan_eos_fig":       rel_fig("murnaghan_eos.png"),
@@ -264,8 +252,9 @@ def main():
     # -----------------------------------------------------------------------
     # Provenance
     # -----------------------------------------------------------------------
-    mda_version = (e2e.get("mdanalysis_version") or rg.get("mdanalysis_version")
-                   or rdf.get("mdanalysis_version") or "unknown")
+    # No producer in the engine-driven path currently emits mdanalysis_version (the tools that
+    # once did -- end-to-end/RDF/Rg extraction -- are never invoked by run_campaign.py).
+    mda_version = "unknown"
 
     summary = {
         "run": {
@@ -285,7 +274,10 @@ def main():
             "D-02_charges":      args.d02,
             "D-03_electrostatics": args.d03,
             "D-04_system_size":  args.d04,
-            "D-05_convergence":  args.d05,
+            # eq_gate (equilibration.json's "gate" section, the enforce_equilibration_gate
+            # verdict) is the real record when present; --d05 is a caller-supplied fallback for
+            # runs where that section hasn't been written (e.g. no gate ever ran).
+            "D-05_convergence":  eq_gate.get("verdict") or args.d05,
             "D-06_tg_fit_quality": args.d06,
         },
         "plan": {
@@ -320,31 +312,20 @@ def main():
         "convergence": {
             "verdict":            args.d05 or (("PASS" if eq_comp.get("overall_pass") else "FAIL")
                                               if eq_comp else None),
-            # Prefer the comprehensive nested schema; fall back to the legacy flat keys.
-            "density_equilibrated": _dig(eq_comp, "thermo", "density_drift", "pass",
-                                         default=eq_chk.get("density_equilibrated")),
-            "energy_equilibrated":  _dig(eq_comp, "thermo", "energy_drift", "pass",
-                                         default=eq_chk.get("energy_equilibrated")),
-            "density_drift_pct":    _dig(eq_comp, "thermo", "density_drift", "drift_pct",
-                                         default=_dig(eq_chk, "density", "drift", "drift_pct")),
+            "density_equilibrated": _dig(eq_comp, "thermo", "density_drift", "pass"),
+            "energy_equilibrated":  _dig(eq_comp, "thermo", "energy_drift", "pass"),
+            "density_drift_pct":    _dig(eq_comp, "thermo", "density_drift", "drift_pct"),
         },
         "structural_checks": {
-            "rg_cv":              _dig(eq_comp, "chain", "rg", "cv",
-                                       default=rg.get("rg_cv_across_chains")),
-            "rg_spread_flag":     (_not(_dig(eq_comp, "chain", "rg", "pass"))
-                                   if eq_comp else rg.get("rg_spread_flag")),
-            "kinetic_trap_flag":  _dig(eq_comp, "chain", "msd", "kinetic_trap_flag",
-                                       default=msd.get("kinetic_trap_flag")),
-            "diffusion_regime":   _dig(eq_comp, "chain", "msd", "diffusion_regime",
-                                       default=msd.get("diffusion_regime")),
-            "ordered_flag":       (_not(_dig(eq_comp, "spatial", "p2", "pass"))
-                                   if eq_comp else orient.get("ordered_flag")),
-            "p2_mean":            _dig(eq_comp, "spatial", "p2", "p2_mean",
-                                       default=orient.get("p2_mean")),
+            "rg_cv":              _dig(eq_comp, "chain", "rg", "cv"),
+            "rg_spread_flag":     _not(_dig(eq_comp, "chain", "rg", "pass")) if eq_comp else None,
+            "kinetic_trap_flag":  _dig(eq_comp, "chain", "msd", "kinetic_trap_flag"),
+            "diffusion_regime":   _dig(eq_comp, "chain", "msd", "diffusion_regime"),
+            "ordered_flag":       _not(_dig(eq_comp, "spatial", "p2", "pass")) if eq_comp else None,
+            "p2_mean":            _dig(eq_comp, "spatial", "p2", "p2_mean"),
             "heterogeneous_flag": (_not(_dig(eq_comp, "spatial", "density_homogeneity", "pass"))
-                                   if eq_comp else dh.get("heterogeneous_flag")),
-            "density_cv_mean":    _dig(eq_comp, "spatial", "density_homogeneity", "cv_mean",
-                                       default=dh.get("cv_mean")),
+                                   if eq_comp else None),
+            "density_cv_mean":    _dig(eq_comp, "spatial", "density_homogeneity", "cv_mean"),
         },
         "artifacts":    artifacts,
         "artifacts_missing": artifacts_missing,

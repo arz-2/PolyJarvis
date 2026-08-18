@@ -69,8 +69,9 @@ python3 orchestration/scripts/scientific_control.py \
   --dry-run
 ```
 
-The control layer persists `control_state.json`; deterministic stages persist
-`executor_state.json`. Successful runs never invoke the recovery command. Remove `--dry-run` to
+The control layer persists `control_state.json`; the workflow engine persists per-run
+`workflow_state.json` and, per stage attempt, `executor_state.json` (resolved parameters +
+computed outputs). Successful runs never invoke the recovery command. Remove `--dry-run` to
 execute the simulation chain.
 
 ## Scientific Workflow

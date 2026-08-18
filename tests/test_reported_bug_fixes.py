@@ -173,13 +173,13 @@ def test_gate_verdict_is_persisted_including_failures(tmp_path):
     import server
 
     ok = server._save_gate_verdict(tmp_path, {"verdict": "PASS"})
-    saved = json.loads((tmp_path / "equilibration_gate.json").read_text())
-    assert saved["verdict"] == "PASS"
-    assert ok["saved_to"].endswith("equilibration_gate.json")
+    saved = json.loads((tmp_path / "equilibration.json").read_text())
+    assert saved["gate"]["verdict"] == "PASS"
+    assert ok["saved_to"].endswith("equilibration.json")
 
     # A blown-up probe is the case most worth having a record of.
     server._save_gate_verdict(tmp_path, {"status": "failed", "error": "probe exploded"})
-    assert json.loads((tmp_path / "equilibration_gate.json").read_text())["status"] == "failed"
+    assert json.loads((tmp_path / "equilibration.json").read_text())["gate"]["status"] == "failed"
 
     # A missing out_dir must not raise -- the verdict still returns.
     assert server._save_gate_verdict(None, {"verdict": "PASS"})["verdict"] == "PASS"

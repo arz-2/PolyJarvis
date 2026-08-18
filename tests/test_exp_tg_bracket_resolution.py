@@ -14,6 +14,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 
+import stage_params  # noqa: E402
 from make_deterministic_plan import build_planned_stages  # noqa: E402
 from validate_run_plan import _exp_tg_companion_findings  # noqa: E402
 
@@ -33,16 +34,57 @@ def test_run_name_resolves_the_correct_member():
     assert _tg_stage(stages)["success_criteria"]["t_range_brackets_exp_tg"] == 258
 
 
-def test_no_run_name_or_unmatched_run_name_falls_back_to_median_not_none():
-    """_exp_tg_point's own convention (already proven for the real runtime grading path):
-    an absent or unmatched run_name falls back to the class median rather than staying
-    unresolved -- every real call site always supplies a run_name in practice, so this
-    fallback is a defensive last resort, not the common case."""
+def test_no_run_name_or_unmatched_run_name_stays_unresolved_without_smiles():
+    """_exp_tg_point no longer borrows another class member's measured value when run_name
+    doesn't resolve -- that used to silently substitute an unrelated polymer's real
+    experimental Tg (e.g. run_name='a-PS' against PSTR's {PS:373, P2VP:374} inherited P2VP's
+    374K, because the 'a-' prefix breaks the 'PS' startswith match). Absent a smiles to
+    estimate from, the bracket now stays genuinely unresolved (None), which Check C flags."""
     stages = build_planned_stages(PHYC, {"tg"})
-    assert _tg_stage(stages)["success_criteria"]["t_range_brackets_exp_tg"] == 205  # median
+    assert _tg_stage(stages)["success_criteria"]["t_range_brackets_exp_tg"] is None
 
     stages = build_planned_stages(PHYC, {"tg"}, run_name="UNKNOWN99")
-    assert _tg_stage(stages)["success_criteria"]["t_range_brackets_exp_tg"] == 205  # median
+    assert _tg_stage(stages)["success_criteria"]["t_range_brackets_exp_tg"] is None
+
+
+def test_unmatched_run_name_uses_group_contribution_estimate_when_smiles_given(monkeypatch):
+    """No sibling member's value is borrowed; instead a SMILES-derived estimate for THIS
+    molecule is used. _estimate_tg_group_contribution shells into the radonpy conda env
+    (RDKit isn't in `base`) so it's monkeypatched here rather than actually invoked."""
+    monkeypatch.setattr(stage_params, "_estimate_tg_group_contribution",
+                         lambda smiles, timeout=30: {"tg_estimated_K": 342, "confidence": "low",
+                                                       "motifs_matched": ["phenylene"]})
+    stages = build_planned_stages(PHYC, {"tg"}, run_name="UNKNOWN99", smiles="*CC*")
+    assert _tg_stage(stages)["success_criteria"]["t_range_brackets_exp_tg"] == 342
+
+
+def test_unmatched_run_name_with_smiles_but_failed_estimate_stays_none(monkeypatch):
+    """The estimator itself is advisory-only and may fail (bad SMILES, no rdkit, timeout) --
+    that must degrade to None, never raise and never fall back to a sibling member's value."""
+    monkeypatch.setattr(stage_params, "_estimate_tg_group_contribution",
+                         lambda smiles, timeout=30: None)
+    stages = build_planned_stages(PHYC, {"tg"}, run_name="UNKNOWN99", smiles="not a smiles")
+    assert _tg_stage(stages)["success_criteria"]["t_range_brackets_exp_tg"] is None
+
+
+def test_class_with_no_experimental_tg_key_uses_group_contribution_estimate(monkeypatch):
+    """The actual 'novel run' case: a class/SMILES with NO experimental_tg_K field at all
+    (not a dict, not a scalar -- genuinely never characterized), not just a multi-member dict
+    with an unmatched run_name. Must also reach the estimator, not just return None."""
+    monkeypatch.setattr(stage_params, "_estimate_tg_group_contribution",
+                         lambda smiles, timeout=30: {"tg_estimated_K": 250, "confidence": "low",
+                                                       "motifs_matched": ["backbone_CH2"]})
+    stages = build_planned_stages({}, {"tg"}, run_name="X1", smiles="*CC*")
+    assert _tg_stage(stages)["success_criteria"]["t_range_brackets_exp_tg"] == 250
+
+
+def test_scalar_experimental_tg_k_override_wins_outright():
+    """overrides.experimental_tg_K (OVERRIDE_RANGES) replaces the class's experimental_tg_K
+    wholesale via apply_plan's {**cls, **decided_params}, landing here as a plain scalar --
+    must win immediately, without touching run_name matching or the estimator at all."""
+    stages = build_planned_stages({"experimental_tg_K": 373.0}, {"tg"}, run_name="a-PS",
+                                   smiles="*CC(c1ccccc1)*")
+    assert _tg_stage(stages)["success_criteria"]["t_range_brackets_exp_tg"] == 373.0
 
 
 def test_class_with_no_experimental_tg_at_all_stays_unresolved():

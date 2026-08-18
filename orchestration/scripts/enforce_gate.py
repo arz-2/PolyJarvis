@@ -5,14 +5,13 @@ Cross-checks a completed equil run's overall_pass + per-gate results against
 decision_policy.json's require_glassy / require_rubbery / plain-require clauses,
 programmatically -- not via worker prose. Also applies density_value_binding
 (assess_cooling_contraction must have run when 300K density falls >5% below
-experiment) and lints run_log.md for an unfilled D-05 template placeholder.
+experiment).
 
 Usage: python3 enforce_gate.py <run_name> [--repo-root PATH]
 Prints a JSON verdict to stdout: PASS_CLEAN | PASS_CARVEOUT | VIOLATION | UNADJUDICATED.
 """
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -42,8 +41,6 @@ ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_dri
 # degree, so binding it before the magnitude bound is calibrated would halt the whole glassy
 # track. It is emitted and logged now; promote to STRUCTURAL_GATES once the bound is set.
 ALWAYS_ADVISORY = {"msd_not_trapped", "msid_gaussian", "residual_stress"}
-
-D05_PLACEHOLDER_RE = re.compile(r"\[PASS\s*/\s*EXTEND[×x]N\s*/\s*ESCALATE\]", re.IGNORECASE)
 
 
 def load_json(path):
@@ -107,7 +104,7 @@ def classify(gates: dict, regime: str, dp_typical, ct_gate_reliable):
 
 
 def collect_gates(comp: dict) -> dict:
-    """Pull every per-gate pass boolean out of equilibration_comprehensive.json.
+    """Pull every per-gate pass boolean out of equilibration.json's thermo/chain/spatial sections.
 
     Single source of truth for both enforce() and enforce_live() -- a gate key added to
     only one of them would be a silent no-op in the other path.
@@ -197,15 +194,15 @@ def enforce(run_name, repo_root: Path):
     raw = run_dir / "raw"
 
     plan = load_json(raw / "run_plan.json")
-    comp = load_json(raw / "equilibration_comprehensive.json")
-    dens = load_json(raw / "equilibrated_density.json")
+    comp = load_json(raw / "equilibration.json")
+    dens = (comp or {}).get("density")
     cooling = load_json(raw / "cooling_contraction.json")  # may not exist
     policy = load_json(repo_root / "orchestration" / "decision_policy.json")
     rules = load_json(repo_root / "guides" / "polymer_rules.json")
 
     if plan is None or comp is None:
         return {"run_name": run_name, "verdict": "UNADJUDICATED",
-                "reason": "missing run_plan.json or equilibration_comprehensive.json"}
+                "reason": "missing run_plan.json or equilibration.json"}
 
     dp = plan.get("decided_params", {})
     polymer_class = plan.get("polymer_class", "")
@@ -216,11 +213,15 @@ def enforce(run_name, repo_root: Path):
     dp_typical = dp.get("dp_typical") or cls_rules.get("dp_typical")
     ct_gate_reliable = cls_rules.get("ct_gate_reliable")
 
-    # --- pull per-gate pass booleans from equilibration_comprehensive.json ---
+    # --- pull per-gate pass booleans from equilibration.json ---
     gates = collect_gates(comp)
 
     # --- density-in-band (density_value_binding target) ---
-    exp_density_dict = cls_rules.get("experimental_density_gcm3")
+    # dp first: a planning agent's overrides.experimental_density_gcm3 pin (OVERRIDE_RANGES)
+    # must be respected here too, same precedence as dp_typical above -- previously this read
+    # cls_rules only, so an override that correctly reached equil-check's density band would
+    # still silently grade the FINAL gate verdict against the class's un-overridden default.
+    exp_density_dict = dp.get("experimental_density_gcm3") or cls_rules.get("experimental_density_gcm3")
     polymer_key = run_name.rstrip("0123456789")  # e.g. "PMMA2" -> "PMMA"
     # experimental_density_gcm3 keys are member names (e.g. "PMMA"); polymer_key already matches
     plateau_mean = (dens or {}).get("plateau_density_mean")
@@ -257,15 +258,6 @@ def enforce(run_name, repo_root: Path):
     else:
         verdict = "VIOLATION"
 
-    # --- D-05 placeholder lint ---
-    run_log = run_dir / "run_log.md"
-    d05_placeholder = False
-    if run_log.exists():
-        text = run_log.read_text(errors="ignore")
-        if D05_PLACEHOLDER_RE.search(text):
-            d05_placeholder = True
-            verdict = "UNADJUDICATED"
-
     return {
         "run_name": run_name,
         "polymer_class": polymer_class,
@@ -279,7 +271,6 @@ def enforce(run_name, repo_root: Path):
         "density_value_binding": dvb_status,
         "overall_pass_reported": overall_pass_reported,
         "failing_binding_gates": failing_binding,
-        "d05_placeholder_unfilled": d05_placeholder,
         "verdict": verdict,
     }
 
@@ -308,9 +299,9 @@ def enforce_live(args) -> dict:
     dp_typical = args.dp
     ct_gate_reliable = args.ct_gate_reliable
 
-    # --- density-in-band, straight from plateau_density_mean if present in comp's neighbor file ---
-    dens_path = Path(args.comprehensive_json).parent / "equilibrated_density.json"
-    dens = load_json(dens_path)
+    # --- density-in-band, straight from plateau_density_mean under comp's own "density" section
+    # (extract_equilibrated_density.py merges its result there rather than a neighbor file) ---
+    dens = comp.get("density")
     plateau_mean = (dens or {}).get("plateau_density_mean")
     exp_density = args.exp_density_gcm3
     gap_pct = None

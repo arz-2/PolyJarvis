@@ -15,7 +15,7 @@ This is a from-scratch rewrite (branch `refactor/deterministic-control-plane`). 
 - `.mcp.json` is gitignored; copy `.mcp.json.example` and fill in host paths (`LAMBDA_*`, `CONDA_ENV`, `EMC_ROOT`, `RADONPY_PATH`, etc.).
 - `mcp-radonpy-server` is referenced in `.mcp.json.example` but has no directory under `mcp-servers/` in this checkout — only `mcp-lammps-engine`, `mcp-emc-server`, and `mcp-mol-builder-server` exist here.
 - `db/polymer_db.sqlite` is gitignored (curated from copyrighted sources) and does not exist until built/copied locally — `db/query_best_match.py` lookups need it first.
-- Resumable run state lives in `data/<run>/raw/control_state.json` (control layer) and `data/<run>/raw/executor_state.json` (stage execution); completed stages are skipped on resume.
+- Resumable run state lives in `data/<run>/raw/control_state.json` (control layer), `data/<run>/workflow_state.json` (per-stage status/attempts), and each attempt's own `data/<run>/attempts/<stage>/<attempt_id>/executor_state.json` (that attempt's resolved parameters + computed outputs); completed stages are skipped on resume.
 - GPU claims go through `orchestration/scripts/pick_gpu.py` (atomic claim/release ledger) — don't assume a GPU is free without checking it.
 
 Subdirectory `CLAUDE.md` files can be added for module-specific instructions (e.g. `orchestration/`, `mcp-servers/<server>/`) — they load automatically when Claude works in those directories. Ask if you want one.

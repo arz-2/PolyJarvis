@@ -35,7 +35,7 @@ degenerate/inverted — run `tg_rates_K_per_ns[0]` instead).
 | Tool | `extract_thermal` |
 | Method | Stepped cooling sweep from high T to ≤200 K; bilinear fit of density vs T; breakpoint = Tg_MD. CTE (α_g, α_r) and ΔCp come from the same fit's branch slopes |
 | Fit quality | PASS / WARN / ABORT; R² and segment slopes reported |
-| Outputs | `tg_summary.json`, `tg_density_vs_T.png` |
+| Outputs | `thermal.json`, `tg_density_vs_T.png` |
 | Validation | `experimental_tg_K` from polymer_rules.json, graded strictly (no offset in the band); MD Tg overestimates experiment by ~80–120 K (fast cooling rate artifact — Patrone 2016, Webb 2024), reported as an annotation only (`tg_offset_corrected_K`), never folded into PASS/FAIL |
 | Side effect | `is_glassy` is decided from this sweep's MD Tg (`is_glassy = Tg_MD > 300`) when it ran at the class's highest configured rate; a degenerate fit or a deliberately slowest-rate sweep (PKTN, PSFO) falls back to `experimental_tg_K > 300` |
 
@@ -66,7 +66,7 @@ Fit parameters: B0 (GPa) = K_T, B0' (pressure derivative), V0 (reference volume 
 | Acceptance | `fit_converged=True`; otherwise fall back to Path C (deformation). `B0_prime` outside [4, 20] is a WARNING annotation only, not a fallback trigger |
 | Cross-check | Volume-fluctuation K, computed inside the same `extract_bulk_modulus_murnaghan` call via its `npt_prod_log` argument — a diagnostic, not the reported value |
 | Method label | `murnaghan` |
-| Outputs | `bulk_modulus_murnaghan.json`, `murnaghan_eos.png` |
+| Outputs | `mechanical.json`, `murnaghan_eos.png` |
 
 ---
 
@@ -83,7 +83,7 @@ Same Murnaghan EOS fit as Path A, run at T>Tg from the melt production cell over
 | Advantage over fluctuation | Barostat-independent (uses mean V per pressure, not variance); captures EOS nonlinearity |
 | Convergence fallback | If curve_fit fails → linear regression of P vs ln V (method label: `linear_fallback`) |
 | Method label | `murnaghan` |
-| Outputs | `bulk_modulus_murnaghan.json`, `murnaghan_eos.png` |
+| Outputs | `mechanical.json`, `murnaghan_eos.png` |
 
 ---
 

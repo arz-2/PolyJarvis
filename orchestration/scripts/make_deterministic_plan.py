@@ -109,16 +109,18 @@ STAGE_TRACK = {
 }
 
 
-def build_planned_stages(cls: dict, properties: set, run_name: str | None = None) -> list:
+def build_planned_stages(cls: dict, properties: set, run_name: str | None = None,
+                          smiles: str | None = None) -> list:
     """Experiment DAG with per-stage success_criteria the Validator enforces."""
     exp_tg = _exp_tg_scalar(cls)                 # regime/temperature (median ok for multi-member)
     glassy_hint = (exp_tg is not None and exp_tg > 300)
     # accuracy gate: resolves per-member via run_name (same resolver stage_params.py uses for
-    # the real runtime grading target), so it's no longer permanently None for a multi-member
-    # class -- None now only means run_name genuinely didn't match any member (or wasn't given,
-    # e.g. the scaffold path), which is exactly the case worth flagging (see validate_run_plan's
-    # Check C). Previously this was hardcoded to always return None for multi-member classes.
-    exp_tg_bracket = _exp_tg_point(cls, run_name)
+    # the real runtime grading target). A run_name that matches no member falls to a
+    # group-contribution estimate from smiles itself (not another member's measured value --
+    # see _exp_tg_point); None now only means genuinely nothing could be resolved (no smiles,
+    # or the estimator itself failed), which is exactly the case worth flagging (see
+    # validate_run_plan's Check C).
+    exp_tg_bracket = _exp_tg_point(cls, run_name, smiles)
 
     def _s(stage, criteria, **extra):
         return {"stage": stage, "track": STAGE_TRACK[stage],
@@ -208,7 +210,7 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
         "uncertainties": uncertainties,
         "decided_params": decided_params,
         "decisions": build_decisions(cls),
-        "planned_stages": build_planned_stages(cls, properties, run_name),
+        "planned_stages": build_planned_stages(cls, properties, run_name, smiles),
         "critique": {"status": "pending_scientific_review", "rounds": 0, "findings": []},
         "provenance": {"generator": "make_deterministic_plan.py",
                        "generated_at": datetime.now(timezone.utc).isoformat()},

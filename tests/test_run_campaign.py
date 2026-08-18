@@ -19,7 +19,7 @@ from stage_params import resolve_stage_params, apply_plan, resolve_hardware, loa
 from hw_common import load_rules, get_class_entry  # noqa: E402
 import run_campaign as rdr  # noqa: E402
 from run_campaign import (  # noqa: E402
-    _base_args, wait_for_analysis, do_equil_and_check, do_summary, ExecutorState,
+    _base_args, wait_for_analysis, do_equil_and_check, do_summary,
 )
 
 RULES = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
@@ -263,10 +263,6 @@ def equil_check_args_cls():
     yield args, effective_cls
 
 
-def _fake_state(tmp_path):
-    return ExecutorState(tmp_path / "executor_state.json", "DRTU", "PACR", "fake_plan.json")
-
-
 def test_do_equil_and_check_halts_when_backbone_types_unresolved(tmp_path, equil_check_args_cls, monkeypatch):
     """Genuine last resort: bond-topology derivation is attempted first and fails (e.g. the
     chain has fewer than 2 heavy atoms, or no bond topology at all), so the halt still fires."""
@@ -276,12 +272,11 @@ def test_do_equil_and_check_halts_when_backbone_types_unresolved(tmp_path, equil
         {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
     fake = _FakeEquilLammps(tmp_path, comp_results=[], gate_verdicts=[],
                             atom_type_names={"1": "c", "2": "c1"}, derived_backbone_types=None)
-    state = _fake_state(tmp_path)
 
-    result = do_equil_and_check(state, args, cls, fake, tmp_path / "run_log.md")
+    result = do_equil_and_check(args, cls, fake)
 
-    assert result == {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED"}
-    assert state.data["halted"]["reason"] == "BACKBONE_TYPES_UNRESOLVED"
+    assert result["halted"] is True
+    assert result["reason"] == "BACKBONE_TYPES_UNRESOLVED"
     assert fake.derive_backbone_types_calls == [{"data_file": "/fake/original/cell.data"}]
     # halted only after derivation itself failed -- no guessed [] silently submitted
     assert fake.inspect_data_file_calls == ["/fake/original/cell.data"]
@@ -300,12 +295,11 @@ def test_do_equil_and_check_auto_derives_backbone_types(tmp_path, equil_check_ar
         gate_verdicts=[{"verdict": "PASS"}],
         derived_backbone_types=[1, 2],
     )
-    state = _fake_state(tmp_path)
 
-    result = do_equil_and_check(state, args, cls, fake, tmp_path / "run_log.md")
+    result = do_equil_and_check(args, cls, fake)
 
     assert result["equil_verdict"] == "PASS"
-    assert state.data["halted"] is None
+    assert result["backbone_derivation"]["outcome"] == "RESOLVED — automatic"
     assert fake.derive_backbone_types_calls == [{"data_file": "/fake/original/cell.data"}]
     assert fake.inspect_data_file_calls == []  # never reached -- derivation succeeded
     assert cls["backbone_types"] == [1, 2]
@@ -327,11 +321,12 @@ def test_do_equil_and_check_sizes_extend_off_measured_tau_relax(tmp_path, equil_
         ],
         gate_verdicts=[{"verdict": "EXTEND"}, {"verdict": "PASS"}],
     )
-    state = _fake_state(tmp_path)
 
-    result = do_equil_and_check(state, args, cls, fake, tmp_path / "run_log.md")
+    result = do_equil_and_check(args, cls, fake)
 
     assert result["equil_verdict"] == "PASS"
+    assert len(result["extend_history"]) == 1
+    assert result["extend_history"][0]["attempt"] == 1
     # Two generate_equilibration_workflow calls: the initial submission, then the EXTEND.
     assert len(fake.generate_equilibration_workflow_calls) == 2
     extend_call = fake.generate_equilibration_workflow_calls[1]
@@ -386,14 +381,14 @@ def test_do_summary_waits_for_generate_run_summary_completion(tmp_path):
     fake = _FakeSummaryLammps(completed_result={
         "status": "success", "summary_json": str(tmp_path / "raw" / "run_summary.json"),
     })
-    state = _fake_state(tmp_path)
 
-    result = do_summary(state, args, cls, fake, is_glassy=False, thermal_result=None,
-                        raw_dir=tmp_path / "raw", graphs_dir=tmp_path / "graphs",
-                        plan_path="fake_plan.json", run_log_path=tmp_path / "run_log.md")
+    result = do_summary(args, cls, fake, is_glassy=False, thermal_result=None,
+                        equil_verdict="PASS", raw_dir=tmp_path / "raw")
 
     assert fake.get_run_status_calls >= 1, "generate_run_summary's result was never polled"
-    assert result == {"status": "success", "summary_json": str(tmp_path / "raw" / "run_summary.json")}
+    assert result["status"] == "success"
+    assert result["summary_json"] == str(tmp_path / "raw" / "run_summary.json")
+    assert result["run_summary_path"] == str(tmp_path / "raw" / "run_summary.json")
     assert result.get("status") != "submitted"
 
 
@@ -427,9 +422,8 @@ def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_ch
         gate_verdicts=[{"verdict": "PASS"}],
         workflow_stages=workflow_stages,
     )
-    state = _fake_state(tmp_path)
 
-    result = do_equil_and_check(state, args, cls, fake, tmp_path / "run_log.md")
+    result = do_equil_and_check(args, cls, fake)
 
     assert result["equil_verdict"] == "PASS"
     comp_call = fake.check_equilibration_comprehensive_calls[0]

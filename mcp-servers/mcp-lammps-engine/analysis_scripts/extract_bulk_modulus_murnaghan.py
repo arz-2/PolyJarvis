@@ -21,8 +21,8 @@ Fallback:
     linear regression of P vs ln V with method="linear_fallback" and a warning.
 
 Output:
-    bulk_modulus_murnaghan.json  — B0_GPa, B0_prime, V0_A3, r_squared, …
-    murnaghan_eos.png            — scatter of (V, P) with Murnaghan fit curve
+    mechanical.json      — B0_GPa, B0_prime, V0_A3, r_squared, …
+    murnaghan_eos.png    — scatter of (V, P) with Murnaghan fit curve
 
 Aliases for generate_run_summary.py compatibility:
     bulk_modulus_GPa  = B0_GPa
@@ -762,7 +762,7 @@ def main():
     # -------------------------------------------------------------------
     # 5. Save JSON
     # -------------------------------------------------------------------
-    summary_path = str(output_dir / "bulk_modulus_murnaghan.json")
+    summary_path = str(output_dir / "mechanical.json")
     with open(summary_path, "w") as jf:
         json.dump(result, jf, indent=2)
     result["summary_json"] = summary_path

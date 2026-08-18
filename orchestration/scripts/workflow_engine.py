@@ -46,6 +46,13 @@ PARAMETER_STAGE: dict[str, str] = {
     "npt_prod300_ns": "equilibration", "melt_npt_ns": "equilibration",
     "alpha_glass_per_K": "equilibration", "alpha_melt_per_K": "equilibration",
     "ct_min_decay_melt": "equilibration", "ct_gate_reliable": "equilibration",
+    # Consumed by equil-check's assess_cooling_contraction (tg_K arg) and, downstream, the
+    # thermal track's tg-sweep bracket and degenerate-fit is_glassy fallback -- "equilibration"
+    # is the earliest of the two, so invalidate_from cascades into thermal too.
+    "experimental_tg_K": "equilibration",
+    # Consumed by equil-check's assess_cooling_contraction (exp_density_gcm3 arg) and the
+    # density-in-band binding gate -- same owning stage as experimental_tg_K, same reasoning.
+    "experimental_density_gcm3": "equilibration",
     "velocity_seed": "equilibration",
     "npt_prod_ns": "equilibration", "npt_cool_steps": "equilibration",
     "npt_cool300_steps": "equilibration", "npt_continuation_ns": "equilibration",
@@ -75,6 +82,8 @@ PARAMETER_STAGE: dict[str, str] = {
     "bm_temperature_K": "mechanical", "bm_thermo_freq": "mechanical",
     "mechanical_method": "mechanical", "mechanical_resample_points": "mechanical",
     "mechanical_sampling_factor": "mechanical",
+    # Only consumed by _exp_K_range (analyze-bm's exp_K_range grading target) -- mechanical.
+    "exp_K_min_GPa": "mechanical", "exp_K_max_GPa": "mechanical",
 }
 
 
@@ -547,7 +556,17 @@ class WorkflowEngine:
         attempt_id = record.get("accepted_attempt")
         if not attempt_id:
             raise ValueError(f"{stage} has no accepted attempt")
-        path = self.attempts_dir / stage / attempt_id / "manifest.json"
+        attempt_dir = self.attempts_dir / stage / attempt_id
+        stored = next((entry.get("manifest") for entry in record.get("attempts", ())
+                       if entry.get("attempt_id") == attempt_id), None)
+        # entry["manifest"] is the authoritative path once _finish_attempt has stamped it (the
+        # attempt's own record of what it was actually named). Attempts persisted before the
+        # manifest.json -> executor_state.json rename have no stored path -- fall back to the
+        # new filename, then the pre-rename one, so an on-disk run from before this change
+        # doesn't hard-fail resumption.
+        path = (Path(stored) if stored else
+                (attempt_dir / "executor_state.json" if (attempt_dir / "executor_state.json").exists()
+                 else attempt_dir / "manifest.json"))
         manifest = json.loads(path.read_text())
         for artifact in manifest.get("artifacts", []):
             artifact_path = Path(artifact["path"])
@@ -634,7 +653,8 @@ class WorkflowEngine:
         return attempt_id, attempt_dir
 
     def _finish_attempt(self, stage: str, attempt_id: str, attempt_dir: Path,
-                        result: StageResult, input_hash: str) -> dict[str, Any]:
+                        result: StageResult, input_hash: str, parameters: Mapping[str, Any]
+                        ) -> dict[str, Any]:
         artifacts = []
         for raw_path in result.artifacts:
             path = Path(raw_path)
@@ -647,12 +667,13 @@ class WorkflowEngine:
         manifest = {
             "attempt_id": attempt_id, "stage": stage, "status": result.status,
             "input_hash": input_hash, "findings": [item.to_dict() for item in result.findings],
-            "outputs": result.outputs, "artifacts": artifacts, "finished_at": _now(),
+            "parameters": dict(parameters), "outputs": result.outputs, "artifacts": artifacts,
+            "finished_at": _now(),
         }
-        atomic_write_json(attempt_dir / "manifest.json", manifest)
+        atomic_write_json(attempt_dir / "executor_state.json", manifest)
         entry = self.state["stages"][stage]["attempts"][-1]
         entry.update({"status": result.status, "finished_at": manifest["finished_at"],
-                      "manifest": str(attempt_dir / "manifest.json")})
+                      "manifest": str(attempt_dir / "executor_state.json")})
         self._save()
         return manifest
 
@@ -676,7 +697,8 @@ class WorkflowEngine:
         except Exception as exc:  # process adapters normalize unexpected execution failures
             result = StageResult("failed", (Finding("PROCESS_FAILED", stage,
                                                      details={"error": str(exc)}),))
-        manifest = self._finish_attempt(stage, attempt_id, attempt_dir, result, input_hash)
+        manifest = self._finish_attempt(stage, attempt_id, attempt_dir, result, input_hash,
+                                        context["parameters"])
         return result, manifest
 
     def _apply_remedy(self, finding: Finding) -> bool:

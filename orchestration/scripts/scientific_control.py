@@ -38,6 +38,23 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "T_equil_K": (100, 1500),
     "annealing_T_high_K": (100, 2000),
     "T_workflow_K": (100, 1500),
+    # A scalar replaces the class's (possibly multi-member-dict, possibly absent)
+    # experimental_tg_K wholesale via apply_plan's {**cls, **decided_params} overlay -- both
+    # _exp_tg_point and _exp_tg_scalar already have an isinstance(tg, (int, float)) passthrough
+    # for exactly this shape. Lets the planning agent pin the correct experimental target when
+    # it has reasoned one out (multi-member disambiguation by substituent, a literature value,
+    # or an accepted group-contribution estimate for a genuinely novel SMILES) instead of
+    # relying on run_name-prefix matching against the class dict.
+    "experimental_tg_K": (1, 1500),
+    # Same rationale as experimental_tg_K: a scalar replaces the class's (possibly
+    # multi-member-dict, possibly absent) experimental_density_gcm3 wholesale.
+    "experimental_density_gcm3": (0.05, 3.0),
+    # exp_K_GPa is a flat {min,max} PER CLASS, not per-member -- e.g. PACR's is scoped to PMMA
+    # specifically even though PACR also covers PMA (see the class's own note). There is no
+    # existing per-member resolution to fix; these let the agent pin the correct range for
+    # whichever member this SMILES actually is.
+    "exp_K_min_GPa": (0.001, 200),
+    "exp_K_max_GPa": (0.001, 200),
     "P_equil_atm": (0.01, 100000),
     "t_equil_ns": (0.01, 1000),
     "eq_annealing_cycles": (0, 50),
@@ -348,7 +365,8 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     if "T_equil_K" in decision.overrides and "T_workflow_K" not in decision.overrides:
         plan["decided_params"]["T_workflow_K"] = decision.overrides["T_equil_K"]
         effective_class["T_workflow_K"] = decision.overrides["T_equil_K"]
-    plan["planned_stages"] = build_planned_stages(effective_class, properties, intent.run_name)
+    plan["planned_stages"] = build_planned_stages(effective_class, properties, intent.run_name,
+                                                   intent.smiles)
     plan["decisions"] = build_decisions(effective_class)
     for row in plan["decisions"]:
         row["confidence"] = decision.confidence
@@ -412,7 +430,8 @@ def apply_recovery(plan: dict, decision: RecoveryDecision) -> dict:
     effective_class = {**class_entry, **decided_params}
     _validate_protocol_relationships(effective_class, set(decision.modifications))
     revised["planned_stages"] = build_planned_stages(
-        effective_class, set(revised.get("properties", [])), revised.get("run_name")
+        effective_class, set(revised.get("properties", [])), revised.get("run_name"),
+        revised.get("smiles")
     )
     revised.setdefault("recovery_history", []).append({
         "action": decision.action,
@@ -721,17 +740,6 @@ def _write_json(path: Path, value: dict) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, indent=2, default=list) + "\n")
     temporary.replace(path)
-
-
-def _read_executor_state(run_name: str) -> dict:
-    path = REPO_ROOT / "data" / run_name / "raw" / "executor_state.json"
-    if not path.exists():
-        return {}
-    try:
-        value = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return value if isinstance(value, dict) else {}
 
 
 def main() -> None:

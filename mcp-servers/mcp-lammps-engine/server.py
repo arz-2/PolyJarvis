@@ -1226,7 +1226,7 @@ def get_run_status(run_id: str) -> dict:
     # analysis tools (extract_thermal etc.) can carry large per-frame lists
     # (structural_metrics_per_T, relaxation_metrics) that overflow the client (~73k chars). Keep
     # scalar result fields; replace big collections with a pointer — callers read the written JSON
-    # artifact (e.g. tg_summary.json) for full detail.
+    # artifact (e.g. thermal.json) for full detail.
     result = run.get("result")
     if not isinstance(result, dict):
         return run
@@ -1994,19 +1994,28 @@ def _require_output_dir(output_dir, tool: str, legacy: str):
 
 
 def _save_gate_verdict(out_dir, result: dict) -> dict:
-    """Persist the equilibration-gate verdict to <out_dir>/equilibration_gate.json.
+    """Persist the equilibration-gate verdict under the "gate" key of <out_dir>/equilibration.json.
 
     The decision that authorises (or blocks) every downstream property extraction used to exist
     only in the calling worker's reply, leaving nothing to audit — unlike every other stage,
     which leaves a JSON in raw/. Failures are written too: a probe that blew up is the case most
-    worth having a record of.
+    worth having a record of. equilibration.json is shared with check_equilibration_comprehensive
+    (top-level thermo/chain/spatial keys) and extract_equilibrated_density ("density" key) —
+    read-merge-write so this producer's own section replaces wholesale without clobbering theirs.
     """
     if not out_dir:
         return result
     try:
-        verdict_path = Path(out_dir) / "equilibration_gate.json"
+        verdict_path = Path(out_dir) / "equilibration.json"
         verdict_path.parent.mkdir(parents=True, exist_ok=True)
-        verdict_path.write_text(json.dumps(result, indent=2, default=str))
+        merged = {}
+        if verdict_path.exists():
+            try:
+                merged = json.loads(verdict_path.read_text())
+            except (OSError, json.JSONDecodeError):
+                merged = {}
+        merged["gate"] = result
+        verdict_path.write_text(json.dumps(merged, indent=2, default=str))
         result["saved_to"] = str(verdict_path)
     except Exception as e:  # never let an audit-trail write mask the verdict itself
         logger.error(f"could not save equilibration gate verdict: {e}")
@@ -3630,10 +3639,10 @@ def extract_bulk_modulus_murnaghan(
         of sequence (likely inadequate equilibration at that point).
 
     Output files written to output_dir:
-        bulk_modulus_murnaghan.json  — B0_GPa, B0_prime, V0_A3, r_squared, …
-                                       Also contains bulk_modulus_GPa alias for
-                                       compatibility with generate_run_summary.
-        murnaghan_eos.png            — P vs V scatter with fit curve
+        mechanical.json      — B0_GPa, B0_prime, V0_A3, r_squared, …
+                               Also contains bulk_modulus_GPa alias for
+                               compatibility with generate_run_summary.
+        murnaghan_eos.png    — P vs V scatter with fit curve
 
     The job runs in the background — poll with get_run_status(run_id).
 
@@ -3641,7 +3650,7 @@ def extract_bulk_modulus_murnaghan(
         log_files:      List of LAMMPS log file paths, one per pressure point.
                         Same order as pressures_atm. From run_bulk_modulus_series.
         pressures_atm:  List of target pressures (atm), same order as log_files.
-        output_dir:     Directory for bulk_modulus_murnaghan.json output.
+        output_dir:     Directory for mechanical.json output.
         graphs_dir:     Directory for PNG figures. Defaults to output_dir/figures.
         eq_fraction:    Fraction of each log used as production window. Default 0.5.
         npt_prod_log:   Optional separate NPT production log for the fluctuation
@@ -3909,7 +3918,7 @@ def generate_run_summary(
     Args:
         output_dir:       Absolute path to data/[RUN]/raw/.
                           Every analysis JSON must already exist directly here —
-                          only tg_summary.json is searched recursively. Anything an
+                          only thermal.json is searched recursively. Anything an
                           extractor wrote into a subdirectory is reported in
                           artifacts_missing, not silently dropped.
         run_name:         Run directory name (e.g. "PS4").
@@ -3920,11 +3929,11 @@ def generate_run_summary(
         charge_method:    Charge method used (e.g. "AM1-BCC", "embedded in FF").
         dp, n_chains, n_atoms: System size parameters.
         date_start, date_end: ISO date strings (e.g. "2026-06-04").
-        d01–d06:          Decision strings from run_log.md.
+        d01–d06:          Decision strings (caller-resolved from the run plan).
         n_replicates:     Replicate count reported in results.tg.n_replicates
                           (single-run protocol: 1).
-        tg_path:          Explicit path to the canonical tg_summary.json (e.g.
-                          tg_r40/tg_summary.json — the slowest-rate folder). When
+        tg_path:          Explicit path to the canonical thermal.json (e.g.
+                          tg_r40/thermal.json — the slowest-rate folder). When
                           supplied, skips rglob discovery; prevents alphabetical-order
                           bugs when multiple rate folders coexist.
 

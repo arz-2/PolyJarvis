@@ -20,22 +20,39 @@ def test_contract_enforces_scientific_planning_and_conditional_recovery():
 
 
 def test_inspect_run_combines_control_and_executor_state(tmp_path):
-    raw_dir = tmp_path / "data" / "RUN1" / "raw"
+    run_dir = tmp_path / "data" / "RUN1"
+    raw_dir = run_dir / "raw"
     raw_dir.mkdir(parents=True)
     (raw_dir / "control_state.json").write_text(json.dumps({
         "status": "unresolved",
         "recovery_agent_calls": 1,
     }))
-    (raw_dir / "executor_state.json").write_text(json.dumps({
-        "halted": {"stage": "mechanical", "reason": "TENSION_RUN_FAILED"},
-        "stages": {"equil_check": {"status": "done"}},
+
+    # executor is assembled from each stage's latest attempt executor_state.json (the file
+    # workflow_engine._finish_attempt writes), located via workflow_state.json's own stored
+    # attempt["manifest"] path -- not a flat run-level executor_state.json, which nothing writes.
+    attempt_dir = run_dir / "attempts" / "mechanical" / "attempt-0001"
+    attempt_dir.mkdir(parents=True)
+    manifest_path = attempt_dir / "executor_state.json"
+    manifest_path.write_text(json.dumps({
+        "attempt_id": "attempt-0001", "stage": "mechanical", "status": "failed",
+        "findings": [{"code": "TENSION_RUN_FAILED"}], "parameters": {}, "outputs": {},
+    }))
+    (run_dir / "workflow_state.json").write_text(json.dumps({
+        "status": "unresolved",
+        "stages": {
+            "mechanical": {
+                "status": "failed",
+                "attempts": [{"attempt_id": "attempt-0001", "manifest": str(manifest_path)}],
+            },
+        },
     }))
 
     result = agent_api.inspect_run("RUN1", repo_root=tmp_path)
 
     assert result["status"] == "unresolved"
     assert result["control"]["recovery_agent_calls"] == 1
-    assert result["executor"]["halted"]["reason"] == "TENSION_RUN_FAILED"
+    assert result["executor"]["mechanical"]["findings"][0]["code"] == "TENSION_RUN_FAILED"
 
 
 def test_inspect_unknown_run_is_structured(tmp_path):

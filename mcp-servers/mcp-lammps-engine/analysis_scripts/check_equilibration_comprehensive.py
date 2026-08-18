@@ -1023,9 +1023,20 @@ def main():
         "timestamp": timestamp,
     })
 
-    json_path = str(output_dir / "equilibration_comprehensive.json")
-    with open(json_path, "w") as jf:
-        json.dump(result, jf, indent=2)
+    # equilibration.json is shared with extract_equilibrated_density.py ("density" key) and
+    # enforce_equilibration_gate's _save_gate_verdict ("gate" key) -- read-merge-write so this
+    # producer's own top-level keys (below) replace wholesale on each EXTEND re-check without
+    # clobbering whichever of those two sibling sections already landed from a prior pass.
+    equilibration_json = output_dir / "equilibration.json"
+    merged = {}
+    if equilibration_json.exists():
+        try:
+            merged = json.loads(equilibration_json.read_text())
+        except (OSError, json.JSONDecodeError):
+            merged = {}
+    merged.update(result)
+    equilibration_json.write_text(json.dumps(merged, indent=2))
+    json_path = str(equilibration_json)
     result["summary_json"] = json_path
 
     d05_path = str(output_dir / "d05_block.md")

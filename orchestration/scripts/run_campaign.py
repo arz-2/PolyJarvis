@@ -84,41 +84,16 @@ def _load_server_module(name: str, path: Path, cwd: Path, extra_env: dict):
         os.environ.update(old_env)
 
 
-# ─── Executor state (resumability) ─────────────────────────────────────────────
+# ─── Stage halt with structured detail ─────────────────────────────────────────
 
-class ExecutorState:
-    """Per-run persisted stage status (data/<RUN>/raw/executor_state.json). A stage marked
-    "done" is never re-run; re-invoking with the same --plan picks up from the first non-done
-    stage. Structured halt details are consumed by the recovery agent boundary."""
+class StageHalt(SystemExit):
+    """Raised by a do_* function to abort its stage with structured detail attached (e.g. a
+    finite-size forecast) — execute()'s except SystemExit handler reads .details instead of
+    re-deriving it from a side-channel state file."""
 
-    def __init__(self, path: Path, run_name: str, polymer_class: str, plan_path: str):
-        self.path = path
-        if path.exists():
-            self.data = json.loads(path.read_text())
-        else:
-            self.data = {"run_name": run_name, "polymer_class": polymer_class,
-                         "plan_path": str(plan_path), "stages": {}, "halted": None}
-            self._save()
-
-    def _save(self):
-        self.path.write_text(json.dumps(self.data, indent=2) + "\n")
-
-    def stage(self, name: str) -> dict:
-        return self.data["stages"].get(name, {})
-
-    def is_done(self, name: str) -> bool:
-        return self.stage(name).get("status") == "done"
-
-    def mark(self, name: str, status: str, **extra):
-        self.data["stages"][name] = {"status": status,
-                                     "updated_at": datetime.now(timezone.utc).isoformat(),
-                                     **extra}
-        self._save()
-
-    def halt(self, stage: str, reason: str, detail: dict = None):
-        self.data["halted"] = {"stage": stage, "reason": reason, "detail": detail or {},
-                               "at": datetime.now(timezone.utc).isoformat()}
-        self._save()
+    def __init__(self, message, details: dict = None):
+        super().__init__(message)
+        self.details = details or {}
 
 
 # ─── GPU claim (A.6 — cross-track rules as code, not convention) ──────────────
@@ -221,28 +196,6 @@ def wait_for_analysis(lammps, submit_result: dict, label: str, poll_seconds: flo
         time.sleep(poll_seconds)
 
 
-# ─── run_log.md writing (minimal but covers what enforce_gate.py's retrospective ─────
-# lint checks: the Seeds line and a non-placeholder D-05 block) ────────────────
-
-def _append_run_log(run_log_path: Path, text: str):
-    with open(run_log_path, "a") as f:
-        f.write(text if text.endswith("\n") else text + "\n")
-
-
-def log_seed(run_log_path: Path, label: str, seed):
-    _append_run_log(run_log_path, f"\n_Seed logged ({label}): `{seed}`_\n")
-
-
-def log_d05(run_log_path: Path, d05_markdown: str):
-    _append_run_log(run_log_path, "\n## D-05 CONVERGENCE DETAIL (scripted)\n\n" + d05_markdown + "\n")
-
-
-def log_recovery(run_log_path: Path, stage: str, attempt: int, trigger: str, action: str, outcome: str):
-    _append_run_log(run_log_path, (
-        f"\n## RECOVERY — {stage} attempt {attempt}\n"
-        f"- **Trigger:** {trigger}\n- **Action:** {action}\n- **Outcome:** {outcome}\n"))
-
-
 # ─── Base workflow arguments ──────────────────────────────────────────────────
 
 def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNamespace:
@@ -269,7 +222,7 @@ def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNames
 
 # ─── Stage: build ───────────────────────────────────────────────────────────
 
-def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: Path) -> dict:
+def do_build(args, cls: dict, emc, lammps) -> dict:
     preferred_builder = cls.get("preferred_builder", "emc")
     if preferred_builder != "emc":
         raise SystemExit(
@@ -288,7 +241,6 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
         field_override=p["preferred_ff"],
     )
     if job.get("error"):
-        state.mark("build", "failed", error=job["error"])
         raise SystemExit(f"submit_emc_cell_job failed: {job['error']}")
     job_id = job["job_id"]
 
@@ -299,7 +251,6 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
             break
         time.sleep(POLL_SECONDS)
     if status["status"] != "completed":
-        state.mark("build", "failed", error=status)
         raise SystemExit(f"EMC build job {job_id} failed: {status}")
 
     out = emc.get_emc_job_output(job_id)["result"]
@@ -328,13 +279,12 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
     size_errors = [e for e in (info.get("validation", {}).get("errors") or [])
                    if e.startswith("SIZE_")]
     if size_errors:
-        state.mark("build", "failed",
-                   result={"finite_size_forecast": info.get("finite_size_forecast")})
-        raise SystemExit(
+        raise StageHalt(
             "Halting before equilibration — the built cell would self-image once compressed: "
             + " ".join(size_errors)
             + " A deterministic replicate must not silently rebuild at a different nchain; "
-              "that is a decided_params change and needs human review."
+              "that is a decided_params change and needs human review.",
+            details={"finite_size_forecast": info.get("finite_size_forecast")},
         )
 
     result = {
@@ -344,8 +294,6 @@ def do_build(state: ExecutorState, args, cls: dict, emc, lammps, run_log_path: P
         "lammps_flags": out["lammps_flags"],
         "n_atoms": info.get("info", {}).get("n_atoms"),
     }
-    state.mark("build", "done", result=result)
-    log_seed(run_log_path, "EMC", emc_seed)
     return result
 
 
@@ -409,7 +357,7 @@ def _stage_dump_path(stage: dict) -> str:
     return f"{stage['work_dir']}/{stage['params']['DUMP_FILE']}"
 
 
-def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_path: Path) -> dict:
+def do_equil_and_check(args, cls: dict, lammps) -> dict:
     # Captured before args.data_path gets reassigned to the equilibration chain's own output
     # below — the original pre-simulation .data file is the only one whose Masses section still
     # has the "# <name>" comments inspect_data_file's atom_type_names parsing needs; a write_data
@@ -417,8 +365,10 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
     build_data_path = getattr(args, "build_data_path", None) or args.data_path
 
     # generate_equilibration_workflow rejects a null seed; stage_params resolves one (pinned, else
-    # derived from run_name) for the chain and every EXTEND continuation below. Log it like EMC's.
-    log_seed(run_log_path, "velocity", resolve_stage_params("equil", args, cls)["velocity_seed"])
+    # derived from run_name) for the chain and every EXTEND continuation below.
+    velocity_seed = resolve_stage_params("equil", args, cls)["velocity_seed"]
+    extend_history = []
+    backbone_derivation = None
 
     gpu_per_run = cls.get("gpu_per_run") or 1
     with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
@@ -434,7 +384,6 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
             submission = _submit_equil_chain(args, cls, lammps)
         result = wait_for_run(lammps, submission["chain_id"], "equilibration chain")
     if result.get("status") != "completed":
-        state.mark("equil_check", "failed", result=result)
         raise SystemExit(f"Equilibration chain did not complete: {result}")
 
     workflow = submission["workflow"]
@@ -484,10 +433,12 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
                 plan_on_disk = load_plan(args.plan)
                 plan_on_disk.setdefault("decided_params", {})["backbone_types"] = backbone_types
                 atomic_write_json(Path(args.plan), plan_on_disk)
-                log_recovery(run_log_path, "equilibration", attempts, "backbone_types unresolved",
-                            f"auto-derived {backbone_types} from build_data_path bond topology "
-                            "(heavy_atom_graph_diameter) and persisted to decided_params",
-                            "RESOLVED — automatic")
+                backbone_derivation = {
+                    "trigger": "backbone_types unresolved",
+                    "action": f"auto-derived {backbone_types} from build_data_path bond topology "
+                              "(heavy_atom_graph_diameter) and persisted to decided_params",
+                    "outcome": "RESOLVED — automatic",
+                }
             else:
                 # Genuine last resort — the chain itself has fewer than 2 heavy atoms, or no bond
                 # topology at all. inspect_data_file only for diagnostics attached to this halt.
@@ -495,17 +446,13 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
                     data_file=build_data_path, lj_cutoff=p["cutoff_A"] or 12.0,
                     target_density_gcm3=None, nchain=None,
                 )
-                state.halt("equil_check", "BACKBONE_TYPES_UNRESOLVED", {
+                detail = {
                     "reason": "bond-topology derivation could not resolve a backbone for this "
                               "cell: " + str(derived.get("error", "unknown")),
                     "atom_type_names": diag.get("info", {}).get("atom_type_names"),
                     "build_data_path": build_data_path,
-                })
-                log_recovery(run_log_path, "equilibration", attempts, "backbone_types unresolved",
-                            "none — bond-topology derivation failed; requires human/agent review "
-                            "to populate decided_params.backbone_types for this class",
-                            "UNRESOLVED — human review")
-                return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED"}
+                }
+                return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED", "detail": detail}
 
         comp = wait_for_analysis(lammps, lammps.check_equilibration_comprehensive(
             log_file=p["npt_prod_log_path"], dump_file=p["melt_dump_path"],
@@ -516,7 +463,7 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
         density = wait_for_analysis(lammps, lammps.extract_equilibrated_density(
             log_file=p["npt_prod_log_path"], target_temp=p["npt_prod_temp_K"], output_dir=p["output_dir"],
         ), "equil-check density")
-        comprehensive_json = str(Path(p["output_dir"]) / "equilibration_comprehensive.json")
+        comprehensive_json = str(Path(p["output_dir"]) / "equilibration.json")
         verdict = lammps.enforce_equilibration_gate(
             comprehensive_json=comprehensive_json, regime=p["regime"], dp=p["dp"],
             ct_gate_reliable=p["ct_gate_reliable"], exp_density_gcm3=p["exp_density_point_gcm3"],
@@ -526,14 +473,13 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
             alpha_melt_per_K=None if p["alpha_melt_per_K"] == "null" else p["alpha_melt_per_K"],
         )
         equil_verdict = verdict.get("verdict")
-        if verdict.get("d05_markdown"):
-            log_d05(run_log_path, verdict["d05_markdown"])
 
         if equil_verdict == "PASS":
             result = {"equil_verdict": "PASS", "npt_prod_data_path": p["npt_prod_data_path"],
                       "npt_prod_log_path": p["npt_prod_log_path"], "npt_prod_dump_path": npt_prod_dump_path,
-                      "density_gcm3": density.get("plateau_density_mean")}
-            state.mark("equil_check", "done", result=result)
+                      "density_gcm3": density.get("plateau_density_mean"),
+                      "velocity_seed": velocity_seed, "extend_history": extend_history,
+                      "backbone_derivation": backbone_derivation}
             return result
 
         if equil_verdict == "EXTEND":
@@ -547,24 +493,22 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
                         "npt_prod_dump_path": npt_prod_dump_path}
             attempts += 1
             if attempts > EXTEND_MAX_ATTEMPTS:
-                state.halt("equil_check", "EXTEND_EXHAUSTED", {"attempts": attempts})
-                log_recovery(run_log_path, "equilibration", attempts, "EXTEND verdict",
-                            "exceeded max EXTEND attempts (deterministic cap=2)", "UNRESOLVED — human review")
-                return {"halted": True, "reason": "EXTEND_EXHAUSTED"}
+                return {"halted": True, "reason": "EXTEND_EXHAUSTED",
+                        "detail": {"attempts": attempts}}
             # A measured relaxation signal from this run's own data beats a blind flat guess —
             # tau_relax_ps comes from the comprehensive check's KWW fit.
             extend_ns = 1.5
             if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
                 extend_ns = max(1.5, round(1.5 * tau_relax_ps / 1000, 2))
-            log_recovery(run_log_path, "equilibration", attempts, "equil_verdict=EXTEND",
-                        f"npt_extend +{extend_ns} ns at {p['npt_prod_temp_K']} K", "pending")
+            extend_history.append({"attempt": attempts, "trigger": "equil_verdict=EXTEND",
+                                   "extend_ns": extend_ns, "tau_relax_ps": tau_relax_ps,
+                                   "npt_prod_temp_K": p["npt_prod_temp_K"]})
             with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
                 args.gpu_ids = gpu_ids
                 submission = _submit_equil_chain(args, cls, lammps, extend_from_data=p["npt_prod_data_path"],
                                                  extend_temp=p["npt_prod_temp_K"], extend_ns=extend_ns)
                 ext_result = wait_for_run(lammps, submission["chain_id"], "equilibration EXTEND")
             if ext_result.get("status") != "completed":
-                state.mark("equil_check", "failed", result=ext_result)
                 raise SystemExit(f"EXTEND chain did not complete: {ext_result}")
             npt_prod_data_path = submission["workflow"]["stages"][0]["output_data"]
             npt_prod_dump_path = _stage_dump_path(submission["workflow"]["stages"][0])
@@ -572,17 +516,12 @@ def do_equil_and_check(state: ExecutorState, args, cls: dict, lammps, run_log_pa
 
         # Structural or protocol failures never trigger an implicit protocol change. Halt with
         # structured evidence for the recovery-agent boundary.
-        state.halt("equil_check", equil_verdict, verdict)
-        log_recovery(run_log_path, "equilibration", attempts + 1, f"equil_verdict={equil_verdict}",
-                    "none — protocol changes are never auto-applied",
-                    "UNRESOLVED — recovery review required")
         return {"halted": True, "reason": equil_verdict, "detail": verdict}
 
 
 # ─── Stage: thermal track ──────────────────────────────────────────────────
 
-def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, graphs_dir: Path,
-               run_log_path: Path) -> dict:
+def do_thermal(args, cls: dict, lammps) -> dict:
     """Single-rate-primary: run one sweep at the class's primary configured rate (highest by
     default; tg_slope_gate_fallback="slowest_rate" classes — PKTN, PSFO — run rates[0] instead,
     since their highest-rate fit is documented as degenerate/inverted)."""
@@ -627,7 +566,6 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
             )
             result = wait_for_run(lammps, run["run_id"], f"tg sweep rate={rate}")
         if result.get("status") != "completed":
-            state.mark("thermal", "failed", result=result)
             raise SystemExit(f"Tg sweep (rate={rate}) did not complete: {result}")
 
         ap = resolve_stage_params("analyze-tg", args, cls)
@@ -640,7 +578,8 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
         per_rate.append({"rate": rate, "Tg_K": thermal.get("Tg_K"),
                          "fit_quality": thermal.get("fit_quality"), "r_squared": thermal.get("r_squared"),
                          "output_dir": ap["output_dir"], "used_highest_rate": idx == len(tg_rates) - 1,
-                         "tg_gate_verdict": thermal.get("tg_gate_verdict")})
+                         "tg_gate_verdict": thermal.get("tg_gate_verdict"),
+                         "velocity_seed": p["velocity_seed"]})
 
     highest = per_rate[-1] if per_rate else None
 
@@ -658,7 +597,6 @@ def do_thermal(state: ExecutorState, args, cls: dict, lammps, raw_dir: Path, gra
 
     result = {"per_rate": per_rate, "is_glassy": is_glassy,
               "tg_gate_verdict": (highest or {}).get("tg_gate_verdict")}
-    state.mark("thermal", "done", result=result)
     return result
 
 
@@ -695,14 +633,14 @@ def _submit_deform(args, cls: dict, lammps, mode: str) -> dict:
     return {"run_id": run["run_id"], "log_path": f"{p['work_dir']}/05_deform{suffix}.log"}
 
 
-def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool,
-                  npt_prod_data_path: str, raw_dir: Path, graphs_dir: Path) -> dict:
+def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: str) -> dict:
     args.is_glassy = "true" if is_glassy else "false"
     gpu_per_run = cls.get("gpu_per_run") or 1
     p = resolve_stage_params("murnaghan", args, cls)
+    # ced_mpa (cohesive energy density) has no producer anywhere in this codebase yet --
+    # select_pressure_ladder already treats None as "no CED-informed adjustment".
     pressure_selection = select_pressure_ladder(
-        configured_pressures=p["bm_pressures_atm"],
-        ced_mpa=state.stage("equil_check").get("result", {}).get("ced_mpa"),
+        configured_pressures=p["bm_pressures_atm"], ced_mpa=None,
     )
 
     point_status = {}
@@ -750,7 +688,6 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
         result = {"method": "murnaghan", "point_status": point_status,
                   "workflow_finding": {"code": "MECHANICAL_IDENTIFIABILITY_FAILED",
                                        "details": {"point_status": point_status}}}
-        state.mark("mechanical", "failed", result=result)
         return result
 
     bp = resolve_stage_params("analyze-bm", args, cls)
@@ -775,21 +712,20 @@ def do_mechanical(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool
                   "B0_prime": murn.get("B0_prime"),
                   "bm_gate_verdict": murn.get("bm_gate_verdict"),
                   "bm_gate_reasons": murn.get("bm_gate_reasons"),
-                  "murnaghan_result": murn,
+                  "murnaghan_result": murn, "velocity_seed": p["velocity_seed"],
                   "pressure_selection": pressure_selection.to_dict()}
-        state.mark("mechanical", "done", result=result)
         return result
 
     result = {"method": "murnaghan", "bulk_modulus_GPa": murn.get("bulk_modulus_GPa"),
               "accepted": False, "reason": murn.get("bm_gate_verdict") or "BM_INADMISSIBLE",
               "bm_gate_verdict": murn.get("bm_gate_verdict"),
               "bm_gate_reasons": murn.get("bm_gate_reasons"), "is_glassy": is_glassy,
-              "murnaghan_result": murn, "pressure_selection": pressure_selection.to_dict()}
-    state.mark("mechanical", "failed", result=result)
+              "murnaghan_result": murn, "velocity_seed": p["velocity_seed"],
+              "pressure_selection": pressure_selection.to_dict()}
     return result
 
 
-def do_deformation(state: ExecutorState, args, cls: dict, lammps) -> dict:
+def do_deformation(args, cls: dict, lammps) -> dict:
     """Run and gate the deformation fallback selected by the workflow engine."""
     gpu_per_run = cls.get("gpu_per_run") or 1
     with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
@@ -797,7 +733,6 @@ def do_deformation(state: ExecutorState, args, cls: dict, lammps) -> dict:
         primary = _submit_deform(args, cls, lammps, "primary")
         d_result = wait_for_run(lammps, primary["run_id"], "deform primary")
     if d_result.get("status") != "completed":
-        state.mark("mechanical", "failed", result=d_result)
         raise SystemExit(f"Deform (primary) did not complete: {d_result}")
 
     slow_log = None
@@ -825,15 +760,15 @@ def do_deformation(state: ExecutorState, args, cls: dict, lammps) -> dict:
              "youngs_modulus_GPa": deform_extract.get("youngs_modulus_GPa"),
              "deform_gate_verdict": deform_extract.get("deform_gate_verdict"),
              "deform_gate_reasons": deform_extract.get("deform_gate_reasons"),
-             "rate_sensitivity": deform_extract.get("rate_sensitivity")}
-    state.mark("mechanical", "done", result=result)
+             "rate_sensitivity": deform_extract.get("rate_sensitivity"),
+             "velocity_seed": resolve_stage_params("deform", args, cls)["velocity_seed"]}
     return result
 
 
 # ─── Stage: summary ─────────────────────────────────────────────────────────
 
-def do_summary(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool, thermal_result,
-               raw_dir: Path, graphs_dir: Path, plan_path: str, run_log_path: Path) -> dict:
+def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_verdict: str,
+               raw_dir: Path) -> dict:
     exp_lookup_path = raw_dir / "exp_lookup.json"
     properties = ({"density", "tg", "bulk_modulus"} if args.properties in (None, "all")
                   else {x.strip().lower() for x in args.properties.split(",") if x.strip()})
@@ -852,15 +787,17 @@ def do_summary(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool, t
 
     tg_path = None
     if thermal_result is not None:
-        # Single-rate-primary: the one sweep's tg_summary.json path is already known from the
+        # Single-rate-primary: the one sweep's thermal.json path is already known from the
         # analyze-tg stage's own output_dir — no rate ambiguity to resolve.
         if thermal_result.get("per_rate"):
-            tg_path = str(Path(thermal_result["per_rate"][-1]["output_dir"]) / "tg_summary.json")
+            tg_path = str(Path(thermal_result["per_rate"][-1]["output_dir"]) / "thermal.json")
         args.tg_path = tg_path
         args.tg_fit_quality = (thermal_result["per_rate"][-1]["fit_quality"]
                                if thermal_result.get("per_rate") else "N/A (not requested)")
 
-    args.d05 = "PASS"  # do_summary is only reached after equil_check returned PASS
+    # do_summary is only reached after equil_check returned PASS, but read the real verdict
+    # (rather than assume the string) so a future non-PASS path to this stage can't silently lie.
+    args.d05 = equil_verdict or "PASS"
     sp = resolve_stage_params("run-summary", args, cls)
     summary = wait_for_analysis(lammps, lammps.generate_run_summary(
         output_dir=sp["output_dir"], graphs_dir=sp["graphs_dir"], run_name=args.run_name,
@@ -870,7 +807,7 @@ def do_summary(state: ExecutorState, args, cls: dict, lammps, is_glassy: bool, t
         d05=args.d05, d06=args.tg_fit_quality or "N/A (not requested)",
         n_replicates=args.n_replicates, tg_path=tg_path,
     ), "run-summary generation")
-    state.mark("summary", "done", result={"run_summary_path": str(Path(sp["output_dir"]) / "run_summary.json")})
+    summary["run_summary_path"] = str(Path(sp["output_dir"]) / "run_summary.json")
     return summary
 
 
@@ -932,11 +869,6 @@ class CampaignStageExecutor:
                 setattr(args, key, value)
         args.work_dir = str(attempt_dir / "work")
         args.output_dir = str(attempt_dir / "raw")
-        graphs_dir = attempt_dir / "graphs"
-        graphs_dir.mkdir(parents=True, exist_ok=True)
-        run_log = attempt_dir / "run_log.md"
-        legacy = ExecutorState(attempt_dir / "executor_state.json", args.run_name,
-                               args.polymer_class, self.plan_path)
         build = self._outputs(context, "build")
         equil = self._outputs(context, "equilibration")
         thermal = self._outputs(context, "thermal") or None
@@ -959,12 +891,12 @@ class CampaignStageExecutor:
                     break
         try:
             if stage == "build":
-                outputs = do_build(legacy, args, cls, self.emc, self.lammps, run_log)
+                outputs = do_build(args, cls, self.emc, self.lammps)
             elif stage == "equilibration":
-                outputs = do_equil_and_check(legacy, args, cls, self.lammps, run_log)
+                outputs = do_equil_and_check(args, cls, self.lammps)
                 if outputs.get("halted"):
                     code = outputs.get("reason") or "STRUCTURAL_FAIL"
-                    detail = outputs.get("detail") or (legacy.data.get("halted") or {}).get("detail") or {}
+                    detail = outputs.get("detail") or {}
                     if code == "STRUCTURAL_FAIL":
                         code = (detail.get("finite_size_verdict") or
                                 detail.get("cooling_verdict") or
@@ -977,34 +909,32 @@ class CampaignStageExecutor:
                                                 details=detail),),
                                        self._artifacts(attempt_dir), outputs)
             elif stage == "thermal":
-                outputs = do_thermal(legacy, args, cls, self.lammps, attempt_dir / "raw",
-                                     graphs_dir, run_log)
+                outputs = do_thermal(args, cls, self.lammps)
             elif stage == "mechanical":
                 is_glassy = (thermal.get("is_glassy") if thermal else
                               resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0)
                 if context["parameters"].get("mechanical_method") == "deformation":
                     args.is_glassy = "true" if is_glassy else "false"
-                    outputs = do_deformation(legacy, args, cls, self.lammps)
+                    outputs = do_deformation(args, cls, self.lammps)
                 else:
-                    outputs = do_mechanical(legacy, args, cls, self.lammps, is_glassy,
-                                            args.data_path, attempt_dir / "raw", graphs_dir)
+                    outputs = do_mechanical(args, cls, self.lammps, is_glassy, args.data_path)
             elif stage == "summary":
                 is_glassy = (thermal.get("is_glassy") if thermal else
                               resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0)
-                outputs = do_summary(legacy, args, cls, self.lammps, is_glassy, thermal,
-                                     attempt_dir / "raw", graphs_dir, self.plan_path, run_log)
+                outputs = do_summary(args, cls, self.lammps, is_glassy, thermal,
+                                     equil.get("equil_verdict"), attempt_dir / "raw")
             else:
                 raise ValueError(f"unknown workflow stage {stage!r}")
         except SystemExit as exc:
             message = str(exc)
             code = "PROCESS_FAILED"
-            details = {"error": message}
+            details = dict(getattr(exc, "details", {}))
+            details["error"] = message
             if "preferred_builder" in message:
                 code = "UNSUPPORTED_BUILDER"
             elif "SIZE_" in message:
                 code = next((token.strip(".,:") for token in message.split()
                              if token.startswith("SIZE_")), "FINITE_SIZE_FAILED")
-                details.update((legacy.stage("build").get("result") or {}))
                 details["nchain"] = cls.get("nchain")
             return StageResult("failed", (Finding(code, stage, details=details),),
                                self._artifacts(attempt_dir))

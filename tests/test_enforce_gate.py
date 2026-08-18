@@ -87,7 +87,7 @@ def _write_comp(tmp_path, kinetic_trap_flag, gaussian_pass=True, msid_available=
             "energy_sem": {"pass": True},
         },
     }
-    path = tmp_path / "equilibration_comprehensive.json"
+    path = tmp_path / "equilibration.json"
     path.write_text(json.dumps(comp))
     return path
 
