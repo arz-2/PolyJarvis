@@ -292,6 +292,28 @@ def _fit_power_law(x, y, min_pts=5):
     return float(c[0]), float(np.exp(c[1])), r2
 
 
+def _classify_diffusion_regime(alpha):
+    """MSD power-law exponent -> descriptive regime label.
+
+    This is a scaling-behavior classification only -- it does NOT assert a kinetic-trap
+    verdict. Whether chains are actually trapped is a separate, magnitude-based test
+    (msd_max_A2 vs mean_Rg2_A2, see `kinetic_trap_flag`): a low alpha can equally mean
+    ordinary Rouse-regime sub-diffusion that hasn't yet crossed over to Fickian behavior
+    within the trajectory window, which is expected physics, not arrest. Conflating the two
+    previously mislabeled healthy runs (e.g. PE1: alpha=0.371, kinetic_trap_flag=False,
+    msd_max_A2=1370.3 >> mean_Rg2_A2=672.4) as "kinetically trapped" in this field alone.
+    """
+    if alpha is None:
+        return "insufficient data"
+    if alpha < 0.4:
+        return "strongly sub-diffusive (see kinetic_trap_flag for trap verdict)"
+    if alpha < 0.85:
+        return "sub-diffusive (Rouse/reptation)"
+    if alpha < 1.15:
+        return "Fickian diffusion"
+    return "super-diffusive (non-equilibrated)"
+
+
 def _kww_fit(lags_ps, ct_values):
     """Fit C(t) = exp(-(t/tau)^beta). Returns tau, beta, tau_relax, decay_fraction."""
     valid = ct_values > 0.01
@@ -549,17 +571,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     msd_max = float(msd_vals.max()) if len(msd_vals) > 0 else 0.0
     kinetic_trap = bool(msd_max < overall_mean_rg2) if overall_mean_rg2 > 0 else False
 
-    if alpha is not None:
-        if alpha < 0.4:
-            regime = "sub-diffusive / kinetically trapped"
-        elif alpha < 0.85:
-            regime = "sub-diffusive (Rouse/reptation)"
-        elif alpha < 1.15:
-            regime = "Fickian diffusion"
-        else:
-            regime = "super-diffusive (non-equilibrated)"
-    else:
-        regime = "insufficient data"
+    regime = _classify_diffusion_regime(alpha)
 
     msd_result = {
         "alpha": r(alpha, 3) if alpha is not None else None,
