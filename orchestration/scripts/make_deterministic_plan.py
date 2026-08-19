@@ -28,11 +28,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hw_common import load_rules, get_class_entry  # shared rules access (single source of truth)
+from hw_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family  # shared rules access (single source of truth)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from stage_params import _exp_tg_point  # reuse the proven run_name-member resolver, don't duplicate it
+from stage_params import _exp_tg_point, _regime_exp_tg  # reuse the proven resolvers, don't duplicate them
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+DECISION_POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
 # Decision-relevant class keys consumed by stage_params.py. Only keys that
 # EXIST in the class entry are snapshotted, so the overlay stays an exact identity.
 SNAPSHOT_KEYS = [
@@ -49,24 +50,46 @@ SNAPSHOT_KEYS = [
 ]
 
 
-def _exp_tg_scalar(cls: dict):
-    """Tg used ONLY for the glassy-vs-rubbery REGIME (and hence equil temperature). For a
-    multi-member class the members sit on the same side of 300 K, so the dict median picks the
-    regime correctly — keep it, so the deterministic plan reproduces the no-plan equil prompt."""
-    tg = cls.get("experimental_tg_K")
-    if isinstance(tg, dict):
-        vals = sorted(v for v in tg.values() if isinstance(v, (int, float)))
-        return vals[len(vals) // 2] if vals else None
-    return tg if isinstance(tg, (int, float)) else None
+def _policy_criteria() -> dict:
+    """decision_id -> its policy's evaluate list, read straight from decision_policy.json --
+    single source of truth so a row's criteria_evaluated can never drift from the policy that
+    validate_run_plan.py checks it against."""
+    policy = json.loads(DECISION_POLICY_PATH.read_text())
+    return {p["decision_id"]: p.get("evaluate", []) for p in policy.get("policies", {}).values()}
+
+
+def _build_hardware_decision(cls: dict, criteria_evaluated: list) -> dict:
+    """D-08_hardware default: engine/mpi/gpu_per_run from hardware_policy.by_forcefield[fam],
+    the same FF-family resolver stage_params.resolve_hardware uses. Deliberately NOT
+    select_hardware.py's live-host/atom-count-aware defensibility check -- that needs a SMILES
+    and nvidia-smi and stays the independent check validate_run_plan.py already runs; this is
+    the pure, fast, deterministic class default."""
+    hp = hardware_policy()
+    fam = resolve_ff_family(cls.get("preferred_ff") or "", hp)
+    default = hp.get("by_forcefield", {}).get(fam, {})
+    choice = {"engine": default.get("engine"), "gpu_per_run": default.get("gpu_per_run"),
+              "mpi_ranks": default.get("mpi")}
+    evidence = ([{"claim": default["note"], "source": "polymer_rules.json:hardware_policy.by_forcefield"}]
+                if default.get("note") else [])
+    return {"id": "D-08_hardware", "choice": choice, "criteria_evaluated": criteria_evaluated,
+            "evidence": evidence, "confidence": "class_default", "alternatives": []}
 
 
 def build_decisions(cls: dict) -> list:
     """Structured default decision rows carrying evidence/confidence/alternatives, mirroring
     run_summary.json decision IDs. Evidence is transcribed from existing class fields.
 
+    Covers D-01_ff, D-02_charges, D-03_electrostatics, D-04_system_size, D-08_hardware --
+    the decisions a planning agent can actually reason about before any simulation exists.
+    D-05_convergence, D-06_tg_fit_quality, D-07_property_method are deliberately excluded:
+    decision_policy.json defines all three as mechanized runtime gate verdicts (equil_verdict,
+    tg_gate_verdict, bm_gate_verdict) to route on, not re-derive -- they have no pre-simulation
+    default choice to annotate here and stay enforced solely via planned_stages success_criteria.
+
     "confidence" here is a fixed "class_default" placeholder. The scientific control layer
     replaces it with the planning agent's confidence before execution.
     """
+    criteria = _policy_criteria()
     ff_evidence = []
     if cls.get("ff_justification_doi"):
         ff_evidence.append({"claim": cls.get("ff_note", "force field choice"),
@@ -77,22 +100,22 @@ def build_decisions(cls: dict) -> list:
     conf = "class_default"
     return [
         {"id": "D-01_ff", "choice": cls.get("preferred_ff"),
-         "criteria_evaluated": ["literature_support", "parameter_coverage",
-                                 "validation_data", "computational_cost"],
+         "criteria_evaluated": criteria.get("D-01_ff", []),
          "evidence": ff_evidence, "confidence": conf,
          "alternatives": cls.get("forcefield_alternatives", [])},
         {"id": "D-02_charges", "choice": cls.get("charge_method"),
-         "criteria_evaluated": ["backbone_polarity", "ff_embedded_vs_qm"],
+         "criteria_evaluated": criteria.get("D-02_charges", []),
          "evidence": [], "confidence": conf, "alternatives": []},
         {"id": "D-03_electrostatics", "choice": cls.get("electrostatics"),
-         "criteria_evaluated": ["backbone_heteroatoms", "max_partial_charge"],
+         "criteria_evaluated": criteria.get("D-03_electrostatics", []),
          "evidence": [{"claim": "see electrostatics_decision_guide",
                        "source": "polymer_rules.json:electrostatics_decision_guide"}],
          "confidence": conf, "alternatives": []},
         {"id": "D-04_system_size",
          "choice": f"DP={cls.get('dp_typical')}, nchain={cls.get('nchain')}",
-         "criteria_evaluated": ["property_target", "finite_size_effects", "gpu_budget"],
+         "criteria_evaluated": criteria.get("D-04_system_size", []),
          "evidence": [], "confidence": conf, "alternatives": []},
+        _build_hardware_decision(cls, criteria.get("D-08_hardware", [])),
     ]
 
 
@@ -112,15 +135,12 @@ STAGE_TRACK = {
 def build_planned_stages(cls: dict, properties: set, run_name: str | None = None,
                           smiles: str | None = None) -> list:
     """Experiment DAG with per-stage success_criteria the Validator enforces."""
-    exp_tg = _exp_tg_scalar(cls)                 # regime/temperature (median ok for multi-member)
-    glassy_hint = (exp_tg is not None and exp_tg > 300)
-    # accuracy gate: resolves per-member via run_name (same resolver stage_params.py uses for
-    # the real runtime grading target). A run_name that matches no member falls to a
-    # group-contribution estimate from smiles itself (not another member's measured value --
-    # see _exp_tg_point); None now only means genuinely nothing could be resolved (no smiles,
-    # or the estimator itself failed), which is exactly the case worth flagging (see
-    # validate_run_plan's Check C).
+    # tg-stage accuracy bracket: central Tg estimate (see _exp_tg_point).
     exp_tg_bracket = _exp_tg_point(cls, run_name, smiles)
+    # murnaghan deform-fallback hint: regime call, not the bracket -- _regime_exp_tg pads an
+    # estimated Tg toward glassy (see its docstring), so this can disagree with the bracket.
+    glassy_hint = ((regime_tg := _regime_exp_tg(cls, run_name, smiles)) is not None
+                   and regime_tg > 300)
 
     def _s(stage, criteria, **extra):
         return {"stage": stage, "track": STAGE_TRACK[stage],
@@ -185,7 +205,9 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
     cls = get_class_entry(rules, polymer_class)
     _assert_tg_rates_feasible(cls, polymer_class.upper())
     decided_params = {k: cls[k] for k in SNAPSHOT_KEYS if k in cls}
-    exp_tg = _exp_tg_scalar(cls)
+    # Regime call (see _regime_exp_tg): a novel polymer's Tg estimate now drives this instead of
+    # defaulting glassy by omission, padded toward glassy for an uncertain estimate.
+    exp_tg = _regime_exp_tg(cls, run_name, smiles)
     T_equil = decided_params.get("T_equil_K", 600.0)
     decided_params["T_workflow_K"] = 300.0 if (exp_tg is not None and exp_tg < 300) else T_equil
     uncertainties = [{

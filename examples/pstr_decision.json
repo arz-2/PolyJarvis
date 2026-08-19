@@ -7,18 +7,41 @@
   ],
   "rationale": [
     "The repeat unit is a polystyrenic thermoplastic.",
-    "At 300 K, the configured workflow treats this system as glassy and uses Murnaghan with deformation fallback."
+    "At 300 K, the configured workflow treats this system as glassy and uses Murnaghan with deformation fallback.",
+    "Class defaults for D-01/D-02/D-04/D-08 are accepted as-is (default_choice unchanged); D-03's evidence was upgraded from the scaffold's bare policy-pointer placeholder to a genuine citation."
   ],
   "overrides": {},
   "decision_evaluations": {
+    "D-01_ff": {
+      "default_choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "PCFF Class II explicitly parameterizes aromatic C-H charges and cross-terms needed for the phenyl ring; TraPPE-UA has no PS Tg validation in the literature.",
+          "source_doi": "10.1021/ja00086a030"
+        }
+      ],
+      "alternatives": [
+        "trappe (UA, rejected: ignores phenyl pi-dihedral barriers governing PS Tg)"
+      ]
+    },
     "D-02_charges": {
+      "default_choice": "bond-increment",
       "criteria_evaluated": [
         "backbone_polarity",
         "charge_method_cost",
         "ff_embedded_vs_qm"
-      ]
+      ],
+      "evidence": [],
+      "alternatives": []
     },
     "D-03_electrostatics": {
+      "default_choice": "pppm",
       "criteria_evaluated": [
         "backbone_heteroatoms",
         "max_partial_charge",
@@ -26,13 +49,45 @@
       ],
       "evidence": [
         {
-          "claim": "Use the long-range electrostatics treatment paired with the configured PCFF protocol.",
-          "citation": "class-configured force-field evidence"
+          "claim": "Aromatic backbone carries non-negligible partial charges under PCFF bond-increment assignment; long-range electrostatics (pppm) required rather than lj_cut per electrostatics_decision_guide's |q|>0.1e rule.",
+          "citation": "polymer_rules.json:electrostatics_decision_guide"
         }
       ],
       "alternatives": [
-        "short-range Coulomb treatment"
+        "lj_cut (rejected: heteroatom-free backbone rule does not apply -- phenyl ring carries polarized C-H)"
       ]
+    },
+    "D-04_system_size": {
+      "default_choice": "DP=40, nchain=10",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [],
+      "alternatives": []
+    },
+    "D-08_hardware": {
+      "default_choice": {
+        "engine": "kokkos",
+        "gpu_per_run": 1,
+        "mpi_ranks": 1
+      },
+      "criteria_evaluated": [
+        "forcefield_cost_structure",
+        "atom_count",
+        "concurrent_load",
+        "benchmark_evidence",
+        "cell_size_vs_benchmark_cell",
+        "host_match"
+      ],
+      "evidence": [
+        {
+          "claim": "class2/kk FULL-OFFLOAD via the KOKKOS binary; mpi=1 is canonical here because kspace runs on the GPU, not CPU-serial.",
+          "source": "polymer_rules.json:hardware_policy.by_forcefield"
+        }
+      ],
+      "alternatives": []
     }
   },
   "assumptions": [

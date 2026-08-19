@@ -15,7 +15,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 
 import stage_params  # noqa: E402
-from make_deterministic_plan import build_planned_stages  # noqa: E402
+from make_deterministic_plan import build_planned_stages, make_plan  # noqa: E402
 from validate_run_plan import _exp_tg_companion_findings  # noqa: E402
 
 PHYC = {"experimental_tg_K": {"PE": 195, "PP": 258, "PIB": 205}}
@@ -113,3 +113,59 @@ def test_check_c_never_fired_under_the_old_is_true_test():
     """Regression guard: the old check compared against a sentinel this field never holds."""
     plan = {"planned_stages": [{"stage": "tg", "success_criteria": {"t_range_brackets_exp_tg": None}}]}
     assert any(f["check"] == "exp_tg_companion" for f in _exp_tg_companion_findings(plan))
+
+
+def test_make_plan_t_workflow_k_follows_group_contribution_estimate_when_confidently_rubbery(monkeypatch):
+    """150K stays rubbery even after the +/-80K margin (150+80=230 < 300)."""
+    monkeypatch.setattr(stage_params, "_estimate_tg_group_contribution",
+                         lambda smiles, timeout=30: {"tg_estimated_K": 150, "confidence": "low",
+                                                       "motifs_matched": ["backbone_CH2"]})
+    plan = make_plan("UNKNOWN99", "PHYC", "*CC*", {"density"})
+    assert plan["decided_params"]["T_workflow_K"] == 300.0
+
+
+def test_make_plan_t_workflow_k_defaults_glassy_when_estimate_is_uncertain(monkeypatch):
+    """250K < 300 on its own, but +80K uncertainty could put it at 330K -- defaults glassy."""
+    monkeypatch.setattr(stage_params, "_estimate_tg_group_contribution",
+                         lambda smiles, timeout=30: {"tg_estimated_K": 250, "confidence": "low",
+                                                       "motifs_matched": ["backbone_CH2"]})
+    plan = make_plan("UNKNOWN99", "PHYC", "*CC*", {"density"})
+    assert plan["decided_params"]["T_workflow_K"] == plan["decided_params"]["T_equil_K"]
+
+
+def test_make_plan_t_workflow_k_stays_glassy_default_when_estimate_above_300(monkeypatch):
+    monkeypatch.setattr(stage_params, "_estimate_tg_group_contribution",
+                         lambda smiles, timeout=30: {"tg_estimated_K": 350, "confidence": "low",
+                                                       "motifs_matched": ["phenylene"]})
+    plan = make_plan("UNKNOWN99", "PHYC", "*CC*", {"density"})
+    assert plan["decided_params"]["T_workflow_K"] == plan["decided_params"]["T_equil_K"]
+
+
+def test_make_plan_t_workflow_k_matched_member_unaffected():
+    """Curated member data is exact and unpadded, unlike an estimate."""
+    plan = make_plan("PE1", "PHYC", "*CC*", {"density"})
+    assert plan["decided_params"]["T_workflow_K"] == 300.0  # PE's exp Tg 195K < 300 -> rubbery
+
+
+def test_glassy_hint_agrees_with_t_workflow_k_regime_for_curated_data():
+    """Bracket (_exp_tg_point) and regime hint (_regime_exp_tg) differ only for an estimate;
+    for curated data both must still agree."""
+    stages = build_planned_stages({"experimental_tg_K": {"PE": 195}}, {"bulk_modulus"},
+                                   run_name="PE1")
+    murnaghan = next(s for s in stages if s["stage"] == "murnaghan")
+    assert "fallback" not in murnaghan  # rubbery: no deform fallback annotation
+
+    stages = build_planned_stages({"experimental_tg_K": {"PS": 373}}, {"bulk_modulus"},
+                                   run_name="PS1")
+    murnaghan = next(s for s in stages if s["stage"] == "murnaghan")
+    assert murnaghan.get("fallback") == "deform"  # glassy: deform fallback present
+
+
+def test_glassy_hint_defaults_glassy_when_estimate_is_uncertain(monkeypatch):
+    """Same borderline estimate as the T_workflow_K test, applied to the murnaghan hint."""
+    monkeypatch.setattr(stage_params, "_estimate_tg_group_contribution",
+                         lambda smiles, timeout=30: {"tg_estimated_K": 250, "confidence": "low",
+                                                       "motifs_matched": ["backbone_CH2"]})
+    stages = build_planned_stages({}, {"bulk_modulus"}, run_name="X1", smiles="*CC*")
+    murnaghan = next(s for s in stages if s["stage"] == "murnaghan")
+    assert murnaghan.get("fallback") == "deform"  # glassy: uncertain estimate defaults glassy

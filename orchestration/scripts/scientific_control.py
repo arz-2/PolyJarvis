@@ -39,9 +39,9 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "annealing_T_high_K": (100, 2000),
     "T_workflow_K": (100, 1500),
     # A scalar replaces the class's (possibly multi-member-dict, possibly absent)
-    # experimental_tg_K wholesale via apply_plan's {**cls, **decided_params} overlay -- both
-    # _exp_tg_point and _exp_tg_scalar already have an isinstance(tg, (int, float)) passthrough
-    # for exactly this shape. Lets the planning agent pin the correct experimental target when
+    # experimental_tg_K wholesale via apply_plan's {**cls, **decided_params} overlay --
+    # _exp_tg_point already has an isinstance(tg, (int, float)) passthrough for exactly this
+    # shape. Lets the planning agent pin the correct experimental target when
     # it has reasoned one out (multi-member disambiguation by substituent, a literature value,
     # or an accepted group-contribution estimate for a genuinely novel SMILES) instead of
     # relying on run_name-prefix matching against the class dict.

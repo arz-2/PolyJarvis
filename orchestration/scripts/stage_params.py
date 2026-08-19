@@ -162,6 +162,26 @@ def _exp_tg_point(cls: dict, run_name: str | None=None, smiles: str | None=None)
             return est_tg
     return None
 
+TG_ESTIMATE_UNCERTAINTY_K = 80.0  # estimate_tg_group_contribution.py's own stated accuracy
+
+def _regime_exp_tg(cls: dict, run_name: str | None=None, smiles: str | None=None):
+    """Tg for the glassy-vs-rubbery regime call, not _exp_tg_point's bracket estimate. Curated
+    values (scalar/matched member) are exact and returned as-is; an estimated value is padded
+    by its own +/-80K uncertainty toward glassy, so a borderline estimate defaults safe."""
+    tg = cls.get('experimental_tg_K')
+    if isinstance(tg, (int, float)):
+        return tg
+    if isinstance(tg, dict) and run_name:
+        for (key, val) in tg.items():
+            if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
+                return val
+    if smiles:
+        est = _estimate_tg_group_contribution(smiles) or {}
+        est_tg = est.get('tg_estimated_K')
+        if isinstance(est_tg, (int, float)):
+            return est_tg + TG_ESTIMATE_UNCERTAINTY_K
+    return None
+
 def _exp_density_point(cls: dict, run_name: str | None=None):
     """Point exp_density_gcm3 value (not a ±5% band) for assess_cooling_contraction. A scalar
     (single-member class, or a planning agent's overrides.experimental_density_gcm3 pin -- see
