@@ -80,8 +80,8 @@ def test_routing_fields_are_known(cid):
 # than an obvious data error. This is a *structural* invariant only: it pins each
 # class to one of the two routes and rejects a QM charge job on EMC. The exact
 # per-class force field and embedded-charge token (pcff→bond-increment,
-# opls→opls-library, trappe→none) are the authority of test_ff_routing.py, which is
-# sourced from the same JSON; duplicating those exact values here only invites the
+# opls→opls-library, trappe→embedded) are the authority of test_ff_routing.py, which
+# is sourced from the same JSON; duplicating those exact values here only invites the
 # two tests to contradict each other.
 EMC_FF_FAMILIES = ("pcff", "opls", "trappe")   # substring families (both opls spellings)
 QM_CHARGE_JOBS = {"resp", "am1-bcc", "am1bcc", "gasteiger"}
@@ -110,6 +110,25 @@ def test_build_route_consistency(cid):
         assert e["charge_method"] in {"RESP", "AM1-BCC"}, (
             f"{cid}: RadonPy runs a charge job → charge_method must be RESP/AM1-BCC, "
             f"got {e['charge_method']!r}"
+        )
+
+
+# D-03_electrostatics is mechanized by electrostatics_decision_guide's own class
+# lists, not a separate script (unlike D-01/D-08) -- nothing previously checked that
+# each class's electrostatics field actually agrees with the guide it is supposed to
+# be implementing.
+def test_electrostatics_matches_its_own_decision_guide():
+    guide = RULES["electrostatics_decision_guide"]
+    lj_classes = set(guide["use_lj_cut"]["classes"])
+    pppm_classes = set(guide["use_pppm"]["classes"])
+    assert lj_classes | pppm_classes == set(CLASSES), (
+        "electrostatics_decision_guide's class lists have drifted from classes{}"
+    )
+    for cid, e in CLASSES.items():
+        expected = "lj_cut" if cid in lj_classes else "pppm"
+        assert e["electrostatics"] == expected, (
+            f"{cid}: electrostatics_decision_guide says {expected!r}, "
+            f"classes.{cid}.electrostatics is {e['electrostatics']!r}"
         )
 
 

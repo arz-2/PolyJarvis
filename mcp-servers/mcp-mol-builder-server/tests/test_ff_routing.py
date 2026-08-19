@@ -65,6 +65,26 @@ def test_pstr_routes_pcff():
     assert CLASSES["PSTR"]["electrostatics"] == "pppm"
 
 
+# D-02_charges' own require clause names these tokens by FF family (PCFF uses
+# bond-increment/Gasteiger, TraPPE-UA embeds charges); test_pstr_routes_pcff above
+# only pinned the single class that already had it right (18 of 21 classes carried
+# the generic "none" placeholder until this was corrected).
+_CHARGE_METHOD_BY_FF_FAMILY = {"pcff": "bond-increment", "trappe-ua": "embedded",
+                              "opls/2024/opls-aa": "opls-library"}
+
+
+@pytest.mark.parametrize("cid", sorted(cid for cid in CLASSES
+                                       if CLASSES[cid]["preferred_ff"]
+                                       in _CHARGE_METHOD_BY_FF_FAMILY))
+def test_charge_method_matches_ff_family_convention(cid):
+    e = CLASSES[cid]
+    expected = _CHARGE_METHOD_BY_FF_FAMILY[e["preferred_ff"]]
+    assert e["charge_method"] == expected, (
+        f"{cid}: preferred_ff={e['preferred_ff']!r} implies charge_method={expected!r}, "
+        f"got {e['charge_method']!r}"
+    )
+
+
 def test_unknown_class_falls_back_without_raising():
     got = ff_routing.get_preferred_ff("UNKNOWN")
     assert got["preferred_builder"] is None
