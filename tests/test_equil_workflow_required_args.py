@@ -135,15 +135,16 @@ def test_no_seed_is_drawn_at_random_once_one_is_given():
 
 
 def test_deterministic_executor_passes_every_required_arg():
-    """run_campaign has two call sites -- the full chain and the EXTEND
-    continuation -- and each must name all six, including the ones it passes as None."""
+    """run_campaign has three call sites -- the full chain, the EXTEND continuation, and the
+    resume_from continuation (melt_hold/slower_cooling's checkpoint-based resubmission) -- and
+    each must name all six, including the ones it passes as None."""
     src = (REPO_ROOT / "orchestration" / "scripts" / "run_campaign.py").read_text()
     tree = ast.parse(src)
     calls = [n for n in ast.walk(tree)
              if isinstance(n, ast.Call)
              and isinstance(n.func, ast.Attribute)
              and n.func.attr == "generate_equilibration_workflow"]
-    assert len(calls) == 2
+    assert len(calls) == 3
     for call in calls:
         passed = {kw.arg for kw in call.keywords}
         assert set(REQUIRED) <= passed, f"missing {set(REQUIRED) - passed}"

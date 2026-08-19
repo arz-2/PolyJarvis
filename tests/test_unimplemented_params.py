@@ -30,7 +30,7 @@ def test_executor_forwards_resolved_annealing_controls():
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
              and isinstance(node.func, ast.Attribute)
              and node.func.attr == "generate_equilibration_workflow"]
-    assert len(calls) == 2
+    assert len(calls) == 3
     full = next(call for call in calls
                 if any(kw.arg == "anneal_cycles" and isinstance(kw.value, ast.Subscript)
                        for kw in call.keywords))

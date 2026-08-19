@@ -9,6 +9,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -430,3 +431,182 @@ def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_ch
     assert comp_call["dump_file"] == str(nvt_dir / "nvt_production.dump")
     gate_call = fake.enforce_equilibration_gate_calls[0]
     assert gate_call["melt_data"] == str(npt_dir / "npt_production_out.data")
+
+
+# ─── CampaignStageExecutor.execute(): STRUCTURAL_FAIL finding-code routing ─────────
+
+def test_structural_fail_routes_to_cooling_verdict_not_a_passing_finite_size_string(
+        tmp_path, monkeypatch):
+    """detail["finite_size_verdict"] is "SIZE_PASS" -- a truthy string -- whenever finite size
+    was merely *evaluated*, independent of whether it passed. A real MELT_STAGE_DEFICIT halt
+    with finite_size passing must still route to the cooling_verdict code, not fall into an
+    `or`-chain trap that picks "SIZE_PASS" just because it's non-empty and comes first -- that
+    would hand RemedyRegistry a code with no registered remedy for a real, remediable finding."""
+    from run_campaign import CampaignStageExecutor
+    import run_campaign as rc
+
+    halted_detail = {
+        "verdict": "STRUCTURAL_FAIL", "finite_size_verdict": "SIZE_PASS",
+        "cooling_verdict": "MELT_STAGE_DEFICIT", "homogeneity_verdict": "HOMOG_PASS",
+        "remedy_confidence": "high",
+    }
+    monkeypatch.setattr(rc, "do_equil_and_check", lambda args, cls, lammps: {
+        "halted": True, "reason": "STRUCTURAL_FAIL", "detail": halted_detail,
+    })
+
+    attempt_dir = tmp_path / "attempt-0001"
+    attempt_dir.mkdir()
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    context = {"attempt_dir": str(attempt_dir), "parameters": {}, "dependencies": {},
+              "prior_attempts": []}
+
+    result = executor.execute("equilibration", context)
+
+    assert result.status == "remedy_required"
+    assert result.findings[0].code == "MELT_STAGE_DEFICIT"
+
+
+def _write_prior_manifest(tmp_path, name, parameters, stage_checkpoints):
+    manifest_path = tmp_path / f"{name}.json"
+    manifest_path.write_text(json.dumps({
+        "parameters": parameters,
+        "outputs": {"stage_checkpoints": stage_checkpoints},
+    }))
+    return {"manifest": str(manifest_path)}
+
+
+def test_equilibration_resume_from_anneal_computes_delta_not_absolute_target(tmp_path, monkeypatch):
+    """The real bug trap: eq_annealing_cycles in effective_parameters is melt_hold's new
+    ABSOLUTE target (5->10), but a resume from anneal_05_cool with anneal_cycles=10 would run 15
+    total, not 10. The executor must compute the delta (10 - 5 = 5) from what the prior attempt
+    actually ran, found in ITS OWN stored parameters -- not from baseline_eq_annealing_cycles,
+    which _melt_hold freezes at the pre-rung-1 value across both rungs."""
+    import run_campaign as rc
+    from run_campaign import CampaignStageExecutor
+
+    captured = {}
+    monkeypatch.setattr(rc, "do_equil_and_check", lambda args, cls, lammps: (
+        captured.update(resume_from=getattr(args, "equil_resume_from", None),
+                        data_path=getattr(args, "equil_resume_data_path", None),
+                        cycles=getattr(args, "equil_resume_anneal_cycles", None))
+        or {"halted": True, "reason": "MELT_STAGE_DEFICIT", "detail": {}}
+    ))
+
+    prior = _write_prior_manifest(
+        tmp_path, "prior",
+        parameters={"eq_annealing_cycles": 5, "baseline_eq_annealing_cycles": 0},
+        stage_checkpoints={"anneal_05_cool": "/data/anneal_05_cool_out.data"},
+    )
+
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    attempt_dir = tmp_path / "attempt-0002"
+    attempt_dir.mkdir()
+    context = {"attempt_dir": str(attempt_dir),
+              "parameters": {"eq_annealing_cycles": 10, "baseline_eq_annealing_cycles": 5,
+                             "equilibration_resume_from": "anneal"},
+              "dependencies": {}, "prior_attempts": [prior]}
+
+    executor.execute("equilibration", context)
+
+    assert captured["resume_from"] == "anneal"
+    assert captured["data_path"] == "/data/anneal_05_cool_out.data"
+    assert captured["cycles"] == 5
+
+
+def test_equilibration_resume_from_anneal_rung_two_finds_zero_delta(tmp_path, monkeypatch):
+    """Rung 2 doesn't raise eq_annealing_cycles further (stays at rung 1's target) -- if the most
+    recent prior attempt already ran that many cycles, the delta must be 0, not re-derived
+    against the frozen pre-rung-1 baseline (which would wrongly reattempt cycles 6-10 again)."""
+    import run_campaign as rc
+    from run_campaign import CampaignStageExecutor
+
+    captured = {}
+    monkeypatch.setattr(rc, "do_equil_and_check", lambda args, cls, lammps: (
+        captured.update(resume_from=getattr(args, "equil_resume_from", None),
+                        data_path=getattr(args, "equil_resume_data_path", None),
+                        cycles=getattr(args, "equil_resume_anneal_cycles", None))
+        or {"halted": True, "reason": "MELT_STAGE_DEFICIT", "detail": {}}
+    ))
+
+    rung1 = _write_prior_manifest(
+        tmp_path, "rung1",
+        parameters={"eq_annealing_cycles": 10, "baseline_eq_annealing_cycles": 5},
+        stage_checkpoints={"anneal_10_cool": "/data/anneal_10_cool_out.data"},
+    )
+
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    attempt_dir = tmp_path / "attempt-0003"
+    attempt_dir.mkdir()
+    context = {"attempt_dir": str(attempt_dir),
+              "parameters": {"eq_annealing_cycles": 10, "baseline_eq_annealing_cycles": 5,
+                             "equilibration_resume_from": "anneal",
+                             "melt_hold_ns": 5.0, "add_melt_npt": True},
+              "dependencies": {}, "prior_attempts": [rung1]}
+
+    executor.execute("equilibration", context)
+
+    assert captured["resume_from"] == "anneal"
+    assert captured["data_path"] == "/data/anneal_10_cool_out.data"
+    assert captured["cycles"] == 0
+
+
+def test_equilibration_resume_from_npt_production_finds_its_checkpoint(tmp_path, monkeypatch):
+    import run_campaign as rc
+    from run_campaign import CampaignStageExecutor
+
+    captured = {}
+    monkeypatch.setattr(rc, "do_equil_and_check", lambda args, cls, lammps: (
+        captured.update(resume_from=getattr(args, "equil_resume_from", None),
+                        data_path=getattr(args, "equil_resume_data_path", None))
+        or {"halted": True, "reason": "UNDER_ANNEALED_COOLING", "detail": {}}
+    ))
+
+    prior = _write_prior_manifest(
+        tmp_path, "prior", parameters={"npt_cool300_steps": 1000000},
+        stage_checkpoints={"npt_production": "/data/npt_production_out.data"},
+    )
+
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    attempt_dir = tmp_path / "attempt-0002"
+    attempt_dir.mkdir()
+    context = {"attempt_dir": str(attempt_dir),
+              "parameters": {"npt_cool300_steps": 2000000,
+                             "equilibration_resume_from": "npt_production"},
+              "dependencies": {}, "prior_attempts": [prior]}
+
+    executor.execute("equilibration", context)
+
+    assert captured["resume_from"] == "npt_production"
+    assert captured["data_path"] == "/data/npt_production_out.data"
+
+
+def test_structural_fail_routes_to_real_finite_size_failure_code(tmp_path, monkeypatch):
+    """A genuine finite-size failure must still win -- the fix must not overcorrect into
+    ignoring finite_size_verdict altogether."""
+    from run_campaign import CampaignStageExecutor
+    import run_campaign as rc
+
+    halted_detail = {
+        "verdict": "STRUCTURAL_FAIL", "finite_size_verdict": "SIZE_MIN_IMAGE_VIOLATION",
+        "cooling_verdict": None, "homogeneity_verdict": "HOMOG_PASS",
+        "remedy_confidence": "high",
+    }
+    monkeypatch.setattr(rc, "do_equil_and_check", lambda args, cls, lammps: {
+        "halted": True, "reason": "STRUCTURAL_FAIL", "detail": halted_detail,
+    })
+
+    attempt_dir = tmp_path / "attempt-0001"
+    attempt_dir.mkdir()
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    context = {"attempt_dir": str(attempt_dir), "parameters": {}, "dependencies": {},
+              "prior_attempts": []}
+
+    result = executor.execute("equilibration", context)
+
+    assert result.status == "remedy_required"
+    assert result.findings[0].code == "SIZE_MIN_IMAGE_VIOLATION"

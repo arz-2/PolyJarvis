@@ -300,11 +300,40 @@ def do_build(args, cls: dict, emc, lammps) -> dict:
 # ─── Stage: equilibration + gate (EXTEND loop, STRUCTURAL_FAIL halt) ──────────
 
 def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
-                         extend_temp: float = None, extend_ns: float = 1.5) -> dict:
+                         extend_temp: float = None, extend_ns: float = 1.5,
+                         resume_from: str = None, resume_data_path: str = None,
+                         resume_anneal_cycles: int = None) -> dict:
     p = resolve_stage_params("equil", args, cls)
     flags = p["lammps_flags"]
     velocity_seed = p["velocity_seed"]
-    if extend_from_data is None:
+    if resume_from is not None:
+        # "anneal": run only the DELTA cycles the remedy computed (resume_anneal_cycles), not
+        # the new absolute eq_annealing_cycles target -- that target already counts cycles the
+        # prior attempt ran, which resume_data_path's checkpoint already reflects.
+        # "npt_production": anneal_cycles is unused (nvt_production/npt_production are both
+        # skipped) but generate_equilibration_workflow still validates it as a non-negative int.
+        workflow = lammps.generate_equilibration_workflow(
+            data_file=resume_data_path, work_dir_base=p["work_dir"],
+            polymer_name=args.run_name, temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
+            press=p["P_equil_atm"], use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"],
+            use_opls=flags["use_opls"], npt_prod_steps=p["npt_prod_steps"],
+            nvt_prod_steps=p["nvt_prod_steps"], npt_prod300_steps=p["npt_prod300_steps"],
+            add_melt_npt=p["add_melt_npt"] if resume_from == "anneal" else False,
+            t_equil_K=(p["T_equil_K"] if resume_from == "anneal" and p["add_melt_npt"] else None),
+            add_300k_production=p["add_300k_production"],
+            melt_npt_steps=p["melt_npt_steps"], engine=p["engine"], velocity_seed=velocity_seed,
+            npt_cool_steps=p["npt_cool_steps"], npt_cool300_steps=p["npt_cool300_steps"],
+            anneal_cycles=(resume_anneal_cycles or 0) if resume_from == "anneal" else 0,
+            anneal_cycle_steps=p["anneal_cycle_steps"],
+            thermostat_damp_fs=p["thermostat_damp_fs"],
+            barostat_damp_fs=p["barostat_damp_fs"],
+            max_press=p["compression_max_pressure_atm"],
+            use_long_range=p["use_long_range_electrostatics"],
+            extend_steps=None,
+            params_file="",
+            resume_from=resume_from,
+        )
+    elif extend_from_data is None:
         workflow = lammps.generate_equilibration_workflow(
             data_file=p["data_path"], work_dir_base=p["work_dir"],
             polymer_name=args.run_name, temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
@@ -345,8 +374,9 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
 
     chain = lammps.run_lammps_chain(
         stages=workflow["stages"], gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"],
-        data_file=extend_from_data or p["data_path"], engine=p["engine"],
-        params_file=(p.get("emc_params_path") or "") if extend_from_data is None else "",
+        data_file=resume_data_path or extend_from_data or p["data_path"], engine=p["engine"],
+        params_file=(p.get("emc_params_path") or "")
+                    if (extend_from_data is None and resume_from is None) else "",
     )
     if chain.get("status") == "error":
         raise SystemExit(f"run_lammps_chain failed: {chain}")
@@ -370,23 +400,59 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
     extend_history = []
     backbone_derivation = None
 
+    # Reattach guard: run_lammps_chain launches a detached (setsid nohup) shell that keeps
+    # running and finishes independently of this process. If the orchestrator dies while
+    # wait_for_run is blocked below, the chain itself is often still fine -- but nothing
+    # previously recorded its chain_id anywhere, so a resumed run had no way to find it and
+    # would call _submit_equil_chain again, silently discarding a possibly-completed chain and
+    # burning the GPU time twice. Persist the submission the moment it's made (before waiting on
+    # it), and reuse it on reattachment instead of resubmitting. WorkflowEngine._new_attempt only
+    # reaches this function without minting a fresh attempt_dir when the prior attempt's own
+    # status is "incomplete" (process death, not a real terminal verdict) -- see its reattach
+    # branch -- so an existing file here always means "the same attempt tried this before".
+    pending_path = (Path(args.work_dir).parent / "pending_equil_submission.json"
+                    if args.work_dir else None)
+
     gpu_per_run = cls.get("gpu_per_run") or 1
     with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
         args.gpu_ids = gpu_ids
-        continuation_path = getattr(args, "pending_continuation_path", None)
-        if continuation_path:
-            submission = _submit_equil_chain(
-                args, cls, lammps, extend_from_data=continuation_path,
-                extend_temp=getattr(args, "continuation_temp_K", 300.0),
-                extend_ns=float(getattr(args, "npt_continuation_ns", 1.5)),
-            )
+        if pending_path is not None and pending_path.is_file():
+            submission = json.loads(pending_path.read_text())
         else:
-            submission = _submit_equil_chain(args, cls, lammps)
+            continuation_path = getattr(args, "pending_continuation_path", None)
+            resume_from = getattr(args, "equil_resume_from", None)
+            if resume_from is not None:
+                submission = _submit_equil_chain(
+                    args, cls, lammps, resume_from=resume_from,
+                    resume_data_path=getattr(args, "equil_resume_data_path", None),
+                    resume_anneal_cycles=getattr(args, "equil_resume_anneal_cycles", None),
+                )
+            elif continuation_path:
+                submission = _submit_equil_chain(
+                    args, cls, lammps, extend_from_data=continuation_path,
+                    extend_temp=getattr(args, "continuation_temp_K", 300.0),
+                    extend_ns=float(getattr(args, "npt_continuation_ns", 1.5)),
+                )
+            else:
+                submission = _submit_equil_chain(args, cls, lammps)
+            if pending_path is not None:
+                atomic_write_json(pending_path, submission)
         result = wait_for_run(lammps, submission["chain_id"], "equilibration chain")
     if result.get("status") != "completed":
         raise SystemExit(f"Equilibration chain did not complete: {result}")
+    if pending_path is not None:
+        pending_path.unlink(missing_ok=True)
 
     workflow = submission["workflow"]
+    # Every stage THIS call actually built, by name -> its own write_data output. A later
+    # attempt's remedy (melt_hold's anneal-cycle extension, a future npt_cool300 remedy) needs a
+    # real checkpoint path to resume from — CampaignStageExecutor.execute locates it by walking
+    # this attempt's outputs (via prior_attempts), the same pattern npt_continuation_ns already
+    # uses for npt_prod_data_path. Surfaced on every return below, halted or not: a resumed chain
+    # (resume_from set) only contains ITS OWN tail stages here, not the ones it skipped -- a
+    # remedy resuming from one of those earlier stages must walk further back through
+    # prior_attempts to find them, same as any other stage_checkpoints lookup.
+    stage_checkpoints = {s["name"]: s["output_data"] for s in workflow["stages"] if s.get("name")}
     # Glassy (9-run chain, add_300k_production default True): the server exposes the terminal
     # npt_prod300 stage's output directly as npt_prod300_data/_dump. Rubbery (7-run chain, no
     # npt_prod300 stage): the terminal stage is npt_production itself — stages[-1] (no generic
@@ -452,7 +518,8 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                     "atom_type_names": diag.get("info", {}).get("atom_type_names"),
                     "build_data_path": build_data_path,
                 }
-                return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED", "detail": detail}
+                return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED", "detail": detail,
+                        "stage_checkpoints": stage_checkpoints}
 
         comp = wait_for_analysis(lammps, lammps.check_equilibration_comprehensive(
             log_file=p["npt_prod_log_path"], dump_file=p["melt_dump_path"],
@@ -479,7 +546,8 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                       "npt_prod_log_path": p["npt_prod_log_path"], "npt_prod_dump_path": npt_prod_dump_path,
                       "density_gcm3": density.get("plateau_density_mean"),
                       "velocity_seed": velocity_seed, "extend_history": extend_history,
-                      "backbone_derivation": backbone_derivation}
+                      "backbone_derivation": backbone_derivation,
+                      "stage_checkpoints": stage_checkpoints}
             return result
 
         if equil_verdict == "EXTEND":
@@ -490,11 +558,12 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                     detail["relaxation_time_ns"] = tau_relax_ps / 1000.0
                 return {"halted": True, "reason": "EXTEND", "detail": detail,
                         "npt_prod_data_path": p["npt_prod_data_path"],
-                        "npt_prod_dump_path": npt_prod_dump_path}
+                        "npt_prod_dump_path": npt_prod_dump_path,
+                        "stage_checkpoints": stage_checkpoints}
             attempts += 1
             if attempts > EXTEND_MAX_ATTEMPTS:
                 return {"halted": True, "reason": "EXTEND_EXHAUSTED",
-                        "detail": {"attempts": attempts}}
+                        "detail": {"attempts": attempts}, "stage_checkpoints": stage_checkpoints}
             # A measured relaxation signal from this run's own data beats a blind flat guess —
             # tau_relax_ps comes from the comprehensive check's KWW fit.
             extend_ns = 1.5
@@ -516,7 +585,8 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
 
         # Structural or protocol failures never trigger an implicit protocol change. Halt with
         # structured evidence for the recovery-agent boundary.
-        return {"halted": True, "reason": equil_verdict, "detail": verdict}
+        return {"halted": True, "reason": equil_verdict, "detail": verdict,
+                "stage_checkpoints": stage_checkpoints}
 
 
 # ─── Stage: thermal track ──────────────────────────────────────────────────
@@ -889,6 +959,38 @@ class CampaignStageExecutor:
                     args.pending_continuation_path = prior_outputs["npt_prod_data_path"]
                     args.npt_continuation_ns = context["parameters"]["npt_continuation_ns"]
                     break
+        # equilibration_resume_from: set by a remedy (melt_hold -> "anneal", a future
+        # npt_cool300 remedy -> "npt_production") to signal do_equil_and_check should resume a
+        # generate_equilibration_workflow(resume_from=...) chain instead of a fresh from-scratch
+        # submission. Locate the real checkpoint from the most recent prior attempt's own
+        # stage_checkpoints (do_equil_and_check surfaces it on every return, halted or not) --
+        # same reversed(prior_attempts) walk as npt_continuation_ns above.
+        if stage == "equilibration" and cls.get("equilibration_resume_from") in ("anneal", "npt_production"):
+            resume_kind = cls["equilibration_resume_from"]
+            for prior in reversed(context.get("prior_attempts") or ()):
+                manifest_path = prior.get("manifest")
+                if not manifest_path or not Path(manifest_path).is_file():
+                    continue
+                prior_manifest = json.loads(Path(manifest_path).read_text())
+                checkpoints = (prior_manifest.get("outputs") or {}).get("stage_checkpoints") or {}
+                if resume_kind == "npt_production":
+                    if checkpoints.get("npt_production"):
+                        args.equil_resume_from = "npt_production"
+                        args.equil_resume_data_path = checkpoints["npt_production"]
+                        break
+                else:  # "anneal"
+                    # How many cycles the MOST RECENT attempt actually ran -- not
+                    # baseline_eq_annealing_cycles, which _melt_hold freezes at the value from
+                    # BEFORE the first rung ever fired and reuses unchanged across both rungs.
+                    prior_cycles = int((prior_manifest.get("parameters") or {})
+                                      .get("eq_annealing_cycles") or 0)
+                    checkpoint_name = f"anneal_{prior_cycles:02d}_cool" if prior_cycles > 0 else "minimize"
+                    if checkpoints.get(checkpoint_name):
+                        args.equil_resume_from = "anneal"
+                        args.equil_resume_data_path = checkpoints[checkpoint_name]
+                        new_cycles = int(cls.get("eq_annealing_cycles") or 0)
+                        args.equil_resume_anneal_cycles = max(0, new_cycles - prior_cycles)
+                        break
         try:
             if stage == "build":
                 outputs = do_build(args, cls, self.emc, self.lammps)
@@ -898,7 +1000,17 @@ class CampaignStageExecutor:
                     code = outputs.get("reason") or "STRUCTURAL_FAIL"
                     detail = outputs.get("detail") or {}
                     if code == "STRUCTURAL_FAIL":
-                        code = (detail.get("finite_size_verdict") or
+                        # finite_size_verdict is "SIZE_PASS" (a truthy string) whenever finite
+                        # size was merely evaluated, pass or fail -- the common case is it
+                        # passed while a *different* gate (cooling_verdict, homogeneity) is the
+                        # real failure. An `or` chain on truthiness alone picked "SIZE_PASS" over
+                        # the actual cause every time finite_size happened to pass, misrouting
+                        # the finding to a code with no registered remedy. Only prefer it when it
+                        # names a real failure (enforce_gate.py's own vocabulary: SIZE_MIN_IMAGE_
+                        # VIOLATION | SIZE_CHAIN_SELF_IMAGE | SIZE_PASS | None).
+                        finite_size_code = detail.get("finite_size_verdict")
+                        code = (finite_size_code
+                                if finite_size_code not in (None, "SIZE_PASS") else
                                 detail.get("cooling_verdict") or
                                 ("DENSITY_HETEROGENEITY"
                                  if detail.get("homogeneity_verdict") == "HOMOG_HETEROGENEOUS"

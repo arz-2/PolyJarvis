@@ -69,6 +69,7 @@ PARAMETER_STAGE: dict[str, str] = {
     # already-verified PASS back to "stale" on repair-script reconstruction.
     "npt_continuation_attempt": "equilibration", "baseline_npt_cool_steps": "equilibration",
     "baseline_eq_annealing_cycles": "equilibration", "rerun_homogeneity_gate": "equilibration",
+    "baseline_npt_cool300_steps": "equilibration", "equilibration_resume_from": "equilibration",
     "tg_t_high_K": "thermal", "tg_t_low_K": "thermal", "tg_t_step_K": "thermal",
     "tg_primary_rate_index": "thermal", "tg_rates_K_per_ns": "thermal",
     "tg_slope_gate_fallback": "thermal",
@@ -253,10 +254,20 @@ def _continue_npt(params: dict[str, Any], finding: Finding, attempt: int) -> dic
 
 
 def _cooling(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[str, Any]:
-    baseline = int(params.get("baseline_npt_cool_steps") or params.get("npt_cool_steps") or 1)
-    return _merge(params, npt_cool_steps=baseline * (2 ** attempt),
-                  baseline_npt_cool_steps=baseline,
-                  cooling_resume_source="accepted_melt")
+    """UNDER_ANNEALED_COOLING: melt density is fine, but the glass under-contracted relative to
+    the system's own thermal-expansion prediction -- free volume frozen in during cooling
+    (assess_cooling_contraction.py's definition). The only stage that can physically produce this
+    is npt_cool300 (T_workflow -> 300 K): it is the sole stage that crosses Tg, and at its ~1 ns
+    default that is typically a much faster quench than this codebase's own Tg-sweep rates
+    (tg_rates_K_per_ns) run at. npt_cool (max_temp -> T_workflow) stays entirely above Tg for a
+    normal glassy run -- no glass transition happens there regardless of ramp rate, so it is not
+    a physically meaningful lever for this specific finding. equilibration_resume_from="npt_production"
+    lets do_equil_and_check regenerate only npt_cool300 + npt_prod300 from the prior attempt's
+    own real npt_production_out.data, instead of re-running the whole melt-phase protocol."""
+    baseline = int(params.get("baseline_npt_cool300_steps") or params.get("npt_cool300_steps") or 1)
+    return _merge(params, npt_cool300_steps=baseline * (2 ** attempt),
+                  baseline_npt_cool300_steps=baseline,
+                  equilibration_resume_from="npt_production")
 
 
 def _melt_hold(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[str, Any]:
@@ -267,13 +278,18 @@ def _melt_hold(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[
     5 ns, not the ~100 ns NkepsuMbitou2025 cites for full convergence: PolyJarvis is a quick
     survey tool, not a per-polymer optimizer -- this rung is a bounded diagnostic probe, not
     meant to brute-force convergence. A deficit that doesn't resolve within it should escalate to
-    agent_only for human review rather than keep spending wall-clock chasing the literature value."""
+    agent_only for human review rather than keep spending wall-clock chasing the literature value.
+    equilibration_resume_from="anneal" lets do_equil_and_check run only the ADDITIONAL cycles
+    from the prior attempt's own last anneal_NN_cool checkpoint (the executor computes the delta
+    from eq_annealing_cycles here vs what the prior attempt actually ran -- baseline_eq_annealing_
+    cycles below is frozen at the value from BEFORE rung 1 ever fired and is not that number)."""
     baseline = int(params.get("baseline_eq_annealing_cycles") or params.get("eq_annealing_cycles") or 0)
     revised = _merge(params, eq_annealing_cycles=max(baseline * 2, baseline + 2, 2),
-                      baseline_eq_annealing_cycles=baseline)
+                      baseline_eq_annealing_cycles=baseline,
+                      equilibration_resume_from="anneal")
     if attempt > 1:
         revised = _merge(revised, melt_hold_ns=5.0, add_melt_npt=True,
-                          equilibration_phase="melt_then_cool", cooling_resume_source="remedied_melt")
+                          equilibration_phase="melt_then_cool")
     return revised
 
 
@@ -642,6 +658,26 @@ class WorkflowEngine:
 
     def _new_attempt(self, stage: str, input_hash: str) -> tuple[str, Path]:
         record = self.state["stages"][stage]
+        # Reattach instead of minting a fresh attempt when the *previous* invocation of this
+        # exact stage+input never reached a terminal executor verdict -- its own process died
+        # (killed session, host reboot, OOM) while still inside self.executor.execute(), not
+        # because the executor itself returned failed/remedy_required/escalation_required.
+        # _load_or_create_state() is the only place that produces this "incomplete" status, and
+        # it deliberately leaves the last attempt entry's own status at "running" (see there) so
+        # it's distinguishable here from a real terminal state. Executors that submit a
+        # long-running detached background job (equilibration/thermal/mechanical chains) may have
+        # left that job running or even finished — reusing the same attempt_dir lets them find
+        # and reattach to it (see do_equil_and_check's pending_equil_submission.json) instead of
+        # blindly resubmitting and discarding real, possibly expensive completed work.
+        last = (record.get("attempts") or [None])[-1]
+        if (record.get("status") == "incomplete" and last is not None
+                and last.get("status") == "running" and last.get("input_hash") == input_hash):
+            attempt_id = last["attempt_id"]
+            attempt_dir = self.attempts_dir / stage / attempt_id
+            if attempt_dir.is_dir():
+                record["status"] = "running"
+                self._save()
+                return attempt_id, attempt_dir
         attempt_id = f"attempt-{len(record.get('attempts', [])) + 1:04d}"
         attempt_dir = self.attempts_dir / stage / attempt_id
         attempt_dir.mkdir(parents=True, exist_ok=False)

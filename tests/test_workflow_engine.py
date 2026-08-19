@@ -224,6 +224,44 @@ def test_interrupted_running_attempt_is_recovered_as_incomplete(tmp_path):
     assert "accepted_attempt" not in resumed.state["stages"]["build"]
 
 
+def test_incomplete_attempt_reattaches_to_same_attempt_dir_not_a_fresh_one(tmp_path):
+    """A prior process death (killed session, host reboot) mid-executor-call must not cause the
+    next run to mint attempt-0002 and silently resubmit -- an executor that persisted a
+    long-running background job's chain_id in attempt-0001's own directory (e.g.
+    do_equil_and_check's pending_equil_submission.json) needs that same directory back so it can
+    reattach instead of discarding real, possibly already-finished work."""
+    engine = WorkflowEngine(tmp_path, plan(), FakeExecutor())
+    input_hash = engine._input_hash("build")
+    attempt_id, attempt_dir = engine._new_attempt("build", input_hash)
+    marker = attempt_dir / "pending_submission.json"
+    marker.write_text('{"chain_id": "abc123"}')
+
+    resumed = WorkflowEngine(tmp_path, plan(), FakeExecutor())
+    assert resumed.state["stages"]["build"]["status"] == "incomplete"
+
+    reused_id, reused_dir = resumed._new_attempt("build", input_hash)
+
+    assert reused_id == attempt_id
+    assert reused_dir == attempt_dir
+    assert marker.is_file()  # the reattach point survives -- not wiped by a fresh mkdir
+    assert len(resumed.state["stages"]["build"]["attempts"]) == 1  # no second entry appended
+    assert resumed.state["stages"]["build"]["status"] == "running"
+
+
+def test_incomplete_attempt_with_changed_input_hash_gets_a_fresh_attempt(tmp_path):
+    """A changed input (e.g. a recovery-agent revise_plan between the death and the resume)
+    must not reattach to a stale attempt scoped to the old inputs."""
+    engine = WorkflowEngine(tmp_path, plan(), FakeExecutor())
+    old_hash = engine._input_hash("build")
+    old_id, _ = engine._new_attempt("build", old_hash)
+
+    resumed = WorkflowEngine(tmp_path, plan(), FakeExecutor())
+    new_id, new_dir = resumed._new_attempt("build", "a-completely-different-hash")
+
+    assert new_id != old_id
+    assert new_dir.is_dir()
+
+
 def test_pressure_point_drop_requires_identifiable_remaining_series():
     assert pressure_point_drop_allowed({-500: "failed", 0: "accepted", 500: "accepted",
                                         1000: "accepted", 2000: "accepted"})

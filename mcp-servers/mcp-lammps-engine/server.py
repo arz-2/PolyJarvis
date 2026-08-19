@@ -1392,6 +1392,8 @@ def generate_equilibration_workflow(
     extend_only: bool = False,
     thermostat_damp_fs: float = 100.0,
     barostat_damp_fs: float = 1000.0,
+    resume_from: Optional[str] = None,
+    extend_ensemble: str = "npt",
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
@@ -1455,8 +1457,12 @@ def generate_equilibration_workflow(
         melt_npt_steps: REQUIRED. Step count for the npt_melt isothermal run. Pass null to
                         take int(1.0e6 / dt_prod) (≈1 ns at the production timestep). Ignored
                         unless add_melt_npt=True.
-        extend_steps:   REQUIRED. Step count for the npt_extend stage. Pass null to take
+        extend_steps:   REQUIRED. Step count for the extend stage. Pass null to take
                         int(1.0e6 / dt_prod) (~1 ns). Ignored unless extend_only=True.
+        extend_ensemble: "npt" (default) or "nvt" — which ensemble the extend-only continuation
+                        stage runs. nvt_production is NVT; using the default "npt" to extend it
+                        would silently switch on a barostat mid-trajectory. Ignored unless
+                        extend_only=True.
         polymer_name:   Label used in filenames and log comments.
         temp:           REQUIRED. Target simulation temperature (K). This is the workflow
                         temperature, not room temperature — a glassy melt runs at T_equil_K
@@ -1506,6 +1512,57 @@ def generate_equilibration_workflow(
                              These provide density and deformation input for glassy polymers.
                              npt_production_log/dir in the return dict point to npt_prod300
                              when present. Set False only for diagnostic or rubbery-at-high-T runs.
+        resume_from:         None (default, full chain from minimize) or one of "anneal" |
+                             "npt_cool" | "npt_production" — skip the stages before the named
+                             checkpoint and start the returned chain there, reading data_file as
+                             that checkpoint's own write_data output (the caller passes a prior
+                             chain's real <stage>_out.data). Scientifically identical to a normal
+                             stage handoff: every stage this can resume into runs with
+                             init_velocity=None (no `velocity all create`), so it always inherits
+                             velocities from whatever .data file it's given — resuming from an
+                             already-run checkpoint is not a special case, it's how every stage
+                             boundary in the full chain already works.
+                               "anneal":         skip only minimize. Generates anneal_cycles
+                                 fresh cycles from data_file, then nvt_softheat onward as normal.
+                                 Two remedies share this one code path, distinguished only by
+                                 what data_file is: pass minimize's own output to redo annealing
+                                 from scratch with different anneal parameters (cheap to discard —
+                                 minimize is a small stage); pass an EARLIER attempt's last
+                                 anneal_NN_cool output to instead EXTEND the cycle count (e.g.
+                                 5->10) by running only the additional cycles, without re-running
+                                 the ones already done or re-minimizing.
+                               "npt_cool":       skip minimize..npt_cool. Generates nvt_production
+                                 onward from data_file (a prior npt_cool_out.data). Use to widen
+                                 nvt_prod_steps/npt_prod_steps from scratch (both stages rebuilt
+                                 fresh) without re-paying for minimize + annealing + compression +
+                                 the initial cool. If nvt_production already ran and only needs
+                                 lengthening (not redoing), extend it first with extend_only=True,
+                                 extend_ensemble="nvt" from its own nvt_production_out.data, wait
+                                 for that chain to actually finish, then use "nvt_production"
+                                 (below) with data_file = the extend stage's real output — cheaper
+                                 than this point. This DOES need two sequential run_lammps_chain
+                                 submissions, not one: each generate_equilibration_workflow call
+                                 preflight-validates data_file against the real file on disk, so
+                                 the second call's data_file can't be predicted and passed before
+                                 the first stage has actually run and produced it.
+                               "nvt_production": skip minimize..nvt_production. Generates only
+                                 npt_production onward (npt_production + the glassy tail, if any)
+                                 from data_file. Pairs with an nvt extend_only continuation (see
+                                 above) as the efficient way to widen nvt_prod_steps: extend the
+                                 real nvt_production trajectory instead of discarding and redoing
+                                 it, then let npt_production rebuild fresh from the new endpoint
+                                 (npt_production always must be rebuilt when nvt_production's
+                                 output changes — there is no meaningful way to "extend" it against
+                                 a stale starting point).
+                               "npt_production": skip through npt_production. Generates only the
+                                 glassy 300 K tail (npt_cool300 + npt_prod300) from data_file (a
+                                 prior npt_production_out.data). Use to widen npt_cool300_steps (a
+                                 slower final quench) without re-running the melt-phase stages.
+                                 Requires add_300k_production=True and temp>300 — there is no
+                                 glassy tail to regenerate otherwise.
+                             add_melt_npt is only supported with resume_from in (None, "anneal")
+                             — its insertion point is before npt_cool, which "npt_cool" and
+                             "npt_production" already skip past.
 
     Returns:
         dict with:
@@ -1524,6 +1581,25 @@ def generate_equilibration_workflow(
             }
         if not isinstance(anneal_cycles, int) or isinstance(anneal_cycles, bool) or anneal_cycles < 0:
             return {"status": "error", "error": "anneal_cycles must be a non-negative integer"}
+        if resume_from not in (None, "anneal", "npt_cool", "nvt_production", "npt_production"):
+            return {"status": "error",
+                    "error": f"resume_from={resume_from!r} is not supported — must be one of "
+                             "None, 'anneal', 'npt_cool', 'nvt_production', 'npt_production'."}
+        if resume_from is not None and extend_only:
+            return {"status": "error", "error": "resume_from and extend_only are mutually exclusive"}
+        if extend_ensemble not in ("npt", "nvt"):
+            return {"status": "error",
+                    "error": f"extend_ensemble={extend_ensemble!r} must be 'npt' or 'nvt'"}
+        if resume_from in ("npt_cool", "nvt_production", "npt_production") and add_melt_npt:
+            return {"status": "error",
+                    "error": f"resume_from={resume_from!r} is not supported together with "
+                             "add_melt_npt — the npt_cool_melt/npt_melt insertion point is "
+                             "before npt_cool, which this resume point already skips."}
+        if resume_from == "npt_production" and not (add_300k_production and temp > 300.0):
+            return {"status": "error",
+                    "error": "resume_from='npt_production' requires add_300k_production=True and "
+                             "temp>300 — there is no glassy 300 K tail to regenerate otherwise "
+                             "(a rubbery chain has nothing left to run after npt_production)."}
         if thermostat_damp_fs <= 0 or barostat_damp_fs <= 0:
             return {"status": "error", "error": "thermostat/barostat damping must be positive"}
 
@@ -1641,13 +1717,21 @@ def generate_equilibration_workflow(
         # the equil-check gate consume it identically. Submit with engine= matching this call.
         if extend_only:
             ext_steps = int(extend_steps) if extend_steps else int(1.0e6 / dt_prod)  # ~1 ns default
-            sx = _stage("npt_extend", "npt", {
-                "T_START": temp, "T_FINAL": temp, "T_DAMP": thermostat_damp_fs,
-                "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
-                "TIMESTEP": dt_prod, "N_STEPS": ext_steps,
-                "use_pppm": use_long_range and not use_trappe,
-                "use_gpu": True, "write_restart": False,
-            }, data_file)
+            if extend_ensemble == "nvt":
+                sx = _stage("nvt_extend", "nvt", {
+                    "T_START": temp, "T_FINAL": temp, "T_DAMP": thermostat_damp_fs,
+                    "TIMESTEP": dt_prod, "N_STEPS": ext_steps,
+                    "use_pppm": use_long_range and not use_trappe,
+                    "use_gpu": True, "write_restart": False,
+                }, data_file)
+            else:
+                sx = _stage("npt_extend", "npt", {
+                    "T_START": temp, "T_FINAL": temp, "T_DAMP": thermostat_damp_fs,
+                    "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
+                    "TIMESTEP": dt_prod, "N_STEPS": ext_steps,
+                    "use_pppm": use_long_range and not use_trappe,
+                    "use_gpu": True, "write_restart": False,
+                }, data_file)
             stages.append(sx)
             return {
                 "status":             "success",
@@ -1658,6 +1742,7 @@ def generate_equilibration_workflow(
                 "n_stages":           1,
                 "engine":             engine,
                 "extend_only":        True,
+                "extend_ensemble":    extend_ensemble,
                 "stages":             stages,
                 "run_order":          [sx["name"]],
                 "npt_production_log":  f"{sx['work_dir']}/{sx['params']['LOG_FILE']}",
@@ -1666,195 +1751,225 @@ def generate_equilibration_workflow(
                 "preflight_warnings":  vr["warnings"],
                 "preflight_stats":     vr["stats"],
                 "instructions": (
-                    f"Extend-only: 1 NPT continuation stage (npt_extend, {ext_steps} steps) from "
-                    f"{data_file} at {temp} K / {press} atm (engine={engine}). Submit with "
-                    f"run_lammps_chain(engine='{engine}'); then re-run equil-check on "
-                    f"{sx['output_data']}."
+                    f"Extend-only: 1 {extend_ensemble.upper()} continuation stage "
+                    f"({sx['name']}, {ext_steps} steps) from {data_file} at {temp} K"
+                    + ("" if extend_ensemble == "nvt" else f" / {press} atm")
+                    + f" (engine={engine}). Submit with run_lammps_chain(engine='{engine}'); "
+                    f"then re-run equil-check on {sx['output_data']}."
                 ),
             }
 
-        # minimize
-        s1 = _stage("minimize", "minimize", {
-            "use_pppm":  use_long_range and not use_trappe,
-            "use_gpu":   True,
-            "MIN_STYLE": "cg",
-            "MAXITER":   50000,
-        }, data_file)
-        stages.append(s1)
+        _use_melt_npt = False  # only ever set True in the (None, "anneal") branch below
+        s4 = None  # only built in the (None, "anneal") branch; guarded at every later use
 
-        # Complete, explicitly counted thermal-annealing cycles. Each cycle returns to
-        # 300 K; the existing nvt_softheat stage then performs the final heat to max_temp
-        # before compression. Names are stable and unique for immutable attempt manifests.
-        anneal_prev = s1
-        anneal_steps = int(anneal_cycle_steps) if anneal_cycle_steps else steps_heat
-        for cycle_index in range(1, anneal_cycles + 1):
-            heat = _stage(f"anneal_{cycle_index:02d}_heat", "nvt", {
-                "T_START": 300.0, "T_FINAL": max_temp,
-                "T_DAMP": thermostat_damp_fs, "TIMESTEP": dt_prod,
-                "N_STEPS": anneal_steps, "use_pppm": use_long_range and not use_trappe,
-                "use_gpu": True, "write_restart": True,
-            }, anneal_prev["output_data"])
-            stages.append(heat)
-            cool = _stage(f"anneal_{cycle_index:02d}_cool", "nvt", {
-                "T_START": max_temp, "T_FINAL": 300.0,
-                "T_DAMP": thermostat_damp_fs, "TIMESTEP": dt_prod,
-                "N_STEPS": anneal_steps, "use_pppm": use_long_range and not use_trappe,
-                "use_gpu": True, "write_restart": True,
-            }, heat["output_data"])
-            stages.append(cool)
-            anneal_prev = cool
-
-        # nvt_softheat — GPU + PPPM throughout
-        s2 = _stage("nvt_softheat", "nvt", {
-            "T_START":    300.0,
-            "T_FINAL":    max_temp,
-            "T_DAMP":     thermostat_damp_fs,
-            "TIMESTEP":   0.5,
-            "N_STEPS":    steps_comp,
-            "use_pppm":   use_long_range and not use_trappe,
-            "use_gpu":    True,
-            "use_shake":  False,
-            "init_velocity": 300.0,
-        }, anneal_prev["output_data"])
-        stages.append(s2)
-
-        # npt_compress — NPT compression to target density.
-        # OPLS-AA: use short-range Coulomb (use_pppm=False → lj/cut/coul/cut) during compression
-        # to prevent PPPM "out of range atoms" crash when the box shrinks rapidly at high pressure.
-        # Full PPPM resumes at npt_pppm. ff_base temporarily overridden so use_pppm=False wins.
-        saved_ff_base = ff_base
-        ff_base = {**ff_base, "use_pppm": False} if use_opls else ff_base
-        s3 = _stage("npt_compress", "npt_compress", {
-            "T_START":   max_temp,
-            "T_FINAL":   max_temp,
-            "T_DAMP":    thermostat_damp_fs,
-            "P_START":   1.0,
-            "P_FINAL":   max_press,
-            "P_DAMP":    barostat_damp_fs,
-            "TIMESTEP":  0.5,
-            "N_STEPS":   steps_comp,
-            "use_pppm":  False,
-            "use_gpu":   True,
-        }, s2["output_data"])
-        stages.append(s3)
-        ff_base = saved_ff_base  # restore PPPM for all subsequent stages
-
-        # npt_pppm — NPT decompress, GPU + PPPM
-        s4 = _stage("npt_pppm", "npt", {
-            "T_START":   max_temp,
-            "T_FINAL":   max_temp,
-            "T_DAMP":    thermostat_damp_fs,
-            "P_START":   max_press,
-            "P_FINAL":   press,
-            "P_DAMP":    barostat_damp_fs,
-            "TIMESTEP":  dt_prod,
-            "N_STEPS":   steps_comp,
-            "use_pppm":  use_long_range and not use_trappe,
-            "use_gpu":   True,
-            "write_restart": True,
-        }, s3["output_data"])
-        stages.append(s4)
-
-        # npt_cool — NPT cool to target temp.
-        # With add_melt_npt=True (rubbery validation runs): split into npt_cool_melt/npt_melt/npt_cool
-        # to capture an isothermal NPT run at t_equil_K for melt density extraction.
-        _use_melt_npt = (
-            add_melt_npt
-            and t_equil_K is not None
-            and temp < t_equil_K
-        )
-        _cool_steps = npt_cool_steps if npt_cool_steps is not None else steps_npt
-        if _use_melt_npt:
-            _melt_steps = melt_npt_steps or int(1.0e6 / dt_prod)
-            s5a = _stage("npt_cool_melt", "npt", {
-                "T_START":   max_temp,
-                "T_FINAL":   t_equil_K,
-                "T_DAMP":    thermostat_damp_fs,
-                "P_START":   press,
-                "P_FINAL":   press,
-                "P_DAMP":    barostat_damp_fs,
-                "TIMESTEP":  dt_prod,
-                "N_STEPS":   steps_npt // 2,
+        # --- minimize: only for the full chain -----------------------------------------------
+        if resume_from is None:
+            s1 = _stage("minimize", "minimize", {
                 "use_pppm":  use_long_range and not use_trappe,
                 "use_gpu":   True,
-                "write_restart": True,
-            }, s4["output_data"])
-            stages.append(s5a)
-            s5b = _stage("npt_melt", "npt", {
-                "T_START":   t_equil_K,
-                "T_FINAL":   t_equil_K,
-                "T_DAMP":    thermostat_damp_fs,
-                "P_START":   press,
-                "P_FINAL":   press,
-                "P_DAMP":    barostat_damp_fs,
-                "TIMESTEP":  dt_prod,
-                "N_STEPS":   _melt_steps,
-                "use_pppm":  use_long_range and not use_trappe,
-                "use_gpu":   True,
-                "write_restart": True,
-            }, s5a["output_data"])
-            stages.append(s5b)
-            s5 = _stage("npt_cool", "npt", {
-                "T_START":   t_equil_K,
-                "T_FINAL":   temp,
-                "T_DAMP":    thermostat_damp_fs,
-                "P_START":   press,
-                "P_FINAL":   press,
-                "P_DAMP":    barostat_damp_fs,
-                "TIMESTEP":  dt_prod,
-                "N_STEPS":   _cool_steps,
-                "use_pppm":  use_long_range and not use_trappe,
-                "use_gpu":   True,
-                "write_restart": True,
-            }, s5b["output_data"])
-            stages.append(s5)
+                "MIN_STYLE": "cg",
+                "MAXITER":   50000,
+            }, data_file)
+            stages.append(s1)
+            anneal_start_data = s1["output_data"]
         else:
-            s5 = _stage("npt_cool", "npt", {
+            anneal_start_data = data_file  # meaningful only when resume_from == "anneal"
+
+        # --- annealing through npt_cool: full chain, or resume_from == "anneal" ---------------
+        # "anneal" serves two remedies sharing this one code path, distinguished only by what
+        # data_file physically is: minimize's own output (redo annealing from scratch with new
+        # parameters -- minimize is cheap to discard) or an earlier attempt's last
+        # anneal_NN_cool output (extend the cycle count, e.g. 5->10, by running only the
+        # additional cycles this call's own anneal_cycles requests).
+        if resume_from in (None, "anneal"):
+            anneal_prev_data = anneal_start_data
+            anneal_steps = int(anneal_cycle_steps) if anneal_cycle_steps else steps_heat
+            for cycle_index in range(1, anneal_cycles + 1):
+                heat = _stage(f"anneal_{cycle_index:02d}_heat", "nvt", {
+                    "T_START": 300.0, "T_FINAL": max_temp,
+                    "T_DAMP": thermostat_damp_fs, "TIMESTEP": dt_prod,
+                    "N_STEPS": anneal_steps, "use_pppm": use_long_range and not use_trappe,
+                    "use_gpu": True, "write_restart": True,
+                }, anneal_prev_data)
+                stages.append(heat)
+                cool = _stage(f"anneal_{cycle_index:02d}_cool", "nvt", {
+                    "T_START": max_temp, "T_FINAL": 300.0,
+                    "T_DAMP": thermostat_damp_fs, "TIMESTEP": dt_prod,
+                    "N_STEPS": anneal_steps, "use_pppm": use_long_range and not use_trappe,
+                    "use_gpu": True, "write_restart": True,
+                }, heat["output_data"])
+                stages.append(cool)
+                anneal_prev_data = cool["output_data"]
+
+            # nvt_softheat — GPU + PPPM throughout
+            s2 = _stage("nvt_softheat", "nvt", {
+                "T_START":    300.0,
+                "T_FINAL":    max_temp,
+                "T_DAMP":     thermostat_damp_fs,
+                "TIMESTEP":   0.5,
+                "N_STEPS":    steps_comp,
+                "use_pppm":   use_long_range and not use_trappe,
+                "use_gpu":    True,
+                "use_shake":  False,
+                "init_velocity": 300.0,
+            }, anneal_prev_data)
+            stages.append(s2)
+
+            # npt_compress — NPT compression to target density.
+            # OPLS-AA: use short-range Coulomb (use_pppm=False → lj/cut/coul/cut) during compression
+            # to prevent PPPM "out of range atoms" crash when the box shrinks rapidly at high pressure.
+            # Full PPPM resumes at npt_pppm. ff_base temporarily overridden so use_pppm=False wins.
+            saved_ff_base = ff_base
+            ff_base = {**ff_base, "use_pppm": False} if use_opls else ff_base
+            s3 = _stage("npt_compress", "npt_compress", {
                 "T_START":   max_temp,
-                "T_FINAL":   temp,
+                "T_FINAL":   max_temp,
                 "T_DAMP":    thermostat_damp_fs,
-                "P_START":   press,
+                "P_START":   1.0,
+                "P_FINAL":   max_press,
+                "P_DAMP":    barostat_damp_fs,
+                "TIMESTEP":  0.5,
+                "N_STEPS":   steps_comp,
+                "use_pppm":  False,
+                "use_gpu":   True,
+            }, s2["output_data"])
+            stages.append(s3)
+            ff_base = saved_ff_base  # restore PPPM for all subsequent stages
+
+            # npt_pppm — NPT decompress, GPU + PPPM
+            s4 = _stage("npt_pppm", "npt", {
+                "T_START":   max_temp,
+                "T_FINAL":   max_temp,
+                "T_DAMP":    thermostat_damp_fs,
+                "P_START":   max_press,
                 "P_FINAL":   press,
                 "P_DAMP":    barostat_damp_fs,
                 "TIMESTEP":  dt_prod,
-                "N_STEPS":   _cool_steps,
+                "N_STEPS":   steps_comp,
                 "use_pppm":  use_long_range and not use_trappe,
                 "use_gpu":   True,
                 "write_restart": True,
-            }, s4["output_data"])
-            stages.append(s5)
+            }, s3["output_data"])
+            stages.append(s4)
 
-        # nvt_production — NVT production, GPU + PPPM
-        s6 = _stage("nvt_production", "nvt", {
-            "T_START":   temp,
-            "T_FINAL":   temp,
-            "T_DAMP":    thermostat_damp_fs,
-            "TIMESTEP":  dt_prod,
-            "N_STEPS":   nvt_prod_steps if nvt_prod_steps is not None else steps_nvt,
-            "use_pppm":  use_long_range and not use_trappe,
-            "use_gpu":   True,
-            "write_restart": False,
-        }, s5["output_data"])
-        stages.append(s6)
+            # npt_cool — NPT cool to target temp.
+            # With add_melt_npt=True (rubbery validation runs): split into npt_cool_melt/npt_melt/npt_cool
+            # to capture an isothermal NPT run at t_equil_K for melt density extraction.
+            _use_melt_npt = (
+                add_melt_npt
+                and t_equil_K is not None
+                and temp < t_equil_K
+            )
+            _cool_steps = npt_cool_steps if npt_cool_steps is not None else steps_npt
+            if _use_melt_npt:
+                _melt_steps = melt_npt_steps or int(1.0e6 / dt_prod)
+                s5a = _stage("npt_cool_melt", "npt", {
+                    "T_START":   max_temp,
+                    "T_FINAL":   t_equil_K,
+                    "T_DAMP":    thermostat_damp_fs,
+                    "P_START":   press,
+                    "P_FINAL":   press,
+                    "P_DAMP":    barostat_damp_fs,
+                    "TIMESTEP":  dt_prod,
+                    "N_STEPS":   steps_npt // 2,
+                    "use_pppm":  use_long_range and not use_trappe,
+                    "use_gpu":   True,
+                    "write_restart": True,
+                }, s4["output_data"])
+                stages.append(s5a)
+                s5b = _stage("npt_melt", "npt", {
+                    "T_START":   t_equil_K,
+                    "T_FINAL":   t_equil_K,
+                    "T_DAMP":    thermostat_damp_fs,
+                    "P_START":   press,
+                    "P_FINAL":   press,
+                    "P_DAMP":    barostat_damp_fs,
+                    "TIMESTEP":  dt_prod,
+                    "N_STEPS":   _melt_steps,
+                    "use_pppm":  use_long_range and not use_trappe,
+                    "use_gpu":   True,
+                    "write_restart": True,
+                }, s5a["output_data"])
+                stages.append(s5b)
+                s5 = _stage("npt_cool", "npt", {
+                    "T_START":   t_equil_K,
+                    "T_FINAL":   temp,
+                    "T_DAMP":    thermostat_damp_fs,
+                    "P_START":   press,
+                    "P_FINAL":   press,
+                    "P_DAMP":    barostat_damp_fs,
+                    "TIMESTEP":  dt_prod,
+                    "N_STEPS":   _cool_steps,
+                    "use_pppm":  use_long_range and not use_trappe,
+                    "use_gpu":   True,
+                    "write_restart": True,
+                }, s5b["output_data"])
+                stages.append(s5)
+            else:
+                s5 = _stage("npt_cool", "npt", {
+                    "T_START":   max_temp,
+                    "T_FINAL":   temp,
+                    "T_DAMP":    thermostat_damp_fs,
+                    "P_START":   press,
+                    "P_FINAL":   press,
+                    "P_DAMP":    barostat_damp_fs,
+                    "TIMESTEP":  dt_prod,
+                    "N_STEPS":   _cool_steps,
+                    "use_pppm":  use_long_range and not use_trappe,
+                    "use_gpu":   True,
+                    "write_restart": True,
+                }, s4["output_data"])
+                stages.append(s5)
+        elif resume_from == "npt_cool":
+            # data_file IS npt_cool's own write_data output — nvt_production (next) reads it
+            # exactly like it would read s5["output_data"] above; only this stand-in differs.
+            s5 = {"output_data": data_file}
+        # else resume_from in ("nvt_production", "npt_production"): s5 is never referenced below.
 
-        # npt_production — NPT production at target conditions, dedicated for K_T measurement.
-        # Must be constant-T/P; the npt_cool ramp is invalid for volume fluctuation method.
-        # Reads from nvt_production output (best-equilibrated config).
-        steps_npt_prod = npt_prod_steps if npt_prod_steps is not None else steps_npt // 2
-        s7 = _stage("npt_production", "npt", {
-            "T_START":       temp,
-            "T_FINAL":       temp,
-            "T_DAMP":        thermostat_damp_fs,
-            "P_START":       press,
-            "P_FINAL":       press,
-            "P_DAMP":        barostat_damp_fs,
-            "TIMESTEP":      dt_prod,
-            "N_STEPS":       steps_npt_prod,
-            "use_pppm":      use_long_range and not use_trappe,
-            "use_gpu":       True,
-            "write_restart": False,
-        }, s6["output_data"])
-        stages.append(s7)
+        if resume_from not in ("nvt_production", "npt_production"):
+            # nvt_production — NVT production, GPU + PPPM
+            s6 = _stage("nvt_production", "nvt", {
+                "T_START":   temp,
+                "T_FINAL":   temp,
+                "T_DAMP":    thermostat_damp_fs,
+                "TIMESTEP":  dt_prod,
+                "N_STEPS":   nvt_prod_steps if nvt_prod_steps is not None else steps_nvt,
+                "use_pppm":  use_long_range and not use_trappe,
+                "use_gpu":   True,
+                "write_restart": False,
+            }, s5["output_data"])
+            stages.append(s6)
+        elif resume_from == "nvt_production":
+            # data_file IS nvt_production's own write_data output (typically the endpoint of an
+            # extend_only=True, extend_ensemble="nvt" continuation of the real trajectory, not a
+            # fresh restart) — npt_production (next) reads it exactly like it would read
+            # s6["output_data"] above; only this stand-in differs.
+            s6 = {"output_data": data_file}
+        # else resume_from == "npt_production": s6 is never referenced below.
+
+        if resume_from != "npt_production":
+            # npt_production — NPT production at target conditions, dedicated for K_T measurement.
+            # Must be constant-T/P; the npt_cool ramp is invalid for volume fluctuation method.
+            # Reads from nvt_production output (best-equilibrated config).
+            steps_npt_prod = npt_prod_steps if npt_prod_steps is not None else steps_npt // 2
+            s7 = _stage("npt_production", "npt", {
+                "T_START":       temp,
+                "T_FINAL":       temp,
+                "T_DAMP":        thermostat_damp_fs,
+                "P_START":       press,
+                "P_FINAL":       press,
+                "P_DAMP":        barostat_damp_fs,
+                "TIMESTEP":      dt_prod,
+                "N_STEPS":       steps_npt_prod,
+                "use_pppm":      use_long_range and not use_trappe,
+                "use_gpu":       True,
+                "write_restart": False,
+            }, s6["output_data"])
+            stages.append(s7)
+        else:
+            # data_file IS npt_production's own write_data output — npt_cool300 (next) reads it
+            # exactly like it would read s7["output_data"] above; only this stand-in differs.
+            s7 = {"output_data": data_file}
 
         # npt_cool300 + npt_prod300 (glassy only): cool and produce at 300 K.
         # temp > 300 means the chain runs at melt T; density and deform inputs
@@ -1901,10 +2016,10 @@ def generate_equilibration_workflow(
         # not npt_production (300 K). Glassy polymers use npt_prod300 (existing path, unchanged).
         if _use_melt_npt:
             _npt_tg_prep = s5b["output_data"]     # npt_melt at t_equil_K — well-relaxed melt
-        elif temp <= 300.0:
+        elif temp <= 300.0 and s4 is not None:
             _npt_tg_prep = s4["output_data"]       # fallback: npt_pppm at max_temp
         else:
-            _npt_tg_prep = None                    # glassy: use npt_prod300 (separate key)
+            _npt_tg_prep = None                    # glassy, or resumed past npt_pppm: use npt_prod300/None
 
         ret = {
             "status":     "success",
@@ -1942,6 +2057,8 @@ def generate_equilibration_workflow(
         if _use_melt_npt:
             ret["melt_npt_log"] = f"{s5b['work_dir']}/{s5b['params']['LOG_FILE']}"
             ret["melt_npt_dir"] = s5b["work_dir"]
+        if resume_from is not None:
+            ret["resumed_from"] = resume_from
         return ret
 
     except Exception as e:
