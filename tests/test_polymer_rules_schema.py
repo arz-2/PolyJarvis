@@ -132,6 +132,24 @@ def test_electrostatics_matches_its_own_decision_guide():
         )
 
 
+# D-04_system_size's Fox-Flory require clause (mechanized by select_system_size.py):
+# DP>=20 for flexible backbones, DP>=50 for the three classes global_notes names as
+# stiff. dp_min is each class's own claimed floor -- this locks it to actually clear
+# the plateau its class cites, the same self-consistency shape as
+# test_electrostatics_matches_its_own_decision_guide above.
+STIFF_BACKBONE_CLASSES = {"PIMD", "PKTN", "PSFO"}
+
+
+@pytest.mark.parametrize("cid", sorted(CLASSES))
+def test_dp_min_clears_its_own_fox_flory_floor(cid):
+    floor = 50 if cid in STIFF_BACKBONE_CLASSES else 20
+    assert CLASSES[cid]["dp_min"] >= floor, (
+        f"{cid}: dp_min={CLASSES[cid]['dp_min']} is below the Fox-Flory floor {floor} "
+        f"its own class ({'stiff' if cid in STIFF_BACKBONE_CLASSES else 'flexible'} "
+        "backbone) claims to clear"
+    )
+
+
 def test_tg_slope_gate_fallback_valid():
     """tg_slope_gate_fallback marks classes whose highest configured Tg rate is
     documented as unreliable (degenerate/inverted fit); value names which rate

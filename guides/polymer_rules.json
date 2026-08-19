@@ -153,6 +153,7 @@
       "dp_typical": "Degree of polymerization (repeat units per chain) for production runs",
       "dp_min": "Minimum DP for chain-length-independent Tg (Fox-Flory plateau)",
       "nchain": "Number of chains in simulation cell",
+      "entanglement_Me_gmol": "Entanglement molecular weight Me=rho*R*T/Ge (Mark 2007 Ch.25), documented for exactly ONE named member of a multi-member class (e.g. PACR.PMMA, not PACR as a whole) -- keyed by member name, resolved via run_name by select_system_size.py. Absent (or a member without an entry) means MW_FLOOR_UNKNOWN, never a class-wide assumption.",
       "density_initial_gcm3": "Starting density for amorphous cell construction (g/cm³); ~0.5x experimental RT density avoids atomic overlaps",
       "electrostatics": "Runtime long-range Coulomb treatment: pppm (required for any heteroatom) or lj_cut (purely apolar C/H only)",
       "cutoff_A": "van der Waals and real-space Coulomb cutoff (Angstroms)",
@@ -589,6 +590,10 @@
         "P2VP": 374,
         "notes": "PS: ~100°C (373 K). P2VP similar to PS due to similar backbone rigidity."
       },
+      "entanglement_Me_gmol": {
+        "PS": 16600,
+        "note": "Me=rho*R*T/Ge (Mark 2007 Ch.25 Tables 25.1-25.5). DP@Me=16600/104.15~=160. Documented for PS only -- do not generalize to P2VP/P4VP/SAN."
+      },
       "citations": [
         "Srivastava2026",
         "Tang2022",
@@ -751,6 +756,10 @@
         "PMA": 281,
         "PAA": 379,
         "notes": "PMMA: ~105°C (378 K); PMA: ~8°C (281 K); PAA: ~106°C (379 K)."
+      },
+      "entanglement_Me_gmol": {
+        "PMMA": 12500,
+        "note": "Me=rho*R*T/Ge (Mark 2007 Ch.25 Tables 25.1-25.5). DP@Me=12500/100.12~=125. Documented for PMMA only -- do not generalize to PMA/PAA."
       },
       "citations": [
         "Hayashi2022",
@@ -1159,6 +1168,10 @@
         "PBT": 323,
         "notes": "PET: ~69°C (342 K); PLA: ~58°C (331 K); PCL: ~-60°C (213 K); PBT: ~50°C (323 K)."
       },
+      "entanglement_Me_gmol": {
+        "PET": 1450,
+        "note": "Me=rho*R*T/Ge (Mark 2007 Ch.25 Tables 25.1-25.5). DP@Me << current dp_typical -- no change needed for PET. Documented for PET only -- do not generalize to PLA/PCL/PBT."
+      },
       "exp_E_GPa": {
         "PET": 3.0,
         "PBT": "2.3-2.5",
@@ -1245,6 +1258,10 @@
         "Nylon66": 323,
         "Nylon12": 310,
         "notes": "Nylon-6: ~50°C (323 K); Nylon-66: ~50°C (323 K); Nylon-12: ~37°C (310 K)."
+      },
+      "entanglement_Me_gmol": {
+        "Nylon6": 2470,
+        "note": "Me=rho*R*T/Ge (Mark 2007 Ch.25 Tables 25.1-25.5). DP@Me << current dp_typical -- no change needed for Nylon6. Documented for Nylon6 only -- do not generalize to Nylon66/Nylon12."
       },
       "exp_E_GPa": {
         "PA6": 3.0,
@@ -1345,7 +1362,7 @@
       "forcefield": "GAFF2_mod",
       "charge_method": "RESP",
       "dp_typical": 30,
-      "dp_min": 15,
+      "dp_min": 20,
       "nchain": 10,
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
@@ -1400,8 +1417,8 @@
       ],
       "forcefield": "PCFF",
       "charge_method": "bond-increment",
-      "dp_typical": 24,
-      "dp_min": 15,
+      "dp_typical": 50,
+      "dp_min": 50,
       "nchain": 6,
       "density_initial_gcm3": 0.71,
       "electrostatics": "pppm",
@@ -1442,8 +1459,7 @@
         "MD Tg expected 730-810 K for high-Tg polyimides after overestimation. Sweep to 900 K required.",
         "High Tg means long equilibration: 15 ns and 8 cycles required (rigid-rod backbone, slow chain relaxation).",
         "EMC annealing upper bound must reach 900 K for high-Tg polyimides (Kapton Tg ~633 K exp + 120 K MD overestimate); annealing_T_high_K=900 K in this class block reflects this.",
-        "SCREENING dp/nchain: dp_typical=15 nchain=6 for 48h-budget Tg sweep (4,680 atoms, ~47h/4GPU). τ_Rouse at dp=15 T_equil=800K ≈ 4.7 ns; tg_steps_per_t=2M = 2ns ≈ 0.43×τ_Rouse — acknowledged inadequate (t/τ<1). Tg will be overestimated by ~20-40% beyond standard MD bias. Kashmari2024 15k-atom convergence limit already violated at current dp=24 nchain=8 (9,984 atoms < 15k); both settings are screening compromises.",
-        "Chain length: 15 repeat units (Wen2020) validated minimum; DP=15 acceptable, DP=20 preferred.",
+        "dp_typical=50, dp_min=50: PIMD is one of the three stiff backbones (Patrone 2016, polymer_rules.json global_notes) requiring DP>=50 for the Fox-Flory chain-length-independent-Tg plateau, mechanized and enforced per run by select_system_size.py.",
         "Exp. RT density: Kapton=1.42 g/cm³. Initial 0.71 g/cm³ = ~0.5x Kapton density.",
         "WARNING: Do not simulate crystalline polyimide (BPDA-PDA) in amorphous mode without verifying density matches amorphous values (~1.35-1.42 g/cm³)."
       ],
@@ -1552,6 +1568,10 @@
         "BPA_PC": 422,
         "notes": "Bisphenol-A polycarbonate: ~149°C (422 K). Literature DSC consensus."
       },
+      "entanglement_Me_gmol": {
+        "BPA_PC": 1660,
+        "note": "Me=rho*R*T/Ge (Mark 2007 Ch.25 Tables 25.1-25.5). DP@Me << current dp_typical -- no change needed. PCBN is single-member (BPA-PC only)."
+      },
       "experimental_density_gcm3": {
         "BPA_PC": 1.20,
         "notes": "Amorphous BPA-PC at RT, 1.20-1.22 g/cm³ (Mark2007; cf. exp_E_GPa notes). Used for the R1M7 ablation accuracy read."
@@ -1595,7 +1615,7 @@
       "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "dp_typical": 20,
-      "dp_min": 10,
+      "dp_min": 20,
       "nchain": 10,
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
@@ -1724,7 +1744,7 @@
       "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "dp_typical": 30,
-      "dp_min": 15,
+      "dp_min": 20,
       "nchain": 10,
       "density_initial_gcm3": 0.55,
       "electrostatics": "pppm",
@@ -1780,8 +1800,8 @@
       ],
       "forcefield": "PCFF",
       "charge_method": "bond-increment",
-      "dp_typical": 32,
-      "dp_min": 15,
+      "dp_typical": 50,
+      "dp_min": 50,
       "nchain": 8,
       "density_initial_gcm3": 0.66,
       "electrostatics": "pppm",
@@ -1835,7 +1855,7 @@
         "COMPASS II gives Tg=424-429 K for PEEK variants (PMC7285100), close to experimental 418 K.",
         "MD Tg for PEEK expected ~500-540 K after overestimation. Sweep to 750 K safely brackets this.",
         "Very rigid aromatic backbone: slow chain relaxation → 8 annealing cycles and 15 ns required.",
-        "SCREENING dp/nchain: dp_typical=15 nchain=8 for 48h-budget Tg sweep (4,800 atoms, ~40h/4GPU). τ_Rouse at dp=15 T_equil=770K ≈ 2.2 ns; tg_steps_per_t=2M = 2ns ≈ 0.91×τ_Rouse — borderline adequate for screening. Tg may be overestimated by ~5-15% beyond standard MD bias. Original nchain=10 dp=32 MW ~9,216 g/mol crossed Klajmon2023 density convergence threshold (~9,000 g/mol); dp=15 nchain=8 MW ~3,456 g/mol is below threshold but acceptable for Tg screening.",
+        "dp_typical=50, dp_min=50: PKTN is one of the three stiff backbones (Patrone 2016, polymer_rules.json global_notes) requiring DP>=50 for the Fox-Flory chain-length-independent-Tg plateau, mechanized and enforced per run by select_system_size.py. At nchain=8 (~34 atoms/repeat) this is a ~13,600-atom cell.",
         "Exp. RT density: amorphous PEEK=1.263 g/cm³; semicrystalline=1.30–1.32 g/cm³ (NOT the comparator for MD amorphous cells). Initial packing 0.66 g/cm³ = ~0.5x amorphous density.",
         "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. Verify density ~1.26 g/cm³ at 298 K (amorphous ref) before Tg sweep; 1.30–1.32 indicates partial crystallinity.",
         "DENSITY SYSTEMATIC: PCFF MD systematically underestimates amorphous PEEK density by ~5% (rho_sim ~= 1.194 vs amorphous-ref 1.263 g/cm^3, band [1.199,1.326]). The run-summary density warning is ANTICIPATED, not a failure - accept rho_sim near the lower bound as a valid amorphous baseline. No band widening (1.263 stays the amorphous comparator; widening would mask a real FF systematic)."
@@ -1861,8 +1881,8 @@
       ],
       "forcefield": "PCFF",
       "charge_method": "bond-increment",
-      "dp_typical": 25,
-      "dp_min": 20,
+      "dp_typical": 50,
+      "dp_min": 50,
       "nchain": 8,
       "density_initial_gcm3": 0.62,
       "electrostatics": "pppm",
@@ -1897,6 +1917,10 @@
         "PPSU": 493,
         "notes": "PSU (Udel): ~190°C (463 K); PES: ~220°C (493 K); PPSU: ~220°C (493 K)."
       },
+      "entanglement_Me_gmol": {
+        "PSU": 2380,
+        "note": "Me=rho*R*T/Ge (Mark 2007 Ch.25 Tables 25.1-25.5). DP@Me << current dp_typical -- no change needed for PSU. Documented for PSU only -- do not generalize to PES/PPSU."
+      },
       "exp_E_GPa": {
         "PSU": "2.5-2.6",
         "source": "Mark2007_Table24.4",
@@ -1913,9 +1937,9 @@
         "T_equil=700 K: PES Tg=493 K + 150 K = 643 K → 700 K conservative for slow-relaxing rigid backbone.",
         "MD Tg for PSU expected ~540-580 K after overestimation. Sweep to 750 K safely brackets this.",
         "Rigid aromatic backbone: 15 ns and 8 cycles essential for equilibration.",
-        "dp_typical=25, dp_min=20 (Fox-Flory hard floor: decision_policy.json requires DP≥20 for Tg/bulk_modulus targets). nchain=8 → ~11,000 atoms at ~442 g/mol repeat unit. At dp=25 MW~11,050 g/mol ≈ 1 M_e for PSU; adequate for Tg but short of entanglement plateau for K. Prior dp_min=15 (MW~5,304) was below the Fox-Flory floor for Tg — bumped to 20.",
+        "dp_typical=50, dp_min=50: PSFO is one of the three stiff backbones (Patrone 2016, polymer_rules.json global_notes) requiring DP>=50 for the Fox-Flory chain-length-independent-Tg plateau, not the DP>=20 flexible floor this note previously assumed -- mechanized and enforced per run by select_system_size.py. entanglement_Me_gmol.PSU=2,380 g/mol is well below the MW this DP now reaches, so the entanglement plateau for K is comfortably cleared too.",
         "Exp. RT density: PSF=1.24 g/cm³. Initial 0.62 g/cm³ = ~0.5x PSF density.",
-        "WARNING: DP≥15 minimum; stiff backbone means very short chains behave differently. Aim for DP=20 if budget allows."
+        "WARNING: DP<50 behaves as a chain-length-dependent oligomer for this stiff backbone, not a converged Tg plateau -- do not run below dp_min=50."
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",

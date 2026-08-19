@@ -416,6 +416,37 @@ def _forcefield_findings(plan: dict) -> list:
     return findings
 
 
+def _system_size_findings(plan: dict) -> list:
+    """D-04_system_size must not silently under-provision DP for a floor the class's own
+    cited literature already documents (Fox-Flory for tg, entanglement DP@Me for
+    bulk_modulus). select_system_size.py records required_dp_floor whenever it measured
+    one; this checks the plan's decided dp_typical against it, same acknowledgeable-flag
+    pattern as _forcefield_findings' provenance check -- a floor violation does not block
+    the plan outright, it must be raised or carried as a stated uncertainty.
+    """
+    findings = []
+    d = next((x for x in plan.get("decisions", []) if x.get("id") == "D-04_system_size"), None)
+    if not d:
+        return findings
+    required_floor = d.get("required_dp_floor")
+    if required_floor is None:
+        return findings
+    dp = plan.get("decided_params", {}).get("dp_typical")
+    if dp is None or dp >= required_floor:
+        return findings
+    acknowledged = any(u.get("name") == "system_size_dp_floor"
+                       for u in plan.get("uncertainties", []))
+    if not acknowledged:
+        findings.append({
+            "check": "system_size_dp_floor_unacknowledged", "severity": "structural",
+            "detail": (f"decided_params.dp_typical={dp} is below D-04_system_size."
+                      f"required_dp_floor={required_floor} ({d.get('floor_sources')}) and no "
+                      "uncertainties entry named 'system_size_dp_floor' acknowledges it. "
+                      "Raise dp_typical to the floor or record the gap as a stated "
+                      "uncertainty -- re-run orchestration/scripts/select_system_size.py.")})
+    return findings
+
+
 def validate_plan(plan: dict, policy: dict) -> list:
     findings = []
     findings += _criteria_and_evidence_findings(plan, policy)
@@ -425,6 +456,7 @@ def validate_plan(plan: dict, policy: dict) -> list:
     findings += _exp_tg_companion_findings(plan)
     findings += _hardware_findings(plan)
     findings += _forcefield_findings(plan)
+    findings += _system_size_findings(plan)
     findings += _finite_size_findings(plan)
     findings += _unimplemented_param_findings(plan)
     findings += _overridden_param_findings(plan)
