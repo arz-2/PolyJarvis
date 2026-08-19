@@ -126,6 +126,29 @@ class TestMakeEshStructure:
         s = sections(esh)
         assert "pcff" in s["OPTIONS"]
 
+    def test_pcff_uses_explicit_h_cap(self):
+        # non-UA (all-atom) fields have an explicit H atom type -- *[H] is valid
+        esh = make_esh("*CC*", field="pcff")
+        assert "cap      *[H]" in esh
+
+    def test_trappe_ua_uses_methyl_cap_not_explicit_h(self):
+        # UA hydrogen is implicit -- *[H] has no UA atom type and EMC aborts with
+        # "Missing rules." on it (see is_ua in make_esh)
+        esh = make_esh("*CC*", field="trappe/2014/trappe-ua")
+        s = sections(esh)
+        assert "*[H]" not in s["GROUPS"]
+        assert "cap      *C" in esh
+
+    def test_opls_ua_uses_methyl_cap_not_explicit_h(self):
+        # OPLS-UA field id has no "trappe" substring but still ends in "-ua" -- must
+        # get the same UA-correct cap as TraPPE-UA, or every build fails with
+        # "Missing rules" (regression: this previously fell through to the *[H]
+        # all-atom cap because the old detection only matched "trappe" in field.lower())
+        esh = make_esh("*CC*", field="opls/2024/opls-ua")
+        s = sections(esh)
+        assert "*[H]" not in s["GROUPS"]
+        assert "cap      *C" in esh
+
     def test_density_in_options(self):
         esh = make_esh("*CC*", density=1.2)
         s = sections(esh)

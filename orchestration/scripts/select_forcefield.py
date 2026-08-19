@@ -44,6 +44,10 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 LINEAGE = {
     "pcff": "class2", "pcff_ore": "class2", "compass": "class2",
     "opls/2024/opls-aa": "opls", "opls/2012/opls-aa": "opls",
+    # OPLS-UA is a distinct representation (no explicit H, no improper term) fit
+    # separately from OPLS-AA -- not the same functional form, so it gets its own
+    # lineage bucket rather than being folded into "opls".
+    "opls/2024/opls-ua": "opls_ua", "opls/2012/opls-ua": "opls_ua",
     "trappe-ua": "ua", "trappe-eh": "ua",
     "gaff": "gaff", "gaff2": "gaff", "gaff2_mod": "gaff",
     "dreiding": "dreiding", "charmm/c36a": "charmm",
@@ -79,14 +83,22 @@ def select_forcefield(polymer_class, smiles, fields=None, archive_root="manuscri
                       emc_root=ff_provenance.EMC_ROOT, keep_dir=None):
     rules = load_rules()
     cls = get_class_entry(rules, polymer_class, warn_on_miss=True)
-    default = cls.get("preferred_ff") or cls.get("forcefield")
-    if not default:
+    default_raw = cls.get("preferred_ff") or cls.get("forcefield")
+    if not default_raw:
         return {"error": f"polymer_rules.json class {polymer_class!r} has no preferred_ff"}
 
     tmp = keep_dir or tempfile.mkdtemp(prefix="ffsel_")
     cap = ff_capability.assess_all(smiles, fields, keep_dir=tmp)
     if "error" in cap:
         return cap
+
+    # polymer_rules.json's preferred_ff casing does not always match
+    # ff_capability.FIELDS' canonical (lowercase) keys -- e.g. PURA stores
+    # "GAFF2_mod" against the registry key "gaff2_mod". Resolve to the registry's
+    # casing so an admissible class default is never mistaken for inadmissible;
+    # the raw JSON value is still shown verbatim in the evidence claim below.
+    default = next((f for f in cap["fields"] if f.lower() == default_raw.lower()),
+                   default_raw)
 
     assessed = {}
     for field, r in cap["fields"].items():
@@ -158,7 +170,7 @@ def select_forcefield(polymer_class, smiles, fields=None, archive_root="manuscri
                 {"claim": reason},
                 {"claim": f"admissible fields (integrate + type this SMILES): {admissible}"},
                 {"claim": f"class default source: polymer_rules.json:classes."
-                          f"{polymer_class}.preferred_ff = {default!r}",
+                          f"{polymer_class}.preferred_ff = {default_raw!r}",
                  "ff_justification_doi": cls.get("ff_justification_doi"),
                  "ff_note": cls.get("ff_note")},
             ],

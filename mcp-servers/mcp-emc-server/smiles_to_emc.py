@@ -80,13 +80,16 @@ def make_esh(
     #   cap group's single connection (1) can terminate either end of the repeat unit
     #   cap chemistry: *[H] — explicit H atom type present in PCFF and OPLS-AA
     #
-    # Connection spec for TraPPE-UA (united-atom field):
+    # Connection spec for united-atom fields (TraPPE-UA, TraPPE-EH, OPLS-UA):
     #   Hydrogen is IMPLICIT in united-atom; *[H] has no UA atom type → EMC exits with
     #   "Missing rules." Use *C (CH3 methyl UA group) as chain-end cap instead.
     #   Connection spec goes on the repeat line: repeat knows it can bond to cap.
     #   Validated against EMC v9.4.4 trappe-ua.top rule 69: c4h3 = C(C) (one neighbour).
-    is_trappe = "trappe" in field.lower()
-    if is_trappe:
+    #   Matched by field-id suffix "-ua" (e.g. opls/2024/opls-ua) as well as the
+    #   "trappe" substring, so OPLS-UA gets the same UA-correct cap as TraPPE-UA/EH
+    #   instead of silently failing every build with "Missing rules" via the *[H] cap.
+    is_ua = "trappe" in field.lower() or field.lower().endswith("-ua")
+    if is_ua:
         repeat_connect = f"{smiles},1,repeat:2, 1,cap:1, 2,cap:1"
         cap_line = "*C"
     else:

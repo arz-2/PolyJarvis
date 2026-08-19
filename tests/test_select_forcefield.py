@@ -18,6 +18,7 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import emc_fields  # noqa: E402
 import ff_capability  # noqa: E402
+import select_forcefield as sf  # noqa: E402
 from select_forcefield import LINEAGE  # noqa: E402
 from validate_run_plan import _forcefield_findings  # noqa: E402
 
@@ -41,6 +42,32 @@ def test_class2_members_share_one_lineage():
 
 def test_opls_and_class2_are_distinct_lineages():
     assert LINEAGE["opls/2024/opls-aa"] != LINEAGE["pcff"]
+
+
+# --- case-insensitive default matching --------------------------------------------
+
+def _fake_field(candidate=True):
+    return {"candidate": candidate, "integrates": candidate, "types_smiles": candidate,
+            "typing_error": None, "cell_dir": None}
+
+
+def test_class_default_matched_case_insensitively(monkeypatch):
+    """polymer_rules.json's preferred_ff casing need not match ff_capability.FIELDS'
+    canonical (lowercase) keys -- e.g. PURA stores "GAFF2_mod" against the registry's
+    "gaff2_mod". A class default that IS admissible must never be reported as
+    inadmissible, and decided_params_override must never fire, merely because of a
+    casing mismatch (regression: this previously fell through to the "not admissible"
+    branch and proposed overriding PURA's DOI-justified default to dreiding)."""
+    fake_cap = {"fields": {"gaff2_mod": _fake_field(), "gaff": _fake_field(),
+                          "gaff2": _fake_field(), "dreiding": _fake_field()}}
+    monkeypatch.setattr(sf.ff_capability, "assess_all", lambda *a, **k: fake_cap)
+
+    result = sf.select_forcefield("PURA", "*NC(=O)N*")
+    assert result["decision"]["choice"] == "gaff2_mod"
+    assert result["decision"]["confidence"] == "high"
+    assert result["decided_params_override"] == {}
+    # the raw JSON casing is still shown verbatim in the evidence trail
+    assert "'GAFF2_mod'" in result["decision"]["evidence"][-1]["claim"]
 
 
 # --- validator -------------------------------------------------------------------

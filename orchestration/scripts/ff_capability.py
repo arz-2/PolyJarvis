@@ -60,6 +60,18 @@ FIELDS = {
                              styles=dict(pair="lj/cut/coul/long", bond="harmonic",
                                          angle="harmonic", dihedral="opls",
                                          improper="cvff")),
+    # United-atom OPLS, present in ~/emc/field/opls/{2012,2024}/opls-ua.* but never
+    # previously registered here, so it was never assessed as a D-01 candidate.
+    # Confirmed by reading both .prm files directly: neither carries a final
+    # `ITEM IMPROPER` params list (2012 has only IMPROPER_AUTO derivation rules,
+    # 2024 has none at all), so -- unlike opls-aa -- no improper style is required,
+    # matching the trappe-ua/trappe-eh pattern below.
+    "opls/2024/opls-ua": dict(front_end="emc", name="opls/2024/opls-ua",
+                             styles=dict(pair="lj/cut/coul/long", bond="harmonic",
+                                         angle="harmonic", dihedral="opls")),
+    "opls/2012/opls-ua": dict(front_end="emc", name="opls/2012/opls-ua",
+                             styles=dict(pair="lj/cut/coul/long", bond="harmonic",
+                                         angle="harmonic", dihedral="opls")),
     "trappe-ua":        dict(front_end="emc", name="trappe/2014/trappe-ua",
                              styles=dict(pair="lj/cut/coul/long", bond="harmonic",
                                          angle="harmonic", dihedral="opls")),

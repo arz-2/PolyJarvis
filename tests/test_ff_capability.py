@@ -201,3 +201,14 @@ def test_excluded_fields_carry_a_reason(monkeypatch):
     assert set(fc.EXCLUDED) & {"cff", "uff", "martini"}
     assert all(v.strip() for v in fc.EXCLUDED.values())
     assert not (set(fc.EXCLUDED) & set(fc.FIELDS))
+
+
+def test_opls_ua_is_registered_with_no_improper_style():
+    """~/emc/field/opls/{2012,2024}/opls-ua.prm has no final ITEM IMPROPER params
+    list (2012 has only IMPROPER_AUTO derivation rules; 2024 has none at all) --
+    unlike opls-aa, so requiring an improper style here would wrongly reject an
+    admissible field on integration alone."""
+    for name in ("opls/2024/opls-ua", "opls/2012/opls-ua"):
+        assert name in fc.FIELDS, f"{name} missing from FIELDS registry"
+        assert "improper" not in fc.FIELDS[name]["styles"]
+        assert fc.FIELDS[name]["front_end"] == "emc"
