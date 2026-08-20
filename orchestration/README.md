@@ -14,7 +14,11 @@ guides or generate worker prompts.
 | `validate_run_plan.py` | Structural and policy validation of plan artifacts |
 | `enforce_gate.py` | Deterministic equilibration gate enforcement |
 | `pick_gpu.py` | Atomic GPU claim and release ledger |
-| `select_hardware.py` | Hardware-policy resolution |
+| `select_hardware.py` | Hardware-policy resolution (D-08_hardware) |
+| `select_forcefield.py` | Force-field admissibility resolution (D-01_ff) |
+| `select_system_size.py` | Fox-Flory/entanglement DP floor resolution (D-04_system_size); re-run live by `validate_run_plan.py` on every plan, not just hand-transcribed |
+| `plan_system_size_arms.py` | Opt-in two-arm split when a run's tg and bulk_modulus DP floors diverge sharply — sizes each arm from its own property subset instead of the run-wide max |
+| `merge_arm_summaries.py` | Combines two split arms' `run_summary.json` into one report |
 
 Control events live in `data/<run>/raw/control_state.json`; execution state lives in
 `data/<run>/workflow_state.json` (per-stage status/attempts) and each attempt's own

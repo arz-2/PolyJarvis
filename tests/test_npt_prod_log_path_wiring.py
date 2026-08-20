@@ -31,7 +31,7 @@ GLASSY_CLS = {"T_workflow_K": 450.0, "experimental_tg_K": 450}
 
 def _args(**overrides):
     base = dict(
-        run_name="PE1", data_path=None, npt_prod_log=None, npt_prod_dump=None,
+        run_name="PE1", smiles="*CC*", data_path=None, npt_prod_log=None, npt_prod_dump=None,
         output_dir=None, phase=None, dp=None, exp_K_min=None, exp_K_max=None,
         dt_fs=None, backbone_types=None,
     )

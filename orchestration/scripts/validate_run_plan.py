@@ -26,7 +26,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from select_hardware import select_hardware
-from hw_common import load_rules, get_class_entry
+from select_system_size import select_system_size
+from hw_common import load_rules, get_class_entry, resolve_member_value
 
 _ENGINE_SCRIPTS = (Path(__file__).resolve().parents[2]
                    / "mcp-servers" / "mcp-lammps-engine" / "analysis_scripts")
@@ -35,24 +36,19 @@ if str(_ENGINE_SCRIPTS) not in sys.path:
 from finite_size import predict_equilibrated_L  # noqa: E402
 
 
-def _target_density(cls: dict, run_name: str):
+def _target_density(cls: dict, smiles: str):
     """Class experimental density. Multi-member classes key it by member name (PACR
-    {PMMA, PMA}, PHYC {PE, PP, PIB}), so resolve via the run name's alpha prefix; a bare
-    float applies to the whole class. Returns None when it cannot be resolved -- the
-    caller then skips rather than guessing a density."""
+    {PMMA, PMA}, PHYC {PE, PP, PIB}), resolved via the run's own SMILES against the
+    class's member_smiles table. A bare float applies to the whole class. Returns None
+    when it cannot be resolved -- the caller then skips rather than guessing a density.
+    A dict with exactly one numeric member is not treated as unambiguous: it means only
+    that one member's density happens to be documented, not that the class has one
+    member (e.g. PSTR documents PS but also covers P2VP)."""
     ed = cls.get("experimental_density_gcm3")
     if isinstance(ed, (int, float)):
         return float(ed)
-    if isinstance(ed, dict):
-        key = run_name.rstrip("0123456789")
-        v = ed.get(key)
-        if isinstance(v, (int, float)):
-            return float(v)
-        numeric = [x for x in ed.values() if isinstance(x, (int, float))]
-        # Single-member dict is unambiguous; a real multi-member class without a run-name
-        # match is NOT -- refuse rather than pick one.
-        if len(numeric) == 1:
-            return float(numeric[0])
+    if isinstance(ed, dict) and smiles:
+        return resolve_member_value(cls, "experimental_density_gcm3", smiles)
     return None
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -203,7 +199,7 @@ def _finite_size_findings(plan: dict) -> list:
 
     cls = get_class_entry(load_rules(), polymer_class) or {}
     cutoff_A = dp.get("cutoff_A") or cls.get("cutoff_A")
-    rho = _target_density(cls, plan.get("run_name") or "")
+    rho = _target_density(cls, smiles)
     if not cutoff_A or not rho:
         return findings
 
@@ -419,19 +415,36 @@ def _forcefield_findings(plan: dict) -> list:
 def _system_size_findings(plan: dict) -> list:
     """D-04_system_size must not silently under-provision DP for a floor the class's own
     cited literature already documents (Fox-Flory for tg, entanglement DP@Me for
-    bulk_modulus). select_system_size.py records required_dp_floor whenever it measured
-    one; this checks the plan's decided dp_typical against it, same acknowledgeable-flag
-    pattern as _forcefield_findings' provenance check -- a floor violation does not block
-    the plan outright, it must be raised or carried as a stated uncertainty.
+    bulk_modulus).
+
+    Mirrors _hardware_findings: select_system_size.py is re-run live against the plan's
+    own smiles/properties, same as _hardware_findings does with select_hardware.py. A
+    floor violation does not block the plan outright, it must be raised or carried as a
+    stated uncertainty -- same acknowledgeable-flag pattern as _forcefield_findings'
+    provenance check.
     """
     findings = []
-    d = next((x for x in plan.get("decisions", []) if x.get("id") == "D-04_system_size"), None)
-    if not d:
+    dp_dict = plan.get("decided_params", {})
+    smiles, polymer_class = plan.get("smiles"), plan.get("polymer_class")
+    if not smiles or not polymer_class:
         return findings
-    required_floor = d.get("required_dp_floor")
+
+    try:
+        rec = select_system_size(polymer_class, smiles,
+                                 properties=plan.get("properties"),
+                                 dp_typical=dp_dict.get("dp_typical"),
+                                 nchain=dp_dict.get("nchain"))
+    except Exception as e:  # noqa: BLE001 -- a broken check must not block a plan
+        findings.append({"check": "system_size_safety", "severity": "structural",
+                         "detail": f"select_system_size.py raised: {e}"})
+        return findings
+    if "error" in rec:
+        return findings
+
+    required_floor = rec["decision"].get("required_dp_floor")
     if required_floor is None:
         return findings
-    dp = plan.get("decided_params", {}).get("dp_typical")
+    dp = dp_dict.get("dp_typical")
     if dp is None or dp >= required_floor:
         return findings
     acknowledged = any(u.get("name") == "system_size_dp_floor"
@@ -439,10 +452,10 @@ def _system_size_findings(plan: dict) -> list:
     if not acknowledged:
         findings.append({
             "check": "system_size_dp_floor_unacknowledged", "severity": "structural",
-            "detail": (f"decided_params.dp_typical={dp} is below D-04_system_size."
-                      f"required_dp_floor={required_floor} ({d.get('floor_sources')}) and no "
-                      "uncertainties entry named 'system_size_dp_floor' acknowledges it. "
-                      "Raise dp_typical to the floor or record the gap as a stated "
+            "detail": (f"decided_params.dp_typical={dp} is below the measured "
+                      f"required_dp_floor={required_floor} ({rec['decision'].get('floor_sources')}) "
+                      "and no uncertainties entry named 'system_size_dp_floor' acknowledges "
+                      "it. Raise dp_typical to the floor or record the gap as a stated "
                       "uncertainty -- re-run orchestration/scripts/select_system_size.py.")})
     return findings
 

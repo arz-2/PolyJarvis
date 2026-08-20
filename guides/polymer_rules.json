@@ -153,7 +153,8 @@
       "dp_typical": "Degree of polymerization (repeat units per chain) for production runs",
       "dp_min": "Minimum DP for chain-length-independent Tg (Fox-Flory plateau)",
       "nchain": "Number of chains in simulation cell",
-      "entanglement_Me_gmol": "Entanglement molecular weight Me=rho*R*T/Ge (Mark 2007 Ch.25), documented for exactly ONE named member of a multi-member class (e.g. PACR.PMMA, not PACR as a whole) -- keyed by member name, resolved via run_name by select_system_size.py. Absent (or a member without an entry) means MW_FLOOR_UNKNOWN, never a class-wide assumption.",
+      "entanglement_Me_gmol": "Entanglement molecular weight Me=rho*R*T/Ge (Mark 2007 Ch.25), documented for exactly ONE named member of a multi-member class (e.g. PACR.PMMA, not PACR as a whole) -- keyed by member name, resolved via the run's own SMILES against member_smiles by select_system_size.py. Absent (or a member without an entry) means MW_FLOOR_UNKNOWN, never a class-wide assumption.",
+      "member_smiles": "Per-member {member_name: [canonical_smiles, ...]} table for multi-member classes -- the identity mechanism every member-keyed field (experimental_tg_K, experimental_density_gcm3, entanglement_Me_gmol) resolves against, via hw_common.resolve_member/resolve_member_value matching the run's own SMILES (canonicalized, stereo-stripped) against these entries. A class/member with none listed here (or a {\"note\": ...}-only value) has no member data resolvable by SMILES -- either a structural/copolymer category with no single well-defined molecule (PURT, PURA, most of PANH/PLGA and PIMN/DGEBA_amine), or curation not yet done (PIMD, PIMN/PEI_Ultem).",
       "density_initial_gcm3": "Starting density for amorphous cell construction (g/cm³); ~0.5x experimental RT density avoids atomic overlaps",
       "electrostatics": "Runtime long-range Coulomb treatment: pppm (required for any heteroatom) or lj_cut (purely apolar C/H only)",
       "cutoff_A": "van der Waals and real-space Coulomb cutoff (Angstroms)",
@@ -523,6 +524,17 @@
         "min": 1.5,
         "max": 2.0,
         "note": "K_T (isothermal, PVT/dilatometry) for rubbery amorphous PE at 25°C (above Tg=195K). Mark 2007 Table 7.5 Tait params for branched/linear PE above Tg give K_T≈1.7–1.9 GPa at 25°C (C=0.0894, b0≈1770–1880 bar, b1≈0.0043–0.0047). Range [1.5,2.0] consistent with Brandrup & Immergut. Note: literature values [2.5-3.5] GPa sourced from semicrystalline/HDPE ultrasonic K_S — not the correct comparator for fully-amorphous TraPPE-UA simulation."
+      },
+      "member_smiles": {
+        "PE": [
+          "*CC*"
+        ],
+        "PP": [
+          "*CC(*)C"
+        ],
+        "PIB": [
+          "*CC(*)(C)C"
+        ]
       }
     },
     "PSTR": {
@@ -617,7 +629,15 @@
         "max": 4.0,
         "note": "K_T (isothermal, PVT/dilatometry) for glassy aPS at 25°C. Mark 2007 Table 7.6 Tait params for glassy PS (b0≈3300–3900 bar, b1≈0.0027–0.0043) give K_T≈3.4–3.7 GPa at 25°C. Prior [3.5,5.5] upper bound unsupported; 5.5 GPa is ultrasonic K_S. Source: Zoller 1978 via Mark 2007 Table 7.6 refs [10,20,33,34]."
       },
-      "K_deform_rate_slow_inv_s": 1000000.0
+      "K_deform_rate_slow_inv_s": 1000000.0,
+      "member_smiles": {
+        "PS": [
+          "*CC(*)c1ccccc1"
+        ],
+        "P2VP": [
+          "*CC(*)c1ccccn1"
+        ]
+      }
     },
     "PVNL": {
       "name": "Polyvinyl",
@@ -693,7 +713,18 @@
         "max": 4.5,
         "note": "K_T (isothermal, PVT/dilatometry) for glassy PVC at 25°C. Mark 2007 Table 7.6 Tait params for glassy PVC (b0=3751 bar, b1=0.00241, Tg=75°C, ref [33,34]) give K_T≈4.0 GPa at 25°C. Range [3.5,4.5] also consistent with revision.md K_T=[3.6,4.5] derived from K_S=[4.0,5.0]×0.87. Source: Orwoll in Mark 2007 Ch.7; Hellwege et al. via Zoller."
       },
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "PVA": [
+          "*CC(*)O"
+        ],
+        "PVC": [
+          "*CC(*)Cl"
+        ],
+        "PVAc": [
+          "*CC(*)OC(C)=O"
+        ]
+      }
     },
     "PACR": {
       "name": "Polyacrylic",
@@ -791,7 +822,18 @@
         "note": "K_T (isothermal, PVT/dilatometry) for glassy PMMA at 25°C. Mark 2007 Table 7.6 Tait params for glassy PMMA (b0≈3560–3770 bar, b1≈0.0032–0.0047, Tg≈100–105°C, refs [7,18,48]) give K_T≈3.5–3.8 GPa at 25°C. Prior upper 5.0 GPa was ultrasonic K_S not converted. revision.md [4.3,5.4] uses K_S→K_T which overestimates vs direct PVT; K_T priority rule applies. Source: Zoller/McKinney/Rogers via Mark 2007 Table 7.6."
       },
       "K_deform_rate_slow_inv_s": 10000000.0,
-      "melt_npt_ns": 1.0
+      "melt_npt_ns": 1.0,
+      "member_smiles": {
+        "PMMA": [
+          "*CC(*)(C)C(=O)OC"
+        ],
+        "PMA": [
+          "*CC(*)C(=O)OC"
+        ],
+        "PAA": [
+          "*CC(*)C(=O)O"
+        ]
+      }
     },
     "PHAL": {
       "name": "Polyhalogenated",
@@ -864,7 +906,18 @@
         "Amorphous PVDF density validation target: 1.75–1.78 g/cm³ at 283 K (Byutner2000 Fig 5; experimental Kynar amorphous PVDF). Simulation density at 283 K below 1.70 g/cm³ indicates incorrect charge scaling or wrong nonbonded parameters."
       ],
       "K_deform_rate_slow_inv_s": 10000000.0,
-      "melt_npt_ns": 1.0
+      "melt_npt_ns": 1.0,
+      "member_smiles": {
+        "PVDF": [
+          "*CC(*)(F)F"
+        ],
+        "PTFE": [
+          "*C(F)(F)C(*)(F)F"
+        ],
+        "PCTFE": [
+          "*C(F)(F)C(*)(F)Cl"
+        ]
+      }
     },
     "PDIE": {
       "name": "Polydiene",
@@ -951,6 +1004,14 @@
         "min": 1.38,
         "max": 1.95,
         "note": "K_T (isothermal, PVT/dilatometry) for amorphous rubbery dienes at 25°C. cis-1,4-PBD K_T=1.38 GPa, cis-1,4-PI K_T=1.94 GPa (Mark, Polymer Data Handbook 1999; polymer_db). Mark 2007 Table 7.5 Tait params for Natural Rubber (cis-PI; b0≈1916–1937 bar, b1≈0.00425–0.00517) independently confirm K_T(PI)≈1.93 GPa at 25°C — validates the Mark 1999 upper bound. cis-PBD not listed in Mark 2007 Table 7.5/7.8; K_T=1.38 GPa from Mark 1999 PVT stands as primary source. revision.md K_T=[1.5,2.2] derived from K_S×0.87 conversion is consistent but overestimates vs direct PVT; K_T priority rule → keep [1.38,1.95]. Prior [0.2,0.6] was shear/Young's modulus (mis-scoped), corrected 2026-06-21 after cis-PBD1 pilot (D-07). R1 measured 1.565 GPa (+13% above 1.38 lower bound): PASS."
+      },
+      "member_smiles": {
+        "PBD": [
+          "*CC=CC*"
+        ],
+        "PI": [
+          "*CC=C(C)C*"
+        ]
       }
     },
     "POXI": {
@@ -1042,7 +1103,18 @@
         "max": 4.0,
         "note": "K_T (isothermal, PVT/dilatometry) for amorphous PEO. Mark 2007 Table 7.5 Tait params for Polyoxyethylene melt (b0≈2077–2870 bar, b1≈0.0040–0.0047, measured 75–224°C) extrapolate to K_T≈2.1 GPa at 25°C for fully-amorphous rubbery PEO (Tg=206K; 25°C is above Tg). Upper bound 4.0 GPa accounts for partial crystallinity in experimental samples (PEO Tm≈65°C; semicrystalline at 25°C adds mechanical reinforcement). revision.md K_T=[3.0,4.0] is the semicrystalline-inclusive range. Use 2.0 as the amorphous-phase floor. Source: Orwoll in Mark 2007 Table 7.5 refs [1,21,47]."
       },
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "PEO": [
+          "*CCO*"
+        ],
+        "PPO": [
+          "*CC(C)O*"
+        ],
+        "PVME": [
+          "*CC(*)OC"
+        ]
+      }
     },
     "PSUL": {
       "name": "Polythioether / Polysulfide",
@@ -1115,7 +1187,15 @@
         "min": 3.5,
         "max": 5.5
       },
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "PPS": [
+          "*Sc1ccc(*)cc1"
+        ],
+        "poly(propylene sulfide)": [
+          "*CC(C)S*"
+        ]
+      }
     },
     "PEST": {
       "name": "Polyester",
@@ -1212,7 +1292,21 @@
         3000,
         5000
       ],
-      "bm_pressures_note": "Stiff ester glass: +/-1000 atm gives B0_prime runaway (invalid fit); tension beyond -1000 atm cavitates the cell. Compression-biased range confirmed on 4/4 PLA replicates (B0_prime 6.1-11.4, r2>=0.9997)."
+      "bm_pressures_note": "Stiff ester glass: +/-1000 atm gives B0_prime runaway (invalid fit); tension beyond -1000 atm cavitates the cell. Compression-biased range confirmed on 4/4 PLA replicates (B0_prime 6.1-11.4, r2>=0.9997).",
+      "member_smiles": {
+        "PET": [
+          "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+        ],
+        "PLA": [
+          "*OC(C)C(*)=O"
+        ],
+        "PCL": [
+          "*CCCCCC(=O)O*"
+        ],
+        "PBT": [
+          "*OCCCCOC(=O)c1ccc(C(*)=O)cc1"
+        ]
+      }
     },
     "PAMD": {
       "name": "Polyamide",
@@ -1293,7 +1387,18 @@
         "min": 3.5,
         "max": 5.5
       },
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "Nylon6": [
+          "*CCCCCC(=O)N*"
+        ],
+        "Nylon66": [
+          "*NCCCCCCNC(=O)CCCCC(*)=O"
+        ],
+        "Nylon12": [
+          "*CCCCCCCCCCCC(=O)N*"
+        ]
+      }
     },
     "PURT": {
       "name": "Polyurethane",
@@ -1351,7 +1456,10 @@
       "ff_justification_doi": "10.3390/polym18060679",
       "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: aliphatic TPU PASS). WARNING: aromatic MDI-type urethane SMILES fail with {o,c_2} increment error — test build before submitting aromatic TPU.",
       "K_deform_rate_slow_inv_s": 10000000.0,
-      "melt_npt_ns": 1.0
+      "melt_npt_ns": 1.0,
+      "member_smiles": {
+        "note": "soft_segment/hard_segment are generic polyol-/diisocyanate-derived structural roles, not one discrete repeat-unit molecule each -- no member_smiles entries."
+      }
     },
     "PURA": {
       "name": "Polyurea",
@@ -1404,7 +1512,10 @@
       "preferred_ff": "GAFF2_mod",
       "preferred_builder": "radonpy",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "RadonPy/GAFF2_mod path. Polar (C=O, N-H, N-H) urea backbone. EMC does not yet implement PURA."
+      "ff_note": "RadonPy/GAFF2_mod path. Polar (C=O, N-H, N-H) urea backbone. EMC does not yet implement PURA.",
+      "member_smiles": {
+        "note": "hard_segment is a generic isocyanate-derived structural role, not one discrete repeat-unit molecule -- no member_smiles entry."
+      }
     },
     "PIMD": {
       "name": "Polyimide",
@@ -1471,7 +1582,10 @@
         "min": 4.0,
         "max": 6.0
       },
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "note": "PMDA_ODA (Kapton) and BPDA_PDA are fused polyimide structures that could not be confidently hand-curated in this pass (a first attempt produced an invalid 3-open-valence PMDA_ODA structure and an incomplete BPDA_PDA missing its dianhydride-imide half) -- needs verification against a primary source (e.g. PubChem or a cited synthesis paper) before adding real member_smiles entries."
+      }
     },
     "PANH": {
       "name": "Polyanhydride",
@@ -1528,7 +1642,13 @@
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acsapm.0c00524",
       "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(sebacic anhydride) PASS). PCFF ester-like types cover anhydride linkage.",
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "poly_sebacic_anhydride": [
+          "*OC(=O)CCCCCCCCC(*)=O"
+        ],
+        "note": "PLGA is an inherently variable-composition lactide:glycolide copolymer, not a single homopolymer repeat unit -- no member_smiles entry for it. poly_sebacic_anhydride is a real single molecule and has one."
+      }
     },
     "PCBN": {
       "name": "Polycarbonate",
@@ -1602,7 +1722,12 @@
         "min": 3.0,
         "max": 4.0
       },
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "BPA_PC": [
+          "*Oc1ccc(C(C)(C)c2ccc(OC(*)=O)cc2)cc1"
+        ]
+      }
     },
     "PIMN": {
       "name": "Polyamine / Polyetherimide / Epoxy",
@@ -1661,7 +1786,13 @@
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1002/pol.20200050",
       "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PEI PASS). PCFF has amine N types. Wen2020 validates PCFF for Ultem (4,4-BPADA+MPD): MD Tg=525K vs exp ~490K (+7%).",
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "linear_PEI": [
+          "*CCN*"
+        ],
+        "note": "PEI_Ultem and DGEBA_amine excluded: DGEBA_amine is a cured epoxy-amine thermoset network reference, not a discrete repeat-unit molecule. PEI_Ultem was attempted but its repeat-unit structure could not be confidently curated (formula cross-check against Ultem's known ~592.6 g/mol repeat MW failed) -- needs verification against a primary source before adding. linear_PEI is a real, verified molecule and has an entry."
+      }
     },
     "PSIL": {
       "builder_status": "supported",
@@ -1732,7 +1863,15 @@
       "ff_justification_doi": "10.1021/acs.jpcb.4c08471",
       "ff_note": "EMC opls/2024/opls-aa with patched siloxane typing rules (2026-06-05). Charges from BCIs: si4_internal=+0.94, si4_terminal=+0.82, o2(bridge)=-0.44, o2h(silanol)=-0.60. Validate density against PDMS exp. target ~0.97 g/cm³.",
       "ff": "opls/2024/opls-aa",
-      "ff_notes": "EMC opls/2024/opls-aa with added siloxane rules. Si4/o2 bond+angle+torsion params were already present; only typing rules and o2-si4/o2h-si4 charge increments were added. pcff still missing {si,osi}."
+      "ff_notes": "EMC opls/2024/opls-aa with added siloxane rules. Si4/o2 bond+angle+torsion params were already present; only typing rules and o2-si4/o2h-si4 charge increments were added. pcff still missing {si,osi}.",
+      "member_smiles": {
+        "PDMS": [
+          "*O[Si](*)(C)C"
+        ],
+        "PMHS": [
+          "*O[SiH](*)C"
+        ]
+      }
     },
     "PPHS": {
       "name": "Polyphosphazene",
@@ -1788,7 +1927,12 @@
       "ff_justification_doi": "10.3390/polym14071451",
       "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(ethoxyphosphazene) PASS; pcff.frc explicitly added polyphosphazene types). WARNING: Cl-substituted PDCP not tested.",
       "K_deform_rate_slow_inv_s": 10000000.0,
-      "melt_npt_ns": 1.0
+      "melt_npt_ns": 1.0,
+      "member_smiles": {
+        "poly_ethoxyphosphazene": [
+          "*N=P(*)(OCC)OCC"
+        ]
+      }
     },
     "PKTN": {
       "name": "Polyketone / Polyetherketone",
@@ -1869,7 +2013,18 @@
         "max": 5.8,
         "note": "K_T (isothermal, PVT/dilatometry) for glassy PEEK at 25°C. No PEEK entry in Mark 2007 Table 7.5/7.6/7.8. Range [4.0,5.8] from revision.md (Chen2025; Sahputra2018). Prior upper 7.0 GPa was unsupported; corrected 2026-06-21."
       },
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "PEEK": [
+          "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1"
+        ],
+        "PEK": [
+          "*Oc1ccc(C(=O)c2ccc(*)cc2)cc1"
+        ],
+        "PEKK": [
+          "*Oc1ccc(C(=O)c2ccc(C(=O)c3ccc(*)cc3)cc2)cc1"
+        ]
+      }
     },
     "PSFO": {
       "name": "Polysulfone",
@@ -1950,7 +2105,18 @@
         "max": 5.5,
         "note": "K_T (isothermal, PVT/dilatometry) for glassy PSU at 25°C. Mark 2007 Table 7.6 Tait params for glassy Polysulfone/Bisphenol-A (b0=4323 bar, b1=0.00154, Tg=186°C, ref [24]) give K_T≈4.65 GPa at 25°C. Prior [3.0,5.0] lower bound 3.0 is unsupported — Zoller's PVT data puts K_T at ~4.7 GPa. Range [4.0,5.5] consistent with revision.md K_T=[3.5,5.0] upper and Mark 2007 point. Source: Zoller 1978 (J.Polym.Sci. Polym.Phys. 16, 1261) via Mark 2007 Table 7.6 ref [24]."
       },
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "PSU": [
+          "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1"
+        ],
+        "PES": [
+          "*Oc1ccc(S(=O)(=O)c2ccc(*)cc2)cc1"
+        ],
+        "PPSU": [
+          "*Oc1ccc(-c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1"
+        ]
+      }
     },
     "PPNL": {
       "name": "Polyphenylenevinylene / Conjugated Polymer",
@@ -2015,7 +2181,18 @@
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1002/mats.201600006",
       "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PPV PASS). Note: OPLS-AA failed for PPV (no vinyl rule); PCFF succeeded. Conjugated torsional accuracy not yet validated. Venkatanarayanan2016 validates PCFF directly for PPV: Tg=416±8K vs exp ~416K.",
-      "K_deform_rate_slow_inv_s": 10000000.0
+      "K_deform_rate_slow_inv_s": 10000000.0,
+      "member_smiles": {
+        "PPV": [
+          "*C=Cc1ccc(*)cc1"
+        ],
+        "MEH_PPV": [
+          "*C=Cc1cc(OC)c(OCC(CC)CCCC)cc1*"
+        ],
+        "PPO_PPE": [
+          "*Oc1cc(C)c(*)c(C)c1"
+        ]
+      }
     }
   },
   "global_defaults": {

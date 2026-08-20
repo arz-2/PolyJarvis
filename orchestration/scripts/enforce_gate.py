@@ -15,6 +15,9 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hw_common import resolve_member_value  # noqa: E402
+
 BINDING_GLASSY = {"density_drift", "density_sem", "energy_drift", "energy_sem",
                    "density_in_band", "density_homogeneity", "p2", "n_eff_density",
                    "finite_size"}
@@ -54,16 +57,8 @@ def resolve_regime(t_workflow_k):
     return "rubbery" if t_workflow_k is not None and t_workflow_k <= 300.0 else "glassy"
 
 
-def density_in_band(plateau_mean, exp_field, polymer_key, band_pct=5.0):
-    if plateau_mean is None or exp_field is None:
-        return None, None, None
-    if isinstance(exp_field, (int, float)):
-        exp_val = exp_field
-    elif isinstance(exp_field, dict):
-        exp_val = exp_field.get(polymer_key)
-    else:
-        exp_val = None
-    if exp_val is None:
+def density_in_band(plateau_mean, exp_val, band_pct=5.0):
+    if plateau_mean is None or exp_val is None:
         return None, None, None
     gap_pct = 100.0 * (plateau_mean - exp_val) / exp_val
     return abs(gap_pct) <= band_pct, gap_pct, exp_val
@@ -218,14 +213,17 @@ def enforce(run_name, repo_root: Path):
 
     # --- density-in-band (density_value_binding target) ---
     # dp first: a planning agent's overrides.experimental_density_gcm3 pin (OVERRIDE_RANGES)
-    # must be respected here too, same precedence as dp_typical above -- previously this read
-    # cls_rules only, so an override that correctly reached equil-check's density band would
-    # still silently grade the FINAL gate verdict against the class's un-overridden default.
+    # must be respected here too, same precedence as dp_typical above.
+    smiles = plan.get("smiles")
     exp_density_dict = dp.get("experimental_density_gcm3") or cls_rules.get("experimental_density_gcm3")
-    polymer_key = run_name.rstrip("0123456789")  # e.g. "PMMA2" -> "PMMA"
-    # experimental_density_gcm3 keys are member names (e.g. "PMMA"); polymer_key already matches
+    if isinstance(exp_density_dict, (int, float)):
+        exp_density_resolved = exp_density_dict
+    elif isinstance(exp_density_dict, dict):
+        exp_density_resolved = resolve_member_value(cls_rules, "experimental_density_gcm3", smiles)
+    else:
+        exp_density_resolved = None
     plateau_mean = (dens or {}).get("plateau_density_mean")
-    in_band, gap_pct, exp_val = density_in_band(plateau_mean, exp_density_dict, polymer_key)
+    in_band, gap_pct, exp_val = density_in_band(plateau_mean, exp_density_resolved)
     gates["density_in_band"] = in_band  # may be None if no exp value on file
 
     # --- determine applicable clause ---

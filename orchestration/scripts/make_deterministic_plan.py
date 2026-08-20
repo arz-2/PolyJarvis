@@ -132,14 +132,13 @@ STAGE_TRACK = {
 }
 
 
-def build_planned_stages(cls: dict, properties: set, run_name: str | None = None,
-                          smiles: str | None = None) -> list:
+def build_planned_stages(cls: dict, properties: set, smiles: str | None = None) -> list:
     """Experiment DAG with per-stage success_criteria the Validator enforces."""
     # tg-stage accuracy bracket: central Tg estimate (see _exp_tg_point).
-    exp_tg_bracket = _exp_tg_point(cls, run_name, smiles)
+    exp_tg_bracket = _exp_tg_point(cls, smiles)
     # murnaghan deform-fallback hint: regime call, not the bracket -- _regime_exp_tg pads an
     # estimated Tg toward glassy (see its docstring), so this can disagree with the bracket.
-    glassy_hint = ((regime_tg := _regime_exp_tg(cls, run_name, smiles)) is not None
+    glassy_hint = ((regime_tg := _regime_exp_tg(cls, smiles)) is not None
                    and regime_tg > 300)
 
     def _s(stage, criteria, **extra):
@@ -207,7 +206,7 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
     decided_params = {k: cls[k] for k in SNAPSHOT_KEYS if k in cls}
     # Regime call (see _regime_exp_tg): a novel polymer's Tg estimate now drives this instead of
     # defaulting glassy by omission, padded toward glassy for an uncertain estimate.
-    exp_tg = _regime_exp_tg(cls, run_name, smiles)
+    exp_tg = _regime_exp_tg(cls, smiles)
     T_equil = decided_params.get("T_equil_K", 600.0)
     decided_params["T_workflow_K"] = 300.0 if (exp_tg is not None and exp_tg < 300) else T_equil
     uncertainties = [{
@@ -232,7 +231,7 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
         "uncertainties": uncertainties,
         "decided_params": decided_params,
         "decisions": build_decisions(cls),
-        "planned_stages": build_planned_stages(cls, properties, run_name, smiles),
+        "planned_stages": build_planned_stages(cls, properties, smiles),
         "critique": {"status": "pending_scientific_review", "rounds": 0, "findings": []},
         "provenance": {"generator": "make_deterministic_plan.py",
                        "generated_at": datetime.now(timezone.utc).isoformat()},

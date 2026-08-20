@@ -12,7 +12,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from hw_common import load_rules, resolve_ff_family, get_class_entry, host_matches, live_host
+from hw_common import load_rules, resolve_ff_family, get_class_entry, host_matches, live_host, resolve_member_value
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 RULES_PATH = REPO_ROOT / 'guides' / 'polymer_rules.json'
 
@@ -127,33 +127,29 @@ def _estimate_tg_group_contribution(smiles: str, timeout: int = 30) -> dict | No
         return None
     return result if isinstance(result, dict) and 'error' not in result else None
 
-def _exp_tg_point(cls: dict, run_name: str | None=None, smiles: str | None=None):
+def _exp_tg_point(cls: dict, smiles: str | None=None):
     """Point exp_tg_K value for assess_cooling_contraction's tg_K arg and the tg stage's
     planning-time bracket. A scalar experimental_tg_K (single-member class, or a planning
     agent's overrides.experimental_tg_K pin -- see OVERRIDE_RANGES) always wins outright.
-    Otherwise resolves per-member via run_name (fixes the class-mean-averaging bug for
-    multi-member classes). Nothing concrete resolved -- run_name matched no member, or
-    experimental_tg_K is absent entirely (a genuinely novel polymer/class: no experimental Tg
-    exists for ANY member, let alone this one) -> a group-contribution estimate from the
-    SMILES itself (low confidence, ~+/-80K), NOT another member's value: run_name='a-PS'
-    against experimental_tg_K={'PS':373,'P2VP':374} used to silently return 374 (the class
-    median) because the 'a-' prefix breaks the 'PS' startswith match -- an unrelated member's
-    number standing in for this molecule's own property. Estimating from the actual SMILES is
-    honest about what's known and what isn't; borrowing a sibling member's exact value is not."""
+    Otherwise resolves per-member via the run's SMILES. Nothing concrete resolved -- the
+    SMILES matched no member, or experimental_tg_K is absent entirely (a genuinely novel
+    polymer/class: no experimental Tg exists for ANY member, let alone this one) -> a
+    group-contribution estimate from the SMILES itself (low confidence, ~+/-80K), NOT
+    another member's value. Estimating from the actual SMILES is honest about what's known
+    and what isn't; borrowing a sibling member's exact value is not."""
     tg = cls.get('experimental_tg_K')
     if isinstance(tg, (int, float)):
         return tg
-    if isinstance(tg, dict) and run_name:
-        for (key, val) in tg.items():
-            if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                return val
+    resolved = resolve_member_value(cls, 'experimental_tg_K', smiles) if smiles else None
+    if resolved is not None:
+        return resolved
     if smiles:
         est = _estimate_tg_group_contribution(smiles) or {}
         est_tg = est.get('tg_estimated_K')
         if isinstance(est_tg, (int, float)):
             if isinstance(tg, dict):
                 members = sorted(k for k, v in tg.items() if isinstance(v, (int, float)))
-                reason = f"no run_name match among {members} for run_name={run_name!r}"
+                reason = f"smiles matched no member among {members}"
             else:
                 reason = "experimental_tg_K is not set for this class"
             print(f"INFO: {reason} -- using group-contribution estimate {est_tg}K "
@@ -164,17 +160,16 @@ def _exp_tg_point(cls: dict, run_name: str | None=None, smiles: str | None=None)
 
 TG_ESTIMATE_UNCERTAINTY_K = 80.0  # estimate_tg_group_contribution.py's own stated accuracy
 
-def _regime_exp_tg(cls: dict, run_name: str | None=None, smiles: str | None=None):
+def _regime_exp_tg(cls: dict, smiles: str | None=None):
     """Tg for the glassy-vs-rubbery regime call, not _exp_tg_point's bracket estimate. Curated
     values (scalar/matched member) are exact and returned as-is; an estimated value is padded
     by its own +/-80K uncertainty toward glassy, so a borderline estimate defaults safe."""
     tg = cls.get('experimental_tg_K')
     if isinstance(tg, (int, float)):
         return tg
-    if isinstance(tg, dict) and run_name:
-        for (key, val) in tg.items():
-            if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                return val
+    resolved = resolve_member_value(cls, 'experimental_tg_K', smiles) if smiles else None
+    if resolved is not None:
+        return resolved
     if smiles:
         est = _estimate_tg_group_contribution(smiles) or {}
         est_tg = est.get('tg_estimated_K')
@@ -182,22 +177,18 @@ def _regime_exp_tg(cls: dict, run_name: str | None=None, smiles: str | None=None
             return est_tg + TG_ESTIMATE_UNCERTAINTY_K
     return None
 
-def _exp_density_point(cls: dict, run_name: str | None=None):
+def _exp_density_point(cls: dict, smiles: str | None=None):
     """Point exp_density_gcm3 value (not a ±5% band) for assess_cooling_contraction. A scalar
     (single-member class, or a planning agent's overrides.experimental_density_gcm3 pin -- see
-    OVERRIDE_RANGES) always wins outright. Otherwise resolves per-member via run_name. No
-    run_name match -> None, NOT another member's measured density (no group-contribution
-    density estimator exists, unlike Tg; matches validate_run_plan.py's _target_density, which
-    already refuses rather than guesses here). Pin overrides.experimental_density_gcm3 if you've
+    OVERRIDE_RANGES) always wins outright. Otherwise resolves per-member via the run's SMILES.
+    No match -> None, NOT another member's measured density (no group-contribution density
+    estimator exists, unlike Tg; matches validate_run_plan.py's _target_density, which already
+    refuses rather than guesses here). Pin overrides.experimental_density_gcm3 if you've
     reasoned out which member this SMILES actually is."""
     exp = cls.get('experimental_density_gcm3')
     if isinstance(exp, (int, float)):
         return exp
-    if isinstance(exp, dict) and run_name:
-        for (key, val) in exp.items():
-            if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                return val
-    return None
+    return resolve_member_value(cls, 'experimental_density_gcm3', smiles) if smiles else None
 
 def _exp_K_range(cls: dict) -> list:
     """exp_K_GPa is a flat {min,max} PER CLASS, not per-member -- e.g. PACR's is scoped to
@@ -214,20 +205,16 @@ def _exp_K_range(cls: dict) -> list:
         return [exp['min'], exp['max']]
     return [None, None]
 
-def _exp_density_range(cls: dict, run_name: str | None=None) -> list:
-    """Resolves per-member via run_name (same class-mean-averaging bug fixed here for
-    multi-member classes like PHYC's PE/PP/PIB). No run_name match -> the generic
-    density_initial_gcm3-derived band, NOT another member's measured density -- guessing a
-    sibling member's real value here previously banded PE1 (own density 0.855) against PP's
-    median 0.91, sitting PE's true value at the wrong band's edge. Pin
+def _exp_density_range(cls: dict, smiles: str | None=None) -> list:
+    """Resolves per-member via the run's SMILES. No match -> the generic
+    density_initial_gcm3-derived band, NOT another member's measured density. Pin
     overrides.experimental_density_gcm3 if you've reasoned out which member this SMILES is."""
     exp = cls.get('experimental_density_gcm3')
     if isinstance(exp, (int, float)):
         return [round(exp * 0.95, 3), round(exp * 1.05, 3)]
-    if isinstance(exp, dict) and run_name:
-        for (key, val) in exp.items():
-            if isinstance(val, (int, float)) and run_name.upper().startswith(key.upper()):
-                return [round(val * 0.95, 3), round(val * 1.05, 3)]
+    resolved = resolve_member_value(cls, 'experimental_density_gcm3', smiles) if smiles else None
+    if resolved is not None:
+        return [round(resolved * 0.95, 3), round(resolved * 1.05, 3)]
     d0 = cls.get('density_initial_gcm3', 0.6)
     implied_rt = d0 / 0.55
     return [round(implied_rt * 0.85, 3), round(implied_rt * 1.15, 3)]
@@ -245,20 +232,7 @@ def _resolve_t_workflow(args, cls: dict) -> float:
     if exp_tg_override is not None:
         exp_tg = exp_tg_override
     else:
-        _tg_dict = cls.get('experimental_tg_K')
-        if isinstance(_tg_dict, dict):
-            _run = getattr(args, 'run_name', None)
-            exp_tg = None
-            if _run:
-                for (k, v) in _tg_dict.items():
-                    if isinstance(v, (int, float)) and _run.upper().startswith(k.upper()):
-                        exp_tg = v
-                        break
-            if exp_tg is None:
-                _vals = sorted((v for v in _tg_dict.values() if isinstance(v, (int, float))))
-                exp_tg = _vals[len(_vals) // 2] if _vals else None
-        else:
-            exp_tg = _tg_dict
+        exp_tg = _regime_exp_tg(cls, getattr(args, 'smiles', None))
     if 'T_workflow_K' in cls:
         return cls['T_workflow_K']
     T_equil = _pick(getattr(args, 'T_equil_K', None), cls, 'T_equil_K', 600.0)
@@ -360,7 +334,7 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         'velocity_seed': _velocity_seed(args),
         'cutoff_A': cls.get('cutoff_A', 12.0),
         'nchain': args.nchain or cls.get('nchain', 10),
-        'exp_density_gcm3': _exp_density_point(cls, args.run_name),
+        'exp_density_gcm3': _exp_density_point(cls, args.smiles),
     }
 
 def _resolve_tg_rate(args, cls: dict):
@@ -455,7 +429,7 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
     npt_prod_log_path = args.npt_prod_log or (
         npt_prod_data_path[:-len('_out.data')] + '.log' if npt_prod_data_path.endswith('_out.data')
         else f'{lammps_base}/equil/{prod}/{prod}.log')
-    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'exp_density_range': _exp_density_range(cls, run_name=args.run_name), 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, args.run_name, getattr(args, 'smiles', None)), 'exp_density_point_gcm3': _exp_density_point(cls, args.run_name), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'alpha_glass_per_K': cls.get('alpha_glass_per_K', 'null'), 'alpha_melt_per_K': cls.get('alpha_melt_per_K', 'null'), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'exp_density_range': _exp_density_range(cls, smiles=args.smiles), 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)), 'exp_density_point_gcm3': _exp_density_point(cls, args.smiles), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'alpha_glass_per_K': cls.get('alpha_glass_per_K', 'null'), 'alpha_melt_per_K': cls.get('alpha_melt_per_K', 'null'), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""

@@ -365,8 +365,7 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     if "T_equil_K" in decision.overrides and "T_workflow_K" not in decision.overrides:
         plan["decided_params"]["T_workflow_K"] = decision.overrides["T_equil_K"]
         effective_class["T_workflow_K"] = decision.overrides["T_equil_K"]
-    plan["planned_stages"] = build_planned_stages(effective_class, properties, intent.run_name,
-                                                   intent.smiles)
+    plan["planned_stages"] = build_planned_stages(effective_class, properties, intent.smiles)
     plan["decisions"] = build_decisions(effective_class)
     for row in plan["decisions"]:
         row["confidence"] = decision.confidence
@@ -430,8 +429,7 @@ def apply_recovery(plan: dict, decision: RecoveryDecision) -> dict:
     effective_class = {**class_entry, **decided_params}
     _validate_protocol_relationships(effective_class, set(decision.modifications))
     revised["planned_stages"] = build_planned_stages(
-        effective_class, set(revised.get("properties", [])), revised.get("run_name"),
-        revised.get("smiles")
+        effective_class, set(revised.get("properties", [])), revised.get("smiles")
     )
     revised.setdefault("recovery_history", []).append({
         "action": decision.action,

@@ -25,7 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 from stage_params import resolve_stage_params, apply_plan, resolve_hardware, load_plan  # noqa: E402
-from hw_common import load_rules, get_class_entry  # noqa: E402
+from hw_common import load_rules, get_class_entry, resolve_member_value  # noqa: E402
 from protocol_policy import select_pressure_ladder  # noqa: E402
 from workflow_engine import (  # noqa: E402
     Finding, StageResult, WorkflowEngine, atomic_write_json, pressure_point_drop_allowed,
@@ -659,8 +659,7 @@ def do_thermal(args, cls: dict, lammps) -> dict:
     # decision, the same outcome those classes got via the old slope-gate-failure path.
     degenerate = (not highest) or highest["fit_quality"] == "POOR" or not highest["used_highest_rate"]
     if degenerate:
-        exp_tg = cls.get("experimental_tg_K")
-        exp_tg_val = exp_tg if isinstance(exp_tg, (int, float)) else None
+        exp_tg_val = resolve_member_value(cls, "experimental_tg_K", getattr(args, "smiles", None))
         is_glassy = bool(exp_tg_val and exp_tg_val > 300)
     else:
         is_glassy = bool(highest and isinstance(highest["Tg_K"], (int, float)) and highest["Tg_K"] > 300)

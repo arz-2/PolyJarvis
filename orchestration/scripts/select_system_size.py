@@ -23,16 +23,10 @@ made mechanically checkable here, not re-derived:
 
   ENTANGLEMENT MW (Me = rho*R*T/Ge, Mark 2007 Ch.25 Tables 25.1-25.5): documented with a
   real Me number for exactly six classes -- but for ONE MEMBER of each, not the class as
-  a whole (e.g. PACR covers PMMA/PMA/PAA; only PMMA's Me=12,500 is documented). Applying
-  a member's Me to its siblings would repeat a bug this codebase already found and fixed
-  once for experimental density (stage_params.py:217-223: guessing a sibling member's
-  density previously banded PE1 against PP's value and got it wrong). So Me is resolved
-  per-member here via the same convention stage_params._exp_tg_point/_exp_density_point
-  already use: match `run_name` against the class's own experimental_tg_K dict keys
-  (case-insensitive startswith), and refuse -- MW_FLOOR_UNKNOWN, never a class-level
-  number -- on no match. Only PCBN's single-member dict resolves unconditionally (no
-  sibling to confuse it with), matching validate_run_plan.py:_target_density's existing
-  "single-member dict is unambiguous" exception. DP@Me = Me / repeat-unit molar mass is
+  a whole (e.g. PACR covers PMMA/PMA/PAA; only PMMA's Me=12,500 is documented). Me is
+  resolved per-member via the run's own SMILES against the class's member_smiles table
+  (hw_common.resolve_member), and refuses -- MW_FLOOR_UNKNOWN, never a class-level number
+  -- when the SMILES matches no documented member. DP@Me = Me / repeat-unit molar mass is
   computed here with the SAME RDKit residue-mass convention select_hardware.py already
   uses (dummy '*' atoms carry zero mass) -- this reproduces the notes' own cited
   DP@Me=160 (PS) / 125 (PMMA) figures rather than storing a second, driftable copy.
@@ -58,7 +52,7 @@ while nchain=20 is the "literature-recommended production minimum for PCFF class
 
 Usage:
   python3 orchestration/scripts/select_system_size.py <CLASS> "<SMILES>" \\
-      [--properties tg,bulk_modulus] [--run_name NAME] [--dp_typical N] [--nchain N]
+      [--properties tg,bulk_modulus] [--dp_typical N] [--nchain N]
 Prints JSON, always exits 0 (errors are {"error": ...} in the payload, matching
 select_forcefield.py -- callers parse JSON, never a traceback).
 """
@@ -68,7 +62,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hw_common import load_rules, get_class_entry              # noqa: E402
+from hw_common import load_rules, get_class_entry, resolve_member  # noqa: E402
 from select_hardware import _monomer_atoms_and_mw               # noqa: E402
 
 # Fox-Flory plateau (Patrone 2016, polymer_rules.json:_metadata.global_notes). Data, not
@@ -76,19 +70,6 @@ from select_hardware import _monomer_atoms_and_mw               # noqa: E402
 STIFF_BACKBONE_CLASSES = {"PIMD", "PKTN", "PSFO"}
 FOX_FLORY_FLEXIBLE_FLOOR_DP = 20
 FOX_FLORY_STIFF_FLOOR_DP = 50
-
-# Entanglement MW (Mark 2007 Ch.25), cited verbatim in global_notes -- ONE member per
-# class, never the whole class. Every other class, and every other member of these six
-# classes, must come back MW_FLOOR_UNKNOWN.
-ENTANGLEMENT_ME_GMOL_BY_MEMBER = {
-    "PSTR": {"PS": 16600},
-    "PACR": {"PMMA": 12500},
-    "PAMD": {"Nylon6": 2470},
-    "PCBN": {"BPA_PC": 1660},   # single-member class -- resolves without a run_name match
-    "PEST": {"PET": 1450},
-    "PSFO": {"PSU": 2380},
-}
-_SINGLE_MEMBER_CLASSES = {"PCBN"}
 
 PCFF_NCHAIN_PRODUCTION_MINIMUM = 20  # Bejagam 2020; nchain=10 is Hayashi2022 throughput compromise
 
@@ -101,37 +82,31 @@ def _fox_flory_floor(polymer_class: str) -> tuple:
     return floor, note
 
 
-def _resolve_me_member(cls: dict, polymer_class: str, run_name: str):
-    """(member_name, Me_gmol) for the member this run_name resolves to, or (None, None).
-
-    Same matching convention as stage_params._exp_tg_point: run_name (case-insensitive)
-    must startswith a documented member's key. PCBN's single-member dict resolves without
-    a run_name -- there is no sibling to confuse it with, mirroring
-    validate_run_plan.py:_target_density's single-member-dict exception."""
-    me_by_member = ENTANGLEMENT_ME_GMOL_BY_MEMBER.get(polymer_class.upper())
+def _resolve_me_member(cls: dict, smiles: str):
+    """(member_name, Me_gmol) for the member this smiles resolves to, or (None, None)."""
+    me_by_member = cls.get("entanglement_Me_gmol")
     if not me_by_member:
         return None, None
-    if polymer_class.upper() in _SINGLE_MEMBER_CLASSES:
-        (member, me), = me_by_member.items()
-        return member, me
-    if run_name:
-        for member, me in me_by_member.items():
-            if run_name.upper().startswith(member.upper()):
-                return member, me
-    return None, None
+    member = resolve_member(cls, "member_smiles", smiles)
+    if member is None:
+        return None, None
+    me = me_by_member.get(member)
+    return (member, me) if isinstance(me, (int, float)) else (None, None)
 
 
-def _entanglement_floor(polymer_class: str, smiles: str, cls: dict, run_name: str):
+def _entanglement_floor(polymer_class: str, smiles: str, cls: dict):
     """(dp_at_me, note) or (None, uncertainty_dict)."""
-    member, me = _resolve_me_member(cls, polymer_class, run_name)
+    member, me = _resolve_me_member(cls, smiles)
     if me is None:
-        documented = ENTANGLEMENT_ME_GMOL_BY_MEMBER.get(polymer_class.upper())
-        if documented is None:
+        documented = cls.get("entanglement_Me_gmol")
+        if not documented:
             detail = ("no documented entanglement Me for this class in "
                       "polymer_rules.json:_metadata.global_notes")
         else:
-            detail = (f"class has documented Me for member(s) {sorted(documented)} only; "
-                      f"run_name={run_name!r} did not match one -- refusing rather than "
+            documented_members = sorted(k for k, v in documented.items()
+                                        if isinstance(v, (int, float)))
+            detail = (f"class has documented Me for member(s) {documented_members} only; "
+                      "this SMILES did not resolve to one -- refusing rather than "
                       "generalizing a sibling member's Me to this molecule")
         return None, {"name": "MW_FLOOR_UNKNOWN", "dominant": False, "class": polymer_class,
                       "detail": detail + " -- bulk_modulus chain-length adequacy is "
@@ -147,9 +122,47 @@ def _entanglement_floor(polymer_class: str, smiles: str, cls: dict, run_name: st
     return dp_at_me, note
 
 
+# Canonical order (not the arbitrary iteration order of a set) so evidence text/floors
+# stay reproducible across calls with the same property set.
+_KNOWN_PROPERTY_ORDER = ("tg", "bulk_modulus", "density")
+
+
+def property_floors(polymer_class: str, smiles: str, properties, cls: dict = None) -> dict:
+    """Per-property DP floor -- the piece select_system_size() collapses via max().
+
+    One entry per element of `properties`, keyed by property name:
+      {"floor_dp": int|None, "source": str|None, "note": str|None, "unmet": dict|None}
+    `floor_dp` is None both when no floor mechanism applies at all (e.g. density) and
+    when one applies but could not resolve (MW_FLOOR_UNKNOWN) -- `unmet` then carries
+    the reason (the same uncertainty dict select_system_size() would report). Exposed
+    standalone so a multi-arm planner can size each arm from its own property subset
+    instead of the single run-wide max().
+    """
+    if cls is None:
+        cls = get_class_entry(load_rules(), polymer_class, warn_on_miss=True)
+    properties = set(properties or [])
+    result = {}
+    for prop in sorted(properties, key=lambda p: _KNOWN_PROPERTY_ORDER.index(p)
+                       if p in _KNOWN_PROPERTY_ORDER else len(_KNOWN_PROPERTY_ORDER)):
+        if prop == "tg":
+            floor, note = _fox_flory_floor(polymer_class)
+            result[prop] = {"floor_dp": floor, "source": "fox_flory_tg", "note": note,
+                            "unmet": None}
+        elif prop == "bulk_modulus":
+            dp_at_me, note_or_unc = _entanglement_floor(polymer_class, smiles, cls)
+            if dp_at_me is not None:
+                result[prop] = {"floor_dp": dp_at_me, "source": "entanglement_bm",
+                                "note": note_or_unc, "unmet": None}
+            else:
+                result[prop] = {"floor_dp": None, "source": None, "note": None,
+                                "unmet": note_or_unc}
+        else:
+            result[prop] = {"floor_dp": None, "source": None, "note": None, "unmet": None}
+    return result
+
+
 def select_system_size(polymer_class: str, smiles: str, properties=None,
-                       run_name: str = None, dp_typical: int = None,
-                       nchain: int = None) -> dict:
+                       dp_typical: int = None, nchain: int = None) -> dict:
     rules = load_rules()
     cls = get_class_entry(rules, polymer_class, warn_on_miss=True)
     dp = dp_typical if dp_typical is not None else cls.get("dp_typical")
@@ -161,16 +174,11 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
     uncertainties = []
     floors = []  # (source, floor_dp, note)
 
-    if "tg" in properties:
-        floor, note = _fox_flory_floor(polymer_class)
-        floors.append(("fox_flory_tg", floor, note))
-
-    if "bulk_modulus" in properties:
-        dp_at_me, note_or_unc = _entanglement_floor(polymer_class, smiles, cls, run_name)
-        if dp_at_me is not None:
-            floors.append(("entanglement_bm", dp_at_me, note_or_unc))
-        else:
-            uncertainties.append(note_or_unc)
+    for prop, info in property_floors(polymer_class, smiles, properties, cls=cls).items():
+        if info["floor_dp"] is not None:
+            floors.append((info["source"], info["floor_dp"], info["note"]))
+        elif info["unmet"] is not None:
+            uncertainties.append(info["unmet"])
 
     required_floor = max((f[1] for f in floors), default=None)
     floor_violated = required_floor is not None and dp < required_floor
@@ -234,11 +242,11 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
         "uncertainties": uncertainties,
         "note": ("A documented floor is a hard require (D-04_system_size); a documented "
                  "over-provisioning gap is reported, never auto-shrunk. Entanglement Me is "
-                 "resolved per-member via run_name and refuses (MW_FLOOR_UNKNOWN) rather "
-                 "than generalizing a sibling member's value. Chain-self-imaging (L>=2*Rg) "
-                 "is NOT assessed here -- see validate_run_plan.py's _finite_size_findings "
-                 "(pre-build, minimum-image only) and inspect_data_file's "
-                 "finite_size_forecast (post-build, the full check)."),
+                 "resolved per-member via the run's SMILES and refuses (MW_FLOOR_UNKNOWN) "
+                 "rather than generalizing a sibling member's value. Chain-self-imaging "
+                 "(L>=2*Rg) is NOT assessed here -- see validate_run_plan.py's "
+                 "_finite_size_findings (pre-build, minimum-image only) and "
+                 "inspect_data_file's finite_size_forecast (post-build, the full check)."),
     }
 
 
@@ -248,8 +256,6 @@ def main():
     p.add_argument("polymer_class")
     p.add_argument("smiles")
     p.add_argument("--properties", help="comma-separated: tg,bulk_modulus,density")
-    p.add_argument("--run_name", default=None,
-                   help="resolves which class member the SMILES is, for entanglement Me lookup")
     p.add_argument("--dp_typical", type=int, default=None)
     p.add_argument("--nchain", type=int, default=None)
     args = p.parse_args()
@@ -258,7 +264,7 @@ def main():
         result = select_system_size(
             args.polymer_class, args.smiles,
             args.properties.split(",") if args.properties else None,
-            args.run_name, args.dp_typical, args.nchain)
+            args.dp_typical, args.nchain)
     except Exception as e:  # noqa: BLE001 -- callers parse JSON, never a traceback
         result = {"error": f"{type(e).__name__}: {e}"}
 

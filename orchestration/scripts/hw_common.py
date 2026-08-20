@@ -17,6 +17,7 @@ import json
 import os
 import subprocess
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -145,6 +146,56 @@ def host_matches(rules: dict | None = None) -> bool:
     return (_gpu_model_matches(live["gpu_model"], saved.get("gpu_model", ""))
             and live["gpus"] == saved.get("gpus")
             and live["phys_cores"] == saved.get("phys_cores"))
+
+
+@lru_cache(maxsize=256)
+def _canon_for_match(smiles: str) -> str | None:
+    """Stereo-stripped canonical SMILES for member-identity matching. Distinct from
+    guides/system_characterization_cache.json's canonical_smiles cache key, which stays
+    isomeric -- a different stereo variant of the same molecule needs independent protocol
+    validation there, but tacticity/stereo markers must not change which class member a
+    SMILES resolves to.
+
+    Memoized: canonicalize() shells into a conda env per call. None on any failure
+    (unparseable SMILES, RDKit/conda unavailable, timeout) -- never raises."""
+    if not smiles:
+        return None
+    from canon_smiles import canonicalize
+    try:
+        return canonicalize(smiles, isomeric=False)
+    except (RuntimeError, subprocess.TimeoutExpired):
+        return None
+
+
+def resolve_member(cls: dict, field: str, smiles: str) -> str | None:
+    """Which member of cls[field] (a {member_name: [canonical_smiles, ...]} table) this
+    smiles resolves to, or None."""
+    member_smiles = cls.get(field) or {}
+    canon = _canon_for_match(smiles)
+    if canon is None:
+        return None
+    for member, variants in member_smiles.items():
+        if not isinstance(variants, list):
+            continue  # skip a sibling "note" string key
+        if canon in variants:
+            return member
+    return None
+
+
+def resolve_member_value(cls: dict, value_field: str, smiles: str):
+    """cls[value_field] resolved for this smiles: the bare value if value_field is a
+    scalar (applies to the whole class), the matched member's entry if value_field is a
+    dict and cls['member_smiles'] resolves this smiles to one of its keys, else None."""
+    val = cls.get(value_field)
+    if isinstance(val, (int, float)):
+        return val
+    if not isinstance(val, dict):
+        return None
+    member = resolve_member(cls, "member_smiles", smiles)
+    if member is None:
+        return None
+    v = val.get(member)
+    return v if isinstance(v, (int, float)) else None
 
 
 def resolve_ff_family(ff_raw: str, hp: dict) -> str:

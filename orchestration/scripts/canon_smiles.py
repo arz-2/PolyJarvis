@@ -25,14 +25,16 @@ _PY_SNIPPET = """\
 import os
 from rdkit import Chem
 smi = os.environ['CANON_SMILES_INPUT']
+isomeric = os.environ.get('CANON_SMILES_ISOMERIC', '1') != '0'
 mol = Chem.MolFromSmiles(smi)
 if mol is None:
     raise SystemExit('RDKit could not parse SMILES: ' + smi)
-print(Chem.MolToSmiles(mol, canonical=True))
+print(Chem.MolToSmiles(mol, canonical=True, isomericSmiles=isomeric))
 """
 
 
-def canonicalize(smiles: str, env: str = "radonpy", timeout: int = 30) -> str:
+def canonicalize(smiles: str, env: str = "radonpy", timeout: int = 30, *,
+                  isomeric: bool = True) -> str:
     # Written to a temp file, not `python3 -c "..."`, so SMILES-unrelated newline/quoting
     # concerns in the snippet itself never interact with bash's double-quote parsing.
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
@@ -46,6 +48,7 @@ def canonicalize(smiles: str, env: str = "radonpy", timeout: int = 30) -> str:
         )
         run_env = dict(os.environ)
         run_env["CANON_SMILES_INPUT"] = smiles
+        run_env["CANON_SMILES_ISOMERIC"] = "1" if isomeric else "0"
         r = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
                            stdin=subprocess.DEVNULL, timeout=timeout, env=run_env)
     finally:

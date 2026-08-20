@@ -43,6 +43,10 @@ class SpyPlanningAgent:
             polymer_class="PSTR",
             properties=("density", "bulk_modulus"),
             rationale=("The requested state is a glassy polystyrenic workflow at 300 K.",),
+            # PS's entanglement floor (Me=16600 g/mol -> DP@Me=160) exceeds PSTR's class
+            # default dp_typical=50 for a bulk_modulus request -- raise it to clear D-04's
+            # measured floor.
+            overrides={"dp_typical": 160},
             decision_evaluations={
                 "D-02_charges": {
                     "criteria_evaluated": [
