@@ -435,6 +435,27 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
             f"\\\"failed_at\\\":\\\"{name}\\\",\\\"ts\\\":\\\"$(date -Iseconds)\\\"}}\" >> \"$PROGRESS\"; exit 1; }}",
             "",
         ]
+        if name == "minimize":
+            # LAMMPS' minimize command always exits 0, even when it stops at MAXITER/MAXEVAL
+            # without meeting ETOL/FTOL -- the && above never sees this as a failure. Grep the
+            # stage's own log for its stopping-criterion line; two convergent forms are known
+            # from this repo's archive: "energy tolerance" (matches "tolerance") and
+            # "linesearch alpha is zero" (a legitimate stall, not an artificial cutoff --
+            # distinct in kind from "max iterations"/"max force evaluations", which mean the
+            # structure was cut off before finding a real minimum). Anything not matching
+            # either convergent form is treated as non-convergent.
+            # `if ! grep ...; then ...; fi` is required under this script's `set -euo pipefail`
+            # -- a bare `grep -q` line would abort the whole script on exactly the
+            # non-convergence case this exists to catch.
+            lines += [
+                "# --- Minimization-convergence check (not itself a LAMMPS exit-code failure) ---",
+                f'if ! grep -Eq "Stopping criterion.*(tolerance|linesearch alpha is zero)" {wdir}/{log}; then',
+                f"  log_fail {name}; sentinel_fail minimize_not_converged; "
+                f'echo "{{\\"stage\\":\\"__chain__\\",\\"status\\":\\"failed\\","'
+                f'"\\"failed_at\\":\\"{name}\\",\\"ts\\":\\"$(date -Iseconds)\\"}}" >> "$PROGRESS"; exit 1',
+                "fi",
+                "",
+            ]
 
     lines += [
         f"echo \"{{\\\"stage\\\":\\\"__chain__\\\",\\\"status\\\":\\\"completed\\\","
@@ -840,6 +861,10 @@ def run_lammps_script(
     progress_file: str = "",
     n_stages: int = 0,
     allow_concurrent_writer: bool = False,
+    data_file: Optional[str] = None,
+    h_type_ids: Optional[list] = None,
+    backbone_types: Optional[list] = None,
+    lj_cutoff: float = 12.0,
 ) -> dict:
     """
     Execute a LAMMPS .in script on the local GPU in the background.
@@ -862,6 +887,17 @@ def run_lammps_script(
                           "kokkos" (full-offload — pair+class2 bonded+pppm+neigh on GPU via
                           the KOKKOS binary, -sf kk), or "cpu". The KOKKOS path uses
                           LAMBDA_LAMMPS_KOKKOS and is ~7.9× faster on PCFF at mpi=1.
+        data_file:        Optional path to the .data file this script reads. When provided,
+                          the same pre-flight validation run_lammps_chain already performs
+                          (structural/charge/box checks) runs here too, before submission —
+                          closes a gap where the thermal Tg sweep and the deformation
+                          mechanical leg (both call this, not run_lammps_chain) previously got
+                          no early checks at all.
+        h_type_ids:       SHAKE H type IDs — validated against the data file.
+        backbone_types:   Backbone type IDs — validated against the data file.
+        lj_cutoff:        LJ cutoff (Å) used for the box-vs-cutoff preflight check. Pass the
+                          run's real cutoff_A — the 12.0 default overstates the bound for
+                          classes that run 9.5 Å.
 
     Returns:
         dict with run_id for status polling via get_run_status().
@@ -875,6 +911,29 @@ def run_lammps_script(
             conflict = _live_sim_writers([f"{work_dir}/{log_file}"])
             if conflict:
                 return _double_launch_error(conflict)
+
+        # Pre-flight validation (same check run_lammps_chain performs when data_file is given).
+        if data_file:
+            try:
+                content = Path(data_file).read_text(encoding="utf-8")
+                gen = ScriptGenerator(data_file=data_file)
+                gen.parse_data_file(content=content)
+                vr = gen.validate_data_file(
+                    content=content, h_type_ids=h_type_ids, backbone_types=backbone_types,
+                    lj_cutoff=lj_cutoff,
+                )
+                if vr["errors"]:
+                    return {
+                        "status": "error",
+                        "error": "Pre-flight validation failed — script not submitted",
+                        "validation_errors": vr["errors"],
+                        "validation_warnings": vr["warnings"],
+                        "validation_stats": vr["stats"],
+                    }
+                if vr["warnings"]:
+                    logger.warning(f"Pre-flight warnings for {data_file}: {vr['warnings']}")
+            except Exception as ve:
+                logger.warning(f"Pre-flight validation skipped (error reading data file): {ve}")
 
         meta = {
             "script":        script,
@@ -1394,6 +1453,10 @@ def generate_equilibration_workflow(
     barostat_damp_fs: float = 1000.0,
     resume_from: Optional[str] = None,
     extend_ensemble: str = "npt",
+    minimize_etol: float = 1e-6,
+    minimize_ftol: float = 1e-6,
+    minimize_maxiter: int = 50000,
+    minimize_maxeval: int = 100000,
 ) -> dict:
     """
     Auto-generate a complete equilibration workflow as a sequence of
@@ -1463,6 +1526,15 @@ def generate_equilibration_workflow(
                         stage runs. nvt_production is NVT; using the default "npt" to extend it
                         would silently switch on a barostat mid-trajectory. Ignored unless
                         extend_only=True.
+        minimize_etol:  Energy-tolerance stopping criterion for the minimize stage (default
+                        1e-6, matches script_generator.py's own default). Escalated (looser,
+                        x10/attempt) by the raise_minimize_tolerance remedy on
+                        MINIMIZE_NOT_CONVERGED. Ignored unless resume_from is None (a resumed
+                        chain skips minimize entirely).
+        minimize_ftol:  Force-tolerance stopping criterion (default 1e-6). Same remedy/scope.
+        minimize_maxiter: Max minimizer iterations (default 50000). Escalated x4/attempt by the
+                        same remedy.
+        minimize_maxeval: Max force evaluations (default 100000). Same remedy/scope.
         polymer_name:   Label used in filenames and log comments.
         temp:           REQUIRED. Target simulation temperature (K). This is the workflow
                         temperature, not room temperature — a glassy melt runs at T_equil_K
@@ -1768,7 +1840,10 @@ def generate_equilibration_workflow(
                 "use_pppm":  use_long_range and not use_trappe,
                 "use_gpu":   True,
                 "MIN_STYLE": "cg",
-                "MAXITER":   50000,
+                "ETOL":      minimize_etol,
+                "FTOL":      minimize_ftol,
+                "MAXITER":   minimize_maxiter,
+                "MAXEVAL":   minimize_maxeval,
             }, data_file)
             stages.append(s1)
             anneal_start_data = s1["output_data"]
@@ -2949,60 +3024,48 @@ def derive_backbone_types(data_file: str) -> dict:
 @mcp.tool()
 def assess_cooling_contraction(
     glass_data: str,
-    exp_density_gcm3: float,
     tg_K: float,
     t_equil_K: float,
     melt_data: Optional[str] = None,
-    alpha_glass: float = 2.5e-4,
-    alpha_melt: float = 6.0e-4,
-    band_pct: float = 5.0,
 ) -> dict:
     """
-    Melt-vs-glass density decomposition — distinguishes an UNDER-ANNEALED (kinetically
-    trapped) glass from force-field underbinding, which the convergence checks cannot.
+    Cooling-contraction self-consistency check — distinguishes an UNDER-ANNEALED (kinetically
+    trapped) glass from a normally-cooled one, purely from the run's own data.
 
-    A converged 300 K density only means the cell stopped moving, not that it stopped at the
-    RIGHT value: a trapped glass converges low because free volume froze in during cooling.
-    This computes densities directly from the final structures (box + masses), compares the
-    melt→glass contraction against the system's own thermal-expansion expectation, and routes
-    the correct remedy:
+    A converged 300 K density only means the cell stopped moving, not that it densified as
+    much as it should have: a trapped glass converges low because free volume froze in during
+    cooling. This computes densities directly from the final structures (box + masses),
+    compares the melt→glass contraction against the system's own thermal-expansion prediction
+    (alpha_glass/alpha_melt — literature-typical-polymer constants, not specific to any one
+    material), and reports:
 
-      - UNDER_ANNEALED_COOLING : melt density OK but cell under-contracted on cooling →
-        re-melt + SLOW re-cool (NOT EXTEND at 300 K — a glass cannot densify below Tg).
-      - MELT_STAGE_DEFICIT     : melt density already low → FF underbinding OR melt-stage
-        under-annealing; probe with a heavy melt anneal (NkepsuMbitou 10-TAC). Re-cool won't help.
-      - OK                     : glass density within ±band_pct of experiment.
+      - UNDER_ANNEALED_COOLING : the cell under-contracted relative to its own predicted
+        contraction → re-melt + SLOW re-cool (NOT EXTEND at 300 K — a glass cannot densify
+        below Tg).
+      - OK                     : cooling contraction is self-consistent with the prediction.
+      - INSUFFICIENT_DATA      : glass-state density could not be measured.
 
-    Use this as a ROUTING gate alongside the absolute glass-vs-experiment density check whenever
-    a glassy production density falls below experiment (do not accept a sub-band density as
-    "force-field bias" without running this first). The alpha-extrapolation degrades over large
-    cooling spans; `extrapolation_reliable=False` (span > 300 K) means lean on the absolute
-    density gate and treat the split as indicative.
+    Deliberately never compares to an experimental/curated density or thermal-expansion
+    value — a novel system may have neither, and this check does not need either.
+    `extrapolation_reliable=False` (cooling span > 300 K) means treat the verdict as
+    indicative, not firm.
 
     Args:
-        glass_data:        npt_prod300_out.data at 300 K (the glass state). Required.
-        exp_density_gcm3:  experimental amorphous density at 300 K for the polymer.
-        tg_K:              experimental (or class) Tg in K. If <=300, treated as rubbery.
-        t_equil_K:         melt/equilibration temperature (T_workflow) in K.
-        melt_data:         npt_production_out.data at T_equil (melt). Optional but required
-                           for the melt/cooling split; without it only OK/below-band is returned.
-        alpha_glass:       volumetric thermal-expansion coeff below Tg (default 2.5e-4 /K).
-        alpha_melt:        volumetric thermal-expansion coeff above Tg (default 6.0e-4 /K).
-        band_pct:          pass band as % below experiment (default 5.0).
+        glass_data:  npt_prod300_out.data at 300 K (the glass state). Required.
+        tg_K:        (class) Tg in K. If <=300, treated as rubbery/equilibrium (no-op).
+        t_equil_K:   melt/equilibration temperature (T_workflow) in K.
+        melt_data:   npt_production_out.data at T_equil (melt). Optional but required for the
+                     self-consistency computation; without it the verdict is OK/non-blocking.
 
     Returns:
-        dict with rho_melt, rho_glass, glass_density_gap_pct, melt_density_gap_pct,
-        expected_contraction, actual_contraction, contraction_shortfall,
-        under_annealed_cooling (bool), verdict, remedy, extrapolation_reliable, markdown.
+        dict with rho_melt, rho_glass, expected_contraction, actual_contraction,
+        contraction_shortfall, under_annealed_cooling (bool), verdict, remedy,
+        extrapolation_reliable, markdown.
     """
     parts = [f"python {MDA_SCRIPTS_DIR}/assess_cooling_contraction.py",
              f"--glass_data {glass_data}",
-             f"--exp_density_gcm3 {exp_density_gcm3}",
              f"--tg_K {tg_K}",
-             f"--t_equil_K {t_equil_K}",
-             f"--alpha_glass {alpha_glass}",
-             f"--alpha_melt {alpha_melt}",
-             f"--band_pct {band_pct}"]
+             f"--t_equil_K {t_equil_K}"]
     if melt_data:
         parts.append(f"--melt_data {melt_data}")
     command = " ".join(parts)
@@ -3018,22 +3081,20 @@ def enforce_equilibration_gate(
     regime: str,
     dp: Optional[float],
     ct_gate_reliable: bool,
-    exp_density_gcm3: Optional[float],
     tg_K: Optional[float],
     t_equil_K: Optional[float],
     glass_data: Optional[str],
     melt_data: Optional[str],
     out_dir: Optional[str],
-    alpha_glass_per_K: Optional[float],
-    alpha_melt_per_K: Optional[float],
 ) -> dict:
     """
     Mechanized equilibration gate verdict — replaces prose PASS/EXTEND/FAIL judgment with a
     programmatic cross-check of check_equilibration_comprehensive's per-gate results against
     decision_policy.json's require_glassy / require_rubbery clauses, plus density_value_binding
-    (a glassy 300K density >5% below experiment requires an assess_cooling_contraction diagnosis
-    before any verdict — a check overall_pass never performs on its own, since it only tests that
-    density stopped moving, not that it stopped at the right value).
+    (an unconditional self-consistency check on a glassy run's melt→glass contraction vs. its
+    own thermal-expansion prediction — a check overall_pass never performs on its own, since it
+    only tests that density stopped moving, not that it stopped at a physically consistent
+    value). Never compares to any experimental/curated density or thermal-expansion value.
 
     Single-call: if density_value_binding is triggered and no cached diagnosis exists at
     <out_dir>/cooling_contraction.json, this calls assess_cooling_contraction.py internally
@@ -3052,26 +3113,20 @@ def enforce_equilibration_gate(
         dp:                 Degree of polymerization (drives the require_glassy DP≥30 carve-out).
         ct_gate_reliable:   False for aromatic-backbone classes (PSFO/PKTN) — C(t) is
                             structurally undefined there regardless of DP.
-        exp_density_gcm3:   Point experimental density (g/cm³) for this polymer member.
-        tg_K:               Point experimental Tg (K) for this polymer member.
+        tg_K:               (Class) Tg (K) — used only to split the cooling path into a glassy
+                            and a melt segment, never as an experimental target.
         t_equil_K:          Melt/equilibration temperature (T_workflow_K).
         glass_data:         npt_prod300_out.data (glass at 300K) — required only if
                             density_value_binding needs to run assess_cooling_contraction.
         melt_data:          npt_production_out.data (melt at T_equil) — same condition.
         out_dir:            Run's raw/ output directory — cooling_contraction.json is cached
                             here so repeat calls (e.g. after an EXTEND) don't re-run the probe.
-        alpha_glass_per_K:  Class- or literature-grounding-sourced volumetric thermal-expansion
-                            coeff below Tg, from decided_params.alpha_glass_per_K (set at plan
-                            time — this tool never searches for it live). None falls back to
-                            assess_cooling_contraction.py's generic default (2.5e-4/K).
-        alpha_melt_per_K:   Same, above Tg (decided_params.alpha_melt_per_K). None falls back to
-                            the generic default (6.0e-4/K).
 
     Returns:
-        dict: regime, applicable_clause, binding_gates, advisory_gates, density_gap_pct,
+        dict: regime, applicable_clause, binding_gates, advisory_gates,
         density_value_binding, failing_binding_gates, verdict (PASS | EXTEND |
         STRUCTURAL_FAIL | FAIL), remedy (set only for STRUCTURAL_FAIL — e.g.
-        re_melt_slow_recool | heavy_melt_anneal_probe | a melt-mixing extension note).
+        re_melt_slow_recool | a melt-mixing extension note).
     """
     repo_root = Path(__file__).resolve().parents[2]
     orchestration_dir = str(repo_root / "orchestration" / "scripts")
@@ -3087,14 +3142,11 @@ def enforce_equilibration_gate(
     live_args.regime = regime
     live_args.dp = dp
     live_args.ct_gate_reliable = ct_gate_reliable
-    live_args.exp_density_gcm3 = exp_density_gcm3
     live_args.tg_k = tg_K
     live_args.t_equil_k = t_equil_K
     live_args.glass_data = glass_data
     live_args.melt_data = melt_data
     live_args.out_dir = out_dir
-    live_args.alpha_glass_per_k = alpha_glass_per_K
-    live_args.alpha_melt_per_k = alpha_melt_per_K
 
     result = enforce_gate.enforce_live(live_args)
 
@@ -3102,7 +3154,6 @@ def enforce_equilibration_gate(
         cc_args = result["assess_cooling_contraction_args"]
         parts = [f"python {MDA_SCRIPTS_DIR}/assess_cooling_contraction.py",
                  f"--glass_data {cc_args['glass_data']}",
-                 f"--exp_density_gcm3 {cc_args['exp_density_gcm3']}",
                  f"--tg_K {cc_args['tg_K']}",
                  f"--t_equil_K {cc_args['t_equil_K']}"]
         if cc_args.get("melt_data"):
@@ -3111,10 +3162,6 @@ def enforce_equilibration_gate(
             parts.append(f"--melt_log {cc_args['melt_log']}")
         if cc_args.get("glass_log"):
             parts.append(f"--glass_log {cc_args['glass_log']}")
-        if cc_args.get("alpha_glass") is not None:
-            parts.append(f"--alpha_glass {cc_args['alpha_glass']}")
-        if cc_args.get("alpha_melt") is not None:
-            parts.append(f"--alpha_melt {cc_args['alpha_melt']}")
         command = " ".join(parts)
         logger.info(f"enforce_equilibration_gate: auto-running density_value_binding probe: {command}")
         stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=600)

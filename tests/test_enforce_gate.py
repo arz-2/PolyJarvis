@@ -95,9 +95,8 @@ def _write_comp(tmp_path, kinetic_trap_flag, gaussian_pass=True, msid_available=
 def _live_args(comp_path, regime, dp, ct_gate_reliable):
     return SimpleNamespace(
         comprehensive_json=str(comp_path), regime=regime, dp=dp,
-        ct_gate_reliable=ct_gate_reliable, exp_density_gcm3=None, tg_k=None,
+        ct_gate_reliable=ct_gate_reliable, tg_k=None,
         t_equil_k=None, glass_data=None, melt_data=None, out_dir=None,
-        alpha_glass_per_k=None, alpha_melt_per_k=None,
     )
 
 
@@ -306,3 +305,77 @@ def test_n_eff_remedy_scales_extension_with_deficit(tmp_path):
     result = enforce_gate.enforce_live(_live_args(comp_path, "glassy", 35, True))
     assert result["verdict"] == "EXTEND"
     assert "extend_ns=2.7" in result["remedy"]
+
+
+# ─── density_value_binding: unconditional self-consistency trigger, no exp data ────
+
+def test_cooling_trigger_never_fires_without_both_data_paths(tmp_path):
+    """No glass_data/melt_data (e.g. the phase=melt checkpoint) must never misfire
+    needs_probe -- there is no post-cool glass state to assess yet."""
+    comp_path = _write_comp(tmp_path, kinetic_trap_flag=False)
+    args = _live_args(comp_path, "glassy", 35, True)
+    result = enforce_gate.enforce_live(args)
+    assert "needs_probe" not in result
+    assert result["density_value_binding"] == "n/a"
+
+
+def test_cooling_trigger_fires_needs_probe_with_no_exp_density_arg(tmp_path):
+    """With both data paths present, the probe request must never reference an
+    experimental density -- assess_cooling_contraction_args carries no such key."""
+    comp_path = _write_comp(tmp_path, kinetic_trap_flag=False)
+    args = _live_args(comp_path, "glassy", 35, True)
+    args.glass_data = str(tmp_path / "npt_prod300_out.data")
+    args.melt_data = str(tmp_path / "npt_production_out.data")
+    args.out_dir = str(tmp_path)
+    args.tg_k = 373.0
+    args.t_equil_k = 550.0
+    result = enforce_gate.enforce_live(args)
+    assert result["needs_probe"] is True
+    cc_args = result["assess_cooling_contraction_args"]
+    assert "exp_density_gcm3" not in cc_args
+    assert "alpha_glass" not in cc_args
+    assert "alpha_melt" not in cc_args
+    assert cc_args["tg_K"] == 373.0
+
+
+def test_cooling_verdict_ok_satisfies_without_blocking(tmp_path):
+    comp_path = _write_comp(tmp_path, kinetic_trap_flag=False)
+    cooling_path = tmp_path / "cooling_contraction.json"
+    cooling_path.write_text(json.dumps({"verdict": "OK"}))
+    args = _live_args(comp_path, "glassy", 35, True)
+    args.glass_data = str(tmp_path / "npt_prod300_out.data")
+    args.melt_data = str(tmp_path / "npt_production_out.data")
+    args.out_dir = str(tmp_path)
+    result = enforce_gate.enforce_live(args)
+    assert result["verdict"] == "PASS"
+    assert result["density_value_binding"] == "satisfied (OK)"
+
+
+def test_cooling_verdict_insufficient_data_satisfies_without_blocking(tmp_path):
+    """Must not keep re-triggering needs_probe past the wrapper's one retry."""
+    comp_path = _write_comp(tmp_path, kinetic_trap_flag=False)
+    cooling_path = tmp_path / "cooling_contraction.json"
+    cooling_path.write_text(json.dumps({"verdict": "INSUFFICIENT_DATA"}))
+    args = _live_args(comp_path, "glassy", 35, True)
+    args.glass_data = str(tmp_path / "npt_prod300_out.data")
+    args.melt_data = str(tmp_path / "npt_production_out.data")
+    args.out_dir = str(tmp_path)
+    result = enforce_gate.enforce_live(args)
+    assert "needs_probe" not in result
+    assert result["verdict"] == "PASS"
+
+
+def test_cooling_verdict_under_annealed_blocks_structural(tmp_path):
+    comp_path = _write_comp(tmp_path, kinetic_trap_flag=False)
+    cooling_path = tmp_path / "cooling_contraction.json"
+    cooling_path.write_text(json.dumps({"verdict": "UNDER_ANNEALED_COOLING",
+                                         "extrapolation_reliable": True}))
+    args = _live_args(comp_path, "glassy", 35, True)
+    args.glass_data = str(tmp_path / "npt_prod300_out.data")
+    args.melt_data = str(tmp_path / "npt_production_out.data")
+    args.out_dir = str(tmp_path)
+    result = enforce_gate.enforce_live(args)
+    assert result["verdict"] == "STRUCTURAL_FAIL"
+    assert "density_value_binding" in result["failing_binding_gates"]
+    assert "re_melt_slow_recool" in result["remedy"]
+    assert "npt_cool_steps" not in result["remedy"]  # only npt_cool300_steps is actually touched

@@ -205,20 +205,6 @@ def _exp_K_range(cls: dict) -> list:
         return [exp['min'], exp['max']]
     return [None, None]
 
-def _exp_density_range(cls: dict, smiles: str | None=None) -> list:
-    """Resolves per-member via the run's SMILES. No match -> the generic
-    density_initial_gcm3-derived band, NOT another member's measured density. Pin
-    overrides.experimental_density_gcm3 if you've reasoned out which member this SMILES is."""
-    exp = cls.get('experimental_density_gcm3')
-    if isinstance(exp, (int, float)):
-        return [round(exp * 0.95, 3), round(exp * 1.05, 3)]
-    resolved = resolve_member_value(cls, 'experimental_density_gcm3', smiles) if smiles else None
-    if resolved is not None:
-        return [round(resolved * 0.95, 3), round(resolved * 1.05, 3)]
-    d0 = cls.get('density_initial_gcm3', 0.6)
-    implied_rt = d0 / 0.55
-    return [round(implied_rt * 0.85, 3), round(implied_rt * 1.15, 3)]
-
 def _resolve_build_params(args, cls: dict) -> dict:
     """Resolve deterministic molecule-builder arguments."""
     return {'smiles': args.smiles, 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps', 'preferred_builder': cls.get('preferred_builder', 'emc'), 'preferred_ff': cls.get('preferred_ff', 'gaff2_mod'), 'dp': args.dp or cls.get('dp_typical', 50), 'nchain': args.nchain or cls.get('nchain', 10), 'density_initial_gcm3': _pick(args.density_initial, cls, 'density_initial_gcm3', 0.6), 'build_temperature_K': cls.get('build_temperature_K', 300.0), 'emc_seed': args.emc_seed if getattr(args, 'emc_seed', None) is not None else None, 'charge_method': cls.get('charge_method', 'am1bcc').lower(), 'electrostatics': cls.get('electrostatics', 'pppm'), 'cutoff_A': cls.get('cutoff_A', 12.0), 'dt_fs': cls.get('dt_fs', 1.0), 'phal_patch': args.polymer_class.upper() == 'PHAL', 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'ff_confidence': 'cited' if cls.get('ff_justification_doi') else 'uncited'}
@@ -335,6 +321,16 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         'cutoff_A': cls.get('cutoff_A', 12.0),
         'nchain': args.nchain or cls.get('nchain', 10),
         'exp_density_gcm3': _exp_density_point(cls, args.smiles),
+        # minimize.in's ETOL/FTOL/MAXITER/MAXEVAL -- defaults match script_generator.py's own.
+        # raise_minimize_tolerance (workflow_engine.py) escalates these via decided_params on
+        # a MINIMIZE_NOT_CONVERGED finding; cls here is the post-apply_plan overlay, so a
+        # remedy-written decided_params value is picked up automatically on resubmission.
+        'minimize_etol': _pick(getattr(args, 'minimize_etol', None), cls, 'minimize_etol', 1e-6),
+        'minimize_ftol': _pick(getattr(args, 'minimize_ftol', None), cls, 'minimize_ftol', 1e-6),
+        'minimize_maxiter': int(_pick(getattr(args, 'minimize_maxiter', None), cls,
+                                      'minimize_maxiter', 50000)),
+        'minimize_maxeval': int(_pick(getattr(args, 'minimize_maxeval', None), cls,
+                                      'minimize_maxeval', 100000)),
     }
 
 def _resolve_tg_rate(args, cls: dict):
@@ -361,11 +357,11 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     else:
         n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
     work_dir = args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/thermal'
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600), 'T_end_K': _pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200), 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': getattr(args, 'tg_start_data', None) or args.data_path, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600), 'T_end_K': _pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200), 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': getattr(args, 'tg_start_data', None) or args.data_path, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0)}
 
 def _resolve_deform_params(args, cls: dict) -> dict:
     """Resolve deterministic deformation arguments."""
-    return {'deform_rate_mode': args.deform_rate_mode, 'equil_data_path': args.data_path, 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'K_deform_rate_inv_s': _pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 100000000.0), 'K_deform_rate_slow_inv_s': cls.get('K_deform_rate_slow_inv_s', 'null'), 'K_strain_max': _pick(args.K_strain_max, cls, 'K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
+    return {'deform_rate_mode': args.deform_rate_mode, 'equil_data_path': args.data_path, 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'K_deform_rate_inv_s': _pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 100000000.0), 'K_deform_rate_slow_inv_s': cls.get('K_deform_rate_slow_inv_s', 'null'), 'K_strain_max': _pick(args.K_strain_max, cls, 'K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0)}
 
 def _run_graphs_dir(args) -> str:
     """Run-level graphs directory, shared by every plotting stage -- NOT output_dir with its
@@ -429,7 +425,7 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
     npt_prod_log_path = args.npt_prod_log or (
         npt_prod_data_path[:-len('_out.data')] + '.log' if npt_prod_data_path.endswith('_out.data')
         else f'{lammps_base}/equil/{prod}/{prod}.log')
-    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'exp_density_range': _exp_density_range(cls, smiles=args.smiles), 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)), 'exp_density_point_gcm3': _exp_density_point(cls, args.smiles), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'alpha_glass_per_K': cls.get('alpha_glass_per_K', 'null'), 'alpha_melt_per_K': cls.get('alpha_melt_per_K', 'null'), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""

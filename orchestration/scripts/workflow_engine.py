@@ -44,14 +44,20 @@ PARAMETER_STAGE: dict[str, str] = {
     "compression_max_pressure_atm": "equilibration",
     "thermostat_damp_fs": "equilibration", "barostat_damp_fs": "equilibration",
     "npt_prod300_ns": "equilibration", "melt_npt_ns": "equilibration",
+    # alpha_glass_per_K/alpha_melt_per_K are now fully inert: assess_cooling_contraction.py's
+    # self-consistency check always uses its own generic literature-typical constants and
+    # never reads a class-curated value, so these two keys have no consumer anymore. Left
+    # defined (reversible, harmless) rather than purged from the schema.
     "alpha_glass_per_K": "equilibration", "alpha_melt_per_K": "equilibration",
     "ct_min_decay_melt": "equilibration", "ct_gate_reliable": "equilibration",
     # Consumed by equil-check's assess_cooling_contraction (tg_K arg) and, downstream, the
     # thermal track's tg-sweep bracket and degenerate-fit is_glassy fallback -- "equilibration"
     # is the earliest of the two, so invalidate_from cascades into thermal too.
     "experimental_tg_K": "equilibration",
-    # Consumed by equil-check's assess_cooling_contraction (exp_density_gcm3 arg) and the
-    # density-in-band binding gate -- same owning stage as experimental_tg_K, same reasoning.
+    # Fully inert: the finite-size forecast (do_build/inspect_data_file) and the
+    # density_value_binding gate both stopped reading this key -- the former always
+    # estimates from density_initial_gcm3 (COMPRESSION_RATIO), the latter is now a pure
+    # self-consistency check. Left defined (reversible, harmless) rather than purged.
     "experimental_density_gcm3": "equilibration",
     "velocity_seed": "equilibration",
     "npt_prod_ns": "equilibration", "npt_cool_steps": "equilibration",
@@ -70,6 +76,13 @@ PARAMETER_STAGE: dict[str, str] = {
     "npt_continuation_attempt": "equilibration", "baseline_npt_cool_steps": "equilibration",
     "baseline_eq_annealing_cycles": "equilibration", "rerun_homogeneity_gate": "equilibration",
     "baseline_npt_cool300_steps": "equilibration", "equilibration_resume_from": "equilibration",
+    # minimize.in's ETOL/FTOL/MAXITER/MAXEVAL, threaded from decided_params -- _raise_minimize_
+    # tolerance's ladder bookkeeping (baseline_minimize_*) follows the same pattern as the
+    # anneal-cycle/cool-steps baselines above.
+    "minimize_etol": "equilibration", "minimize_ftol": "equilibration",
+    "minimize_maxiter": "equilibration", "minimize_maxeval": "equilibration",
+    "baseline_minimize_etol": "equilibration", "baseline_minimize_ftol": "equilibration",
+    "baseline_minimize_maxiter": "equilibration", "baseline_minimize_maxeval": "equilibration",
     "tg_t_high_K": "thermal", "tg_t_low_K": "thermal", "tg_t_step_K": "thermal",
     "tg_primary_rate_index": "thermal", "tg_rates_K_per_ns": "thermal",
     "tg_slope_gate_fallback": "thermal",
@@ -270,27 +283,28 @@ def _cooling(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[st
                   equilibration_resume_from="npt_production")
 
 
-def _melt_hold(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[str, Any]:
-    """MELT_STAGE_DEFICIT ladder: try the cheaper, more-targeted lever first. Attempt 1 escalates
-    thermal-cycling depth (more chance to escape a bad initial pack); attempt 2 adds a bounded
-    isothermal melt hold, the fallback for systems no amount of annealing fixes (genuine FF
-    underbinding) -- assess_cooling_contraction.py cannot separate the two causes on its own.
-    5 ns, not the ~100 ns NkepsuMbitou2025 cites for full convergence: PolyJarvis is a quick
-    survey tool, not a per-polymer optimizer -- this rung is a bounded diagnostic probe, not
-    meant to brute-force convergence. A deficit that doesn't resolve within it should escalate to
-    agent_only for human review rather than keep spending wall-clock chasing the literature value.
-    equilibration_resume_from="anneal" lets do_equil_and_check run only the ADDITIONAL cycles
-    from the prior attempt's own last anneal_NN_cool checkpoint (the executor computes the delta
-    from eq_annealing_cycles here vs what the prior attempt actually ran -- baseline_eq_annealing_
-    cycles below is frozen at the value from BEFORE rung 1 ever fired and is not that number)."""
-    baseline = int(params.get("baseline_eq_annealing_cycles") or params.get("eq_annealing_cycles") or 0)
-    revised = _merge(params, eq_annealing_cycles=max(baseline * 2, baseline + 2, 2),
-                      baseline_eq_annealing_cycles=baseline,
-                      equilibration_resume_from="anneal")
-    if attempt > 1:
-        revised = _merge(revised, melt_hold_ns=5.0, add_melt_npt=True,
-                          equilibration_phase="melt_then_cool")
-    return revised
+def _raise_minimize_tolerance(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[str, Any]:
+    """MINIMIZE_NOT_CONVERGED: the minimize stage hit MAXITER/MAXEVAL without meeting
+    ETOL/FTOL (LAMMPS' minimize command always exits 0 in this case, so the chain script's own
+    post-stage log grep is what catches it -- see server.py's _build_chain_script). Escalate
+    both levers together rather than picking one: a structure that hasn't relaxed could be
+    iteration-limited, evaluation-limited, or genuinely need looser tolerances, and there is no
+    cheap way to tell which from a single failed attempt. minimize is stage 0 of the chain, so
+    unlike _cooling/_melt_hold above there is no checkpoint to resume from -- every attempt is
+    a full restart (no equilibration_resume_from override)."""
+    baseline_maxiter = int(params.get("baseline_minimize_maxiter") or params.get("minimize_maxiter") or 50000)
+    baseline_maxeval = int(params.get("baseline_minimize_maxeval") or params.get("minimize_maxeval") or 100000)
+    baseline_etol = float(params.get("baseline_minimize_etol") or params.get("minimize_etol") or 1e-6)
+    baseline_ftol = float(params.get("baseline_minimize_ftol") or params.get("minimize_ftol") or 1e-6)
+    return _merge(params,
+                  minimize_maxiter=baseline_maxiter * (4 ** attempt),
+                  minimize_maxeval=baseline_maxeval * (4 ** attempt),
+                  minimize_etol=baseline_etol * (10 ** attempt),
+                  minimize_ftol=baseline_ftol * (10 ** attempt),
+                  baseline_minimize_maxiter=baseline_maxiter,
+                  baseline_minimize_maxeval=baseline_maxeval,
+                  baseline_minimize_etol=baseline_etol,
+                  baseline_minimize_ftol=baseline_ftol)
 
 
 def _melt_homogeneity(params: dict[str, Any], finding: Finding, attempt: int) -> dict[str, Any]:
@@ -366,8 +380,8 @@ def default_remedies() -> tuple[Remedy, ...]:
                2, _continue_npt, "equilibration"),
         Remedy("slower_cooling", frozenset({"UNDER_ANNEALED_COOLING"}), 2,
                _cooling, "equilibration"),
-        Remedy("melt_hold", frozenset({"MELT_STAGE_DEFICIT"}), 2,
-               _melt_hold, "equilibration"),
+        Remedy("raise_minimize_tolerance", frozenset({"MINIMIZE_NOT_CONVERGED"}), 2,
+               _raise_minimize_tolerance, "equilibration"),
         Remedy("melt_homogeneity", frozenset({"HOMOG_HETEROGENEOUS", "DENSITY_HETEROGENEITY"}),
                2, _melt_homogeneity, "equilibration"),
         Remedy("tg_sampling", frozenset({"TG_NOT_REPORTABLE"}), 7,

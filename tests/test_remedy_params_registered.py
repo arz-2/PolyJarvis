@@ -35,7 +35,7 @@ _DETAILS_BY_REMEDY = {
     "unique_forcefield": {"admissible_alternatives": [{"forcefield": "pcff"}]},
     "continue_npt": {},
     "slower_cooling": {},
-    "melt_hold": {},
+    "raise_minimize_tolerance": {},
     "melt_homogeneity": {},
     "tg_sampling": {},
     "tg_breakpoint": {},

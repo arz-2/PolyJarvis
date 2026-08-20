@@ -46,8 +46,8 @@ exact formulas/caps rather than trusting this table to stay current. Summary, by
 | Foundation | `UNIMPLEMENTED_PARAMETER`, `OVERRIDDEN_NOOP_PARAMETER` | `remove_noop`, ×1 | — |
 | Foundation | `FORCE_FIELD_TYPING_FAILED` | `unique_forcefield`, ×1 (only if exactly one alternative) | `FORCE_FIELD_TYPING_AMBIGUOUS` (>1 alternative) is `agent_only` — pick one, cite the evidence |
 | Foundation | `EQUIL_DRIFT`/`EQUIL_SEM`/`EQUIL_N_EFF`/`EXTEND` | `continue_npt`, ×2 — extension length from measured τ_relax | **Price it first (§3)** — a Class B gate whose gap is actually bias (not variance) is the wrong lever |
-| Foundation | `UNDER_ANNEALED_COOLING` | `slower_cooling` — doubles `npt_cool_steps`/attempt, ×2 | Quench-rate trapping only; do not conflate with melt-stage deficits |
-| Foundation | `MELT_STAGE_DEFICIT` | `melt_hold`, ×2 — attempt 1 doubles `eq_annealing_cycles` (more thermal-cycling depth to escape a bad initial pack); attempt 2 keeps that and adds a bounded 5 ns isothermal melt hold (deliberately short of the ~100 ns full-convergence literature value — PolyJarvis surveys, it doesn't optimize a single polymer) | Both rungs tried and density still low → likely genuine FF underbinding, not annealing depth; don't recommend a longer hold, escalate instead |
+| Foundation | `UNDER_ANNEALED_COOLING` | `slower_cooling` — doubles `npt_cool300_steps`/attempt, ×2 | Self-consistency trigger now (melt→glass contraction vs. this run's own thermal-expansion prediction, contraction_shortfall<0.97) — unconditional, no experimental density involved; do not conflate with melt-stage deficits |
+| Foundation | `MINIMIZE_NOT_CONVERGED` | `raise_minimize_tolerance`, ×2 — escalates `minimize_maxiter`/`minimize_maxeval` ×4/attempt and loosens `minimize_etol`/`minimize_ftol` ×10/attempt, full restart each time (minimize is stage 0) | Structure still won't relax after 2 rungs — likely a genuinely bad initial pack, not a tolerance problem; escalate rather than loosening further |
 | Foundation | `HOMOG_HETEROGENEOUS`/`DENSITY_HETEROGENEITY` | `melt_homogeneity`, ×2 | Melt-only signal — don't apply to a glassy 300K read |
 | Thermal | `TG_NOT_REPORTABLE` | `tg_sampling` — doubles `tg_steps_per_t`, then halves `tg_t_step_K` (floor 5K), ×7 | Fit genuinely won't resolve at any floor-respecting rate |
 | Thermal | `TG_REVIEW` | `tg_breakpoint` — halves `tg_t_step_K` once, ×1 | primary/alt Tg gap >20K persists — check whether the class needs `tg_slope_gate_fallback=slowest_rate` |
@@ -67,8 +67,8 @@ confidence.
 ## 3. Price the rung
 
 Mandatory before recommending anything that trades wall time for a property value (another
-EXTEND, a slower Tg rate, more annealing cycles beyond what `melt_hold` already tried). Skip only
-for Class A structural remedies (`finite_size_rebuild` and friends).
+EXTEND, a slower Tg rate, more cooling cycles beyond what `slower_cooling` already tried). Skip
+only for Class A structural remedies (`finite_size_rebuild` and friends).
 
 ```bash
 python3 orchestration/scripts/remedy_economics.py \

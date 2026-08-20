@@ -20,7 +20,7 @@ from stage_params import resolve_stage_params, apply_plan, resolve_hardware, loa
 from hw_common import load_rules, get_class_entry  # noqa: E402
 import run_campaign as rdr  # noqa: E402
 from run_campaign import (  # noqa: E402
-    _base_args, wait_for_analysis, do_equil_and_check, do_summary,
+    _base_args, wait_for_analysis, do_equil_and_check, do_summary, do_build, COMPRESSION_RATIO,
 )
 
 RULES = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
@@ -164,6 +164,56 @@ def test_wait_for_analysis_timeout_raises():
                           poll_seconds=0, timeout_s=0)
 
 
+# ─── do_build(): finite-size forecast target density is never experimental data ────
+
+class _FakeEmc:
+    def __init__(self, tmp_path):
+        self.tmp_path = tmp_path
+        (tmp_path / "cell.data").write_text("# fake cell\n")
+
+    def submit_emc_cell_job(self, **kwargs):
+        return {"job_id": "job-1"}
+
+    def get_emc_job_status(self, job_id):
+        return {"status": "completed"}
+
+    def get_emc_job_output(self, job_id):
+        return {"result": {"data_path": str(self.tmp_path / "cell.data"),
+                           "output_dir": str(self.tmp_path), "lammps_flags": ""}}
+
+
+class _FakeBuildLammps:
+    def __init__(self):
+        self.inspect_data_file_calls = []
+
+    def inspect_data_file(self, **kwargs):
+        self.inspect_data_file_calls.append(kwargs)
+        return {"info": {}, "validation": {"errors": [], "warnings": []},
+                "finite_size_forecast": {"available": True}}
+
+
+def test_do_build_target_density_ignores_resolvable_experimental_density(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """Even when experimental_density_gcm3 IS resolvable for this class/SMILES, the
+    finite-size forecast must never read it -- target_density_gcm3 is always
+    COMPRESSION_RATIO * density_initial_gcm3, unconditionally."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+    assert cls.get("experimental_density_gcm3") is not None, (
+        "fixture class must have a resolvable experimental_density_gcm3 for this "
+        "test to prove the forecast ignores it, not merely never needed it")
+
+    emc = _FakeEmc(tmp_path)
+    lammps = _FakeBuildLammps()
+
+    do_build(args, cls, emc, lammps)
+
+    assert len(lammps.inspect_data_file_calls) == 1
+    call = lammps.inspect_data_file_calls[0]
+    expected = COMPRESSION_RATIO * cls["density_initial_gcm3"]
+    assert call["target_density_gcm3"] == pytest.approx(expected)
+
+
 # ─── do_equil_and_check(): backbone_types halt + EXTEND sizing (Findings 2/3) ─────────
 
 class _FakeEquilLammps:
@@ -262,6 +312,42 @@ def equil_check_args_cls():
     effective_cls = apply_plan(cls_raw, plan, args)
     resolve_hardware(args, effective_cls, rules)
     yield args, effective_cls
+
+
+def test_do_equil_and_check_routes_minimize_not_converged_as_halted_dict(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """The chain-script's post-minimize convergence check (Change 4a) signals via a distinct
+    sentinel stage name ("minimize_not_converged", not the plain "minimize" a real LAMMPS
+    crash would produce) -- do_equil_and_check must route this to the same halted-dict shape
+    used by EXTEND_EXHAUSTED/STRUCTURAL_FAIL (which CampaignStageExecutor.execute already
+    knows how to turn into a routable Finding), not the generic bare SystemExit fallback."""
+    args, cls = equil_check_args_cls
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: (
+        {"status": "failed", "stage": "minimize_not_converged", "run_id": run_id}))
+    fake = _FakeEquilLammps(tmp_path, comp_results=[], gate_verdicts=[])
+
+    result = do_equil_and_check(args, cls, fake)
+
+    assert result["halted"] is True
+    assert result["reason"] == "MINIMIZE_NOT_CONVERGED"
+    assert result["detail"]["stage"] == "minimize_not_converged"
+
+
+def test_do_equil_and_check_other_chain_failures_still_raise(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """A plain "minimize" (or any other) stage failure -- a real LAMMPS crash, not the
+    convergence check -- must still hit the generic bare-SystemExit fallback, unchanged."""
+    args, cls = equil_check_args_cls
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: (
+        {"status": "failed", "stage": "minimize", "run_id": run_id}))
+    fake = _FakeEquilLammps(tmp_path, comp_results=[], gate_verdicts=[])
+
+    with pytest.raises(SystemExit, match="Equilibration chain did not complete"):
+        do_equil_and_check(args, cls, fake)
 
 
 def test_do_equil_and_check_halts_when_backbone_types_unresolved(tmp_path, equil_check_args_cls, monkeypatch):
@@ -438,16 +524,17 @@ def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_ch
 def test_structural_fail_routes_to_cooling_verdict_not_a_passing_finite_size_string(
         tmp_path, monkeypatch):
     """detail["finite_size_verdict"] is "SIZE_PASS" -- a truthy string -- whenever finite size
-    was merely *evaluated*, independent of whether it passed. A real MELT_STAGE_DEFICIT halt
-    with finite_size passing must still route to the cooling_verdict code, not fall into an
-    `or`-chain trap that picks "SIZE_PASS" just because it's non-empty and comes first -- that
-    would hand RemedyRegistry a code with no registered remedy for a real, remediable finding."""
+    was merely *evaluated*, independent of whether it passed. A real UNDER_ANNEALED_COOLING
+    halt with finite_size passing must still route to the cooling_verdict code, not fall into
+    an `or`-chain trap that picks "SIZE_PASS" just because it's non-empty and comes first --
+    that would hand RemedyRegistry a code with no registered remedy for a real, remediable
+    finding."""
     from run_campaign import CampaignStageExecutor
     import run_campaign as rc
 
     halted_detail = {
         "verdict": "STRUCTURAL_FAIL", "finite_size_verdict": "SIZE_PASS",
-        "cooling_verdict": "MELT_STAGE_DEFICIT", "homogeneity_verdict": "HOMOG_PASS",
+        "cooling_verdict": "UNDER_ANNEALED_COOLING", "homogeneity_verdict": "HOMOG_PASS",
         "remedy_confidence": "high",
     }
     monkeypatch.setattr(rc, "do_equil_and_check", lambda args, cls, lammps: {
@@ -464,7 +551,7 @@ def test_structural_fail_routes_to_cooling_verdict_not_a_passing_finite_size_str
     result = executor.execute("equilibration", context)
 
     assert result.status == "remedy_required"
-    assert result.findings[0].code == "MELT_STAGE_DEFICIT"
+    assert result.findings[0].code == "UNDER_ANNEALED_COOLING"
 
 
 def _write_prior_manifest(tmp_path, name, parameters, stage_checkpoints):
@@ -610,3 +697,78 @@ def test_structural_fail_routes_to_real_finite_size_failure_code(tmp_path, monke
 
     assert result.status == "remedy_required"
     assert result.findings[0].code == "SIZE_MIN_IMAGE_VIOLATION"
+
+
+# ─── run_campaign_workflow() writes system_characterization_cache.json on acceptance ──────
+
+def _stub_engine(result: dict):
+    class _StubWorkflowEngine:
+        def __init__(self, *a, **k):
+            pass
+
+        def run(self):
+            return dict(result)
+
+    return _StubWorkflowEngine
+
+
+def _setup_workflow_fixture(tmp_path, monkeypatch, run_name="WCC_RUN"):
+    """A minimal repo_root + run_plan.json sufficient to reach run_campaign_workflow()'s
+    WorkflowEngine(...).run() call, with the heavy MCP server loads and WorkflowEngine itself
+    stubbed out -- this test is about the cache-write WIRING, not stage execution."""
+    import shutil
+    (tmp_path / "orchestration").mkdir()
+    shutil.copy(REPO_ROOT / "orchestration" / "decision_policy.json",
+               tmp_path / "orchestration" / "decision_policy.json")
+    plan = {"run_name": run_name, "polymer_class": "PHYC", "smiles": "*CC*",
+           "properties": ["density"], "decided_params": {}, "decisions": [], "planned_stages": []}
+    plan_path = tmp_path / "run_plan.json"
+    plan_path.write_text(json.dumps(plan))
+    monkeypatch.setattr(rdr, "_load_server_module", lambda *a, **k: SimpleNamespace())
+    return plan_path
+
+
+def test_run_campaign_workflow_writes_cache_on_acceptance(tmp_path, monkeypatch):
+    plan_path = _setup_workflow_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(rdr, "WorkflowEngine", _stub_engine({"status": "accepted"}))
+
+    import write_characterization_cache as wcc
+    calls = []
+    monkeypatch.setattr(wcc, "write_characterization_cache",
+                        lambda run_name, **kw: calls.append((run_name, kw)))
+
+    result = rdr.run_campaign_workflow(plan_path, repo_root=tmp_path)
+
+    assert result["status"] == "accepted"
+    assert calls == [("WCC_RUN", {"repo_root": tmp_path})]
+
+
+def test_run_campaign_workflow_skips_cache_write_when_not_accepted(tmp_path, monkeypatch):
+    plan_path = _setup_workflow_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(rdr, "WorkflowEngine", _stub_engine({"status": "failed"}))
+
+    import write_characterization_cache as wcc
+    calls = []
+    monkeypatch.setattr(wcc, "write_characterization_cache",
+                        lambda run_name, **kw: calls.append((run_name, kw)))
+
+    result = rdr.run_campaign_workflow(plan_path, repo_root=tmp_path)
+
+    assert result["status"] == "failed"
+    assert calls == []
+
+
+def test_run_campaign_workflow_cache_write_failure_does_not_propagate(tmp_path, monkeypatch, capsys):
+    plan_path = _setup_workflow_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(rdr, "WorkflowEngine", _stub_engine({"status": "accepted"}))
+
+    import write_characterization_cache as wcc
+
+    def _boom(run_name, **kw):
+        raise RuntimeError("disk full")
+    monkeypatch.setattr(wcc, "write_characterization_cache", _boom)
+
+    result = rdr.run_campaign_workflow(plan_path, repo_root=tmp_path)
+
+    assert result["status"] == "accepted"  # the campaign result must survive a cache-write failure
+    assert "WARNING" in capsys.readouterr().err

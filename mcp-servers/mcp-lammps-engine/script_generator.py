@@ -840,12 +840,12 @@ class ScriptGenerator:
                 density = total_mass_amu / box_vol_A3 * 1.66054
                 stats["density_g_cm3"] = round(density, 4)
                 if density < 0.1:
-                    warnings.append(
+                    errors.append(
                         f"Density = {density:.3f} g/cm³ — unusually low. "
                         f"Cell may be over-expanded or have vacuum voids."
                     )
                 elif density > 2.5:
-                    warnings.append(
+                    errors.append(
                         f"Density = {density:.3f} g/cm³ — unusually high. "
                         f"Cell may be over-compressed or overlapping atoms."
                     )

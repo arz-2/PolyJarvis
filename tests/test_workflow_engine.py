@@ -161,25 +161,42 @@ def test_tg_gate_cannot_be_accepted_from_process_completion(tmp_path):
     assert thermal_calls[-1][1]["parameters"]["tg_t_step_K"] == 10
 
 
-def test_melt_stage_deficit_escalates_anneal_cycles_before_melt_hold(tmp_path):
-    finding = Finding("MELT_STAGE_DEFICIT", "equilibration")
+def test_minimize_not_converged_escalates_tolerance_and_iteration_caps(tmp_path):
+    finding = Finding("MINIMIZE_NOT_CONVERGED", "equilibration")
     fake = FakeExecutor({"equilibration": [
         StageResult("remedy_required", (finding,)),
         StageResult("remedy_required", (finding,)),
     ]})
-    engine = WorkflowEngine(tmp_path, plan(eq_annealing_cycles=3), fake)
+    engine = WorkflowEngine(
+        tmp_path,
+        plan(minimize_maxiter=50000, minimize_maxeval=100000,
+             minimize_etol=1e-6, minimize_ftol=1e-6),
+        fake,
+    )
 
     result = engine.run()
 
     assert result["status"] == "accepted"
     equil_calls = [call for call in fake.calls if call[0] == "equilibration"]
     assert len(equil_calls) == 3
-    # attempt 1: cheaper lever only -- more thermal-cycling depth, no melt hold yet
-    assert equil_calls[1][1]["parameters"]["eq_annealing_cycles"] == 6
-    assert "melt_hold_ns" not in equil_calls[1][1]["parameters"]
-    # attempt 2: cycles stay escalated, bounded melt hold added as the fallback
-    assert equil_calls[2][1]["parameters"]["eq_annealing_cycles"] == 6
-    assert equil_calls[2][1]["parameters"]["melt_hold_ns"] == 5.0
+    # attempt 1: x4 iteration/eval caps, x10 looser tolerances
+    p1 = equil_calls[1][1]["parameters"]
+    assert p1["minimize_maxiter"] == 200000
+    assert p1["minimize_maxeval"] == 400000
+    assert round(p1["minimize_etol"], 10) == 1e-5
+    assert round(p1["minimize_ftol"], 10) == 1e-5
+    assert "equilibration_resume_from" not in p1  # stage 0 -- always a full restart
+    # attempt 2: escalates again off the frozen baseline, not off attempt 1's already-raised value
+    p2 = equil_calls[2][1]["parameters"]
+    assert p2["minimize_maxiter"] == 800000
+    assert round(p2["minimize_etol"], 10) == 1e-4
+
+
+def test_minimize_not_converged_routes_to_raise_minimize_tolerance():
+    from workflow_engine import RemedyRegistry, Finding as F
+    registry = RemedyRegistry()
+    remedy = registry.route(F("MINIMIZE_NOT_CONVERGED", "equilibration"))
+    assert remedy.remedy_id == "raise_minimize_tolerance"
 
 
 def test_thermal_change_invalidates_mechanical_and_summary_not_build(tmp_path):

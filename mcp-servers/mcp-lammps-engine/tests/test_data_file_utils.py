@@ -100,6 +100,26 @@ def test_incomplete_pair_coeffs_is_blocked():
     assert any("Pair Coeffs" in e for e in res["errors"])
 
 
+def test_density_below_0_1_is_blocked():
+    # total mass 26.038 amu; a large box drops density well under the 0.1 g/cm3 floor
+    # (26.038 * 1.66054 / 0.1 ~= 432 A^3 -> ~7.57 A edge; use 10 A to clear the margin).
+    bad = CLEAN_DATA.replace("0.0 4.0", "0.0 10.0")
+    res = _gen().validate_data_file(content=bad, lj_cutoff=1.0)
+    assert res["valid"] is False
+    assert any("unusually low" in e for e in res["errors"])
+    assert res["warnings"] == []  # promoted to blocking, not left as a warning
+
+
+def test_density_above_2_5_is_blocked():
+    # a small box pushes density well over the 2.5 g/cm3 ceiling
+    # (26.038 * 1.66054 / 2.5 ~= 17.3 A^3 -> ~2.59 A edge; use 2.0 A to clear the margin).
+    bad = CLEAN_DATA.replace("0.0 4.0", "0.0 2.0")
+    res = _gen().validate_data_file(content=bad, lj_cutoff=0.5)
+    assert res["valid"] is False
+    assert any("unusually high" in e for e in res["errors"])
+    assert res["warnings"] == []
+
+
 def test_out_of_range_type_id_is_blocked():
     # only 2 atom types exist; requesting type 5 as a SHAKE H is invalid
     res = _gen().validate_data_file(content=CLEAN_DATA, lj_cutoff=1.0, h_type_ids=[5])

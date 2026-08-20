@@ -43,7 +43,12 @@ def _target_density(cls: dict, smiles: str):
     when it cannot be resolved -- the caller then skips rather than guessing a density.
     A dict with exactly one numeric member is not treated as unambiguous: it means only
     that one member's density happens to be documented, not that the class has one
-    member (e.g. PSTR documents PS but also covers P2VP)."""
+    member (e.g. PSTR documents PS but also covers P2VP).
+
+    No longer called by _finite_size_findings (which now always estimates from
+    density_initial_gcm3, never a curated experimental value -- see COMPRESSION_RATIO
+    above). Kept as a standalone resolver utility; tests/test_plan_system_size_arms.py
+    exercises it directly."""
     ed = cls.get("experimental_density_gcm3")
     if isinstance(ed, (int, float)):
         return float(ed)
@@ -53,6 +58,13 @@ def _target_density(cls: dict, smiles: str):
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
+
+# Finite-size forecast target density: density_initial_gcm3 is a build parameter chosen for
+# every run (how loosely to pack the initial cell before EMC/LAMMPS compress it), never
+# experimental data -- always resolvable, unlike a curated per-SMILES experimental_density_gcm3.
+# See orchestration/scripts/run_campaign.py's COMPRESSION_RATIO for the same constant/rationale
+# (duplicated, not shared -- no existing shared-constants module for this kind of value).
+COMPRESSION_RATIO = 2.0
 
 
 def _prefix(decision_id: str) -> str:
@@ -182,9 +194,10 @@ def _finite_size_findings(plan: dict) -> list:
     """Cheapest possible finite-size check: plan time, before the build, before any GPU.
 
     Only the MINIMUM-IMAGE criterion is decidable here -- it needs no Rg. The predicted
-    equilibrated box edge follows from the planned cell mass and the class experimental
-    density: L = (m / (N_A * rho))^(1/3), accurate to within ~3% of the archive's actual
-    post-compression boxes.
+    equilibrated box edge follows from the planned cell mass and an estimated target density:
+    L = (m / (N_A * rho))^(1/3), where rho = COMPRESSION_RATIO * density_initial_gcm3 -- never
+    a curated experimental value (a novel system may have none), always resolvable since
+    density_initial_gcm3 is a build parameter chosen for every run, not measured data.
 
     The chain-self-imaging criterion (L >= 2*Rg) needs a real Rg, so it is enforced one
     step later by inspect_data_file's finite_size_forecast on the built cell -- still
@@ -199,7 +212,7 @@ def _finite_size_findings(plan: dict) -> list:
 
     cls = get_class_entry(load_rules(), polymer_class) or {}
     cutoff_A = dp.get("cutoff_A") or cls.get("cutoff_A")
-    rho = _target_density(cls, smiles)
+    rho = COMPRESSION_RATIO * (dp.get("density_initial_gcm3") or cls.get("density_initial_gcm3", 0.6))
     if not cutoff_A or not rho:
         return findings
 

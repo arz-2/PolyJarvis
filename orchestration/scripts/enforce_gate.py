@@ -3,9 +3,13 @@
 
 Cross-checks a completed equil run's overall_pass + per-gate results against
 decision_policy.json's require_glassy / require_rubbery / plain-require clauses,
-programmatically -- not via worker prose. Also applies density_value_binding
-(assess_cooling_contraction must have run when 300K density falls >5% below
-experiment).
+programmatically -- not via worker prose. Also applies density_value_binding: an
+unconditional, self-consistency-only check (assess_cooling_contraction.py) on whether a
+glassy cell's melt->glass density contraction matches its own thermal-expansion prediction.
+Never compares to any experimental/curated density or thermal-expansion value -- neither
+this gate nor the finite-size forecast reads experimental_density_gcm3/alpha_glass_per_K/
+alpha_melt_per_K anymore, so a novel system with none of those curated is assessed exactly
+the same way as a well-characterized one.
 
 Usage: python3 enforce_gate.py <run_name> [--repo-root PATH]
 Prints a JSON verdict to stdout: PASS_CLEAN | PASS_CARVEOUT | VIOLATION | UNADJUDICATED.
@@ -16,11 +20,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hw_common import resolve_member_value  # noqa: E402
+from hw_common import resolve_member_value  # noqa: E402  (still used by other callers of this module)
 
 BINDING_GLASSY = {"density_drift", "density_sem", "energy_drift", "energy_sem",
-                   "density_in_band", "density_homogeneity", "p2", "n_eff_density",
-                   "finite_size"}
+                   "density_homogeneity", "p2", "n_eff_density", "finite_size"}
 ADVISORY_GLASSY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "residual_stress"}
 
 BINDING_RUBBERY = {"density_sem", "density_homogeneity", "energy_drift", "energy_sem",
@@ -55,13 +58,6 @@ def load_json(path):
 
 def resolve_regime(t_workflow_k):
     return "rubbery" if t_workflow_k is not None and t_workflow_k <= 300.0 else "glassy"
-
-
-def density_in_band(plateau_mean, exp_val, band_pct=5.0):
-    if plateau_mean is None or exp_val is None:
-        return None, None, None
-    gap_pct = 100.0 * (plateau_mean - exp_val) / exp_val
-    return abs(gap_pct) <= band_pct, gap_pct, exp_val
 
 
 def _stage_log_for(data_path):
@@ -177,9 +173,10 @@ def msd_msid_gates(chain: dict) -> dict:
 EXTENDABLE_GATES = {"density_drift", "energy_drift", "density_sem", "energy_sem",
                     "n_eff_density"}
 # Gates whose failure means the cell is WRONG, not merely unconverged -- extending at 300K
-# cannot fix these (policy: "a glass cannot densify below Tg").
-STRUCTURAL_GATES = {"density_homogeneity", "density_in_band", "p2", "density_value_binding",
-                    "finite_size"}
+# cannot fix these (policy: "a glass cannot densify below Tg"). density_value_binding is a
+# Class A structural cooling-protocol defect (see decision_policy.json), not a sampling
+# deficiency -- its remedy is re-melt+slow-recool, never EXTEND, same as every other member.
+STRUCTURAL_GATES = {"density_homogeneity", "p2", "density_value_binding", "finite_size"}
 
 
 def enforce(run_name, repo_root: Path):
@@ -190,7 +187,6 @@ def enforce(run_name, repo_root: Path):
 
     plan = load_json(raw / "run_plan.json")
     comp = load_json(raw / "equilibration.json")
-    dens = (comp or {}).get("density")
     cooling = load_json(raw / "cooling_contraction.json")  # may not exist
     policy = load_json(repo_root / "orchestration" / "decision_policy.json")
     rules = load_json(repo_root / "guides" / "polymer_rules.json")
@@ -211,44 +207,36 @@ def enforce(run_name, repo_root: Path):
     # --- pull per-gate pass booleans from equilibration.json ---
     gates = collect_gates(comp)
 
-    # --- density-in-band (density_value_binding target) ---
-    # dp first: a planning agent's overrides.experimental_density_gcm3 pin (OVERRIDE_RANGES)
-    # must be respected here too, same precedence as dp_typical above.
-    smiles = plan.get("smiles")
-    exp_density_dict = dp.get("experimental_density_gcm3") or cls_rules.get("experimental_density_gcm3")
-    if isinstance(exp_density_dict, (int, float)):
-        exp_density_resolved = exp_density_dict
-    elif isinstance(exp_density_dict, dict):
-        exp_density_resolved = resolve_member_value(cls_rules, "experimental_density_gcm3", smiles)
-    else:
-        exp_density_resolved = None
-    plateau_mean = (dens or {}).get("plateau_density_mean")
-    in_band, gap_pct, exp_val = density_in_band(plateau_mean, exp_density_resolved)
-    gates["density_in_band"] = in_band  # may be None if no exp value on file
-
     # --- determine applicable clause ---
     clause, binding_results, advisory_results = classify(gates, regime, dp_typical, ct_gate_reliable)
     binding_all_pass = all(binding_results.values()) if binding_results else True
 
-    # --- density_value_binding: assess_cooling_contraction must have run if glassy density is >5% low ---
+    # --- density_value_binding: retrospective, read-only re-audit of a cached
+    # cooling_contraction.json (this function never re-runs assess_cooling_contraction --
+    # that's enforce_live()'s job during a live run). Binding iff the cached verdict is the
+    # new schema's UNDER_ANNEALED_COOLING; a file cached under the OLD (retired) schema
+    # (MELT_STAGE_DEFICIT/AMBIGUOUS, from a run equilibrated before this reframing) cannot be
+    # honestly re-classified without re-running the script against that run's raw melt/glass
+    # data, so it is reported non-binding rather than guessed either way. ---
     dvb_status = "n/a"
-    if regime == "glassy" and gap_pct is not None and gap_pct < -5.0:
-        if cooling is not None and cooling.get("verdict") in (
-            "UNDER_ANNEALED_COOLING", "MELT_STAGE_DEFICIT", "OK"
-        ):
-            dvb_status = f"satisfied ({cooling['verdict']})"
+    if regime == "glassy":
+        if cooling is None:
+            dvb_status = "no_cooling_evidence"
         else:
-            dvb_status = "missing_evidence"
-            binding_all_pass = False  # density_value_binding is itself binding
+            cooling_verdict = cooling.get("verdict")
+            if cooling_verdict == "UNDER_ANNEALED_COOLING":
+                dvb_status = f"satisfied ({cooling_verdict})"
+                binding_all_pass = False  # density_value_binding is itself binding
+            elif cooling_verdict in ("OK", "INSUFFICIENT_DATA"):
+                dvb_status = f"satisfied ({cooling_verdict})"
+            else:
+                dvb_status = f"stale_verdict_not_reauditable ({cooling_verdict})"
 
     overall_pass_reported = comp.get("overall_pass")
     failing_binding = [k for k, v in binding_results.items() if v is False]
-    if dvb_status == "missing_evidence":
+    if dvb_status.startswith("satisfied (UNDER_ANNEALED_COOLING)"):
         failing_binding.append("density_value_binding")
 
-    # density_value_binding is a policy-level check independent of check_equilibration_comprehensive's
-    # own overall_pass (which only tests drift/SEM stability, never absolute magnitude vs experiment) --
-    # so it can veto a PASS_CLEAN verdict on its own.
     if not failing_binding and overall_pass_reported is True:
         verdict = "PASS_CLEAN"
     elif binding_all_pass and not failing_binding:
@@ -265,7 +253,6 @@ def enforce(run_name, repo_root: Path):
         "applicable_clause": clause,
         "binding_gates": binding_results,
         "advisory_gates": advisory_results,
-        "density_gap_pct": round(gap_pct, 2) if gap_pct is not None else None,
         "density_value_binding": dvb_status,
         "overall_pass_reported": overall_pass_reported,
         "failing_binding_gates": failing_binding,
@@ -276,15 +263,15 @@ def enforce(run_name, repo_root: Path):
 def enforce_live(args) -> dict:
     """Live-run gate enforcement for equilibration-checker (Step 3), called via
     `enforce_gate.py --live` with explicit values already present in the worker's
-    runtime arguments (regime/dp/exp density/tg from stage_params.py) -- does not depend on
+    runtime arguments (regime/dp from stage_params.py) -- does not depend on
     run_plan.json having been fully written yet.
 
     Emits a 4-way verdict the orchestrator can route directly:
       PASS            -> equil_verdict=PASS
       EXTEND          -> equil_verdict=EXTEND (re-run at 300K; only drift/SEM gates failed)
       STRUCTURAL_FAIL -> equil_verdict=STRUCTURAL_FAIL (NEW — route to the specific recovery
-                         ladder: re-melt+slow-recool for UNDER_ANNEALED_COOLING, heavy-melt-anneal
-                         probe for MELT_STAGE_DEFICIT. EXTEND cannot fix these.)
+                         ladder: re-melt+slow-recool for UNDER_ANNEALED_COOLING. EXTEND cannot
+                         fix these.)
       FAIL            -> equil_verdict=FAIL (unclassifiable / hard structural failure)
     """
     comp = load_json(Path(args.comprehensive_json))
@@ -297,28 +284,22 @@ def enforce_live(args) -> dict:
     dp_typical = args.dp
     ct_gate_reliable = args.ct_gate_reliable
 
-    # --- density-in-band, straight from plateau_density_mean under comp's own "density" section
-    # (extract_equilibrated_density.py merges its result there rather than a neighbor file) ---
-    dens = comp.get("density")
-    plateau_mean = (dens or {}).get("plateau_density_mean")
-    exp_density = args.exp_density_gcm3
-    gap_pct = None
-    if plateau_mean is not None and exp_density is not None:
-        gap_pct = 100.0 * (plateau_mean - exp_density) / exp_density
-        gates["density_in_band"] = abs(gap_pct) <= 5.0
-
     clause, binding_results, advisory_results = classify(gates, regime, dp_typical, ct_gate_reliable)
     failing_binding = [k for k, v in binding_results.items() if v is False]
 
-    # --- density_value_binding: live probe-or-check ---
+    # --- density_value_binding: unconditional self-consistency check (live probe-or-check).
+    # Triggers on data-path presence, NOT on any density-vs-experiment gap -- the live
+    # checkpoint call at phase=melt legitimately has glass_data/melt_data as None (no
+    # post-cool glass state exists yet), so guarding on regime alone would misfire needs_probe
+    # there. ---
     dvb_status = "n/a"
     cooling_verdict = None
     cooling_reliable = True
-    if regime == "glassy" and gap_pct is not None and gap_pct < -5.0:
+    if regime == "glassy" and args.glass_data and args.melt_data:
         cooling_path = Path(args.out_dir) / "cooling_contraction.json" if args.out_dir else None
         cooling = load_json(cooling_path) if cooling_path else None
         if cooling is not None and cooling.get("verdict") in (
-            "UNDER_ANNEALED_COOLING", "MELT_STAGE_DEFICIT", "OK"
+            "UNDER_ANNEALED_COOLING", "OK", "INSUFFICIENT_DATA"
         ):
             dvb_status = f"satisfied ({cooling['verdict']})"
             cooling_verdict = cooling.get("verdict")
@@ -326,31 +307,21 @@ def enforce_live(args) -> dict:
         else:
             return {
                 "needs_probe": True,
-                "reason": f"density {gap_pct:.2f}% below experiment (>5% threshold) — "
-                          "density_value_binding requires assess_cooling_contraction before "
-                          "any verdict can be issued (policy: a bare force-field-bias claim "
-                          "is not sufficient).",
+                "reason": "density_value_binding requires assess_cooling_contraction (a "
+                          "self-consistency check on the melt->glass contraction vs. this "
+                          "system's own thermal-expansion prediction) before any verdict can "
+                          "be issued.",
                 "assess_cooling_contraction_args": {
                     "glass_data": args.glass_data,
                     "melt_data": args.melt_data,
-                    # Stage logs carry the whole NPT plateau; the _out.data files carry one
-                    # fluctuating final frame. Derived from the data paths by the stage layout
-                    # (<stage>/<stage>_out.data -> <stage>/<stage>.log); assess_cooling_
-                    # contraction falls back to the final frame when the log is absent.
                     "glass_log": _stage_log_for(args.glass_data),
                     "melt_log": _stage_log_for(args.melt_data),
-                    "exp_density_gcm3": exp_density,
                     "tg_K": args.tg_k,
                     "t_equil_K": args.t_equil_k,
-                    # None -> assess_cooling_contraction.py falls back to its own generic
-                    # defaults (2.5e-4 / 6.0e-4); only set when the plan curated a class- or
-                    # grounding-sourced value (decided_params.alpha_glass_per_K/alpha_melt_per_K).
-                    "alpha_glass": getattr(args, "alpha_glass_per_k", None),
-                    "alpha_melt": getattr(args, "alpha_melt_per_k", None),
                 },
                 "save_result_to": str(cooling_path),
             }
-        if cooling_verdict != "OK":
+        if cooling_verdict == "UNDER_ANNEALED_COOLING":
             failing_binding.append("density_value_binding")
 
     # --- 4-way verdict mapping ---
@@ -393,17 +364,9 @@ def enforce_live(args) -> dict:
                       "until L >= 2*Rg. Extending or re-cooling cannot fix a too-small box.")
         elif cooling_verdict == "UNDER_ANNEALED_COOLING":
             remedy = ("re_melt_slow_recool — re-melt from npt_production_out.data at T_equil_K "
-                      "(never the 300 K cell) and slow the ramp: npt_cool300_steps and "
-                      "npt_cool_steps x2 on attempt 1, x4 on attempt 2 (max 2). Baselines: "
-                      "npt_cool300_steps=int(1.0e6/dt_fs); npt_cool_steps from the atom tier "
-                      "(<5000->1e6, <15000->2e6, else 3e6). Do NOT extend at 300 K.")
-        elif cooling_verdict == "MELT_STAGE_DEFICIT":
-            remedy = ("heavy_melt_anneal_probe — re-generate the workflow with add_melt_npt=True, "
-                      "t_equil_K=<class T_equil_K>, and melt_npt_steps=10*int(1.0e6/dt_fs) "
-                      "(~10 ns hold) on attempt 1, 50x (~50 ns) on attempt 2; re-run the "
-                      "phase=melt gate after each. The 1 ns default is ~100x short of the ~100 ns "
-                      "melt anneal that reached PMMA 1.19 g/cm3 (NkepsuMbitou 2025). Still "
-                      "under-band after rung 2 -> escalate to a different force field.")
+                      "(never the 300 K cell) and slow the ramp: npt_cool300_steps x2 on "
+                      "attempt 1, x4 on attempt 2 (max 2). Baseline: "
+                      "npt_cool300_steps=int(1.0e6/dt_fs). Do NOT extend at 300 K.")
         elif "density_homogeneity" in failing_binding:
             remedy = ("MELT-MIXING — extend the melt stage in place (phase=melt extend_only at "
                       "T_workflow_K, cap 2), then re-run the phase=melt gate. Never re-melt from "
@@ -411,23 +374,21 @@ def enforce_live(args) -> dict:
         else:
             remedy = "route to RECOVERY — structural gate failure without a specific density_value_binding diagnosis"
 
-        if cooling_verdict in ("UNDER_ANNEALED_COOLING", "MELT_STAGE_DEFICIT") and not cooling_reliable:
+        if cooling_verdict == "UNDER_ANNEALED_COOLING" and not cooling_reliable:
             remedy_confidence = "low"
             remedy += (" [LOW CONFIDENCE: cooling span >300K — the alpha-based melt/cooling "
-                       "split (UNDER_ANNEALED_COOLING vs MELT_STAGE_DEFICIT) is unreliable here; "
-                       "treat this remedy as a starting hypothesis, not a firm diagnosis. Lean on "
-                       "the absolute glass-vs-experiment density gap as the trustworthy signal.]")
+                       "contraction prediction is unreliable here; treat this remedy as a "
+                       "starting hypothesis, not a firm diagnosis.]")
 
     return {
         "regime": regime,
         "applicable_clause": clause,
         "binding_gates": binding_results,
         "advisory_gates": advisory_results,
-        "density_gap_pct": round(gap_pct, 2) if gap_pct is not None else None,
         "density_value_binding": dvb_status,
-        # Structured, not only embedded in the remedy prose: the melt/cooling split is
-        # alpha-extrapolated and unreliable past a 300 K span (PKTN 470 K, PSFO 400 K),
-        # so a consumer that reports the verdict must be able to read that flag.
+        # Structured, not only embedded in the remedy prose: the alpha-based contraction
+        # prediction is unreliable past a 300 K cooling span (PKTN 470 K, PSFO 400 K), so a
+        # consumer that reports the verdict must be able to read that flag.
         # None means no cooling assessment applied here, NOT "reliable".
         "cooling_verdict": cooling_verdict,
         "cooling_extrapolation_reliable": cooling_reliable if cooling_verdict else None,
@@ -453,14 +414,11 @@ def main():
     ap.add_argument("--regime", choices=["glassy", "rubbery"])
     ap.add_argument("--dp", type=lambda v: None if v == "null" else float(v))
     ap.add_argument("--ct-gate-reliable", type=lambda v: v.lower() != "false")
-    ap.add_argument("--exp-density-gcm3", type=lambda v: None if v == "null" else float(v))
     ap.add_argument("--tg-k", type=lambda v: None if v == "null" else float(v))
     ap.add_argument("--t-equil-k", type=float)
     ap.add_argument("--glass-data")
     ap.add_argument("--melt-data")
     ap.add_argument("--out-dir")
-    ap.add_argument("--alpha-glass-per-k", type=lambda v: None if v == "null" else float(v))
-    ap.add_argument("--alpha-melt-per-k", type=lambda v: None if v == "null" else float(v))
     args = ap.parse_args()
 
     if args.live:

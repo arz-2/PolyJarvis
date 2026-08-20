@@ -40,6 +40,16 @@ MCP_JSON = REPO_ROOT / ".mcp.json"
 
 POLL_SECONDS = 30
 EXTEND_MAX_ATTEMPTS = 2
+# Finite-size forecast target density: density_initial_gcm3 is a build parameter we choose
+# (how loosely to pack the initial cell before EMC/LAMMPS compress it), never experimental
+# data -- always resolvable, unlike a curated per-SMILES experimental_density_gcm3. EMC's own
+# convention packs at ~0.5x the eventual density; the archive's observed
+# experimental_density_gcm3/density_initial_gcm3 ratio spans ~1.3x (PHYC) to ~2.0x
+# (PSTR/PACR). 2.0 is the conservative (smaller-predicted-box) end of that range: this gate's
+# false-positive cost (an unnecessary rebuild-larger, at the cheapest point in the pipeline)
+# is far cheaper than its false-negative cost (a silently under-sized cell burning the whole
+# equilibration chain).
+COMPRESSION_RATIO = 2.0
 
 
 # ─── Module loading (bypasses MCP transport entirely) ─────────────────────────
@@ -271,10 +281,13 @@ def do_build(args, cls: dict, emc, lammps) -> dict:
 
     # Size gate at the cheapest point: the built cell, before any MD. A too-small cell would
     # otherwise burn the whole equilibration chain before the equil-check gate said the same.
+    # target_density_gcm3 is always the density_initial_gcm3-derived estimate (COMPRESSION_RATIO,
+    # module-level above) -- never a curated experimental value, so this forecast runs
+    # unconditionally for every system, known or novel.
     ep = resolve_stage_params("equil", args, cls)
     info = lammps.inspect_data_file(
         data_file=str(dest_data), lj_cutoff=ep.get("cutoff_A") or 12.0,
-        target_density_gcm3=ep.get("exp_density_gcm3"), nchain=ep.get("nchain"),
+        target_density_gcm3=COMPRESSION_RATIO * p["density_initial_gcm3"], nchain=ep.get("nchain"),
     )
     size_errors = [e for e in (info.get("validation", {}).get("errors") or [])
                    if e.startswith("SIZE_")]
@@ -352,6 +365,8 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             use_long_range=p["use_long_range_electrostatics"],
             extend_steps=None,
             params_file=p.get("emc_params_path") or "",
+            minimize_etol=p["minimize_etol"], minimize_ftol=p["minimize_ftol"],
+            minimize_maxiter=p["minimize_maxiter"], minimize_maxeval=p["minimize_maxeval"],
         )
     else:
         dt = p["dt_fs"]
@@ -439,6 +454,12 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                 atomic_write_json(pending_path, submission)
         result = wait_for_run(lammps, submission["chain_id"], "equilibration chain")
     if result.get("status") != "completed":
+        if result.get("stage") == "minimize_not_converged":
+            # minimize is stage 0 of the chain -- nothing else in THIS submission completed,
+            # so there is no real stage_checkpoints to resume from (unlike EXTEND_EXHAUSTED/
+            # STRUCTURAL_FAIL below, which fire after real stages have run).
+            return {"halted": True, "reason": "MINIMIZE_NOT_CONVERGED", "detail": result,
+                    "stage_checkpoints": {}}
         raise SystemExit(f"Equilibration chain did not complete: {result}")
     if pending_path is not None:
         pending_path.unlink(missing_ok=True)
@@ -533,11 +554,9 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
         comprehensive_json = str(Path(p["output_dir"]) / "equilibration.json")
         verdict = lammps.enforce_equilibration_gate(
             comprehensive_json=comprehensive_json, regime=p["regime"], dp=p["dp"],
-            ct_gate_reliable=p["ct_gate_reliable"], exp_density_gcm3=p["exp_density_point_gcm3"],
+            ct_gate_reliable=p["ct_gate_reliable"],
             tg_K=p["exp_tg_point_K"], t_equil_K=p["T_workflow_K"], glass_data=p["npt_prod_data_path"],
             melt_data=p["melt_data_path"], out_dir=p["output_dir"],
-            alpha_glass_per_K=None if p["alpha_glass_per_K"] == "null" else p["alpha_glass_per_K"],
-            alpha_melt_per_K=None if p["alpha_melt_per_K"] == "null" else p["alpha_melt_per_K"],
         )
         equil_verdict = verdict.get("verdict")
 
@@ -633,6 +652,7 @@ def do_thermal(args, cls: dict, lammps) -> dict:
             run = lammps.run_lammps_script(
                 script=script["output_script"], work_dir=p["tg_sweep_dir"], log_file="tg_sweep_run.log",
                 gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"], engine=p["engine"],
+                data_file=p["equil_data_path"], lj_cutoff=p["cutoff_A"],
             )
             result = wait_for_run(lammps, run["run_id"], f"tg sweep rate={rate}")
         if result.get("status") != "completed":
@@ -698,6 +718,7 @@ def _submit_deform(args, cls: dict, lammps, mode: str) -> dict:
     run = lammps.run_lammps_script(
         script=script["output_script"], work_dir=p["work_dir"], log_file=f"05_deform{suffix}.log",
         gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"], engine=p["engine"],
+        data_file=p["equil_data_path"], lj_cutoff=p["cutoff_A"],
     )
     return {"run_id": run["run_id"], "log_path": f"{p['work_dir']}/05_deform{suffix}.log"}
 
@@ -1116,10 +1137,25 @@ def run_campaign_workflow(plan_path: Path, *, dry_run: bool = False,
             policy_hashes[str(path.relative_to(repo_root))] = hashlib.sha256(path.read_bytes()).hexdigest()
     executor = CampaignStageExecutor(args, cls, emc, lammps, str(plan_path))
     decision_policy = json.loads((repo_root / "orchestration" / "decision_policy.json").read_text())
-    return WorkflowEngine(run_dir, plan, executor, recovery_agent=recovery_agent,
-                          policy_hashes=policy_hashes, plan_path=plan_path,
-                          plan_validator=lambda candidate: validate_plan(candidate, decision_policy),
-                          override_validator=validate_overrides).run()
+    engine_result = WorkflowEngine(run_dir, plan, executor, recovery_agent=recovery_agent,
+                                   policy_hashes=policy_hashes, plan_path=plan_path,
+                                   plan_validator=lambda candidate: validate_plan(candidate, decision_policy),
+                                   override_validator=validate_overrides).run()
+    if engine_result.get("status") == "accepted":
+        # Freeze this run's actually-executed protocol into system_characterization_cache.json so
+        # a future run of the exact same SMILES can replay it instead of re-deriving class
+        # defaults (make_deterministic_plan.py's make_plan_from_cache). This is the single choke
+        # point for every route that reaches an accepted WorkflowEngine result -- both a fresh
+        # scientific_control.py-driven run (Workflow.execute() calls run_campaign_workflow
+        # internally) and a campaign resumed directly via `run_campaign.py --plan`, which never
+        # passes through scientific_control.py's own control_state.json bookkeeping at all.
+        try:
+            from write_characterization_cache import write_characterization_cache
+            write_characterization_cache(run_name, repo_root=repo_root)
+        except Exception as exc:  # never fail an accepted campaign on a cache-write problem
+            print(f"WARNING: system_characterization_cache write failed for {run_name}: {exc}",
+                 file=sys.stderr)
+    return engine_result
 
 
 def main():
