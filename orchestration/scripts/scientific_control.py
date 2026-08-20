@@ -21,6 +21,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from hw_common import get_class_entry, load_rules  # noqa: E402
 from make_deterministic_plan import build_decisions, build_planned_stages, make_plan  # noqa: E402
+import canon_smiles  # noqa: E402  -- module import so tests can monkeypatch canon_smiles.canonicalize
 
 
 VALID_PROPERTIES = frozenset({"density", "tg", "bulk_modulus"})
@@ -328,7 +329,13 @@ def planning_context(intent: ScientificIntent) -> dict[str, Any]:
     policy = json.loads((REPO_ROOT / "orchestration" / "decision_policy.json").read_text())
     cache_path = REPO_ROOT / "guides" / "system_characterization_cache.json"
     characterization_cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
-    characterization = characterization_cache.get(intent.smiles)
+    canonical_smiles = None
+    if intent.smiles:
+        try:
+            canonical_smiles = canon_smiles.canonicalize(intent.smiles, isomeric=True)
+        except (RuntimeError, subprocess.TimeoutExpired):
+            pass
+    characterization = characterization_cache.get(canonical_smiles or intent.smiles)
     decision_framework = {}
     for policy_entry in policy.get("policies", {}).values():
         decision_id = policy_entry.get("decision_id")

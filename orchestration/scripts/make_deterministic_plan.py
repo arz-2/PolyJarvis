@@ -23,6 +23,7 @@ Usage:
 
 import argparse
 import json
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hw_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family  # shared rules access (single source of truth)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from stage_params import _exp_tg_point, _regime_exp_tg  # reuse the proven resolvers, don't duplicate them
+import canon_smiles  # noqa: E402  -- module import so tests can monkeypatch canon_smiles.canonicalize
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DECISION_POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
@@ -238,6 +240,82 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
     }
 
 
+CACHE_PATH_DEFAULT = REPO_ROOT / "guides" / "system_characterization_cache.json"
+
+
+def make_plan_from_cache(run_name: str, polymer_class: str, smiles: str, canonical_smiles: str,
+                          properties: set, cache_entry: dict) -> dict:
+    """Materialize run_plan.json from a validated cache entry's frozen protocol -- the exact
+    protocol previously proven to reach "accepted" for this exact molecule -- instead of
+    polymer_rules.json class defaults. This is the "system, not class" fast path.
+
+    D-08_hardware is the one exception: always resolved fresh via _build_hardware_decision,
+    matching decision_policy.json's stance that hardware stays host-dependent and is never
+    frozen/replayed (the cache's protocol.decisions never carries a D-08 row in the first place --
+    write_characterization_cache.py drops it before freezing).
+    """
+    rules = load_rules()
+    cls = get_class_entry(rules, polymer_class)
+    protocol = cache_entry["protocol"]
+    decided_params = dict(protocol["decided_params"])  # literal replay, no recomputation
+    decisions = [dict(d) for d in protocol["decisions"]]
+    decisions.append(_build_hardware_decision(cls, _policy_criteria().get("D-08_hardware", [])))
+    return {
+        "schema_version": "1.0",
+        "goal": f"Predict {', '.join(sorted(properties))} for {polymer_class.upper()} ({smiles})",
+        "run_name": run_name,
+        "polymer_class": polymer_class.upper(),
+        "smiles": smiles,
+        "properties": sorted(properties),
+        "confidence": "high",
+        "plan_mode": "deterministic",
+        "assumptions": [
+            f"decided_params/decisions/planned_stages replayed verbatim from "
+            f"guides/system_characterization_cache.json[{canonical_smiles!r}], validated by "
+            f"run {cache_entry.get('source_run_name')!r} on {cache_entry.get('validated_at')}.",
+        ],
+        "uncertainties": [{"name": "none_dominant", "dominant": True, "reduction_probe": "none"}],
+        "decided_params": decided_params,
+        "decisions": decisions,
+        "planned_stages": list(protocol["planned_stages"]),
+        "critique": {"status": "protocol_validated_replay", "rounds": 0, "findings": []},
+        "provenance": {"generator": "make_deterministic_plan.py:make_plan_from_cache",
+                       "generated_at": datetime.now(timezone.utc).isoformat(),
+                       "cache_canonical_smiles": canonical_smiles},
+    }
+
+
+def _try_cache(run_name: str, polymer_class: str, smiles, properties: set,
+               cache_path: Path | None = None) -> dict | None:
+    """Look up a validated protocol for this exact SMILES and, if it covers every requested
+    property, materialize the plan from it. Returns None (never raises) on any miss -- no smiles,
+    no cache file, no entry, not validated, insufficient coverage, or a polymer_class mismatch --
+    so callers fall through to the class-default make_plan() unchanged."""
+    if not smiles:
+        return None
+    path = cache_path or CACHE_PATH_DEFAULT
+    if not path.exists():
+        return None
+    try:
+        canonical = canon_smiles.canonicalize(smiles, isomeric=True)
+    except (RuntimeError, subprocess.TimeoutExpired):
+        return None
+    try:
+        cache = json.loads(path.read_text())
+    except json.JSONDecodeError:
+        return None
+    entry = cache.get(canonical)
+    if not entry or not entry.get("protocol_validated"):
+        return None
+    if not set(entry.get("validated_properties", [])) >= properties:
+        return None
+    if str(entry.get("polymer_class", "")).upper() != polymer_class.upper():
+        # Don't trust a cache entry recorded under a different class label -- fall back
+        # rather than silently apply a different class's frozen protocol.
+        return None
+    return make_plan_from_cache(run_name, polymer_class, smiles, canonical, properties, entry)
+
+
 def main():
     p = argparse.ArgumentParser(description="Emit a deterministic run_plan.json.")
     p.add_argument("--run_name")
@@ -247,6 +325,8 @@ def main():
                    help="Comma-separated: density,tg,bulk_modulus or 'all'")
     p.add_argument("--out", default=None,
                    help="Output path; default data/<run_name>/raw/run_plan.json; '-' = stdout")
+    p.add_argument("--cache_path", default=None,
+                   help="Override guides/system_characterization_cache.json path (testing only)")
     args = p.parse_args()
 
     if not args.run_name:
@@ -256,7 +336,9 @@ def main():
     properties = ({"density", "tg", "bulk_modulus"} if props_str == "all"
                   else {x.strip().lower() for x in props_str.split(",") if x.strip()})
 
-    plan = make_plan(args.run_name, args.polymer_class, args.smiles, properties)
+    cache_path = Path(args.cache_path) if args.cache_path else None
+    plan = (_try_cache(args.run_name, args.polymer_class, args.smiles, properties, cache_path)
+            or make_plan(args.run_name, args.polymer_class, args.smiles, properties))
     text = json.dumps(plan, indent=2)
 
     if args.out == "-":

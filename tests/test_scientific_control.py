@@ -9,6 +9,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
+import canon_smiles  # noqa: E402
+import scientific_control  # noqa: E402
 from scientific_control import (  # noqa: E402
     DeterministicScriptChain,
     PlanDecision,
@@ -20,6 +22,7 @@ from scientific_control import (  # noqa: E402
     JsonSubprocessAgent,
     SubprocessPlanningAgent,
     materialize_plan,
+    planning_context,
 )
 
 
@@ -329,3 +332,55 @@ def test_recovery_agent_is_never_called_more_than_twice(tmp_path):
     assert recovery.calls == 2
     assert workflow.calls == 3
     assert result["recovery_agent_calls"] == 2
+
+
+# ─── planning_context() canonicalizes intent.smiles before the cache lookup ───────────────
+
+def test_planning_context_looks_up_cache_by_canonical_smiles(tmp_path, monkeypatch):
+    """A cache entry keyed by the ISOMERIC-CANONICAL form of a SMILES must still be found even
+    when intent.smiles is a differently-formatted-but-equivalent string -- the pre-fix code
+    looked up characterization_cache.get(intent.smiles) with no canonicalization at all."""
+    import shutil
+    (tmp_path / "orchestration").mkdir()
+    shutil.copy(REPO_ROOT / "orchestration" / "decision_policy.json",
+               tmp_path / "orchestration" / "decision_policy.json")
+    (tmp_path / "guides").mkdir()
+    canonical = "*CC(c1ccccc1)*"  # deliberately distinct from INTENT.smiles's raw string below
+    cache_entry = {"polymer_class": "PSTR", "protocol_validated": True}
+    (tmp_path / "guides" / "system_characterization_cache.json").write_text(
+        json.dumps({canonical: cache_entry}))
+
+    monkeypatch.setattr(scientific_control, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(canon_smiles, "canonicalize", lambda smi, *a, **k: canonical)
+
+    raw_intent = ScientificIntent(
+        run_name="CANON_TEST", goal="test", smiles="not-yet-canonical-form",
+        requested_properties=("density",), polymer_class_hint="PSTR",
+    )
+    context = planning_context(raw_intent)
+    assert context["exact_smiles_characterization"] == cache_entry
+
+
+def test_planning_context_falls_back_to_raw_smiles_on_canonicalization_failure(tmp_path, monkeypatch):
+    import shutil
+    (tmp_path / "orchestration").mkdir()
+    shutil.copy(REPO_ROOT / "orchestration" / "decision_policy.json",
+               tmp_path / "orchestration" / "decision_policy.json")
+    (tmp_path / "guides").mkdir()
+    raw_smiles = "*CC*"
+    cache_entry = {"polymer_class": "PHYC", "protocol_validated": True}
+    (tmp_path / "guides" / "system_characterization_cache.json").write_text(
+        json.dumps({raw_smiles: cache_entry}))
+
+    monkeypatch.setattr(scientific_control, "REPO_ROOT", tmp_path)
+
+    def _boom(smi, *a, **k):
+        raise RuntimeError("RDKit unavailable")
+    monkeypatch.setattr(canon_smiles, "canonicalize", _boom)
+
+    raw_intent = ScientificIntent(
+        run_name="CANON_TEST2", goal="test", smiles=raw_smiles,
+        requested_properties=("density",), polymer_class_hint="PHYC",
+    )
+    context = planning_context(raw_intent)
+    assert context["exact_smiles_characterization"] == cache_entry
