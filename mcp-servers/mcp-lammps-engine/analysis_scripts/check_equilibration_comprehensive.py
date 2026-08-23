@@ -19,11 +19,20 @@ Soft warnings (reported, never blocking):
   B. C_inf outside literature range, MSID slope deviation >20%, C(t) not decayed,
      MSD kinetic trap
 
+--dump_file/--data_file carry the ensemble-sensitive checks (MSD/kinetic-trap, C(t)) and must
+be a fixed-volume NVT window (e.g. nvt_kinetic_stability). --struct_dump_file/--struct_data_file
+are optional and, when given, carry the ensemble-insensitive per-frame geometry checks (Rg,
+MSID, R_ee, torsion, P2, density homogeneity, finite-size) instead -- normally npt_final's own
+trajectory, the actual equilibrated parent state. Omitting them falls back to --dump_file for
+everything (single-trajectory legacy behaviour).
+
 Usage:
     python check_equilibration_comprehensive.py \
-        --log_file /path/to/06_nvt_production.log \
-        --dump_file /path/to/06_nvt_production.dump \
-        --data_file /path/to/cell.data \
+        --log_file /path/to/npt_final.log \
+        --dump_file /path/to/nvt_kinetic_stability.dump \
+        --data_file /path/to/nvt_kinetic_stability_out.data \
+        --struct_dump_file /path/to/npt_final.dump \
+        --struct_data_file /path/to/npt_final_out.data \
         --backbone_types 2 3 \
         [--output_dir /path/to/out] \
         [--skip_frames 50] \
@@ -949,6 +958,95 @@ def collect_warnings(thermo, structural):
     return w
 
 
+# ─── Trajectory loading ───────────────────────────────────────────────────────
+
+def _load_and_analyze(data_file, dump_file, atom_style, backbone_set, skip_frames,
+                      n_backbone_bonds, bond_length_A, timestep_fs, dump_every_arg,
+                      ct_min_decay, graphs_dir, cv_signal_max, msid_s_split,
+                      torsion_block_count, torsion_js_threshold, label):
+    """Load one LAMMPS trajectory (data_file for topology, dump_file for frames) and run
+    run_structural_analysis's single-pass checks over it. Returns (structural, n_frames_used);
+    structural is None (n_frames_used still reported) when fewer than 10 frames remain after
+    skip_frames -- the caller decides how to fail on that."""
+    print(f"Loading {label} trajectory for structural checks...", flush=True)
+    u = mda.Universe(data_file, dump_file, format="LAMMPSDUMP", atom_style=atom_style)
+    n_atoms = u.atoms.n_atoms
+    n_frames_total = u.trajectory.n_frames
+    print(f"  [{label}] n_atoms={n_atoms}, n_frames={n_frames_total}", flush=True)
+
+    chain_ids = sorted(set(int(r) for r in u.atoms.resids))
+    print(f"  [{label}] {len(chain_ids)} chains", flush=True)
+
+    try:
+        u.trajectory.add_transformations(trans.unwrap(u.atoms))
+        print(f"  [{label}] Coordinate unwrapping applied", flush=True)
+    except Exception as e:
+        print(f"  [{label}] WARNING: unwrap failed ({e})", flush=True)
+
+    # Adaptive grid_n: target ~25 atoms/voxel, clamp [3, 10]
+    grid_n = max(3, min(10, int(round((n_atoms / 25) ** (1 / 3)))))
+    print(f"  [{label}] Adaptive grid_n={grid_n} ({n_atoms/grid_n**3:.1f} atoms/voxel)", flush=True)
+
+    # Try to auto-detect dump_every from timestep spacing
+    dump_every = dump_every_arg
+    if n_frames_total >= 2:
+        try:
+            steps = []
+            for ts in u.trajectory[:5]:
+                steps.append(int(ts.data.get("step", -1)))
+            if len(steps) >= 2 and steps[1] > steps[0] > 0:
+                dump_every = steps[1] - steps[0]
+                print(f"  [{label}] Auto-detected dump_every={dump_every}", flush=True)
+        except Exception:
+            pass
+
+    traj_slice = u.trajectory[skip_frames:]
+    n_frames_used = n_frames_total - skip_frames
+    if n_frames_used < 10:
+        return None, n_frames_used
+
+    print(f"  [{label}] Analysing {n_frames_used} frames (skip={skip_frames})", flush=True)
+    structural = run_structural_analysis(
+        u=u,
+        chain_ids=chain_ids,
+        backbone_set=backbone_set,
+        n_atoms=n_atoms,
+        skip_frames=skip_frames,
+        n_backbone_bonds=n_backbone_bonds,
+        bond_length_A=bond_length_A,
+        timestep_fs=timestep_fs,
+        dump_every=dump_every,
+        grid_n=grid_n,
+        trajectory_slice=traj_slice,
+        ct_min_decay=ct_min_decay,
+        graphs_dir=graphs_dir,
+        cv_signal_max=cv_signal_max,
+        msid_s_split=msid_s_split,
+        torsion_block_count=torsion_block_count,
+        torsion_js_threshold=torsion_js_threshold,
+    )
+    return structural, n_frames_used
+
+
+_STRUCT_SOURCED_KEYS = ("rg", "ree", "msid", "torsion", "p2", "density_homogeneity",
+                       "backbone_type_coverage")
+
+
+def _merge_structural(structural_primary, structural_struct):
+    """Combine two run_structural_analysis() results into the one dict main() reports.
+
+    Per-frame relative-geometry checks (rg/ree/msid/torsion/p2/density_homogeneity/
+    backbone_type_coverage) have no ensemble dependence -- take them from the struct
+    trajectory (typically npt_final, the actual equilibrated parent state). MSD/kinetic-trap
+    and C(t) stay on the primary trajectory: a barostatted trajectory affine-scales
+    coordinates every step and would contaminate cumulative CoM displacement / end-to-end-
+    vector autocorrelation."""
+    structural = dict(structural_primary)
+    for key in _STRUCT_SOURCED_KEYS:
+        structural[key] = structural_struct[key]
+    return structural
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -956,8 +1054,23 @@ def main():
         description="Comprehensive polymer equilibration validator: thermo + structural checks in one call."
     )
     parser.add_argument("--log_file",          required=True)
-    parser.add_argument("--dump_file",         required=True)
+    parser.add_argument("--dump_file",         required=True,
+                        help="Trajectory for the ensemble-sensitive checks (MSD/kinetic-trap, "
+                             "C(t) end-to-end autocorrelation) -- must be a fixed-volume NVT "
+                             "window (e.g. nvt_kinetic_stability); a barostatted trajectory "
+                             "affine-scales coordinates every step and contaminates cumulative "
+                             "CoM displacement.")
     parser.add_argument("--data_file",         required=True)
+    parser.add_argument("--struct_dump_file",  default=None,
+                        help="Optional second trajectory for the ensemble-INsensitive per-frame "
+                             "geometry checks (Rg, MSID, R_ee, torsion, P2, density homogeneity, "
+                             "finite-size) -- normally npt_final's own trajectory, the actual "
+                             "equilibrated parent state. Omit to fall back to --dump_file for "
+                             "everything (single-trajectory legacy behaviour). Must be paired "
+                             "with --struct_data_file.")
+    parser.add_argument("--struct_data_file",  default=None,
+                        help="Topology file paired with --struct_dump_file. Required iff "
+                             "--struct_dump_file is given.")
     parser.add_argument("--backbone_types",    type=int, nargs="+", required=True)
     parser.add_argument("--output_dir",        default=None)
     parser.add_argument("--graphs_dir",        default=None,
@@ -1032,70 +1145,59 @@ def main():
         sys.exit(0)
 
     # ── Section B + C ──
-    print("Loading trajectory for structural checks...", flush=True)
-    u = mda.Universe(args.data_file, args.dump_file,
-                     format="LAMMPSDUMP", atom_style=args.atom_style)
-    n_atoms = u.atoms.n_atoms
-    n_frames_total = u.trajectory.n_frames
-    print(f"  n_atoms={n_atoms}, n_frames={n_frames_total}", flush=True)
-
-    chain_ids = sorted(set(int(r) for r in u.atoms.resids))
-    print(f"  {len(chain_ids)} chains, backbone_types={args.backbone_types}", flush=True)
-
-    try:
-        u.trajectory.add_transformations(trans.unwrap(u.atoms))
-        print("  Coordinate unwrapping applied", flush=True)
-    except Exception as e:
-        print(f"  WARNING: unwrap failed ({e})", flush=True)
-
-    # Adaptive grid_n: target ~25 atoms/voxel, clamp [3, 10]
-    grid_n = max(3, min(10, int(round((n_atoms / 25) ** (1 / 3)))))
-    print(f"  Adaptive grid_n={grid_n} ({n_atoms/grid_n**3:.1f} atoms/voxel)", flush=True)
-
-    # Try to auto-detect dump_every from timestep spacing
-    dump_every = args.dump_every
-    if n_frames_total >= 2:
-        try:
-            steps = []
-            for ts in u.trajectory[:5]:
-                steps.append(int(ts.data.get("step", -1)))
-            if len(steps) >= 2 and steps[1] > steps[0] > 0:
-                dump_every = steps[1] - steps[0]
-                print(f"  Auto-detected dump_every={dump_every}", flush=True)
-        except Exception:
-            pass
-
-    traj_slice = u.trajectory[args.skip_frames:]
-    n_frames_used = n_frames_total - args.skip_frames
-
-    if n_frames_used < 10:
-        print(json.dumps({"status": "failed", "error": f"Only {n_frames_used} frames after skip — need ≥10."}))
+    if bool(args.struct_dump_file) != bool(args.struct_data_file):
+        print(json.dumps({"status": "failed",
+                          "error": "--struct_dump_file and --struct_data_file must be given together."}))
         sys.exit(0)
+    use_split = bool(args.struct_dump_file)
 
-    print(f"  Analysing {n_frames_used} frames (skip={args.skip_frames})", flush=True)
-    structural = run_structural_analysis(
-        u=u,
-        chain_ids=chain_ids,
-        backbone_set=backbone_set,
-        n_atoms=n_atoms,
-        skip_frames=args.skip_frames,
-        n_backbone_bonds=args.n_backbone_bonds,
-        bond_length_A=args.bond_length_A,
-        timestep_fs=args.timestep_fs,
-        dump_every=dump_every,
-        grid_n=grid_n,
-        trajectory_slice=traj_slice,
+    structural_primary, n_frames_primary = _load_and_analyze(
+        data_file=args.data_file, dump_file=args.dump_file, atom_style=args.atom_style,
+        backbone_set=backbone_set, skip_frames=args.skip_frames,
+        n_backbone_bonds=args.n_backbone_bonds, bond_length_A=args.bond_length_A,
+        timestep_fs=args.timestep_fs, dump_every_arg=args.dump_every,
         ct_min_decay=args.ct_min_decay,
-        graphs_dir=args.graphs_dir,
-        cv_signal_max=args.cv_signal_max,
-        msid_s_split=args.msid_s_split,
+        # When a struct trajectory is supplied, its own analysis pass (below) owns the R_ee
+        # histogram PNG -- passing graphs_dir here too would silently overwrite it with the
+        # ensemble-sensitive trajectory's (usually shorter, fixed-volume) version.
+        graphs_dir=None if use_split else args.graphs_dir,
+        cv_signal_max=args.cv_signal_max, msid_s_split=args.msid_s_split,
         torsion_block_count=args.torsion_block_count,
         torsion_js_threshold=args.torsion_js_threshold,
+        label="primary (MSD/C(t))" if use_split else "primary",
     )
+    if structural_primary is None:
+        print(json.dumps({"status": "failed",
+                          "error": f"Only {n_frames_primary} frames after skip in --dump_file — need ≥10."}))
+        sys.exit(0)
+
+    if use_split:
+        structural_struct, n_frames_struct = _load_and_analyze(
+            data_file=args.struct_data_file, dump_file=args.struct_dump_file,
+            atom_style=args.atom_style, backbone_set=backbone_set, skip_frames=args.skip_frames,
+            n_backbone_bonds=args.n_backbone_bonds, bond_length_A=args.bond_length_A,
+            timestep_fs=args.timestep_fs, dump_every_arg=args.dump_every,
+            ct_min_decay=None,  # C(t) from the struct trajectory is never consumed below
+            graphs_dir=args.graphs_dir, cv_signal_max=args.cv_signal_max,
+            msid_s_split=args.msid_s_split, torsion_block_count=args.torsion_block_count,
+            torsion_js_threshold=args.torsion_js_threshold,
+            label="struct (Rg/MSID/packing)",
+        )
+        if structural_struct is None:
+            print(json.dumps({"status": "failed",
+                              "error": f"Only {n_frames_struct} frames after skip in --struct_dump_file — need ≥10."}))
+            sys.exit(0)
+        structural = _merge_structural(structural_primary, structural_struct)
+        finite_size_data_file = args.struct_data_file
+        n_frames_used = n_frames_struct
+    else:
+        structural = structural_primary
+        finite_size_data_file = args.data_file
+        n_frames_used = n_frames_primary
 
     # ── Finite-size (periodic self-imaging) ──
     finite_size = check_finite_size(
-        data_file=args.data_file,
+        data_file=finite_size_data_file,
         cutoff_A=args.cutoff_A,
         mean_rg_A=(structural.get("rg") or {}).get("mean_Rg_A"),
         mean_ree_A=(structural.get("ree") or {}).get("mean_R_ee_A"),
@@ -1168,6 +1270,8 @@ def main():
         "log_file": args.log_file,
         "dump_file": args.dump_file,
         "data_file": args.data_file,
+        "struct_dump_file": args.struct_dump_file,
+        "struct_data_file": args.struct_data_file,
         "backbone_types": args.backbone_types,
         "timestamp": timestamp,
     })

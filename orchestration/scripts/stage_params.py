@@ -416,12 +416,12 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
 
     The terminal stage is always npt_final (at final_T_K/press) in the 8-stage protocol --
     there is no separate glassy-vs-rubbery terminal stage name anymore, since cool_block
-    always ramps down to final_T_K regardless of regime. NOTE (known simplification, not yet
-    fully wired to the target design): the chain-structural checks (Rg/MSID/C(t)) still read
-    from nvt_kinetic_stability's dump (the direct rename of the old nvt_production source),
-    not from npt_final's own trajectory -- moving those specific checks onto npt_final's
-    dump (as the target design calls for) needs check_equilibration_comprehensive to merge
-    two trajectory sources in one call, which is deferred, separately-scoped work."""
+    always ramps down to final_T_K regardless of regime. check_equilibration_comprehensive
+    reads two trajectories: melt_dump_path (nvt_kinetic_stability's fixed-volume window) for
+    the ensemble-sensitive checks (MSD/kinetic-trap, C(t)), and struct_dump_path (npt_final's
+    own trajectory) for the ensemble-insensitive per-frame geometry checks (Rg/MSID/R_ee/
+    torsion/P2/density_homogeneity/finite_size) -- a barostatted trajectory affine-scales
+    coordinates every step and would contaminate cumulative CoM displacement."""
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
     graphs_dir = _run_graphs_dir(args)
     ct_decay = cls.get('ct_min_decay_melt', 0.1) if cls.get('ct_gate_reliable', True) else None
@@ -444,7 +444,14 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
     npt_prod_log_path = args.npt_prod_log or (
         npt_prod_data_path[:-len('_out.data')] + '.log' if npt_prod_data_path.endswith('_out.data')
         else f'{lammps_base}/equil/{prod}/{prod}.log')
-    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_kinetic_stability/nvt_kinetic_stability.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_final/npt_final_out.data', 'npt_prod_temp_K': final_T, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_kinetic_stability/nvt_kinetic_stability.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_final/npt_final_out.data',
+            # struct_dump_path: npt_final's OWN trajectory -- the ensemble-insensitive per-frame
+            # geometry checks (Rg/MSID/R_ee/torsion/P2/density_homogeneity/finite_size) read from
+            # here, not from melt_dump_path (nvt_kinetic_stability's fixed-volume window, which
+            # stays reserved for MSD/kinetic-trap/C(t)). Paired with npt_prod_data_path, which is
+            # already npt_final's own .data.
+            'struct_dump_path': getattr(args, 'struct_dump_path', None) or f'{lammps_base}/equil/npt_final/npt_final.dump',
+            'npt_prod_temp_K': final_T, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""

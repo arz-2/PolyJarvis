@@ -2797,6 +2797,8 @@ def _run_check_equilibration_comprehensive(
     ct_min_decay: Optional[float] = None,
     cv_signal_max: float = 0.11,
     cutoff_A: Optional[float] = None,
+    struct_dump_file: Optional[str] = None,
+    struct_data_file: Optional[str] = None,
 ) -> dict:
     """Background worker — runs check_equilibration_comprehensive.py via CLI."""
     bt_str = " ".join(str(t) for t in backbone_types)
@@ -2829,6 +2831,10 @@ def _run_check_equilibration_comprehensive(
         parts.append(f"--graphs_dir {graphs_dir}")
     if ct_min_decay is not None:
         parts.append(f"--ct_min_decay {ct_min_decay}")
+    if struct_dump_file is not None:
+        parts.append(f"--struct_dump_file {struct_dump_file}")
+    if struct_data_file is not None:
+        parts.append(f"--struct_data_file {struct_data_file}")
 
     command = " ".join(parts)
     logger.info(f"Running comprehensive equilibration check: {command}")
@@ -2874,6 +2880,8 @@ def check_equilibration_comprehensive(
     energy_col: str = "TotEng",
     atom_style: str = "id resid type charge x y z",
     cv_signal_max: float = 0.11,
+    struct_dump_file: Optional[str] = None,
+    struct_data_file: Optional[str] = None,
 ) -> dict:
     """
     Comprehensive polymer equilibration validator — thermo + structural checks in
@@ -2904,8 +2912,20 @@ def check_equilibration_comprehensive(
 
     Args:
         log_file:            LAMMPS log file (thermo output, e.g. 06_nvt_production.log).
-        dump_file:           LAMMPS dump trajectory (e.g. 06_nvt_production.dump).
-        data_file:           LAMMPS .data topology file.
+        dump_file:           LAMMPS dump trajectory carrying the ensemble-sensitive checks
+                             (MSD/kinetic-trap, C(t)) — must be a fixed-volume NVT window
+                             (e.g. nvt_kinetic_stability.dump); a barostatted trajectory
+                             affine-scales coordinates every step and contaminates cumulative
+                             CoM displacement.
+        data_file:           LAMMPS .data topology file paired with dump_file.
+        struct_dump_file:    Optional second trajectory carrying the ensemble-INsensitive
+                             per-frame geometry checks (Rg, MSID, R_ee, torsion, P2, density
+                             homogeneity, finite-size) instead of dump_file — normally
+                             npt_final's own dump, the actual equilibrated parent state. Omit
+                             to fall back to dump_file for everything. Must be paired with
+                             struct_data_file.
+        struct_data_file:    LAMMPS .data topology file paired with struct_dump_file. Required
+                             iff struct_dump_file is given.
         backbone_types:      List of LAMMPS atom type IDs that form the backbone.
                              Determine from inspect_data_file() — do not guess.
         output_dir:          Output directory. Required — the run's raw/ dir.
@@ -2980,6 +3000,8 @@ def check_equilibration_comprehensive(
             ct_min_decay        = ct_min_decay,
             cv_signal_max       = cv_signal_max,
             cutoff_A            = cutoff_A,
+            struct_dump_file    = struct_dump_file,
+            struct_data_file    = struct_data_file,
         )),
         daemon=True,
     )

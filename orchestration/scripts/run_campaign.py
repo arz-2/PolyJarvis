@@ -530,12 +530,14 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
     npt_prod_dump_path = _stage_dump_path(workflow["stages"][-1])
     npt_prod_restart_path = workflow["stages"][-1].get("output_restart")
 
-    # melt_dump_path (the CHAIN-structural checks' source -- rg/msd/ct/msid) is a KNOWN
-    # SIMPLIFICATION (see stage_params._resolve_equil_check_params): it still reads from
-    # nvt_kinetic_stability's dump rather than npt_final's own trajectory. melt_data_path (the
-    # assess_cooling_contraction melt reference) comes directly from the generator's own
-    # melt_data_path field -- the cool_block tagged at `temp`/t_equil_K -- not a stage-name
-    # lookup, since which specific cool_block_NN it is varies per run.
+    # melt_dump_path (nvt_kinetic_stability's fixed-volume window) carries the ensemble-
+    # sensitive checks -- rg/msd/ct/msid used to all read from here too (a known simplification,
+    # now retired); Rg/MSID/R_ee/torsion/P2/density_homogeneity/finite_size now read from
+    # struct_dump_path (npt_final's own trajectory) instead, set just below alongside
+    # npt_prod_data_path each loop iteration. melt_data_path (the assess_cooling_contraction
+    # melt reference) comes directly from the generator's own melt_data_path field -- the
+    # cool_block tagged at `temp`/t_equil_K -- not a stage-name lookup, since which specific
+    # cool_block_NN it is varies per run.
     def _find_stage(name):
         return next((s for s in workflow["stages"] if s.get("name") == name), None)
     _kinetic_stage = _find_stage("nvt_kinetic_stability")
@@ -547,6 +549,7 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
     attempts = 0
     while True:
         args.data_path = npt_prod_data_path
+        args.struct_dump_path = npt_prod_dump_path
         p = resolve_stage_params("equil-check", args, cls)
         # The resolver's value, not the raw CLI arg: the halt below says the list comes from
         # decided_params, and only the resolver reads it from there (via the plan-overlaid cls).
@@ -593,6 +596,7 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
             data_file=p["npt_prod_data_path"], backbone_types=backbone_types,
             ct_min_decay=p["ct_min_decay_melt"], output_dir=p["output_dir"], graphs_dir=p["graphs_dir"],
             cutoff_A=p["cutoff_A"], timestep_fs=p["dt_fs"],
+            struct_dump_file=p["struct_dump_path"], struct_data_file=p["npt_prod_data_path"],
         ), "equil-check comprehensive")
         density = wait_for_analysis(lammps, lammps.extract_equilibrated_density(
             log_file=p["npt_prod_log_path"], target_temp=p["npt_prod_temp_K"], output_dir=p["output_dir"],

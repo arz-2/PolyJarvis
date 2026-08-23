@@ -532,6 +532,12 @@ def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_ch
     assert result["equil_verdict"] == "PASS"
     comp_call = fake.check_equilibration_comprehensive_calls[0]
     assert comp_call["dump_file"] == str(kinetic_dir / "nvt_kinetic_stability.dump")
+    # Rg/MSID/R_ee/torsion/P2/density_homogeneity/finite_size must read from npt_final's OWN
+    # trajectory (struct_dump_file/struct_data_file), not nvt_kinetic_stability's fixed-volume
+    # window -- only MSD/kinetic-trap/C(t) stay on dump_file/data_file above.
+    assert comp_call["struct_dump_file"] == str(final_dir / "npt_final.dump")
+    assert comp_call["struct_data_file"] == str(final_dir / "npt_final_out.data")
+    assert comp_call["data_file"] == str(final_dir / "npt_final_out.data")
     gate_call = fake.enforce_equilibration_gate_calls[0]
     assert gate_call["melt_data"] == melt_data_path
 
