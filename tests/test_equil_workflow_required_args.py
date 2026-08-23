@@ -24,19 +24,26 @@ SERVER_PY = REPO_ROOT / "mcp-servers" / "mcp-lammps-engine" / "server.py"
 
 REQUIRED = [
     "velocity_seed",
-    "npt_prod_steps",
-    "nvt_prod_steps",
-    "npt_prod300_steps",
-    "npt_cool_steps",
-    "npt_cool300_steps",
-    "melt_npt_steps",
-    "extend_steps",
-    "anneal_cycles",
-    "anneal_cycle_steps",
+    "densify_ramp_steps",
+    "densify_check_every_steps",
+    "densify_steps_cap",
+    "ff_activate_npt_steps",
+    "anneal_heat_steps",
+    "anneal_check_every_steps",
+    "anneal_cap_steps",
+    "cool_block_dT_K",
+    "cool_block_hold_steps",
+    "cool_block_hold_cap_steps",
+    "stage7_min_steps",
+    "stage7_cap_steps",
+    "stage8_min_steps",
+    "stage8_cap_steps",
+    "warmup_steps",
     "use_long_range",
 ]
-REQUIRED_INTEGER = {"velocity_seed", "anneal_cycles"}
+REQUIRED_INTEGER = {"velocity_seed"}
 REQUIRED_BOOLEAN = {"use_long_range"}
+REQUIRED_FLOAT = {"cool_block_dT_K"}
 
 
 def _workflow_signature():
@@ -74,7 +81,7 @@ def test_the_optional_knobs_keep_their_defaults():
     What stays optional here is what stays harmless."""
     sig, _ = _workflow_signature()
     for name in ("polymer_name", "max_temp", "press", "max_press", "n_chains",
-                 "add_melt_npt", "extend_only", "add_300k_production"):
+                 "extend_only", "final_T_K", "anneal_margin_K"):
         assert sig[name], f"{name} lost its default"
 
 
@@ -104,9 +111,12 @@ def test_mcp_schema_marks_them_required():
         assert schema["properties"][name]["type"] == "integer"
     for name in REQUIRED_BOOLEAN:
         assert schema["properties"][name]["type"] == "boolean"
-    for name in set(REQUIRED) - REQUIRED_INTEGER - REQUIRED_BOOLEAN:
+    for name in set(REQUIRED) - REQUIRED_INTEGER - REQUIRED_BOOLEAN - REQUIRED_FLOAT:
         types = {b["type"] for b in schema["properties"][name]["anyOf"]}
         assert types == {"integer", "null"}, name
+    for name in REQUIRED_FLOAT:
+        types = {b["type"] for b in schema["properties"][name]["anyOf"]}
+        assert types == {"number", "null"}, name
 
 
 def test_the_other_seed_drawing_tools_require_one_too():

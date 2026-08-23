@@ -344,14 +344,15 @@ def enforce_live(args) -> dict:
         n_eff_min = ((comp.get("thermo") or {}).get("n_eff_density") or {}).get("n_eff_min", 20)
         if "n_eff_density" in failing_binding and n_eff:
             extend_ns = round(1.5 * max(1.0, n_eff_min / max(n_eff, 1)), 1)
-            remedy = (f"extend_only at the SAME temperature: extend_ns={extend_ns} "
-                      f"(1.5 x {n_eff_min}/{n_eff} independent-sample deficit). "
-                      "phase=full extends npt_prod_data_path at npt_prod_temp_K; phase=melt "
-                      "extends npt_production_data_path at T_workflow_K. Cap 2 per gate.")
+            remedy = (f"extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': "
+                      f"extend_ns={extend_ns} (1.5 x {n_eff_min}/{n_eff} independent-sample "
+                      "deficit) via restart-continuation (read_restart from npt_final's own "
+                      ".restart output, appended log/dump) at npt_prod_temp_K. Cap 2 per gate.")
         else:
-            remedy = ("extend_only at the SAME temperature: extend_ns = "
-                      "max(1.5, 1.5*ct_tau_relax_ps/1000), else 1.5 ns. Never re-melt a cooled "
-                      "glass — phase=full uses npt_prod_temp_K, not T_equil_K. Cap 2 per gate.")
+            remedy = ("extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': "
+                      "extend_ns = max(1.5, 1.5*ct_tau_relax_ps/1000), else 1.5 ns, via "
+                      "restart-continuation at npt_prod_temp_K (npt_final always runs at "
+                      "final_T_K, default 300 K — never a re-melt). Cap 2 per gate.")
     elif verdict == "STRUCTURAL_FAIL":
         if fs_verdict == "SIZE_MIN_IMAGE_VIOLATION":
             remedy = ("REBUILD LARGER — L < 2*cutoff_A means the pair potential itself is wrong "
@@ -363,14 +364,19 @@ def enforce_live(args) -> dict:
                       "(cell volume scales with it at fixed density, so L grows as nchain^(1/3)) "
                       "until L >= 2*Rg. Extending or re-cooling cannot fix a too-small box.")
         elif cooling_verdict == "UNDER_ANNEALED_COOLING":
-            remedy = ("re_melt_slow_recool — re-melt from npt_production_out.data at T_equil_K "
-                      "(never the 300 K cell) and slow the ramp: npt_cool300_steps x2 on "
-                      "attempt 1, x4 on attempt 2 (max 2). Baseline: "
-                      "npt_cool300_steps=int(1.0e6/dt_fs). Do NOT extend at 300 K.")
+            remedy = ("slower_cooling (workflow_engine._cooling) — regenerate the entire "
+                      "blockwise cool_block ramp (max_temp -> final_T_K) from the anneal_hold "
+                      "checkpoint (equilibration_resume_from='anneal_hold'), doubling "
+                      "cool_block_hold_steps per attempt (x2 on attempt 1, x4 on attempt 2, "
+                      "max 2). cool_block is the sole stage sequence that crosses Tg in this "
+                      "design — there is no separate npt_cool300 stage to target. Do NOT "
+                      "extend npt_final at final_T_K.")
         elif "density_homogeneity" in failing_binding:
-            remedy = ("MELT-MIXING — extend the melt stage in place (phase=melt extend_only at "
-                      "T_workflow_K, cap 2), then re-run the phase=melt gate. Never re-melt from "
-                      "scratch and never touch the cooling ramp for a mixing defect.")
+            remedy = ("MELT-MIXING — extend the melt reference block in place "
+                      "(extend_only=True, base_stage_name=<the cool_block_NN tagged as the "
+                      "melt reference>, extend_temp_K=temp, cap 2), then re-run the gate. "
+                      "Never re-melt from scratch and never touch the cooling ramp for a "
+                      "mixing defect.")
         else:
             remedy = "route to RECOVERY — structural gate failure without a specific density_value_binding diagnosis"
 

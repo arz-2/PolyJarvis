@@ -46,19 +46,27 @@ def test_equilibration_controls_resolve_to_executable_steps():
     cls = {
         "preferred_ff": "pcff", "electrostatics": "lj_cut", "dt_fs": 2.0,
         "T_equil_K": 650.0, "annealing_T_high_K": 800.0, "P_equil_atm": 2.0,
-        "t_equil_ns": 7.0, "eq_annealing_cycles": 6, "anneal_cycle_ns": 1.5,
-        "npt_prod_ns": 3.0, "npt_prod300_ns": 4.0,
+        "warmup_steps": 100000, "densify_ramp_steps": 200000,
+        "densify_check_every_steps": 300000, "densify_steps_cap": 900000,
+        "ff_activate_npt_steps": 150000,
+        "anneal_heat_steps": 400000, "anneal_check_every_steps": 500000,
+        "anneal_cap_steps": 1500000,
+        "cool_block_dT_K": 25.0, "cool_block_hold_steps": 250000,
+        "cool_block_hold_cap_steps": 750000,
+        "stage7_min_steps": 600000, "stage7_cap_steps": 2400000,
+        "stage8_min_steps": 700000, "stage8_cap_steps": 3500000,
         "compression_max_pressure_atm": 75000.0,
         "thermostat_damp_fs": 150.0, "barostat_damp_fs": 1500.0,
     }
 
     resolved = resolve_stage_params("equil", _args(), cls)
 
-    assert resolved["eq_annealing_cycles"] == 6
-    assert resolved["anneal_cycle_steps"] == 750000
-    assert resolved["nvt_prod_steps"] == 3500000
-    assert resolved["npt_prod_steps"] == 1500000
-    assert resolved["npt_prod300_steps"] == 2000000
+    assert resolved["anneal_cap_steps"] == 1500000
+    assert resolved["anneal_heat_steps"] == 400000
+    assert resolved["anneal_check_every_steps"] == 500000
+    assert resolved["densify_ramp_steps"] == 200000
+    assert resolved["stage7_min_steps"] == 600000
+    assert resolved["stage8_min_steps"] == 700000
     assert resolved["compression_max_pressure_atm"] == 75000.0
     assert resolved["use_long_range_electrostatics"] is False
     assert resolved["thermostat_damp_fs"] == 150.0
@@ -99,21 +107,21 @@ def test_agent_can_materialize_new_protocol_controls():
                               ("density",), "PSTR")
     decision = PlanDecision(
         polymer_class="PSTR", properties=("density",), rationale=("Long anneal needed.",),
-        overrides={"eq_annealing_cycles": 12, "anneal_cycle_ns": 3.0,
-                   "t_equil_ns": 20.0, "P_equil_atm": 1.5},
+        overrides={"anneal_cap_steps": 3000000, "anneal_heat_steps": 500000,
+                   "P_equil_atm": 1.5},
         confidence="high",
     )
 
     plan = materialize_plan(intent, decision)
 
-    assert plan["decided_params"]["eq_annealing_cycles"] == 12
-    assert plan["decided_params"]["anneal_cycle_ns"] == 3.0
-    assert plan["decided_params"]["t_equil_ns"] == 20.0
+    assert plan["decided_params"]["anneal_cap_steps"] == 3000000
+    assert plan["decided_params"]["anneal_heat_steps"] == 500000
+    assert plan["decided_params"]["P_equil_atm"] == 1.5
 
 
 def test_integer_protocol_controls_reject_fractional_values():
-    with pytest.raises(ValueError, match="eq_annealing_cycles must be an integer"):
-        validate_overrides({"eq_annealing_cycles": 2.5})
+    with pytest.raises(ValueError, match="anneal_cap_steps must be an integer"):
+        validate_overrides({"anneal_cap_steps": 2.5})
 
 
 @pytest.mark.parametrize(("overrides", "message"), [

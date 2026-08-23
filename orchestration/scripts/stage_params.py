@@ -256,31 +256,42 @@ def _velocity_seed(args) -> int:
     digest = hashlib.sha256(args.run_name.encode()).hexdigest()
     return 10000 + int(digest, 16) % 989999
 
+ANNEAL_MARGIN_K = 100.0
+"""Minimum required margin between T_anneal_high_K and T_workflow_K -- see the matching hard
+validation guard in generate_equilibration_workflow. Enforced HERE (self-healing at the
+planning layer) as well as there (backstop): a scientifically meaningful choice like the
+anneal peak temperature should be decided once, visibly, not patched deep in the generator."""
+
+
 def _resolve_equil_params(args, cls: dict) -> dict:
-    """Resolve deterministic equilibration-chain arguments."""
+    """Resolve deterministic equilibration-chain arguments (8-stage adaptive protocol)."""
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
     T_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
-    npt_prod_ns_val = _pick(args.npt_prod_ns, cls, 'npt_prod_ns', None)
-    npt_prod_steps = int(npt_prod_ns_val * 1000000.0 / dt) if npt_prod_ns_val is not None else None
-    t_equil_ns = cls.get('t_equil_ns', 5.0)
-    nvt_prod_steps = int(t_equil_ns * 1000000.0 / dt)
-    npt_prod300_ns = cls.get('npt_prod300_ns', 2.0)
-    npt_prod300_steps = int(npt_prod300_ns * 1000000.0 / dt)
-    anneal_cycle_ns = cls.get('anneal_cycle_ns')
-    anneal_cycle_steps = (int(anneal_cycle_ns * 1000000.0 / dt)
-                          if anneal_cycle_ns is not None else None)
     T_workflow = _resolve_t_workflow(args, cls)
-    add_melt_npt = (getattr(args, 'add_melt_npt', False) or
-                    bool(cls.get('add_melt_npt', False)) or T_workflow <= 300.0)
+    T_anneal_high_raw = _pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0)
+    T_anneal_high = max(T_anneal_high_raw, T_workflow + ANNEAL_MARGIN_K)
+
+    # t_equil_K: an explicit melt/production-reference tag for a RUBBERY chain (T_workflow ==
+    # final_T_K) -- the direct successor to the retired add_melt_npt flag. A glassy chain
+    # (T_workflow > final_T_K) already gets its tag at T_workflow itself; the two are mutually
+    # exclusive by construction in generate_equilibration_workflow.
+    want_melt_tag = (getattr(args, 'add_melt_npt', False) or bool(cls.get('add_melt_npt', False)))
+    t_equil_K = T_equil if (want_melt_tag and T_workflow <= 300.0) else None
     remedy_melt_ns = (getattr(args, 'melt_hold_ns', None) or cls.get('melt_hold_ns') or
                       getattr(args, 'melt_only_continuation_ns', None) or
                       cls.get('melt_only_continuation_ns'))
-    melt_npt_ns_val = (remedy_melt_ns if remedy_melt_ns is not None else
-                       (_pick(None, cls, 'melt_npt_ns', None) if add_melt_npt else None))
-    melt_npt_steps = int(melt_npt_ns_val * 1000000.0 / dt) if add_melt_npt and melt_npt_ns_val is not None else None
+    melt_hold_extra_steps = (int(remedy_melt_ns * 1000000.0 / dt)
+                             if remedy_melt_ns is not None else None)
+
     phase = getattr(args, 'phase', 'full') or 'full'
     if T_workflow <= 300.0:
         phase = 'full'
+
+    def _step_pick(name):
+        """Direct step-count override (like npt_cool_steps historically) -- None selects
+        generate_equilibration_workflow's own atom-count tier default."""
+        return _pick(getattr(args, name, None), cls, name, None)
+
     return {
         'data_path': args.data_path,
         'emc_params_path': getattr(args, 'emc_params_path', None),
@@ -291,29 +302,32 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/equil',
         'dt_fs': dt,
         'T_equil_K': T_equil,
-        'T_anneal_high_K': _pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0),
+        'T_anneal_high_K': T_anneal_high,
+        'anneal_margin_K': ANNEAL_MARGIN_K,
         'T_workflow_K': T_workflow,
+        'final_T_K': _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0),
         'P_equil_atm': cls.get('P_equil_atm', 1.0),
         'compression_max_pressure_atm': cls.get('compression_max_pressure_atm', 50000.0),
-        't_equil_ns': t_equil_ns,
-        'nvt_prod_steps': nvt_prod_steps,
-        'npt_prod300_ns': npt_prod300_ns,
-        'npt_prod300_steps': npt_prod300_steps,
-        'eq_annealing_cycles': int(cls.get('eq_annealing_cycles', 0)),
-        'anneal_cycle_ns': anneal_cycle_ns,
-        'anneal_cycle_steps': anneal_cycle_steps,
         'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0),
         'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0),
-        'npt_cool_steps': _pick(getattr(args, 'npt_cool_steps', None), cls,
-                                'npt_cool_steps', None),
-        'npt_cool300_steps': _pick(getattr(args, 'npt_cool300_steps', None), cls,
-                                   'npt_cool300_steps', None),
-        'npt_prod_ns': npt_prod_ns_val,
-        'npt_prod_steps': npt_prod_steps,
-        'add_melt_npt': add_melt_npt,
-        'add_300k_production': bool(cls.get('add_300k_production', True)),
-        'melt_npt_ns': melt_npt_ns_val,
-        'melt_npt_steps': melt_npt_steps,
+        'warmup_steps': _step_pick('warmup_steps'),
+        'densify_ramp_steps': _step_pick('densify_ramp_steps'),
+        'densify_check_every_steps': _step_pick('densify_check_every_steps'),
+        'densify_steps_cap': _step_pick('densify_steps_cap'),
+        'ff_activate_npt_steps': _step_pick('ff_activate_npt_steps'),
+        'anneal_heat_steps': _step_pick('anneal_heat_steps'),
+        'anneal_check_every_steps': _step_pick('anneal_check_every_steps'),
+        'anneal_cap_steps': _step_pick('anneal_cap_steps'),
+        'cool_block_dT_K': _pick(getattr(args, 'cool_block_dT_K', None), cls,
+                                 'cool_block_dT_K', None),
+        'cool_block_hold_steps': _step_pick('cool_block_hold_steps'),
+        'cool_block_hold_cap_steps': _step_pick('cool_block_hold_cap_steps'),
+        'stage7_min_steps': _step_pick('stage7_min_steps'),
+        'stage7_cap_steps': _step_pick('stage7_cap_steps'),
+        'stage8_min_steps': _step_pick('stage8_min_steps'),
+        'stage8_cap_steps': _step_pick('stage8_cap_steps'),
+        't_equil_K': t_equil_K,
+        'melt_hold_extra_steps': melt_hold_extra_steps,
         'gpu_ids': args.gpu_ids,
         'mpi_ranks': args.mpi_ranks,
         'engine': args.engine,
@@ -388,10 +402,8 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     tg_work_dir = args.work_dir or f'{lammps_base}/thermal'
     tg_sweep_dir = f'{tg_work_dir}/tg_sweep{rate_suffix}'
     tg_log = f'{tg_sweep_dir}/tg_sweep.log'
-    if _regime(args, cls) == 'rubbery':
-        default_equil_data = f'{lammps_base}/equil/npt_production/npt_production_out.data'
-    else:
-        default_equil_data = f'{lammps_base}/equil/npt_prod300/npt_prod300_out.data'
+    # npt_final is unconditionally the terminal equilibration stage now (regardless of regime).
+    default_equil_data = f'{lammps_base}/equil/npt_final/npt_final_out.data'
     # args.data_path holds the equilibration attempt's real accepted output during execution
     # (CampaignStageExecutor sets it from the equilibration manifest); the flat-convention guess
     # is a --dry-run-only fallback, since no real attempt path exists yet at preview time.
@@ -400,19 +412,26 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     return {'selected_rate_K_per_ns': selected_rate, 'tg_rate_index': args.tg_rate_index, 'tg_log_path': tg_log, 'tg_data_file': equil_data, 'per_t_dump_file': per_t_dump, 'enthalpy_col': getattr(args, 'enthalpy_col', None) or 'Enthalpy', 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'output_dir': output_dir, 'graphs_dir': graphs_dir, 'method_gap_exempt': bool(cls.get('tg_slope_gate_fallback') == 'slowest_rate')}
 
 def _resolve_equil_check_params(args, cls: dict) -> dict:
-    """Resolve deterministic equilibration validation arguments."""
+    """Resolve deterministic equilibration validation arguments.
+
+    The terminal stage is always npt_final (at final_T_K/press) in the 8-stage protocol --
+    there is no separate glassy-vs-rubbery terminal stage name anymore, since cool_block
+    always ramps down to final_T_K regardless of regime. NOTE (known simplification, not yet
+    fully wired to the target design): the chain-structural checks (Rg/MSID/C(t)) still read
+    from nvt_kinetic_stability's dump (the direct rename of the old nvt_production source),
+    not from npt_final's own trajectory -- moving those specific checks onto npt_final's
+    dump (as the target design calls for) needs check_equilibration_comprehensive to merge
+    two trajectory sources in one call, which is deferred, separately-scoped work."""
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
     graphs_dir = _run_graphs_dir(args)
     ct_decay = cls.get('ct_min_decay_melt', 0.1) if cls.get('ct_gate_reliable', True) else None
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
     T_workflow = _resolve_t_workflow(args, cls)
+    final_T = _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0)
     phase = getattr(args, 'phase', 'full') or 'full'
     if T_workflow <= 300:
         phase = 'full'
-    if phase == 'melt' or T_workflow <= 300:
-        (prod, npt_prod_temp) = ('npt_production', T_workflow)
-    else:
-        (prod, npt_prod_temp) = ('npt_prod300', 300.0)
+    prod = 'npt_final'
     npt_prod_data_path = args.data_path or f'{lammps_base}/equil/{prod}/{prod}_out.data'
     # npt_prod_log_path used to fall to a flat data/<run>/lammps/... convention whenever
     # args.npt_prod_log was unset -- which is always, in real execution (nothing ever sets it).
@@ -425,7 +444,7 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
     npt_prod_log_path = args.npt_prod_log or (
         npt_prod_data_path[:-len('_out.data')] + '.log' if npt_prod_data_path.endswith('_out.data')
         else f'{lammps_base}/equil/{prod}/{prod}.log')
-    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_production/nvt_production.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_production/npt_production_out.data', 'npt_prod_temp_K': npt_prod_temp, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_kinetic_stability/nvt_kinetic_stability.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_final/npt_final_out.data', 'npt_prod_temp_K': final_T, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""
@@ -434,12 +453,10 @@ def _resolve_murnaghan_params(args, cls: dict) -> dict:
     is_glassy = _is_glassy(args, cls)
     # args.data_path IS the equilibration attempt's real npt_prod_data_path in real execution
     # (run_campaign.py sets it from the accepted equilibration manifest before this resolver
-    # runs); the fallback below is a --dry-run-only preview default and must branch on regime
-    # like _resolve_analyze_tg_params/_resolve_analyze_bm_params do -- unbranched, it showed a
-    # glassy preview compressing the 550K melt endpoint instead of the 300K target (a-PS dry-run,
-    # 2026-08-17).
-    default_equil_data = (f'{lammps_base}/equil/npt_prod300/npt_prod300_out.data' if is_glassy
-                           else f'{lammps_base}/equil/npt_production/npt_production_out.data')
+    # runs); the fallback below is a --dry-run-only preview default. npt_final is unconditionally
+    # the terminal stage in the 8-stage adaptive protocol (regardless of regime -- cool_block
+    # always ramps down to final_T_K), so no glassy/rubbery branch is needed anymore.
+    default_equil_data = f'{lammps_base}/equil/npt_final/npt_final_out.data'
     return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': is_glassy, 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'equil_data_path': args.data_path or default_equil_data, 'temp_K': cls.get('bm_temperature_K', 300.0), 'npt_steps': int(cls.get('bm_npt_steps', 500000)) * sampling_factor, 'thermo_freq': int(cls.get('bm_thermo_freq', 100)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'mechanical_sampling_factor': sampling_factor, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
 
 def _resolve_analyze_bm_params(args, cls: dict) -> dict:
@@ -459,7 +476,7 @@ def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     npt_prod_log_path = args.npt_prod_log or (
         args.data_path[:-len('_out.data')] + '.log'
         if args.data_path and args.data_path.endswith('_out.data')
-        else f'{lammps_base}/equil/npt_prod300/npt_prod300.log')
+        else f'{lammps_base}/equil/npt_final/npt_final.log')
     return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'npt_prod_log_path': npt_prod_log_path, 'exp_K_range': exp_K, 'bm_pressures_atm': cls.get('bm_pressures_atm', None), 'strain_rate_per_fs': cls.get('K_deform_rate_inv_s', 100000000.0) * 1e-15, 'strain_rate_slow_per_fs': K_deform_rate_slow_inv_s * 1e-15 if K_deform_rate_slow_inv_s is not None else None, 'K_strain_max': cls.get('K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'deform_log_path': getattr(args, 'deform_log', None), 'deform_log_path_slow': getattr(args, 'deform_log_slow', None), 'murnaghan_log_files': getattr(args, 'murnaghan_logs', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_run_summary_params(args, cls: dict) -> dict:

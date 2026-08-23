@@ -224,7 +224,7 @@ class _FakeEquilLammps:
     (covered separately above)."""
 
     def __init__(self, tmp_path, comp_results, gate_verdicts, atom_type_names=None,
-                 derived_backbone_types=None, workflow_stages=None):
+                 derived_backbone_types=None, workflow_stages=None, workflow_extra=None):
         self.tmp_path = tmp_path
         self._comp_results = list(comp_results)
         self._gate_verdicts = list(gate_verdicts)
@@ -243,6 +243,7 @@ class _FakeEquilLammps:
         # nvt_production/npt_production) -> returned verbatim, for tests of the name-based
         # melt_dump_path/melt_data_path stage lookup.
         self._workflow_stages = workflow_stages
+        self._workflow_extra = workflow_extra or {}
 
     def _sentinel(self):
         self._chain_n += 1
@@ -253,8 +254,10 @@ class _FakeEquilLammps:
     def generate_equilibration_workflow(self, **kwargs):
         self.generate_equilibration_workflow_calls.append(kwargs)
         if self._workflow_stages is not None:
-            return {"stages": self._workflow_stages}
-        stage = {"output_data": f"{self.tmp_path}/npt_prod_{self._chain_n}_out.data",
+            return {"stages": self._workflow_stages, **self._workflow_extra}
+        stage = {"name": "npt_final",
+                 "output_data": f"{self.tmp_path}/npt_prod_{self._chain_n}_out.data",
+                 "output_restart": f"{self.tmp_path}/npt_prod_{self._chain_n}_out.restart",
                  "work_dir": str(self.tmp_path), "params": {"DUMP_FILE": "npt_prod.dump"}}
         return {"stages": [stage]}
 
@@ -418,8 +421,13 @@ def test_do_equil_and_check_sizes_extend_off_measured_tau_relax(tmp_path, equil_
     assert len(fake.generate_equilibration_workflow_calls) == 2
     extend_call = fake.generate_equilibration_workflow_calls[1]
     assert extend_call["extend_only"] is True
+    assert extend_call["base_stage_name"] == "npt_final"
+    assert extend_call["restart_file"] == f"{tmp_path}/npt_prod_0_out.restart"
     dt_fs = resolve_stage_params("equil", args, cls)["dt_fs"]
-    extend_ns_used = extend_call["extend_steps"] * dt_fs / 1e6
+    # npt_final's continuation length comes through stage8_min_steps (the same knob
+    # generate_equilibration_workflow reads for base_stage_name="npt_final"), not a generic
+    # "extend_steps" param.
+    extend_ns_used = extend_call["stage8_min_steps"] * dt_fs / 1e6
     expected_extend_ns = max(1.5, round(1.5 * tau_relax_ps / 1000, 2))
     assert extend_ns_used == pytest.approx(expected_extend_ns, rel=1e-6)
     # sanity: the measured signal actually moved the knob away from the old flat 1.5 ns default
@@ -482,41 +490,50 @@ def test_do_summary_waits_for_generate_run_summary_completion(tmp_path):
 # ─── do_equil_and_check(): melt_dump_path/melt_data_path stage lookup ──────────────
 
 def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_check_args_cls, monkeypatch):
-    """melt_dump_path (nvt_production's dump) and melt_data_path (npt_production's data) must
-    come from the real workflow's own named stages, not the flat-convention guess -- same bug
-    class as npt_prod_log_path, fixed the same way analyze-tg's per_t_dump_file was: look up
-    the real path instead of re-deriving one independently."""
+    """melt_dump_path (nvt_kinetic_stability's dump) must come from the real workflow's own
+    named stage, not the flat-convention guess -- same bug class as npt_prod_log_path, fixed
+    the same way analyze-tg's per_t_dump_file was: look up the real path instead of re-deriving
+    one independently. melt_data_path (the assess_cooling_contraction melt reference) comes
+    directly from the generator's own top-level melt_data_path field -- the cool_block tagged
+    at `temp`/t_equil_K, which stage-name lookup can't find since its name varies (cool_block_NN
+    for whichever N is tagged)."""
     args, cls = equil_check_args_cls
     args.backbone_types = [1, 2]  # skip the halt path
     monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
         {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
 
-    nvt_dir = tmp_path / "work" / "nvt_production"
-    npt_dir = tmp_path / "work" / "npt_production"
-    nvt_dir.mkdir(parents=True)
-    npt_dir.mkdir(parents=True)
+    kinetic_dir = tmp_path / "work" / "nvt_kinetic_stability"
+    final_dir = tmp_path / "work" / "npt_final"
+    cool_block_dir = tmp_path / "work" / "cool_block_02"
+    kinetic_dir.mkdir(parents=True)
+    final_dir.mkdir(parents=True)
+    cool_block_dir.mkdir(parents=True)
     workflow_stages = [
-        {"name": "nvt_production", "work_dir": str(nvt_dir),
-         "params": {"DUMP_FILE": "nvt_production.dump"},
-         "output_data": str(nvt_dir / "nvt_production_out.data")},
-        {"name": "npt_production", "work_dir": str(npt_dir),
-         "params": {"DUMP_FILE": "npt_production.dump"},
-         "output_data": str(npt_dir / "npt_production_out.data")},
+        {"name": "nvt_kinetic_stability", "work_dir": str(kinetic_dir),
+         "params": {"DUMP_FILE": "nvt_kinetic_stability.dump"},
+         "output_data": str(kinetic_dir / "nvt_kinetic_stability_out.data"),
+         "output_restart": str(kinetic_dir / "nvt_kinetic_stability_out.restart")},
+        {"name": "npt_final", "work_dir": str(final_dir),
+         "params": {"DUMP_FILE": "npt_final.dump"},
+         "output_data": str(final_dir / "npt_final_out.data"),
+         "output_restart": str(final_dir / "npt_final_out.restart")},
     ]
+    melt_data_path = str(cool_block_dir / "cool_block_02_out.data")
     fake = _FakeEquilLammps(
         tmp_path,
         comp_results=[{"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}}],
         gate_verdicts=[{"verdict": "PASS"}],
         workflow_stages=workflow_stages,
+        workflow_extra={"melt_data_path": melt_data_path},
     )
 
     result = do_equil_and_check(args, cls, fake)
 
     assert result["equil_verdict"] == "PASS"
     comp_call = fake.check_equilibration_comprehensive_calls[0]
-    assert comp_call["dump_file"] == str(nvt_dir / "nvt_production.dump")
+    assert comp_call["dump_file"] == str(kinetic_dir / "nvt_kinetic_stability.dump")
     gate_call = fake.enforce_equilibration_gate_calls[0]
-    assert gate_call["melt_data"] == str(npt_dir / "npt_production_out.data")
+    assert gate_call["melt_data"] == melt_data_path
 
 
 # ─── CampaignStageExecutor.execute(): STRUCTURAL_FAIL finding-code routing ─────────
@@ -563,27 +580,26 @@ def _write_prior_manifest(tmp_path, name, parameters, stage_checkpoints):
     return {"manifest": str(manifest_path)}
 
 
-def test_equilibration_resume_from_anneal_computes_delta_not_absolute_target(tmp_path, monkeypatch):
-    """The real bug trap: eq_annealing_cycles in effective_parameters is melt_hold's new
-    ABSOLUTE target (5->10), but a resume from anneal_05_cool with anneal_cycles=10 would run 15
-    total, not 10. The executor must compute the delta (10 - 5 = 5) from what the prior attempt
-    actually ran, found in ITS OWN stored parameters -- not from baseline_eq_annealing_cycles,
-    which _melt_hold freezes at the pre-rung-1 value across both rungs."""
+def test_equilibration_resume_from_anneal_hold_finds_its_checkpoint(tmp_path, monkeypatch):
+    """_cooling (UNDER_ANNEALED_COOLING) sets equilibration_resume_from="anneal_hold" directly
+    -- one of generate_equilibration_workflow's 8 fixed checkpoint names -- so the executor's
+    job is a plain lookup in the prior attempt's own stage_checkpoints, no per-cycle delta
+    computation (the retired eq_annealing_cycles concept no longer exists; annealing is one
+    continuously-extendable hold, not a cycle count)."""
     import run_campaign as rc
     from run_campaign import CampaignStageExecutor
 
     captured = {}
     monkeypatch.setattr(rc, "do_equil_and_check", lambda args, cls, lammps: (
         captured.update(resume_from=getattr(args, "equil_resume_from", None),
-                        data_path=getattr(args, "equil_resume_data_path", None),
-                        cycles=getattr(args, "equil_resume_anneal_cycles", None))
-        or {"halted": True, "reason": "MELT_STAGE_DEFICIT", "detail": {}}
+                        data_path=getattr(args, "equil_resume_data_path", None))
+        or {"halted": True, "reason": "STRUCTURAL_FAIL", "detail": {}}
     ))
 
     prior = _write_prior_manifest(
         tmp_path, "prior",
-        parameters={"eq_annealing_cycles": 5, "baseline_eq_annealing_cycles": 0},
-        stage_checkpoints={"anneal_05_cool": "/data/anneal_05_cool_out.data"},
+        parameters={"cool_block_hold_steps": 200000},
+        stage_checkpoints={"anneal_hold": "/data/anneal_hold_out.data"},
     )
 
     executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
@@ -591,53 +607,45 @@ def test_equilibration_resume_from_anneal_computes_delta_not_absolute_target(tmp
     attempt_dir = tmp_path / "attempt-0002"
     attempt_dir.mkdir()
     context = {"attempt_dir": str(attempt_dir),
-              "parameters": {"eq_annealing_cycles": 10, "baseline_eq_annealing_cycles": 5,
-                             "equilibration_resume_from": "anneal"},
+              "parameters": {"cool_block_hold_steps": 400000,
+                             "equilibration_resume_from": "anneal_hold"},
               "dependencies": {}, "prior_attempts": [prior]}
 
     executor.execute("equilibration", context)
 
-    assert captured["resume_from"] == "anneal"
-    assert captured["data_path"] == "/data/anneal_05_cool_out.data"
-    assert captured["cycles"] == 5
+    assert captured["resume_from"] == "anneal_hold"
+    assert captured["data_path"] == "/data/anneal_hold_out.data"
 
 
-def test_equilibration_resume_from_anneal_rung_two_finds_zero_delta(tmp_path, monkeypatch):
-    """Rung 2 doesn't raise eq_annealing_cycles further (stays at rung 1's target) -- if the most
-    recent prior attempt already ran that many cycles, the delta must be 0, not re-derived
-    against the frozen pre-rung-1 baseline (which would wrongly reattempt cycles 6-10 again)."""
+def test_equilibration_resume_from_missing_checkpoint_leaves_resume_unset(tmp_path, monkeypatch):
+    """If the named checkpoint never actually ran in any prior attempt (nothing to resume
+    from), the executor must not set equil_resume_from at all -- do_equil_and_check would then
+    submit a from-scratch chain, which is the safe fallback, not a crash on a missing key."""
     import run_campaign as rc
     from run_campaign import CampaignStageExecutor
 
     captured = {}
     monkeypatch.setattr(rc, "do_equil_and_check", lambda args, cls, lammps: (
-        captured.update(resume_from=getattr(args, "equil_resume_from", None),
-                        data_path=getattr(args, "equil_resume_data_path", None),
-                        cycles=getattr(args, "equil_resume_anneal_cycles", None))
-        or {"halted": True, "reason": "MELT_STAGE_DEFICIT", "detail": {}}
+        captured.update(resume_from=getattr(args, "equil_resume_from", None))
+        or {"halted": True, "reason": "STRUCTURAL_FAIL", "detail": {}}
     ))
 
-    rung1 = _write_prior_manifest(
-        tmp_path, "rung1",
-        parameters={"eq_annealing_cycles": 10, "baseline_eq_annealing_cycles": 5},
-        stage_checkpoints={"anneal_10_cool": "/data/anneal_10_cool_out.data"},
+    prior = _write_prior_manifest(
+        tmp_path, "prior", parameters={},
+        stage_checkpoints={"npt_densify": "/data/npt_densify_out.data"},
     )
 
     executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
                                      {}, emc=None, lammps=None, plan_path="unused")
-    attempt_dir = tmp_path / "attempt-0003"
+    attempt_dir = tmp_path / "attempt-0002"
     attempt_dir.mkdir()
     context = {"attempt_dir": str(attempt_dir),
-              "parameters": {"eq_annealing_cycles": 10, "baseline_eq_annealing_cycles": 5,
-                             "equilibration_resume_from": "anneal",
-                             "melt_hold_ns": 5.0, "add_melt_npt": True},
-              "dependencies": {}, "prior_attempts": [rung1]}
+              "parameters": {"equilibration_resume_from": "anneal_hold"},
+              "dependencies": {}, "prior_attempts": [prior]}
 
     executor.execute("equilibration", context)
 
-    assert captured["resume_from"] == "anneal"
-    assert captured["data_path"] == "/data/anneal_10_cool_out.data"
-    assert captured["cycles"] == 0
+    assert captured["resume_from"] is None
 
 
 def test_equilibration_resume_from_npt_production_finds_its_checkpoint(tmp_path, monkeypatch):

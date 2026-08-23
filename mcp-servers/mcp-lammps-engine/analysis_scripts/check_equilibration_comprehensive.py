@@ -48,6 +48,7 @@ import MDAnalysis.transformations as trans
 from scipy import stats as sp_stats
 from scipy.optimize import curve_fit
 from scipy.special import gamma as sp_gamma
+from scipy.spatial.distance import jensenshannon
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -314,6 +315,91 @@ def _classify_diffusion_regime(alpha):
     return "super-diffusive (non-equilibrated)"
 
 
+def _dihedral_angle(p0, p1, p2, p3):
+    """Signed dihedral angle (degrees) for the four points p0-p1-p2-p3."""
+    b0 = p0 - p1
+    b1 = p2 - p1
+    b2 = p3 - p2
+    b1n = b1 / (np.linalg.norm(b1) + 1e-12)
+    v = b0 - np.dot(b0, b1n) * b1n
+    w = b2 - np.dot(b2, b1n) * b1n
+    x = np.dot(v, w)
+    y = np.dot(np.cross(b1n, v), w)
+    return float(np.degrees(np.arctan2(y, x)))
+
+
+def _backbone_dihedrals(bb_pos_sorted):
+    """Backbone dihedral angles (degrees), one per consecutive 4-atom window."""
+    n = len(bb_pos_sorted)
+    if n < 4:
+        return []
+    return [
+        _dihedral_angle(bb_pos_sorted[i], bb_pos_sorted[i + 1],
+                        bb_pos_sorted[i + 2], bb_pos_sorted[i + 3])
+        for i in range(n - 3)
+    ]
+
+
+def _fit_msid_regime(n_vals, mean_vals, mask):
+    """Power-law fit of MSID(n) over the subset of separations selected by `mask`."""
+    if mask.sum() < 5:
+        return {"available": False, "n_separations": int(mask.sum())}
+    slope, _, r2 = _fit_power_law(n_vals[mask].astype(float), mean_vals[mask])
+    return {
+        "available": slope is not None,
+        "slope": r(slope, 3) if slope is not None else None,
+        "r2": r(r2, 4) if r2 is not None else None,
+        "gaussian_pass": bool(slope is not None and abs(slope - 1.0) <= 0.20),
+        "n_separations": int(mask.sum()),
+        "s_range": [int(n_vals[mask].min()), int(n_vals[mask].max())],
+    }
+
+
+def _torsion_js_stabilization(torsion_per_frame, block_count, js_threshold):
+    """Block the trajectory into `block_count` windows, histogram the pooled backbone-dihedral
+    distribution in each, and return the Jensen-Shannon divergence between consecutive blocks.
+
+    `torsion_per_frame` is a list of 1-D arrays (one per frame, possibly ragged/empty).
+    """
+    n_frames = len(torsion_per_frame)
+    if n_frames < block_count * 2 or not any(len(t) for t in torsion_per_frame):
+        return {"available": False}
+
+    bin_edges = np.linspace(-180.0, 180.0, 37)  # 36 bins, 10 deg each
+    block_size = n_frames // block_count
+    hists = []
+    for b in range(block_count):
+        start = b * block_size
+        end = (b + 1) * block_size if b < block_count - 1 else n_frames
+        block_frames = [torsion_per_frame[i] for i in range(start, end) if len(torsion_per_frame[i])]
+        if not block_frames:
+            hists.append(None)
+            continue
+        block_vals = np.concatenate(block_frames)
+        h, _ = np.histogram(block_vals, bins=bin_edges, density=False)
+        h = h.astype(float) + 1e-9  # avoid zero bins, which break JS divergence
+        h /= h.sum()
+        hists.append(h)
+
+    js_series = []
+    for i in range(1, len(hists)):
+        if hists[i] is None or hists[i - 1] is None:
+            continue
+        # scipy's jensenshannon returns a distance (sqrt of the divergence); square it back
+        # to the divergence itself, base=2 bounds it to [0, 1].
+        js_series.append(float(jensenshannon(hists[i - 1], hists[i], base=2) ** 2))
+
+    js_last = js_series[-1] if js_series else None
+    return {
+        "available": True,
+        "n_blocks": block_count,
+        "js_divergence_series": [r(v, 5) for v in js_series],
+        "js_divergence_last": r(js_last, 5) if js_last is not None else None,
+        "js_threshold": js_threshold,
+        "stable": bool(js_last is not None and js_last <= js_threshold),
+    }
+
+
 def _kww_fit(lags_ps, ct_values):
     """Fit C(t) = exp(-(t/tau)^beta). Returns tau, beta, tau_relax, decay_fraction."""
     valid = ct_values > 0.01
@@ -339,7 +425,8 @@ def _kww_fit(lags_ps, ct_values):
 def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
                             n_backbone_bonds, bond_length_A, timestep_fs, dump_every,
                             grid_n, trajectory_slice, ct_min_decay=None, graphs_dir=None,
-                            cv_signal_max=0.11):
+                            cv_signal_max=0.11, msid_s_split=None, torsion_block_count=6,
+                            torsion_js_threshold=0.05):
     """Single-pass over dump frames. Returns raw per-frame arrays for all checks."""
     # Storage
     rg_sq_per_frame = []   # (n_frames, n_chains)
@@ -347,6 +434,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     com_per_frame = []     # (n_frames, n_chains, 3)  — CoMs for MSD
     p2_per_frame = []
     cv_per_frame = []
+    torsion_per_frame = []  # list of 1-D arrays (backbone dihedral angles, all chains flattened)
     msid_accum = None      # shape (n_backbone_per_chain - 1,)
     msid_n = None
     msid_count = 0
@@ -396,6 +484,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
 
         rg_sq_row, ree_row, com_row = [], [], []
         bb_bond_vecs_all = []
+        torsion_row = []
 
         for cid in chain_ids:
             d = chain_data[cid]
@@ -430,6 +519,9 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
                     dr = bb_pos_sorted[i + 1] - bb_pos_sorted[i]
                     bb_bond_vecs_all.append(dr)
 
+                # Backbone torsion (dihedral) angles
+                torsion_row.extend(_backbone_dihedrals(bb_pos_sorted))
+
                 # MSID accumulation
                 if msid_n_vals is not None and len(bb_pos_sorted) == first_bb_len:
                     for j, sep in enumerate(msid_n_vals):
@@ -452,6 +544,8 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         # Density homogeneity
         cv_val, _ = _compute_density_cv(u.atoms.positions.copy(), masses_all, box, grid_n)
         cv_per_frame.append(cv_val)
+
+        torsion_per_frame.append(np.array(torsion_row) if torsion_row else np.array([]))
 
         frame_idx += 1
         if frame_idx % 100 == 0:
@@ -487,6 +581,14 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     }
 
     # ── MSID ──
+    # Two regimes are fit: the combined whole-range fit (unchanged, for backward
+    # compatibility with existing consumers of msid.slope/r2/gaussian_pass), plus a
+    # small/intermediate-s vs large-s split. A single whole-range fit can look Gaussian
+    # on average while masking a large-s-only distortion (a badly initialized
+    # long-wavelength chain configuration -- see GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED)
+    # or a small-s-only one (local packing defects); the split separates what's
+    # accessible to ordinary MD (small/intermediate s) from what may reflect an
+    # initialization problem no amount of annealing will fix (large s).
     msid_result = {"available": False}
     if msid_n_vals is not None and msid_count_arr[0] > 0:
         msid_mean = msid_accum / msid_count_arr
@@ -499,6 +601,16 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
             "gaussian_pass": bool(gaussian_pass),
             "n_separations": int(len(msid_n_vals)),
         }
+
+        # s_split default is a starting point (not benchmarked against the archive yet):
+        # roughly the first third of the available separation range is treated as
+        # "small/intermediate", the rest as "large".
+        s_split = msid_s_split if msid_s_split is not None else max(4, len(msid_n_vals) // 3 + 1)
+        small_mask = msid_n_vals <= s_split
+        large_mask = ~small_mask
+        msid_result["s_split"] = int(s_split)
+        msid_result["small_intermediate"] = _fit_msid_regime(msid_n_vals, msid_mean, small_mask)
+        msid_result["large_s"] = _fit_msid_regime(msid_n_vals, msid_mean, large_mask)
 
     # ── C(t) end-to-end autocorrelation ──
     ct_result = {"available": False}
@@ -581,6 +693,14 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "kinetic_trap_flag": kinetic_trap,
     }
 
+    # ── Torsion (backbone dihedral) distribution stabilization ──
+    # Intended as an anneal-loop stopping signal: once the pooled backbone-dihedral
+    # distribution stops changing between consecutive trajectory blocks (JS divergence
+    # at/below threshold), further high-T sampling is not changing accessible torsional
+    # states.
+    torsion_result = _torsion_js_stabilization(torsion_per_frame, torsion_block_count,
+                                               torsion_js_threshold)
+
     # ── P2 ──
     p2_mean = float(p2_arr.mean())
     p2_std = float(p2_arr.std())
@@ -641,6 +761,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "msid": msid_result,
         "ct": ct_result,
         "msd": msd_result,
+        "torsion": torsion_result,
         "p2": p2_result,
         "density_homogeneity": dh_result,
         "backbone_type_coverage": r(backbone_type_coverage_mean, 3)
@@ -715,9 +836,21 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
         r2 = msid.get("r2")
         g_pass = msid.get("gaussian_pass", True)
         label = "OK" if g_pass else "⚠ non-Gaussian"
-        lines.append(f"| MSID slope | {slope} (R²={r2}) | 1.0 ±20% | {label} |")
+        lines.append(f"| MSID slope (combined) | {slope} (R²={r2}) | 1.0 ±20% | {label} |")
+        large_s = msid.get("large_s", {})
+        if large_s.get("available"):
+            ls_label = "OK" if large_s.get("gaussian_pass", True) else "⚠ non-Gaussian (large-s)"
+            lines.append(f"| MSID slope (large-s, n={large_s.get('s_range')}) | "
+                        f"{large_s.get('slope')} (R²={large_s.get('r2')}) | 1.0 ±20% | {ls_label} |")
     else:
         lines.append("| MSID slope | — | 1.0 ±20% | skipped (short backbone) |")
+
+    torsion = structural.get("torsion", {})
+    if torsion.get("available"):
+        js = torsion.get("js_divergence_last")
+        thr = torsion.get("js_threshold")
+        label = "OK (stable)" if torsion.get("stable") else "still changing"
+        lines.append(f"| Torsion JS-divergence (last block-pair) | {js} | ≤{thr} | {label} |")
 
     ct = structural.get("ct", {})
     if ct.get("available"):
@@ -861,6 +994,18 @@ def main():
                         help="Minimum C(t) decay fraction to pass hard gate (0–1). "
                              "Omit for soft-warning-only behaviour (backwards compat). "
                              "Use 0.25 for melt equilibration checks.")
+    parser.add_argument("--msid_s_split",      type=int, default=None,
+                        help="Backbone separation n splitting the MSID fit into "
+                             "small/intermediate-s vs large-s regimes. Default: "
+                             "max(4, n_separations // 3 + 1) — an unbenchmarked starting "
+                             "point, not a physical constant.")
+    parser.add_argument("--torsion_block_count", type=int, default=6,
+                        help="Number of contiguous trajectory blocks for the backbone "
+                             "torsion-distribution Jensen-Shannon-divergence stabilization "
+                             "check.")
+    parser.add_argument("--torsion_js_threshold", type=float, default=0.05,
+                        help="Max JS divergence (base-2, in [0,1]) between the last two "
+                             "torsion-distribution blocks to call the distribution stable.")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir) if args.output_dir else Path(args.dump_file).parent / "eq_comprehensive"
@@ -943,6 +1088,9 @@ def main():
         ct_min_decay=args.ct_min_decay,
         graphs_dir=args.graphs_dir,
         cv_signal_max=args.cv_signal_max,
+        msid_s_split=args.msid_s_split,
+        torsion_block_count=args.torsion_block_count,
+        torsion_js_threshold=args.torsion_js_threshold,
     )
 
     # ── Finite-size (periodic self-imaging) ──
@@ -1007,6 +1155,7 @@ def main():
             "msid": structural["msid"],
             "ct": structural["ct"],
             "msd": structural["msd"],
+            "torsion": structural["torsion"],
             "backbone_type_coverage": structural["backbone_type_coverage"],
         },
         "spatial": {

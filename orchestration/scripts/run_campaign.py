@@ -314,74 +314,116 @@ def do_build(args, cls: dict, emc, lammps) -> dict:
 
 def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
                          extend_temp: float = None, extend_ns: float = 1.5,
-                         resume_from: str = None, resume_data_path: str = None,
-                         resume_anneal_cycles: int = None) -> dict:
+                         extend_base_stage: str = None, extend_ensemble: str = "npt",
+                         extend_temp_K: float = None,
+                         resume_from: str = None, resume_data_path: str = None) -> dict:
+    """resume_from is one of generate_equilibration_workflow's 8 checkpoint names (see
+    server.py) -- e.g. "anneal_hold" to regenerate cooling+tail with different parameters
+    after a remedy adjusts them, or "cool_block"/"nvt_kinetic_stability" to redo only the
+    tail. extend_from_data (paired with extend_base_stage/extend_ensemble) is a genuine
+    restart-continuation of one already-run adaptive stage, not a resubmission."""
     p = resolve_stage_params("equil", args, cls)
     flags = p["lammps_flags"]
     velocity_seed = p["velocity_seed"]
     if resume_from is not None:
-        # "anneal": run only the DELTA cycles the remedy computed (resume_anneal_cycles), not
-        # the new absolute eq_annealing_cycles target -- that target already counts cycles the
-        # prior attempt ran, which resume_data_path's checkpoint already reflects.
-        # "npt_production": anneal_cycles is unused (nvt_production/npt_production are both
-        # skipped) but generate_equilibration_workflow still validates it as a non-negative int.
         workflow = lammps.generate_equilibration_workflow(
             data_file=resume_data_path, work_dir_base=p["work_dir"],
-            polymer_name=args.run_name, temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
-            press=p["P_equil_atm"], use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"],
-            use_opls=flags["use_opls"], npt_prod_steps=p["npt_prod_steps"],
-            nvt_prod_steps=p["nvt_prod_steps"], npt_prod300_steps=p["npt_prod300_steps"],
-            add_melt_npt=p["add_melt_npt"] if resume_from == "anneal" else False,
-            t_equil_K=(p["T_equil_K"] if resume_from == "anneal" and p["add_melt_npt"] else None),
-            add_300k_production=p["add_300k_production"],
-            melt_npt_steps=p["melt_npt_steps"], engine=p["engine"], velocity_seed=velocity_seed,
-            npt_cool_steps=p["npt_cool_steps"], npt_cool300_steps=p["npt_cool300_steps"],
-            anneal_cycles=(resume_anneal_cycles or 0) if resume_from == "anneal" else 0,
-            anneal_cycle_steps=p["anneal_cycle_steps"],
-            thermostat_damp_fs=p["thermostat_damp_fs"],
-            barostat_damp_fs=p["barostat_damp_fs"],
+            temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
+            anneal_margin_K=p["anneal_margin_K"], final_T_K=p["final_T_K"],
             max_press=p["compression_max_pressure_atm"],
-            use_long_range=p["use_long_range_electrostatics"],
-            extend_steps=None,
+            warmup_steps=p["warmup_steps"],
+            densify_ramp_steps=p["densify_ramp_steps"],
+            densify_check_every_steps=p["densify_check_every_steps"],
+            densify_steps_cap=p["densify_steps_cap"],
+            ff_activate_npt_steps=p["ff_activate_npt_steps"],
+            anneal_heat_steps=p["anneal_heat_steps"],
+            anneal_check_every_steps=p["anneal_check_every_steps"],
+            anneal_cap_steps=p["anneal_cap_steps"],
+            cool_block_dT_K=p["cool_block_dT_K"],
+            cool_block_hold_steps=p["cool_block_hold_steps"],
+            cool_block_hold_cap_steps=p["cool_block_hold_cap_steps"],
+            stage7_min_steps=p["stage7_min_steps"], stage7_cap_steps=p["stage7_cap_steps"],
+            stage8_min_steps=p["stage8_min_steps"], stage8_cap_steps=p["stage8_cap_steps"],
+            t_equil_K=p["t_equil_K"], melt_hold_extra_steps=p["melt_hold_extra_steps"],
             params_file="",
             resume_from=resume_from,
+            polymer_name=args.run_name, press=p["P_equil_atm"],
+            use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
+            engine=p["engine"], velocity_seed=velocity_seed,
+            thermostat_damp_fs=p["thermostat_damp_fs"], barostat_damp_fs=p["barostat_damp_fs"],
+            use_long_range=p["use_long_range_electrostatics"],
         )
     elif extend_from_data is None:
         workflow = lammps.generate_equilibration_workflow(
             data_file=p["data_path"], work_dir_base=p["work_dir"],
-            polymer_name=args.run_name, temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
-            press=p["P_equil_atm"], use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"],
-            use_opls=flags["use_opls"], npt_prod_steps=p["npt_prod_steps"],
-            nvt_prod_steps=p["nvt_prod_steps"], npt_prod300_steps=p["npt_prod300_steps"],
-            add_melt_npt=p["add_melt_npt"], t_equil_K=p["T_equil_K"] if p["add_melt_npt"] else None,
-            add_300k_production=p["add_300k_production"],
-            melt_npt_steps=p["melt_npt_steps"], engine=p["engine"], velocity_seed=velocity_seed,
-            npt_cool_steps=p["npt_cool_steps"], npt_cool300_steps=p["npt_cool300_steps"],
-            anneal_cycles=p["eq_annealing_cycles"],
-            anneal_cycle_steps=p["anneal_cycle_steps"],
-            thermostat_damp_fs=p["thermostat_damp_fs"],
-            barostat_damp_fs=p["barostat_damp_fs"],
+            temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
+            anneal_margin_K=p["anneal_margin_K"], final_T_K=p["final_T_K"],
             max_press=p["compression_max_pressure_atm"],
-            use_long_range=p["use_long_range_electrostatics"],
-            extend_steps=None,
+            warmup_steps=p["warmup_steps"],
+            densify_ramp_steps=p["densify_ramp_steps"],
+            densify_check_every_steps=p["densify_check_every_steps"],
+            densify_steps_cap=p["densify_steps_cap"],
+            ff_activate_npt_steps=p["ff_activate_npt_steps"],
+            anneal_heat_steps=p["anneal_heat_steps"],
+            anneal_check_every_steps=p["anneal_check_every_steps"],
+            anneal_cap_steps=p["anneal_cap_steps"],
+            cool_block_dT_K=p["cool_block_dT_K"],
+            cool_block_hold_steps=p["cool_block_hold_steps"],
+            cool_block_hold_cap_steps=p["cool_block_hold_cap_steps"],
+            stage7_min_steps=p["stage7_min_steps"], stage7_cap_steps=p["stage7_cap_steps"],
+            stage8_min_steps=p["stage8_min_steps"], stage8_cap_steps=p["stage8_cap_steps"],
+            t_equil_K=p["t_equil_K"], melt_hold_extra_steps=p["melt_hold_extra_steps"],
             params_file=p.get("emc_params_path") or "",
             minimize_etol=p["minimize_etol"], minimize_ftol=p["minimize_ftol"],
             minimize_maxiter=p["minimize_maxiter"], minimize_maxeval=p["minimize_maxeval"],
+            polymer_name=args.run_name, press=p["P_equil_atm"],
+            use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
+            engine=p["engine"], velocity_seed=velocity_seed,
+            thermostat_damp_fs=p["thermostat_damp_fs"], barostat_damp_fs=p["barostat_damp_fs"],
+            use_long_range=p["use_long_range_electrostatics"],
         )
     else:
+        # Genuine restart-continuation of extend_base_stage's own trajectory (read_restart,
+        # appended log/dump) -- NOT a fresh stage. extend_from_data is that stage's own
+        # .restart file (not a .data file); extend_temp_K is required for a cool_block_NN
+        # (its hold temperature can't be inferred from the name alone).
         dt = p["dt_fs"]
-        extend_steps = int(extend_ns * 1e6 / dt)
+        extend_steps_val = int(extend_ns * 1e6 / dt)
+        base = extend_base_stage or "npt_final"
+        override = {
+            "npt_densify_hold": {"densify_check_every_steps": extend_steps_val},
+            "anneal_hold": {"anneal_check_every_steps": extend_steps_val},
+            "nvt_kinetic_stability": {"stage7_min_steps": extend_steps_val},
+            "npt_final": {"stage8_min_steps": extend_steps_val},
+        }.get(base, {"cool_block_hold_steps": extend_steps_val})
         workflow = lammps.generate_equilibration_workflow(
-            data_file=extend_from_data, work_dir_base=p["work_dir"], polymer_name=args.run_name,
-            temp=extend_temp, press=p["P_equil_atm"], use_pcff=flags["use_pcff"],
-            use_trappe=flags["use_trappe"], use_opls=flags["use_opls"], engine=p["engine"],
-            velocity_seed=velocity_seed, extend_only=True, extend_steps=extend_steps,
-            npt_prod_steps=None, nvt_prod_steps=None, npt_prod300_steps=None,
-            npt_cool_steps=None, npt_cool300_steps=None,
-            melt_npt_steps=None,
-            anneal_cycles=0, anneal_cycle_steps=None,
-            thermostat_damp_fs=p["thermostat_damp_fs"],
-            barostat_damp_fs=p["barostat_damp_fs"],
+            data_file=p["data_path"], work_dir_base=p["work_dir"],
+            temp=extend_temp if extend_temp is not None else p["T_workflow_K"],
+            max_temp=p["T_anneal_high_K"], anneal_margin_K=p["anneal_margin_K"],
+            final_T_K=p["final_T_K"], max_press=p["compression_max_pressure_atm"],
+            warmup_steps=p["warmup_steps"], densify_ramp_steps=p["densify_ramp_steps"],
+            densify_check_every_steps=override.get("densify_check_every_steps",
+                                                    p["densify_check_every_steps"]),
+            densify_steps_cap=p["densify_steps_cap"],
+            ff_activate_npt_steps=p["ff_activate_npt_steps"],
+            anneal_heat_steps=p["anneal_heat_steps"],
+            anneal_check_every_steps=override.get("anneal_check_every_steps",
+                                                  p["anneal_check_every_steps"]),
+            anneal_cap_steps=p["anneal_cap_steps"], cool_block_dT_K=p["cool_block_dT_K"],
+            cool_block_hold_steps=override.get("cool_block_hold_steps",
+                                               p["cool_block_hold_steps"]),
+            cool_block_hold_cap_steps=p["cool_block_hold_cap_steps"],
+            stage7_min_steps=override.get("stage7_min_steps", p["stage7_min_steps"]),
+            stage7_cap_steps=p["stage7_cap_steps"],
+            stage8_min_steps=override.get("stage8_min_steps", p["stage8_min_steps"]),
+            stage8_cap_steps=p["stage8_cap_steps"],
+            t_equil_K=p["t_equil_K"], melt_hold_extra_steps=p["melt_hold_extra_steps"],
+            extend_only=True, restart_file=extend_from_data, base_stage_name=base,
+            extend_ensemble=extend_ensemble, extend_temp_K=extend_temp_K,
+            polymer_name=args.run_name, press=p["P_equil_atm"],
+            use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
+            engine=p["engine"], velocity_seed=velocity_seed,
+            thermostat_damp_fs=p["thermostat_damp_fs"], barostat_damp_fs=p["barostat_damp_fs"],
             use_long_range=p["use_long_range_electrostatics"],
         )
     if workflow.get("status") == "error":
@@ -440,13 +482,20 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                 submission = _submit_equil_chain(
                     args, cls, lammps, resume_from=resume_from,
                     resume_data_path=getattr(args, "equil_resume_data_path", None),
-                    resume_anneal_cycles=getattr(args, "equil_resume_anneal_cycles", None),
                 )
             elif continuation_path:
+                # continuation_path is the prior attempt's npt_prod_RESTART_path (a .restart
+                # file), not its .data output -- see CampaignStageExecutor.execute, which sets
+                # it from prior_outputs["npt_prod_restart_path"]. extend_base_stage defaults to
+                # "npt_final" (the terminal-stage EXTEND case); a remedy that instead wants to
+                # continue a different adaptive stage sets equilibration_extend_base_stage/
+                # _ensemble explicitly (see workflow_engine._continue_npt).
                 submission = _submit_equil_chain(
                     args, cls, lammps, extend_from_data=continuation_path,
-                    extend_temp=getattr(args, "continuation_temp_K", 300.0),
+                    extend_temp=getattr(args, "continuation_temp_K", None),
                     extend_ns=float(getattr(args, "npt_continuation_ns", 1.5)),
+                    extend_base_stage=getattr(args, "equilibration_extend_base_stage", "npt_final"),
+                    extend_ensemble=getattr(args, "equilibration_extend_ensemble", "npt"),
                 )
             else:
                 submission = _submit_equil_chain(args, cls, lammps)
@@ -474,29 +523,26 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
     # remedy resuming from one of those earlier stages must walk further back through
     # prior_attempts to find them, same as any other stage_checkpoints lookup.
     stage_checkpoints = {s["name"]: s["output_data"] for s in workflow["stages"] if s.get("name")}
-    # Glassy (9-run chain, add_300k_production default True): the server exposes the terminal
-    # npt_prod300 stage's output directly as npt_prod300_data/_dump. Rubbery (7-run chain, no
-    # npt_prod300 stage): the terminal stage is npt_production itself — stages[-1] (no generic
-    # top-level "..._data"/"..._dump" key exists for this case, per generate_equilibration_
-    # workflow's own return-shape logic in server.py).
-    npt_prod_data_path = workflow.get("npt_prod300_data") or workflow["stages"][-1]["output_data"]
-    npt_prod_dump_path = workflow.get("npt_prod300_dump") or _stage_dump_path(workflow["stages"][-1])
+    # npt_final is unconditionally the terminal stage in the 8-stage adaptive protocol -- there
+    # is no separate glassy-vs-rubbery terminal stage name anymore (cool_block always ramps
+    # down to final_T_K regardless of regime).
+    npt_prod_data_path = workflow["stages"][-1]["output_data"]
+    npt_prod_dump_path = _stage_dump_path(workflow["stages"][-1])
+    npt_prod_restart_path = workflow["stages"][-1].get("output_restart")
 
-    # melt_dump_path/melt_data_path (the CHAIN-structural checks' source -- rg/msd/ct/msid --
-    # and the assess_cooling_contraction melt reference) had the same flat-convention bug as
-    # npt_prod_log_path above, but couldn't be fixed the same way (a data_path suffix swap):
-    # they name two DIFFERENT stages (nvt_production's dump, npt_production's data), neither of
-    # which is npt_prod_data_path/_dump_path (the terminal stage, npt_prod300 for glassy chains).
-    # Locate them by name in the real workflow, same as npt_prod_data_path/_dump_path do for the
-    # terminal stage above, instead of guessing a path.
+    # melt_dump_path (the CHAIN-structural checks' source -- rg/msd/ct/msid) is a KNOWN
+    # SIMPLIFICATION (see stage_params._resolve_equil_check_params): it still reads from
+    # nvt_kinetic_stability's dump rather than npt_final's own trajectory. melt_data_path (the
+    # assess_cooling_contraction melt reference) comes directly from the generator's own
+    # melt_data_path field -- the cool_block tagged at `temp`/t_equil_K -- not a stage-name
+    # lookup, since which specific cool_block_NN it is varies per run.
     def _find_stage(name):
         return next((s for s in workflow["stages"] if s.get("name") == name), None)
-    _nvt_stage = _find_stage("nvt_production")
-    if _nvt_stage:
-        args.npt_prod_dump = _stage_dump_path(_nvt_stage)
-    _melt_stage = _find_stage("npt_production")
-    if _melt_stage:
-        args.melt_data_path = _melt_stage.get("output_data")
+    _kinetic_stage = _find_stage("nvt_kinetic_stability")
+    if _kinetic_stage:
+        args.npt_prod_dump = _stage_dump_path(_kinetic_stage)
+    if workflow.get("melt_data_path"):
+        args.melt_data_path = workflow["melt_data_path"]
 
     attempts = 0
     while True:
@@ -563,6 +609,7 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
         if equil_verdict == "PASS":
             result = {"equil_verdict": "PASS", "npt_prod_data_path": p["npt_prod_data_path"],
                       "npt_prod_log_path": p["npt_prod_log_path"], "npt_prod_dump_path": npt_prod_dump_path,
+                      "npt_prod_restart_path": npt_prod_restart_path,
                       "density_gcm3": density.get("plateau_density_mean"),
                       "velocity_seed": velocity_seed, "extend_history": extend_history,
                       "backbone_derivation": backbone_derivation,
@@ -578,6 +625,7 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                 return {"halted": True, "reason": "EXTEND", "detail": detail,
                         "npt_prod_data_path": p["npt_prod_data_path"],
                         "npt_prod_dump_path": npt_prod_dump_path,
+                        "npt_prod_restart_path": npt_prod_restart_path,
                         "stage_checkpoints": stage_checkpoints}
             attempts += 1
             if attempts > EXTEND_MAX_ATTEMPTS:
@@ -593,13 +641,19 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                                    "npt_prod_temp_K": p["npt_prod_temp_K"]})
             with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
                 args.gpu_ids = gpu_ids
-                submission = _submit_equil_chain(args, cls, lammps, extend_from_data=p["npt_prod_data_path"],
-                                                 extend_temp=p["npt_prod_temp_K"], extend_ns=extend_ns)
+                # Restart-continuation of npt_final's own trajectory -- extend_from_data is its
+                # .restart output (not .data), read via read_restart with the log/dump appended
+                # onto npt_final's own files, so the result is one continuous trajectory.
+                submission = _submit_equil_chain(
+                    args, cls, lammps, extend_from_data=npt_prod_restart_path,
+                    extend_temp=p["npt_prod_temp_K"], extend_ns=extend_ns,
+                    extend_base_stage="npt_final", extend_ensemble="npt")
                 ext_result = wait_for_run(lammps, submission["chain_id"], "equilibration EXTEND")
             if ext_result.get("status") != "completed":
                 raise SystemExit(f"EXTEND chain did not complete: {ext_result}")
             npt_prod_data_path = submission["workflow"]["stages"][0]["output_data"]
             npt_prod_dump_path = _stage_dump_path(submission["workflow"]["stages"][0])
+            npt_prod_restart_path = submission["workflow"]["stages"][0].get("output_restart")
             continue
 
         # Structural or protocol failures never trigger an implicit protocol change. Halt with
@@ -975,42 +1029,37 @@ class CampaignStageExecutor:
                 if not manifest_path or not Path(manifest_path).is_file():
                     continue
                 prior_outputs = json.loads(Path(manifest_path).read_text()).get("outputs") or {}
-                if prior_outputs.get("npt_prod_data_path"):
-                    args.pending_continuation_path = prior_outputs["npt_prod_data_path"]
+                # The .restart output (read_restart, appended log/dump), NOT .data -- a genuine
+                # continuation of the prior attempt's own trajectory, not a fresh stage.
+                if prior_outputs.get("npt_prod_restart_path"):
+                    args.pending_continuation_path = prior_outputs["npt_prod_restart_path"]
                     args.npt_continuation_ns = context["parameters"]["npt_continuation_ns"]
+                    args.equilibration_extend_base_stage = context["parameters"].get(
+                        "equilibration_extend_base_stage", "npt_final")
+                    args.equilibration_extend_ensemble = context["parameters"].get(
+                        "equilibration_extend_ensemble", "npt")
                     break
-        # equilibration_resume_from: set by a remedy (melt_hold -> "anneal", a future
-        # npt_cool300 remedy -> "npt_production") to signal do_equil_and_check should resume a
-        # generate_equilibration_workflow(resume_from=...) chain instead of a fresh from-scratch
-        # submission. Locate the real checkpoint from the most recent prior attempt's own
-        # stage_checkpoints (do_equil_and_check surfaces it on every return, halted or not) --
-        # same reversed(prior_attempts) walk as npt_continuation_ns above.
-        if stage == "equilibration" and cls.get("equilibration_resume_from") in ("anneal", "npt_production"):
-            resume_kind = cls["equilibration_resume_from"]
+        # equilibration_resume_from: set by a remedy (_cooling -> "anneal_hold", regenerating
+        # the blockwise cooldown with a slower cool_block_hold_steps) to signal
+        # do_equil_and_check should resume a generate_equilibration_workflow(resume_from=...)
+        # chain instead of a fresh from-scratch submission. Locate the real checkpoint from the
+        # most recent prior attempt's own stage_checkpoints (do_equil_and_check surfaces it on
+        # every return, halted or not) -- same reversed(prior_attempts) walk as
+        # npt_continuation_ns above. The checkpoint name IS the resume_from value directly now
+        # (one of generate_equilibration_workflow's 8 fixed checkpoint names) -- no per-cycle
+        # name derivation needed, since annealing is no longer cycle-counted.
+        resume_kind = cls.get("equilibration_resume_from")
+        if stage == "equilibration" and resume_kind:
             for prior in reversed(context.get("prior_attempts") or ()):
                 manifest_path = prior.get("manifest")
                 if not manifest_path or not Path(manifest_path).is_file():
                     continue
                 prior_manifest = json.loads(Path(manifest_path).read_text())
                 checkpoints = (prior_manifest.get("outputs") or {}).get("stage_checkpoints") or {}
-                if resume_kind == "npt_production":
-                    if checkpoints.get("npt_production"):
-                        args.equil_resume_from = "npt_production"
-                        args.equil_resume_data_path = checkpoints["npt_production"]
-                        break
-                else:  # "anneal"
-                    # How many cycles the MOST RECENT attempt actually ran -- not
-                    # baseline_eq_annealing_cycles, which _melt_hold freezes at the value from
-                    # BEFORE the first rung ever fired and reuses unchanged across both rungs.
-                    prior_cycles = int((prior_manifest.get("parameters") or {})
-                                      .get("eq_annealing_cycles") or 0)
-                    checkpoint_name = f"anneal_{prior_cycles:02d}_cool" if prior_cycles > 0 else "minimize"
-                    if checkpoints.get(checkpoint_name):
-                        args.equil_resume_from = "anneal"
-                        args.equil_resume_data_path = checkpoints[checkpoint_name]
-                        new_cycles = int(cls.get("eq_annealing_cycles") or 0)
-                        args.equil_resume_anneal_cycles = max(0, new_cycles - prior_cycles)
-                        break
+                if checkpoints.get(resume_kind):
+                    args.equil_resume_from = resume_kind
+                    args.equil_resume_data_path = checkpoints[resume_kind]
+                    break
         try:
             if stage == "build":
                 outputs = do_build(args, cls, self.emc, self.lammps)

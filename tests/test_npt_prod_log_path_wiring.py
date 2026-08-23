@@ -41,21 +41,22 @@ def _args(**overrides):
 
 def test_equil_check_derives_log_from_real_data_path_rubbery():
     args = _args(
-        data_path="/data/PE1/attempts/equilibration/attempt-0001/work/npt_production/npt_production_out.data",
+        data_path="/data/PE1/attempts/equilibration/attempt-0001/work/npt_final/npt_final_out.data",
     )
     p = _resolve_equil_check_params(args, RUBBERY_CLS)
     assert p["npt_prod_log_path"] == (
-        "/data/PE1/attempts/equilibration/attempt-0001/work/npt_production/npt_production.log"
+        "/data/PE1/attempts/equilibration/attempt-0001/work/npt_final/npt_final.log"
     )
 
 
 def test_equil_check_derives_log_from_real_data_path_glassy():
+    """npt_final is unconditionally the terminal stage now -- no separate glassy stage name."""
     args = _args(
-        data_path="/data/PC1/attempts/equilibration/attempt-0001/work/npt_prod300/npt_prod300_out.data",
+        data_path="/data/PC1/attempts/equilibration/attempt-0001/work/npt_final/npt_final_out.data",
     )
     p = _resolve_equil_check_params(args, GLASSY_CLS)
     assert p["npt_prod_log_path"] == (
-        "/data/PC1/attempts/equilibration/attempt-0001/work/npt_prod300/npt_prod300.log"
+        "/data/PC1/attempts/equilibration/attempt-0001/work/npt_final/npt_final.log"
     )
 
 
@@ -63,17 +64,17 @@ def test_equil_check_dry_run_preview_falls_back_to_flat_convention():
     args = _args()  # data_path=None, matching --dry-run preview
     p = _resolve_equil_check_params(args, RUBBERY_CLS)
     assert p["npt_prod_log_path"] == (
-        "/home/arz2/PolyJarvis_v2/data/PE1/lammps/equil/npt_production/npt_production.log"
+        "/home/arz2/PolyJarvis_v2/data/PE1/lammps/equil/npt_final/npt_final.log"
     )
 
 
 def test_analyze_bm_derives_log_from_real_data_path():
     args = _args(
-        data_path="/data/PE1/attempts/equilibration/attempt-0001/work/npt_production/npt_production_out.data",
+        data_path="/data/PE1/attempts/equilibration/attempt-0001/work/npt_final/npt_final_out.data",
     )
     p = _resolve_analyze_bm_params(args, RUBBERY_CLS)
     assert p["npt_prod_log_path"] == (
-        "/data/PE1/attempts/equilibration/attempt-0001/work/npt_production/npt_production.log"
+        "/data/PE1/attempts/equilibration/attempt-0001/work/npt_final/npt_final.log"
     )
 
 
@@ -81,11 +82,11 @@ def test_analyze_bm_dry_run_preview_falls_back_to_flat_convention():
     args = _args()
     p = _resolve_analyze_bm_params(args, RUBBERY_CLS)
     assert p["npt_prod_log_path"] == (
-        "/home/arz2/PolyJarvis_v2/data/PE1/lammps/equil/npt_prod300/npt_prod300.log"
+        "/home/arz2/PolyJarvis_v2/data/PE1/lammps/equil/npt_final/npt_final.log"
     )
 
 
 def test_explicit_cli_override_still_wins():
-    args = _args(data_path="/data/PE1/.../npt_production_out.data", npt_prod_log="/explicit/override.log")
+    args = _args(data_path="/data/PE1/.../npt_final_out.data", npt_prod_log="/explicit/override.log")
     assert _resolve_equil_check_params(args, RUBBERY_CLS)["npt_prod_log_path"] == "/explicit/override.log"
     assert _resolve_analyze_bm_params(args, RUBBERY_CLS)["npt_prod_log_path"] == "/explicit/override.log"

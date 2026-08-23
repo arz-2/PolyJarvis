@@ -54,7 +54,7 @@ def test_dry_run_preview_falls_back_to_flat_convention():
     p = _resolve_analyze_tg_params(args, PHYC)
     assert p["tg_log_path"] == "/home/arz2/PolyJarvis_v2/data/PE1/lammps/thermal/tg_sweep/tg_sweep.log"
     assert p["per_t_dump_file"] == "/home/arz2/PolyJarvis_v2/data/PE1/lammps/thermal/tg_sweep/per_t_structs.dump"
-    assert p["tg_data_file"] == "/home/arz2/PolyJarvis_v2/data/PE1/lammps/equil/npt_production/npt_production_out.data"
+    assert p["tg_data_file"] == "/home/arz2/PolyJarvis_v2/data/PE1/lammps/equil/npt_final/npt_final_out.data"
 
 
 def test_multirate_suffix_threaded_into_all_three_paths():

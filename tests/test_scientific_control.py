@@ -176,7 +176,7 @@ def test_materializer_applies_bounded_scientific_overrides():
         polymer_class="PSTR",
         properties=("density",),
         rationale=("Use a longer NPT production window for the requested precision.",),
-        overrides={"npt_prod_ns": 8.0, "nchain": 12},
+        overrides={"stage8_min_steps": 8000000, "nchain": 12},
         decision_evaluations={
             "D-02_charges": {
                 "criteria_evaluated": [
@@ -198,7 +198,7 @@ def test_materializer_applies_bounded_scientific_overrides():
     plan = materialize_plan(INTENT, decision)
 
     assert plan["plan_mode"] == "reasoned"
-    assert plan["decided_params"]["npt_prod_ns"] == 8.0
+    assert plan["decided_params"]["stage8_min_steps"] == 8000000
     assert plan["decided_params"]["nchain"] == 12
     assert plan["uncertainties"] == [{
         "name": "sampling", "dominant": True, "reduction_probe": "none"

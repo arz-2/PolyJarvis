@@ -97,11 +97,11 @@ def test_freezes_effective_parameters_not_plan_decided_params(tmp_path):
     remedy_history = [{"remedy_id": "melt_hold_extend", "application": 1,
                        "finding": {"stage": "equilibration"}}]
     _make_run(tmp_path, "RUN3",
-             effective_parameters={"eq_annealing_cycles": 4, "T_workflow_K": 300.0},
+             effective_parameters={"anneal_cap_steps": 4000000, "T_workflow_K": 300.0},
              remedy_history=remedy_history)
     cache_path = tmp_path / "cache.json"
     entry = wcc.write_characterization_cache("RUN3", repo_root=tmp_path, cache_path=cache_path)
-    assert entry["protocol"]["decided_params"]["eq_annealing_cycles"] == 4
+    assert entry["protocol"]["decided_params"]["anneal_cap_steps"] == 4000000
     assert "melt_hold_extend" in entry["notes"]
     assert "equilibration" in entry["notes"]
 
@@ -171,3 +171,16 @@ def test_missing_run_plan_writes_nothing(tmp_path):
     cache_path = tmp_path / "cache.json"
     entry = wcc.write_characterization_cache("NEVER_RAN", repo_root=tmp_path, cache_path=cache_path)
     assert entry is None
+
+
+def test_real_cache_file_was_actually_invalidated_by_the_equilibration_redesign():
+    """Eager bulk invalidation (the 8-stage adaptive equilibration protocol replaced
+    generate_equilibration_workflow in place -- every pre-redesign cache entry references
+    stage names, decided_params shapes, and gate keys that no longer exist). A smoke test
+    that this was actually executed, not just planned: the real repo cache file at
+    guides/system_characterization_cache.json must have zero entries; the pre-redesign
+    content is preserved for reference at system_characterization_cache.pre_redesign.json."""
+    repo_root = Path(__file__).resolve().parent.parent
+    live_cache = json.loads((repo_root / "guides" / "system_characterization_cache.json").read_text())
+    assert live_cache == {}
+    assert (repo_root / "guides" / "system_characterization_cache.pre_redesign.json").is_file()

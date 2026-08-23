@@ -377,5 +377,6 @@ def test_cooling_verdict_under_annealed_blocks_structural(tmp_path):
     result = enforce_gate.enforce_live(args)
     assert result["verdict"] == "STRUCTURAL_FAIL"
     assert "density_value_binding" in result["failing_binding_gates"]
-    assert "re_melt_slow_recool" in result["remedy"]
+    assert "slower_cooling" in result["remedy"]
+    assert "anneal_hold" in result["remedy"]
     assert "npt_cool_steps" not in result["remedy"]  # only npt_cool300_steps is actually touched

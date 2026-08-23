@@ -498,6 +498,14 @@ class ScriptGenerator:
     Parses a RadonPy LAMMPS data file and generates filled-in .in scripts.
     """
 
+    # LAMMPS dump-command ID per template, needed to target dump_modify ... append yes
+    # at the right dump on a restart-based continuation run.
+    _DUMP_ID_BY_TEMPLATE = {
+        "nvt": "dump_nvt",
+        "npt": "dump_npt",
+        "npt_compress": "dump_comp",
+    }
+
     def __init__(self, data_file: str, templates_dir: Optional[str] = None):
         """
         Args:
@@ -1130,6 +1138,18 @@ write_data tg_step_out.data
         subs["DUMP_FILE"]        = cfg.get("DUMP_FILE", f"{template_name}.dump")
         subs["LAST_DUMP_FILE"]   = cfg.get("LAST_DUMP_FILE", f"{template_name}_last.dump")
         subs["WRITE_DATA_FILE"]  = cfg.get("WRITE_DATA_FILE", f"{template_name}_out.data")
+        # Unconditional final-state restart file (independent of periodic RESTART_BLOCK
+        # checkpointing): every nvt/npt/npt_compress run writes one, so a later
+        # restart-based continuation call always has a definitive state to read from.
+        subs["WRITE_RESTART_FILE"] = cfg.get("WRITE_RESTART_FILE", f"{template_name}_out.restart")
+        # dump_modify ... append yes: set only when this run is CONTINUING a trajectory
+        # an earlier run already started into the same DUMP_FILE (paired with
+        # use_restart=True / LOG_APPEND=True) -- never on a fresh-start run.
+        _dump_id = self._DUMP_ID_BY_TEMPLATE.get(template_name)
+        if cfg.get("dump_append", False) and _dump_id:
+            subs["DUMP_APPEND_BLOCK"] = f"dump_modify {_dump_id} append yes"
+        else:
+            subs["DUMP_APPEND_BLOCK"] = ""
 
         # ── Force field styles ────────────────────────────────────────────
         use_pcff   = cfg.get("use_pcff",   False)
