@@ -361,6 +361,132 @@ def test_planning_context_looks_up_cache_by_canonical_smiles(tmp_path, monkeypat
     assert context["exact_smiles_characterization"] == cache_entry
 
 
+# --- D-04 system size: materialize_plan() auto-fills solve_system_size()'s recommendation --
+
+PHYC_INTENT = ScientificIntent(
+    run_name="D04_AUTOFILL_TEST", goal="test", smiles="*CC*",
+    requested_properties=("tg",), polymer_class_hint="PHYC",
+)
+
+
+def test_materializer_auto_fills_the_floor_clearing_dp_when_unset():
+    """PHYC's class default dp_typical is well above its Fox-Flory floor (20) -- the agent
+    left dp_typical unset, so materialize_plan() should fill in the floor-clearing minimum
+    via solve_system_size() rather than the bloated class default."""
+    decision = PlanDecision(
+        polymer_class="PHYC", properties=("tg",),
+        rationale=("Just need Tg.",), dominant_uncertainty="none", confidence="high",
+    )
+    plan = materialize_plan(PHYC_INTENT, decision)
+    assert plan["decided_params"]["dp_typical"] == 20
+    d04 = next(d for d in plan["decisions"] if d["id"] == "D-04_system_size")
+    assert d04["choice"] == "DP=20, nchain=20"
+    assert any("floor" in e.get("claim", "") for e in d04["evidence"])
+    assert any("D-04_system_size auto-filled" in a for a in plan["assumptions"])
+
+
+def test_materializer_explicit_override_wins_over_the_auto_fill():
+    decision = PlanDecision(
+        polymer_class="PHYC", properties=("tg",),
+        rationale=("Pin a specific DP for a reason.",),
+        overrides={"dp_typical": 40}, dominant_uncertainty="none", confidence="high",
+    )
+    plan = materialize_plan(PHYC_INTENT, decision)
+    assert plan["decided_params"]["dp_typical"] == 40  # the agent's pin, not the floor (20)
+    assert not any("D-04_system_size auto-filled" in a for a in plan["assumptions"])
+
+
+def test_materializer_folds_in_literature_grounding_when_present(tmp_path, monkeypatch):
+    (tmp_path / "data" / "D04_LIT_TEST" / "raw").mkdir(parents=True)
+    (tmp_path / "data" / "D04_LIT_TEST" / "raw" / "literature_grounding_system_size.json").write_text(
+        json.dumps({"system_size": {"dp_typical": 90, "nchain": None,
+                                    "convergence_basis": "class_analogy", "confidence": "high"}}))
+    monkeypatch.setattr(scientific_control, "REPO_ROOT", tmp_path)
+
+    intent = ScientificIntent(run_name="D04_LIT_TEST", goal="test", smiles="*CC*",
+                              requested_properties=("tg",), polymer_class_hint="PHYC")
+    decision = PlanDecision(polymer_class="PHYC", properties=("tg",),
+                            rationale=("test",), dominant_uncertainty="none", confidence="high")
+    plan = materialize_plan(intent, decision)
+    assert plan["decided_params"]["dp_typical"] == 90  # literature raises above the floor (20)
+
+
+def test_materializer_attaches_a_populated_cost_estimate():
+    """Mechanizes decision_policy.json's gpu_budget/computational_cost criteria -- every
+    materialized reasoned plan should carry a real cost_model.plan_cost_estimate() payload,
+    not just name the criterion without a number behind it."""
+    decision = PlanDecision(
+        polymer_class="PHYC", properties=("tg",),
+        rationale=("Just need Tg.",), dominant_uncertainty="none", confidence="high",
+    )
+    plan = materialize_plan(PHYC_INTENT, decision)
+    assert "cost_estimate" in plan
+    assert "error" not in plan["cost_estimate"]
+    assert plan["cost_estimate"]["total_gpu_hours"] is not None
+    assert "tg" in plan["cost_estimate"]["stages"]
+
+
+def test_materializer_cost_estimate_failure_degrades_to_error_payload_not_a_raise(monkeypatch):
+    """cost estimation is advisory -- an unresolvable estimate must never block plan
+    materialization."""
+    monkeypatch.setattr(scientific_control.cost_model, "plan_cost_estimate",
+                        lambda plan, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    decision = PlanDecision(
+        polymer_class="PHYC", properties=("tg",),
+        rationale=("Just need Tg.",), dominant_uncertainty="none", confidence="high",
+    )
+    plan = materialize_plan(PHYC_INTENT, decision)
+    assert "boom" in plan["cost_estimate"]["error"]
+
+
+def test_materializer_flags_tg_ladder_cost_unoptimized_when_tg_is_planned():
+    """D-06: no accuracy-vs-cooling-rate curve exists anywhere in this codebase (only an
+    aggregate fast-cooling bias is documented, not a per-rate slope), so the rate ladder stays
+    floor-only rather than fabricating an optimizer. Surface that gap explicitly rather than
+    silently implying the ladder is cost-optimal."""
+    decision = PlanDecision(
+        polymer_class="PHYC", properties=("tg",),
+        rationale=("Just need Tg.",), dominant_uncertainty="none", confidence="high",
+    )
+    plan = materialize_plan(PHYC_INTENT, decision)
+    names = {u["name"] for u in plan["uncertainties"]}
+    assert "tg_ladder_cost_unoptimized" in names
+
+
+def test_materializer_omits_tg_ladder_flag_when_tg_is_not_planned():
+    intent = ScientificIntent(
+        run_name="D06_NO_TG_TEST", goal="test", smiles="*CC*",
+        requested_properties=("bulk_modulus",), polymer_class_hint="PHYC",
+    )
+    decision = PlanDecision(
+        polymer_class="PHYC", properties=("bulk_modulus",),
+        rationale=("Just need K.",), dominant_uncertainty="none", confidence="high",
+    )
+    plan = materialize_plan(intent, decision)
+    names = {u["name"] for u in plan["uncertainties"]}
+    assert "tg_ladder_cost_unoptimized" not in names
+
+
+def test_apply_recovery_refreshes_the_stale_cost_estimate():
+    """A recovery dp_typical/nchain bump changes the plan's actual cost -- cost_estimate
+    must not sit stale next to the post-recovery decided_params (same failure mode as the
+    'decided_params can be decorative' class of bug: a field the code carries but a later
+    step forgets to keep in sync)."""
+    decision = PlanDecision(
+        polymer_class="PHYC", properties=("tg",),
+        rationale=("Just need Tg.",), dominant_uncertainty="none", confidence="high",
+    )
+    plan = materialize_plan(PHYC_INTENT, decision)
+    before = plan["cost_estimate"]["total_gpu_hours"]
+
+    revised = scientific_control.apply_recovery(
+        plan, RecoveryDecision("revise_plan", "Bump nchain for a finite-size rebuild.",
+                              modifications={"nchain": 200}))
+    assert "cost_estimate" in revised
+    assert "error" not in revised["cost_estimate"]
+    assert revised["cost_estimate"]["total_gpu_hours"] != before
+
+
 def test_planning_context_falls_back_to_raw_smiles_on_canonicalization_failure(tmp_path, monkeypatch):
     import shutil
     (tmp_path / "orchestration").mkdir()

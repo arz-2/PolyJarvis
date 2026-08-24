@@ -159,6 +159,57 @@ def test_no_properties_requested_is_an_error():
     assert "error" in r
 
 
+# --- cost-based split decision: replaces the DP-ratio proxy when a real GPU-hours ---------
+# comparison is available (equil_gpu_hours_per_1k_atoms supplied). Isolates cost_model.py's
+# own arithmetic (already covered by tests/test_cost_model.py) by monkeypatching
+# cost_model.gpu_hours directly rather than needing a full hardware_policy fixture.
+
+def test_cost_comparison_splits_when_savings_exceed_the_overhead(monkeypatch):
+    _mw_stub(monkeypatch)
+    _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
+    monkeypatch.setattr(psa.cost_model, "_tg_sweep_total_steps", lambda cls: (1_000_000, "stub"))
+
+    def _fake_gpu_hours(atoms, steps, dt_fs, fam, gpu_per_run, hp=None, rules=None):
+        # cost scales with atoms -- tg-floor cell is far cheaper than the union-floor cell
+        return {"gpu_hours": atoms / 1000.0, "confidence": "high", "basis": "stub"}
+    monkeypatch.setattr(psa.cost_model, "gpu_hours", _fake_gpu_hours)
+
+    r = plan_arms("PACR", PACR_SMILES, "PMMA1", ["tg", "bulk_modulus"],
+                 divergence_threshold=999.0,  # ratio proxy would NOT split at this threshold
+                 equil_gpu_hours_per_1k_atoms=0.001)  # tiny assumed overhead
+    assert r["split"] is True
+    assert r["cost_comparison"]["worth_splitting"] is True
+    assert r["cost_comparison"]["savings_gpu_hours"] > 0
+    assert "cost model:" in r["reason"]
+
+
+def test_cost_comparison_does_not_split_when_overhead_exceeds_savings(monkeypatch):
+    _mw_stub(monkeypatch)
+    _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
+    monkeypatch.setattr(psa.cost_model, "_tg_sweep_total_steps", lambda cls: (1_000_000, "stub"))
+    monkeypatch.setattr(psa.cost_model, "gpu_hours",
+                        lambda atoms, steps, dt_fs, fam, gpu_per_run, hp=None, rules=None:
+                        {"gpu_hours": atoms / 1000.0, "confidence": "high", "basis": "stub"})
+
+    r = plan_arms("PACR", PACR_SMILES, "PMMA1", ["tg", "bulk_modulus"],
+                 divergence_threshold=1.0,  # ratio proxy WOULD split at this threshold
+                 equil_gpu_hours_per_1k_atoms=1000.0)  # huge assumed overhead
+    assert r["split"] is False
+    assert r["cost_comparison"]["worth_splitting"] is False
+    assert "cost model shows" in r["reason"]
+
+
+def test_cost_comparison_falls_back_to_ratio_proxy_without_equil_hours_estimate(monkeypatch):
+    """No equil_gpu_hours_per_1k_atoms supplied -> identical to the pre-existing ratio
+    behavior, explicitly labeled as a proxy, not a cost comparison."""
+    _mw_stub(monkeypatch)
+    _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
+    r = plan_arms("PACR", PACR_SMILES, "PMMA1", ["tg", "bulk_modulus"])
+    assert r["split"] is True
+    assert r["cost_comparison"] is None
+    assert "DP-ratio proxy" in r["reason"]
+
+
 # --- member resolution is via SMILES, not the arm's run_name suffix ----------------
 # _target_density used to match run_name.upper().startswith(member_key) (or, further
 # back, an even stricter rstrip-digits exact match) -- both broke on any run_name

@@ -26,8 +26,10 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 import canon_smiles  # noqa: E402
 import hw_common  # noqa: E402
 import select_system_size as sss  # noqa: E402
-from select_system_size import select_system_size, _fox_flory_floor, property_floors  # noqa: E402
-from validate_run_plan import _system_size_findings  # noqa: E402
+from select_system_size import (select_system_size, solve_system_size, _fox_flory_floor,
+                                property_floors)  # noqa: E402
+from validate_run_plan import (_system_size_findings,
+                               _system_size_over_provisioned_findings)  # noqa: E402
 
 PACR_SMILES = "*CC(C)(C(=O)OC)*"
 PAA_SMILES = "*CC(C(=O)O)*"
@@ -279,3 +281,144 @@ def test_live_check_catches_a_previously_vacuous_real_plan():
     assert "decisions" not in plan  # no D-04 row to read required_dp_floor off of at all
     f = _system_size_findings(plan)
     assert [x["check"] for x in f] == ["system_size_dp_floor_unacknowledged"]
+
+
+# --- solve_system_size: the cost-minimizing companion, additive -- select_system_size()
+# above is completely unchanged (still what _system_size_findings checks every plan,
+# replay or reasoned, against). solve_system_size() is only ever meant to be called from
+# scientific_control.py:materialize_plan(), which only ever produces plan_mode="reasoned"
+# plans -- so shrinking an over-provisioned DP here carries no replay-safety risk. ------
+
+def test_solve_shrinks_an_over_provisioned_class_default_to_the_floor():
+    """Mirrors test_over_provisioned_gap_is_reported_never_overridden's PHYC case, but
+    solve_system_size() recommends the floor-clearing minimum instead of only reporting."""
+    r = solve_system_size("PHYC", PHYC_SMILES, properties=["tg"])
+    assert r["recommended_params"] == {"dp_typical": 20}
+    # the base select_system_size() uncertainty is still carried through for provenance --
+    # solve_system_size() adds the fix, it doesn't erase the record of the original gap
+    assert "size_over_provisioned" in [u["name"] for u in r["uncertainties"]]
+
+
+def test_solve_raises_an_under_provisioned_dp_to_the_floor():
+    r = solve_system_size("PKTN", PKTN_SMILES, properties=["tg"], dp_typical=32)
+    assert r["recommended_params"]["dp_typical"] == 50
+
+
+def test_solve_recommends_pcff_nchain_minimum():
+    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], nchain=10)
+    assert r["recommended_params"]["nchain"] == 20
+
+
+def test_solve_no_change_when_class_default_already_at_the_floor():
+    r = solve_system_size("PHYC", PHYC_SMILES, properties=["tg"], dp_typical=20, nchain=20)
+    assert r["recommended_params"] == {}
+
+
+# --- literature grounding: makes the recommendation vary by molecule, not just class -----
+
+_LIT_GROUNDING_SCHEMA = {  # matches .claude/agents/system-size-literature-worker.md's schema
+    "system_size": {"dp_typical": 200, "nchain": 12,
+                    "convergence_basis": "entanglement_mw", "confidence": "medium"},
+}
+
+
+def test_literature_grounding_raises_above_the_mechanized_floor(monkeypatch):
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (15, 100.12))
+    _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
+    r = solve_system_size("PACR", PACR_SMILES, properties=["bulk_modulus"],
+                          dp_typical=50, literature_grounding=_LIT_GROUNDING_SCHEMA)
+    assert r["decision"]["required_dp_floor"] == 125  # PMMA entanglement floor, unchanged
+    assert r["recommended_params"]["dp_typical"] == 200  # literature raises it further
+    assert any("raises the mechanized floor" in reason for reason in r["recommendation_reasons"])
+
+
+def test_literature_grounding_below_low_confidence_does_not_raise_the_floor(monkeypatch):
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (15, 100.12))
+    _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
+    low_conf = {"system_size": {**_LIT_GROUNDING_SCHEMA["system_size"], "confidence": "low"}}
+    r = solve_system_size("PACR", PACR_SMILES, properties=["bulk_modulus"],
+                          dp_typical=50, literature_grounding=low_conf)
+    assert r["recommended_params"]["dp_typical"] == 125  # mechanized floor wins, not 200
+    assert any("floor stands" in reason for reason in r["recommendation_reasons"])
+
+
+def test_literature_grounding_resolves_mw_floor_unknown_at_any_confidence(monkeypatch):
+    """PAA has no documented Me (PACR only documents PMMA) -- MW_FLOOR_UNKNOWN today. Even
+    a low-confidence literature grounding is strictly better than outright refusal."""
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw",
+                        lambda *a, **k: pytest.fail("must not reach RDKit for a direct-DP grounding"))
+    _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
+    low_conf = {"system_size": {"dp_typical": 90, "nchain": None,
+                                "convergence_basis": "class_analogy", "confidence": "low"}}
+    r = solve_system_size("PACR", PAA_SMILES, properties=["bulk_modulus"],
+                          dp_typical=50, literature_grounding=low_conf)
+    assert r["decision"]["required_dp_floor"] is None  # base check still refuses
+    assert r["floor_was_unknown"] is True
+    assert r["recommended_params"]["dp_typical"] == 90
+    assert any("otherwise-unassessed" in reason for reason in r["recommendation_reasons"])
+
+
+def test_literature_grounding_never_lowers_a_recommendation():
+    """A literature dp_typical below the mechanized floor must not undercut it -- a single
+    per-molecule study is not licensed to undercut Fox-Flory/entanglement-Me evidence."""
+    low_dp = {"system_size": {"dp_typical": 10, "nchain": None,
+                              "convergence_basis": "class_analogy", "confidence": "high"}}
+    r = solve_system_size("PKTN", PKTN_SMILES, properties=["tg"], dp_typical=32,
+                          literature_grounding=low_dp)
+    assert r["recommended_params"]["dp_typical"] == 50  # the Fox-Flory stiff floor, not 10
+
+
+# --- validate_run_plan._system_size_over_provisioned_findings: symmetric to the
+# under-provision check, gated on plan_mode -- a replay must never be flagged. -------------
+
+def _reasoned_plan(polymer_class="PHYC", smiles=PHYC_SMILES, properties=None,
+                   dp=120, nchain=None, uncertainties=None, plan_mode="reasoned"):
+    return {"smiles": smiles, "polymer_class": polymer_class,
+            "properties": properties if properties is not None else ["tg"],
+            "decided_params": {"dp_typical": dp, "nchain": nchain},
+            "uncertainties": uncertainties or [], "plan_mode": plan_mode}
+
+
+def test_over_provisioned_unacknowledged_is_structural_for_a_reasoned_plan():
+    """PHYC dp=120 is 6x its Fox-Flory floor (20) -- flagged when reasoned and unacknowledged."""
+    f = _system_size_over_provisioned_findings(_reasoned_plan(dp=120))
+    assert [x["check"] for x in f] == ["system_size_over_provisioned_unacknowledged"]
+    assert f[0]["severity"] == "structural"
+
+
+def test_over_provisioned_acknowledged_clears():
+    f = _system_size_over_provisioned_findings(_reasoned_plan(
+        dp=120, uncertainties=[{"name": "system_size_over_provisioned"}]))
+    assert f == []
+
+
+def test_over_provisioned_check_never_fires_on_a_replay():
+    """Structural belt-and-suspenders: a protocol_validated replay's plan_mode is
+    "deterministic", never "reasoned" -- this check must not touch it even if its DP
+    happens to look over-provisioned by the same threshold."""
+    f = _system_size_over_provisioned_findings(_reasoned_plan(dp=120, plan_mode="deterministic"))
+    assert f == []
+
+
+def test_over_provisioned_check_no_finding_when_dp_already_at_the_floor():
+    f = _system_size_over_provisioned_findings(_reasoned_plan(dp=20))
+    assert f == []
+
+
+def test_me_estimated_gmol_computes_dp_at_me_the_same_way_a_documented_table_me_does(monkeypatch):
+    """Priority-3 fallback: a packing-length-derived Me estimate, reduced to the same
+    DP@Me = Me/repeat-unit-MW arithmetic a curated table Me already uses -- never a second,
+    invented formula in this script."""
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw",
+                        lambda smiles, is_ua: (10, 74.15))  # PDMS-scale repeat unit
+    packing_length_grounding = {
+        "system_size": {"dp_typical": None, "nchain": None,
+                        "convergence_basis": "packing_length_estimate",
+                        "confidence": "low", "me_estimated_gmol": 7415.0},
+    }
+    r = solve_system_size("PHYC", PHYC_SMILES, properties=["bulk_modulus"], dp_typical=50,
+                          literature_grounding=packing_length_grounding)
+    # PHYC has no documented entanglement Me at all -> base floor is None (MW_FLOOR_UNKNOWN)
+    assert r["decision"]["required_dp_floor"] is None
+    assert r["recommended_params"]["dp_typical"] == round(7415.0 / 74.15)  # == 100
+    assert any("packing-length Me estimate" in reason for reason in r["recommendation_reasons"])

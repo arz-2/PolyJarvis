@@ -250,6 +250,154 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
     }
 
 
+# Literature grounding at any confidence level can resolve an otherwise-unresolvable
+# MW_FLOOR_UNKNOWN (a cited, caveated estimate beats an outright refusal) -- but pushing a
+# recommendation ABOVE an already-established mechanized floor requires the worker's own
+# medium/high confidence bar, so a low-confidence guess never overrides real Fox-Flory/
+# entanglement-Me evidence upward on a whim.
+_GROUNDING_CONFIDENCE_TO_RAISE_AN_EXISTING_FLOOR = {"medium", "high"}
+
+
+def _literature_dp_recommendation(literature_grounding: dict, cls: dict, smiles: str):
+    """(dp, nchain, note, confidence) from a parsed literature_grounding_system_size.json,
+    or (None, None, None, None) if it grounds nothing usable.
+
+    Two distinct sources, both reduced to the same "a per-molecule DP was grounded" shape:
+      - system_size.dp_typical/nchain: a direct convergence-DP citation (worker priority 2).
+      - system_size.me_estimated_gmol: a packing-length-derived Me estimate (worker priority
+        3, see .claude/agents/system-size-literature-worker.md) -- computed the SAME way a
+        documented table Me is (DP@Me = Me / repeat-unit MW), just literature-sourced rather
+        than curated, so it is never re-derived here from a raw C-infinity value this script
+        would have to trust blindly.
+    """
+    if not literature_grounding:
+        return None, None, None, None
+    ss = literature_grounding.get("system_size") or {}
+    confidence = ss.get("confidence")
+    dp = ss.get("dp_typical")
+    nchain = ss.get("nchain")
+    if isinstance(dp, (int, float)) and dp:
+        return (int(dp), int(nchain) if isinstance(nchain, (int, float)) else None,
+                f"literature-grounded convergence DP ({ss.get('convergence_basis')}, "
+                f"confidence={confidence})", confidence)
+    me = ss.get("me_estimated_gmol")
+    if isinstance(me, (int, float)) and me:
+        try:
+            _, mw_per_monomer = _monomer_atoms_and_mw(smiles, is_ua=False)
+        except Exception as e:  # noqa: BLE001 -- a bad estimate must not crash the solve
+            return None, None, None, None
+        dp_at_me = round(me / mw_per_monomer)
+        return (dp_at_me, None,
+                f"literature-grounded packing-length Me estimate ({me} g/mol) / repeat-unit "
+                f"MW {mw_per_monomer:.1f} g/mol -> DP@Me={dp_at_me} (confidence={confidence})",
+                confidence)
+    return None, None, None, None
+
+
+def solve_system_size(polymer_class: str, smiles: str, properties=None,
+                      dp_typical: int = None, nchain: int = None,
+                      literature_grounding: dict = None) -> dict:
+    """Cost-minimizing companion to select_system_size(): the DP/nchain a reasoned/novel
+    plan should actually USE, not merely a check of whether the class default clears its
+    floor.
+
+    ADDITIVE, not a replacement -- select_system_size() itself is unchanged and stays the
+    function validate_run_plan.py's _system_size_findings calls against EVERY plan,
+    including frozen protocol_validated replays; shrinking DP there would risk silently
+    changing an already-validated protocol. This function is only ever meant to be called
+    from materialize_plan() (scientific_control.py), which by construction only ever
+    produces plan_mode="reasoned" plans -- there is no replay-safety concern here.
+
+    Fox-Flory's own premise is that accuracy is FLAT above the floor and falls off a cliff
+    below it (that is what "plateau" means) -- so once a floor is known, there is no
+    accuracy left to buy by exceeding it, and the cost-minimizing choice is exactly the
+    floor, in both directions. This collapses to a closed-form set (not a search): DP is
+    set to required_floor when one applies; nchain is set to the PCFF production minimum
+    (Bejagam 2020) for PCFF-family classes, since no pre-build Rg predictor exists to give
+    nchain a continuous cost/accuracy curve (select_system_size.py's own docstring rules
+    that out as invented physics) -- this only moves the ALREADY-KNOWN floor from
+    advisory to binding, it does not add new physics.
+
+    literature_grounding (parsed literature_grounding_system_size.json, or None) makes the
+    recommendation genuinely vary by molecule rather than only by class-bucket: a real,
+    DOI-verified per-SMILES convergence DP (or packing-length-derived Me) can raise the
+    recommendation above the mechanized floor at medium/high confidence, or resolve an
+    otherwise-unresolvable MW_FLOOR_UNKNOWN at ANY confidence (a cited, caveated estimate
+    beats outright refusal) -- but it never lowers a recommendation below a floor this
+    script has already mechanically established; a single per-molecule study is not
+    licensed to undercut Fox-Flory/entanglement-Me evidence.
+    """
+    base = select_system_size(polymer_class, smiles, properties=properties,
+                              dp_typical=dp_typical, nchain=nchain)
+    if "error" in base:
+        return base
+
+    rules = load_rules()
+    cls = get_class_entry(rules, polymer_class, warn_on_miss=True)
+    dp = dp_typical if dp_typical is not None else cls.get("dp_typical")
+    nchain_v = nchain if nchain is not None else cls.get("nchain")
+    required_floor = base["decision"].get("required_dp_floor")
+    floor_was_unknown = required_floor is None and any(
+        u.get("name") == "MW_FLOOR_UNKNOWN" for u in base.get("uncertainties", []))
+
+    lit_dp, lit_nchain, lit_note, lit_confidence = _literature_dp_recommendation(
+        literature_grounding, cls, smiles)
+
+    recommended = {}
+    reasons = []
+
+    recommended_dp = required_floor
+    if lit_dp is not None:
+        if recommended_dp is None:
+            # Resolves an MW_FLOOR_UNKNOWN -- any confidence beats refusal, but say so.
+            recommended_dp = lit_dp
+            reasons.append(f"{lit_note} -- resolves an otherwise-unassessed bulk_modulus "
+                          "chain-length floor (no documented entanglement Me for this "
+                          "class/member)")
+        elif lit_confidence in _GROUNDING_CONFIDENCE_TO_RAISE_AN_EXISTING_FLOOR:
+            if lit_dp > recommended_dp:
+                recommended_dp = lit_dp
+                reasons.append(f"{lit_note} -- raises the mechanized floor {required_floor} "
+                              "for this specific molecule")
+            else:
+                reasons.append(f"{lit_note} -- does not exceed the mechanized floor "
+                              f"{required_floor}; floor stands")
+        else:
+            reasons.append(f"{lit_note} -- confidence too low to raise an already-"
+                          f"established floor {required_floor}; floor stands")
+
+    if recommended_dp is not None and dp != recommended_dp:
+        recommended["dp_typical"] = recommended_dp
+        if not reasons:  # pure floor-clearing, no literature involved
+            direction = "below" if dp < recommended_dp else "above"
+            reasons.append(f"dp_typical={dp} is {direction} the documented floor "
+                          f"{recommended_dp} for {sorted(set(properties or []))}; the "
+                          "cost-minimizing choice is exactly the floor -- Fox-Flory's "
+                          "plateau means there is no accuracy gain above it, and no "
+                          "trajectory-length remedy exists below it")
+
+    ff = (cls.get("preferred_ff") or "").lower()
+    recommended_nchain = None
+    if "pcff" in ff and nchain_v and nchain_v < PCFF_NCHAIN_PRODUCTION_MINIMUM:
+        recommended_nchain = PCFF_NCHAIN_PRODUCTION_MINIMUM
+    if (lit_nchain and lit_confidence in _GROUNDING_CONFIDENCE_TO_RAISE_AN_EXISTING_FLOOR
+            and lit_nchain > (recommended_nchain or nchain_v or 0)):
+        recommended_nchain = lit_nchain
+        reasons.append(f"literature-grounded nchain={lit_nchain} raises the recommendation "
+                      f"({lit_note})")
+    if recommended_nchain is not None and recommended_nchain != nchain_v:
+        recommended["nchain"] = recommended_nchain
+        if "pcff" in ff and not any("nchain" in r for r in reasons):
+            reasons.append(f"nchain={nchain_v} is below the PCFF production minimum "
+                          f"{PCFF_NCHAIN_PRODUCTION_MINIMUM} (Bejagam 2020); binding this "
+                          "for reasoned/novel plans rather than leaving it advisory-only "
+                          "(no pre-build Rg predictor exists, so this stays a floor, not "
+                          "a continuous cost/accuracy curve)")
+
+    return {**base, "recommended_params": recommended, "recommendation_reasons": reasons,
+            "floor_was_unknown": floor_was_unknown}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -258,13 +406,23 @@ def main():
     p.add_argument("--properties", help="comma-separated: tg,bulk_modulus,density")
     p.add_argument("--dp_typical", type=int, default=None)
     p.add_argument("--nchain", type=int, default=None)
+    p.add_argument("--literature_grounding",
+                   help="path to a literature_grounding_system_size.json to fold in via "
+                        "solve_system_size() instead of the plain check")
     args = p.parse_args()
 
     try:
-        result = select_system_size(
-            args.polymer_class, args.smiles,
-            args.properties.split(",") if args.properties else None,
-            args.dp_typical, args.nchain)
+        if args.literature_grounding:
+            lit = json.loads(Path(args.literature_grounding).read_text())
+            result = solve_system_size(
+                args.polymer_class, args.smiles,
+                args.properties.split(",") if args.properties else None,
+                args.dp_typical, args.nchain, literature_grounding=lit)
+        else:
+            result = select_system_size(
+                args.polymer_class, args.smiles,
+                args.properties.split(",") if args.properties else None,
+                args.dp_typical, args.nchain)
     except Exception as e:  # noqa: BLE001 -- callers parse JSON, never a traceback
         result = {"error": f"{type(e).__name__}: {e}"}
 

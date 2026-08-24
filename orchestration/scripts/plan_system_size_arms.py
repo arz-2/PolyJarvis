@@ -49,15 +49,55 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hw_common import load_rules, get_class_entry              # noqa: E402
-from select_system_size import select_system_size, property_floors  # noqa: E402
+from hw_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family  # noqa: E402
+from select_system_size import select_system_size, property_floors, _monomer_atoms_and_mw  # noqa: E402
+import cost_model                                              # noqa: E402
 
 DEFAULT_DIVERGENCE_THRESHOLD = 2.0
 
 
+def _tg_sweep_cost(cls: dict, smiles: str, fam: str, dp: int, nchain_v: int, hp: dict) -> dict:
+    """GPU-hours to run this class's full tg sweep on a cell sized at (dp, nchain_v) --
+    reuses cost_model's tg-sweep step-count arithmetic (the same formula
+    stage_params._resolve_tg_params uses), never a second copy."""
+    is_ua = (fam == "trappe")
+    atoms_per_monomer, _mw = _monomer_atoms_and_mw(smiles, is_ua)
+    cell_atoms = atoms_per_monomer * dp * nchain_v
+    total_steps, note = cost_model._tg_sweep_total_steps(cls)
+    if not total_steps:
+        return {"gpu_hours": None, "confidence": "none", "basis": note, "cell_atoms": cell_atoms}
+    dt_fs = cls.get("dt_fs", 1.0)
+    gpu_per_run = hp.get("by_forcefield", {}).get(fam, {}).get("gpu_per_run", 1)
+    priced = cost_model.gpu_hours(cell_atoms, total_steps, dt_fs, fam, gpu_per_run, hp)
+    priced["cell_atoms"] = cell_atoms
+    return priced
+
+
 def plan_arms(polymer_class: str, smiles: str, run_name: str, properties,
              dp_typical: int = None, nchain: int = None,
-             divergence_threshold: float = DEFAULT_DIVERGENCE_THRESHOLD) -> dict:
+             divergence_threshold: float = DEFAULT_DIVERGENCE_THRESHOLD,
+             equil_gpu_hours_per_1k_atoms: float = None) -> dict:
+    """Decide whether to split. Prefers an actual GPU-hours comparison over the bare
+    DP-ratio heuristic when a real cost estimate is available:
+
+    savings   = cost(tg sweep at the union/bulk_modulus floor) - cost(tg sweep at the tg
+                floor)  [both fully resolvable via cost_model.py -- tg step counts are a
+                known function of dt_fs/rate/T-range, independent of DP]
+    overhead  = equil_gpu_hours_per_1k_atoms * (tg-arm cell_atoms / 1000)  [the extra
+                build+equilibration pipeline a second arm needs -- NOT resolvable from
+                anything in this repo (equil stage length is generator-determined, not a
+                class-level knob; EMC build time doesn't follow an ns/day model at all),
+                so this is an explicit, caller-supplied estimate, never invented here]
+
+    split when savings > overhead. bulk_modulus's own Murnaghan cost is identical whether
+    split or not (bulk_modulus needs the higher floor either way), so it is deliberately
+    excluded from the comparison -- only the resolvable difference matters.
+
+    Without equil_gpu_hours_per_1k_atoms, falls back to the original bulk_modulus/tg
+    floor-ratio heuristic (divergence_threshold), explicitly labeled as a proxy rather than
+    a cost comparison -- this keeps the function usable when no equil-cost estimate is
+    available, without pretending the ratio IS a cost model.
+    """
     properties = set(properties or [])
     if not properties:
         return {"error": "no properties requested"}
@@ -73,11 +113,34 @@ def plan_arms(polymer_class: str, smiles: str, run_name: str, properties,
     bm_floor = pf.get("bulk_modulus", {}).get("floor_dp")
 
     divergence = None
-    can_split = ("tg" in properties and "bulk_modulus" in properties
-                and tg_floor is not None and bm_floor is not None)
-    if can_split:
+    eligible = ("tg" in properties and "bulk_modulus" in properties
+               and tg_floor is not None and bm_floor is not None)
+    if eligible:
         divergence = bm_floor / tg_floor
-        can_split = divergence >= divergence_threshold
+
+    cost_comparison = None
+    if eligible and equil_gpu_hours_per_1k_atoms is not None:
+        hp = hardware_policy(load_rules())
+        ff_raw = cls.get("preferred_ff") or cls.get("forcefield") or ""
+        fam = resolve_ff_family(ff_raw, hp)
+        cost_at_tg_floor = _tg_sweep_cost(cls, smiles, fam, tg_floor, nchain_v, hp)
+        cost_at_union_floor = _tg_sweep_cost(cls, smiles, fam, bm_floor, nchain_v, hp)
+        if cost_at_tg_floor["gpu_hours"] is not None and cost_at_union_floor["gpu_hours"] is not None:
+            savings = cost_at_union_floor["gpu_hours"] - cost_at_tg_floor["gpu_hours"]
+            overhead = equil_gpu_hours_per_1k_atoms * (cost_at_tg_floor["cell_atoms"] / 1000.0)
+            conf_rank = {"high": 3, "medium": 2, "low": 1, "none": 0}
+            cost_comparison = {
+                "tg_sweep_gpu_hours_at_tg_floor": cost_at_tg_floor["gpu_hours"],
+                "tg_sweep_gpu_hours_at_union_floor": cost_at_union_floor["gpu_hours"],
+                "savings_gpu_hours": round(savings, 4),
+                "assumed_equil_overhead_gpu_hours": round(overhead, 4),
+                "confidence": min(cost_at_tg_floor["confidence"], cost_at_union_floor["confidence"],
+                                  key=lambda c: conf_rank[c]),
+                "worth_splitting": savings > overhead,
+            }
+
+    can_split = eligible and (cost_comparison["worth_splitting"] if cost_comparison
+                             else divergence >= divergence_threshold)
 
     if can_split:
         tg_props = sorted(properties & {"tg", "density"})
@@ -88,12 +151,18 @@ def plan_arms(polymer_class: str, smiles: str, run_name: str, properties,
              "dp_typical": bm_floor, "nchain": nchain_v,
              "floor_source": pf["bulk_modulus"]["source"]},
         ]
-        reason = (f"bulk_modulus floor {bm_floor} is {divergence:.2f}x the tg floor "
-                  f"{tg_floor} (>= {divergence_threshold}x threshold) -- splitting saves "
-                  f"~{100 * (1 - tg_floor / bm_floor):.0f}% of atom count on the tg/density "
-                  "arm vs. running everything at the bulk_modulus floor")
+        if cost_comparison:
+            reason = (f"cost model: splitting saves {cost_comparison['savings_gpu_hours']} "
+                      f"GPU-hours on the tg sweep against an assumed "
+                      f"{cost_comparison['assumed_equil_overhead_gpu_hours']} GPU-hour extra "
+                      f"build+equil overhead (confidence={cost_comparison['confidence']})")
+        else:
+            reason = (f"DP-ratio proxy (no equil-cost estimate supplied): bulk_modulus floor "
+                      f"{bm_floor} is {divergence:.2f}x the tg floor {tg_floor} "
+                      f"(>= {divergence_threshold}x threshold)")
         return {"split": True, "arms": arms, "reason": reason,
-                "divergence": divergence, "divergence_threshold": divergence_threshold}
+                "divergence": divergence, "divergence_threshold": divergence_threshold,
+                "cost_comparison": cost_comparison}
 
     # No split: identical to select_system_size.py's own single-arm decision for the
     # full property set -- never a second, driftable copy of the floor arithmetic.
@@ -105,17 +174,24 @@ def plan_arms(polymer_class: str, smiles: str, run_name: str, properties,
     # select_system_size.py's own decided_params_override rule -- never shrunk below the
     # class/pinned default for an over-provisioned gap.
     arm_dp = whole["decided_params_override"].get("dp_typical", dp)
-    reason = ("no split: " + (
-        "bulk_modulus not requested alongside tg" if "bulk_modulus" not in properties
-        or "tg" not in properties else
-        "bulk_modulus floor is MW_FLOOR_UNKNOWN for this class/member" if bm_floor is None
-        else f"divergence {divergence:.2f}x is below the {divergence_threshold}x threshold"
-        if divergence is not None else "no floor applies to the requested properties"))
+    if cost_comparison:
+        reason = (f"no split: cost model shows {cost_comparison['savings_gpu_hours']} GPU-hours "
+                  f"saved against {cost_comparison['assumed_equil_overhead_gpu_hours']} GPU-hour "
+                  "assumed overhead -- not worth a second build+equil pipeline "
+                  f"(confidence={cost_comparison['confidence']})")
+    else:
+        reason = ("no split: " + (
+            "bulk_modulus not requested alongside tg" if "bulk_modulus" not in properties
+            or "tg" not in properties else
+            "bulk_modulus floor is MW_FLOOR_UNKNOWN for this class/member" if bm_floor is None
+            else f"divergence {divergence:.2f}x is below the {divergence_threshold}x threshold "
+                 "(DP-ratio proxy -- no equil-cost estimate was supplied)"
+            if divergence is not None else "no floor applies to the requested properties"))
     return {"split": False, "arms": [
         {"run_name": run_name, "properties": sorted(properties), "dp_typical": arm_dp,
          "nchain": nchain_v, "floor_source": None}],
         "reason": reason, "divergence": divergence,
-        "divergence_threshold": divergence_threshold}
+        "divergence_threshold": divergence_threshold, "cost_comparison": cost_comparison}
 
 
 def main():
@@ -129,12 +205,16 @@ def main():
     p.add_argument("--dp_typical", type=int, default=None)
     p.add_argument("--nchain", type=int, default=None)
     p.add_argument("--divergence_threshold", type=float, default=DEFAULT_DIVERGENCE_THRESHOLD)
+    p.add_argument("--equil_gpu_hours_per_1k_atoms", type=float, default=None,
+                   help="Estimated build+equilibration GPU-hours per 1000 atoms, used to "
+                        "price the second pipeline a split needs. Without this, falls back "
+                        "to the DP-ratio proxy (--divergence_threshold).")
     args = p.parse_args()
 
     try:
         result = plan_arms(args.polymer_class, args.smiles, args.run_name,
                            args.properties.split(","), args.dp_typical, args.nchain,
-                           args.divergence_threshold)
+                           args.divergence_threshold, args.equil_gpu_hours_per_1k_atoms)
     except Exception as e:  # noqa: BLE001 -- callers parse JSON, never a traceback
         result = {"error": f"{type(e).__name__}: {e}"}
 

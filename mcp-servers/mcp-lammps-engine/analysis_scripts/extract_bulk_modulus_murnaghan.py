@@ -43,6 +43,7 @@ References:
 
 import argparse
 import json
+import math
 import sys
 import numpy as np
 from pathlib import Path
@@ -53,7 +54,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from plot_style import apply_style, save_fig
-from analysis_utils import parse_lammps_log
+from analysis_utils import parse_lammps_log, compute_tau_eff, effective_sample_size
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +72,16 @@ ATM_TO_GPA = ATM_TO_PA * PA_TO_GPA
 
 
 def extract_mean_volume(log_path, eq_fraction):
-    """Parse log, discard first (1-eq_fraction) rows, return mean Volume (Å³)."""
+    """Parse log, discard first (1-eq_fraction) rows, return mean Volume (Å³) plus
+    autocorrelation-corrected sampling stats for that point.
+
+    The naive std/sqrt(n) SEM ignores that consecutive NPT dumps are correlated, so it
+    understates the true uncertainty on the mean volume -- compute_tau_eff/
+    effective_sample_size (already used elsewhere in this pipeline) give the honest SEM,
+    std/sqrt(n_eff), instead. This is a per-point precision estimate, distinct from and
+    additional to fit_murnaghan()'s covariance-based B0_sem_GPa (residual misfit of the
+    means around the Murnaghan form, not sampling noise on any one mean).
+    """
     df = parse_lammps_log(log_path)
     vol_col = None
     for candidate in ["Volume", "Vol", "vol"]:
@@ -90,7 +100,13 @@ def extract_mean_volume(log_path, eq_fraction):
             f"Only {len(prod)} production rows in {log_path} after "
             f"discarding {n_discard} burn-in rows (eq_fraction={eq_fraction})."
         )
-    return float(prod[vol_col].mean()), float(prod[vol_col].std()), len(prod)
+    values = prod[vol_col].to_numpy(dtype=float)
+    v_mean, v_std, n_prod = float(values.mean()), float(values.std()), len(values)
+    tau_frames, _ = compute_tau_eff(values)
+    tau_frames = tau_frames if tau_frames > 0 else 1.0
+    n_eff = effective_sample_size(n_prod, tau_frames)
+    vol_sem_A3 = v_std / math.sqrt(max(1, n_eff))
+    return v_mean, v_std, n_prod, tau_frames, n_eff, vol_sem_A3
 
 
 # ---------------------------------------------------------------------------
@@ -483,13 +499,20 @@ def main():
     volumes_A3 = []
     vol_stds = []
     n_prod_list = []
+    tau_frames_list = []
+    n_eff_list = []
+    vol_sem_list = []
     errors = []
     for log_path, p_atm in zip(args.log_files, args.pressures_atm):
         try:
-            v_mean, v_std, n_prod = extract_mean_volume(log_path, args.eq_fraction)
+            v_mean, v_std, n_prod, tau_frames, n_eff, vol_sem = extract_mean_volume(
+                log_path, args.eq_fraction)
             volumes_A3.append(v_mean)
             vol_stds.append(v_std)
             n_prod_list.append(n_prod)
+            tau_frames_list.append(tau_frames)
+            n_eff_list.append(n_eff)
+            vol_sem_list.append(vol_sem)
         except Exception as e:
             errors.append(f"{log_path} @ {p_atm} atm: {e}")
 
@@ -510,6 +533,9 @@ def main():
     log_files_sorted = [args.log_files[i] for i in order]
     n_prod_sorted = [n_prod_list[i] for i in order]
     vol_stds_sorted = [vol_stds[i] for i in order]
+    tau_frames_sorted = [tau_frames_list[i] for i in order]
+    n_eff_sorted = [n_eff_list[i] for i in order]
+    vol_sem_sorted = [vol_sem_list[i] for i in order]
 
     volume_monotonic = all(
         pressures_sorted[i + 1] > pressures_sorted[i]
@@ -713,6 +739,13 @@ def main():
         "vol_stds_A3": [round(vol_stds_sorted[i], 2) for i in range(len(volumes_sorted)) if i not in excluded_idx],
         "n_prod_rows": n_prod_sorted,
         "log_files": log_files_sorted,
+        # Autocorrelation-corrected per-point volume SEM (D-07) -- full sorted order, NOT
+        # filtered by excluded_idx: a resample/sampling-factor decision is exactly about the
+        # flagged/excluded points, so their SEM must not be dropped here. Distinct from
+        # B0_sem_GPa above (fit covariance, not sampling precision) -- see extract_mean_volume.
+        "tau_frames_per_point": [round(t, 3) for t in tau_frames_sorted],
+        "n_eff_per_point": n_eff_sorted,
+        "vol_sem_A3_per_point": [round(s, 4) for s in vol_sem_sorted],
         "eq_fraction": args.eq_fraction,
         "output_dir": str(output_dir),
         "volume_monotonic": window["volume_monotonic"],

@@ -21,7 +21,9 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from hw_common import get_class_entry, load_rules  # noqa: E402
 from make_deterministic_plan import build_decisions, build_planned_stages, make_plan  # noqa: E402
+from select_system_size import select_system_size, solve_system_size  # noqa: E402
 import canon_smiles  # noqa: E402  -- module import so tests can monkeypatch canon_smiles.canonicalize
+import cost_model  # noqa: E402
 
 
 VALID_PROPERTIES = frozenset({"density", "tg", "bulk_modulus"})
@@ -372,6 +374,21 @@ def planning_context(intent: ScientificIntent) -> dict[str, Any]:
     }
 
 
+def _load_system_size_literature_grounding(run_name: str) -> Optional[dict]:
+    """data/<run_name>/raw/literature_grounding_system_size.json, if the novel-run-plan
+    skill's step 4 already produced one for this run -- None otherwise (a genuinely novel
+    plan run outside that skill's flow, or a worker failure). Never raises: a malformed or
+    unreadable grounding file must not block materialization, only leave the fallback
+    class-bucket recommendation in place."""
+    path = REPO_ROOT / "data" / run_name / "raw" / "literature_grounding_system_size.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     """Convert a narrow agent decision into a complete executable run plan."""
     _validate_decision(decision)
@@ -380,8 +397,23 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     rules = load_rules()
     class_entry = dict(get_class_entry(rules, decision.polymer_class, warn_on_miss=False))
     effective_class = {**class_entry, **decision.overrides}
+
+    # D-04 system size: fill in the cost-minimizing recommendation for whichever of
+    # dp_typical/nchain the agent's own overrides didn't already decide. Safe here and only
+    # here -- materialize_plan() (unlike select_system_size.py's own live validator check)
+    # only ever produces plan_mode="reasoned" plans, never a protocol_validated replay.
+    size_solve = solve_system_size(
+        decision.polymer_class, intent.smiles, properties,
+        dp_typical=class_entry.get("dp_typical"), nchain=class_entry.get("nchain"),
+        literature_grounding=_load_system_size_literature_grounding(intent.run_name))
+    auto_filled = {k: v for k, v in size_solve.get("recommended_params", {}).items()
+                   if k not in decision.overrides}
+    if auto_filled:
+        effective_class.update(auto_filled)
+
     _validate_protocol_relationships(effective_class, set(decision.overrides))
     plan["decided_params"].update(decision.overrides)
+    plan["decided_params"].update(auto_filled)
     if "T_equil_K" in decision.overrides and "T_workflow_K" not in decision.overrides:
         plan["decided_params"]["T_workflow_K"] = decision.overrides["T_equil_K"]
         effective_class["T_workflow_K"] = decision.overrides["T_equil_K"]
@@ -397,17 +429,51 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
                 row["evidence"] = list(evaluation["evidence"])
             if "alternatives" in evaluation:
                 row["alternatives"] = list(evaluation["alternatives"])
+        if auto_filled and row["id"] == "D-04_system_size":
+            row["evidence"] = list(row.get("evidence") or []) + [
+                {"claim": reason} for reason in size_solve.get("recommendation_reasons", [])]
+
+    size_assumptions = ([f"D-04_system_size auto-filled {auto_filled} via "
+                        "solve_system_size() -- see D-04_system_size's evidence for why"]
+                        if auto_filled else [])
+
+    # Self-acknowledge an over-provisioned final DP (whichever path set it -- auto-fill,
+    # literature grounding, or the agent's own override) so validate_run_plan.py's
+    # symmetric _system_size_over_provisioned_findings never has to guess at WHY a plan
+    # exceeds the mechanized floor; it only ever flags a plan that skipped this step
+    # entirely (hand-edited, or produced outside materialize_plan()).
+    final_dp = plan["decided_params"].get("dp_typical")
+    over_provisioned_ack = []
+    if final_dp is not None:
+        base_check = select_system_size(decision.polymer_class, intent.smiles,
+                                        properties=properties, dp_typical=final_dp,
+                                        nchain=plan["decided_params"].get("nchain"))
+        if any(u.get("name") == "size_over_provisioned"
+               for u in base_check.get("uncertainties", [])):
+            over_provisioned_ack = [{"name": "system_size_over_provisioned", "dominant": False,
+                                     "reduction_probe": "none"}]
+
+    # D-06 tg rate ladder is floor-only (tg_min_steps_per_T), never cost-optimized against a
+    # real accuracy-vs-rate curve -- no such curve exists anywhere in this codebase (see
+    # decision_policy.json's tg_protocol; only an aggregate fast-cooling bias is documented,
+    # not a per-rate slope). Surface the gap rather than silently assume the ladder is optimal;
+    # its real GPU-hours cost is already visible via cost_estimate above.
+    tg_ladder_ack = ([{"name": "tg_ladder_cost_unoptimized", "dominant": False,
+                       "reduction_probe": "none"}]
+                      if any(s.get("stage") == "tg" for s in plan.get("planned_stages", []))
+                      else [])
+
     plan.update({
         "goal": intent.goal,
         "properties": sorted(properties),
         "confidence": decision.confidence,
         "plan_mode": "reasoned",
-        "assumptions": list(decision.assumptions),
+        "assumptions": list(decision.assumptions) + size_assumptions,
         "uncertainties": [{
             "name": decision.dominant_uncertainty,
             "dominant": True,
             "reduction_probe": "none",
-        }],
+        }] + over_provisioned_ack + tg_ladder_ack,
         "critique": {
             "status": "scientific_agent_decision",
             "rounds": 1,
@@ -423,6 +489,15 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
         ).hexdigest(),
         "agent_rationale": list(decision.rationale),
     }
+    # Mechanizes decision_policy.json's gpu_budget/computational_cost criteria, which named
+    # a cost figure long before cost_model.py existed to compute one. Best-effort: an
+    # unresolvable estimate (e.g. RDKit atom-count failure) must never block plan
+    # materialization, so failures degrade to an explicit {"error": ...} payload rather than
+    # raising.
+    try:
+        plan["cost_estimate"] = cost_model.plan_cost_estimate(plan)
+    except Exception as e:  # noqa: BLE001 -- cost estimation is advisory, never blocking
+        plan["cost_estimate"] = {"error": f"{type(e).__name__}: {e}"}
     return plan
 
 
@@ -457,6 +532,12 @@ def apply_recovery(plan: dict, decision: RecoveryDecision) -> dict:
         "modifications": decision.modifications,
         "at": datetime.now(timezone.utc).isoformat(),
     })
+    # A recovery modification (e.g. a dp_typical/nchain bump) changes the actual cost --
+    # refresh cost_estimate so it never sits stale next to post-recovery decided_params.
+    try:
+        revised["cost_estimate"] = cost_model.plan_cost_estimate(revised)
+    except Exception as e:  # noqa: BLE001 -- cost estimation is advisory, never blocking
+        revised["cost_estimate"] = {"error": f"{type(e).__name__}: {e}"}
     return revised
 
 

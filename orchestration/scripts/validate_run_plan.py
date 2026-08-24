@@ -27,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from select_hardware import select_hardware
 from select_system_size import select_system_size
-from hw_common import load_rules, get_class_entry, resolve_member_value
+from hw_common import load_rules, get_class_entry, resolve_member_value, hardware_policy, host_matches
 
 _ENGINE_SCRIPTS = (Path(__file__).resolve().parents[2]
                    / "mcp-servers" / "mcp-lammps-engine" / "analysis_scripts")
@@ -251,6 +251,26 @@ def _finite_size_findings(plan: dict) -> list:
     return findings
 
 
+def _family_has_multi_gpu_benchmark(fam: str) -> bool:
+    """True iff some real measured point for this FF family (recommended_by_ff or
+    size_points) actually used gpu_per_run>=2 ON A HOST MATCHING THIS ONE
+    (hw_common.host_matches -- hardware_policy.host, the same host-match check
+    cost_model.estimate_ns_per_day itself uses). Every point calibrated so far (both fields)
+    is gpu=1 -- select_hardware.py's cost_model-driven "high" confidence describes how well
+    the ns_per_day NUMBER at a given atom count is supported, not whether a >=2-GPU pin is
+    benchmarked, which is what this specific check claims to verify -- those are different
+    claims and must not be conflated just because one confidence field happens to cover both
+    today."""
+    rules = load_rules()
+    if not host_matches(rules):
+        return False
+    dp_probe = hardware_policy(rules).get("directional_probe", {})
+    rec = dp_probe.get("recommended_by_ff", {}).get(fam)
+    if rec and (rec.get("gpu") or 1) >= 2:
+        return True
+    return any((p.get("gpu") or 1) >= 2 for p in dp_probe.get("size_points", {}).get(fam, []))
+
+
 def _hardware_findings(plan: dict) -> list:
     """Delegates the recommended choice to select_hardware.py -- decision_policy.json's
     hardware require/prefer thresholds live there once, not duplicated here."""
@@ -294,11 +314,13 @@ def _hardware_findings(plan: dict) -> list:
             findings.append({"check": "hardware_size_mismatch", "severity": "structural",
                              "detail": f"gpu_per_run={gpu_pin} pinned but estimated cell "
                                        f"{rec['cell_atoms_estimate']} atoms < 10k"})
-        elif rec["decision"]["confidence"] != "high":
+        elif not _family_has_multi_gpu_benchmark(rec["ff_family"]):
             findings.append({"check": "hardware_size_mismatch", "severity": "structural",
-                             "detail": "gpu_per_run>=2 pinned without clean benchmark support "
-                                       "(select_hardware.py would not recommend it at high "
-                                       "confidence for this cell/host)"})
+                             "detail": f"gpu_per_run={gpu_pin} pinned for ff_family="
+                                       f"{rec['ff_family']!r} but no real measured point "
+                                       "(recommended_by_ff or size_points) for this family "
+                                       "used gpu_per_run>=2 -- a well-supported ns_per_day "
+                                       "number at gpu=1 is not evidence for a multi-GPU pin"})
 
     deviates = any(pin.get(k) not in (None, rec_choice.get(k)) for k in rec_choice)
     if deviates:
@@ -473,6 +495,58 @@ def _system_size_findings(plan: dict) -> list:
     return findings
 
 
+def _system_size_over_provisioned_findings(plan: dict) -> list:
+    """Symmetric to _system_size_findings above, but for the OTHER direction: a
+    reasoned/novel plan whose dp_typical clears select_system_size.py's own
+    size_over_provisioned threshold (>1.5x the mechanized floor) without any
+    acknowledgment in the plan.
+
+    Gated on plan_mode=="reasoned" -- a protocol_validated replay must never be touched
+    by this check (shrinking/flagging a frozen protocol is exactly what materialize_plan()
+    is structurally prevented from doing; this check must not second-guess a replay either).
+
+    Expected to basically never fire for a plan actually produced by
+    scientific_control.py:materialize_plan(), which self-acknowledges this exact condition
+    (an uncertainties[] entry named "system_size_over_provisioned") whenever it applies --
+    auto-filled, literature-grounded, or from the agent's own override. This is defense in
+    depth for a hand-edited plan or one produced by a path that skipped that step, matching
+    this file's existing practice of re-deriving live rather than trusting the plan's own
+    claims.
+    """
+    findings = []
+    if plan.get("plan_mode") != "reasoned":
+        return findings
+    dp_dict = plan.get("decided_params", {})
+    smiles, polymer_class = plan.get("smiles"), plan.get("polymer_class")
+    dp = dp_dict.get("dp_typical")
+    if not smiles or not polymer_class or dp is None:
+        return findings
+
+    try:
+        rec = select_system_size(polymer_class, smiles, properties=plan.get("properties"),
+                                 dp_typical=dp, nchain=dp_dict.get("nchain"))
+    except Exception as e:  # noqa: BLE001 -- a broken check must not block a plan
+        findings.append({"check": "system_size_safety", "severity": "structural",
+                         "detail": f"select_system_size.py raised: {e}"})
+        return findings
+    if "error" in rec:
+        return findings
+
+    if not any(u.get("name") == "size_over_provisioned" for u in rec.get("uncertainties", [])):
+        return findings
+    acknowledged = any(u.get("name") == "system_size_over_provisioned"
+                      for u in plan.get("uncertainties", []))
+    if not acknowledged:
+        findings.append({
+            "check": "system_size_over_provisioned_unacknowledged", "severity": "structural",
+            "detail": (f"decided_params.dp_typical={dp} clears select_system_size.py's "
+                      "size_over_provisioned threshold and no uncertainties entry named "
+                      "'system_size_over_provisioned' acknowledges it. A plan built through "
+                      "materialize_plan() self-acknowledges this automatically -- re-run it, "
+                      "or add the uncertainty by hand if this plan was edited directly.")})
+    return findings
+
+
 def validate_plan(plan: dict, policy: dict) -> list:
     findings = []
     findings += _criteria_and_evidence_findings(plan, policy)
@@ -483,6 +557,7 @@ def validate_plan(plan: dict, policy: dict) -> list:
     findings += _hardware_findings(plan)
     findings += _forcefield_findings(plan)
     findings += _system_size_findings(plan)
+    findings += _system_size_over_provisioned_findings(plan)
     findings += _finite_size_findings(plan)
     findings += _unimplemented_param_findings(plan)
     findings += _overridden_param_findings(plan)

@@ -1,6 +1,6 @@
 {
   "hardware_policy": {
-    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for stage parameter resolution and hardware validation; specific gpu_ids stay runtime (orchestration/scripts/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default \u2014 for pcff/opls/trappe this is mpi=1 (KOKKOS/GPU-resident kspace, 1 core/run, up to 4 concurrent runs on 4 GPUs); gaff is the outlier at mpi=4. `mpi_single_run_hint` equals `mpi` (both 1) for pcff/opls/trappe, confirmed by the 2026-08-08 clean host-matched calibration pass (values_are_benchmarked=true, see hardware/HARDWARE_STUDY.md); gaff's mpi_single_run_hint=8 remains a provisional GUESS because no calibration cell exists for it yet.",
+    "description": "FF-family mpi/gpu defaults for the workstation (4x Quadro RTX 6000 24GB, 18 physical cores). Source of truth for stage parameter resolution and hardware validation; specific gpu_ids stay runtime (orchestration/scripts/pick_gpu.py). `mpi` is the CONCURRENT-SAFE per-run default — for pcff/opls/trappe this is mpi=1 (KOKKOS/GPU-resident kspace, 1 core/run, up to 4 concurrent runs on 4 GPUs); gaff is the outlier at mpi=4. `mpi_single_run_hint` equals `mpi` (both 1) for pcff/opls/trappe, confirmed by the 2026-08-08 clean host-matched calibration pass (values_are_benchmarked=true, see hardware/HARDWARE_STUDY.md); gaff's mpi_single_run_hint=8 remains a provisional GUESS because no calibration cell exists for it yet.",
     "host": {
       "gpus": 4,
       "gpu_model": "Quadro RTX 6000",
@@ -29,13 +29,13 @@
         "opls_parity_2026-06-20": "PASS. run-0 on decane-oplsaa (3200 atoms, OPLS-AA): lj/cut/coul/long/kk + harmonic bond/angle kk + dihedral opls/kk + pppm/kk vs GPU-package agree to 0.000% on E_bond/E_angle/E_dihed/E_vdwl/E_coul/E_long/PotEng and the pressure tensor. OPLS KOKKOS stack validated.",
         "gate": "GREEN as of 2026-06-20. pcff + opls FLIPPED to engine=kokkos, mpi=1, gpu_per_run=1 (both run-0 parity-validated). trappe FLIPPED to engine=gpu, mpi=1, gpu_per_run=1 with `neigh yes` (run-0 parity PASS, see trappe_neigh_yes_2026-06-20). gaff pending its own parity (no cell yet).",
         "binary": "/home/arz2/lammps-install-kokkos/bin/lmp (env LAMBDA_LAMMPS_KOKKOS)",
-        "kokkos_deck_gotchas": "Three KOKKOS pitfalls (hit on the 2nd machine pre-merge; ALREADY correct on this hardware-optimization branch): (1) the KOKKOS package is loaded on the COMMAND LINE via `-pk kokkos` (in _engine_launch), NOT as an in-deck `package kokkos ...` line \u2014 script_generator renders only a comment for engine=kokkos. An in-deck `package kokkos gpu 1 comm no` is ILLEGAL (use `package kokkos neigh full comm no` if ever hand-writing one). (2) `-sf kk` rewrites STYLE commands (pair/bond/angle/dihedral/kspace/fix) to /kk, but NOT the `neighbor` command \u2014 decks keep plain `neighbor 2.0 bin`; `neighbor 2.0 bin/kk` is an invalid suffix. (3) run_lammps_script AND run_lammps_chain both take `engine=`, so no manual binary wrapper is needed \u2014 pass engine='kokkos' and the right binary+flags are selected. Our single-GPU mpi=1 `-pk kokkos` defaults passed parity; multi-GPU may need explicit `comm`/`neigh` tuning.",
+        "kokkos_deck_gotchas": "Three KOKKOS pitfalls (hit on the 2nd machine pre-merge; ALREADY correct on this hardware-optimization branch): (1) the KOKKOS package is loaded on the COMMAND LINE via `-pk kokkos` (in _engine_launch), NOT as an in-deck `package kokkos ...` line — script_generator renders only a comment for engine=kokkos. An in-deck `package kokkos gpu 1 comm no` is ILLEGAL (use `package kokkos neigh full comm no` if ever hand-writing one). (2) `-sf kk` rewrites STYLE commands (pair/bond/angle/dihedral/kspace/fix) to /kk, but NOT the `neighbor` command — decks keep plain `neighbor 2.0 bin`; `neighbor 2.0 bin/kk` is an invalid suffix. (3) run_lammps_script AND run_lammps_chain both take `engine=`, so no manual binary wrapper is needed — pass engine='kokkos' and the right binary+flags are selected. Our single-GPU mpi=1 `-pk kokkos` defaults passed parity; multi-GPU may need explicit `comm`/`neigh` tuning.",
         "trappe_neigh_yes_2026-06-20": "TraPPE-UA is NOT a CPU job. CALIB_PHYC (1640 atoms), mpi=1/GPU, niced on idle GPU2 under identical contention (ratios robust, absolute ns/day suppressed uniformly): cpu_mpi4=136; A0 gpu-pkg neigh-on-CPU=136 (Neigh 71% stays on CPU -> no win, ties CPU); A1 gpu-pkg neigh-ON-GPU=501 (3.7x, now Bond 60% CPU-bound); A3 KOKKOS full-offload=397 (2.9x; Modify/Bond/Neigh, /kk launch+fix overhead loses on tiny UA cells). WINNER = GPU package + `neigh yes`, mpi=1, 1 GPU/run (A1). Implemented by gating `package gpu 1 neigh yes` on use_trappe in script_generator.py. Parity: run-0 static CPU lj/cut vs GPU lj/cut/gpu+neigh-yes on CALIB_PHYC = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl/density (only virial/pressure differs ~0.3% from FP summation order; advisory/non-gated). bench_accuracy_diff.py PASS. (Note: bench_accuracy_diff _pct_diff fixed to handle the no-kspace E_long=0/0 nan edge.) Open: mpi=2 may beat mpi=1 (Bond is CPU-bound at mpi=1) but costs a core -> defer to a drained box; 2/GPU MPS throughput for batches still to measure.",
         "gpu_sharing_2026-06-20": "DO NOT pack >1 run/GPU for PPPM-heavy (PCFF/OPLS) KOKKOS runs. Measured on PEG1 7020 atoms, GPU2: solo=38.9 ns/day; 2 concurrent time-sliced (no MPS)=6.3 aggregate (0.16x, Kspace blows up 15x from GPU context-switching on PPPM sync points); 2 concurrent with CUDA MPS=39.0 aggregate (1.00x, clean 2x/section, 50% each) = ZERO gain. The GPU is already saturated by one PPPM job (pair kernel is tiny but the cuFFT pipeline keeps it busy). Optimal = 1 run/GPU, 4 concurrent across 4 GPUs (mpi=1, gpu_per_run=1)."
       },
       "measured_on": "4x Quadro RTX 6000 / 18 phys cores (calibrate_hardware.py --revalidate)",
       "date": "2026-08-08",
-      "mode": "revalidate \u2014 ran the shipped by_forcefield default per FF (no engine re-search) + run-0 parity vs CPU; records host-matched ns/day. Use --full for a fresh engine\u00d7config sweep on a drained box.",
+      "mode": "revalidate — ran the shipped by_forcefield default per FF (no engine re-search) + run-0 parity vs CPU; records host-matched ns/day. Use --full for a fresh engine×config sweep on a drained box.",
       "cells": {
         "pcff": "/home/arz2/PolyJarvis/hardware/CALIB_PCFF/emc_build.data",
         "opls": "/home/arz2/PolyJarvis/hardware/CALIB_OPLS/emc_build.data",
@@ -87,7 +87,79 @@
       "trappe_ns_per_day": {
         "gpu1_mpi1": 639.19
       },
-      "calibration_note": "clean host-matched revalidation \u2014 every shipped default ran and passed run-0 parity on this box; values_are_benchmarked=true."
+      "calibration_note": "clean host-matched revalidation — every shipped default ran and passed run-0 parity on this box; values_are_benchmarked=true.",
+      "size_points": {
+        "_note": "Additive multi-size extension, not a replacement for cells_atoms/recommended_by_ff above (other code still reads those for the single canonical point). Each family's own shipped default config (same engine/mpi/gpu as recommended_by_ff[fam]) benchmarked at 3 atom counts on this host (2026-08-24, GPUs 1-3 only -- GPU 0 excluded, a live run occupied it at measurement time; steps=4000, same convention as calibrate_hardware.py). Confirms ns_per_day vs atoms is NOT a fixed exponent across families in the 3k-15k range: trappe (lj/cut, no kspace) is close to linear cost-per-atom (atoms*ns_per_day roughly flat, 1.05M-1.16M), while pcff/opls (KOKKOS full-offload, PPPM) show clearly sub-linear cost growth -- a naive single-point linear extrapolation from the original 3020/3220-atom point would have OVER-estimated pcff's cost at 15040 atoms by >2x (predicted 8.5 ns/day vs measured 17.4) and opls's by ~24% (11.8 vs 15.6). cost_model.py interpolates log-log between the two bracketing measured points instead of assuming one global exponent.",
+        "pcff": [
+          {
+            "atoms": 3020,
+            "ns_per_day": 42.269,
+            "engine": "kokkos",
+            "mpi": 1,
+            "gpu": 1
+          },
+          {
+            "atoms": 5140,
+            "ns_per_day": 30.63,
+            "engine": "kokkos",
+            "mpi": 1,
+            "gpu": 1
+          },
+          {
+            "atoms": 15040,
+            "ns_per_day": 17.384,
+            "engine": "kokkos",
+            "mpi": 1,
+            "gpu": 1
+          }
+        ],
+        "opls": [
+          {
+            "atoms": 3220,
+            "ns_per_day": 55.191,
+            "engine": "kokkos",
+            "mpi": 1,
+            "gpu": 1
+          },
+          {
+            "atoms": 5040,
+            "ns_per_day": 36.049,
+            "engine": "kokkos",
+            "mpi": 1,
+            "gpu": 1
+          },
+          {
+            "atoms": 15040,
+            "ns_per_day": 15.645,
+            "engine": "kokkos",
+            "mpi": 1,
+            "gpu": 1
+          }
+        ],
+        "trappe": [
+          {
+            "atoms": 1640,
+            "ns_per_day": 639.19,
+            "engine": "gpu",
+            "mpi": 1,
+            "gpu": 1
+          },
+          {
+            "atoms": 5040,
+            "ns_per_day": 227.491,
+            "engine": "gpu",
+            "mpi": 1,
+            "gpu": 1
+          },
+          {
+            "atoms": 15040,
+            "ns_per_day": 76.857,
+            "engine": "gpu",
+            "mpi": 1,
+            "gpu": 1
+          }
+        ]
+      }
     },
     "ff_aliases": {
       "PCFF": "pcff",
@@ -102,7 +174,7 @@
         "mpi": 1,
         "mpi_single_run_hint": 1,
         "gpu_per_run": 1,
-        "note": "class2/kk FULL-OFFLOAD (pair+class2 bonded+pppm+neigh on GPU) via the KOKKOS binary (env LAMBDA_LAMMPS_KOKKOS). mpi=1 is CANONICAL here \u2014 kspace runs on the GPU, NOT CPU-serial, so the old GPU-package 'never mpi=1' rule does NOT apply. ~7.9x vs gpu-pkg A0 at 1 rank; 1 core/run frees cores for ~4 concurrent runs (1/GPU). Parity run-0 vs CPU class2 = 0.000% on energies+forces (2026-06-20). Fallback: engine=gpu, mpi=4 (GPU package).",
+        "note": "class2/kk FULL-OFFLOAD (pair+class2 bonded+pppm+neigh on GPU) via the KOKKOS binary (env LAMBDA_LAMMPS_KOKKOS). mpi=1 is CANONICAL here — kspace runs on the GPU, NOT CPU-serial, so the old GPU-package 'never mpi=1' rule does NOT apply. ~7.9x vs gpu-pkg A0 at 1 rank; 1 core/run frees cores for ~4 concurrent runs (1/GPU). Parity run-0 vs CPU class2 = 0.000% on energies+forces (2026-06-20). Fallback: engine=gpu, mpi=4 (GPU package).",
         "_prev_gpu_package": {
           "engine": "gpu",
           "mpi": 4,
@@ -126,7 +198,7 @@
         "mpi": 1,
         "mpi_single_run_hint": 1,
         "gpu_per_run": 1,
-        "note": "lj/cut, no kspace, neigh-build dominated (~71%). GPU package with `neigh yes` (neighbor build ON the GPU) = 3.7x vs CPU mpi=4 at 1 core/run (A1 501 vs 136 ns/day, CALIB_PHYC 1640 atoms, 2026-06-20, niced/contended ratio). BEATS KOKKOS here (397) \u2014 UA bonded is trivial and lj/cut/gpu is leaner than /kk per-kernel launch overhead on small cells (opposite of PCFF). The `neigh yes` line is rendered automatically by script_generator gating on use_trappe (engine=gpu only \u2014 PPPM classes keep neigh no). Parity run-0 vs CPU lj/cut = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl (2026-06-20). mpi=1 is the concurrency-optimal default (4 TraPPE runs on 4 GPUs = 4 cores). Fallback: engine=cpu, mpi=4.",
+        "note": "lj/cut, no kspace, neigh-build dominated (~71%). GPU package with `neigh yes` (neighbor build ON the GPU) = 3.7x vs CPU mpi=4 at 1 core/run (A1 501 vs 136 ns/day, CALIB_PHYC 1640 atoms, 2026-06-20, niced/contended ratio). BEATS KOKKOS here (397) — UA bonded is trivial and lj/cut/gpu is leaner than /kk per-kernel launch overhead on small cells (opposite of PCFF). The `neigh yes` line is rendered automatically by script_generator gating on use_trappe (engine=gpu only — PPPM classes keep neigh no). Parity run-0 vs CPU lj/cut = 0.000% on PotEng/TotEng/E_bond/E_angle/E_dihed/E_vdwl (2026-06-20). mpi=1 is the concurrency-optimal default (4 TraPPE runs on 4 GPUs = 4 cores). Fallback: engine=cpu, mpi=4.",
         "_prev_cpu": {
           "engine": "cpu",
           "mpi": 4,
@@ -444,7 +516,7 @@
       "preferred_ff": "trappe-ua",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acs.macromol.5b00823",
-      "ff_note": "Ramos 2015: TraPPE-UA PE Tg=187K vs exp 185-195K, density ±7%. Branched types (PP, PIB): UA types exist but no polymer-Tg validation — use with medium confidence.",
+      "ff_note": "TraPPE-UA via EMC: purely apolar C/H backbone (charge <0.1 e), which qualifies for the lj/cut-only routing tier -- PCFF/OPLS-AA's PPPM machinery is unnecessary and TraPPE-UA is far cheaper per atom. Ramos2015: PE Tg=187K vs exp 185-195K, density within +/-7% -- directly validated. Branched types (PP, PIB) have UA parameters but no published polymer-Tg validation; treat with medium confidence until confirmed. TraPPE-UA's own founding paper (Martin & Siepmann 1998) validates only C1-C12 n-alkane VLE/critical-point data via Monte Carlo -- PE's confidence rests on the downstream Ramos2015 MD validation, not the 1998 origin paper.",
       "forcefield": "TraPPE-UA",
       "charge_method": "embedded",
       "dp_typical": 120,
@@ -548,8 +620,8 @@
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1021/ja00086a030",
-      "ff_note": "PCFF via EMC (Class II). Switched from TraPPE-UA 2026-06-11: UA representation ignores phenyl ring partial charges and pi-dihedral barriers that govern PS Tg (~373 K); no TraPPE-UA PS Tg validation exists in literature. PCFF Class II explicitly parameterizes aromatic C-H charges and cross-terms; validated for PMMA vinyl backbone (NkepsuMbitou2025, Class II within 10%). (Note: Tang2022 studied PC/PMMA Tg with the Kremer and OPLS-AA force fields, NOT PCFF; the prior 'PC Tang2022 PCFF Tg=417K' claim was a misattribution and is removed.) Soldera2006 (COMPASS/OPLS) confirms MD can reach PS Tg ~449-484 K raw, WLF-corrected ~373 K. No direct PCFF PS Tg paper found; confidence=medium until confirmed. DENSITY CAVEAT (2026-08-20): PCFF underpredicts PS 300K density by -5.85% to -6.32% across three independent a-PS runs (original + two orthogonal equilibration-time extensions that failed to close the gap -- see docs/ff_selection_literature.json section 6). PCFF's own founding paper (Sun 1998 COMPASS, DOI 10.1021/jp980939v) documents a same-family benzene/toluene density deficit of -6.3%/-6.5%, mechanistically an NVT excess-pressure defect at the correct density; COMPASS reduces this to -1.1%/-1.2% for the same compounds. field_override='compass' is EMC-admissible in principle (Class II, same LAMMPS deck) but has not been build-tested against PS's SMILES -- run ff_capability.py before committing equilibration compute to it. Do not generalize this specific aromatic-ring finding to non-aromatic classes.",
+      "ff_justification_doi": "10.1021/jp980939v",
+      "ff_note": "PCFF (Class II) via EMC. TraPPE-UA was rejected: its united-atom representation ignores the phenyl ring partial charges and pi-dihedral barriers that govern PS's Tg (~373K), and no TraPPE-UA PS Tg validation exists. PCFF explicitly parameterizes aromatic C-H charges and cross-terms; Soldera2006 (COMPASS/OPLS) confirms MD reaches PS Tg ~449-484K raw, WLF-corrected ~373K -- no direct PCFF PS Tg paper exists, so confidence is medium. DENSITY CAVEAT: PCFF underpredicts PS 300K density by -5.85% to -6.32% across three independent runs; PCFF's founding paper documents the same aromatic-ring deficit for benzene/toluene (-6.3%/-6.5%), which COMPASS reduces to -1.1%/-1.2% for the same compounds -- field_override='compass' is EMC-admissible but not build-tested against PS's SMILES. Do not generalize this aromatic-ring finding to non-aromatic classes.",
       "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "dp_typical": 40,
@@ -582,8 +654,8 @@
       "T_equil_K": 550.0,
       "stage7_min_steps": 5000000,
       "annealing_T_high_K": 630.0,
-      "alpha_glass_per_K": 2.49e-4,
-      "alpha_melt_per_K": 5.76e-4,
+      "alpha_glass_per_K": 0.000249,
+      "alpha_melt_per_K": 0.000576,
       "_alpha_note": "2026-08-04: derived from Mark 2007 Polystyrene density(T) equations in db/polymer_db.sqlite (density_equations table), alpha_V = -(1/rho)(drho/dT). glass: mean of 2 equations near 300K (2.12e-4, 2.86e-4). melt: mean of 3 equations, evaluated up to 276.9C (one equation's own valid range extends to 320C, no extrapolation). Feeds enforce_equilibration_gate's density_value_binding diagnosis -- relevant here since PS is currently an open MELT_STAGE_DEFICIT probe (see _density_value_binding_open_probe above); a more accurate alpha_melt sharpens that probe's melt-density-gap read once it's run.",
       "tg_t_high_K": 600,
       "tg_t_low_K": 200,
@@ -668,7 +740,7 @@
       "T_equil_K": 530.0,
       "stage7_min_steps": 8000000,
       "annealing_T_high_K": 610.0,
-      "alpha_melt_per_K": 6.55e-4,
+      "alpha_melt_per_K": 0.000655,
       "_alpha_note": "2026-08-04: derived from Mark 2007 Poly(vinylchloride) melt density(T) equation in db/polymer_db.sqlite (density_equations table), alpha_V = -(1/rho)(drho/dT), evaluated at t_max=150C (equation's own valid range is 100-150C -- no extrapolation). No glass-phase equation exists in the DB for PVC; alpha_glass_per_K stays unset, gate falls back to the generic default (2.5e-4/K) for the glassy-side term. Feeds enforce_equilibration_gate's density_value_binding diagnosis.",
       "tg_t_high_K": 550,
       "tg_t_low_K": 150,
@@ -705,7 +777,7 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1007/s10118-019-2249-5",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PVC PASS, PVAc PASS, PVA PASS). Note: OPLS-AA failed for PVC and PVAc; PCFF succeeded.",
+      "ff_note": "PCFF via EMC (build-tested: PVC/PVAc/PVA all PASS). OPLS-AA was tried and failed to build for PVC and PVAc. A full-text-verified COMPASS (Class-II) study of neat PVC reports K=2.947 GPa at 298K, numerically overlapping PolyJarvis's own PCFF-measured K=2.7-2.9 GPa -- two independent Class-II variants converge on the same value, suggesting the ~20-35% K deficit vs the experimental band [3.5,4.5] GPa is a Class-II-family-wide limitation rather than a PCFF-specific bug; switching to COMPASS would likely not fix it. No field-override recommended.",
       "exp_K_GPa": {
         "min": 3.5,
         "max": 4.5,
@@ -766,8 +838,8 @@
       "annealing_T_high_K": 630.0,
       "cool_block_hold_steps": 400000,
       "_cool_block_hold_steps_note": "Raised above the 200,000-step default (2026-08-04) per assess_cooling_contraction on PMMA2/3/4: all 3 showed UNDER_ANNEALED_COOLING (melt density fine, cooling ramp achieved only 93-95% of expected contraction). Matches this class's own experimental_density_gcm3 note above (NkepsuMbitou2025: ~10 anneal cycles needed for <2% density accuracy, doubled here as cool_block_hold_steps=400,000). Hypothesis for the _R2 pilot to validate, not yet empirically confirmed at n>0.",
-      "alpha_glass_per_K": 1.99e-4,
-      "alpha_melt_per_K": 6.15e-4,
+      "alpha_glass_per_K": 0.000199,
+      "alpha_melt_per_K": 0.000615,
       "_alpha_note": "2026-08-04: derived from Mark 2007 Poly(methylmethacrylate) density(T) equations in db/polymer_db.sqlite (density_equations table), alpha_V = -(1/rho)(drho/dT). glass: mean of 4 equations evaluated near 300K (individual values 1.60e-4 to 2.30e-4/K). melt: mean of 5 equations evaluated near T_equil=550K, all within or at the edge of their fitted T-range (up to 270C) -- no large extrapolation. Feeds enforce_equilibration_gate's density_value_binding diagnosis (assess_cooling_contraction), replacing its generic default (2.5e-4/6.0e-4).",
       "tg_t_high_K": 600,
       "tg_t_low_K": 150,
@@ -813,7 +885,7 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1016/j.commatsci.2025.113861",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PMMA PASS). PCFF (Class II) strongly preferred: NkepsuMbitou2025 shows GAFF Tg error >45% for PMMA; PCFF within 10%.",
+      "ff_note": "PCFF via EMC (build-tested: PMMA PASS). GAFF/GAFF2 (Class I) was rejected: NkepsuMbitou2025 reports >45% Tg error for PMMA under GAFF vs <10% under PCFF. An unresolved discrepancy remains open: the same review's <2% Class-II density figure for PMMA is 3-4x smaller than PolyJarvis's own measured -5.7% to -6.6% PCFF density deficit; a dedicated search for a tacticity/DP/charge-method mechanism found nothing. Treat PACR density as this class's known-weakest/lowest-confidence property; no field-override recommended.",
       "exp_K_GPa": {
         "min": 3.5,
         "max": 4.2,
@@ -843,7 +915,7 @@
       "preferred_ff": "opls/2024/opls-aa",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/jp004071w",
-      "ff_note": "Halogen → OPLS-AA path. Afzal 2021 halogen-class R²=0.87, MAE=20.8K. Note: Watkins & Jorgensen 2001 covers perfluoroalkanes (PTFE-like all-CF2); PVDF mixed CF2-CH2 dihedrals use general OPLS-AA CT/HC types. PVDF2 run in progress for validation. ff_justification_doi = Watkins & Jorgensen 2001 (10.1021/jp004071w), the real OPLS-AA lineage; Byutner2000 is a separate bespoke FF, kept only for density-target/PPPM justification.",
+      "ff_note": "OPLS-AA via EMC: native Watkins & Jorgensen 2001 F LJ parameters (opls_965: sigma=2.95 A, epsilon=0.053 kcal/mol) cover CF2/CF3 backbones; PCFF lacks fluorocarbon parameterization and TraPPE-UA/GAFF2 are not the chemistry-appropriate fit for this backbone. Afzal2021 reports halogen-class R2=0.87, MAE=20.8K for OPLS3e. PVDF's mixed CF2-CH2 dihedrals use general OPLS-AA CT/HC types (Byutner2000 provides a bespoke density-target reference, not the routing justification itself). CAUTION: a same-family fluoropolymer comparison (Viton A, VDF/HFP) reports OPLS-derived fields producing systematically too-soft, under-packed structures relative to PCFF -- qualitative only, worth watching if PHAL modulus/K results come back low. OPLS-AA's own founding paper never tested a fluorine-containing liquid, so today's routing is an extrapolation beyond its stated scope, consistent with (not contradicted by) the Viton A caution.",
       "forcefield": "OPLS-AA",
       "charge_method": "opls-library",
       "dp_typical": 60,
@@ -927,7 +999,7 @@
       "preferred_ff": "trappe-ua",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/jp001044x",
-      "ff_note": "TraPPE-UA via EMC. Wick 2000 TraPPE-4 (J. Phys. Chem. B 104:8008) defines cis/trans-CH=CH- and CH2=CH- UA types for 1,3-butadiene and isoprene. Previous ff_justification_doi (Ramos2015) was for PE (PHYC), not dienes — corrected. Sharma2016 (JPCB) validates multiple UA FFs for PBD/PI Tg at microsecond timescales with excellent agreement. Afzal2021 butadiene-class OPLS3e R2=0.87, MAE=13.1 K also acceptable. TraPPE-UA includes alkene types; cis/trans microstructure must be encoded in SMILES.",
+      "ff_note": "TraPPE-UA via EMC: purely apolar diene backbone qualifies for the lj/cut-only tier over PCFF/OPLS-AA's heavier PPPM path. Wick2000 TraPPE-4 defines the cis/trans-CH=CH- and CH2=CH- UA types used for 1,3-butadiene and isoprene; Sharma2016 validates multiple UA FFs for PBD/PI Tg at microsecond timescales with excellent agreement vs experiment (PBD ~181K, PI ~200K); Afzal2021 butadiene-class OPLS3e R2=0.87, MAE=13.1K corroborates from a Class-I angle. cis/trans microstructure must be encoded directly in the input SMILES. TraPPE-UA's own 1998 founding paper covers only saturated n-alkanes; today's routing rests on the downstream Wick2000/Sharma2016/Afzal2021 extensions, not the 1998 origin paper.",
       "forcefield": "TraPPE-UA",
       "charge_method": "embedded",
       "dp_typical": 100,
@@ -1087,8 +1159,8 @@
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested 2026-05-31: PEO PASS). PCFF Class II outperforms GAFF2 for thermomechanical properties (NkepsuMbitou2025). EMC recommended.",
+      "ff_justification_doi": "10.1021/acs.iecr.3c03038",
+      "ff_note": "PCFF via EMC (build-tested 2026-05-31: PEO PASS). GAFF2 was rejected: PCFF (Class II) outperforms it for thermomechanical properties (NkepsuMbitou2025). Klajmon2023 benchmarks PLA/PEG/PVP with AA-MD and is this class's cited PEG/PEO reference (CrossRef-verified DOI); full text remains ACS-paywall-blocked, so PEG-specific Tg/density figures are treated as topic-relevant, not independently re-confirmed numerics.",
       "exp_K_GPa": {
         "min": 2.0,
         "max": 4.0,
@@ -1171,8 +1243,8 @@
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PPS PASS). PCFF has sulfone/sulfide types.",
+      "ff_justification_doi": null,
+      "ff_note": "PCFF via EMC (build-tested: PPS PASS). PCFF has native sulfone/sulfide types; the polar S-containing backbone is outside TraPPE-UA/lj_cut's apolar scope and outside OPLS-AA's covered chemistries, so PCFF is the only EMC-supported fit. No PCFF-vs-experiment polythioether/PPS literature has been located despite a dedicated search -- a genuine open validation gap. A 2024 on-chemistry PPS paper exists but uses COMPASS II, not PCFF, and reports no extractable quantitative baseline.",
       "exp_K_GPa": {
         "min": 3.5,
         "max": 5.5
@@ -1265,8 +1337,8 @@
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PLA PASS, PET PASS). PCFF has explicit ester types (c_1, o_2, oe). Klajmon2023 benchmarks PLA/PEG with AA-MD.",
+      "ff_justification_doi": "10.1021/acs.iecr.3c03038",
+      "ff_note": "PCFF via EMC (build-tested: PLA PASS, PET PASS). PCFF has explicit ester types (c_1, o_2, oe) covering this backbone; GAFF2 was rejected for the same Class-I Tg-accuracy reasons general to polar EMC-routed classes. Klajmon2023 benchmarks PLA/PEG AA-MD (CrossRef-verified DOI, full text ACS-paywall-blocked this session -- treated as topic-relevant, not independently re-confirmed). No PCFF-specific (as opposed to COMPASS/DREIDING/GAFF) density or Tg error for PLA or a small-molecule ester analog has been found despite a dedicated search. This class's +12.8% measured Tg offset is attributed to the known single-rate cooling-rate artifact common to all classes, with no independent literature FF-accuracy check available either way. No field-override recommended.",
       "exp_K_GPa": {
         "min": 3.0,
         "max": 4.5,
@@ -1368,8 +1440,8 @@
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1021/ja00086a030",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md) Confidence lowered to medium: PCFF used here by EMC builder constraint (no AMBER path available). AMBER99sb/CHARMM36 would be more accurate for H-bonded polyamides (Lukasheva2017 Soft Matter); PCFF QEq charges underrepresent amide H-bond geometry vs HF/6-31G* RESP charges.",
+      "ff_justification_doi": null,
+      "ff_note": "PCFF via EMC -- the only builder-supported path for this chemistry (no AMBER/CHARMM path is implemented in PolyJarvis). Confidence is medium: AMBER99sb/CHARMM36 (Lukasheva2017, not available in this platform) would likely be more accurate for H-bonded polyamides -- PCFF's QEq charges underrepresent amide H-bond geometry vs. HF/6-31G* RESP charges. No class-specific PCFF MD validation paper for polyamides has been located; this is a genuine open gap.",
       "exp_K_GPa": {
         "min": 3.5,
         "max": 5.5
@@ -1439,8 +1511,8 @@
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.3390/polym18060679",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: aliphatic TPU PASS). WARNING: aromatic MDI-type urethane SMILES fail with {o,c_2} increment error — test build before submitting aromatic TPU.",
+      "ff_justification_doi": null,
+      "ff_note": "PCFF via EMC (build-tested: aliphatic TPU PASS). WARNING: aromatic MDI-type urethane SMILES fail with a {o,c_2} increment error -- test-build before submitting aromatic TPU. GAFF2/RadonPy was tried and replaced by this EMC/PCFF path. No PCFF-specific validation for a linear/aliphatic TPU melt has been located in the literature; a 2026 PCFF/COMPASS paper exists but studies a crosslinked/curing thermoset network, a different physical system from the linear melt this class actually simulates, so it is not cited as justification. This remains a genuine open gap.",
       "K_deform_rate_slow_inv_s": 10000000.0,
       "member_smiles": {
         "note": "soft_segment/hard_segment are generic polyol-/diisocyanate-derived structural roles, not one discrete repeat-unit molecule each -- no member_smiles entries."
@@ -1495,8 +1567,8 @@
       ],
       "preferred_ff": "GAFF2_mod",
       "preferred_builder": "radonpy",
-      "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "RadonPy/GAFF2_mod path. Polar (C=O, N-H, N-H) urea backbone. EMC does not yet implement PURA.",
+      "ff_justification_doi": null,
+      "ff_note": "GAFF2_mod via RadonPy -- EMC does not yet implement this class (missing the n_2/hn amide-N increment), so PCFF/OPLS-AA/TraPPE-UA are all unavailable here; RadonPy/GAFF2 is the only builder path. No GAFF2-vs-experiment polyurea literature has been located: neither of two partial analogs closes the gap -- GAFF2 on a urea crystal (Anker2023) gets the force field and functional group right but the wrong physical state (crystal, not amorphous melt); a 2025 'polyureas' paper gets the physical state right but turns out on full-text inspection to be a urea-urethane hybrid under COMPASS, not GAFF2. Per the platform-wide GAFF/GAFF2 caution, Tg results for this class should be treated as screening-quality (+/-20-30K) unless validated against experiment.",
       "member_smiles": {
         "note": "hard_segment is a generic isocyanate-derived structural role, not one discrete repeat-unit molecule -- no member_smiles entry."
       }
@@ -1559,8 +1631,8 @@
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1002/pol.20200050",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md).",
+      "ff_justification_doi": null,
+      "ff_note": "PCFF via EMC -- Sun1994 (CFF93/PCFF) is the FF's general origin; no class-specific PCFF MD validation paper for this class's own exemplar (PMDA-ODA/Kapton) has been located. A 2024 paper validates PMDA-ODA/Kapton mechanical properties directly (Young's modulus 2.5 GPa MD vs 2.5-3.2 GPa experimental range) but under OPLS-AA, not PCFF -- a source combining PCFF with this class's actual chemistry does not yet exist. This is a genuine open gap, not a routing concern (PCFF remains the correct choice for this polar, charge-bearing backbone).",
       "exp_K_GPa": {
         "min": 4.0,
         "max": 6.0
@@ -1622,8 +1694,8 @@
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1021/acsapm.0c00524",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(sebacic anhydride) PASS). PCFF ester-like types cover anhydride linkage.",
+      "ff_justification_doi": null,
+      "ff_note": "PCFF via EMC (build-tested: poly(sebacic anhydride) PASS). PCFF's ester-like types cover the anhydride linkage; the polar backbone rules out TraPPE-UA/lj_cut and OPLS-AA lacks matching parameters, so PCFF is the only EMC-supported fit. No PCFF/COMPASS/Class-II density or Tg source for any polyanhydride has been located despite a dedicated search of the drug-delivery/biodegradable-polymer MD literature specifically. This is a genuine, confirmed-open validation gap.",
       "K_deform_rate_slow_inv_s": 10000000.0,
       "member_smiles": {
         "poly_sebacic_anhydride": [
@@ -1674,7 +1746,7 @@
         "note": "Me=rho*R*T/Ge (Mark 2007 Ch.25 Tables 25.1-25.5). DP@Me << current dp_typical -- no change needed. PCBN is single-member (BPA-PC only)."
       },
       "experimental_density_gcm3": {
-        "BPA_PC": 1.20,
+        "BPA_PC": 1.2,
         "notes": "Amorphous BPA-PC at RT, 1.20-1.22 g/cm³ (Mark2007; cf. exp_E_GPa notes). Used for the R1M7 ablation accuracy read."
       },
       "exp_E_GPa": {
@@ -1698,7 +1770,7 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/ja00086a030",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin and the PCFF justification. Tang2022 shows AA-MD reproduces BPA-PC Tg/Rg but with the Kremer et al. FF (NOT PCFF) — it supports AA-MD for PC generally, not the PCFF choice specifically.",
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF), 'An ab Initio CFF93 All-Atom Force Field for Polycarbonates,' is genuinely PCBN-specific founding parameterization. Tang2022 shows AA-MD reproduces BPA-PC Tg/Rg, but with the Kremer et al. force field, not PCFF -- it supports AA-MD for PC generally, not the PCFF choice specifically. Sun1994's own validation is entirely ab initio conformational-energy fits, crystal-lattice parameters, and vibrational frequencies on small model compounds and a 7-molecule crystal cluster -- never a bulk liquid/polymer-melt MD simulation. PCBN's PCFF choice is therefore chemistry-matched by citation but still empirically unvalidated by this specific paper for bulk density/Tg.",
       "exp_K_GPa": {
         "min": 3.0,
         "max": 4.0
@@ -1765,7 +1837,7 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1002/pol.20200050",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PEI PASS). PCFF has amine N types. Wen2020 validates PCFF for Ultem (4,4-BPADA+MPD): MD Tg=525K vs exp ~490K (+7%).",
+      "ff_note": "PCFF via EMC (build-tested: PEI PASS). PCFF has amine N types covering this backbone. Wen2020 explicitly confirms PCFF usage ('All MD simulations were performed using LAMMPS with the PCFF force field') and validates Ultem (4,4-BPADA+MPD): the paper's less-accurate specific-volume method gives Tg=525K/+7.1% vs exp; its own preferred self-diffusion method gives 504K/+2.9%. Four other BPADA-etherimide variants are also reported (Tg errors +2.3% to +9.1%). This evidence covers only the polyetherimide/Ultem side of this class's dual scope -- linear poly(ethylenimine) remains uncited, a genuine open gap.",
       "K_deform_rate_slow_inv_s": 10000000.0,
       "member_smiles": {
         "linear_PEI": [
@@ -1839,7 +1911,7 @@
       "preferred_ff": "opls/2024/opls-aa",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acs.jpcb.4c08471",
-      "ff_note": "EMC opls/2024/opls-aa with patched siloxane typing rules (2026-06-05). Charges from BCIs: si4_internal=+0.94, si4_terminal=+0.82, o2(bridge)=-0.44, o2h(silanol)=-0.60. Validate density against PDMS exp. target ~0.97 g/cm³.",
+      "ff_note": "OPLS-AA via EMC with patched siloxane typing rules -- PCFF lacks {si, osi} parameters, ruling it out outright. Charges from BCIs: si4_internal=+0.94, si4_terminal=+0.82, o2(bridge)=-0.44, o2h(silanol)=-0.60; validate density against PDMS exp. target ~0.97 g/cm3. This class has the strongest literature backing of any class in the file: a same-polymer 5-force-field PDMS benchmark ranks OPLS-AA 2nd-best of five by density RMSE (0.0414 g/cm3), well ahead of COMPASS (worst of five, RMSE 0.178, wrong-sign over-prediction) -- a direct, same-polymer, multi-force-field comparison that independently confirms the routing choice despite OPLS-AA's own founding paper never testing a Si-O liquid. No field-override warranted.",
       "ff": "opls/2024/opls-aa",
       "ff_notes": "EMC opls/2024/opls-aa with added siloxane rules. Si4/o2 bond+angle+torsion params were already present; only typing rules and o2-si4/o2h-si4 charge increments were added. pcff still missing {si,osi}.",
       "member_smiles": {
@@ -1901,8 +1973,8 @@
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.3390/polym14071451",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: poly(ethoxyphosphazene) PASS; pcff.frc explicitly added polyphosphazene types). WARNING: Cl-substituted PDCP not tested.",
+      "ff_justification_doi": null,
+      "ff_note": "PCFF via EMC (build-tested: poly(ethoxyphosphazene) PASS; pcff.frc explicitly added polyphosphazene types). WARNING: Cl-substituted PDCP not tested. No PCFF-vs-experiment polyphosphazene validation paper has been located -- a 1998 COMPASS-phosphazene parameterization paper (Sun/Ren/Fried) explains the pcff.frc phosphazene types mechanistically (COMPASS's phosphazene nonbonded terms were derived from PCFF) but is small-molecule/crystal-scoped, not a bulk-polymer validation. This is a genuine, confirmed-open validation gap for this class.",
       "K_deform_rate_slow_inv_s": 10000000.0,
       "member_smiles": {
         "poly_ethoxyphosphazene": [
@@ -1932,7 +2004,7 @@
       "annealing_T_high_K": 850.0,
       "cool_block_hold_steps": 300000,
       "_cool_block_hold_steps_note": "Raised above the 200,000-step default (2026-08-04) per assess_cooling_contraction on PEEK1/2/3/4: all 4 showed UNDER_ANNEALED_COOLING (contraction shortfall 0.91-0.93), same mechanism as PMMA's fix. LOWER CONFIDENCE than the PMMA fix: extrapolation_reliable=False on all 4 (470K cooling span exceeds the tool's reliable range) -- per decision_policy.json density_value_binding, lean on the absolute glass-vs-exp density gate as primary evidence, treat the melt/cooling split as indicative only. Hypothesis for the _R2 pilot to validate, not yet empirically confirmed at n>0. Set cool_block_hold_steps=300,000 (1.5x default).",
-      "alpha_melt_per_K": 6.69e-4,
+      "alpha_melt_per_K": 0.000669,
       "_alpha_note": "2026-08-04: derived from Mark 2007 Polyetheretherketone melt density(T) equation in db/polymer_db.sqlite (density_equations table), rho(t)=1.397*exp(-6.69e-4*t) -- alpha_V = -(1/rho)(drho/dt) is exactly 6.69e-4 everywhere for a pure-exponential fit (extrapolation-insensitive: same value whether evaluated at the equation's own t_max=400C or extrapolated to T_equil=770K/497C). No glass-phase equation exists in the DB for PEEK; alpha_glass_per_K stays unset, generic default (2.5e-4/K) applies for the glassy-side term -- this does NOT resolve the extrapolation_reliable=False caveat above, which is about the 470K cooling-span assumption in the piecewise model, a separate issue from this alpha value's own quality.",
       "tg_t_high_K": 750,
       "tg_t_low_K": 250,
@@ -1983,7 +2055,7 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.3390/polym12051054",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md). PEEK2020 validates COMPASS II (Class II family) for PEEK: Tg=424-429K vs exp 418K (+1-3%).",
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF's general origin; no class-specific PCFF MD validation paper for PEEK has been located. PEEK2020 validates COMPASS II (same Class-II family) for PEEK: Tg=424-429K vs exp 418K (+1-3%), but its density figure over-predicts by +2.2% (1.364 vs exp 1.328 g/cm3) on a small cyclic-oligomer model -- the opposite sign from PolyJarvis's own measured PCFF density deficit of -5.1% on a linear amorphous melt. This is a genuine unresolved sign discrepancy (different Class-II variant, different structural model), not a confirmation or refutation of the internal PCFF number; no field-override recommended, and 'Class-II under-predicts PEEK density' should not be treated as a settled family-wide rule.",
       "exp_K_GPa": {
         "min": 4.0,
         "max": 5.8,
@@ -2023,8 +2095,8 @@
       "stage7_min_steps": 20000000,
       "_stage7_min_steps_note": "Raised 15->20 ns (2026-08-04) per assess_cooling_contraction on PSU2/3/4: bulk glass density is OK (unlike PMMA), so the density-homogeneity CV failure is a melt-stage MIXING defect, not a cooling-ramp defect. stage7_min_steps controls the isothermal melt-hold (nvt_kinetic_stability) duration that the homogeneity check runs against -- anneal_hold/cool_block is not the right lever here. Hypothesis for the _R2 pilot to validate, not yet empirically confirmed at n>0.",
       "annealing_T_high_K": 780.0,
-      "alpha_glass_per_K": 2.10e-4,
-      "alpha_melt_per_K": 6.19e-4,
+      "alpha_glass_per_K": 0.00021,
+      "alpha_melt_per_K": 0.000619,
       "_alpha_note": "2026-08-04: derived from Mark 2007 Polysulfone (Bisphenol A) density(T) equations in db/polymer_db.sqlite (density_equations table), alpha_V = -(1/rho)(drho/dT). glass: single equation evaluated near 300K. melt: single equation evaluated at t=371C, exactly at the equation's own valid-range upper bound (185-371C) -- no extrapolation. Feeds enforce_equilibration_gate's density_value_binding diagnosis.",
       "tg_t_high_K": 750,
       "tg_t_low_K": 250,
@@ -2073,8 +2145,8 @@
       ],
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
-      "ff_justification_doi": "10.1021/ja00086a030",
-      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF origin; no class-specific PCFF MD validation paper available yet (see Track G in ROADMAP.md).",
+      "ff_justification_doi": null,
+      "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF's general origin; no class-specific PCFF MD validation paper for polysulfone has been located. A dedicated literature search found no PCFF- or COMPASS-vs-experiment density/Tg number for polysulfone, polyethersulfone, or a small-molecule diaryl-sulfone analog. PolyJarvis's own measured -4.0% to -4.3% density deficit and +2-8% Tg overestimate are internal measurements only, neither literature-corroborated nor contradicted. No field-override recommended; this is a genuine open validation gap.",
       "exp_K_GPa": {
         "min": 4.0,
         "max": 5.5,
@@ -2154,7 +2226,7 @@
       "preferred_ff": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1002/mats.201600006",
-      "ff_note": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested: PPV PASS). Note: OPLS-AA failed for PPV (no vinyl rule); PCFF succeeded. Conjugated torsional accuracy not yet validated. Venkatanarayanan2016 validates PCFF directly for PPV: Tg=416±8K vs exp ~416K.",
+      "ff_note": "PCFF via EMC (build-tested: PPV PASS). OPLS-AA was tried and failed for PPV (no vinyl rule). Venkatanarayanan2016 validates PCFF directly for PPV: Tg=416+/-8K vs exp ~416K, independently corroborated via CrossRef and multiple converging sources -- an essentially exact match. Young's modulus at 298K is also reported: 9.20+/-0.57 GPa (PPV), 1.81+/-0.34 GPa (polyacetylene, no Tg observed 120-500K). CAVEAT: the paper's own PCFF usage could not be re-confirmed from primary text this round (paywalled) -- reported as unconfirmed-through-paywall, not contradicted. Conjugated-torsion/backbone-planarity accuracy remains fully open.",
       "K_deform_rate_slow_inv_s": 10000000.0,
       "member_smiles": {
         "PPV": [

@@ -167,7 +167,7 @@ def _carry_provenance(prior_probe: dict, probe: dict) -> None:
     """Carry hand-authored provenance sub-blocks (e.g. kokkos_offload_study) across a fresh
     directional_probe rebuild. Those record cross-host engine rationale that isn't re-derived
     by a throughput sweep, so wiping them on every calibration would lose real history."""
-    for key in ("kokkos_offload_study",):
+    for key in ("kokkos_offload_study", "size_points"):
         if key in prior_probe:
             probe[key] = prior_probe[key]
 

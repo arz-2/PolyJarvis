@@ -15,14 +15,14 @@ ff_family} to stdout (exit 0), or {"error": "..."} (exit 1).
 """
 import argparse
 import json
-import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hw_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family, live_host
+from hw_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family
+import cost_model
 
 _RDKIT_SNIPPET = """\
 import os
@@ -76,23 +76,6 @@ def _monomer_atoms_and_mw(smiles: str, is_ua: bool, env: str = "radonpy",
         Path(snippet_path).unlink(missing_ok=True)
 
 
-def _host_matches_measured_on(measured_on: str, live: dict) -> bool:
-    """directional_probe.measured_on is free-text prose (e.g. '4x NVIDIA A800 40GB Active /
-    32 phys cores (...)'), not a structured dict like hardware_policy.host -- extract the GPU
-    model and phys_cores substrings and compare against the live host. Unparseable or absent
-    -> treat as mismatched (conservative: never silently adopt a probe from an unknown host)."""
-    if not measured_on:
-        return False
-    cores_match = re.search(r"(\d+)\s*phys\s*cores", measured_on)
-    if not cores_match or int(cores_match.group(1)) != live.get("phys_cores"):
-        return False
-    gpu_model = live.get("gpu_model") or ""
-    # Compare on the model's distinguishing token (e.g. "A800", "RTX 6000") rather than the
-    # full string -- measured_on and hardware_policy.host format GPU names slightly differently.
-    tokens = [t for t in re.split(r"[\s,/]+", gpu_model) if len(t) >= 3]
-    return any(t in measured_on for t in tokens) if tokens else False
-
-
 def select_hardware(polymer_class: str, smiles: str, dp_typical: int | None,
                      nchain: int | None) -> dict:
     rules = load_rules()
@@ -117,45 +100,25 @@ def select_hardware(polymer_class: str, smiles: str, dp_typical: int | None,
     cell_atoms = atoms_per_monomer * dp * nchain_v
     cell_mass = mw_per_monomer * dp * nchain_v          # g/mol, end caps neglected
 
-    dp_probe = hp.get("directional_probe", {})
-    values_are_benchmarked = bool(hp.get("values_are_benchmarked", False))
-    measured_on = dp_probe.get("measured_on")
-    live = live_host()
-    host_match = _host_matches_measured_on(measured_on, live)
-    recommended = dp_probe.get("recommended_by_ff", {}).get(fam)
-
-    cleanly_benchmarked = values_are_benchmarked and host_match and recommended is not None
-    in_size_window = False
-    if cleanly_benchmarked:
-        probe_atoms = recommended.get("cell_atoms")
-        if probe_atoms:
-            in_size_window = (0.5 * probe_atoms <= cell_atoms <= 2.0 * probe_atoms)
-
-    if cleanly_benchmarked and in_size_window:
-        choice = {"engine": recommended["engine"], "gpu_per_run": recommended["gpu"],
-                   "mpi_ranks": recommended["mpi"]}
-        evidence = [{
-            "claim": f"directional_probe.recommended_by_ff[{fam}] measured on this host, "
-                     f"cell_atoms={recommended.get('cell_atoms')} within [0.5x,2x] of the "
-                     f"planned estimate ({cell_atoms} atoms)",
-            "ns_per_day": recommended.get("ns_per_day"),
-            "measured_on": measured_on, "date": dp_probe.get("date"),
-        }]
-        confidence = "high"
-    else:
-        choice = {"engine": default.get("engine"), "gpu_per_run": default.get("gpu_per_run"),
-                  "mpi_ranks": default.get("mpi")}
-        reason = ("by_forcefield default; not yet cleanly benchmarked on this host"
-                  if not cleanly_benchmarked else
-                  f"by_forcefield default; directional_probe cell_atoms="
-                  f"{recommended.get('cell_atoms')} outside [0.5x,2x] of the planned estimate "
-                  f"({cell_atoms} atoms) -- probe is out of size range for this run")
-        evidence = [{"claim": reason, "note": default.get("note")}]
-        # cleanly_benchmarked-but-out-of-size-window still falls back to the by_forcefield
-        # default (not the measured recommendation) -- "medium", not "high": the host/engine
-        # choice is calibrated, but this specific cell size wasn't. "low" is reserved for no
-        # clean sweep at all.
-        confidence = "low" if not cleanly_benchmarked else "medium"
+    # D-08's only priced candidate: `by_forcefield[fam]` IS the config
+    # `recommended_by_ff`/`size_points` measured (same engine/mpi/gpu, per
+    # polymer_rules.json:hardware_policy.directional_probe.size_points._note) -- there is no
+    # second engine/mpi/gpu combination in this repo with its own real ns_per_day data to
+    # argmin against (`_prev_gpu_package` fallbacks carry no throughput numbers at all, so
+    # pricing them would be fabrication, not measurement). "Choosing hardware" here therefore
+    # means: price this one candidate honestly at the plan's actual cell size and let the
+    # confidence level reflect how much that price should be trusted -- using
+    # cost_model.py's real multi-point log-log interpolation (size_points) instead of this
+    # script's old single-point in-window heuristic, which never read size_points at all.
+    choice = {"engine": default.get("engine"), "gpu_per_run": default.get("gpu_per_run"),
+              "mpi_ranks": default.get("mpi")}
+    est = cost_model.estimate_ns_per_day(cell_atoms, fam, hp=hp, rules=rules)
+    confidence = est["confidence"]
+    evidence = [{
+        "claim": f"cost_model.estimate_ns_per_day at this run's {cell_atoms}-atom estimate: "
+                 f"{est['ns_per_day']} ns/day ({confidence} confidence)",
+        "basis": est["basis"], "note": default.get("note"),
+    }]
 
     # Size-scale floor: never let anything (probe or default) pin >=2 GPUs for a small cell.
     if cell_atoms < 10000 and choice.get("gpu_per_run", 1) and choice["gpu_per_run"] >= 2:
@@ -177,7 +140,7 @@ def select_hardware(polymer_class: str, smiles: str, dp_typical: int | None,
                                     "mpi_ranks": choice["mpi_ranks"]}
 
     uncertainties = []
-    if not cleanly_benchmarked:
+    if confidence != "high":
         uncertainties.append({"name": "hardware_optimum", "dominant": False,
                               "reduction_probe": "hardware_benchmark"})
 
