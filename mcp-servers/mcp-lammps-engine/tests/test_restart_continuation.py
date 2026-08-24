@@ -93,6 +93,20 @@ def test_continuation_reads_restart_appends_no_velocity_create(tmp_path, templat
     assert any(l.startswith("write_restart ") for l in lines)
 
 
+def test_minimize_writes_a_restart_file(tmp_path):
+    """minimize is the first stage in every equilibration chain and, unlike every other
+    stage, used to write only a .data file on completion -- no restart checkpoint at all.
+    A chain that crashes before the next stage's own checkpoint exists (e.g. disk-full
+    mid-chain) then has nothing newer than the as-built cell to resume from. minimize must
+    write a definitive restart file too, same as nvt/npt/npt_compress already do."""
+    out = str(tmp_path / "minimize.in")
+    script = ScriptGenerator(data_file=str(PCFF_DATA)).generate(
+        "minimize", output_path=out, params={},
+    )
+    lines = _noncomment_lines(script)
+    assert any(l.startswith("write_restart ") for l in lines)
+
+
 def test_continuation_and_fresh_start_use_the_same_dump_and_log_filenames(tmp_path):
     """The whole point of continuation is one growing trajectory -- fresh-start and its
     continuation must target the identical DUMP_FILE/LOG_FILE, not per-attempt names."""
