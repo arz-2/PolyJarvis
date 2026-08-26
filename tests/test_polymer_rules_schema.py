@@ -83,7 +83,13 @@ def test_routing_fields_are_known(cid):
 # opls→opls-library, trappe→embedded) are the authority of test_ff_routing.py, which
 # is sourced from the same JSON; duplicating those exact values here only invites the
 # two tests to contradict each other.
-EMC_FF_FAMILIES = ("pcff", "opls", "trappe")   # substring families (both opls spellings)
+EMC_FF_FAMILIES = ("pcff", "opls", "trappe", "compass")   # substring families (both opls spellings)
+# compass added 2026-08-26: it's a legal ENUM_OVERRIDES["preferred_ff"] value
+# (scientific_control.py), stage_params.py already treats it as pcff-equivalent
+# (class_ii = 'pcff' in ff or ff in ('compass', 'pcff_ore')), and it is mechanically
+# EMC-admissible for at least one class (POXI) -- the tuple was simply incomplete,
+# this closes a real test gap even though it doesn't itself unlock any currently
+# non-admissible class (compass fails admissibility for PEST/PURT independently).
 QM_CHARGE_JOBS = {"resp", "am1-bcc", "am1bcc", "gasteiger"}
 
 
@@ -102,11 +108,15 @@ def test_build_route_consistency(cid):
             f"{cid}: EMC embeds force-field charges → must not run a QM charge job, "
             f"got charge_method={e['charge_method']!r}"
         )
-    else:  # radonpy — runs a real charge-assignment job with a GAFF2 field
-        assert pref_ff in {"GAFF2", "GAFF2_mod"}, (
-            f"{cid}: RadonPy route expects a GAFF2 field, got preferred_ff={pref_ff!r}"
+    else:  # radonpy — runs a real charge-assignment job with a GAFF2 or Dreiding field
+        # Dreiding added 2026-08-26: mcp-mol-builder-server's assign_forcefield/
+        # submit_copolymerize_job now support it (radonpy.ff.dreiding.Dreiding, confirmed
+        # installed and build-tested end-to-end after patching a dict-vs-list bug in that
+        # module's assign_atypes/assign_dtypes/assign_itypes — see docs/ff_capability_gaps.json).
+        assert pref_ff in {"GAFF2", "GAFF2_mod", "Dreiding"}, (
+            f"{cid}: RadonPy route expects a GAFF2 or Dreiding field, got preferred_ff={pref_ff!r}"
         )
-        assert e["forcefield"] in {"GAFF2", "GAFF2_mod"}
+        assert e["forcefield"] in {"GAFF2", "GAFF2_mod", "Dreiding"}
         assert e["charge_method"] in {"RESP", "AM1-BCC"}, (
             f"{cid}: RadonPy runs a charge job → charge_method must be RESP/AM1-BCC, "
             f"got {e['charge_method']!r}"

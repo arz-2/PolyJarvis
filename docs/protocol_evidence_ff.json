@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-25T16:59:49Z",
+  "generated_at": "2026-08-26T15:18:57Z",
   "records": [
     {
       "schema_version": 1,
@@ -1190,6 +1190,1853 @@
         "source_run": "EvidenceStoreVerify1",
         "migrated_from": null,
         "added_at": "2026-08-25T16:56:28Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "e8055ddf867b",
+      "field": "forcefield",
+      "polymer_class": "PHAL",
+      "polymer_names": [
+        "PVDF (poly(vinylidene fluoride))"
+      ],
+      "smiles": [
+        "*CC(*)(F)F"
+      ],
+      "claim": "This MD study (20 chains x 20 CF2-CH2 repeat units, 2440 atoms) of amorphous PVDF used the all-atom Consistent Valence Force Field (CVFF, from Materials Studio) for bond/angle/torsion (harmonic) and LJ 12-6 + Coulomb nonbonded terms, run in LAMMPS -- not OPLS. No comparison against alternative force fields was performed within this paper (single-FF study), so it does not itself rank CVFF vs PCFF vs OPLS-AA.",
+      "value": {
+        "recommendation": "PCFF"
+      },
+      "doi": "10.20964/2018.11.01",
+      "url": "https://doi.org/10.20964/2018.11.01",
+      "title": "The Predicted Dielectric Constant of an Amorphous PVDF Changing with Temperature by Molecular Dynamics Simulations",
+      "year": 2018,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVDF_trace",
+        "migrated_from": null,
+        "added_at": "2026-08-26T12:11:20Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "e9cdd9a63aed",
+      "field": "electrostatics",
+      "polymer_class": "PHAL",
+      "polymer_names": [
+        "PVDF (poly(vinylidene fluoride))"
+      ],
+      "smiles": [
+        "*CC(*)(F)F"
+      ],
+      "claim": "Section 2.3 (Methods) states explicitly: 'The Lennard-Jones and Coulomb interactions are calculated within the neighbor list with cutoff distance 0.95 nm. The long-range interactions are calculated in k-space as a particle-particle/particle-mesh solver (PPPM).' Timestep 1 fs.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.20964/2018.11.01",
+      "url": "https://doi.org/10.20964/2018.11.01",
+      "title": "The Predicted Dielectric Constant of an Amorphous PVDF Changing with Temperature by Molecular Dynamics Simulations",
+      "year": 2018,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVDF_trace",
+        "migrated_from": null,
+        "added_at": "2026-08-26T12:11:20Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "d490f5bc08e2",
+      "field": "cooling_rate",
+      "polymer_class": "PHAL",
+      "polymer_names": [
+        "PVDF (poly(vinylidene fluoride))"
+      ],
+      "smiles": [
+        "*CC(*)(F)F"
+      ],
+      "claim": "Section 2.3: after NVE/NVT relaxation, the model was heated 100 K to 400 K over 250 ps under NPT, then cooled 400 K back down to 100 K over 250 ps under NPT (300 K span / 250 ps = 1.2 K/ps = 1200 K/ns). A separate stepwise NPT run (100-400 K in 50 K increments, 100 ps equilibration at 100 K then 20 ps per subsequent step) was used to build the density-temperature curve from which Tg was extracted at the crossing point of the two linear (glassy/melt) regimes, giving Tg_MD = 295 K vs their cited DMA experimental Tg_exp = 237 K (a +58 K / +24% overestimate, consistent with the paper's own note that 'the Tg obtained by MD simulations are higher than those measured from experiments'). This is a single continuous-ramp rate, not a multi-rate sweep, and the resulting Tg is a known overestimate -- treat this rate as a data point calibrating the fast end of the window, not as a validated accurate-Tg rate.",
+      "value": {
+        "rates": [
+          1200.0
+        ]
+      },
+      "doi": "10.20964/2018.11.01",
+      "url": "https://doi.org/10.20964/2018.11.01",
+      "title": "The Predicted Dielectric Constant of an Amorphous PVDF Changing with Temperature by Molecular Dynamics Simulations",
+      "year": 2018,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVDF_trace",
+        "migrated_from": null,
+        "added_at": "2026-08-26T12:11:20Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "331a28075b8b",
+      "field": "tg_target",
+      "polymer_class": "PHAL",
+      "polymer_names": [
+        "PVDF (poly(vinylidene fluoride))"
+      ],
+      "smiles": [
+        "*CC(*)(F)F"
+      ],
+      "claim": "Section 3.1: 'Liu used a dynamic mechanical analysis (DMA) to measure the glass transition temperature of PVDF, which is 237 K.' This is the experimental Tg the paper cites as its own comparison point for the MD-derived Tg (295 K).",
+      "value": {
+        "range": [
+          237,
+          237
+        ]
+      },
+      "doi": "10.20964/2018.11.01",
+      "url": "https://doi.org/10.20964/2018.11.01",
+      "title": "The Predicted Dielectric Constant of an Amorphous PVDF Changing with Temperature by Molecular Dynamics Simulations",
+      "year": 2018,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVDF_trace",
+        "migrated_from": null,
+        "added_at": "2026-08-26T12:11:20Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "caabaaa3a4cb",
+      "field": "cte_glass_melt",
+      "polymer_class": "PHAL",
+      "polymer_names": [
+        "PVDF (poly(vinylidene fluoride))"
+      ],
+      "smiles": [
+        "*CC(*)(F)F"
+      ],
+      "claim": "Values are NOT stated numerically by the authors -- they are this agent's own volumetric-CTE estimate (alpha_V = -(1/rho) drho/dT) computed by reading off two points on each linear regime of the paper's own Figure 3 density-vs-temperature plot: glassy regime approx (100 K, 1.535 g/cm3) to (250 K, 1.495 g/cm3) gives alpha_glass approx 1.8e-4 /K; melt regime approx (300 K, 1.475 g/cm3) to (400 K, 1.415 g/cm3) gives alpha_melt approx 4.2e-4 /K (a ~2.4x glass-to-melt increase, consistent with the generally reported 2-3x factor for amorphous polymers). Treat as an order-of-magnitude sanity check only, not an author-reported figure -- graph-reading precision is limited and this CVFF force field's absolute densities (1.42-1.54 g/cm3) run well below typical experimental amorphous-PVDF density (~1.68-1.78 g/cm3), so the underlying model may not be well packed.",
+      "value": {
+        "alpha_glass_per_K": 0.00018,
+        "alpha_melt_per_K": 0.00042
+      },
+      "doi": "10.20964/2018.11.01",
+      "url": "https://doi.org/10.20964/2018.11.01",
+      "title": "The Predicted Dielectric Constant of an Amorphous PVDF Changing with Temperature by Molecular Dynamics Simulations",
+      "year": 2018,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVDF_trace",
+        "migrated_from": null,
+        "added_at": "2026-08-26T12:11:20Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "52813af9a0a2",
+      "field": "forcefield",
+      "polymer_class": "PAMD",
+      "polymer_names": [
+        "Nylon-6 (polyamide 6, representative member of the PAMD class)"
+      ],
+      "smiles": [
+        "*CCCCCC(=O)N*"
+      ],
+      "claim": "RadonPy's fully-automated all-atom MD pipeline uses GAFF2 (general Amber force field version 2) as its production force field for all polymer chemistries, assigned automatically via RDKit/atom-typing with RESP-derived partial charges. The validated 1,070-polymer amorphous dataset explicitly spans 21 PoLyInfo backbone classes including a distinct 'Polyamides' class (shown as its own category in the UMAP chemical-space plot, Fig. 3, and in the joint-property-distribution plot, Fig. 5). One of the three example repeat-unit SMILES shown in the pipeline flowchart (Fig. 1) is '*NC(=O)CCCCC*' -- the aliphatic caprolactam/Nylon-6 repeat unit, i.e. the same amide-in-aliphatic-backbone chemistry as this run's target SMILES. Across the full validated set (N=382 polymers with experimental density in PoLyInfo), GAFF2-computed amorphous density reproduced experimental values with R^2=0.890 and parity-plot slope 0.805 (slight systematic underestimation attributed to lower MD polymerization degree vs. experimental samples, not a GAFF2 chemistry-specific failure). Two GAFF2-simulated amide-containing rigid/aromatic polyamide-family polymers are individually named and analyzed: PI626 (poly-p-phenyleneterephthalamide, i.e. Kevlar, an aromatic polyamide) and PI1093 (an aromatic polyimide containing an amide linkage), both showing physically sensible density, refractive index, and thermal-conductivity behavior driven by their amide hydrogen-bonding network, indicating GAFF2's RESP-charge/H-bond treatment functions correctly for amide chemistry at the class level.",
+      "value": {
+        "recommendation": "gaff2"
+      },
+      "doi": "10.1038/s41524-022-00906-4",
+      "url": "https://doi.org/10.1038/s41524-022-00906-4",
+      "title": "RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PAMD_ff_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:21:37Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "fcd5f9b8f747",
+      "field": "forcefield",
+      "polymer_class": "PCBN",
+      "polymer_names": [
+        "BPA-PC (bisphenol-A polycarbonate)"
+      ],
+      "smiles": [
+        "*Oc1ccc(C(C)(C)c2ccc(OC(*)=O)cc2)cc1"
+      ],
+      "claim": "Fan, Cagin, Chen, and Smith developed a modified DREIDING force field (parameters refined against ab initio torsional potentials) for bisphenol-A polycarbonate, validated crystallographic density against the model compound 4,4'-isopropylidenediphenylbis(phenyl carbonate) with good agreement to experiment, then used it to build amorphous BPA-PC structures for static/mechanical property MD. DOI confirmed to resolve to the exact matching ACS Macromolecules article (same authors, year, and title as consistently cited across independent secondary sources describing this as 'a modified version of the Dreiding force field'); full text is paywalled (403 via WebFetch on pubs.acs.org and ResearchGate) so the DREIDING attribution rests on the title/author/year match plus multiple independent secondary-source corroboration rather than a directly fetched abstract quote -- flagged accordingly, not treated as fully independently confirmed.",
+      "value": {
+        "recommendation": "dreiding"
+      },
+      "doi": "10.1021/ma00087a004",
+      "url": "https://doi.org/10.1021/ma00087a004",
+      "title": "Molecular Modeling of Polycarbonate. 1. Force Field, Static Structure, and Mechanical Properties",
+      "year": 1994,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PCBN_ff_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:21:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "16734ffaa979",
+      "field": "forcefield",
+      "polymer_class": "POXI",
+      "polymer_names": [
+        "PEG (poly(ethylene glycol)/PEO)"
+      ],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "All-atom PEO melt MD study uses the OPLS-AA force field; simulated density at 300 K is 1.071 g/cm3, stated by the authors as consistent with experimental data.",
+      "value": {
+        "recommendation": "OPLS-AA"
+      },
+      "doi": "10.3390/polym13224049",
+      "url": "https://doi.org/10.3390/polym13224049",
+      "title": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEG1",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:30:54Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "e4793dc8803b",
+      "field": "forcefield",
+      "polymer_class": "POXI",
+      "polymer_names": [
+        "PEG (poly(ethylene glycol)/PEO)"
+      ],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "PEG oligomer (n=2-7) MD study uses the General AMBER Force Field (GAFF); for the tetramer at 328 K, GAFF reproduces the experimental density (1096.0 +/- 0.1 kg/m3 exp vs 1143.3 +/- 0.1 kg/m3 sim) within ~5%.",
+      "value": {
+        "recommendation": "OPLS-AA"
+      },
+      "doi": "10.1039/d4ra04898a",
+      "url": "https://doi.org/10.1039/d4ra04898a",
+      "title": "Thermophysical properties of polyethylene glycol oligomers via molecular dynamics simulations",
+      "year": 2024,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEG1",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:30:54Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "c69e09be0f5e",
+      "field": "electrostatics",
+      "polymer_class": "POXI",
+      "polymer_names": [
+        "PEG (poly(ethylene glycol)/PEO)"
+      ],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "\"The long-range electrostatic contributions are calculated by using the Ewald summation.\" (mesh-Ewald/PPPM class method for all-atom PEO melt MD).",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.3390/polym13224049",
+      "url": "https://doi.org/10.3390/polym13224049",
+      "title": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEG1",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:30:54Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "384f251d716b",
+      "field": "electrostatics",
+      "polymer_class": "POXI",
+      "polymer_names": [
+        "PEG (poly(ethylene glycol)/PEO)"
+      ],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "\"For the treatment of long-range electrostatic interactions, the Ewald summation method was employed.\"",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.1039/d4ra04898a",
+      "url": "https://doi.org/10.1039/d4ra04898a",
+      "title": "Thermophysical properties of polyethylene glycol oligomers via molecular dynamics simulations",
+      "year": 2024,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEG1",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:30:54Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "938c2c328c9b",
+      "field": "density_target",
+      "polymer_class": "POXI",
+      "polymer_names": [
+        "PEG (poly(ethylene glycol)/PEO)"
+      ],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "Cites experimental PEO melt/amorphous density references of 1.112 g/cm3 and a 1.07-1.27 g/cm3 range as the validation target for its own OPLS-AA simulated density of 1.071 g/cm3 at 300 K.",
+      "value": {
+        "range": [
+          1.07,
+          1.27
+        ],
+        "T_K": 300
+      },
+      "doi": "10.3390/polym13224049",
+      "url": "https://doi.org/10.3390/polym13224049",
+      "title": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEG1",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:30:54Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "8d14bbc8f5ca",
+      "field": "density_target",
+      "polymer_class": "POXI",
+      "polymer_names": [
+        "PEG (poly(ethylene glycol)/PEO)"
+      ],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "Cites an experimental PEG tetramer density of 1096.0 +/- 0.1 kg/m3 (1.096 g/cm3) at 328 K as the validation target for its GAFF-based MD density of 1143.3 kg/m3.",
+      "value": {
+        "range": [
+          1.07,
+          1.27
+        ],
+        "T_K": 300
+      },
+      "doi": "10.1039/d4ra04898a",
+      "url": "https://doi.org/10.1039/d4ra04898a",
+      "title": "Thermophysical properties of polyethylene glycol oligomers via molecular dynamics simulations",
+      "year": 2024,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEG1",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:30:54Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "eab3fcea6893",
+      "field": "electrostatics",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "Poly(methyl methacrylate) (PMMA, atactic -- representative PACR member)"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "Bulk PMMA MD (OPLS-AA) used particle mesh Ewald electrostatics (grid spacing 0.25 nm, interpolation order 4) for the ester-carbonyl-bearing polymer; this is the Ewald-family method PolyJarvis maps to LAMMPS pppm.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.3390/ma12203315",
+      "url": "https://doi.org/10.3390/ma12203315",
+      "title": "Molecular Dynamics Study of the Swelling of Poly(methyl methacrylate) in Supercritical Carbon Dioxide",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PACR_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:34:38Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "6be13f472bbc",
+      "field": "electrostatics",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "Poly(methyl methacrylate) (PMMA, atactic -- representative PACR member)"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "General-practice confirmation from a 315-polymer high-throughput MD screening dataset (not PMMA-specific) that PME/PPPM-type Ewald electrostatics is standard for this class of amorphous polymer MD; DOI resolves to the correct ACS article page (full text 403-gated, not independently re-verified this pass).",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.1021/acsapm.0c00524",
+      "url": "https://doi.org/10.1021/acsapm.0c00524",
+      "title": "High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PACR_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:34:38Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "69b61211cbbe",
+      "field": "density_target",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "Poly(methyl methacrylate) (PMMA, atactic -- representative PACR member)"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "OPLS-AA MD of bulk PMMA reported density 1161 +/- 2 kg/m3 at 333 K, matching the paper's own cited experimental validation target of 1160 kg/m3 at the same conditions. Full text obtained via PMC (PMC6829346); DOI independently re-resolved to the correct MDPI article via redirect (title/PII confirmed).",
+      "value": {
+        "range": [
+          1.155,
+          1.166
+        ],
+        "T_K": 333
+      },
+      "doi": "10.3390/ma12203315",
+      "url": "https://doi.org/10.3390/ma12203315",
+      "title": "Molecular Dynamics Study of the Swelling of Poly(methyl methacrylate) in Supercritical Carbon Dioxide",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PACR_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:34:38Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "41d36c295378",
+      "field": "tg_target",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "Poly(methyl methacrylate) (PMMA, atactic -- representative PACR member)"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "Simulated Tg (417 K, OPLS-AA, rapid-cooling) exceeded the paper's own cited experimental Tg range of 363-387 K for PMMA, attributed by the authors to the simulation's much faster cooling rate than DSC; the 363-387 K exp band brackets and corroborates polymer_rules.json's PACR.experimental_tg_K.PMMA = 378 K class default.",
+      "value": {
+        "range": [
+          363,
+          387
+        ]
+      },
+      "doi": "10.3390/ma12203315",
+      "url": "https://doi.org/10.3390/ma12203315",
+      "title": "Molecular Dynamics Study of the Swelling of Poly(methyl methacrylate) in Supercritical Carbon Dioxide",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PACR_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:34:38Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "076d0ac670fb",
+      "field": "forcefield",
+      "polymer_class": "PVNL",
+      "polymer_names": [
+        "Poly(vinyl chloride) (PVC, representative member of PVNL class -- PVA/PVC/PVAc)"
+      ],
+      "smiles": [
+        "*CC(*)Cl"
+      ],
+      "claim": "Full PDF confirmed: neat/amorphous atactic PVC (24 repeat units, Mn=25534, built in Materials Studio) simulated with the COMPASS force field (Class II, same lineage/functional form as PCFF). Bulk modulus K=2.947 GPa at 298K reported for pure PVC; Tg by density method=365.42K and by free-volume method=363.68K vs experimental Tg=354.15K (both methods +2.7-3.2% over). This is the SAME paper already cited as PVNL's ff_justification_doi in polymer_rules.json -- re-verified independently this round via direct PDF retrieval (not just search snippet).",
+      "value": {
+        "recommendation": "PCFF"
+      },
+      "doi": "10.1007/s10118-019-2249-5",
+      "url": "https://doi.org/10.1007/s10118-019-2249-5",
+      "title": "Research on the Glass Transition Temperature and Mechanical Properties of Poly(vinyl chloride)/Dioctyl Phthalate (PVC/DOP) Blends by Molecular Dynamics Simulations",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVNL_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:35:53Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "c8c3bcc7b6cd",
+      "field": "electrostatics",
+      "polymer_class": "PVNL",
+      "polymer_names": [
+        "Poly(vinyl chloride) (PVC, representative member of PVNL class -- PVA/PVC/PVAc)"
+      ],
+      "smiles": [
+        "*CC(*)Cl"
+      ],
+      "claim": "Full PDF confirmed (Simulation Details section, p.835): 'the electrostatic interactions were approximated by the Ewald method with an accuracy of 0.4186 J*mol^-1'; van der Waals handled atom-based with cutoff distance 1.55 nm. Ewald-mesh summation is the direct analog of LAMMPS pppm (both are Ewald-family long-range Coulomb solvers, as opposed to a bare lj_cut/coul_cut truncation) -- directly supports treating PVC's backbone C-Cl dipoles with a full Ewald/PPPM electrostatics solver rather than a cutoff scheme.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.1007/s10118-019-2249-5",
+      "url": "https://doi.org/10.1007/s10118-019-2249-5",
+      "title": "Research on the Glass Transition Temperature and Mechanical Properties of Poly(vinyl chloride)/Dioctyl Phthalate (PVC/DOP) Blends by Molecular Dynamics Simulations",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVNL_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:35:53Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "47eac93da56c",
+      "field": "cooling_rate",
+      "polymer_class": "PVNL",
+      "polymer_names": [
+        "Poly(vinyl chloride) (PVC, representative member of PVNL class -- PVA/PVC/PVAc)"
+      ],
+      "smiles": [
+        "*CC(*)Cl"
+      ],
+      "claim": "Full PDF confirmed (Simulation Details, p.835): after initial equilibration, 'an annealing process at high temperature was conducted... in which the temperature was lowered from 458 K to 148 K at an interval of 20 K under atmospheric pressure', with each step given 400 ps NPT + 400 ps NVT (800 ps dwell/equilibration per temperature point) to build the V-T curve used for the density-method and free-volume-method Tg fits. This is a STAIRCASE (stepwise) protocol, not a literal continuous ramp; the paper never states a K/ns figure itself. Reducing it to an effective average rate for comparison purposes: (458-148)K / (16 steps x 0.8 ns/step) = 310K / 12.8ns ~= 24.2 K/ns -- this number is MY OWN arithmetic derived from the paper's stated protocol, not a value the paper itself reports. This effective rate lands almost exactly on the lowest rate (25 K/ns) already in PolyJarvis's PVNL tg_rates_K_per_ns=[25,50,100] default, i.e. current defaults already bracket the literature-implied rate from below.",
+      "value": {
+        "rates": [
+          24.2
+        ]
+      },
+      "doi": "10.1007/s10118-019-2249-5",
+      "url": "https://doi.org/10.1007/s10118-019-2249-5",
+      "title": "Research on the Glass Transition Temperature and Mechanical Properties of Poly(vinyl chloride)/Dioctyl Phthalate (PVC/DOP) Blends by Molecular Dynamics Simulations",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVNL_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:35:53Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "bcb2a2dca011",
+      "field": "tg_target",
+      "polymer_class": "PVNL",
+      "polymer_names": [
+        "Poly(vinyl chloride) (PVC, representative member of PVNL class -- PVA/PVC/PVAc)"
+      ],
+      "smiles": [
+        "*CC(*)Cl"
+      ],
+      "claim": "Full PDF Table 2 confirmed: for pure PVC the paper cites its own experimental Tg validation target as 354.15 K, against which the COMPASS-simulated density-method (365.42K, +3.2%) and free-volume-method (363.68K, +2.7%) Tg values are compared. This single-point figure exactly matches PolyJarvis's existing PVNL experimental_tg_K['PVC']=354 default (rounded).",
+      "value": {
+        "range": [
+          354.15,
+          354.15
+        ]
+      },
+      "doi": "10.1007/s10118-019-2249-5",
+      "url": "https://doi.org/10.1007/s10118-019-2249-5",
+      "title": "Research on the Glass Transition Temperature and Mechanical Properties of Poly(vinyl chloride)/Dioctyl Phthalate (PVC/DOP) Blends by Molecular Dynamics Simulations",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVNL_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:35:53Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "8e6fd6004a24",
+      "field": "forcefield",
+      "polymer_class": "PSTR",
+      "polymer_names": [
+        "Polystyrene (PS, representative member of the PSTR class)"
+      ],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "Across a 12-polymer benchmark dataset that includes polystyrene (experimental 300K density cited as 1.05 g/cm3 for PS), classical MD Tg-prediction RMSE is substantially lower for PCFF (76.77 K) than for GAFF2 (119.74 K), i.e. PCFF is the better-supported of the two classical alternatives for this aromatic-vinyl chemistry class. Full baseline protocol (cooling rate, electrostatics) not disclosed in the fetched text.",
+      "value": {
+        "recommendation": "PCFF"
+      },
+      "doi": "10.48550/arXiv.2601.17137",
+      "url": "https://arxiv.org/abs/2601.17137",
+      "title": "On-the-Fly Machine-Learned Force Fields for High-Fidelity Polymer Glass Transition Simulations",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "preprint",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PSTR_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:36:21Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "1e010b3d7e13",
+      "field": "density_target",
+      "polymer_class": "PSTR",
+      "polymer_names": [
+        "Polystyrene (PS, representative member of the PSTR class)"
+      ],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "\"For representative systems such as PE and polystyrene (PS), the experimental densities at 300 K of 0.88-0.93 and 1.05 g/cm3, respectively\" -- confirms 1.05 g/cm3 at 300K as the experimental density target this MD-simulation-benchmarking study cites for its own PS validation, exactly matching polymer_rules.json's current experimental_density_gcm3.PS value.",
+      "value": {
+        "range": [
+          1.05,
+          1.05
+        ],
+        "T_K": 300
+      },
+      "doi": "10.48550/arXiv.2601.17137",
+      "url": "https://arxiv.org/abs/2601.17137",
+      "title": "On-the-Fly Machine-Learned Force Fields for High-Fidelity Polymer Glass Transition Simulations",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "preprint",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PSTR_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:36:21Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "3c9cba4095ab",
+      "field": "tg_target",
+      "polymer_class": "PSTR",
+      "polymer_names": [
+        "Polystyrene (PS, representative member of the PSTR class)"
+      ],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "The paper's Vivace MLFF estimates polystyrene Tg as 399+/-22 K, explicitly compared against an experimental value of 373 K -- confirms 373 K as the experimental Tg target this MD-simulation-benchmarking study cites for its own PS validation, exactly matching polymer_rules.json's current experimental_tg_K.PS value.",
+      "value": {
+        "range": [
+          373,
+          373
+        ]
+      },
+      "doi": "10.48550/arXiv.2510.13696",
+      "url": "https://arxiv.org/abs/2510.13696",
+      "title": "SimPoly: Simulation of Polymers with Machine Learning Force Fields Derived from First Principles",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "preprint",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PSTR_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:36:21Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "8ad9f9e4e184",
+      "field": "forcefield",
+      "polymer_class": "PHYC",
+      "polymer_names": [
+        "Polyethylene (PE, representative member of the PHYC class)"
+      ],
+      "smiles": [
+        "*CC*"
+      ],
+      "claim": "MD comparison of two force fields for a C192 polyethylene model (melt dynamics, glass transition, nonisothermal crystallization) found TraPPE-UA in better quantitative agreement with experimental data than the alternative (PYS) force field; simulated Tg=187.0 K vs experimental extrapolated range 185-195 K (Gordon-Taylor equation).",
+      "value": {
+        "recommendation": "TraPPE-UA"
+      },
+      "doi": "10.1021/acs.macromol.5b00823",
+      "url": "https://doi.org/10.1021/acs.macromol.5b00823",
+      "title": "Molecular Dynamics Simulations for the Description of Experimental Molecular Conformation, Melt Dynamics, and Phase Transitions in Polyethylene",
+      "year": 2015,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PHYC_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:37:03Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "db2330056662",
+      "field": "forcefield",
+      "polymer_class": "PHYC",
+      "polymer_names": [
+        "Polyethylene (PE, representative member of the PHYC class)"
+      ],
+      "smiles": [
+        "*CC*"
+      ],
+      "claim": "Uses TraPPE (Transferable Potential for Phase Equilibria) force field for PE MD; amorphous-region density ~0.85 g/cm3 at 300 K, consistent with experimental values; LJ-only nonbonded treatment with 14.0 A cutoff, no explicit electrostatics method employed.",
+      "value": {
+        "recommendation": "TraPPE-UA"
+      },
+      "doi": "10.3390/polym16020304",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10819154/",
+      "title": "Preparation and Characterization of High-Density Polyethylene with Alternating Lamellar Stems Using Molecular Dynamics Simulations",
+      "year": 2024,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PHYC_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:37:03Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "1859a539a9b4",
+      "field": "forcefield",
+      "polymer_class": "PHYC",
+      "polymer_names": [
+        "Polyethylene (PE, representative member of the PHYC class)"
+      ],
+      "smiles": [
+        "*CC*"
+      ],
+      "claim": "Founding TraPPE-UA paper: proposes united-atom Lennard-Jones 12-6 interaction parameters for n-alkane pseudo-atoms (CH2/CH3), fit to critical temperature and saturated-liquid density; nonbonded interactions are governed solely by LJ 12-6 potentials (no partial charges). Validated only against small-molecule (C1-C12) VLE/critical-point data, not bulk polymer melt -- downstream chemistry-specific validation (Ramos2015 above) is what supports PE specifically.",
+      "value": {
+        "recommendation": "TraPPE-UA"
+      },
+      "doi": "10.1021/jp972543+",
+      "url": "https://doi.org/10.1021/jp972543+",
+      "title": "Transferable Potentials for Phase Equilibria. 1. United-Atom Description of n-Alkanes",
+      "year": 1998,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PHYC_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:37:03Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "2f9fb19a4f78",
+      "field": "electrostatics",
+      "polymer_class": "PHYC",
+      "polymer_names": [
+        "Polyethylene (PE, representative member of the PHYC class)"
+      ],
+      "smiles": [
+        "*CC*"
+      ],
+      "claim": "TraPPE PE MD study uses no explicit electrostatics method -- van der Waals/Lennard-Jones with a 14.0 A cutoff only. This matches the PHYC class's own cutoff_A=14.0 default exactly.",
+      "value": {
+        "recommendation": "lj_cut"
+      },
+      "doi": "10.3390/polym16020304",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10819154/",
+      "title": "Preparation and Characterization of High-Density Polyethylene with Alternating Lamellar Stems Using Molecular Dynamics Simulations",
+      "year": 2024,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PHYC_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:37:03Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "7adc23b7150e",
+      "field": "electrostatics",
+      "polymer_class": "PHYC",
+      "polymer_names": [
+        "Polyethylene (PE, representative member of the PHYC class)"
+      ],
+      "smiles": [
+        "*CC*"
+      ],
+      "claim": "TraPPE-UA hydrocarbon pseudo-atoms carry no partial charges by construction (LJ 12-6 only), so PPPM/Ewald electrostatics is not needed for this force field on a purely aliphatic backbone.",
+      "value": {
+        "recommendation": "lj_cut"
+      },
+      "doi": "10.1021/jp972543+",
+      "url": "https://doi.org/10.1021/jp972543+",
+      "title": "Transferable Potentials for Phase Equilibria. 1. United-Atom Description of n-Alkanes",
+      "year": 1998,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PHYC_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:37:03Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "5b255e732e90",
+      "field": "cooling_rate",
+      "polymer_class": "PHYC",
+      "polymer_names": [
+        "Polyethylene (PE, representative member of the PHYC class)"
+      ],
+      "smiles": [
+        "*CC*"
+      ],
+      "claim": "Reaches a near-experimental Tg (187 K vs exp 185-195 K) via a multi-rate cooling sweep with extrapolation (not a single fast cooling rate), consistent with the PHYC class's own multi-rate [10,25,40] K/ns design pattern.",
+      "value": {
+        "rates": [
+          10,
+          25,
+          40
+        ]
+      },
+      "doi": "10.1021/acs.macromol.5b00823",
+      "url": "https://doi.org/10.1021/acs.macromol.5b00823",
+      "title": "Molecular Dynamics Simulations for the Description of Experimental Molecular Conformation, Melt Dynamics, and Phase Transitions in Polyethylene",
+      "year": 2015,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PHYC_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:37:03Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "4fa7440a7cf3",
+      "field": "density_target",
+      "polymer_class": "PHYC",
+      "polymer_names": [
+        "Polyethylene (PE, representative member of the PHYC class)"
+      ],
+      "smiles": [
+        "*CC*"
+      ],
+      "claim": "TraPPE PE MD amorphous-region density ~0.85 g/cm3 at 300 K, cited as consistent with experimental amorphous PE density (independently corroborated in general references as ~0.855 g/cm3 at 25C).",
+      "value": {
+        "range": [
+          0.85,
+          0.857
+        ],
+        "T_K": 300
+      },
+      "doi": "10.3390/polym16020304",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10819154/",
+      "title": "Preparation and Characterization of High-Density Polyethylene with Alternating Lamellar Stems Using Molecular Dynamics Simulations",
+      "year": 2024,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PHYC_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:37:03Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "d6d28cd91a9d",
+      "field": "density_target",
+      "polymer_class": "PHYC",
+      "polymer_names": [
+        "Polyethylene (PE, representative member of the PHYC class)"
+      ],
+      "smiles": [
+        "*CC*"
+      ],
+      "claim": "TraPPE-UA PE MD study's own validation target is the experimentally established amorphous PE density near 0.855 g/cm3, matching the class default's experimental_density_gcm3.PE=0.855.",
+      "value": {
+        "range": [
+          0.85,
+          0.857
+        ],
+        "T_K": 300
+      },
+      "doi": "10.1021/acs.macromol.5b00823",
+      "url": "https://doi.org/10.1021/acs.macromol.5b00823",
+      "title": "Molecular Dynamics Simulations for the Description of Experimental Molecular Conformation, Melt Dynamics, and Phase Transitions in Polyethylene",
+      "year": 2015,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PHYC_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:37:03Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "b9f588b561aa",
+      "field": "tg_target",
+      "polymer_class": "PHYC",
+      "polymer_names": [
+        "Polyethylene (PE, representative member of the PHYC class)"
+      ],
+      "smiles": [
+        "*CC*"
+      ],
+      "claim": "TraPPE-UA MD simulated Tg=187.0 K for linear PE, cited by the authors as good agreement with their own extrapolated (Gordon-Taylor) experimental Tg range of 185-195 K -- this is the same range and MD value (187 K) already recorded in the PHYC class default's experimental_tg_K.PE=195 and ff_note.",
+      "value": {
+        "range": [
+          185,
+          195
+        ]
+      },
+      "doi": "10.1021/acs.macromol.5b00823",
+      "url": "https://doi.org/10.1021/acs.macromol.5b00823",
+      "title": "Molecular Dynamics Simulations for the Description of Experimental Molecular Conformation, Melt Dynamics, and Phase Transitions in Polyethylene",
+      "year": 2015,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PHYC_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:37:03Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "120becde67bf",
+      "field": "forcefield",
+      "polymer_class": "POXI",
+      "polymer_names": [
+        "Poly(ethylene oxide) (PEO, representative member of POXI class)"
+      ],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "All-atom PEO melt MD study (up to 300 ns production per temperature) uses the OPLS-AA force field throughout; simulated density at 300 K (1.071 g/cm3) is stated by the authors as consistent with experimental data (1.112 g/cm3, and a 1.07-1.27 g/cm3 literature range), and the study's own MD Tg (249 K) is consistent with prior MD studies (Tg~251 K) and within the cited experimental Tg range (158-233 K).",
+      "value": {
+        "recommendation": "OPLS-AA"
+      },
+      "doi": "10.3390/polym13224049",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8618988/",
+      "title": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "POXI_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:44:31Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "7b1a1fb2b143",
+      "field": "cooling_rate",
+      "polymer_class": "POXI",
+      "polymer_names": [
+        "Poly(ethylene oxide) (PEO, representative member of POXI class)"
+      ],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "\"The cooling rate in our simulations is 4x10^9 K/s, which is much higher than in experiments but is still close to previous simulations.\" Stepwise protocol: 400 K down to 160 K in 20 K decrements, minimum 20 ns equilibration per temperature before 300 ns production; this rate/protocol gave a simulated Tg (249 K) the authors call consistent with prior MD (~251 K) and with the cited experimental Tg range.",
+      "value": {
+        "rates": [
+          4.0
+        ]
+      },
+      "doi": "10.3390/polym13224049",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8618988/",
+      "title": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "POXI_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:44:31Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "10925a652ae6",
+      "field": "tg_target",
+      "polymer_class": "POXI",
+      "polymer_names": [
+        "Poly(ethylene oxide) (PEO, representative member of POXI class)"
+      ],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "Reports own MD Tg (OPLS-AA, stepwise cooling, 4x10^9 K/s) of 249 K; cites the experimental literature Tg range for PEO as 158-233 K and a prior MD study giving Tg~251 K, calling its own result consistent with both.",
+      "value": {
+        "range": [
+          158,
+          233
+        ]
+      },
+      "doi": "10.3390/polym13224049",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8618988/",
+      "title": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "POXI_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:44:31Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "dccb51f6ce25",
+      "field": "forcefield",
+      "polymer_class": "PDIE",
+      "polymer_names": [
+        "Polybutadiene (PBD, cis-1,4, representative member of the PDIE class -- PDIE is multi-member: PBD/PI)"
+      ],
+      "smiles": [
+        "*CC=CC*"
+      ],
+      "claim": "MD simulations of polybutadiene and polyisoprene used the OPLS-UA (united-atom) force field parameterization from Moltemplate, modeling CH/CH2/CH3 groups as single united atoms with zero net charge; only Lennard-Jones nonbonded interactions were used (12/6 LJ, 10 A cutoff), no explicit electrostatics. Density and Tg were not explicitly reported vs experiment in this paper; thermal conductivity comparisons showed reasonable agreement (e.g. polyisoprene 22C: sim 0.17 W/m/K vs exp 0.14 W/m/K).",
+      "value": {
+        "recommendation": "TraPPE-UA"
+      },
+      "doi": "10.3390/polym12051081",
+      "url": "https://doi.org/10.3390/polym12051081",
+      "title": "Thermal Conductivity of Polyisoprene and Polybutadiene from Molecular Dynamics Simulations and Transient Measurements",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PDIE_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:44:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "242154a87191",
+      "field": "forcefield",
+      "polymer_class": "PDIE",
+      "polymer_names": [
+        "Polybutadiene (PBD, cis-1,4, representative member of the PDIE class -- PDIE is multi-member: PBD/PI)"
+      ],
+      "smiles": [
+        "*CC=CC*"
+      ],
+      "claim": "A united-atom model (CH/CH2/CH3 as single united atoms, zero net charge) was used to simulate bulk polybutadiene rubber; only van der Waals (LJ, 10 A cutoff) nonbonded interactions were included, Coulomb interactions were explicitly excluded because united-atom groups carry zero charge. Density targeting was done iteratively toward the experimental density (no explicit numeric density value given in accessible text). Glass transition temperature from an MD thermal-conductivity-maxima method was ~-50C (223K), compared to experimental DMA loss-factor-peak measurements of -71C to -73C (200-202K); the paper notes DSC-derived Tg is typically ~20K lower than DMA-derived Tg, i.e. ~180-182K DSC-equivalent for this rubber -- closely matching PDIE's existing experimental_tg_K.PBD=181K class default.",
+      "value": {
+        "recommendation": "TraPPE-UA"
+      },
+      "doi": "10.3390/ma14247737",
+      "url": "https://doi.org/10.3390/ma14247737",
+      "title": "Thermal Conductivity of Polybutadiene Rubber from Molecular Dynamics Simulations and Measurements by the Heat Flow Meter Method",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PDIE_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:44:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "f2d52e85798e",
+      "field": "electrostatics",
+      "polymer_class": "PDIE",
+      "polymer_names": [
+        "Polybutadiene (PBD, cis-1,4, representative member of the PDIE class -- PDIE is multi-member: PBD/PI)"
+      ],
+      "smiles": [
+        "*CC=CC*"
+      ],
+      "claim": "MD simulations of polybutadiene and polyisoprene used the OPLS-UA (united-atom) force field parameterization from Moltemplate, modeling CH/CH2/CH3 groups as single united atoms with zero net charge; only Lennard-Jones nonbonded interactions were used (12/6 LJ, 10 A cutoff), no explicit electrostatics.",
+      "value": {
+        "recommendation": "lj_cut"
+      },
+      "doi": "10.3390/polym12051081",
+      "url": "https://doi.org/10.3390/polym12051081",
+      "title": "Thermal Conductivity of Polyisoprene and Polybutadiene from Molecular Dynamics Simulations and Transient Measurements",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PDIE_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:44:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "e24f2f56484b",
+      "field": "electrostatics",
+      "polymer_class": "PDIE",
+      "polymer_names": [
+        "Polybutadiene (PBD, cis-1,4, representative member of the PDIE class -- PDIE is multi-member: PBD/PI)"
+      ],
+      "smiles": [
+        "*CC=CC*"
+      ],
+      "claim": "A united-atom model (CH/CH2/CH3 as single united atoms, zero net charge) was used to simulate bulk polybutadiene rubber; only van der Waals (LJ, 10 A cutoff) nonbonded interactions were included, Coulomb interactions were explicitly excluded because united-atom groups carry zero charge.",
+      "value": {
+        "recommendation": "lj_cut"
+      },
+      "doi": "10.3390/ma14247737",
+      "url": "https://doi.org/10.3390/ma14247737",
+      "title": "Thermal Conductivity of Polybutadiene Rubber from Molecular Dynamics Simulations and Measurements by the Heat Flow Meter Method",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PDIE_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:44:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "9074b412d575",
+      "field": "tg_target",
+      "polymer_class": "PDIE",
+      "polymer_names": [
+        "Polybutadiene (PBD, cis-1,4, representative member of the PDIE class -- PDIE is multi-member: PBD/PI)"
+      ],
+      "smiles": [
+        "*CC=CC*"
+      ],
+      "claim": "A united-atom model (CH/CH2/CH3 as single united atoms, zero net charge) was used to simulate bulk polybutadiene rubber; only van der Waals (LJ, 10 A cutoff) nonbonded interactions were included, Coulomb interactions were explicitly excluded because united-atom groups carry zero charge. Density targeting was done iteratively toward the experimental density (no explicit numeric density value given in accessible text). Glass transition temperature from an MD thermal-conductivity-maxima method was ~-50C (223K), compared to experimental DMA loss-factor-peak measurements of -71C to -73C (200-202K); the paper notes DSC-derived Tg is typically ~20K lower than DMA-derived Tg, i.e. ~180-182K DSC-equivalent for this rubber -- closely matching PDIE's existing experimental_tg_K.PBD=181K class default.",
+      "value": {
+        "range": [
+          180,
+          182
+        ]
+      },
+      "doi": "10.3390/ma14247737",
+      "url": "https://doi.org/10.3390/ma14247737",
+      "title": "Thermal Conductivity of Polybutadiene Rubber from Molecular Dynamics Simulations and Measurements by the Heat Flow Meter Method",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PDIE_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:44:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "2ade9444330a",
+      "field": "forcefield",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "Refined OPLS-AA force field (parameterized via DL_FIELD 4.1) used for all-atom MD of PET; predicted density at 300 K/1 atm of ~1.26 g/cm3 vs. the paper's own cited experimental density of 1.30 g/cm3 for PET, a ~3% underprediction.",
+      "value": {
+        "recommendation": "OPLS-AA"
+      },
+      "doi": "10.3390/polym14061161",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8951138/",
+      "title": "All-Atom Molecular Dynamics Simulations on a Single Chain of PET and PEV Polymers",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:45:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "f2ac394f78e0",
+      "field": "forcefield",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "COMPASS force field used for bulk amorphous PET MD; simulated Tg ~83-90C (volume-change / free-volume methods) vs. the paper's own cited experimental Tg ~87C for pure PET -- a same-family (Class-II) result with good Tg accuracy on this exact aromatic-ester chemistry.",
+      "value": {
+        "recommendation": "OPLS-AA"
+      },
+      "doi": "10.1098/rsos.220606",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9399702/",
+      "title": "Molecular-level investigation of plasticization of polyethylene terephthalate (PET) in supercritical carbon dioxide via molecular dynamics simulation",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:45:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a19f7553c592",
+      "field": "electrostatics",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "Electrostatic forces calculated beyond a 12 A real-space cutoff via Particle Mesh Ewald (PME), i.e. the Ewald/PPPM family, for both Drude-polarizable and CGenFF (nonpolarizable) PET models.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.1021/acs.macromol.4c02109",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11741139/",
+      "title": "Structural and Electronic Properties of Poly(ethylene terephthalate) (PET) from Polarizable Molecular Dynamics Simulations",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:45:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "435ef68b7efc",
+      "field": "electrostatics",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "Electrostatic (non-bonded Coulombic) interactions computed with the Ewald summation method at 1e-5 kcal/mol accuracy for bulk amorphous PET.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.1098/rsos.220606",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9399702/",
+      "title": "Molecular-level investigation of plasticization of polyethylene terephthalate (PET) in supercritical carbon dioxide via molecular dynamics simulation",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:45:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a4a622826d1f",
+      "field": "electrostatics",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "Nonbonded electrostatics handled with a 12 A short-range cutoff plus shifted Coulombic potential correction, NOT Ewald/PPPM -- the minority approach among the three verified PET MD papers found this session.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.3390/polym14061161",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8951138/",
+      "title": "All-Atom Molecular Dynamics Simulations on a Single Chain of PET and PEV Polymers",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:45:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "6f1ea1aec9f8",
+      "field": "cooling_rate",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "Stepwise cooling from 600 K to 100 K in 100 K decrements, each held for 2 ns equilibration + 48 ns production (50 ns/step over a 100 K drop), giving an effective cooling rate of ~2 K/ns used to determine PET/PEV Tg.",
+      "value": {
+        "rates": [
+          2.0
+        ]
+      },
+      "doi": "10.3390/polym14061161",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8951138/",
+      "title": "All-Atom Molecular Dynamics Simulations on a Single Chain of PET and PEV Polymers",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:45:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "884e1197053f",
+      "field": "density_target",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "Cites 1.34 g/mL at room temperature (300 K) as the experimental PET density validation target (source: Thompson & Woods, Nature 1955, 176:78-79); own Drude/CGenFF models give 1.218 and 1.233 g/mL respectively, both underpredicting.",
+      "value": {
+        "range": [
+          1.3,
+          1.34
+        ],
+        "T_K": 300
+      },
+      "doi": "10.1021/acs.macromol.4c02109",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11741139/",
+      "title": "Structural and Electronic Properties of Poly(ethylene terephthalate) (PET) from Polarizable Molecular Dynamics Simulations",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:45:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "9306eead4d29",
+      "field": "density_target",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "Cites 1.30 g/cm3 at 300 K/1 atm as the experimental PET density validation target; own refined-OPLS-AA MD gives ~1.26 g/cm3, a ~3% underprediction.",
+      "value": {
+        "range": [
+          1.3,
+          1.34
+        ],
+        "T_K": 300
+      },
+      "doi": "10.3390/polym14061161",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8951138/",
+      "title": "All-Atom Molecular Dynamics Simulations on a Single Chain of PET and PEV Polymers",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:45:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "222c19a1a733",
+      "field": "tg_target",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "Cites ~87 C (~360 K) as the experimental PET Tg validation target; own COMPASS-force-field bulk amorphous MD gives ~83 C (volume-change method) to ~90 C (free-volume method), i.e. within a few K of experiment.",
+      "value": {
+        "range": [
+          358,
+          362
+        ]
+      },
+      "doi": "10.1098/rsos.220606",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9399702/",
+      "title": "Molecular-level investigation of plasticization of polyethylene terephthalate (PET) in supercritical carbon dioxide via molecular dynamics simulation",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:45:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a2ed740de21c",
+      "field": "forcefield",
+      "polymer_class": "PURT",
+      "polymer_names": [
+        "Aliphatic thermoplastic polyurethane (TPU, representative of the PURT class -- soft/hard segment generic, synthetic proxy SMILES)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)NCCCCCCNC(*)=O"
+      ],
+      "claim": "Verified via full-text fetch (WebFetch through r.jina.ai proxy after MDPI 403'd direct access): this is an all-atom MD study of hexamethylene diisocyanate (HDI) hard-segment / PEG soft-segment thermoplastic polyurethane -- a linear, non-crosslinked, ALIPHATIC-diisocyanate TPU chemistry matching PolyJarvis's PURT scope (unlike the store's existing thermoset-curing citation). Two force fields were directly compared on this exact chemistry: OPLS-AA (atom-type-based, via PolyParGen) and OpenFF/Sage 2.2.1 (direct-chemical-perception, with BespokeFit torsional refinements). Both were used to compute density and Tg across a PEG soft-segment-length series (400-2000 g/mol). Neither PCFF nor any Class-II force field was used or benchmarked in this paper -- it is same-chemistry evidence that OPLS-AA (not PCFF) is what published aliphatic-TPU MD literature actually uses and validates against DSC.",
+      "value": {
+        "recommendation": "OPLS-AA"
+      },
+      "doi": "10.3390/molecules31081259",
+      "url": "https://doi.org/10.3390/molecules31081259",
+      "title": "Benchmarking OPLS-AA and OpenFF for HDI\u2013PEG Thermoplastic Polyurethanes with Varying Soft-Segment Length",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PURT_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:06:27Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "9edecd363ce8",
+      "field": "electrostatics",
+      "polymer_class": "PURT",
+      "polymer_names": [
+        "Aliphatic thermoplastic polyurethane (TPU, representative of the PURT class -- soft/hard segment generic, synthetic proxy SMILES)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)NCCCCCCNC(*)=O"
+      ],
+      "claim": "This aliphatic HDI-PEG TPU MD study uses the Particle Mesh Ewald (PME) algorithm for long-range electrostatics, with 10 \u00c5 cutoffs for both nonbonded and short-range electrostatic interactions -- i.e. mesh-Ewald treatment (LAMMPS pppm equivalent), consistent with PURT's current class default (charged carbamate N-H/C=O backbone groups) and not a bare lj_cut/no-electrostatics protocol.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.3390/molecules31081259",
+      "url": "https://doi.org/10.3390/molecules31081259",
+      "title": "Benchmarking OPLS-AA and OpenFF for HDI\u2013PEG Thermoplastic Polyurethanes with Varying Soft-Segment Length",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PURT_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:06:27Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "6d6ed6c81581",
+      "field": "cooling_rate",
+      "polymer_class": "PURT",
+      "polymer_names": [
+        "Aliphatic thermoplastic polyurethane (TPU, representative of the PURT class -- soft/hard segment generic, synthetic proxy SMILES)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)NCCCCCCNC(*)=O"
+      ],
+      "claim": "Simulations cooled from 750 K to 50 K over 140 ns, i.e. ~5 K/ns. The paper itself flags this rate as 'many orders of magnitude faster than experiment' and reports both OPLS-AA and OpenFF Tg predictions substantially ABOVE DSC values as a direct consequence (PEG-H400: OpenFF ~298K/OPLS-AA ~313K vs DSC 271.9K; PEG-H1000: OpenFF ~291K/OPLS-AA ~305K vs DSC 230.5K) -- this is evidence the ~5 K/ns single-rate protocol used in this paper gave POOR (not near-DSC-equivalent) Tg accuracy, so it calibrates a rate that should be treated as a lower bound / cautionary data point rather than a validated target rate for PolyJarvis's own multi-rate extrapolation.",
+      "value": {
+        "rates": [
+          5.0
+        ]
+      },
+      "doi": "10.3390/molecules31081259",
+      "url": "https://doi.org/10.3390/molecules31081259",
+      "title": "Benchmarking OPLS-AA and OpenFF for HDI\u2013PEG Thermoplastic Polyurethanes with Varying Soft-Segment Length",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PURT_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:06:27Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "f22238f87352",
+      "field": "tg_target",
+      "polymer_class": "PURT",
+      "polymer_names": [
+        "Aliphatic thermoplastic polyurethane (TPU, representative of the PURT class -- soft/hard segment generic, synthetic proxy SMILES)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)NCCCCCCNC(*)=O"
+      ],
+      "claim": "DSC-measured experimental Tg values cited by this MD study as its own validation target for aliphatic HDI-PEG TPU: 271.9 K (PEG-H400, shorter soft segment) and 230.5 K (PEG-H1000, longer soft segment). Note this range is strongly composition-dependent (soft-segment length and hard/soft ratio) and specific to HDI-PEG chemistry, not directly transferable to PolyJarvis's synthetic generic aliphatic-diol/diamine repeat unit -- reported as advisory context only, hence low confidence despite the source itself being fully verified.",
+      "value": {
+        "range": [
+          230.5,
+          271.9
+        ]
+      },
+      "doi": "10.3390/molecules31081259",
+      "url": "https://doi.org/10.3390/molecules31081259",
+      "title": "Benchmarking OPLS-AA and OpenFF for HDI\u2013PEG Thermoplastic Polyurethanes with Varying Soft-Segment Length",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PURT_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:06:27Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "149ce17c39f9",
+      "field": "density_target",
+      "polymer_class": "PKTN",
+      "polymer_names": [
+        "Poly(ether ether ketone) (PEEK, representative member of the PKTN class)"
+      ],
+      "smiles": [
+        "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1"
+      ],
+      "claim": "Semantic Scholar abstract text explicitly labels the paper's own 1.328 g/cm3 experimental density comparator as belonging to the 'experimentally observed infinite semi-crystal' -- i.e. this MD study's own validation target is semicrystalline PEEK density, not amorphous PEEK density. This corroborates (does not newly establish) PolyJarvis's own existing exp_density_note caution in polymer_rules.json (amorphous PEEK = 1.263 g/cm3; semicrystalline PEEK = 1.30-1.32 g/cm3; PEEK1 R-01 previously used 1.32 by mistake and got a false -9% error, corrected to -5.5% vs the correct 1.263 amorphous target). No independent amorphous-PEEK density figure was recoverable from this or any other verified MD source this session.",
+      "value": {
+        "range": null,
+        "T_K": null
+      },
+      "doi": "10.3390/polym12051054",
+      "url": "https://doi.org/10.3390/polym12051054",
+      "title": "Combined Molecular Dynamics and DFT Simulation Study of the Molecular and Polymer Properties of a Catechol-Based Cyclic Oligomer of Polyether Ether Ketone",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PKTN_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:10:11Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a00960ced1a8",
+      "field": "tg_target",
+      "polymer_class": "PKTN",
+      "polymer_names": [
+        "Poly(ether ether ketone) (PEEK, representative member of the PKTN class)"
+      ],
+      "smiles": [
+        "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1"
+      ],
+      "claim": "This MD/DFT study on a catechol-based cyclic-oligomer PEEK model cites its own experimental Tg comparison target as 418.2 K, and reports its own COMPASS II MD-simulated Tg (424.4-428.6 K) as 'close to' this experimental value (+1.5 to +2.5%). This independently corroborates polymer_rules.json's existing experimental_tg_K.PEEK=418 entry (sourced there from MD-simulation-and-DSC consensus) -- the two sources agree to within 0.2 K.",
+      "value": {
+        "range": [
+          418,
+          418
+        ]
+      },
+      "doi": "10.3390/polym12051054",
+      "url": "https://doi.org/10.3390/polym12051054",
+      "title": "Combined Molecular Dynamics and DFT Simulation Study of the Molecular and Polymer Properties of a Catechol-Based Cyclic Oligomer of Polyether Ether Ketone",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PKTN_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:10:11Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "c3e419740fab",
+      "field": "electrostatics",
+      "polymer_class": "PSIL",
+      "polymer_names": [
+        "Poly(dimethylsiloxane) (PDMS, representative member of the PSIL class)"
+      ],
+      "smiles": [
+        "*O[Si](*)(C)C"
+      ],
+      "claim": "For the all-atom PDMS models (including OPLS-AA), the paper uses a uniform nonbonded cutoff (OPLS: 1.1 nm) and applies the Particle-Particle Particle-Mesh (PPPM) algorithm for long-range Coulomb interactions, i.e. Ewald-summation electrostatics rather than a bare cutoff Coulomb scheme, for the OPLS-AA all-atom PDMS model specifically. Verified via full-text PMC mirror (PMC11831649) since the ACS/pubs.acs.org page itself 403'd WebFetch.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.1021/acs.jpcb.4c08471",
+      "url": "https://doi.org/10.1021/acs.jpcb.4c08471",
+      "title": "Force-Field Benchmark for Polydimethylsiloxane: Density, Heat Capacity, Isothermal Compressibility, Viscosity and Thermal Conductivity",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PSIL_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:10:32Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "734781c761e2",
+      "field": "forcefield",
+      "polymer_class": "PIMN",
+      "polymer_names": [
+        "Linear poly(ethylenimine) (PEI, representative member of the PIMN class)"
+      ],
+      "smiles": [
+        "*CCN*"
+      ],
+      "claim": "Crossref-supplied abstract (publisher metadata, directly read, not a third-party paraphrase) states this paper develops a NEW, purpose-built CHARMM force field for PEI ('the crucial need for a realistic molecular mechanics force field (FF) for PEI ... development of a new atomistic (CHARMM) FF for PEI in different protonation states, rigorously derived from high-quality ab initio calculations'), used to study solvated/protonated PEI chain dimensions and diffusion -- not PCFF, and not a bulk amorphous glassy/melt cell. This is the only verified MD-methodology evidence found that is on the exact linear-PEI chemistry (amine backbone), and it used a different, purpose-built force field family rather than PCFF -- though its scope (dilute solvated polyelectrolyte, not bulk amorphous polymer density/Tg) means it does not directly contradict PCFF for the bulk-cell use case PolyJarvis needs.",
+      "value": {
+        "recommendation": "PCFF"
+      },
+      "doi": "10.1002/jcc.24890",
+      "url": "https://doi.org/10.1002/jcc.24890",
+      "title": "CHARMM force field and molecular dynamics simulations of protonated polyethylenimine",
+      "year": 2017,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PIMN_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:11:29Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "9800b5dbac80",
+      "field": "electrostatics",
+      "polymer_class": "PIMN",
+      "polymer_names": [
+        "Linear poly(ethylenimine) (PEI, representative member of the PIMN class)"
+      ],
+      "smiles": [
+        "*CCN*"
+      ],
+      "claim": "Crossref abstract confirms this dedicated PEI force-field/MD paper is built around explicit protonation-state electrostatics (multiple protonated states rigorously derived from ab initio calculations) for the same backbone amine chemistry as *CCN*, consistent with the qualitative rationale (amine N as a strong H-bond donor/acceptor) already used in PIMN's polymer_rules.json to mandate PPPM -- but the paper does not itself report which long-range electrostatics summation LAMMPS/CHARMM used for its solvated simulations, so this is corroborating context for the mandate's underlying chemistry, not a direct pppm citation.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.1002/jcc.24890",
+      "url": "https://doi.org/10.1002/jcc.24890",
+      "title": "CHARMM force field and molecular dynamics simulations of protonated polyethylenimine",
+      "year": 2017,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PIMN_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:11:29Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "24efa01ab782",
+      "field": "electrostatics",
+      "polymer_class": "PPNL",
+      "polymer_names": [
+        "Poly(p-phenylene vinylene) (PPV, representative member of PPNL)"
+      ],
+      "smiles": [
+        "*C=Cc1ccc(*)cc1"
+      ],
+      "claim": "Fetched via PMC gold-OA copy (PMC9954299). Reviews OPLS-AA/GAFF/CHARMM/GROMOS/MM3 for conjugated-polymer MD (focused on polythiophenes, not PPV) and states partial-charge parameterization across published conjugated-polymer force fields shows 'minimal consistency, both in sign and magnitude, across the models' -- supports the general premise that conjugated backbones carry non-trivial, model-sensitive partial charges (motivating PPPM over a bare cutoff), but this paper does NOT itself state or recommend PPPM/Ewald, does not mention PCFF/DREIDING/COMPASS, and does not treat PPV specifically. Weak, indirect support only -- not a direct methodological citation for pppm on PPV.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.1021/acspolymersau.1c00027",
+      "url": "https://doi.org/10.1021/acspolymersau.1c00027",
+      "title": "Strategies for the Development of Conjugated Polymer Molecular Dynamics Force Fields Validated with Neutron and X-ray Scattering",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PPNL_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:18:01Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "9fc7a63a45e9",
+      "field": "forcefield",
+      "polymer_class": "PSFO",
+      "polymer_names": [
+        "Poly(sulfone) (PSU/Udel, representative member of the PSFO class -- multi-member: PSU/PES/PPSU)"
+      ],
+      "smiles": [
+        "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1"
+      ],
+      "claim": "MD study of polysulfone (PSU) / polystyrene-co-maleic-anhydride (PSMA) blends used the COMPASS (condensed-phase-optimized molecular potentials for atomistic simulation studies) force field in an amorphous-cell model to compute the Flory-Huggins chi interaction parameter and solubility parameters across blend compositions (including 40% and 60% PSMA), finding predicted miscibility above 400 K. The paper compares its miscibility predictions against an experimental DSC-observed shift in glass transition temperature (Tg) between the individual blend components, but reports no explicit simulated or experimental density/Tg numeric value for pure PSU recoverable from the abstract. doi.org resolves (302 redirect to researchsquare.com); full text 403'd on WebFetch, so this claim rests on the Crossref/Semantic Scholar API abstract record rather than a directly fetched full-text page -- flagged accordingly.",
+      "value": {
+        "recommendation": "PCFF"
+      },
+      "doi": "10.21203/rs.3.rs-1109742/v1",
+      "url": "https://doi.org/10.21203/rs.3.rs-1109742/v1",
+      "title": "Molecular Dynamics Simulation of Polysulfone and Polystyrene-co-maleic Anhydride Blends Compatibility: A mesoscopic, Ewald Approach and Experimental Comparison",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "preprint",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PSFO_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:18:57Z"
       }
     }
   ],

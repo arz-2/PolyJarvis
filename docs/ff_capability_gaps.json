@@ -1,0 +1,85 @@
+{
+  "_metadata": {
+    "description": "Tracked list of cases where fresh MD literature grounding (2026-08-26 polymer_rules.json re-audit) favored a force field that this platform cannot currently route to for that class, and why -- so a future audit doesn't have to rediscover these from scratch, and so they're visible as concrete roadmap items rather than buried in per-class ff_note prose. Each entry records what's blocked, the exact mechanized error behind it, and which blocker_category it falls into (see categories below).",
+    "blocker_categories": {
+      "platform_wiring": "The field is genuinely buildable by an existing PolyJarvis-integrated toolchain (EMC or RadonPy), but this repo's own code (ENUM_OVERRIDES, EMC_FF_FAMILIES, MCP tool Literal types, script_generator.py styles, detection logic) doesn't expose or route to it yet. Fixable entirely within this repo -- the kind of gap worth scheduling as real feature work.",
+      "third_party_field_gap": "The field fails inside EMC's own third-party field-definition files (~/emc/field/<family>/) -- a typing-rule gap ('Missing rules') or a parameter-coverage gap ('Missing force field parameters') for this specific SMILES's local chemical environment. Fixing this means authoring new EMC typing rules or parameter rows in EMC's own rule syntax, a different skill/toolchain than anything in this repo. Not attempted as part of this audit."
+    },
+    "created": "2026-08-26",
+    "source": "guides/polymer_rules.json re-audit session -- see individual class ff_note entries for the full literature grounding behind each row here"
+  },
+  "gaps": [
+    {
+      "polymer_class": "PCBN",
+      "member": "BPA-PC",
+      "smiles": "*Oc1ccc(C(C)(C)c2ccc(OC(*)=O)cc2)cc1",
+      "literature_best_ff": "DREIDING (modified)",
+      "literature_source": {
+        "title": "Molecular Modeling of Polycarbonate. 1. Force Field, Static Structure, and Mechanical Properties",
+        "authors": "Fan, Cagin, Chen, Smith",
+        "year": 1994,
+        "doi": "10.1021/ma00087a004",
+        "note": "A force-field-development paper written specifically for BPA-PC -- the strongest possible kind of literature match, stronger than the class-analogy evidence backing most other rows in polymer_rules.json."
+      },
+      "currently_routed_to": "Dreiding via RadonPy (real fix, not a workaround)",
+      "blocker_category": "platform_wiring (RESOLVED) -- plus an unrelated upstream RadonPy bug found and fixed along the way",
+      "blocker_detail": "DREIDING is NOT an EMC field on this box (no ~/emc/field/dreiding directory; ff_capability.py's own registry marks front_end='radonpy' for it) -- an earlier pass in this same session incorrectly reported it as EMC-admissible; that was wrong and has been corrected. RadonPy DOES have a working, installed Dreiding module (radonpy/ff/dreiding.py, confirmed present in the mol-builder conda env: pair_style='lj', bond='harmonic', angle='harmonic', dihedral='harmonic', improper='umbrella', ff_class='1', RESP-charge-compatible via ff_assign(mol, charge=...)) -- but mcp-mol-builder-server/server.py's tool signatures only expose forcefield: Literal['GAFF','GAFF2','GAFF2_mod'], so Dreiding is unreachable through the MCP layer despite the underlying library supporting it.",
+      "work_required_if_pursued": [
+        "mcp-mol-builder-server/server.py: add 'Dreiding' to the forcefield Literal, import radonpy.ff.dreiding.Dreiding, add a construction branch",
+        "script_generator.py: DREIDING_STYLES (dihedral=harmonic, improper=umbrella -- differs from GAFF2's fourier/cvff; pair/bond/angle match GAFF2's existing composition), DREIDING_SPECIAL_BONDS/PAIR_MODIFY from the module's c_c14=5/6, lj_c14=0.5 constants, a use_dreiding branch in both style-selection chains (~line 1183 and ~1412), and a fix to _detect_ff_from_data_file's collision with PCFF's improper-count heuristic (DREIDING also emits improper types)",
+        "stage_params.py: extend the class_ii-style family logic",
+        "scientific_control.py: add 'dreiding' or 'Dreiding' to ENUM_OVERRIDES['preferred_ff']",
+        "test_polymer_rules_schema.py: extend test_build_route_consistency's radonpy branch (currently asserts pref_ff in {'GAFF2','GAFF2_mod'} only) and test_ff_routing.py",
+        "Validation bar: actually build a cell, generate a deck, run a real short CPU minimize and confirm convergence -- a generated script that merely parses is not proof the styles/coefficients are right"
+      ],
+      "status": "RESOLVED 2026-08-26",
+      "last_updated": "2026-08-26",
+      "resolution": "1) Corrected an earlier wrong claim in this same audit that DREIDING was EMC-admissible -- it is not; ff_capability.py registers it front_end='radonpy'. 2) mcp-mol-builder-server/server.py extended: 'Dreiding' added to the forcefield Literal in assign_forcefield() and submit_copolymerize_job(), plus construction branches (radonpy.ff.dreiding.Dreiding). 3) Found and patched a genuine upstream RadonPy bug (not a PolyJarvis bug): Dreiding.assign_atypes/assign_dtypes/assign_itypes reset mol.angles/dihedrals/impropers to empty lists (setattr(mol, 'angles', [])) instead of preserving the dict every other ff module and core/utils.py's combine_mols/MolToJSON_dict expect -- broke amorphous-cell generation for ANY Dreiding-built polymer, not just BPA-PC. Patched in the installed package (~/miniforge3/envs/mol-builder/.../radonpy/ff/dreiding.py) to dict-key exactly like amber.py/gaff.py's own set_atype/set_dtype/set_itype convention ('%i,%i,%i[,%i]' % (a,b,c[,d])). Only the mol-builder conda env needed patching -- confirmed no other code path in this repo invokes RadonPy's ff-assignment modules via the other two installs on this machine (~/RadonPy/, ~/miniforge3/envs/radonpy/ are only used for RDKit-only SMILES/group-contribution scripts). 4) script_generator.py: DREIDING_STYLES/PAIR_STYLE_DREIDING_PPPM/CUTOFF/SPECIAL_BONDS/PAIR_MODIFY added as a genuine 4th branch (bond=harmonic, angle=harmonic, dihedral=harmonic [not GAFF2's fourier], improper=umbrella [not GAFF2's cvff]) -- all bonded styles confirmed against a real emitted .data file; the geometric mixing rule is the one piece taken from the published DREIDING force field's own stated convention (Mayo/Olafson/Goddard 1990) rather than independently re-derived from an emitted file. 5) stage_params.py, scientific_control.py (ENUM_OVERRIDES), test_polymer_rules_schema.py (test_build_route_consistency's radonpy branch) all updated. 6) VALIDATED END-TO-END: built a real 3-mer x 2-chain BPA-PC cell, ran ff_assign (177 angles / 256 dihedrals / 39 impropers, all correctly dict-keyed), wrote a LAMMPS .data file, generated a real minimize.in deck via script_generator.py, and ran an actual LAMMPS minimize -- converged (energy 443.8->106.8, force norm 727.7->7.2), LAMMPS itself reported 'Generated 15 of 15 mixed pair_coeff terms from geometric mixing rule' confirming every style/coefficient was accepted cleanly, not just that the script parsed. guides/polymer_rules.json PCBN now routes preferred_ff=Dreiding, preferred_builder=radonpy, charge_method=RESP."
+    },
+    {
+      "polymer_class": "POXI",
+      "member": "PEO",
+      "smiles": "*CCO*",
+      "literature_best_ff": "OPLS-AA (all-atom)",
+      "literature_source": {
+        "title": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+        "year": 2021,
+        "doi": "10.3390/polym13224049",
+        "note": "Full-text-verified: all-atom OPLS-AA melt MD, density/Tg both independently confirmed against this class's existing polymer_rules.json defaults."
+      },
+      "currently_routed_to": "PCFF via EMC (unchanged -- caution documented in ff_note, not switched)",
+      "blocker_category": "third_party_field_gap",
+      "blocker_detail": "opls/2024/opls-aa: EMC error 'Missing force field parameters' (types the SMILES, then fails to find bonded/nonbonded parameter rows -- a .prm coverage gap for this ether-oxygen environment). opls/2012/opls-aa: EMC error 'Missing rules' (fails typing itself). Only the united-atom opls/2024/opls-ua variant is EMC-admissible, not the all-atom field the literature actually used. Note: compass IS EMC-admissible for this class (unlike PEST/PURT below) but was not the literature's pick here, so it doesn't close this specific gap.",
+      "status": "open -- third-party EMC field-file gap, not attempted",
+      "last_updated": "2026-08-26"
+    },
+    {
+      "polymer_class": "PEST",
+      "member": "PET",
+      "smiles": "*OCCOC(=O)c1ccc(C(*)=O)cc1",
+      "literature_best_ff": "COMPASS (Tg within a few K of experiment) or refined OPLS-AA (density ~3% low)",
+      "literature_source": {
+        "note": "Two full-text-verified bulk-amorphous-PET MD papers found this session, one per field; neither uses PCFF specifically."
+      },
+      "currently_routed_to": "PCFF via EMC (only viable Class-II option -- see below)",
+      "blocker_category": "third_party_field_gap",
+      "blocker_detail": "Neither compass nor opls/2024/opls-aa is EMC-admissible for this SMILES (mechanized select_forcefield.py, 2026-08-26): admissible=[dreiding, gaff, gaff2, gaff2_mod, pcff] only -- both literature-favored fields fail with 'Missing rules'/'Missing force field parameters' for PET's aromatic-ester backbone. PCFF remains the only Class-II option platform-wide can actually build for this SMILES, regardless of literature preference.",
+      "status": "open -- third-party EMC field-file gap, not attempted",
+      "last_updated": "2026-08-26"
+    },
+    {
+      "polymer_class": "PURT",
+      "member": "aliphatic TPU (synthetic proxy SMILES, no curated member_smiles exists)",
+      "smiles": "*OCCOC(=O)NCCCCCCNC(*)=O",
+      "literature_best_ff": "OPLS-AA / OpenFF",
+      "literature_source": {
+        "note": "The only genuinely on-chemistry (aliphatic HDI-based) MD benchmark found uses OPLS-AA/OpenFF, though it over-predicts DSC Tg by 20-75K at its own cooling rate -- an accuracy caution independent of admissibility."
+      },
+      "currently_routed_to": "PCFF via EMC (only viable Class-II option -- see below)",
+      "blocker_category": "third_party_field_gap",
+      "blocker_detail": "Neither opls/2024/opls-aa nor compass is EMC-admissible for this SMILES: admissible=[dreiding, gaff, gaff2, gaff2_mod, pcff, trappe-ua] only -- both fail with 'Missing rules'/'Missing force field parameters' for the urethane linkage. Separately: plain 'gaff' (not gaff2) appears admissible in several classes' mechanized sweeps but has NO legal path anywhere in this platform (absent from scientific_control.py's ENUM_OVERRIDES['preferred_ff'] and from EMC_FF_FAMILIES) -- a minor, low-priority structural gap noted here for completeness, not urgent since gaff2 already covers the same lineage.",
+      "status": "open -- third-party EMC field-file gap, not attempted",
+      "last_updated": "2026-08-26"
+    }
+  ]
+}

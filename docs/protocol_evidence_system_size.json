@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-25T16:54:06Z",
+  "generated_at": "2026-08-26T17:00:08Z",
   "records": [
     {
       "schema_version": 1,
@@ -33,6 +33,534 @@
         "source_run": "EvidenceStoreVerify1",
         "migrated_from": null,
         "added_at": "2026-08-25T16:54:06Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "772020e18916",
+      "field": "system_size",
+      "polymer_class": "PHAL",
+      "polymer_names": [
+        "PVDF (poly(vinylidene fluoride))"
+      ],
+      "smiles": [
+        "*CC(*)(F)F"
+      ],
+      "claim": "PVDF-specific all-atom MD study (CVFF force field, LAMMPS) built an amorphous cell of 20 randomly generated chains, each 20 CF2-CF2 monomer units (DP=20, nchain=20), and justified this chain length by citing that 'when the chain length is greater than 17 monomer units, the dipole moment per monomer unit converges to a nearly constant value' (their ref. [18]). The same 20-chain/DP-20 cell was used to determine Tg from a density-vs-temperature MD sweep (100-400 K, NPT), i.e. the convergence check and the Tg-determination model are the same system.",
+      "value": {
+        "dp_typical": 20,
+        "nchain": 20,
+        "convergence_basis": "fox_flory_plateau",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.20964/2018.11.01",
+      "url": "https://doi.org/10.20964/2018.11.01",
+      "title": "The Predicted Dielectric Constant of an Amorphous PVDF Changing with Temperature by Molecular Dynamics Simulations",
+      "year": 2018,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVDF_trace",
+        "migrated_from": null,
+        "added_at": "2026-08-26T12:10:08Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "253fc837098c",
+      "field": "system_size",
+      "polymer_class": "POXI",
+      "polymer_names": [
+        "PEG (poly(ethylene glycol)/PEO)"
+      ],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "All-atom MD (OPLS-AA, LAMMPS) of PEO melts built with 20 chains of N=50 (7040 atoms) reproduces experimental melt density (1.071 g/cm^3 sim vs. 1.07-1.27 g/cm^3 exp band) and a physically reasonable Tg (249 K); the authors note this N=50/20-chain construction is consistent with the independent atomistic study of Luo & Jiang (also N=50, density/Flory-Huggins parameters matching experiment) and with Tsalikis et al.'s united-atom PEO melt simulations, i.e. multiple independent MD groups converge on N=50 as adequate for experimentally-accurate density -- this is member-specific (PEO itself), verified full-text.",
+      "value": {
+        "dp_typical": 50,
+        "nchain": 20,
+        "convergence_basis": "class_analogy",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.3390/polym13224049",
+      "url": "https://doi.org/10.3390/polym13224049",
+      "title": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEG1",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:29:28Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "1038fb558911",
+      "field": "system_size",
+      "polymer_class": "PVNL",
+      "polymer_names": [
+        "Poly(vinyl chloride) (PVC, PVNL class re-audit)"
+      ],
+      "smiles": [
+        "*CC(*)Cl"
+      ],
+      "claim": "Seven atomistic PVC models spanning 5-240 -(CH2CHCl)- repeat units were simulated in THF and DMF; most structural and dynamic properties -- end-to-end distance, radius of gyration, RDFs, shape descriptors, correlation functions, glass transition temperature, and melt viscosity -- converge at approximately 100-120 repeat units.",
+      "value": {
+        "dp_typical": 110,
+        "nchain": null,
+        "convergence_basis": "fox_flory_plateau",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.1080/08927022.2023.2234493",
+      "url": "https://doi.org/10.1080/08927022.2023.2234493",
+      "title": "Effects of chain length on the structure and dynamics of polyvinyl chloride during atomistic molecular dynamics simulations",
+      "year": 2023,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PVNL_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:32:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "280fd2d816a1",
+      "field": "system_size",
+      "polymer_class": "PHYC",
+      "polymer_names": [
+        "Polyethylene (PE, representative member of the PHYC class)"
+      ],
+      "smiles": [
+        "*CC*"
+      ],
+      "claim": "Atomistic/united-atom PE MD over N=24-1000 (primitive-path analysis, Table I) shows entanglements-per-chain Z rising smoothly with N (Z=2.876 at N=140, Z=5.089 at N=250, Z=7.168 at N=350); text states entanglement-length estimators cannot be reliably extrapolated for N<100-200, i.e. N~100-200 is a marginally-entangled regime for PE, and the paper's own improved estimators are designed specifically to still work in that marginal regime.",
+      "value": {
+        "dp_typical": 250,
+        "nchain": null,
+        "convergence_basis": "entanglement_mw",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.1103/PhysRevE.80.031803",
+      "url": "https://arxiv.org/abs/0903.2078",
+      "title": "Topological analysis of polymeric melts: Chain-length effects and fast-converging estimators for entanglement length",
+      "year": 2009,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PHYC_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:34:51Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "b7cd5a1cbdbf",
+      "field": "system_size",
+      "polymer_class": "PSTR",
+      "polymer_names": [
+        "Polystyrene (PS, representative member of the PSTR class)"
+      ],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "Directly verified via Europe PMC full-text XML (PMC6723222, open access CC-BY): Table 1 reports the PS atomistic MD cell used Chain No.=4, Repeat Unit (DP)=120 (3840 C + 3848 H atoms), simulated with COMPASS (density/Tg) and PCFF (tensile/Young's modulus) force fields -- the same PCFF family this run's class uses. Density, Tg, and Young's modulus (uniaxial deformation, strain rates 1e8-1e10/s) were all computed successfully at this DP/nchain. No explicit DP-convergence sweep is reported (single DP=120 cell only), so this backs 'a published PCFF-family MD study used DP=120/nchain=4 for Tg+modulus', not an independent convergence proof.",
+      "value": {
+        "dp_typical": 100,
+        "nchain": null,
+        "convergence_basis": "class_analogy",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.3390/nano9081088",
+      "url": "https://doi.org/10.3390/nano9081088",
+      "title": "Fully Atomistic Molecular Dynamics Computation of Physico-Mechanical Properties of PB, PS, and SBS",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PSTR_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:37:19Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "73d57f456b1c",
+      "field": "system_size",
+      "polymer_class": "PDIE",
+      "polymer_names": [
+        "Polybutadiene (PBD, cis-1,4, representative member of PDIE class)"
+      ],
+      "smiles": [
+        "*CC=CC*"
+      ],
+      "claim": "Verified via PMC (PMC9698502). This is the source currently cited in polymer_rules.json's PDIE notes as 'DP=50-200 studied by polyisoprene MD: mechanical properties converge above DP=50' \u2014 that characterization is NOT supported by the paper. The study simulated cis-polyisoprene at DP (p) = 50, 100, 150, 200 with OPLS-AA and found maximum tensile strength and elastic modulus INCREASED CONTINUOUSLY from p=50 to p=200 (e.g. sigma_max: 0.164 GPa at p=50 -> 0.271 GPa at p=200), with no plateau reached over the tested range. Only thermal conductivity (not a mechanical/Tg property) showed a converging scale effect (~0.179 W/(m*K)). This existing internal citation should be corrected: it does not establish DP=50 as a converged floor for mechanical properties.",
+      "value": {
+        "dp_typical": 100,
+        "nchain": 20,
+        "convergence_basis": "entanglement_mw",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.3390/polym14224950",
+      "url": "https://doi.org/10.3390/polym14224950",
+      "title": "Molecular Dynamics Studies of the Mechanical Behaviors and Thermal Conductivity of Polyisoprene with Different Degrees of Polymerization",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PDIE_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:44:18Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "05b7eea8ab97",
+      "field": "system_size",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "CG-MD study of PET (Golmohammadi, Boland-Hemmat, Barahmand, Eslami, J. Chem. Phys. 152, 114901) explicitly builds long PET chains of 100 repeat units to probe the entanglement-dominated dynamics regime, finding a Rouse-to-reptation dynamic crossover already onsets at that chain length (though full separation of the two regimes needs much longer simulated time, not necessarily longer chains). Abstract independently retrieved via Semantic Scholar API (paperId c00ae11ac7c60c5d8b697b3df3e5334be5b94eef) and DOI cross-checked against Crossref metadata; ACS/AIP full-text page itself returned HTTP 403 (publisher paywall) so only the API-sourced abstract, not the full article, was directly read.",
+      "value": {
+        "dp_typical": null,
+        "nchain": null,
+        "convergence_basis": null,
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.1063/1.5145142",
+      "url": "https://doi.org/10.1063/1.5145142",
+      "title": "Coarse-grained molecular dynamics simulations of poly(ethylene terephthalate)",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:46:05Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "3ed37298f04f",
+      "field": "system_size",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(ethylene terephthalate) (PET, representative PEST-class member)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)c1ccc(C(*)=O)cc1"
+      ],
+      "claim": "Single-chain (not bulk, no nchain) all-atom OPLS-AA MD of a 100-repeat-unit PET chain (Sangkhawasi et al., Polymers 14(6), 1161) predicts Tg=345 K, within 5-8 K of experiment and close to a prior 342 K prediction. Verified via direct PMC full-text fetch. No DP-sweep or chain-length convergence test is performed in this paper -- DP=100 is simply the model size chosen, not shown to be a converged minimum -- so this is weak, non-convergence context only; it neither supports nor contradicts dp_typical=50.",
+      "value": {
+        "dp_typical": null,
+        "nchain": null,
+        "convergence_basis": null,
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.3390/polym14061161",
+      "url": "https://doi.org/10.3390/polym14061161",
+      "title": "All-Atom Molecular Dynamics Simulations on a Single Chain of PET and PEV Polymers",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEST_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T14:46:05Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "9642df527698",
+      "field": "system_size",
+      "polymer_class": "PURT",
+      "polymer_names": [
+        "Aliphatic thermoplastic polyurethane (TPU, representative of the PURT class -- soft/hard segment generic, no discrete member_smiles entry)"
+      ],
+      "smiles": [
+        "*OCCOC(=O)NCCCCCCNC(*)=O"
+      ],
+      "claim": "PTMO (the polyether soft-segment component of segmented aliphatic/aromatic PU elastomers, TraPPE-UA all-atom/united-atom MD via LAMMPS): reference density-validation system used Nm=555 repeat units, nchain=20 (M=39960 g/mol), matching experiment to <1%. Smaller chain lengths Nm=50, 90, 200 (M=3600, 6480, 14400 g/mol) were then tested and showed <2% deviation in specific volume/density from the Nm=555 reference at matched T,P -- i.e. density is converged already by Nm=50. A separate finite-size (chain-count) test at Nm=50 compared nchain(NP)=5 vs 50: MSD, shear relaxation modulus G(t), and bulk relaxation modulus K(t) were found insensitive to nchain (NP=5 sufficient), although the end-to-end distance distribution Re showed a real finite-size shift between NP=5 and 50 (structural, not viscoelastic-modulus, sensitivity). Separately, the shear plateau modulus (entanglement signature) only emerges at Nm=200 (Ne=21.4+/-2.0, Me=1396.8-1684.8 g/mol, i.e. DP~19-23); Nm=90 shows no entanglement plateau in G(t). This is an entanglement/viscoelastic (shear) finding, not a claim about the static isothermal bulk modulus K_T=-V(dP/dV)_T that PolyJarvis computes via Murnaghan fit.",
+      "value": {
+        "dp_typical": 50,
+        "nchain": 5,
+        "convergence_basis": "class_analogy",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.48550/arXiv.2202.08993",
+      "url": "https://arxiv.org/abs/2202.08993",
+      "title": "Molecular dynamics study of the linear viscoelastic shear and bulk relaxation moduli of poly(tetramethylene oxide) (PTMO)",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "preprint",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PURT_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:03:28Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "367ca9585e65",
+      "field": "system_size",
+      "polymer_class": "PCBN",
+      "polymer_names": [
+        "BPA-PC (bisphenol-A polycarbonate)"
+      ],
+      "smiles": [
+        "*Oc1ccc(C(C)(C)c2ccc(OC(*)=O)cc2)cc1"
+      ],
+      "claim": "Verified via full-text fetch (PMC9824171): coarse-grained BPA-PC MD used three chain lengths (128-mer/32.8 kg/mol with 32 chains, 192-mer/49.0 kg/mol with 22 chains, 256-mer/65.3 kg/mol with 16 chains, all held at approx 16,500 CG beads total per cell) and reports Ne (entanglements per molecule) of approximately 26-50 depending on annealing time. Note: these 'mers' are coarse-grained beads, not atomistic repeat units, so this figure does not map directly onto polymer_rules.json's atomistic dp_typical/nchain -- it is cited here only as context confirming BPA-PC is a highly-entangled, low-Me chemistry where mechanical-property MD studies routinely use much longer chains than the entanglement onset. The paper does NOT discuss density/modulus/Tg convergence with chain length.",
+      "value": {
+        "dp_typical": 40,
+        "nchain": 10,
+        "convergence_basis": "entanglement_mw",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.3390/polym15010043",
+      "url": "https://doi.org/10.3390/polym15010043",
+      "title": "Coarse-Grained Molecular Dynamics Simulation of Polycarbonate Deformation: Dependence of Mechanical Performance by the Effect of Spatial Distribution and Topological Constraints",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PCBN_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:03:57Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "77ec025aeb94",
+      "field": "system_size",
+      "polymer_class": "PAMD",
+      "polymer_names": [
+        "Nylon-6 (polyamide 6, representative member of the PAMD class)"
+      ],
+      "smiles": [
+        "*CCCCCC(=O)N*"
+      ],
+      "claim": "Atomistic MD (MedeA-packed, PA66) simulated an amorphous cell of 12 chains x 80 monomers (18.1 kg/mol total molecular weight per chain). The authors justify this system size by citing that PA66's entanglement molecular weight Me is ~2 kg/mol and the critical molar mass Mnc (brittle-ductile transition threshold) falls between 3*Me and 5*Me (~6-10 kg/mol); their 18.1 kg/mol chains comfortably exceed this. No explicit DP-sweep/plateau convergence test vs chain length is shown in the paper -- DP=80/nchain=12 is the system size chosen and justified against literature Me, not demonstrated as a converged minimum via their own sweep.",
+      "value": {
+        "dp_typical": 80,
+        "nchain": 12,
+        "convergence_basis": "entanglement_mw",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.1021/acs.jpcb.5c07710",
+      "url": "https://doi.org/10.1021/acs.jpcb.5c07710",
+      "title": "Atomistic Modeling of the Hygromechanical Properties of Amorphous Polyamide 6,6",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PAMD_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:04:04Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "d1bca055ad7a",
+      "field": "system_size",
+      "polymer_class": "PURA",
+      "polymer_names": [
+        "Poly(urea) (generic urea-linkage polymer, representative of the PURA class -- no discrete member_smiles exists in polymer_rules.json; using a minimal urea linkage as a proxy)"
+      ],
+      "smiles": [
+        "*NC(=O)N*"
+      ],
+      "claim": "All-atom MD reference model used a cubic simulation box of 50 oligomer chains (COMPASS force field, LAMMPS, PPPM electrostatics). Each 'chain' is a single fixed block-copolymer oligomer (soft segment of 6 tetramethyleneoxide units + one hard urea segment + soft segment of 7 TMO units) built to match a specific segmented industrial polyurea, NOT a homopolymer -NH-CO-NH- repeat-unit chain, and the paper performs no DP/chain-length convergence sweep -- nchain=50 is simply the fixed cell size chosen, not evidence of a convergence plateau. Read directly from the open-access SI PDF (figshare.com/ndownloader/files/30445338), confirmed to state exactly this.",
+      "value": {
+        "dp_typical": null,
+        "nchain": null,
+        "convergence_basis": null,
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.1080/08927022.2021.1967346",
+      "url": "https://doi.org/10.1080/08927022.2021.1967346",
+      "title": "Revealing the role of hydrogen bonding in polyurea with multiscale simulations (Supplementary Materials)",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PURA_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:04:23Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "50955ebe9109",
+      "field": "system_size",
+      "polymer_class": "PPHS",
+      "polymer_names": [
+        "Poly(diethoxyphosphazene) (representative member of the PPHS class)"
+      ],
+      "smiles": [
+        "*N=P(*)(OCC)OCC"
+      ],
+      "claim": "MD builds of poly(dichlorophosphazene) and poly(trifluoroethoxy)/azido/nitrato-substituted phosphazenes used a cell of 2000 monomer units with ~2% of monomers as chain initiators (implying roughly 40 chains at ~DP~47 average, once ~95% of monomer was consumed). The paper explicitly does NOT test or discuss property convergence as a function of degree of polymerization -- it names that gap as unresolved in prior polyphosphazene MD work and does not close it itself. Substituents studied were trifluoroethoxy/azido/nitrato, not the ethoxy substituent of poly(ethoxyphosphazene).",
+      "value": {
+        "dp_typical": null,
+        "nchain": null,
+        "convergence_basis": null,
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.3390/polym14071451",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9002744/",
+      "title": "A Computational Procedure for Atomistic Modelling of Polyphosphazenes towards Better Capturing Molecular-Level Structuring and Thermo-Mechanical Properties",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PPHS_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:08:57Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "0f7b60ea8b77",
+      "field": "system_size",
+      "polymer_class": "PKTN",
+      "polymer_names": [
+        "Poly(ether ether ketone) (PEEK, representative member of the PKTN class)"
+      ],
+      "smiles": [
+        "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1"
+      ],
+      "claim": "Uses a fixed catechol-based tetrameric oligomer (o-PEEK, DP=4, 136 atoms/oligomer) in a 2x2x2 supercell of 40 oligomers (nchain=40, 5440 atoms) for Tg calculation. Explicitly performs NO chain-length/DP convergence sweep -- the DP=4 oligomer size is an assumption, not a validated convergence point. Cannot support or contradict PKTN's dp_typical=50 rule; already cited in polymer_rules.json PKTN notes for its Tg value, not for system size.",
+      "value": {
+        "dp_typical": null,
+        "nchain": null,
+        "convergence_basis": null,
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "unknown (PMC7285100)",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7285100/",
+      "title": "COMPASS II molecular dynamics simulation of PEEK variants (Tg=424-429K)",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PKTN_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:09:38Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "9614eaf04947",
+      "field": "system_size",
+      "polymer_class": "PSIL",
+      "polymer_names": [
+        "Poly(dimethylsiloxane) (PDMS, representative member of the PSIL class)"
+      ],
+      "smiles": [
+        "*O[Si](*)(C)C"
+      ],
+      "claim": "PDMS-specific Kuhn-scale table (Table 1, PDMS* row): nK=2.82, lK=11.42 A, MK=309.28 g/mol, packing length p=4.06 A, experimental plateau modulus Ge=0.25 MPa, NeK=31.08 entanglement Kuhn segments, alpha=15.7 (derived). NeK is anchored to the measured Ge via Ge*lK^3/(kB*Tref)=nK/NeK (table value 0.091); this is the Fetters/Lohse/Colby packing-length compilation applied at the Kuhn scale. Yields Me = NeK*MK = 9612.4 g/mol for PDMS. Published as Macromolecules 2020, 53, 1901-1916; content verified against the arXiv preprint PDF directly (publisher pubs.acs.org blocked WebFetch, per prior session experience), not the ACS-hosted version, hence trust_tier=preprint rather than peer_reviewed_doi.",
+      "value": {
+        "dp_typical": null,
+        "nchain": null,
+        "convergence_basis": "packing_length_estimate",
+        "me_estimated_gmol": 9612.4,
+        "me_estimation_note": "Me = NeK * MK using PDMS-specific Kuhn-scale table values from Everaers, Karimi-Varzaneh, Fleck, Hojdis, Svaneborg, Macromolecules 2020, 53, 1901-1916 (arXiv:1808.03509v3, PDF verified directly): PDMS row gives Kuhn segment molar mass MK=309.28 g/mol and entanglement Kuhn-segment count NeK=31.08. NeK is anchored to the experimentally measured plateau modulus Ge=0.25 MPa via the reduced form Ge*lK^3/(kB*Tref) = nK/NeK (table column value 0.091; check: 2.82/31.08=0.0907, consistent); the table's alpha=15.7 is a derived output of this same relation (alpha^2/nK^2 = 15.7^2/2.82^2 = 31.0, consistent with NeK=31.08), not an independent input. The alpha=19.0+/-2 packing-argument constant (Kavassalis & Noolandi 1988; Lin 1987) is Gula et al. 2020's separate KG-model construction input, not the source of this NeK value -- do not conflate the two. Me = NeK * MK = 31.08 * 309.28 g/mol = 9612.4 g/mol. Cross-checked against Gula, Karimi-Varzaneh, Svaneborg, arXiv:2004.06473v2 (PDF verified directly), which independently reports NeK=33.1 for a PDMS-tuned Kremer-Grest model vs. an experimental target of 31.3 (same order, same source lineage, both traceable to Fetters/Lohse/Colby packing-length compilation, Physical Properties of Polymers Handbook). No atomistic all-atom MD study of PDMS reporting an explicit DP/nchain convergence sweep for density, Tg, or bulk modulus was found or could be verified (targeted arXiv API queries for PDMS + molecular dynamics + density/entanglement/degree of polymerization returned no on-topic hits beyond the two Kremer-Grest-model papers above; WebSearch quota was exhausted this session so ACS/RSC-hosted atomistic PDMS papers could not be searched fresh, only checked by direct DOI/URL attempt, which was blocked -- see notes)."
+      },
+      "doi": "10.1021/acs.macromol.9b02428",
+      "url": "https://arxiv.org/abs/1808.03509v3",
+      "title": "Kremer-Grest models for commodity polymer melts: Linking theory, experiment and simulation at the Kuhn scale",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "preprint",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PSIL_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:14:16Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "fbfcc59c08f4",
+      "field": "system_size",
+      "polymer_class": "PPNL",
+      "polymer_names": [
+        "Poly(p-phenylene vinylene) (PPV, representative member of the PPNL class -- multi-member: PPV/MEH-PPV/PPO-PPE)"
+      ],
+      "smiles": [
+        "*C=Cc1ccc(*)cc1"
+      ],
+      "claim": "Coarse-grained MD study of regioregular P3HT (thiophene-backbone conjugated polymer -- explicitly listed as a PPNL-class example, 'P3HT-like', in polymer_rules.json). Verified by reading the full arXiv v2 PDF directly (published version is ACS-paywalled and blocked, but preprint content is identical for this claim). States, citing Tummala et al.: 'P3HT oligomers containing at least 50 monomer units are required to observe elastic behavior in MD simulations, while even longer chains are required for appropriate representation of molecular chain entanglements.' The authors themselves ran DP=50-150 with 300-900 molecular chains (CG particles) to satisfy this floor and to avoid chains self-entangling with periodic images.",
+      "value": {
+        "dp_typical": 50,
+        "nchain": null,
+        "convergence_basis": "class_analogy",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.1021/acs.macromol.0c02278",
+      "url": "https://arxiv.org/abs/2010.01962",
+      "title": "Molecular Insights into the Mechanical Properties of Polymer-Fullerene Bulk Heterojunctions for Organic Photovoltaic Applications",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "preprint",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PPNL_rules_audit",
+        "migrated_from": null,
+        "added_at": "2026-08-26T15:18:42Z"
       }
     }
   ]

@@ -121,6 +121,40 @@ TRAPPE_UA_STYLES = {
 TRAPPE_SPECIAL_BONDS = "special_bonds lj 0 0 0"
 TRAPPE_PAIR_MODIFY   = "mix arithmetic tail yes"
 
+# ─── DREIDING force field style constants (RadonPy-generated cells) ─────────
+# Confirmed 2026-08-26 against a real RadonPy-built BPA-PC cell (radonpy.ff.dreiding.Dreiding,
+# ff_class='1'): 2-column epsilon/sigma pair coeffs, 2-column k/r0 bonds, 2-column k/theta0
+# angles (all harmonic, matching GAFF2's bond/angle styles) -- but dihedral_style is
+# harmonic (K,d,n -- 3-column, NOT GAFF2's 4-term fourier) and improper_style is umbrella
+# (K,X0 -- NOT GAFF2's cvff). Distinct branch from GAFF2's "else" default, not a subset of it.
+DREIDING_STYLES = {
+    "BOND_STYLE":      "harmonic",
+    "ANGLE_STYLE":     "harmonic",
+    "DIHEDRAL_STYLE":  "harmonic",
+    "IMPROPER_STYLE":  "umbrella",
+}
+
+# Same lj/charmm/coul/long cutoff-scheme convention as GAFF2 (RadonPy doesn't emit its own
+# LAMMPS input script, only the .data file -- pair_style choice is entirely ours). The
+# per-type epsilon/sigma coefficients are format-identical to GAFF2's; only the combining
+# rule for cross (i!=j) terms differs (see PAIR_MODIFY below).
+PAIR_STYLE_DREIDING_PPPM = (
+    "pair_style lj/charmm/coul/long 8.0 12.0\n"
+    "kspace_style pppm 1e-6"
+)
+PAIR_STYLE_DREIDING_CUTOFF = "pair_style lj/charmm/coul/charmm 8.0 12.0"
+
+# Dreiding.__init__'s own hardcoded constants: c_c12=c_c13=lj_c12=lj_c13=0, c_c14=5/6
+# (0.833333), lj_c14=0.5 -- exactly LAMMPS's "special_bonds amber" shortcut, written out
+# explicitly here so a DREIDING deck doesn't carry a confusing "amber" keyword.
+# Mixing rule: the original DREIDING force field (Mayo, Olafson, Goddard 1990) specifies
+# GEOMETRIC combining for both epsilon and sigma -- distinct from GAFF2's arithmetic mixing;
+# RadonPy's dreiding.py does not itself emit a LAMMPS script/pair_modify directive (data-file
+# writer only), so this choice is PolyJarvis's own and not independently re-verifiable from
+# an emitted file the way the bonded styles above were.
+DREIDING_SPECIAL_BONDS = "special_bonds lj 0.0 0.0 0.5 coul 0.0 0.0 0.833333"
+DREIDING_PAIR_MODIFY   = "mix geometric tail yes"
+
 
 # Lumped CHn pseudo-atom masses (CH, CH2, CH3, CH4). None coincides with an element
 # mass: the closest pair is CH2 14.0268 vs N 14.007, so the 0.005 tolerance separates
@@ -1152,9 +1186,14 @@ write_data tg_step_out.data
             subs["DUMP_APPEND_BLOCK"] = ""
 
         # ── Force field styles ────────────────────────────────────────────
-        use_pcff   = cfg.get("use_pcff",   False)
-        use_opls   = cfg.get("use_opls",   False)
-        use_trappe = cfg.get("use_trappe", False)
+        use_pcff     = cfg.get("use_pcff",     False)
+        use_opls     = cfg.get("use_opls",     False)
+        use_trappe   = cfg.get("use_trappe",   False)
+        # use_dreiding is never auto-detected (see _detect_ff_from_data_file's docstring --
+        # RadonPy pre-equil files return {} for every RadonPy-routed FF, GAFF2 included) --
+        # it depends entirely on the explicit flag stage_params.py derives from the plan's
+        # preferred_ff, exactly like GAFF2/GAFF2_mod already do via the "else" default below.
+        use_dreiding = cfg.get("use_dreiding", False)
 
         if data_file and os.path.exists(data_file):
             detected = _detect_ff_from_data_file(data_file)
@@ -1186,6 +1225,8 @@ write_data tg_step_out.data
             ff_styles = OPLS_STYLES
         elif use_trappe:
             ff_styles = TRAPPE_UA_STYLES
+        elif use_dreiding:
+            ff_styles = DREIDING_STYLES
         else:
             ff_styles = GAFF2_STYLES
         subs["BOND_STYLE"]      = cfg.get("BOND_STYLE",     ff_styles["BOND_STYLE"])
@@ -1202,6 +1243,8 @@ write_data tg_step_out.data
             subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_PCFF_PPPM if use_pppm else PAIR_STYLE_PCFF_CUTOFF
         elif use_opls:
             subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_OPLS_PPPM if use_pppm else PAIR_STYLE_OPLS_CUTOFF
+        elif use_dreiding:
+            subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_DREIDING_PPPM if use_pppm else PAIR_STYLE_DREIDING_CUTOFF
         else:
             subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_PPPM if use_pppm else PAIR_STYLE_CUTOFF
 
@@ -1415,6 +1458,8 @@ write_data tg_step_out.data
             default_sb, default_pm = OPLS_SPECIAL_BONDS, OPLS_PAIR_MODIFY
         elif use_trappe:
             default_sb, default_pm = TRAPPE_SPECIAL_BONDS, TRAPPE_PAIR_MODIFY
+        elif use_dreiding:
+            default_sb, default_pm = DREIDING_SPECIAL_BONDS, DREIDING_PAIR_MODIFY
         else:
             default_sb, default_pm = GAFF2_SPECIAL_BONDS, GAFF2_PAIR_MODIFY
         subs["SPECIAL_BONDS"]  = cfg.get("SPECIAL_BONDS", default_sb)

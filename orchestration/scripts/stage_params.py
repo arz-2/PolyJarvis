@@ -102,7 +102,8 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
         return json.loads(flags_json)
     ff = cls.get('preferred_ff', '').lower()
     class_ii = 'pcff' in ff or ff in ('compass', 'pcff_ore')
-    return {'use_pcff': class_ii, 'use_opls': 'opls' in ff, 'use_trappe': 'trappe' in ff}
+    return {'use_pcff': class_ii, 'use_opls': 'opls' in ff, 'use_trappe': 'trappe' in ff,
+            'use_dreiding': 'dreiding' in ff}
 
 def _estimate_tg_group_contribution(smiles: str, timeout: int = 30) -> dict | None:
     """Shell into the `radonpy` conda env to run estimate_tg_group_contribution.py -- RDKit

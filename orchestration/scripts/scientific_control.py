@@ -112,7 +112,7 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
 }
 ENUM_OVERRIDES = {
     "preferred_builder": frozenset({"emc", "radonpy"}),
-    "preferred_ff": frozenset({"pcff", "pcff_ore", "compass", "opls/2024/opls-aa", "trappe", "gaff2", "gaff2_mod"}),
+    "preferred_ff": frozenset({"pcff", "pcff_ore", "compass", "opls/2024/opls-aa", "trappe", "gaff2", "gaff2_mod", "dreiding"}),
     "charge_method": frozenset({"none", "embedded", "bond-increment", "opls-library",
                                   "gasteiger", "am1bcc", "am1-bcc", "resp"}),
     "electrostatics": frozenset({"pppm", "lj_cut"}),

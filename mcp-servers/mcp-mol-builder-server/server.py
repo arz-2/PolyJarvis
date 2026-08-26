@@ -52,12 +52,12 @@ logger.info("Mol-Builder MCP Server starting...")
 
 # Heavy libs loaded in a background thread so the MCP handshake completes fast
 np = pd = optimize = stats = plt = Chem = utils = calc = poly = None
-GAFF2_mod = GAFF2 = GAFF = qm = Analyze = None
+GAFF2_mod = GAFF2 = GAFF = Dreiding = qm = Analyze = None
 _libs_ready = threading.Event()
 
 def _load_heavy_libs():
     global np, pd, optimize, stats, plt, Chem, utils, calc, poly
-    global GAFF2_mod, GAFF2, GAFF, qm, Analyze
+    global GAFF2_mod, GAFF2, GAFF, Dreiding, qm, Analyze
     import numpy as _np
     import pandas as _pd
     from scipy import optimize as _opt, stats as _stats
@@ -68,11 +68,13 @@ def _load_heavy_libs():
     from radonpy.ff.gaff2_mod import GAFF2_mod as _GAFF2_mod
     from radonpy.ff.gaff2 import GAFF2 as _GAFF2
     from radonpy.ff.gaff import GAFF as _GAFF
+    from radonpy.ff.dreiding import Dreiding as _Dreiding
     from radonpy.sim import qm as _qm
     from radonpy.sim.lammps import Analyze as _Analyze
     np = _np; pd = _pd; optimize = _opt; stats = _stats; plt = _plt; Chem = _Chem
     utils = _utils; calc = _calc; poly = _poly
-    GAFF2_mod = _GAFF2_mod; GAFF2 = _GAFF2; GAFF = _GAFF; qm = _qm; Analyze = _Analyze
+    GAFF2_mod = _GAFF2_mod; GAFF2 = _GAFF2; GAFF = _GAFF; Dreiding = _Dreiding
+    qm = _qm; Analyze = _Analyze
     _libs_ready.set()
     logger.info("Heavy libs loaded in background")
 
@@ -451,6 +453,8 @@ def _run_copolymerize(mol_files, copoly_type, n, ratios, tacticity, nchain, work
         ff_obj = GAFF2()
     elif forcefield == "GAFF2_mod":
         ff_obj = GAFF2_mod()
+    elif forcefield == "Dreiding":
+        ff_obj = Dreiding()
 
     chain_files = []
     ff_failed = []
@@ -729,7 +733,7 @@ def submit_copolymerize_job(
     ratios: Optional[list[float]] = None,
     tacticity: Literal["isotactic", "syndiotactic", "atactic"] = "atactic",
     nchain: int = 10,
-    forcefield: Optional[Literal["GAFF", "GAFF2", "GAFF2_mod"]] = None,
+    forcefield: Optional[Literal["GAFF", "GAFF2", "GAFF2_mod", "Dreiding"]] = None,
     work_dir: str = "copolymerize"
 ) -> dict:
     """
@@ -1078,7 +1082,7 @@ def build_molecule_from_smiles(smiles: str, add_hydrogens: bool = True) -> dict:
 @mcp.tool()
 def assign_forcefield(
     mol_file: str,
-    forcefield: Literal["GAFF", "GAFF2", "GAFF2_mod"] = "GAFF2_mod"
+    forcefield: Literal["GAFF", "GAFF2", "GAFF2_mod", "Dreiding"] = "GAFF2_mod"
 ) -> dict:
     """
     Assign force field parameters (fast, synchronous).
@@ -1100,6 +1104,8 @@ def assign_forcefield(
             ff = GAFF2()
         elif forcefield == "GAFF2_mod":
             ff = GAFF2_mod()
+        elif forcefield == "Dreiding":
+            ff = Dreiding()
         else:
             return {"error": f"Unknown force field: {forcefield}"}
         
