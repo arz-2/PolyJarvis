@@ -1720,9 +1720,9 @@ def generate_equilibration_workflow(
                                  f"({_required_ensemble!r}) — continuing an {_required_ensemble} "
                                  f"stage as {extend_ensemble} would silently add or remove a "
                                  "barostat mid-trajectory."}
-        if max_temp <= temp + anneal_margin_K:
+        if max_temp < temp + anneal_margin_K:
             return {"status": "error",
-                    "error": f"max_temp={max_temp} does not exceed temp={temp} by the required "
+                    "error": f"max_temp={max_temp} does not meet temp={temp} plus the required "
                              f"anneal_margin_K={anneal_margin_K} — the blockwise cooldown "
                              "(cool_block) needs a well-defined positive span from max_temp down "
                              "to final_T_K to ramp through. Raise max_temp (or the class's "

@@ -449,8 +449,8 @@ def _forcefield_findings(plan: dict) -> list:
 
 def _system_size_findings(plan: dict) -> list:
     """D-04_system_size must not silently under-provision DP for a floor the class's own
-    cited literature already documents (Fox-Flory for tg, entanglement DP@Me for
-    bulk_modulus).
+    cited literature already documents (Fox-Flory for tg -- the only mechanized DP floor;
+    entanglement DP@Me for bulk_modulus is advisory only, see select_system_size.py).
 
     Mirrors _hardware_findings: select_system_size.py is re-run live against the plan's
     own smiles/properties, same as _hardware_findings does with select_hardware.py. A

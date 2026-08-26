@@ -198,6 +198,18 @@ def test_max_temp_too_close_to_temp_is_rejected(tmp_path):
     assert "anneal_margin_K" in result["error"] or "max_temp" in result["error"]
 
 
+def test_max_temp_exactly_at_the_margin_boundary_is_accepted(tmp_path):
+    """anneal_margin_K is documented (stage_params.py's ANNEAL_MARGIN_K) as a MINIMUM
+    required margin -- >= semantics. stage_params.py's own self-healing floor
+    (max(annealing_T_high_K, T_workflow_K + ANNEAL_MARGIN_K)) can land exactly on this
+    boundary, so the guard here must accept equality, not just strictly-greater -- a
+    real off-by-one that blocked a live run (2026-08-25, a-PS/PSTR) before this fix."""
+    result = server.generate_equilibration_workflow(
+        **_base_kwargs(tmp_path, temp=300.0, max_temp=400.0, anneal_margin_K=100.0)
+    )
+    assert result["status"] == "success", result
+
+
 def test_final_t_k_above_temp_is_rejected(tmp_path):
     result = server.generate_equilibration_workflow(
         **_base_kwargs(tmp_path, temp=300.0, final_T_K=350.0, max_temp=700.0)

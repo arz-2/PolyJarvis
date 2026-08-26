@@ -4,11 +4,11 @@
 Reads a PolyJarvis failure payload on stdin (the JsonSubprocessAgent contract shared by
 both scientific_control.py's outer recovery loop and workflow_engine.py's inner
 stage-escalation loop), runs a headless Claude session that invokes the `/recover`
-slash command -- the same command a live orchestrating session uses, which loads its
-diagnosis playbook regardless of which checkout it physically lives in (verified:
-`/recover.md` is not in this repo at all, only in the sibling worktree, yet
-`/recover ...` still loads it headlessly) -- and returns exactly one JSON object on
-stdout.
+slash command -- the same command a live orchestrating session uses, loading its
+diagnosis playbook from this repo's own .claude/commands/recover.md (tracked in this
+checkout, not the sibling PolyJarvis worktree -- that sibling's recover.md is for the
+prior plan_mode-based multi-agent architecture and does not apply here; see CLAUDE.md)
+-- and returns exactly one JSON object on stdout.
 
 The session may return `action: retry` (unchanged params -- a confirmed transient
 cause) or `revise_plan` (concrete `modifications`), not just `stop`. This adapter never
@@ -17,8 +17,12 @@ plus a read-only Bash allowlist, same as before. Whatever `action`/`modification
 returned are only ever applied by the calling engine's own already-bounded, already-
 validated machinery (forbidden-key check, `plan_validator`, `_validate_overrides`,
 `_validate_protocol_relationships`, `MAX_AGENT_DECISIONS`/`MAX_RECOVERY_ATTEMPTS` caps)
--- this adapter just stops silently discarding the decision. Wrapper/session failures
-still fail closed to `stop`.
+-- this adapter just stops silently discarding the decision. A wrapper/session failure
+(the headless call itself crashing, timing out, or returning unusable output -- not a
+considered decision) is not a diagnosis, so it is never conflated with an agent's real
+`stop`: it maps to `retry` instead, still bounded by the same MAX_AGENT_DECISIONS/
+MAX_RECOVERY_ATTEMPTS=2 caps, so a persistent (non-transient) failure still reaches a
+human -- see `diagnose()`.
 """
 
 import json
@@ -159,10 +163,19 @@ def diagnose(payload: dict) -> dict:
             action = "stop"
         modifications = dict(structured.get("modifications") or {}) if action == "revise_plan" else {}
         rationale = f"[recovery-agent diagnosis] {structured.get('rationale', '')}"
-    except Exception as exc:  # fail closed: still a valid decision, never crash the caller
-        action = "stop"
+    except Exception as exc:
+        # The invocation itself failed (subprocess crash, timeout, malformed/missing
+        # structured output) -- this carries no diagnosis of the underlying issue, so it
+        # must not be conflated with an agent's considered `stop`. Ask the caller to
+        # retry the stage instead: WorkflowEngine._escalate/ScientificControlPlane
+        # already bound this at MAX_AGENT_DECISIONS/MAX_RECOVERY_ATTEMPTS=2, so a
+        # persistent (non-transient) underlying failure still reaches
+        # escalation_required/unresolved for a human -- this only spares a human from
+        # unsticking a one-off invocation blip. Falls back to "stop" if the caller's own
+        # contract doesn't offer "retry" as a valid action.
+        action = "retry" if "retry" in valid_actions else "stop"
         modifications = {}
-        rationale = f"[recovery-agent wrapper failed, no diagnosis available] {exc}"
+        rationale = f"[recovery-agent invocation failed, retrying the stage] {exc}"
     return {"action": action, "rationale": rationale, "modifications": modifications}
 
 

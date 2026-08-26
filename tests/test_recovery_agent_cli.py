@@ -130,12 +130,28 @@ def test_run_headless_claude_gives_up_after_retries_exhausted():
             assert "aborted_streaming" in str(exc)
 
 
-def test_diagnose_fails_closed_on_headless_error():
+def test_diagnose_retries_stage_on_headless_invocation_failure():
+    """A crashed/timed-out headless call carries no diagnosis -- it must not be conflated
+    with an agent's considered `stop`. It should ask the caller to retry the stage
+    instead, bounded by the caller's own MAX_AGENT_DECISIONS/MAX_RECOVERY_ATTEMPTS caps."""
     with patch.object(rac, "_run_headless_claude", side_effect=RuntimeError("timed out")):
         decision = rac.diagnose(OUTER_PAYLOAD)
-    assert decision["action"] == "stop"
-    assert "wrapper failed" in decision["rationale"]
+    assert decision["action"] == "retry"
+    assert decision["modifications"] == {}
+    assert "invocation failed" in decision["rationale"]
     assert "timed out" in decision["rationale"]
+
+
+def test_diagnose_falls_back_to_stop_on_invocation_failure_when_retry_not_offered():
+    """If the caller's own contract doesn't offer "retry" as a valid action, an
+    invocation failure must still fail closed to "stop" rather than return an action
+    the caller never sanctioned."""
+    payload = json.loads(json.dumps(OUTER_PAYLOAD))
+    payload["output_contract"]["action"] = ["revise_plan", "stop"]
+    with patch.object(rac, "_run_headless_claude", side_effect=RuntimeError("timed out")):
+        decision = rac.diagnose(payload)
+    assert decision["action"] == "stop"
+    assert "invocation failed" in decision["rationale"]
 
 
 def test_main_reads_stdin_writes_one_json_line(capsys, monkeypatch):

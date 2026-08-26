@@ -101,11 +101,17 @@ def test_over_provisioned_gap_is_reported_never_overridden():
 # --- entanglement Me: per-member, never generalized across a class -----------------
 
 def test_entanglement_floor_resolves_the_matched_member(monkeypatch):
+    """Entanglement Me is still resolved and reported (DP@Me=125), but is advisory only for
+    bulk_modulus -- user-directed benchmark criterion, 2026-08-25: Me gates plateau shear
+    modulus/viscoelastic relaxation, not the isothermal bulk modulus. It must never feed
+    required_dp_floor/decided_params_override."""
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (15, 100.12))
     _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
     result = select_system_size("PACR", PACR_SMILES, properties=["bulk_modulus"])
-    assert result["decided_params_override"] == {"dp_typical": 125}
-    assert result["decision"]["required_dp_floor"] == 125
+    assert result["decided_params_override"] == {}
+    assert result["decision"]["required_dp_floor"] is None
+    advisory = next(u for u in result["uncertainties"] if u["name"] == "entanglement_dp_advisory")
+    assert advisory["dp_at_me"] == 125
 
 
 def test_entanglement_floor_refuses_an_unmatched_sibling_member(monkeypatch):
@@ -137,12 +143,15 @@ def test_undocumented_class_bulk_modulus_is_mw_floor_unknown():
 def test_single_member_class_resolves_via_its_own_smiles(monkeypatch):
     """PCBN has exactly one documented member (BPA_PC), but resolution still goes through
     a real SMILES match against member_smiles -- not a bare "only one key exists" shortcut,
-    which would silently swallow a different polycarbonate chemistry planned under PCBN."""
+    which would silently swallow a different polycarbonate chemistry planned under PCBN.
+    Me resolving successfully is reported via entanglement_dp_advisory (never
+    MW_FLOOR_UNKNOWN) -- but stays advisory, never required_dp_floor, for bulk_modulus."""
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (22, 254.0))
     _patch_class_member_smiles(monkeypatch, "PCBN", {"BPA_PC": [PCBN_SMILES]})
     result = select_system_size("PCBN", PCBN_SMILES, properties=["bulk_modulus"])
-    assert result["decision"]["required_dp_floor"] is not None
+    assert result["decision"]["required_dp_floor"] is None
     assert not any(u["name"] == "MW_FLOOR_UNKNOWN" for u in result["uncertainties"])
+    assert any(u["name"] == "entanglement_dp_advisory" for u in result["uncertainties"])
 
 
 def test_single_member_class_still_refuses_an_unmatched_smiles(monkeypatch):
@@ -322,24 +331,31 @@ _LIT_GROUNDING_SCHEMA = {  # matches .claude/agents/system-size-literature-worke
 }
 
 
-def test_literature_grounding_raises_above_the_mechanized_floor(monkeypatch):
+def test_literature_grounding_provides_the_bulk_modulus_recommendation(monkeypatch):
+    """bulk_modulus has no mechanized DP floor (entanglement Me is advisory only, user-
+    directed benchmark criterion 2026-08-25) -- a real per-molecule convergence-DP citation
+    now IS the recommendation outright, not merely something that can raise an existing
+    floor."""
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (15, 100.12))
     _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
     r = solve_system_size("PACR", PACR_SMILES, properties=["bulk_modulus"],
                           dp_typical=50, literature_grounding=_LIT_GROUNDING_SCHEMA)
-    assert r["decision"]["required_dp_floor"] == 125  # PMMA entanglement floor, unchanged
-    assert r["recommended_params"]["dp_typical"] == 200  # literature raises it further
-    assert any("raises the mechanized floor" in reason for reason in r["recommendation_reasons"])
+    assert r["decision"]["required_dp_floor"] is None  # entanglement Me is advisory, not a floor
+    assert r["recommended_params"]["dp_typical"] == 200
+    assert any("entanglement Me is documented but advisory" in reason
+              for reason in r["recommendation_reasons"])
 
 
-def test_literature_grounding_below_low_confidence_does_not_raise_the_floor(monkeypatch):
+def test_literature_grounding_used_even_at_low_confidence_when_no_floor_stands(monkeypatch):
+    """Unlike a genuine mechanized floor (Fox-Flory for tg, which gates literature grounding
+    to medium/high confidence before letting it raise the recommendation), bulk_modulus has
+    no floor to protect against being undercut -- any confidence beats no recommendation."""
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (15, 100.12))
     _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
     low_conf = {"system_size": {**_LIT_GROUNDING_SCHEMA["system_size"], "confidence": "low"}}
     r = solve_system_size("PACR", PACR_SMILES, properties=["bulk_modulus"],
                           dp_typical=50, literature_grounding=low_conf)
-    assert r["recommended_params"]["dp_typical"] == 125  # mechanized floor wins, not 200
-    assert any("floor stands" in reason for reason in r["recommendation_reasons"])
+    assert r["recommended_params"]["dp_typical"] == 200
 
 
 def test_literature_grounding_resolves_mw_floor_unknown_at_any_confidence(monkeypatch):

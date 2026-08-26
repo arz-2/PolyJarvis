@@ -9,6 +9,7 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 from workflow_engine import (  # noqa: E402
     ACTIVE_BLOCKING_CODES,
     MAX_AGENT_DECISIONS,
+    MAX_AUTOMATIC_REMEDIES,
     Finding,
     RemedyRegistry,
     StageResult,
@@ -277,6 +278,167 @@ def test_incomplete_attempt_with_changed_input_hash_gets_a_fresh_attempt(tmp_pat
 
     assert new_id != old_id
     assert new_dir.is_dir()
+
+
+def test_agent_only_code_escalates_immediately_without_local_remedy(tmp_path):
+    """BACKBONE_TYPES_UNRESOLVED has no registered remedy -- it must reach _escalate on the
+    very first failure, never spend an automatic-remedy attempt first."""
+    finding = Finding("BACKBONE_TYPES_UNRESOLVED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+
+    result = engine.run()
+
+    assert result["status"] == "escalation_required"
+    equil_calls = [call for call in fake.calls if call[0] == "equilibration"]
+    assert len(equil_calls) == 1
+    assert engine.state["remedy_counters"]["total"] == 0
+    assert engine.state["agent_escalations"] == []
+
+
+class RegisteredRemedyRecovery:
+    def __init__(self, remedy_id):
+        self.remedy_id = remedy_id
+        self.calls = []
+
+    def diagnose(self, intent, plan, issue):
+        self.calls.append((intent, plan, issue))
+        return {"action": "registered_remedy", "remedy_id": self.remedy_id, "rationale": "test"}
+
+
+def test_registered_remedy_action_applies_despite_low_confidence(tmp_path):
+    """_escalate resets confidence to 'high' before replaying an agent-selected registered
+    remedy -- a low-confidence finding that skipped the automatic ladder must still be
+    remediable once the agent explicitly names the one predefined remedy for its code."""
+    finding = Finding("EQUIL_DRIFT", "equilibration", confidence="low",
+                       details={"extension_ns": 5.0})
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    recovery = RegisteredRemedyRecovery("continue_npt")
+    engine = WorkflowEngine(tmp_path, plan(), fake, recovery_agent=recovery)
+
+    result = engine.run()
+
+    assert result["status"] == "accepted"
+    assert len(recovery.calls) == 1
+    assert engine.state["remedy_counters"]["by_id"]["continue_npt"] == 1
+    equil_calls = [call for call in fake.calls if call[0] == "equilibration"]
+    assert equil_calls[-1][1]["parameters"]["npt_continuation_ns"] == 5.0
+
+
+def test_registered_remedy_action_rejects_mismatched_remedy_id(tmp_path):
+    """An agent naming a remedy other than the one route()'d for this finding's code must be
+    rejected outright -- it never gets to pick an arbitrary lever off-menu."""
+    finding = Finding("EQUIL_DRIFT", "equilibration", confidence="low")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    recovery = RegisteredRemedyRecovery("slower_cooling")
+    engine = WorkflowEngine(tmp_path, plan(), fake, recovery_agent=recovery)
+
+    result = engine.run()
+
+    assert result["status"] == "escalation_required"
+    assert engine.state["remedy_counters"]["total"] == 0
+
+
+def test_route_local_cap_exhaustion_escalates_after_automatic_retries(tmp_path):
+    """slower_cooling's local_cap is 2 -- a third UNDER_ANNEALED_COOLING finding on the same
+    route must escalate rather than apply a third automatic doubling."""
+    finding = Finding("UNDER_ANNEALED_COOLING", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))] * 3})
+    engine = WorkflowEngine(tmp_path, plan(cool_block_hold_steps=1000), fake)
+
+    result = engine.run()
+
+    assert result["status"] == "escalation_required"
+    assert engine.state["remedy_counters"]["by_route"]["slower_cooling:equilibration"] == 2
+    equil_calls = [call for call in fake.calls if call[0] == "equilibration"]
+    assert len(equil_calls) == 3
+
+
+def test_apply_remedy_respects_global_automatic_remedy_cap(tmp_path):
+    """MAX_AUTOMATIC_REMEDIES is a budget across every route, not just per-route -- once spent,
+    even a fresh route with capacity left of its own must not auto-apply."""
+    engine = WorkflowEngine(tmp_path, plan(), FakeExecutor())
+    engine.state["remedy_counters"]["total"] = MAX_AUTOMATIC_REMEDIES
+    finding = Finding("EQUIL_DRIFT", "equilibration")
+
+    assert engine._apply_remedy(finding) is False
+    assert engine.state["remedy_counters"]["total"] == MAX_AUTOMATIC_REMEDIES
+
+
+class DecideRecovery:
+    def __init__(self, action="stop"):
+        self.action = action
+        self.calls = []
+
+    def decide(self, payload):
+        self.calls.append(payload)
+        return {"action": self.action, "rationale": "test", "modifications": {}}
+
+
+def test_escalate_dispatches_to_decide_when_available(tmp_path):
+    """_escalate prefers a .decide(payload) method over .diagnose(...) when both could apply --
+    exercised separately from the .diagnose(intent, plan, issue) fallback covered elsewhere."""
+    finding = Finding("BACKBONE_TYPES_UNRESOLVED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    recovery = DecideRecovery(action="stop")
+    engine = WorkflowEngine(tmp_path, plan(), fake, recovery_agent=recovery)
+
+    result = engine.run()
+
+    assert result["status"] == "failed"
+    assert len(recovery.calls) == 1
+    assert recovery.calls[0]["valid_predefined_remedies"] == ["agent_only"]
+    assert engine.state["agent_escalations"][0]["decision"]["action"] == "stop"
+
+
+def _read_recovery_log(tmp_path):
+    log_path = tmp_path / "recovery_log.jsonl"
+    if not log_path.is_file():
+        return []
+    return [json.loads(line) for line in log_path.read_text().splitlines() if line.strip()]
+
+
+def test_auto_remedy_appends_to_recovery_log(tmp_path):
+    finding = Finding("UNDER_ANNEALED_COOLING", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(cool_block_hold_steps=1000), fake)
+
+    assert engine.run()["status"] == "accepted"
+
+    events = _read_recovery_log(tmp_path)
+    assert [e["event"] for e in events] == ["auto_remedy"]
+    assert events[0]["remedy_id"] == "slower_cooling"
+    assert events[0]["code"] == "UNDER_ANNEALED_COOLING"
+    assert events[0]["run_name"] == "WF"
+
+
+def test_escalation_appends_outcome_to_recovery_log(tmp_path):
+    finding = Finding("TG_NOT_REPORTABLE", "thermal", confidence="low")
+    fake = FakeExecutor({"thermal": [StageResult("remedy_required", (finding,))]})
+    recovery = RevisePlanRecovery({"tg_t_step_K": 10})
+    engine = WorkflowEngine(tmp_path, plan(tg_t_step_K=20), fake,
+                            recovery_agent=recovery, override_validator=validate_overrides)
+
+    assert engine.run()["status"] == "accepted"
+
+    events = _read_recovery_log(tmp_path)
+    assert [e["event"] for e in events] == ["escalation"]
+    assert events[0]["outcome"] == "resume"
+    assert events[0]["action"] == "revise_plan"
+    assert events[0]["code"] == "TG_NOT_REPORTABLE"
+
+
+def test_escalation_without_recovery_agent_logs_the_reason(tmp_path):
+    finding = Finding("BACKBONE_TYPES_UNRESOLVED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+
+    engine.run()
+
+    events = _read_recovery_log(tmp_path)
+    assert [e["event"] for e in events] == ["escalation"]
+    assert events[0]["outcome"] == "escalation_required"
+    assert events[0]["reason"] == "no_recovery_agent_configured"
 
 
 def test_pressure_point_drop_requires_identifiable_remaining_series():

@@ -5,11 +5,18 @@ decision_policy.json's require clauses and polymer_rules.json's own cited litera
 values.
 
 decision_policy.json's D-04_system_size requires DP above the Fox-Flory plateau for Tg
-targets and DP/nchain above the entanglement-MW threshold for bulk_modulus targets.
-Nothing checked either: dp_typical/nchain were read straight off static per-class
-literals with no admissibility logic, unlike D-01/D-08 which each have a select_*.py
-that measures rather than transcribes. This is that script for D-04 -- same contract as
-select_forcefield.py: a checker against already-cited numbers, not a new formula.
+targets. Entanglement-MW (DP/nchain above the entanglement threshold) is reported for
+bulk_modulus targets but is advisory only, never a require -- user-directed benchmark
+acceptance criterion, 2026-08-25: entanglement Me gates the plateau shear modulus /
+viscoelastic relaxation (reptation dynamics), not the isothermal bulk modulus K_T =
+-V(dP/dV)_T, an EOS/local-packing quantity that need not track entanglement onset. The
+right acceptance criterion for K is chain-length CONVERGENCE of density/K (a small DP
+sweep confirming both plateau before DP reaches entanglement), not DP>=DP@Me.
+Nothing checked either before this script existed: dp_typical/nchain were read straight
+off static per-class literals with no admissibility logic, unlike D-01/D-08 which each
+have a select_*.py that measures rather than transcribes. This is that script for D-04
+-- same contract as select_forcefield.py: a checker against already-cited numbers, not a
+new formula.
 
 Two literature values already sit in polymer_rules.json's _metadata.global_notes and are
 made mechanically checkable here, not re-derived:
@@ -175,7 +182,29 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
     floors = []  # (source, floor_dp, note)
 
     for prop, info in property_floors(polymer_class, smiles, properties, cls=cls).items():
-        if info["floor_dp"] is not None:
+        if info["floor_dp"] is not None and info["source"] == "entanglement_bm":
+            # User-directed benchmark acceptance criterion, 2026-08-25 (see decision_policy.json
+            # D-04_system_size): entanglement Me gates the plateau shear modulus / viscoelastic
+            # relaxation (G_N^0 = rho*R*T/Me, reptation-dynamics territory), not the isothermal
+            # bulk modulus K_T = -V(dP/dV)_T -- an EOS/local-packing quantity that need not track
+            # entanglement onset at all. DP@Me is still worth surfacing (a longer chain does
+            # change chain-end fraction, hence density, hence K), but it is advisory context,
+            # never a require -- unlike Fox-Flory's floor_dp below, it must not feed
+            # required_dp_floor/decided_params_override. The right acceptance criterion for K is
+            # chain-length CONVERGENCE of density/K (see property_floors' bulk_modulus branch and
+            # this module's docstring) -- run a small DP sweep and confirm both plateau, never
+            # just "DP exceeds DP@Me".
+            uncertainties.append({
+                "name": "entanglement_dp_advisory", "dominant": False,
+                "detail": (f"{info['note']} -- reported for context only, not an acceptance "
+                          "criterion for bulk_modulus: entanglement Me governs shear/"
+                          "viscoelastic properties (plateau modulus, reptation), not the "
+                          "isothermal bulk modulus, which is an EOS/local-packing quantity. "
+                          "Establish chain-length convergence of density/K instead (a small DP "
+                          "sweep confirming both plateau) rather than requiring DP>=DP@Me."),
+                "dp_at_me": info["floor_dp"],
+            })
+        elif info["floor_dp"] is not None:
             floors.append((info["source"], info["floor_dp"], info["note"]))
         elif info["unmet"] is not None:
             uncertainties.append(info["unmet"])
@@ -240,13 +269,15 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
         },
         "decided_params_override": decided_params_override,
         "uncertainties": uncertainties,
-        "note": ("A documented floor is a hard require (D-04_system_size); a documented "
-                 "over-provisioning gap is reported, never auto-shrunk. Entanglement Me is "
-                 "resolved per-member via the run's SMILES and refuses (MW_FLOOR_UNKNOWN) "
-                 "rather than generalizing a sibling member's value. Chain-self-imaging "
-                 "(L>=2*Rg) is NOT assessed here -- see validate_run_plan.py's "
-                 "_finite_size_findings (pre-build, minimum-image only) and "
-                 "inspect_data_file's finite_size_forecast (post-build, the full check)."),
+        "note": ("A documented Fox-Flory (tg) floor is a hard require (D-04_system_size); a "
+                 "documented over-provisioning gap is reported, never auto-shrunk. Entanglement "
+                 "Me for bulk_modulus is advisory only (user-directed benchmark criterion, "
+                 "2026-08-25 -- see decision_policy.json), resolved per-member via the run's "
+                 "SMILES and refuses (MW_FLOOR_UNKNOWN) rather than generalizing a sibling "
+                 "member's value, but never feeds required_dp_floor/decided_params_override. "
+                 "Chain-self-imaging (L>=2*Rg) is NOT assessed here -- see "
+                 "validate_run_plan.py's _finite_size_findings (pre-build, minimum-image only) "
+                 "and inspect_data_file's finite_size_forecast (post-build, the full check)."),
     }
 
 
@@ -321,11 +352,13 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
     literature_grounding (parsed literature_grounding_system_size.json, or None) makes the
     recommendation genuinely vary by molecule rather than only by class-bucket: a real,
     DOI-verified per-SMILES convergence DP (or packing-length-derived Me) can raise the
-    recommendation above the mechanized floor at medium/high confidence, or resolve an
-    otherwise-unresolvable MW_FLOOR_UNKNOWN at ANY confidence (a cited, caveated estimate
-    beats outright refusal) -- but it never lowers a recommendation below a floor this
-    script has already mechanically established; a single per-molecule study is not
-    licensed to undercut Fox-Flory/entanglement-Me evidence.
+    recommendation above a mechanized floor at medium/high confidence, or provide the
+    recommendation at ANY confidence when no mechanized floor stands (a cited, caveated
+    estimate beats nothing) -- true whether that's because Me is genuinely undocumented
+    (MW_FLOOR_UNKNOWN) or, for bulk_modulus specifically, because entanglement Me is
+    documented but advisory-only (never itself a require -- see property_floors). It never
+    lowers a recommendation below a floor this script has already mechanically established
+    (Fox-Flory for tg); a single per-molecule study is not licensed to undercut that.
     """
     base = select_system_size(polymer_class, smiles, properties=properties,
                               dp_typical=dp_typical, nchain=nchain)
@@ -349,11 +382,21 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
     recommended_dp = required_floor
     if lit_dp is not None:
         if recommended_dp is None:
-            # Resolves an MW_FLOOR_UNKNOWN -- any confidence beats refusal, but say so.
+            # No mechanized DP requirement stands for these properties -- either genuinely
+            # MW_FLOOR_UNKNOWN (Me undocumented) or, for bulk_modulus, entanglement Me was
+            # resolved but is advisory-only (never a require, see property_floors). Either
+            # way a real per-molecule convergence citation beats nothing at any confidence --
+            # but the two reasons are different facts, say the right one.
             recommended_dp = lit_dp
-            reasons.append(f"{lit_note} -- resolves an otherwise-unassessed bulk_modulus "
-                          "chain-length floor (no documented entanglement Me for this "
-                          "class/member)")
+            if floor_was_unknown:
+                reasons.append(f"{lit_note} -- resolves an otherwise-unassessed bulk_modulus "
+                              "chain-length floor (no documented entanglement Me for this "
+                              "class/member)")
+            else:
+                reasons.append(f"{lit_note} -- provides the bulk_modulus chain-length "
+                              "recommendation (entanglement Me is documented but advisory-"
+                              "only, never itself an acceptance criterion for K; this is "
+                              "real per-molecule convergence evidence instead)")
         elif lit_confidence in _GROUNDING_CONFIDENCE_TO_RAISE_AN_EXISTING_FLOOR:
             if lit_dp > recommended_dp:
                 recommended_dp = lit_dp

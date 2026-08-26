@@ -520,8 +520,18 @@ class WorkflowEngine:
         self.override_validator = override_validator
         self.state_path = self.run_dir / "workflow_state.json"
         self.attempts_dir = self.run_dir / "attempts"
+        # Append-only, human-readable record of every remedy/escalation event -- separate from
+        # workflow_state.json (the full re-derivable engine state) so "what happened and why"
+        # can be read/tailed without parsing the whole state blob, and survives even if
+        # workflow_state.json's own remedy_history/agent_escalations fields are ever restructured.
+        self.recovery_log_path = self.run_dir / "recovery_log.jsonl"
         self.state = self._load_or_create_state()
         self._reconcile_plan()
+
+    def _log_recovery_event(self, event: dict[str, Any]) -> None:
+        record = {"at": _now(), "run_name": self.plan.get("run_name"), **event}
+        with self.recovery_log_path.open("a") as stream:
+            stream.write(json.dumps(record, default=str) + "\n")
 
     def enabled_stages(self) -> tuple[str, ...]:
         properties = set(self.plan.get("properties") or ())
@@ -787,12 +797,23 @@ class WorkflowEngine:
         })
         invalidate = finding.stage if remedy.invalidate_from == "same" else remedy.invalidate_from
         self.invalidate_from(invalidate, f"remedy {remedy.remedy_id}")
+        self._log_recovery_event({
+            "event": "auto_remedy", "code": finding.code, "stage": finding.stage,
+            "remedy_id": remedy.remedy_id, "application": used + 1,
+        })
         return True
 
     def _escalate(self, finding: Finding, manifest: Mapping[str, Any]) -> str:
+        def _finish(outcome: str, **extra: Any) -> str:
+            self._log_recovery_event({"event": "escalation", "code": finding.code,
+                                      "stage": finding.stage, "outcome": outcome, **extra})
+            return outcome
+
         escalations = self.state["agent_escalations"]
-        if self.recovery_agent is None or len(escalations) >= MAX_AGENT_DECISIONS:
-            return "escalation_required"
+        if self.recovery_agent is None:
+            return _finish("escalation_required", reason="no_recovery_agent_configured")
+        if len(escalations) >= MAX_AGENT_DECISIONS:
+            return _finish("escalation_required", reason="max_agent_decisions_reached")
         payload = {
             "finding": finding.to_dict(),
             "remedy_history": list(self.state.get("remedy_history", [])),
@@ -832,11 +853,15 @@ class WorkflowEngine:
             selected = decision.get("remedy_id")
             expected = self.registry.route(finding).remedy_id
             if selected != expected:
-                return "escalation_required"
+                return _finish("escalation_required", action=action,
+                               reason="remedy_id_mismatch", selected=selected, expected=expected)
             # Agent selection does not override scientific bounds or caps.
             revised_finding = Finding(finding.code, finding.stage, finding.severity, "high",
                                       finding.details, selected)
-            return "resume" if self._apply_remedy(revised_finding) else "escalation_required"
+            applied = self._apply_remedy(revised_finding)
+            return _finish("resume" if applied else "escalation_required", action=action,
+                           remedy_id=selected,
+                           reason=None if applied else "remedy_rejected_by_apply_remedy")
         if action in {"revise_plan", "retry"}:
             # retry means unchanged params by definition; ignore any modifications a
             # non-conforming agent attaches to it rather than reject the whole decision.
@@ -845,14 +870,16 @@ class WorkflowEngine:
             unsafe = [key for key in modifications
                       if any(token in key.lower() for token in forbidden)]
             if unsafe:
-                return "escalation_required"
+                return _finish("escalation_required", action=action,
+                               reason="forbidden_modification_key", modifications=modifications)
             if self.override_validator is not None:
                 try:
                     self.override_validator(modifications)
                 except ValueError as exc:
                     escalations[-1]["validation_error"] = str(exc)
                     self._save()
-                    return "escalation_required"
+                    return _finish("escalation_required", action=action,
+                                   reason="override_validation_failed", error=str(exc))
             candidate = json.loads(json.dumps(self.plan))
             candidate.setdefault("decided_params", {}).update(modifications)
             if self.plan_validator is not None:
@@ -861,7 +888,9 @@ class WorkflowEngine:
                        for item in validation_findings):
                     escalations[-1]["validation_findings"] = validation_findings
                     self._save()
-                    return "escalation_required"
+                    return _finish("escalation_required", action=action,
+                                   reason="plan_validation_failed",
+                                   findings=validation_findings)
             self.plan = candidate
             self.state["plan_hash"] = _canonical_hash(candidate)
             self.state["effective_parameters"].update(modifications)
@@ -869,10 +898,11 @@ class WorkflowEngine:
                 atomic_write_json(self.plan_path, candidate)
             earliest = decision.get("invalidate_from") or finding.stage
             if earliest not in self.enabled_stages():
-                return "escalation_required"
+                return _finish("escalation_required", action=action,
+                               reason="invalidate_from_not_enabled", invalidate_from=earliest)
             self.invalidate_from(earliest, "recovery agent bounded revision")
-            return "resume"
-        return "failed"
+            return _finish("resume", action=action, modifications=modifications)
+        return _finish("failed", action=action, rationale=decision.get("rationale"))
 
     def run(self) -> dict[str, Any]:
         self.reconcile_inputs()
