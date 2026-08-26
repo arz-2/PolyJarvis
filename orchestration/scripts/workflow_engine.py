@@ -12,11 +12,17 @@ import hashlib
 import json
 import math
 import os
+import sys
 from types import SimpleNamespace
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional, Protocol
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+from protocol_policy import ATM_PER_GPA  # noqa: E402
 
 
 ENGINE_VERSION = "workflow-engine-v1"
@@ -348,6 +354,39 @@ def _murnaghan_resample(params: dict[str, Any], finding: Finding, _: int) -> dic
     return _merge(params, mechanical_resample_points=list(points), mechanical_sampling_factor=2)
 
 
+LADDER_EXTEND_STRAIN_TARGET = 0.16
+LADDER_EXTEND_ATM_CEILING = 30000
+LADDER_EXTEND_ROUND_ATM = 100
+
+
+def _murnaghan_ladder_extend(params: dict[str, Any], finding: Finding, _: int) -> dict[str, Any]:
+    """BM_LADDER_NOT_CONVERGED: widen the COMPRESSION end by one new point. Reuses the
+    same mechanical_resample_points/mechanical_sampling_factor override
+    _murnaghan_resample already relies on -- do_mechanical/run_campaign.py folds it into
+    the prior attempt's accepted points by pressure-value key before refitting, so no
+    changes are needed there or in CampaignStageExecutor.execute. Compression-only in v1
+    (PHYC/PDIE/PEST all document tension as excluded or cavitation-capped). Writes only
+    mechanical_resample_points/mechanical_sampling_factor -- both already mapped to
+    "mechanical" in PARAMETER_STAGE -- deliberately no new effective_parameters key,
+    avoiding the unmapped-key-invalidates-to-build trap noted above."""
+    gate_output = finding.details.get("gate_output") or {}
+    murn = gate_output.get("murnaghan_result") or {}
+    selection = gate_output.get("pressure_selection") or {}
+    current_pressures = [float(v) for v in
+                         (murn.get("pressures_atm") or selection.get("pressures_atm") or [])]
+    if not current_pressures:
+        raise ValueError("BM_LADDER_NOT_CONVERGED requires the prior attempt's pressures_atm")
+    current_max = max(current_pressures)
+    K_GPa = murn.get("B0_GPa") or selection.get("fluctuation_K_GPa")
+    required_atm = (float(K_GPa) * ATM_PER_GPA * LADDER_EXTEND_STRAIN_TARGET
+                    if K_GPa else current_max * 2.0)
+    new_max = min(LADDER_EXTEND_ATM_CEILING, max(2.0 * current_max, required_atm))
+    new_point = int(round(new_max / LADDER_EXTEND_ROUND_ATM) * LADDER_EXTEND_ROUND_ATM)
+    if new_point <= current_max:
+        raise ValueError("ladder already at the extend ceiling")
+    return _merge(params, mechanical_resample_points=[new_point], mechanical_sampling_factor=1)
+
+
 def _deformation(params: dict[str, Any], _finding: Finding, _: int) -> dict[str, Any]:
     return _merge(params, mechanical_method="deformation")
 
@@ -404,6 +443,8 @@ def default_remedies() -> tuple[Remedy, ...]:
                _deformation, "mechanical"),
         Remedy("murnaghan_resample", frozenset({"BM_INADMISSIBLE_NONMONOTONIC"}), 1,
                _murnaghan_resample, "mechanical"),
+        Remedy("murnaghan_ladder_extend", frozenset({"BM_LADDER_NOT_CONVERGED"}), 1,
+               _murnaghan_ladder_extend, "mechanical"),
         Remedy("conditional_deformation", frozenset({"BM_INADMISSIBLE"}), 1,
                _conditional_deformation, "mechanical"),
         Remedy("negative_deformation", frozenset({"DEFORM_NEGATIVE_MODULUS"}), 1,
@@ -478,6 +519,14 @@ def binding_gate_failure(stage: str, outputs: Mapping[str, Any]) -> Optional[Fin
                     if bm == "BM_INADMISSIBLE" and "not monotonic" in reasons
                     else str(bm or "BM_INADMISSIBLE"))
             return Finding(code, stage,
+                           details={"gate_output": dict(outputs)})
+        elif outputs.get("bm_convergence_verdict") == "BM_LADDER_NOT_CONVERGED":
+            # Additive to bm_gate_verdict's admissibility contract -- fires only when the
+            # fit WAS numerically BM_REPORTABLE but the pressure range never actually
+            # identified B0' (plateau/leave-one-out/B0'-band diagnostics). Never touches
+            # the BM_REPORTABLE/BM_FALLBACK_DEFORM/BM_INADMISSIBLE three-value contract.
+            return Finding("BM_LADDER_NOT_CONVERGED", stage,
+                           confidence=str(outputs.get("bm_convergence_confidence") or "high"),
                            details={"gate_output": dict(outputs)})
     return None
 

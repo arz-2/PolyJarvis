@@ -54,6 +54,7 @@ exact formulas/caps rather than trusting this table to stay current. Summary, by
 | Mechanical | `BM_FALLBACK_DEFORM` | `deformation_fallback`, ×1 | — |
 | Mechanical | `BM_INADMISSIBLE_NONMONOTONIC` | `murnaghan_resample`, ×1 | — |
 | Mechanical | `BM_INADMISSIBLE` | `conditional_deformation`, ×1, glassy only | Rubbery + inadmissible has no auto-fallback — `agent_only` |
+| Mechanical | `BM_LADDER_NOT_CONVERGED` | `murnaghan_ladder_extend`, ×1 — widens the compression ceiling by one new point, ONLY when `confidence=high` (i.e. `plateau_confirmed=False`) | `confidence=low` (leave-one-out/B0'-band alone, no `plateau_confirmed=False`) never auto-widens — reaches you instead, per `decision_policy.json`'s `rationale_bm_admissibility` calibration caveat. A **second** widening also reaches you — price it first (§3), `--gate-class C` (not B — see `rationale_murnaghan_ladder`) |
 | Mechanical | `DEFORM_NEGATIVE_MODULUS` | `negative_deformation` — switches to the slow-rate leg, halves strain max, ×1 | — |
 | Mechanical | `DEFORM_RATE_SENSITIVE` | `rate_sensitivity` — lowers the slow-leg rate toward a floor, ×1 | `DEFORM_RATE_SENSITIVITY_PERSISTS` after that is `agent_only` |
 | Mechanical | `DEFORM_ANISOTROPIC`, `DEFORM_INADMISSIBLE` | none | `agent_only` — single-axis K is a biased estimator here; no lever fixes it, needs a different deform direction or a human call |
@@ -73,12 +74,27 @@ only for Class A structural remedies (`finite_size_rebuild` and friends).
 ```bash
 python3 orchestration/scripts/remedy_economics.py \
   --failing-gate <gate> --gate-class <A|B|C|D> \
-  --lever <cooling_rate_K_per_ns|trajectory_ns|nchain|eq_annealing_cycles> --lever-direction <lower|higher> \
+  --lever <cooling_rate_K_per_ns|trajectory_ns|nchain|eq_annealing_cycles|mechanical_sampling_factor|bm_compression_limit_atm> --lever-direction <lower|higher> \
   --history "<lever>:<metric>,..." --next-lever <value> \
   --target-floor <gate threshold> --physical-target <experimental value, not the band edge> \
   --sem <metric SEM> --last-rung-hours <wall time of the most recent rung> \
-  --cost-exponent <-1 for cooling rate, +1 for trajectory length>
+  --cost-exponent <-1 for cooling rate, +1 for trajectory length or ladder widening>
 ```
+
+A second `BM_LADDER_NOT_CONVERGED` widening prices the same way as a second
+`mechanical_sampling_factor` rung — Class C, not B, per `decision_policy.json`'s
+`rationale_murnaghan_ladder` (the taxonomy is Class B convergence; the pricing procedure needs
+Class C's log-linear machinery, which Class B's `decide()` path never reaches):
+
+```bash
+python3 orchestration/scripts/remedy_economics.py \
+  --failing-gate BM_LADDER_NOT_CONVERGED --gate-class C \
+  --lever bm_compression_limit_atm --lever-direction higher \
+  --history "15000:12.4,22500:9.1" --next-lever 30000 \
+  --target-floor 10.0 --last-rung-hours 3.2 --cost-exponent 1.0
+```
+(`--sem`/`--physical-target` omitted — the metric here isn't itself an SEM with a true value to
+converge toward, same reasoning as `mechanical_sampling_factor`.)
 
 `--history` comes from `remedy_history` in `workflow_state.json` (one lever:metric pair per rung
 already spent). Route on the verdict — transcribe it and its `reason` verbatim, never re-derive

@@ -23,8 +23,12 @@ from types import SimpleNamespace
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
+_ENGINE_SCRIPTS = REPO_ROOT / "mcp-servers" / "mcp-lammps-engine" / "analysis_scripts"
+if str(_ENGINE_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_ENGINE_SCRIPTS))
 
 from stage_params import resolve_stage_params, apply_plan, resolve_hardware, load_plan  # noqa: E402
+from analysis_utils import estimate_fluctuation_K_GPa  # noqa: E402
 from hw_common import load_rules, get_class_entry, resolve_member_value  # noqa: E402
 from protocol_policy import select_pressure_ladder  # noqa: E402
 from workflow_engine import (  # noqa: E402
@@ -781,6 +785,26 @@ def _submit_deform(args, cls: dict, lammps, mode: str) -> dict:
     return {"run_id": run["run_id"], "log_path": f"{p['work_dir']}/05_deform{suffix}.log"}
 
 
+def _fluctuation_K_for_pressure_ladder(cls: dict, p: dict):
+    """This polymer's own volume-fluctuation K estimate, for select_pressure_ladder's
+    optional fluctuation-K sanity check on the Murnaghan pressure ladder -- a pure,
+    deterministic function of already-on-disk equilibration output (the ambient NPT
+    production log do_equil_and_check already produced), so no new simulation is run
+    to compute it.
+
+    Returns None (no adjustment) on a resample/extend retry: cls["mechanical_resample_points"]
+    is then set by murnaghan_resample or murnaghan_ladder_extend, so p["bm_pressures_atm"]
+    is that remedy's own deliberately narrow override, not the class ladder this precheck
+    exists to sanity-check -- adjusting THAT would corrupt the merge-by-pressure-value retry
+    in do_mechanical below.
+    """
+    if cls.get("mechanical_resample_points") or not p.get("npt_prod_log_path"):
+        return None
+    if not Path(p["npt_prod_log_path"]).exists():
+        return None
+    return estimate_fluctuation_K_GPa(p["npt_prod_log_path"], eq_fraction=0.5)
+
+
 def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: str) -> dict:
     args.is_glassy = "true" if is_glassy else "false"
     gpu_per_run = cls.get("gpu_per_run") or 1
@@ -789,6 +813,7 @@ def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: 
     # select_pressure_ladder already treats None as "no CED-informed adjustment".
     pressure_selection = select_pressure_ladder(
         configured_pressures=p["bm_pressures_atm"], ced_mpa=None,
+        fluctuation_K_GPa=_fluctuation_K_for_pressure_ladder(cls, p),
     )
 
     point_status = {}
@@ -860,6 +885,9 @@ def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: 
                   "B0_prime": murn.get("B0_prime"),
                   "bm_gate_verdict": murn.get("bm_gate_verdict"),
                   "bm_gate_reasons": murn.get("bm_gate_reasons"),
+                  "bm_convergence_verdict": murn.get("bm_convergence_verdict"),
+                  "bm_convergence_reasons": murn.get("bm_convergence_reasons"),
+                  "bm_convergence_confidence": murn.get("bm_convergence_confidence"),
                   "murnaghan_result": murn, "velocity_seed": p["velocity_seed"],
                   "pressure_selection": pressure_selection.to_dict()}
         return result
@@ -867,7 +895,11 @@ def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: 
     result = {"method": "murnaghan", "bulk_modulus_GPa": murn.get("bulk_modulus_GPa"),
               "accepted": False, "reason": murn.get("bm_gate_verdict") or "BM_INADMISSIBLE",
               "bm_gate_verdict": murn.get("bm_gate_verdict"),
-              "bm_gate_reasons": murn.get("bm_gate_reasons"), "is_glassy": is_glassy,
+              "bm_gate_reasons": murn.get("bm_gate_reasons"),
+              "bm_convergence_verdict": murn.get("bm_convergence_verdict"),
+              "bm_convergence_reasons": murn.get("bm_convergence_reasons"),
+              "bm_convergence_confidence": murn.get("bm_convergence_confidence"),
+              "is_glassy": is_glassy,
               "murnaghan_result": murn, "velocity_seed": p["velocity_seed"],
               "pressure_selection": pressure_selection.to_dict()}
     return result

@@ -41,6 +41,8 @@ _DETAILS_BY_REMEDY = {
     "tg_breakpoint": {},
     "deformation_fallback": {},
     "murnaghan_resample": {"nonmonotonic_points": [1, 2, 3]},
+    "murnaghan_ladder_extend": {"gate_output": {"murnaghan_result": {
+        "pressures_atm": [1, 1000, 2500, 5000, 10000, 15000], "B0_GPa": 1.65}}},
     "conditional_deformation": {"is_glassy": True},
     "negative_deformation": {},
     "rate_sensitivity": {},

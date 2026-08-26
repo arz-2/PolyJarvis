@@ -1891,7 +1891,7 @@
         600,
         1000
       ],
-      "bm_pressures_note": "Rubbery class (PDMS/PMHS Tg<160, produced above Tg). Murnaghan EOS pressure series at T>Tg is the primary K method; the volume-fluctuation estimate overestimates rubbery K, so it is kept only as a diagnostic cross-check. Retains the original narrow [1,100,300,600,1000] atm series; PHYC/PDIE were widened to [1,500,1000,2000,5000] on 2026-06-24 \u2014 widen here too if B0' runs away.",
+      "bm_pressures_note": "Rubbery class (PDMS/PMHS Tg<160, produced above Tg). Murnaghan EOS pressure series at T>Tg is the primary K method; the volume-fluctuation estimate overestimates rubbery K, so it is kept only as a diagnostic cross-check. Retains the original narrow [1,100,300,600,1000] atm series; PHYC/PDIE were widened to [1,500,1000,2000,5000] on 2026-06-24 \u2014 widen here too if B0' runs away. Since the fluctuation-K-informed ladder check shipped (select_pressure_ladder, protocol_policy.py), expect this class to auto-trigger a one-point extend_compression adjustment on a live run \u2014 see pressure_selection.ladder_adjustment in the mechanical stage's output for provenance; this is the check's intended first activation, not a bug.",
       "experimental_tg_K": {
         "PDMS": 148,
         "PMHS": 158,

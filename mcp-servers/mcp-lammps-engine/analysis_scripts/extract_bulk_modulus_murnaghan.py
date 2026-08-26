@@ -186,6 +186,49 @@ def leave_one_out_refit(volumes_sorted, pressures_sorted, pressures_atm_sorted,
     return rows
 
 
+def assess_ladder_convergence(plateau_confirmed, loo_max_dB0_pct, b0_prime,
+                               loo_threshold_pct=10.0, b0_prime_band=(4.0, 20.0)):
+    """Promotes the plateau/leave-one-out/B0'-band diagnostics above from
+    warning-only text into a real, additive signal -- bm_convergence_verdict is
+    independent of bm_gate_verdict and never folds into its three admissibility
+    values (BM_REPORTABLE/BM_FALLBACK_DEFORM/BM_INADMISSIBLE); it answers a
+    different question (is the ladder's pressure RANGE wide enough to identify
+    B0', not is the fit physically admissible).
+
+    confidence="high" only when plateau_not_confirmed fires: that check is a
+    self-consistency property of the fit under trimming (does the next-larger
+    window move B0 by >5%?), not an accuracy claim that needs archive
+    calibration. loo_unstable and b0_prime_out_of_band are each individually
+    LOW confidence, even combined -- decision_policy.json's own
+    rationale_bm_admissibility is explicit that leave-one-out dB0 is "emitted
+    without a threshold... not yet shown to be pathological, and no archived or
+    live run carries leave_one_out_refits to calibrate against", and that
+    r_squared/B0' band checks likewise "stay a warning". Auto-widening the
+    ladder (spending real wall time) on either of those alone would contradict
+    that documented caution; a caller that only auto-remedies high-confidence
+    findings will correctly leave them for a human/agent to review instead.
+    """
+    reasons = []
+    if plateau_confirmed is False:
+        reasons.append("plateau_not_confirmed")
+    if loo_max_dB0_pct is not None and loo_max_dB0_pct > loo_threshold_pct:
+        reasons.append("loo_unstable")
+    if b0_prime is not None and not (b0_prime_band[0] <= b0_prime <= b0_prime_band[1]):
+        reasons.append("b0_prime_out_of_band")
+    if not reasons:
+        return {
+            "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+            "bm_convergence_reasons": [],
+            "bm_convergence_confidence": "high",
+        }
+    confidence = "high" if "plateau_not_confirmed" in reasons else "low"
+    return {
+        "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+        "bm_convergence_reasons": reasons,
+        "bm_convergence_confidence": confidence,
+    }
+
+
 def detect_anomalous_points(volumes_sorted, pressures_atm_sorted, vol_stds_sorted):
     """Flag pressure points showing cavitation/instability signatures, using only
     data already computed for the fit (no extra simulation cost):
@@ -593,6 +636,7 @@ def main():
     # -------------------------------------------------------------------
     loo_results = None
     loo_n_converged = None
+    loo_max_dB0_pct = None
     if converged:
         loo_results = leave_one_out_refit(
             volumes_sorted, pressures_sorted, pressures_atm_sorted, B0_GPa, B0_prime
@@ -601,11 +645,11 @@ def main():
         deltas = [abs(r["dB0_GPa_vs_baseline"]) for r in loo_results
                   if r["dB0_GPa_vs_baseline"] is not None]
         if deltas and B0_GPa:
-            max_dB0_pct = max(deltas) / abs(B0_GPa) * 100
-            if max_dB0_pct > 10.0:
+            loo_max_dB0_pct = max(deltas) / abs(B0_GPa) * 100
+            if loo_max_dB0_pct > 10.0:
                 warnings.append(
                     f"Leave-one-out refit: dropping one pressure point shifts B0 by up to "
-                    f"{max_dB0_pct:.1f}% (>10%) — the fit is not robust to a single point; "
+                    f"{loo_max_dB0_pct:.1f}% (>10%) — the fit is not robust to a single point; "
                     "consider widening the pressure range."
                 )
 
@@ -646,6 +690,14 @@ def main():
     primary_r2 = window["r_squared"]
     primary_B0_sem_GPa = window.get("B0_sem_GPa")
     primary_method = "murnaghan" if primary_converged else method
+
+    if primary_converged:
+        convergence = assess_ladder_convergence(
+            window.get("plateau_confirmed"), loo_max_dB0_pct, primary_B0_prime
+        )
+    else:
+        convergence = {"bm_convergence_verdict": None, "bm_convergence_reasons": [],
+                       "bm_convergence_confidence": None}
 
     # -------------------------------------------------------------------
     # 2d. Fluctuation cross-check (optional) -- compares against the SELECTED
@@ -751,6 +803,10 @@ def main():
         "volume_monotonic": window["volume_monotonic"],
         "loo_results": loo_results,
         "loo_n_converged": loo_n_converged,
+        "loo_max_dB0_pct": round(loo_max_dB0_pct, 2) if loo_max_dB0_pct is not None else None,
+        "bm_convergence_verdict": convergence["bm_convergence_verdict"],
+        "bm_convergence_reasons": convergence["bm_convergence_reasons"],
+        "bm_convergence_confidence": convergence["bm_convergence_confidence"],
         "fluctuation_bulk_modulus_GPa": round(fluctuation_bulk_modulus_GPa, 4)
             if fluctuation_bulk_modulus_GPa is not None else None,
         "fluctuation_divergence_pct": round(fluctuation_divergence_pct, 2)

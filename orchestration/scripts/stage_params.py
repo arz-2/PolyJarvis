@@ -412,6 +412,21 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     per_t_dump = f'{tg_sweep_dir}/per_t_structs.dump'
     return {'selected_rate_K_per_ns': selected_rate, 'tg_rate_index': args.tg_rate_index, 'tg_log_path': tg_log, 'tg_data_file': equil_data, 'per_t_dump_file': per_t_dump, 'enthalpy_col': getattr(args, 'enthalpy_col', None) or 'Enthalpy', 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'output_dir': output_dir, 'graphs_dir': graphs_dir, 'method_gap_exempt': bool(cls.get('tg_slope_gate_fallback') == 'slowest_rate')}
 
+def _derive_npt_prod_log_path(args, effective_data_path, lammps_base: str) -> str:
+    """Shared by _resolve_equil_check_params/_resolve_murnaghan_params/
+    _resolve_analyze_bm_params -- these three independently derived this same path
+    (a prior bug from that duplication was already fixed twice, see the comments in
+    the equil-check and analyze-bm resolvers below). ``effective_data_path`` is each
+    caller's own already-resolved data path (args.data_path, or that resolver's own
+    dry-run default when args.data_path is unset) -- not re-derived here, so this
+    helper's behavior is identical to what each resolver already computed inline."""
+    if args.npt_prod_log:
+        return args.npt_prod_log
+    if effective_data_path and effective_data_path.endswith('_out.data'):
+        return effective_data_path[:-len('_out.data')] + '.log'
+    return f'{lammps_base}/equil/npt_final/npt_final.log'
+
+
 def _resolve_equil_check_params(args, cls: dict) -> dict:
     """Resolve deterministic equilibration validation arguments.
 
@@ -442,9 +457,7 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
     # on every real run -- args.data_path IS the correct, real npt_prod_data_path at this point
     # (do_equil_and_check sets it just before calling this resolver), so derive the sibling .log
     # in the same directory instead of re-deriving a path independently.
-    npt_prod_log_path = args.npt_prod_log or (
-        npt_prod_data_path[:-len('_out.data')] + '.log' if npt_prod_data_path.endswith('_out.data')
-        else f'{lammps_base}/equil/{prod}/{prod}.log')
+    npt_prod_log_path = _derive_npt_prod_log_path(args, npt_prod_data_path, lammps_base)
     return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_kinetic_stability/nvt_kinetic_stability.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_final/npt_final_out.data',
             # struct_dump_path: npt_final's OWN trajectory -- the ensemble-insensitive per-frame
             # geometry checks (Rg/MSID/R_ee/torsion/P2/density_homogeneity/finite_size) read from
@@ -465,7 +478,9 @@ def _resolve_murnaghan_params(args, cls: dict) -> dict:
     # the terminal stage in the 8-stage adaptive protocol (regardless of regime -- cool_block
     # always ramps down to final_T_K), so no glassy/rubbery branch is needed anymore.
     default_equil_data = f'{lammps_base}/equil/npt_final/npt_final_out.data'
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': is_glassy, 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'equil_data_path': args.data_path or default_equil_data, 'temp_K': cls.get('bm_temperature_K', 300.0), 'npt_steps': int(cls.get('bm_npt_steps', 500000)) * sampling_factor, 'thermo_freq': int(cls.get('bm_thermo_freq', 100)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'mechanical_sampling_factor': sampling_factor, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
+    equil_data_path = args.data_path or default_equil_data
+    npt_prod_log_path = _derive_npt_prod_log_path(args, equil_data_path, lammps_base)
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': is_glassy, 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'equil_data_path': equil_data_path, 'npt_prod_log_path': npt_prod_log_path, 'temp_K': cls.get('bm_temperature_K', 300.0), 'npt_steps': int(cls.get('bm_npt_steps', 500000)) * sampling_factor, 'thermo_freq': int(cls.get('bm_thermo_freq', 100)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'mechanical_sampling_factor': sampling_factor, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
 
 def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     """Resolve deterministic bulk-modulus extraction arguments."""
@@ -481,10 +496,7 @@ def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     # fluctuation_bulk_modulus_GPa=null, 2026-08-17). args.data_path IS the equilibration
     # attempt's real npt_prod_data_path here (the mechanical stage's dependency mapping sets it
     # from the accepted equilibration manifest) -- derive the sibling .log the same way.
-    npt_prod_log_path = args.npt_prod_log or (
-        args.data_path[:-len('_out.data')] + '.log'
-        if args.data_path and args.data_path.endswith('_out.data')
-        else f'{lammps_base}/equil/npt_final/npt_final.log')
+    npt_prod_log_path = _derive_npt_prod_log_path(args, args.data_path, lammps_base)
     return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'npt_prod_log_path': npt_prod_log_path, 'exp_K_range': exp_K, 'bm_pressures_atm': cls.get('bm_pressures_atm', None), 'strain_rate_per_fs': cls.get('K_deform_rate_inv_s', 100000000.0) * 1e-15, 'strain_rate_slow_per_fs': K_deform_rate_slow_inv_s * 1e-15 if K_deform_rate_slow_inv_s is not None else None, 'K_strain_max': cls.get('K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'deform_log_path': getattr(args, 'deform_log', None), 'deform_log_path_slow': getattr(args, 'deform_log_slow', None), 'murnaghan_log_files': getattr(args, 'murnaghan_logs', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_run_summary_params(args, cls: dict) -> dict:

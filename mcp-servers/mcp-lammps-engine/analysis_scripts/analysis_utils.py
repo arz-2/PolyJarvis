@@ -49,6 +49,24 @@ def parse_lammps_log(path):
     return pd.concat(all_dfs, ignore_index=True)
 
 
+def parse_lammps_wall_time(path):
+    """
+    Parse the "Total wall time: H:MM:SS" footer LAMMPS writes on clean process exit.
+
+    Returns the wall time in seconds (float), or None if the footer is absent -- a
+    killed/crashed run (e.g. ENOSPC mid-write) never writes it, so callers needing a
+    wall-time figure for every attempt must fall back to file-mtime diffing themselves.
+    """
+    pattern = re.compile(r'Total wall time:\s*(\d+):(\d{2}):(\d{2})')
+    with open(path) as f:
+        for line in f:
+            m = pattern.search(line)
+            if m:
+                h, mm, ss = (int(x) for x in m.groups())
+                return float(h * 3600 + mm * 60 + ss)
+    return None
+
+
 def integrated_act(values):
     """
     Integrated autocorrelation time (frames) by summing the normalised ACF to its
@@ -98,3 +116,83 @@ def compute_tau_eff(values):
 def effective_sample_size(n, tau_frames):
     """Independent-sample count for a series of n frames with inefficiency tau_frames."""
     return int(n / max(1.0, float(tau_frames)))
+
+
+# ---------------------------------------------------------------------------
+# Volume-fluctuation bulk modulus (moved here, not just imported, from
+# extract_bulk_modulus.py: that module imports matplotlib at module scope, so it
+# can't be cheaply imported in-process from orchestration -- see
+# estimate_fluctuation_K_GPa below, which run_campaign.py calls before choosing a
+# Murnaghan pressure ladder. extract_bulk_modulus.py re-exports this name so its
+# own existing import (`from extract_bulk_modulus import compute_bulk_modulus`)
+# keeps working unchanged.
+# ---------------------------------------------------------------------------
+
+_KB_SI = 1.380649e-23   # Boltzmann constant [J/K]
+_A3_TO_M3 = 1e-30       # Å³ -> m³
+_PA_TO_GPA = 1e-9       # Pa -> GPa
+_PA_TO_ATM = 1.0 / 101325.0  # Pa -> atm
+
+
+def compute_bulk_modulus(volumes, temperature):
+    """
+    Compute isothermal bulk modulus from volume time series.
+
+    K_T = kB * T * <V> / Var(V)
+
+    Args:
+        volumes: array of instantaneous volumes (Å³)
+        temperature: mean temperature (K)
+
+    Returns:
+        K_GPa (float), K_atm (float), meta (dict)
+    """
+    V_mean = np.mean(volumes)
+    V_var = np.var(volumes, ddof=1)  # sample variance
+
+    if V_var <= 0 or V_mean <= 0:
+        return None, None, {"error": "Zero or negative volume variance"}
+
+    K_Pa = _KB_SI * temperature * V_mean / V_var / _A3_TO_M3
+    K_GPa = K_Pa * _PA_TO_GPA
+    K_atm = K_Pa * _PA_TO_ATM
+    beta_T = 1.0 / K_Pa  # [1/Pa]
+
+    meta = {
+        "V_mean_A3": float(V_mean),
+        "V_std_A3": float(np.sqrt(V_var)),
+        "V_var_A6": float(V_var),
+        "T_mean_K": float(temperature),
+        "K_Pa": float(K_Pa),
+        "beta_T_per_Pa": float(beta_T),
+    }
+
+    return float(K_GPa), float(K_atm), meta
+
+
+def estimate_fluctuation_K_GPa(npt_prod_log_path, eq_fraction=0.5):
+    """Cheap, matplotlib-free volume-fluctuation K estimate from an ambient NPT
+    production log -- callable in-process, before a Murnaghan pressure ladder is
+    chosen (unlike compute_fluctuation_cross_check in
+    extract_bulk_modulus_murnaghan.py, which only runs post-hoc, after the ladder
+    already ran, as a cross-check against the completed fit).
+
+    Never raises -- returns None on any missing/short/unreadable log or
+    non-positive volume variance, matching compute_fluctuation_cross_check's own
+    contract.
+    """
+    try:
+        df = parse_lammps_log(npt_prod_log_path)
+        vol_col = next((c for c in ["Volume", "Vol", "vol"] if c in df.columns), None)
+        temp_col = next((c for c in ["Temp", "temp", "Temperature"] if c in df.columns), None)
+        if vol_col is None or temp_col is None:
+            return None
+        n = len(df)
+        prod = df.iloc[int(n * (1.0 - eq_fraction)):]
+        if len(prod) < 50:
+            return None
+        K_GPa, _, _ = compute_bulk_modulus(prod[vol_col].to_numpy(dtype=float),
+                                            float(prod[temp_col].mean()))
+        return K_GPa
+    except Exception:
+        return None

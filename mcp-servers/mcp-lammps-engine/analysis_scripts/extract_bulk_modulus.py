@@ -56,7 +56,9 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from plot_style import apply_style, save_fig
 
-from analysis_utils import compute_tau_eff, effective_sample_size, parse_lammps_log
+from analysis_utils import (
+    compute_bulk_modulus, compute_tau_eff, effective_sample_size, parse_lammps_log,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -108,45 +110,11 @@ def compute_B_def(volumes, pressures):
 # Bulk modulus from volume fluctuation
 # ---------------------------------------------------------------------------
 
-def compute_bulk_modulus(volumes, temperature):
-    """
-    Compute isothermal bulk modulus from volume time series.
-
-    K_T = kB * T * <V> / Var(V)
-
-    Args:
-        volumes: array of instantaneous volumes (Å³)
-        temperature: mean temperature (K)
-
-    Returns:
-        K_GPa (float), K_atm (float), meta (dict)
-    """
-    V_mean = np.mean(volumes)
-    V_var = np.var(volumes, ddof=1)  # sample variance
-
-    if V_var <= 0 or V_mean <= 0:
-        return None, None, {"error": "Zero or negative volume variance"}
-
-    # K in Pa:  kB[J/K] * T[K] / (Var(V)[Å⁶] / <V>[Å³])
-    #         = kB * T * <V> / Var(V)  [J/Å³]
-    #         → multiply by 1/A3_TO_M3 to get Pa
-    K_Pa = KB_SI * temperature * V_mean / V_var / A3_TO_M3
-    K_GPa = K_Pa * PA_TO_GPA
-    K_atm = K_Pa * PA_TO_ATM
-
-    # Isothermal compressibility
-    beta_T = 1.0 / K_Pa  # [1/Pa]
-
-    meta = {
-        "V_mean_A3": float(V_mean),
-        "V_std_A3": float(np.sqrt(V_var)),
-        "V_var_A6": float(V_var),
-        "T_mean_K": float(temperature),
-        "K_Pa": float(K_Pa),
-        "beta_T_per_Pa": float(beta_T),
-    }
-
-    return float(K_GPa), float(K_atm), meta
+# compute_bulk_modulus is defined in analysis_utils.py (imported above) so it's
+# callable in-process from orchestration without pulling in this module's
+# module-scope matplotlib import -- see analysis_utils.estimate_fluctuation_K_GPa.
+# Re-exported here (not just left out) so `from extract_bulk_modulus import
+# compute_bulk_modulus` keeps working unchanged for every existing caller.
 
 
 # ---------------------------------------------------------------------------

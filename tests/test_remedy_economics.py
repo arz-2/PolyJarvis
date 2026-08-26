@@ -142,6 +142,38 @@ def test_murnaghan_sampling_factor_two_rungs_prices_a_third():
     assert r["verdict"] == "SPEND"
 
 
+# ─── D-07: prospective pricing of a Murnaghan ladder-widening rung ─────────────────────
+#
+# BM_LADDER_NOT_CONVERGED (plateau_confirmed=False) is taxonomically Class B convergence
+# (gate_classes.B_convergence), but prices as Class C, mirroring
+# mechanical_sampling_factor above for the identical reason: decide()'s gate_class=B path
+# returns immediately after the residual-type test and never reaches the log-linear
+# closure/margin-factor machinery "how much wider is worth it" needs. Only the FIRST
+# widening (murnaghan_ladder_extend, local_cap=1) is free/automatic; a second one must be
+# priced here first. lever="bm_compression_limit_atm", lever_direction="higher",
+# cost_exponent=+1.0 (linear in wall time, matching mechanical_sampling_factor).
+
+def test_murnaghan_ladder_extend_one_rung_buys_the_slope():
+    """Only the first widened point has run -- one point determines no slope."""
+    r = call(failing_gate="BM_LADDER_NOT_CONVERGED", gate_class="C",
+             lever="bm_compression_limit_atm", lever_direction="higher",
+             cost_exponent=1.0, history="15000:12.4", next_lever=22500, target_floor=10.0)
+    assert r["verdict"] == "SPEND"
+    assert r["spend_limit"] == "one rung"
+
+
+def test_murnaghan_ladder_extend_two_rungs_prices_a_third():
+    """Two widened points have run -- enough to fit the log-linear closure and decide
+    whether a third, wider point clears the target floor with adequate margin."""
+    r = call(failing_gate="BM_LADDER_NOT_CONVERGED", gate_class="C",
+             lever="bm_compression_limit_atm", lever_direction="higher",
+             cost_exponent=1.0, history="15000:12.4,22500:9.1", next_lever=30000,
+             target_floor=10.0, last_rung_hours=3.2)
+    assert r["current_lever"] == 22500.0
+    assert r["margin_factor"] == pytest.approx(1.49, abs=0.02)
+    assert r["verdict"] == "STOP_ANNOTATE"
+
+
 # ─── guards for the two flag-path defects ──────────────────────────────────────
 
 @pytest.mark.parametrize("cost_exponent", [-1.0, 1.0])
@@ -192,3 +224,12 @@ def test_policy_declares_the_class_a_carve_out():
     block = policy["policies"]["equilibration"]["remedy_economics"]
     assert "class_A_is_always_worth_paying" in block
     assert block["default_source"].endswith("remedy_economics.py")
+
+
+def test_policy_declares_murnaghan_ladder_rationale():
+    policy = json.loads(POLICY.read_text())
+    block = policy["policies"]["equilibration"]["remedy_economics"]
+    assert "rationale_murnaghan_ladder" in block
+    assert "gate_class" in block["rationale_murnaghan_ladder"].lower() or \
+        "class c" in block["rationale_murnaghan_ladder"].lower()
+    assert "bm_compression_limit_atm" in block["rationale_murnaghan_ladder"]

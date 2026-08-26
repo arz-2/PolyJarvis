@@ -2,6 +2,7 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
@@ -448,3 +449,143 @@ def test_pressure_point_drop_requires_identifiable_remaining_series():
                                             1000: "accepted", 2000: "failed"})
     assert not pressure_point_drop_allowed({-500: "accepted", 0: "accepted",
                                             500: "accepted", 1000: "failed"})
+
+
+# ─── BM_LADDER_NOT_CONVERGED (Feature 2: reactive ladder-widening remedy) ──────────
+
+def test_bm_ladder_not_converged_routes_to_murnaghan_ladder_extend():
+    from workflow_engine import RemedyRegistry, Finding as F
+    registry = RemedyRegistry()
+    remedy = registry.route(F("BM_LADDER_NOT_CONVERGED", "mechanical"))
+    assert remedy.remedy_id == "murnaghan_ladder_extend"
+    assert remedy.local_cap == 1
+    assert remedy.invalidate_from == "mechanical"
+
+
+def test_murnaghan_ladder_extend_widens_compression_and_reuses_resample_fields():
+    """Reuses mechanical_resample_points/mechanical_sampling_factor -- the exact fields
+    murnaghan_resample already uses -- so do_mechanical's existing merge-by-pressure-value
+    retry logic needs no changes to support this remedy."""
+    registry = RemedyRegistry()
+    remedy = registry.route(Finding("BM_LADDER_NOT_CONVERGED", "mechanical"))
+    finding = Finding("BM_LADDER_NOT_CONVERGED", "mechanical", details={
+        "gate_output": {
+            "murnaghan_result": {
+                "pressures_atm": [1, 1000, 2500, 5000, 10000, 15000],
+                "B0_GPa": 1.65,
+            },
+        },
+    })
+
+    revised = remedy.action({}, finding, 1)
+
+    assert revised["mechanical_resample_points"] == [30000]
+    assert revised["mechanical_sampling_factor"] == 1
+
+
+def test_murnaghan_ladder_extend_falls_back_to_fluctuation_k_when_no_b0():
+    remedy = RemedyRegistry().route(Finding("BM_LADDER_NOT_CONVERGED", "mechanical"))
+    finding = Finding("BM_LADDER_NOT_CONVERGED", "mechanical", details={
+        "gate_output": {
+            "murnaghan_result": {"pressures_atm": [0, 3000, 7000, 15000], "B0_GPa": None},
+            "pressure_selection": {"fluctuation_K_GPa": 2.0},
+        },
+    })
+
+    revised = remedy.action({}, finding, 1)
+
+    assert revised["mechanical_resample_points"] == [30000]
+
+
+def test_murnaghan_ladder_extend_respects_ceiling():
+    remedy = RemedyRegistry().route(Finding("BM_LADDER_NOT_CONVERGED", "mechanical"))
+    finding = Finding("BM_LADDER_NOT_CONVERGED", "mechanical", details={
+        "gate_output": {"murnaghan_result": {
+            "pressures_atm": [0, 15000, 30000], "B0_GPa": 5.0}},
+    })
+
+    with pytest.raises(ValueError):
+        remedy.action({}, finding, 1)
+
+
+def test_murnaghan_ladder_extend_requires_prior_pressures():
+    remedy = RemedyRegistry().route(Finding("BM_LADDER_NOT_CONVERGED", "mechanical"))
+    finding = Finding("BM_LADDER_NOT_CONVERGED", "mechanical", details={"gate_output": {}})
+
+    with pytest.raises(ValueError):
+        remedy.action({}, finding, 1)
+
+
+def test_binding_gate_failure_is_additive_to_bm_reportable():
+    from workflow_engine import binding_gate_failure
+
+    reportable = {"bm_gate_verdict": "BM_REPORTABLE", "bm_convergence_verdict": "BM_LADDER_CONVERGED"}
+    assert binding_gate_failure("mechanical", reportable) is None
+
+    not_converged = {"bm_gate_verdict": "BM_REPORTABLE",
+                     "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+                     "bm_convergence_confidence": "high"}
+    finding = binding_gate_failure("mechanical", not_converged)
+    assert finding.code == "BM_LADDER_NOT_CONVERGED"
+    assert finding.confidence == "high"
+
+    # bm_gate_verdict's own three-value contract still takes precedence and is unaffected
+    inadmissible = {"bm_gate_verdict": "BM_INADMISSIBLE", "bm_gate_reasons": ["K is negative"],
+                    "bm_convergence_verdict": "BM_LADDER_CONVERGED"}
+    finding = binding_gate_failure("mechanical", inadmissible)
+    assert finding.code == "BM_INADMISSIBLE"
+
+
+def test_binding_gate_failure_propagates_low_confidence_from_convergence_verdict():
+    from workflow_engine import binding_gate_failure
+
+    outputs = {"bm_gate_verdict": "BM_REPORTABLE",
+              "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+              "bm_convergence_confidence": "low"}
+    finding = binding_gate_failure("mechanical", outputs)
+    assert finding.confidence == "low"
+
+
+def test_bm_ladder_not_converged_applies_the_extend_remedy_and_reruns(tmp_path):
+    """End-to-end through the engine (not just the routing/action unit tests above):
+    binding_gate_failure fires even though do_mechanical's own accepted=True
+    (bm_gate_verdict==BM_REPORTABLE) -- the engine's independent gate re-check on an
+    "accepted" StageResult is what actually blocks acceptance until the ladder
+    identifies B0', then re-executes mechanical with mechanical_resample_points set."""
+    not_converged = StageResult("accepted", outputs={
+        "bm_gate_verdict": "BM_REPORTABLE",
+        "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+        "bm_convergence_confidence": "high",
+        "murnaghan_result": {"pressures_atm": [1, 1000, 2500, 5000, 10000, 15000],
+                             "B0_GPa": 1.65},
+    })
+    converged = StageResult("accepted", outputs={
+        "bm_gate_verdict": "BM_REPORTABLE",
+        "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+        "method": "murnaghan",
+    })
+    fake = FakeExecutor({"mechanical": [not_converged, converged]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+
+    result = engine.run()
+
+    assert result["status"] == "accepted"
+    mech_calls = [call for call in fake.calls if call[0] == "mechanical"]
+    assert len(mech_calls) == 2
+    assert mech_calls[-1][1]["parameters"]["mechanical_resample_points"] == [30000]
+    assert engine.state["remedy_counters"]["by_id"]["murnaghan_ladder_extend"] == 1
+
+
+def test_low_confidence_bm_ladder_finding_escalates_before_plan_mutation(tmp_path):
+    """Mirrors test_low_confidence_escalates_before_plan_mutation: a
+    BM_LADDER_NOT_CONVERGED finding whose only reason is loo_unstable/b0_prime_out_of_band
+    (confidence=low) must never auto-widen the ladder -- it escalates instead."""
+    finding = Finding("BM_LADDER_NOT_CONVERGED", "mechanical", confidence="low")
+    fake = FakeExecutor({"mechanical": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+
+    result = engine.run()
+
+    assert result["status"] == "escalation_required"
+    assert "mechanical_resample_points" not in engine.state["effective_parameters"]
+    assert engine.state["remedy_counters"]["total"] == 0
