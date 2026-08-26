@@ -1208,6 +1208,17 @@ def run_campaign_workflow(plan_path: Path, *, dry_run: bool = False,
         except Exception as exc:  # never fail an accepted campaign on a cache-write problem
             print(f"WARNING: system_characterization_cache write failed for {run_name}: {exc}",
                  file=sys.stderr)
+        # Separate, independently-failing step: turn this run's now-frozen
+        # system_characterization_cache.json entry (if protocol_validated) into protocol
+        # evidence for planning OTHER polymers, not just a same-SMILES replay. See
+        # ingest_internal_run_evidence.py's module docstring for why this is a second
+        # script rather than inlined into write_characterization_cache().
+        try:
+            from ingest_internal_run_evidence import ingest_from_completed_run
+            ingest_from_completed_run(run_name, repo_root=repo_root)
+        except Exception as exc:  # never fail an accepted campaign on an evidence-ingest problem
+            print(f"WARNING: internal-run evidence ingest failed for {run_name}: {exc}",
+                 file=sys.stderr)
     return engine_result
 
 

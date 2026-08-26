@@ -51,6 +51,10 @@ Launch both literature-grounding agents **in parallel** (single message, two `Ag
 - `Agent(subagent_type="system-size-literature-worker", ...)` — same inputs,
   `output_path: data/<run_name>/raw/literature_grounding_system_size.json`
 
+Each worker now queries its own persistent evidence store first (`docs/protocol_evidence_ff.json` /
+`docs/protocol_evidence_system_size.json`) before searching, and writes any newly-verified findings
+back into that store as its last step — this is worker-internal plumbing, invisible to this skill.
+
 Wait for both `RESULT:` blocks, then read both JSON files. Each is DOI-verified, MD-simulation-study-only
 evidence — advisory only, consumed in step 5 below. If either worker reports `error:` (all searches
 failed or it couldn't write its file), proceed with `polymer_rules.json` defaults only and note the

@@ -1,0 +1,1299 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-25T16:59:49Z",
+  "records": [
+    {
+      "schema_version": 1,
+      "record_id": "33b51c7fab89",
+      "field": "forcefield",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "PMMA",
+        "polyisobutylene (PIB)"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "Review of all-atom force fields on PMMA and polyisobutylene (PIB): Class II force fields (PCFF/COMPASS-family) reproduced amorphous density of both polymers within 2% of experiment; OPLS-AA was the only field to keep PIB density error within 2%; GAFF showed discrepancies above 5% for PMMA.",
+      "value": {
+        "fields_compared": [
+          "PCFF/COMPASS (Class II)",
+          "OPLS-AA",
+          "GAFF"
+        ],
+        "reported_errors": "Class II fields: density within 2% for PMMA and PIB (i.e. no systematic large deficit reported for these two polymers); GAFF: >5% error on PMMA density (sign not specified in accessible abstract/snippet); OPLS-AA: within 2% for PIB"
+      },
+      "doi": "10.1016/j.commatsci.2025.113861",
+      "url": "https://doi.org/10.1016/j.commatsci.2025.113861",
+      "title": "A review on all-atom force fields capabilities to predict polymer properties: Case of poly(methyl methacrylate) and polyisobutylene polymer systems",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "This is a chemistry-adjacent (acrylic, hydrocarbon) literature counterexample: it reports Class II (PCFF-family) density performance WITHIN 2% for PMMA specifically, which is inconsistent in magnitude with our measured PCFF PMMA density deficit of -6.2%. Full text is paywalled beyond the verified abstract/summary, so the exact PCFF-vs-COMPASS split and sign are not confirmed at full resolution.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#1_benchmark_studies.findings[1]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "9ad6244eac16",
+      "field": "forcefield",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "PMMA",
+        "polyisobutylene (PIB)"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "A 2025 review (already cited in section 1 and in guides/polymer_rules.json for PACR) reports Class II (PCFF/COMPASS-family) force fields reproducing amorphous PMMA density within 2% of experiment, and separately reports GAFF density discrepancies above 5% for PMMA -- both figures are for a SPECIFIC PMMA model configuration, and the review's own framing is a survey of published results, not a single new benchmark run with disclosed tacticity/DP/charge-method metadata visible in the accessible abstract/summary text.",
+      "value": {
+        "fields_compared": [
+          "PCFF/COMPASS (Class II)",
+          "OPLS-AA",
+          "GAFF"
+        ],
+        "reported_errors": "Class II within 2% for PMMA density (already recorded in section 1); GAFF >5% error for PMMA density"
+      },
+      "doi": "10.1016/j.commatsci.2025.113861",
+      "url": "https://doi.org/10.1016/j.commatsci.2025.113861",
+      "title": "A review on all-atom force fields capabilities to predict polymer properties: Case of poly(methyl methacrylate) and polyisobutylene polymer systems",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Restated from section 1 for direct side-by-side comparison against PolyJarvis's measured PACR density deficit (-5.7 to -6.6%) -- a roughly 3-4x larger error than this review's reported <2% Class-II figure. Full text is paywalled beyond the verified abstract/summary, so tacticity, DP, and charge-assignment-method details behind the <2% number could not be confirmed.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#9_pacr_pcff_pmma_ester_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "96c50fa47fbb",
+      "field": "forcefield",
+      "polymer_class": "PDIE",
+      "polymer_names": [
+        "cis-1,4-polybutadiene (PBD)"
+      ],
+      "smiles": [],
+      "claim": "A 2023 atomistic-dilatometry study of amorphous cis-1,4-polybutadiene (Mw ~5400 g/mol, LAMMPS) computed specific volume across a temperature/pressure grid using the all-atom pcff+ force field (a PCFF variant -- NOT TraPPE-UA, NOT the PDIE class default), and reports specific-volume deviation of only 2% from experimental data, with a linear Tg-vs-pressure relationship extrapolating to Tg = 162 K at zero pressure and dTg/dP = 0.24 K/MPa.",
+      "value": {
+        "fields_compared": [
+          "pcff+ (all-atom PCFF variant)"
+        ],
+        "reported_errors": "Specific volume: ~2% deviation from experiment. Tg extrapolated to 162 K at zero pressure (no experimental Tg comparator stated in accessible text to compute a percent error against)"
+      },
+      "doi": "10.1007/s00894-023-05658-6",
+      "url": "https://doi.org/10.1007/s00894-023-05658-6",
+      "title": "Amorphous cis-1,4-polybutadiene P-V-T properties from atomistic simulations",
+      "year": 2023,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Directly on-chemistry for PDIE (cis-1,4-PBD itself), but uses an all-atom PCFF-family field (pcff+), not TraPPE-UA (PDIE's actual class default). This is useful CROSS-FIELD-FAMILY context -- it shows a different force-field family achieves ~2% density accuracy for this exact polymer -- but does not directly validate or invalidate TraPPE-UA's accuracy for PDIE. It is included as informative context per Step 2/Group C's instruction to prioritize any K/Tg/density finding encountered even outside the exact target force field.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#15_pdie_trappeua_polydiene_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "fd181c3eb13e",
+      "field": "forcefield",
+      "polymer_class": "PDIE",
+      "polymer_names": [
+        "cis- and trans-1,4-polybutadiene (PB)",
+        "1,4-polyisoprene (PI)"
+      ],
+      "smiles": [],
+      "claim": "PDIE's existing ff_justification_doi (Sharma, Roy, Karimi-Varzaneh 2016, JPCB) independently re-confirmed: DOI 10.1021/acs.jpcb.5b10789 resolves correctly (via crossref lookup and a doi.org redirect confirmation to the matching pubs.acs.org article page). Title, authors, and year match the existing polymer_rules.json ff_note description ('validates multiple UA FFs for PBD/PI Tg at microsecond timescales with excellent agreement'). Full-text numeric Tg values could not be extracted in this session (ACS paywall blocked WebFetch), so the specific K-level or percent Tg errors per force field (including whether TraPPE-UA specifically was among the 'multiple UA FFs' tested, versus a different united-atom parameterization) could not be independently re-verified beyond the qualitative claim already on record.",
+      "value": {
+        "fields_compared": [
+          "multiple all-atomistic and united-atom force fields (specific identities including whether TraPPE-UA is among them not independently re-confirmed in this session -- paywalled beyond abstract)"
+        ],
+        "reported_errors": "Qualitative 'excellent agreement' with experimental Tg claimed (per existing polymer_rules.json ff_note and search-snippet summaries); no numeric K/percent values independently re-verified via WebFetch in this session"
+      },
+      "doi": "10.1021/acs.jpcb.5b10789",
+      "url": "https://doi.org/10.1021/acs.jpcb.5b10789",
+      "title": "Validation of Force Fields of Rubber through Glass-Transition Temperature Calculation by Microsecond Atomic-Scale Molecular Dynamics Simulation",
+      "year": 2016,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Re-confirms (does not newly extend) PDIE's existing strongest citation -- DOI resolution verified, but the specific force-field identity (TraPPE-UA vs a different UA model) and numeric Tg accuracy remain exactly as previously documented in polymer_rules.json, not independently strengthened by this session's search.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#15_pdie_trappeua_polydiene_2026_08.findings[1]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "8b917cf11123",
+      "field": "forcefield",
+      "polymer_class": "PHAL",
+      "polymer_names": [
+        "Viton A (VDF/HFP fluoroelastomer, 66% F) -- closest available analog to PHAL's PVDF chemistry; not PTFE (all-CF2) or PCTFE"
+      ],
+      "smiles": [],
+      "claim": "A dedicated force-field-comparison study on Viton A (a VDF/HFP 60/40 wt% fluoroelastomer, 66% fluorine -- chemically closest within the PHAL family to PVDF's CF2-CH2 chemistry) computed thermodynamic, structural, and mechanical properties (density, modulus, Tg-region thermal-volumetric behavior) using several atomistic force fields and compared them against available experimental data. Qualitative results recovered from accessible abstract/summary text: OPLS-derived force fields produce more extended, more mobile chains and a SOFTER material (lower modulus) that under-represents molecular structure/packing; other force fields relying on stronger nonbonded interactions interfere with chain dynamics/mechanics; PCFF is reported as most satisfactorily predicting structural properties and thermal-volumetric (density-related) behavior around Tg, showing relatively successful transferability to long-chain architectures.",
+      "value": {
+        "fields_compared": [
+          "OPLS(-derived)",
+          "PCFF",
+          "others (not individually named in accessible text)"
+        ],
+        "reported_errors": "No numeric percent-error values recoverable from accessible abstract/search-snippet text (full text paywalled) -- only the qualitative ranking (PCFF best for structure/density-adjacent Tg behavior; OPLS produces a too-soft, too-extended-chain, under-packed structure) could be confirmed"
+      },
+      "doi": "10.1016/j.ces.2019.05.007",
+      "url": "https://doi.org/10.1016/j.ces.2019.05.007",
+      "title": "Thermodynamic, structural, and mechanical properties of fluoropolymers from molecular dynamics simulation: Comparison of force fields",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Directly cautionary for PHAL's OPLS-AA default: this is a same-family (fluoropolymer), multi-force-field comparison reporting OPLS as producing a systematically too-soft, too-extended-chain structure relative to PCFF and experiment, for a fluoropolymer chemically adjacent to PVDF. This does not itself report a signed density or Tg percent-error for OPLS vs experiment (only a qualitative under-packing/softness finding), so it should be read as a caution flag on OPLS-AA's likely direction of mechanical-property error for PHAL (under-prediction of modulus/stiffness), not as a quantified confirmation. DOI verified to resolve to the correct ScienceDirect article via a doi.org redirect check.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#12_phal_oplsaa_fluoropolymer_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a365158fc02c",
+      "field": "forcefield",
+      "polymer_class": "PIMD",
+      "polymer_names": [
+        "PMDA-ODA (Kapton)",
+        "PMDA-BIA"
+      ],
+      "smiles": [],
+      "claim": "A 2024 open-access MD study extracts mechanical parameters (Young's modulus, Poisson's ratio) specifically for PMDA-ODA (Kapton) and PMDA-BIA polyimides using the OPLS-AA force field (not PCFF). Simulated Young's modulus for Kapton (2.5 GPa at 4% deformation) is reported to 'almost perfectly replicate' the experimental literature range of 2.5-3.2 GPa.",
+      "value": {
+        "fields_compared": [
+          "OPLS-AA"
+        ],
+        "reported_errors": "Kapton Young's modulus: MD 2.5 GPa vs literature range 2.5-3.2 GPa (within range, near the low end); Poisson's ratio ~0.33, 'within reported values'. PMDA-BIA MD result (~2 GPa) diverged sharply from one cited literature value (Lei et al., 8.5 GPa), leading the authors to question that literature number's reliability rather than their own."
+      },
+      "doi": "10.3390/polym16060813",
+      "url": "https://doi.org/10.3390/polym16060813",
+      "title": "Extraction of Mechanical Parameters via Molecular Dynamics Simulation: Application to Polyimides",
+      "year": 2024,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Confirms PMDA-ODA/Kapton-specific MD literature exists and is accurate for mechanical properties -- but under OPLS-AA, not PCFF. Combined with the Wen2020 finding above, this shows the two axes of PIMD's citation gap are BOTH populated by different papers using different force fields: a PCFF paper that skips PMDA-ODA entirely, and a PMDA-ODA paper that skips PCFF entirely. Neither paper closes the specific gap (PCFF + PMDA-ODA together).",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#20_pimd_pcff_polyimide_kapton_2026_08.findings[1]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "b0441d483616",
+      "field": "forcefield",
+      "polymer_class": "PIMD",
+      "polymer_names": [
+        "4,4'BPADA+MPD (ULTEM)",
+        "4,4'BPADA+PPD",
+        "3,3'BPADA+MPD",
+        "4,4'BPADA+CDA",
+        "4,4'BPADA+DDS -- all aromatic polyetherimides; PMDA-ODA/Kapton NOT studied"
+      ],
+      "smiles": [],
+      "claim": "Wen2020 (the paper formally cited as PIMD's ff_justification_doi) explicitly and verifiably uses PCFF -- WebFetch of the full text confirms: 'All MD simulations were performed using LAMMPS with the PCFF force field.' However, the paper's five simulated polymers are ALL BPADA-based aromatic polyetherimides (4,4'BPADA+MPD [ULTEM], 4,4'BPADA+PPD, 3,3'BPADA+MPD, 4,4'BPADA+CDA, 4,4'BPADA+DDS) -- PMDA-ODA (Kapton), PIMD's own named exemplar chemistry, is NOT among them and is not mentioned in the paper at all.",
+      "value": {
+        "fields_compared": [
+          "PCFF"
+        ],
+        "reported_errors": "Tg (K), MD[rho(T)]/MD[D(T)]/predicted/experimental: BPADA+MPD 525/504/515/490; BPADA+PPD 539/488/499/unknown; BPADA+DDS 542/532/537/520; BPADA+CDA 516/495/551/473; 3,3'BPADA+MPD 524/500/528/511. Density: 'the density of ULTEM from MD simulations is slightly lower than the experimental value, 1.27 g/cm3' (no percent given). None of these five chemistries is PMDA-ODA/Kapton."
+      },
+      "doi": "10.1002/pol.20200050",
+      "url": "https://doi.org/10.1002/pol.20200050",
+      "title": "Determination of glass transition temperature of polyimides from atomistic molecular dynamics simulations and machine-learning algorithms",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "SCOPE MISMATCH for PIMD specifically: this is a verified, on-topic PCFF paper, but for a compositionally different polyimide subfamily (BPADA-based polyetherimides) than PIMD's own named exemplar (PMDA-ODA/Kapton). This is in fact the identical underlying paper legitimately used as PIMN's citation (PIMN's exemplars include polyetherimide/Ultem) -- it validates PIMN's chemistry, not PIMD's.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#20_pimd_pcff_polyimide_kapton_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "c25b85cad9de",
+      "field": "forcefield",
+      "polymer_class": "PIMN",
+      "polymer_names": [
+        "4,4'BPADA+MPD (ULTEM)",
+        "4,4'BPADA+PPD",
+        "3,3'BPADA+MPD",
+        "4,4'BPADA+CDA",
+        "4,4'BPADA+DDS -- all aromatic polyetherimides"
+      ],
+      "smiles": [],
+      "claim": "Wen2020 explicitly uses PCFF ('All MD simulations were performed using LAMMPS with the PCFF force field') and directly validates PCFF for Ultem (4,4'-BPADA+MPD), matching PIMN's own ff_note claim almost exactly: MD Tg (rho(T) method) = 525 K vs experimental 490 K. The paper computes Tg by TWO independent methods on the same simulation data -- rho(T) (specific-volume break) and D(T) (a self-diffusion-based method) -- and these disagree with each other: rho(T) gives 525 K (+7.1% vs exp) while D(T) gives 504 K (+2.9% vs exp). The paper's own text states: 'results on Tg from the D(T) data are closer to and only about 10 to 20 K different from the experimental Tg,' i.e. the authors themselves flag the D(T) method as more accurate than the rho(T) method already recorded in PolyJarvis's ff_note.",
+      "value": {
+        "fields_compared": [
+          "PCFF"
+        ],
+        "reported_errors": "ULTEM (BPADA+MPD) Tg K, [rho(T) / D(T) / ML-predicted / experimental]: 525/504/515/490 -- rho(T) error +7.1%, D(T) error +2.9%, ML-predicted error +5.1%. Other four etherimides (no matched experimental Tg for PPD variant): BPADA+DDS 542/532/537/520 (rho +4.2%, D +2.3%); BPADA+CDA 516/495/551/473 (rho +9.1%, D +4.7%); 3,3'BPADA+MPD 524/500/528/511 (rho +2.5%, D -2.2%). Density: MD density of ULTEM 'slightly lower than experimental value, 1.27 g cm-3' (no percent quantified in accessible text)."
+      },
+      "doi": "10.1002/pol.20200050",
+      "url": "https://doi.org/10.1002/pol.20200050",
+      "title": "Determination of glass transition temperature of polyimides from atomistic molecular dynamics simulations and machine-learning algorithms",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Direct, on-chemistry, force-field-confirmed validation of PCFF for PIMN's Ultem/polyetherimide exemplar -- the strongest and most exactly-matching Group-A finding in this batch. Confirms both the FF identity and the Tg number already in PIMN's ff_note. New nuance: the ff_note's cited 525K/+7% figure is from the LESS accurate of the paper's own two Tg-extraction methods (rho(T)); the paper's own preferred method (D(T)) gives a smaller error (+2.9%, 504K).",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#21_pimn_pcff_polyetherimide_ultem_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "0cf23c3f29b4",
+      "field": "forcefield",
+      "polymer_class": "PKTN",
+      "polymer_names": [
+        "PEEK (catechol-based cyclic oligomer model)"
+      ],
+      "smiles": [],
+      "claim": "guides/polymer_rules.json already cites 'PEEK2020' (DOI 10.3390/polym12051054) for PKTN. Independently re-verifying and re-reading this paper's actual content directly (title: 'Combined Molecular Dynamics and DFT Simulation Study of the Molecular and Polymer Properties of a Catechol-Based Cyclic Oligomer of Polyether Ether Ketone', Polymers (Basel) 2020) recovers BOTH a density and a Tg comparison not previously extracted into this file: using the COMPASS II force field on a catechol-based cyclic-oligomer PEEK model, MD-simulated amorphous density = 1.364 g/cm3 vs experimental 1.328 g/cm3 (+2.2%, i.e. COMPASS II OVER-predicts PEEK density, opposite sign from PolyJarvis's PCFF -5.1% under-density); a companion DFT-PBEsol calculation gave 1.395 g/cm3 (+5.1%). MD-simulated Tg = 424.4 +/- 22.3 K (unit cell) / 428.6 +/- 6.6 K (2x2x2 supercell) vs experimental 418.2 K, i.e. about +6 to +10 K (+1.5 to +2.5%).",
+      "value": {
+        "fields_compared": [
+          "COMPASS II (Class II family)",
+          "DFT-PBEsol (comparator, not MD)"
+        ],
+        "reported_errors": "Density: MD +2.2% (1.364 vs exp 1.328 g/cm3), DFT-PBEsol +5.1% (1.395 g/cm3). Tg: MD +1.5 to +2.5% (424.4-428.6 K vs exp 418.2 K)"
+      },
+      "doi": "10.3390/polym12051054",
+      "url": "https://doi.org/10.3390/polym12051054",
+      "title": "Combined Molecular Dynamics and DFT Simulation Study of the Molecular and Polymer Properties of a Catechol-Based Cyclic Oligomer of Polyether Ether Ketone",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Directly on-chemistry for PKTN (PEEK itself). This is the SAME paper as polymer_rules.json's existing PEEK2020 citation -- the ff_note there records only the Tg figure; this file now also captures its density figure, which is directly comparable to PolyJarvis's own PKTN density measurement. The comparison is stark: COMPASS II OVER-predicts PEEK density by +2.2% in this paper, while PolyJarvis's PCFF measurement UNDER-predicts by -5.1% -- opposite sign and different magnitude, for a related but non-identical Class-II variant (COMPASS II, not PCFF) on a simplified cyclic-oligomer model rather than a full linear amorphous melt. This is informative context, not a same-force-field same-model confirmation or refutation.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#8_pktn_pcff_aromatic_ether_ketone_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "e8dfd3d57292",
+      "field": "forcefield",
+      "polymer_class": "PPHS",
+      "polymer_names": [
+        "poly(dichlorophosphazene) (PZ-DC)",
+        "poly[bis(2,2,2-trifluoroethoxy)]phosphazene (PZ-TFE)",
+        "PZ-Azido (trifluoroethoxy-diazidohexanoxy)",
+        "PZ-Nitrato (trifluoroethoxy-dinitratohexanoxy) -- none is plain poly(ethoxyphosphazene)"
+      ],
+      "smiles": [],
+      "claim": "PPHS's formal ff_justification_doi (Chen & Demir 2022) does NOT use PCFF or any Class-II force field at all -- WebFetch of the PMC full text confirms: 'Molecular dynamics (MD) simulations were carried out using the DREIDING force field with Lennard-Jones potential.' The paper models four chlorinated/fluorinated polyphosphazene variants -- poly(dichlorophosphazene) (PZ-DC), poly[bis(2,2,2-trifluoroethoxy)]phosphazene (PZ-TFE), plus azido- and nitrato-functionalized derivatives -- none of which is the plain alkoxy poly(ethoxyphosphazene) that PolyJarvis's own ff_note says is build-tested; it explicitly covers the Cl-substituted PDCP chemistry PolyJarvis's own note already flags as untested.",
+      "value": {
+        "fields_compared": [
+          "DREIDING (NOT PCFF, NOT any Class-II/COMPASS-family field)"
+        ],
+        "reported_errors": "PZ-DC density: predicted 2.167 g/cm3 at 20C vs experimental 1.98 g/cm3 at 25C (+9.4%). PZ-TFE density: predicted 1.365 g/cm3 vs an 'estimated amorphous' (not directly measured) comparator of 1.65 g/cm3 (~-17%, caveat: the comparator itself is an estimate, not a hard experimental measurement). PZ-Nitrato density: predicted 1.372 g/cm3 vs experimental 1.53 g/cm3 at 25C (~-10.3%). PZ-TFE Tg: predicted -51.8C (corrected) vs experimental range -53 to -82C (within range, near the high/warm end). PZ-Nitrato Tg: predicted -39.5C vs experimental -43C (+3.5C, close)."
+      },
+      "doi": "10.3390/polym14071451",
+      "url": "https://doi.org/10.3390/polym14071451",
+      "title": "A Computational Procedure for Atomistic Modelling of Polyphosphazenes towards Better Capturing Molecular-Level Structuring and Thermo-Mechanical Properties",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "MAJOR FLAG, worse than a chemistry mismatch alone: this is a force-field mismatch. The DOI formally cited as PPHS's ff_justification_doi (driving ff_routing.py's ff_confidence='cited' flag) uses DREIDING, not PCFF or any Class-II field -- it provides zero evidence that PCFF (or any Class-II family member) has been validated on polyphosphazenes of any substitution pattern. It also does not cover the alkoxy/ethoxy substituent chemistry PolyJarvis's own ff_note says is build-tested, and it reports mixed-to-poor density accuracy (+9.4% to -17%) even for the force field it does use.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#22_pphs_pcff_polyphosphazene_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "0ab807c11618",
+      "field": "forcefield",
+      "polymer_class": "PPHS",
+      "polymer_names": [
+        "small-molecule, liquid, and crystalline phosphazene compounds -- NOT bulk amorphous polyphosphazene polymer melts"
+      ],
+      "smiles": [],
+      "claim": "A search for a Class-II-family polyphosphazene validation located the actual COMPASS phosphazene parameterization paper (Sun, Ren & Fried 1998) -- the paper that gives COMPASS its phosphazene atom types. Per search-summary text: 'nonbonded parameters (L-J 9-6 vdW potential) were initially transferred from the polymer consistent force field, PCFF, and optimized using MD simulations of condensed-phase properties,' and validation was performed 'on isolated molecules, liquids, and crystals' with 'favourable agreement' on structure, vibration frequencies, and density.",
+      "value": {
+        "fields_compared": [
+          "COMPASS (with nonbonded parameters explicitly stated as originating from PCFF, then reoptimized)"
+        ],
+        "reported_errors": "Not independently re-extracted with specific numeric values in this pass (full text paywalled beyond search-engine summary); summary states density and other properties were validated with 'favourable agreement' against experiment for isolated molecules, liquids, and crystals."
+      },
+      "doi": "10.1016/s1089-3156(98)00042-7",
+      "url": "https://doi.org/10.1016/s1089-3156(98)00042-7",
+      "title": "The COMPASS force field: parameterization and validation for phosphazenes",
+      "year": 1998,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Explains the mechanistic basis for PPHS's own ff_note claim ('pcff.frc explicitly added polyphosphazene types') -- confirms a genuine PCFF-to-COMPASS parameter lineage exists specifically for phosphazene nonbonded terms. However, like PCFF's and COMPASS's other founding-paper validations already documented elsewhere in this file (sections 5, 16), this validation is small-molecule/liquid/crystal-scoped, not a bulk amorphous polymer-melt validation, and it is COMPASS's own reoptimized parameters being validated, not a PCFF-specific number in isolation. Not currently PPHS's formal citation, but a more genuinely relevant candidate than the DREIDING paper now attached to it.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#22_pphs_pcff_polyphosphazene_2026_08.findings[1]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "f003d60af626",
+      "field": "forcefield",
+      "polymer_class": "PPNL",
+      "polymer_names": [
+        "poly(para-phenylene vinylene) (PPV)",
+        "polyacetylene (PA)"
+      ],
+      "smiles": [],
+      "claim": "The Tg value in PPNL's ff_note (Venkatanarayanan2016, PPV Tg = 416+/-8K vs exp ~416K) is independently corroborated via CrossRef-verified title/author match and multiple corroborating search summaries: 'PPV was found to have a Tg of 416 +/- 8 K, while PA [polyacetylene] did not exhibit a glass transition in the temperature range of 120 to 500 K.' Young's modulus values are also reported: 1.81+/-0.34 GPa for polyacetylene and 9.20+/-0.57 GPa for PPV at 298 K -- new information beyond what PPNL's ff_note currently records.",
+      "value": {
+        "fields_compared": [
+          "not independently re-confirmed as PCFF in this pass -- full text is paywalled on Wiley (403) and ResearchGate (403); no accessible search-engine summary or citing-paper text stated the force field name explicitly. PPNL's ff_note already asserts PCFF was used ('Venkatanarayanan2016 validates PCFF directly for PPV'); this claim is SILENT-vs-unconfirmed here, not contradicted, since no source found in this pass named a different force field either"
+        ],
+        "reported_errors": "PPV Tg: MD 416+/-8K vs experimental ~416K -- ~0% error, essentially exact match (matching ff_note exactly). Young's modulus at 298K: PA 1.81+/-0.34 GPa, PPV 9.20+/-0.57 GPa (no experimental comparator recovered from accessible text for direct percent-error calculation). Polyacetylene showed no glass transition in the simulated 120-500K range."
+      },
+      "doi": "10.1002/mats.201600006",
+      "url": "https://doi.org/10.1002/mats.201600006",
+      "title": "Simulated Dilatometry and Static Deformation Prediction of Glass Transition and Mechanical Properties of Polyacetylene and Poly(para-phenylene vinylene)",
+      "year": 2016,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Corroborates the specific Tg number and near-zero error already recorded in PPNL's ff_note, and adds previously-unrecorded mechanical-property data (Young's modulus for both PA and PPV) that could strengthen the note if transcribed. The one open item is that this pass could not independently re-verify the force-field name (PCFF) from primary text due to a hard paywall on all attempted access routes (Wiley 403, ResearchGate 403, no citing-paper methods description found) -- this is reported honestly as unconfirmed-through-paywall rather than either corroborating or contradicting the note's PCFF claim.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#24_ppnl_pcff_ppv_conjugated_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "8bb29c7537b6",
+      "field": "forcefield",
+      "polymer_class": "PSFO",
+      "polymer_names": [
+        "poly(phthalazinone ether sulfone ketone) (PPESK), 5 novel functionalized variants -- aromatic diaryl-sulfone/diaryl-ether family, closest identified analog to PSFO/polysulfone"
+      ],
+      "smiles": [],
+      "claim": "MD study on five novel designed poly(phthalazinone ether sulfone ketone) (PPESK) polymers -- an aromatic ether-sulfone-ketone backbone chemically adjacent to polysulfone/PSFO (shares the diaryl sulfone and diaryl ether linkages) -- used the COMPASS force field (explicitly described by the authors as 'a typical PCFF type force field... proved suitable for polymer and energetic materials') to predict Tg, density, cohesive energy density, solubility parameter, and mechanical moduli (E, K, G, Poisson's ratio) for five newly designed (not previously synthesized) PPESK variants. Predicted Tg values were above 500 K for all five, with the -NH2-substituted variant near 600 K.",
+      "value": {
+        "fields_compared": [
+          "COMPASS (PCFF-type)"
+        ],
+        "reported_errors": "No signed percent error vs experiment recoverable from accessible abstract/search-snippet text -- the five simulated PPESK variants are novel designs without prior experimental Tg/density measurements to compare against, so this paper validates COMPASS/PCFF-type internal consistency (CED/solubility-parameter/mechanical-property cross-checks) rather than reporting a simulated-vs-experimental density or Tg error for an existing, measured polysulfone-family polymer"
+      },
+      "doi": "10.1016/j.commatsci.2018.05.039",
+      "url": "https://doi.org/10.1016/j.commatsci.2018.05.039",
+      "title": "Molecular dynamics simulation on the physical properties of the novel designed poly-(phthalazinone ether sulfone ketone) (PPESK)",
+      "year": 2018,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Weak, tangential evidence: confirms a PCFF-type (COMPASS) field is used in the published literature on the closest identified aromatic diaryl-sulfone/ether-ketone chemical family to PSFO, but because the target polymers are novel (no experimental reference values), this source cannot confirm or deny the sign/magnitude of PolyJarvis's own measured PSFO density deficit (-4.0 to -4.3%) or Tg offset (+2-8%). DOI verified to resolve correctly to this exact article (ScienceDirect PII S0927025618303525) via a doi.org redirect check.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#7_psfo_pcff_aromatic_sulfone_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "f95cb9559483",
+      "field": "forcefield",
+      "polymer_class": "PSIL",
+      "polymer_names": [
+        "PDMS"
+      ],
+      "smiles": [
+        "*O[Si](*)(C)C"
+      ],
+      "claim": "PDMS benchmark of 5 force fields (UA/Frischknecht-Curro, HUANG improved Class II, COMPASS, OPLS-AA, DREIDING) against experimental density/Cp/compressibility/viscosity/thermal conductivity vs temperature. Density RMSE (g/cm3): HUANG 0.0101 (best), OPLS-AA 0.0414, UA 0.0523, DREIDING 0.1337, COMPASS 0.1781 (worst). COMPASS consistently OVERESTIMATED density across the temperature range.",
+      "value": {
+        "fields_compared": [
+          "COMPASS",
+          "OPLS-AA",
+          "DREIDING",
+          "UA (Frischknecht-Curro)",
+          "HUANG (modified Class II)"
+        ],
+        "reported_errors": "Density RMSE g/cm3: HUANG 0.0101, OPLS-AA 0.0414, UA 0.0523, DREIDING 0.1337, COMPASS 0.1781; COMPASS sign is OVER-prediction, not under-prediction"
+      },
+      "doi": "10.1021/acs.jpcb.4c08471",
+      "url": "https://doi.org/10.1021/acs.jpcb.4c08471",
+      "title": "Force-Field Benchmark for Polydimethylsiloxane: Density, Heat Capacity, Isothermal Compressibility, Viscosity and Thermal Conductivity",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Direct multi-FF, same-polymer, same-metric comparison including COMPASS; shows a Class-II field (COMPASS) can be the WORST performer and can err in the opposite direction (over-density) from our measured PCFF under-density, contradicting any assumption that all Class-II fields share PCFF's sign/magnitude of bias",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#1_benchmark_studies.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a16e32f57b21",
+      "field": "forcefield",
+      "polymer_class": "PSUL",
+      "polymer_names": [
+        "poly(phenylene sulfide) (PPS, reference baseline)",
+        "PP-He-IS, PP-Pe-IS, PP-Bu-IS (alkyl-substituted variants)"
+      ],
+      "smiles": [],
+      "claim": "A 2024 Chinese Journal of Polymer Science paper studies poly(phenylene sulfide) (PPS) directly -- matching PSUL's own build-tested chemistry exactly -- as the reference baseline for a series of alkyl-modified polyarylene sulfide resins (phenyl units partially replaced by hexylene/pentylene/butylene alkyl chains). The primary force field used is confirmed to be COMPASS II: 'the researchers employed molecular dynamics (MD) simulations... COMPASS II is identified as the active simulation tool for this work,' though the paper's background section also references PCFF, UFF, DREIDING, and other fields as prior literature context. The paper reports a qualitative trend ('discernable decrement in the glass transition temperature and elastic modulus, counterbalanced by an increment in yield strength as the alkyl chain length is extended') but no explicit quantitative density or Tg value, nor a percent error vs experiment, for the unmodified PPS baseline itself, in the accessible text.",
+      "value": {
+        "fields_compared": [
+          "COMPASS II (primary, used to run the simulations)"
+        ],
+        "reported_errors": "No explicit numeric density or Tg value, nor percent error vs experiment, was recoverable for unmodified PPS from accessible text (paper is behind a Springer login wall; only an IDP-redirected partial-text extraction was accessible). Only a qualitative trend across the alkyl-substituted series is stated."
+      },
+      "doi": "10.1007/s10118-024-3072-1",
+      "url": "https://doi.org/10.1007/s10118-024-3072-1",
+      "title": "Impact of Carbon Chain Structures in the Backbone on the Flexibility of Modified Polyarylene Sulfide Resins: Molecular Dynamics Simulations and Mesoscopic Analysis",
+      "year": 2024,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Directly on-chemistry (PSUL's own exemplar, PPS) but under COMPASS II, not PCFF, and does not report a PCFF-vs-experiment or even a COMPASS-vs-experiment quantitative accuracy number for the baseline PPS chemistry in the text accessible during this search. Similar in character to section 7's PPESK finding for PSFO: on-topic Class-II-family evidence, but not a chemistry-and-force-field-matched accuracy figure.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#25_psul_pcff_polyphenylene_sulfide_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "fab9b0916eb8",
+      "field": "forcefield",
+      "polymer_class": "PURA",
+      "polymer_names": [
+        "segmented polyurea-polyurethane hybrid elastomers (IPDI + D2000/D230 diamine hard segments + 24 wt% polyol/polycarbonate/polycaprolactone/PTMEG diol soft segments) -- NOT pure polyurea"
+      ],
+      "smiles": [],
+      "claim": "A 2025 MDPI Polymers paper studies dynamic mechanical properties and energy absorption of what it calls 'polyureas' (PURs) via combined experiment and MD simulation, reporting MD density within 2% of experiment for four variants. However, full-text inspection reveals these are segmented POLYUREA-POLYURETHANE HYBRID elastomers -- built from isophorone diisocyanate (IPDI), diamine chain extenders (D2000, D230), AND macrodiol soft segments (polycarbonate, polycaprolactone, polypropylene glycol, or polytetramethylene ether glycol diols, 'remained at 24 wt%') -- not pure polyurea (urea-linkage-only) chemistry. The force field used is COMPASS, not GAFF or GAFF2: 'The COMPASS force field was chosen for the analog modules Forcite and Amorphous Cell.'",
+      "value": {
+        "fields_compared": [
+          "COMPASS (NOT GAFF, NOT GAFF2 -- PURA's actual routed force field)"
+        ],
+        "reported_errors": "Density vs experiment, 4 variants: PPG1000-PUR 1.041 MD vs 1.021 exp (+1.9%); PTMG1000-PUR 1.019 vs 1.007 (+1.2%); PCL1000-PUR 1.045 vs 1.051 (-0.6%); PC1000-PUR 1.055 vs 1.053 (+0.2%). Authors state 'these model errors were revealed to be lower than 2%.' Experimental Tg (DMA) range: -48C to -22C."
+      },
+      "doi": "10.3390/polym17010107",
+      "url": "https://doi.org/10.3390/polym17010107",
+      "title": "Dynamic Mechanical Properties and Energy Absorption Capabilities of Polyureas Through Experiments and Molecular Dynamic Simulation",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "FLAGS A DOUBLE SCOPE MISMATCH, not a corroboration: despite being labeled 'polyureas' in the title, this paper is chemically a urea-urethane hybrid segmented elastomer with substantial (24 wt%) diol soft-segment content -- structurally distinct from PURA's pure-urea-linkage chemistry (the class EMC cannot build, routed to RadonPy/GAFF2_mod specifically because of its {na,c_2} amide-N increment gap). It also uses COMPASS, not GAFF2. The strong density accuracy (<2%) reported here therefore cannot be attributed to GAFF2 or to pure polyurea chemistry, and should not be read as evidence for either.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#27_pura_gaff2_polyurea_2026_08.findings[1]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "4df4736d0c12",
+      "field": "forcefield",
+      "polymer_class": "PURA",
+      "polymer_names": [
+        "urea (small molecule, NH2-CO-NH2) -- NOT polyurea; the urea linkage is the repeat-unit-defining functional group shared with PURA's polymer chemistry"
+      ],
+      "smiles": [],
+      "claim": "A dedicated small-molecule study of urea itself (the exact chemical linkage at the core of every polyurea repeat unit) assesses 4 GAFF-family and 5 OPLS-family force field variants against experimental urea crystal lattice parameters, crystal density, cohesive energy, and aqueous-solution properties. GAFF2 specifically (PURA's actual routed force field) OVER-predicts urea crystal density: calculated 1.476 g/cm3 vs experimental 1.375 g/cm3 (+7.4%). The paper's own text states: 'All force fields slightly underestimate a and overestimate c, and the density, rho, is overestimated by all of the force fields,' i.e. this is a consistent, systematic direction across every GAFF and OPLS variant tested, not GAFF2-specific noise. This study is a small-molecule urea CRYSTAL study -- it does not simulate polyurea (the polymer) at all, and crystal-density errors do not necessarily transfer to amorphous-melt density errors.",
+      "value": {
+        "fields_compared": [
+          "GAFF1",
+          "GAFF2",
+          "GAFF-D1",
+          "GAFF-D3",
+          "OPLS-AA",
+          "OPLS-AA-N",
+          "OPLS-AA-D",
+          "OPLS-S",
+          "OPLS-G"
+        ],
+        "reported_errors": "Urea crystal density vs experiment (1.375 g/cm3): GAFF1 1.460 (+6.2%), GAFF2 1.476 (+7.4%), GAFF-D1 1.521 (+10.6%), GAFF-D3 1.460 (+6.2%). All force fields tested (GAFF and OPLS families alike) overestimate density; the paper reports 'the experimental form I crystal density [is overestimated] by 7-19%' across the full set."
+      },
+      "doi": "10.1021/acs.cgd.3c00785",
+      "url": "https://doi.org/10.1021/acs.cgd.3c00785",
+      "title": "Assessment of GAFF and OPLS Force Fields for Urea: Crystal and Aqueous Solution Properties",
+      "year": 2023,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "The single most directly on-topic finding located for PURA: it is GAFF2 (PURA's actual routed force field), on the exact urea functional group that defines polyurea's repeat unit -- a small-molecule analog in the same spirit as section 6's benzene/toluene benchmark for PS. Important caveat, stated explicitly by the task and preserved here: this is a CRYSTAL density comparison for the monomer compound, not an amorphous bulk-polymer-melt comparison for the polymer -- crystal-packing errors and amorphous-melt errors are not the same quantity and need not share sign or magnitude, so this finding should not be read as a direct GAFF2-polyurea bulk-density prediction.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#27_pura_gaff2_polyurea_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "bae6fb6c2292",
+      "field": "forcefield",
+      "polymer_class": "PURT",
+      "polymer_names": [
+        "a fast-curing (thermoset) polyurethane resin system tracked across degree-of-cure (DoC) via topological crosslinking MD -- NOT PolyJarvis's linear/aliphatic TPU chemistry"
+      ],
+      "smiles": [],
+      "claim": "PURT's formal ff_justification_doi is confirmed via CrossRef to be a real, correctly-titled 2026 MDPI Polymers paper on fast-curing polyurethane systems. However, the accessible abstract describes a CROSSLINKED/CURING THERMOSET polyurethane network study, not a linear/aliphatic TPU melt: 'Fast-curing polyurethane (PU) systems... quantifying cure kinetics, gelation, and cure-dependent glass transition temperature (Tg)... Rheology indicated gelation between 475 and 625 s (DoC = 0.53), and MD (LAMMPS) with topological crosslinking and NPT thermal scans extracted Tg from density-temperature slopes at selected DoC points.' This is a curing/gelation/crosslink-density study of a thermoset network at varying degree-of-cure, not a simulation of a fully-cured linear TPU melt, which is what PolyJarvis's PURT class actually builds and simulates.",
+      "value": {
+        "fields_compared": [
+          "not determinable from accessible abstract/search-summary text; the MD engine (LAMMPS) is confirmed, but the specific force field name (PCFF, OPLS-AA, COMPASS) could not be independently verified through the MDPI paywall (403) or ResearchGate/Semantic Scholar attempts -- a second-hand search-engine summary claimed 'OPLS-AA... along with COMPASS and PCFF force fields' but this could not be corroborated from primary text and is treated as unverified rather than reported as fact, per this document's own established rule (section 11's n-hexane near-miss) against trusting search-engine summarization of force-field claims without primary-source confirmation"
+        ],
+        "reported_errors": "Not extractable from accessible text."
+      },
+      "doi": "10.3390/polym18060679",
+      "url": "https://doi.org/10.3390/polym18060679",
+      "title": "A Theory-Guided Machine Learning and Molecular Dynamics Approach for Characterizing Fast-Curing Polyurethane Systems",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "FLAGS A SCOPE MISMATCH: this citation is about curing kinetics and crosslink-density evolution in a thermoset PU network, a different physical system from PolyJarvis's actual PURT usage (linear/aliphatic TPU melt, no reactive crosslinking). This closely mirrors the Sun1994/PCBN pattern already documented elsewhere in this file (a topically-adjacent but physically-different-system citation) and is a new instance found in this pass. The 2026 publication date and title's own emphasis on 'Fast-Curing' and 'Machine Learning' should have been a stronger signal during original citation selection that this is a curing-process paper, not a linear-polymer-property validation paper.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#23_purt_pcff_polyurethane_tpu_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "87b968c96cdf",
+      "field": "forcefield",
+      "polymer_class": "PVNL",
+      "polymer_names": [
+        "PVC (neat, and PVC/dioctyl-phthalate blends)"
+      ],
+      "smiles": [],
+      "claim": "Full-text retrieval of guides/polymer_rules.json's EXISTING PVNL ff_justification_doi paper (previously only its abstract-level claims were on record) recovers detailed, directly-comparable numbers for neat (unplasticized) PVC that were not previously extracted into this file. Using the COMPASS force field (Class II family, same lineage as PCFF) on amorphous atactic PVC (24 repeating units, Mn=25534, built in Materials Studio), the paper reports: Tg by density method = 365.42 K vs experimental 354.15 K (+3.2%); Tg by free-volume method = 363.68 K vs experimental 354.15 K (+2.7%). Elastic-constant-derived (Reuss-averaged Cij) bulk modulus K for pure PVC at 298 K = 2.9470 GPa (decreasing to 1.8160 GPa at 358 K) -- this K value is NOT compared against an experimental reference in the paper (no experimental K/G/E number for neat PVC is cited in the accessible text; only DOP-blend K values are compared relative to each other).",
+      "value": {
+        "fields_compared": [
+          "COMPASS (Class II)"
+        ],
+        "reported_errors": "Tg: +2.7% to +3.2% vs experiment (COMPASS over-predicts slightly). Bulk modulus K = 2.9470 GPa at 298 K (no experimental K comparator given in the paper itself)"
+      },
+      "doi": "10.1007/s10118-019-2249-5",
+      "url": "https://doi.org/10.1007/s10118-019-2249-5",
+      "title": "Research on the Glass Transition Temperature and Mechanical Properties of Poly(vinyl chloride)/Dioctyl Phthalate (PVC/DOP) Blends by Molecular Dynamics Simulations",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Directly on-chemistry (PVC itself, not an analog) and the SAME paper already cited as PVNL's ff_justification_doi in guides/polymer_rules.json -- full-text retrieval (via a saved PDF fetch, DOI confirmed to resolve to this exact Springer/CJPS article) surfaces its bulk-modulus number for the first time in this file. This K = 2.9470 GPa (COMPASS) sits almost exactly inside PolyJarvis's own measured PCFF K range (2.7-2.9 GPa) for PVNL -- a striking numerical convergence between two DIFFERENT Class-II-family force fields (COMPASS here, PCFF internally) on the SAME polymer, both landing well below PolyJarvis's cited experimental K band of [3.5,4.5] GPa (this paper does not itself state that experimental band; the comparison is PolyJarvis's own external framing, made here for the first time by juxtaposing the two numbers -- this literature source does not claim a discrepancy vs experiment for K itself). Per the task's explicit guidance, PVC Tg is treated here as informative context only, not as confirming/denying PolyJarvis's own unreliable internal Tg fits: this paper's +2.7-3.2% COMPASS Tg overshoot is a modest, well-behaved result and stands in contrast to (does not resolve) PolyJarvis's internally-flagged PCFF PVC Tg fit pathology.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#10_pvnl_pcff_pvc_chlorine_bulk_modulus_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "3c6e76deeaa1",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "cross-polymer survey, 82 studies"
+      ],
+      "smiles": [],
+      "claim": "Atomistic polymer modeling review surveying 82 published MD studies found COMPASS is the most widely used force field for synthetic polymer simulation, followed by OPLS-AA; PCFF was NOT found to be the primary force field used, and PCFF 'has not undergone the same level of continuous refinement and benchmarking as general-purpose force fields, resulting in inaccuracies for some chemistries.' 23 different force fields were used across the 82 studies, with ad-hoc modifications in 27 instances.",
+      "value": {
+        "fields_compared": [
+          "COMPASS",
+          "OPLS-AA",
+          "PCFF",
+          "21 others"
+        ],
+        "reported_errors": "No single aggregated error table; qualitative finding that PCFF specifically is flagged as under-benchmarked relative to COMPASS/OPLS-AA in the literature"
+      },
+      "doi": "10.1021/acs.macromol.5c01166",
+      "url": "https://doi.org/10.1021/acs.macromol.5c01166",
+      "title": "Atomistic Polymer Modeling: Recent Advances and Challenges in Building and Parametrization Workflows",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Corroborates that PCFF is comparatively less validated in the open literature than COMPASS/OPLS-AA \u2014 this is consistent with (does not contradict) a possibility that PCFF's polymer-density bias is under-characterized rather than well-established at -5.9%",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#1_benchmark_studies.findings[2]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a222af1389b3",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "146 poly(aryl ether ketone) family polymers"
+      ],
+      "smiles": [],
+      "claim": "A hybrid QSPR-GAP method on 146 PAEK-family polymers (77 homopolymers + 69 copolymers) achieved a median out-of-sample RMSE of 8 K for Tg, versus an earlier traditional GAP (van-Krevelen-style) method's in-sample MAE of ~10 K (Weyland et al.), and the authors state traditional GAP methods specifically fail for polymers containing structural fragments absent from the training set.",
+      "value": {
+        "fields_compared": [
+          "QSPR-GAP hybrid, not MD"
+        ],
+        "reported_errors": "median out-of-sample RMSE 8 K (QSPR-GAP) vs ~10 K in-sample MAE for traditional van-Krevelen-type GAP"
+      },
+      "doi": "10.1021/acs.macromol.5c00178",
+      "url": "https://doi.org/10.1021/acs.macromol.5c00178",
+      "title": "Polymer Informatics Method for Fast and Accurate Prediction of the Glass Transition Temperature from Chemical Structure",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Directly on PAEK family (chemically adjacent to our PEEK polymer of interest); confirms group-contribution Tg estimators are usable to roughly +-10 K in this family but that the traditional (non-hybrid) van-Krevelen-style approach specifically degrades for novel fragments \u2014 relevant caution for using group contribution as a reference-free check on a genuinely novel polymer",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#4_reference_free_validation.findings[1]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a70c3afad5e9",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "cross-polymer survey"
+      ],
+      "smiles": [],
+      "claim": "82-study literature survey found no systematic, quantitative relationship established in the literature between a force field's parameterization/training-set coverage and prediction error; instead the dominant practice found was ad-hoc post-hoc parameter modification to match experimental targets, which the authors state causes 'parameter proliferation, loss of transferability, and importantly poor reproducibility' \u2014 i.e., the field lacks a standardized error-prediction criterion based on chemical distance from the training set.",
+      "value": {
+        "fields_compared": [
+          "23 force fields surveyed"
+        ],
+        "reported_errors": "No quantitative correlation between training-set coverage and error was found reported anywhere in the surveyed literature"
+      },
+      "doi": "10.1021/acs.macromol.5c01166",
+      "url": "https://doi.org/10.1021/acs.macromol.5c01166",
+      "title": "Atomistic Polymer Modeling: Recent Advances and Challenges in Building and Parametrization Workflows",
+      "year": 2025,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "This is the closest published statement to our own measurement that extrapolated-atom-fraction does not predict |error| (our correlations: -0.26 on K, -0.64 on density, i.e. negative, meaning MORE extrapolation associates with LOWER error in our data). The review does not report a quantitative test either way \u2014 it reports absence of such a test in the literature, which does not contradict our finding but also does not corroborate it; it corroborates the ABSENCE of an established transferability-predicts-error relationship.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#3_transferability_criteria.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "6b2697ba12f1",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "general pipeline, >1000 amorphous polymers"
+      ],
+      "smiles": [],
+      "claim": "RadonPy (open-source high-throughput MD pipeline for polymer informatics, PoLyInfo-scale, >1000 amorphous polymers, 15 properties) standardizes on GAFF2 for all polymer chemistries. Justification given is GAFF2's broad chemical coverage/established parameterization and automatic bonded/non-bonded assignment via heuristic rules for missing parameters \u2014 not a per-polymer field-selection step. The authors explicitly report that GAFF2 density calculation for high-density organic liquids/polymers is 'often poorly performed' and correct this with a machine-learning transfer-learning bias-correction step applied AFTER the raw MD density, rather than by switching force fields.",
+      "value": {
+        "fields_compared": [
+          "GAFF2"
+        ],
+        "reported_errors": "Systematic GAFF2 density bias acknowledged and corrected post hoc via ML/transfer learning rather than resolved by force-field choice"
+      },
+      "doi": "10.1038/s41524-022-00906-4",
+      "url": "https://doi.org/10.1038/s41524-022-00906-4",
+      "title": "RadonPy: automated physical property calculation using all-atom classical molecular dynamics simulations for polymer informatics",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Directly answers Q2: RadonPy fixes ONE force field (GAFF2) for ALL chemistries rather than doing per-polymer FF selection, and treats a known systematic FF density bias as a statistical correction problem, not a force-field-choice problem. This is a precedent for correcting rather than avoiding a known systematic bias.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#2_highthroughput_pipelines.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "8107ddfb8d7f",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        ">1000 amorphous polymers, cross-chemistry"
+      ],
+      "smiles": [],
+      "claim": "RadonPy (GAFF2 for >1000 amorphous polymers) is the only identified source with amorphous-polymer-bulk (not small-molecule-liquid) validation of GAFF2, and it explicitly reports GAFF2 density is 'often poorly performed' for high-density organic systems, correcting this with post-hoc ML bias correction rather than reporting GAFF2 as inherently accurate on bulk polymer density.",
+      "value": {
+        "fields_compared": [
+          "GAFF2"
+        ],
+        "reported_errors": "Systematic density bias acknowledged, magnitude not isolated by chemistry class in the accessible summary; corrected via transfer learning post-simulation"
+      },
+      "doi": "10.1038/s41524-022-00906-4",
+      "url": "https://doi.org/10.1038/s41524-022-00906-4",
+      "title": "RadonPy: automated physical property calculation using all-atom classical molecular dynamics simulations for polymer informatics",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Directly answers whether GAFF2 has amorphous-polymer-bulk (not just small-molecule) validation: yes, at scale (>1000 polymers), but with an admitted systematic density bias requiring statistical correction -- GAFF2 is not presented by its own largest-scale users as bias-free on bulk polymer density",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#5_compass_gaff2_validation_scope.findings[2]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "251732df9dbc",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "198 homopolymers (in-sample)"
+      ],
+      "smiles": [],
+      "claim": "A modified group-contribution (GAP-based) scheme for Tg prediction, validated on 198 homopolymers, achieved R2=0.9925 (in-sample) with mean relative error 8.09% (96/194 polymers <5% MRE, 87/194 in 5-20% MRE). Reports Bicerano's method at R2=0.9749 on a 320-polymer dataset for comparison (explicitly caveating that R2 values are not strictly comparable across differing datasets).",
+      "value": {
+        "fields_compared": [
+          "group contribution / GAP, not MD"
+        ],
+        "reported_errors": "MRE 8.09% in-sample; ~50% of polymers under 5% MRE; Bicerano comparator R2=0.9749 on a different (320-polymer) dataset"
+      },
+      "doi": "10.1021/acsomega.0c04499",
+      "url": "https://doi.org/10.1021/acsomega.0c04499",
+      "title": "Modified Group Contribution Scheme to Predict the Glass-Transition Temperature of Homopolymers through a Limiting Property Dataset",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Direct evidence for Q4a: group-contribution Tg accuracy is roughly 8% MRE in-sample, on ~200 polymers, but validation is in-sample, not out-of-sample/held-out, which is the relevant regime for a truly novel polymer",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#4_reference_free_validation.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "66c9c900c2a0",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "none -- validation sets are 442 neutral organic solutes (hydration free energy in TIP3P water) and 895 organic solvent-solute pairs; every system is a single small molecule in a solvent box, not a polymer melt or repeat-unit chain"
+      ],
+      "smiles": [],
+      "claim": "FULL TEXT CONFIRMED 2026-08-24 (user-supplied PDF, AIP Publishing watermark): He, Man, Yang, Lee, Wang, J. Chem. Phys. 153, 114502 (2020), DOI 10.1063/5.0019056. The paper develops ABCG2, a new set of AM1-BCC bond-charge-correction parameters for GAFF2, targeting hydration/solvation free energy (SFE) accuracy rather than density, Tg, or any mechanical property. Original AM1-BCC+GAFF2 gave mean unsigned error (MUE) 1.03 kcal/mol on hydration free energies of 442 neutral organic solutes in TIP3P water, driven by 12 functional-group classes with MUE >1.0 kcal/mol (halogenated aliphatics/aromatics, alcohols, amines, pyrazines/pyridines, nitriles, nitro/nitrooxy compounds, amides, thioethers -- Table I). After re-deriving BCC terms for those groups (ABCG2), MUE across all 442 solutes dropped to 0.37 kcal/mol, with every functional-group MUE at or below 0.6 kcal/mol. ABCG2 was then tested, with no further fitting, on 895 neutral organic solvent-solute pairs (not just water): MUE 0.51 kcal/mol, RMSE 0.65 kcal/mol, Pearson R=0.94 (Table II). The entire paper is an electrostatics/charge-assignment study -- van der Waals and bonded parameters are untouched, and the word 'polymer' does not appear anywhere in the text; every validation system is a discrete small organic solute (27 non-cyclic alkanes up to 8-carbon nitro compounds) dissolved in a single-component solvent box.",
+      "value": {
+        "fields_compared": [
+          "GAFF2"
+        ],
+        "reported_errors": "Original AM1-BCC+GAFF2: MUE 1.03 kcal/mol (442 solutes, hydration free energy, Table I). New ABCG2: MUE 0.37 kcal/mol (same 442 solutes) and MUE 0.51 kcal/mol / RMSE 0.65 kcal/mol (895 solvent-solute pairs across organic solvents, Table II). Both figures are below the paper's stated ~0.6 kcal/mol experimental measurement uncertainty for hydration free energies."
+      },
+      "doi": "10.1063/5.0019056",
+      "url": "https://doi.org/10.1063/5.0019056",
+      "title": "A fast and high-quality charge model for the next generation general AMBER force field",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "This is the closest identified 'GAFF2 update' paper matching the task's guidance, and full-text reading confirms it addresses charge assignment specifically (a component of the force field) via solvation-free-energy accuracy, not a comprehensive GAFF2 re-validation across bonded/nonbonded/polymer-scale properties -- it should not be over-read as a GAFF2 polymer-applicability statement. Combined with RadonPy's own admission (sections 2 and 5) that GAFF2 bulk density needs post-hoc correction, this now CONFIRMS rather than merely reinforces the open question of whether any GAFF/GAFF2-family paper (founding or update) directly validates bulk amorphous polymer-melt properties: full-text reading establishes affirmatively that this one does not (no polymer system, no density, no Tg, no modulus anywhere in the paper), closing the access gap without changing the substantive conclusion.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#19_gaff_founding_paper_2026_08.findings[1]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "d175f8196a99",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "315 polymers, cross-chemistry screening set"
+      ],
+      "smiles": [],
+      "claim": "A separate GPU-MD high-throughput workflow standardized on the OPLS3e force field and calculated Tg for 315 polymers with experimental values reported, finding 'good agreement' between predicted and experimental Tg across polymer subsets.",
+      "value": {
+        "fields_compared": [
+          "OPLS3e"
+        ],
+        "reported_errors": "Qualitative 'good agreement' claimed; no per-polymer quantitative RMSE verified from accessible text (full text paywalled beyond abstract-level claims retrieved via search snippet, not independently WebFetch-confirmed)"
+      },
+      "doi": "10.1021/acsapm.0c00524",
+      "url": "https://doi.org/10.1021/acsapm.0c00524",
+      "title": "High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "A second precedent for fixing one general-purpose all-atom field (OPLS3e) across an entire cross-chemistry high-throughput screen rather than selecting per-polymer.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#2_highthroughput_pipelines.findings[1]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "48a958602942",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "fragment-level extension targeting polymer-database functional groups, not amorphous-bulk polymer validation"
+      ],
+      "smiles": [],
+      "claim": "COMPASS II (2016) extended COMPASS coverage specifically to 'polymer and drug-like molecule databases' using a fragmentation method to construct small molecules exhibiting key functional groups found in those databases -- i.e. extension is via small-molecule fragments representative of polymer functional groups, not via direct amorphous-bulk polymer density/Tg validation.",
+      "value": {
+        "fields_compared": [
+          "COMPASS II"
+        ],
+        "reported_errors": "Not available from accessible abstract-level text"
+      },
+      "doi": "10.1007/s00894-016-2909-0",
+      "url": "https://doi.org/10.1007/s00894-016-2909-0",
+      "title": "COMPASS II: extended coverage for polymer and drug-like molecule databases",
+      "year": 2016,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Clarifies that COMPASS II's 'polymer coverage' claim is atom-type/fragment coverage, not amorphous-bulk density/Tg validation on actual polymer melts -- the same gap our own measurement found (atom-type coverage does not track bulk-property error)",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#5_compass_gaff2_validation_scope.findings[1]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "ac972ac14a3f",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "none -- validation sets are 74 small-molecule crystal structures, 22 nucleic-acid base pairs, and 71 small-molecule conformational pairs; no polymer or repeat-unit-melt system is part of the founding validation"
+      ],
+      "smiles": [],
+      "claim": "Full text was retrieved directly from an open-access PDF mirror hosted by the AmberTools/AMBER developers themselves (ambermd.org/antechamber/gaff.pdf), corroborating and extending the abstract-level content already recovered via a Wiley WebFetch of the publisher page. GAFF was designed to be compatible with the existing AMBER force fields for proteins/nucleic acids and to cover 'most organic and pharmaceutical molecules... composed of H, C, N, O, S, P, and halogens.' Three validation tests were reported: (I) structural prediction on 74 crystallographic structures, RMS atomic displacement 0.26 Angstroms, comparable to or better than Tripos 5.2, MMFF94, and CHARMm; (II) hydrogen-bonding energetics on 22 nucleic-acid base pairs, RMS displacement 0.25 Angstroms and RMS relative energy 1.2 kcal/mol vs quantum-mechanical benchmarks; (III) conformational energies on 71 conformational pairs, RMS error ~0.5 kcal/mol vs experimental/QM values. The paper explicitly states known failure modes: parameters are unreliable for 'conjugated/aromatic rings attached to large aliphatic rings,' and atomic partial charges assigned to sulfur and phosphorus 'seem too large.' Polymer or bulk macromolecular simulation is not discussed anywhere in the retrieved full text -- the entire paper is scoped to small, drug-like, and organic molecules, consistent with its stated design goal of automatic parameter assignment for structurally diverse small molecules in a drug-design context.",
+      "value": {
+        "fields_compared": [
+          "GAFF"
+        ],
+        "reported_errors": "Structural (Test I): RMSD 0.26 Angstroms across 74 crystal structures. H-bonding (Test II): RMS displacement 0.25 Angstroms, RMS relative energy 1.2 kcal/mol, 22 base pairs. Conformational energies (Test III): RMS error ~0.5 kcal/mol, 71 pairs."
+      },
+      "doi": "10.1002/jcc.20035",
+      "url": "https://doi.org/10.1002/jcc.20035",
+      "title": "Development and testing of a general amber force field",
+      "year": 2004,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "GAFF is not a class default anywhere in mcp-servers/mcp-emc-server/server.py's routing tables, but is referenced throughout this file as an admissible fallback/comparison field (RadonPy standardizes on GAFF2 for all its >1000-polymer pipeline, sections 2 and 5) and would be the natural candidate if a PCFF/OPLS-AA/TraPPE-UA class needed a fallback for a chemistry outside those three fields' typing coverage. Its own founding paper is explicitly and exclusively small/drug-like-molecule scoped -- crystal structures, base pairs, and conformational pairs, all discrete organic molecules -- with an explicit design intent of automatic parameter assignment for diverse but small molecular structures, not repeat-unit polymer chemistry. This is the clearest of the four founding papers reviewed in this task in stating what it does NOT cover (aromatic rings fused to large aliphatic rings; S/P partial charges) and in being silent on polymers -- RadonPy's own admission (already on record in sections 2 and 5) that GAFF2 density is 'often poorly performed' for high-density organic/polymer systems and requires post-hoc ML correction is fully consistent with a force field whose own founding validation never tested a bulk amorphous polymer melt.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#19_gaff_founding_paper_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "bfa80e72ca05",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "multiple sensor-relevant polymers"
+      ],
+      "smiles": [],
+      "claim": "Cohesive-energy-density-derived Hildebrand/Hansen solubility parameters computed via a multi-sample MD procedure with a consistent force field and QM-derived charges achieve RMS accuracy of ~1.1 Hildebrands vs experimental solubility-parameter tables, and the method is proposed explicitly as a discriminating check against experimental/tabulated solubility-parameter data.",
+      "value": {
+        "fields_compared": [
+          "general MD/CED methodology, force-field-agnostic method description"
+        ],
+        "reported_errors": "RMS ~1.1 Hildebrands vs tabulated experimental solubility parameters"
+      },
+      "doi": "10.1002/jcc.20098",
+      "url": "https://doi.org/10.1002/jcc.20098",
+      "title": "Hildebrand and Hansen solubility parameters from Molecular Dynamics with applications to electronic nose polymer sensors",
+      "year": 2004,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Direct evidence for Q4b: CED/solubility-parameter comparison against Hansen/Hildebrand group-contribution tables IS used in the literature as an independent MD validation observable, with a reported discriminating accuracy of ~1.1 Hildebrands (roughly a few percent of typical polymer delta values ~15-25 (J/cm3)^0.5)",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#4_reference_free_validation.findings[2]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "153008626aa0",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "benzene, toluene (small-molecule liquids, not polymer melts)"
+      ],
+      "smiles": [],
+      "claim": "PCFF's own founding validation paper (Sun 1998, COMPASS) reports a direct, same-conditions comparison between PCFF/CFF91 and COMPASS on benzene and toluene liquid density (NPT, Table 13) and on the NVT pressure predicted at the true experimental density (Table 12). NPT density error vs experiment: benzene COMPASS -1.1%, PCFF/CFF91 -6.3%; toluene COMPASS -1.2%, PCFF/CFF91 -6.5%. NVT excess pressure at the true experimental density: benzene COMPASS +48 bar, PCFF/CFF91 +771 bar; toluene COMPASS -103 bar, PCFF/CFF91 +711 bar. The NVT result gives the mechanism for the NPT result: at the correct density PCFF/CFF91's nonbonded interactions produce far more excess repulsive pressure than COMPASS's, so an NPT barostat relaxes the box to a lower, wrong density to relieve it -- the two tables are the same underlying nonbonded defect viewed from fixed-volume and fixed-pressure ensembles, not two independent observations.",
+      "value": {
+        "fields_compared": [
+          "PCFF/CFF91",
+          "COMPASS"
+        ],
+        "reported_errors": "NPT density: benzene -6.3% (PCFF/CFF91) vs -1.1% (COMPASS); toluene -6.5% (PCFF/CFF91) vs -1.2% (COMPASS). NVT excess pressure at true density: benzene +771 bar (PCFF/CFF91) vs +48 bar (COMPASS); toluene +711 bar (PCFF/CFF91) vs -103 bar (COMPASS)"
+      },
+      "doi": "10.1021/jp980939v",
+      "url": "https://doi.org/10.1021/jp980939v",
+      "title": "COMPASS: An ab Initio Force-Field Optimized for Condensed-Phase Applications-Overview with Details on Alkane and Benzene Compounds",
+      "year": 1998,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Directly on-chemistry for any aromatic-ring backbone or pendant group (PSTR/PS phenyl, and any other class with a benzene-like ring) -- benzene/toluene are the smallest possible structural analogs of a phenyl-containing repeat unit, and the -6.3%/-6.5% PCFF/CFF91 density errors closely match our own independently measured a-PS (atactic polystyrene, PCFF via EMC, DP=40/10 chains) 300 K density deficits of -6.32% (original equilibration), -5.94% (5->10 anneal cycles), and -5.85% (10ns/10ns widened melt-phase production) -- three separate real runs, two of them deliberately spending extra equilibration compute on different, non-overlapping mechanisms (fixed-volume thermal cycling vs. barostat-active NPT sampling), all converging to within ~0.5 points of the small-molecule benchmark. That convergence across very different compute strategies is itself evidence the deficit is not a sampling/kinetics artifact for this specific system -- see PolyJarvis's own a-PS run history (2026-08-19/20) for the equilibration-time control. NOTE: this is small-molecule liquid evidence extended to a polymer melt by chemical-family analogy, not a direct amorphous-polystyrene-melt benchmark -- no such direct PS PCFF-vs-COMPASS bulk-melt study was found (see gaps in section 1 above).",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#6_pcff_aromatic_density_mechanism_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "2ccedd955525",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "none -- validation set is n-alkanes methane through dodecane (C1-C12), explicitly molecular/oligomeric, not polymeric; no discussion of polymer chain lengths or bulk polymer melts was found in the accessible abstract"
+      ],
+      "smiles": [],
+      "claim": "The paper's title, authors (Martin, Siepmann), journal (J. Phys. Chem. B 102(14), 2569-2577), and 1998 publication date were confirmed via CrossRef DOI resolution (note the DOI's literal final character is a bare '+', i.e. 10.1021/jp972543+, which resolves correctly when percent-encoded as %2B in a URL). Abstract-level content was recovered directly from the Siepmann research group's own publication listing page (a first-party source): the united-atom Lennard-Jones parameters (a new CH3/CH2 parameter set) were derived and tested via configurational-bias Monte Carlo simulation in the Gibbs ensemble, fitting to critical temperatures and saturated liquid densities of n-ALKANES FROM METHANE THROUGH DODECANE (C1-C12) only. The paper reports that a single CH3/CH2 parameter pair is sufficient to accurately describe fluid-phase behavior across this entire n-alkane range, and explicitly states two limitations: the model does not reproduce experimental second virial coefficients, and saturated vapor pressures/densities show 'small, but systematic' deviations from experimental data. Properties validated: vapor-liquid coexistence curves, critical temperatures, saturated liquid densities, and high-pressure equations of state -- phase-equilibrium properties of small-molecule alkane fluids, not bulk-condensed-phase polymer properties.",
+      "value": {
+        "fields_compared": [
+          "TraPPE-UA"
+        ],
+        "reported_errors": "FULL TEXT CONFIRMED 2026-08-24 (user-supplied PDF, ACS pubs.acs.org watermark): Table 4 reports liquid density at standard conditions vs experiment with rms deviation 0.0040 g/mL for n-pentane (calc 0.6232, expt 0.6262, ~0.5% low) and 0.0044 g/mL for n-octane (calc 0.7053, expt 0.7025, ~0.4% high); text states densities for octane and dodecane agree with experiment 'to better than 1%.' Table 6 confirms the second-virial-coefficient limitation is a CONSISTENT, SIGNED underestimate of magnitude (10-20% low) across ethane through octane at every temperature tested, attributed explicitly to the LJ parameters being effective (not true) pair potentials fit to reproduce VLCC/density rather than B(T). Table 2 shows normal boiling points systematically underestimated for all three force fields (OPLS/SKS/TraPPE) relative to experiment. No Tg, no bulk/elastic modulus, and no chain length beyond n-dodecane (12 carbons, all fully saturated) appear anywhere in the paper; the longest system simulated (1600-molecule n-octane box, used only for a finite-size check) is still a C8 liquid, not a polymer melt."
+      },
+      "doi": "10.1021/jp972543+",
+      "url": "https://doi.org/10.1021/jp972543+",
+      "title": "Transferable Potentials for Phase Equilibria. 1. United-Atom Description of n-Alkanes",
+      "year": 1998,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "This is the founding paper behind PHYC and PDIE, the two classes server.py routes to trappe-ua (mcp-servers/mcp-emc-server/server.py _TRAPPE_CLASSES). Its own validation set (C1-C12 n-alkanes, phase-equilibrium/critical-point fitting) is the narrowest of the three general-purpose founding papers reviewed in this task -- it is a pure small-molecule/short-oligomer phase-equilibria paper with no polymer-chain-length or bulk-melt discussion at all in the recovered text. Section 14 of this file already independently found that 'the overestimation of characteristic ratios for polyethylene by the TraPPE-UA force field is well-known in the literature' (a structural, chain-conformation caution) even though PHYC's actual polymer-Tg validation (Ramos 2015, section 14) is a SEPARATE, later paper -- this founding paper itself establishes only the small-molecule LJ parameters, with polymer-scale chain-conformational/thermal behavior validated (where it has been validated at all) by downstream papers, not by TraPPE-UA's own 1998 origin paper. PDIE (polydienes, PBD/PI) is chemically even further from n-alkanes (unsaturated backbone, different united-atom typing needed) than PHYC (polyethylene-like), making this founding paper's applicability to PDIE the most extrapolated of any class/founding-paper pairing reviewed in this task.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#18_trappeua_founding_paper_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "31b9017ebb23",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "PEO (explicit polymer case); alkanes/benzene as primary validation focus"
+      ],
+      "smiles": [],
+      "claim": "Original COMPASS force field (Sun 1998) validation set spans molecular liquids and molecular crystals across 28 molecular classes, emphasizing small-to-medium molecules; explicit polymer-relevant claim found is PEO: density predicted to accuracy of 1-2% over >=200 K and 180 MPa ranges, with oligomer-to-high-molar-mass PEO extrapolation accurate to better than 1%.",
+      "value": {
+        "fields_compared": [
+          "COMPASS"
+        ],
+        "reported_errors": "PEO density <1-2% error claimed by the original developers"
+      },
+      "doi": "10.1021/jp980939v",
+      "url": "https://doi.org/10.1021/jp980939v",
+      "title": "COMPASS: An ab Initio Force-Field Optimized for Condensed-Phase Applications-Overview with Details on Alkane and Benzene Compounds",
+      "year": 1998,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "Confirms original COMPASS validation was primarily on small molecules (alkanes, benzene) with PEO as essentially the sole amorphous-polymer-bulk validation case in the founding paper; broad polymer-family coverage (aromatic/heteroatom-rich polymers like PEEK/polysulfone analogs) is NOT part of the original validation set",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#5_compass_gaff2_validation_scope.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "1e259c991bb1",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "none -- validation set is >50 small organic molecules/ions (torsional fitting) and 34 pure small-molecule organic liquids (nonbonded fitting/testing); no polymer or macromolecule is part of the founding validation set"
+      ],
+      "smiles": [],
+      "claim": "The paper's title, authors (Jorgensen, Maxwell, Tirado-Rives), journal (JACS 118(45), 11225-11236), and 1996 publication date were confirmed via CrossRef DOI resolution. Abstract-level content was recovered from an institutional-repository listing (MD Anderson Cancer Center Elsevier Pure profile, a first-party-adjacent source) and corroborated by search-engine-indexed secondary sources: bonded/torsional parameters were derived by fitting to ab initio (RHF/6-31G*//RHF/6-31G*) rotational energy profiles for more than 50 small organic molecules and ions, achieving average conformational-energy errors under 0.2 kcal/mol vs the ab initio reference; nonbonded (Lennard-Jones + charge) parameters were separately fit and tested via Monte Carlo simulations of 34 PURE ORGANIC LIQUIDS (alkanes, alcohols, ethers, ketones, amides, and similar small-molecule liquid classes), achieving approximately 2% accuracy for both heats of vaporization and densities against experimental values. Bond-stretching and angle-bending parameters were adopted largely from the AMBER all-atom force field rather than independently derived.",
+      "value": {
+        "fields_compared": [
+          "OPLS-AA"
+        ],
+        "reported_errors": "FULL TEXT independently obtained 2026-08-24 (user-supplied PDF, literature/Jorgensen_1996_OPLS_AA_FF_Organic_Liquids_JACS.pdf, ACS pubs.acs.org watermark) -- prior abstract-level figures confirmed exact. Torsional/conformational energies: average error <0.2 kcal/mol vs ab initio RHF/6-31G* reference, >50 molecules/ions (Tables 1-6). Liquid-phase validation, precise published figures: average error in delta-Hvap = 2.4% (~0.2 kcal/mol), average error in density = 1.6% (~0.02 g/cm3), across 34 pure liquids (Tables 7-10). The 34 liquids include sulfur-containing classes (thiols, sulfides, disulfides -- Table 8/10) but NO fluorine-containing liquid and no siloxane/Si-O liquid of any kind. The paper explicitly states: 'such non-polar and monofunctional systems do not show significant condensed-phase effects on internal energies in going from the gas phase to the pure liquids' -- an explicit scope statement (monofunctional small molecules), not merely a silent omission."
+      },
+      "doi": "10.1021/ja9621760",
+      "url": "https://doi.org/10.1021/ja9621760",
+      "title": "Development and Testing of the OPLS All-Atom Force Field on Conformational Energetics and Properties of Organic Liquids",
+      "year": 1996,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "This is the founding paper behind PHAL and PSIL, the two classes server.py routes to opls/2024/opls-aa (mcp-servers/mcp-emc-server/server.py _OPLS_CLASSES). Its own validation set is entirely small-molecule: gas-phase torsional fitting on discrete organic molecules/ions, and liquid-phase (not polymer-melt) density/heat-of-vaporization fitting on 34 pure small-molecule liquids representing several functional-group classes (alkanes, alcohols, ethers, ketones, amides). Neither PTFE/PVDF/PCTFE-type fluoropolymer chemistry (PHAL) nor siloxane chemistry (PSIL) is a named liquid class among the 34 tested, and polymer/macromolecular bulk simulation is not mentioned anywhere in the recovered abstract-level content. Today's routing of OPLS-AA to whole amorphous PHAL/PSIL melts is therefore an extrapolation beyond this founding paper's own stated validation scope, in the same 'small-molecule founding paper, polymer-bulk application is extrapolation' pattern section 5 already established for COMPASS.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#17_oplsaa_founding_paper_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "16dd2bb1e3fa",
+      "field": "forcefield",
+      "polymer_class": null,
+      "polymer_names": [
+        "polycarbonate model compounds/fragments and crystal structures -- not a full linear amorphous polycarbonate melt, and not PSTR/PAMD/PSFO's own chemistries (the 3 other classes that formally cite this DOI as ff_justification_doi)"
+      ],
+      "smiles": [],
+      "claim": "guides/polymer_rules.json's `ff_justification_doi` field is literally set to Sun 1994 (DOI 10.1021/ja00086a030) on exactly 4 of the 15 _PCFF_CLASSES in mcp-servers/mcp-emc-server/server.py: PCBN, PSTR, PAMD, PSFO (independently re-verified by reading guides/polymer_rules.json directly -- the other 11 PCFF-routed classes, e.g. PKTN/PIMD/POXI/PEST/PSUL/PURT/PANH/PPHS/PACR/PIMN/PVNL, each cite a DIFFERENT, class-specific DOI as their own ff_justification_doi; some of their ff_note PROSE separately mentions 'Sun1994' as general PCFF/CFF93-lineage background, which is a materially weaker, non-citation claim and not a mis-citation). Independently WebFetching and CrossRef-resolving 10.1021/ja00086a030 reveals the paper's ACTUAL title is 'An ab Initio CFF93 All-Atom Force Field for Polycarbonates' (Sun, Mumby, Maple, Hagler, J. Am. Chem. Soc. 1994, 116(7), 2978-2987) -- not a generic 'force field for polymers' title as assumed; it is specifically the CFF93 derivation paper for the polycarbonate chemical family. Its own stated methodology (recovered from CrossRef metadata plus corroborating search-engine-indexed secondary-source text, since the ACS abstract page, Wiley, and ResearchGate full text all returned HTTP 403 in this session): force-field parameters were derived by fitting to ab initio (HF/6-31G*) quantum-mechanical total energies, energy derivatives, and electrostatic potentials computed on small MODEL COMPOUNDS representing polycarbonate structural fragments; van der Waals parameters and partial-charge scaling factors were separately fit to CRYSTAL STRUCTURES; resulting molecular-mechanics predictions for the model compounds were compared against experimental values and against the ab initio calculations themselves.",
+      "value": {
+        "fields_compared": [
+          "CFF93 (direct ancestor of PCFF, Class II lineage)"
+        ],
+        "reported_errors": "FULL TEXT independently obtained 2026-08-24 (user-supplied PDF, renamed to literature/Sun_1994_CFF93_FF_Polycarbonates_JACS.pdf, verified against CrossRef's title/authors/journal/year exactly). The paper reports NO liquid, amorphous-melt, or bulk-density/Tg validation of any kind -- its entire quantitative validation is: (1) Table 3, ab initio energy-fit residuals for 5 model compounds (carbonic acid, methyl/dimethyl/phenyl/diphenyl carbonate): RMS total-energy deviation 0.32-0.54 kcal/mol; (2) Tables 1-2, crystal lattice-parameter and lattice-energy comparisons for ethylene carbonate and diphenyl carbonate of 2,2-bis(4-hydroxyphenyl)propane (BPA-PC's carbonate-linked model compound) -- unit-cell edges match experiment to 0.03-0.29 A, lattice energies to 1.1-2.3 kcal/mol; (3) Table 5, dimethyl-carbonate vibrational frequencies vs liquid/vapor IR-Raman spectra, max deviation ~60 cm-1 pre-scaling, close post-scaling; (4) Tables 4/6/7, gas-phase conformational energy differences vs HF/6-31G* and MP2 for dimethyl carbonate, diphenyl carbonate, and 2,2-diphenylpropane (largest deviation ~1 kcal/mol); (5) a single crystal-cluster (7-molecule) ring-flip barrier calculation (~20 kcal/mol, explicitly flagged by the authors themselves as an overestimate due to imposed rigidity). No pure-liquid or amorphous-bulk MD/MC simulation of any polycarbonate, and no density or Tg number of any kind, appears anywhere in the paper."
+      },
+      "doi": "10.1021/ja00086a030",
+      "url": "https://doi.org/10.1021/ja00086a030",
+      "title": "An ab Initio CFF93 All-Atom Force Field for Polycarbonates",
+      "year": 1994,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": "This is the formal ff_justification_doi field for exactly 4 PCFF-default classes: PCBN (polycarbonates), PSTR (polystyrenics), PAMD (polyamides), and PSFO (polysulfones) -- independently re-verified by reading guides/polymer_rules.json directly, not merely by narrative cross-reference. The other 11 PCFF-routed classes (PKTN, PIMD, POXI, PEST, PSUL, PURT, PANH, PPHS, PACR, PIMN, PVNL) each cite their OWN, different, class-specific DOI as ff_justification_doi -- only a few of their ff_note fields separately mention 'Sun1994' as informal PCFF/CFF93-lineage background, which is a materially weaker claim (general methodology provenance, not chemistry-specific validation evidence) and not the same finding as a mis-citation. For PCBN specifically this DOI is a genuinely on-chemistry founding citation FOR THE PARAMETERIZATION METHODOLOGY, but full-text reading (2026-08-24) shows it is NOT bulk-property validation even for PCBN: it validates conformational energetics and crystal-lattice structure on small model compounds and dimers only, never an amorphous polycarbonate melt's density or Tg. So PCBN's own PCFF density/Tg accuracy is, on this founding paper's evidence alone, just as unvalidated at the bulk-property level as PSTR/PAMD/PSFO's -- the difference between PCBN and the other 3 classes is chemistry-match, not validation depth. For PSTR/PAMD/PSFO it is being used as a stand-in for 'the PCFF/Class-II force field's founding validation,' when the paper's own actual scope (by its title and its ab initio+crystal-structure model-compound methodology) is the polycarbonate structural family only -- an even narrower scope than the generic 'small molecules' extrapolation already documented for COMPASS in section 5. This paper does not itself claim to validate PCFF broadly across chemistries; that broader claim is an assumption made by this codebase's citation practice on 3 classes, not a statement in the source.",
+      "provenance": {
+        "origin": "migration",
+        "source_run": null,
+        "migrated_from": "docs/ff_selection_literature.json#16_pcff_cff91_founding_paper_2026_08.findings[0]",
+        "added_at": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "52a8942cd5c4",
+      "field": "cooling_rate",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "PMMA"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "MD Tg-sweep study of stereoregular PMMA using approximately 1 K/ns cooling to determine apparent glass transition from specific-volume vs temperature. DOI resolves to the correct ACS article and title matches exactly; the specific ~1 K/ns cooling-rate figure was confirmed via full-text access in a prior grounding pass (2026-08-23, isotactic PMMA run) and could not be re-confirmed by full-text in this pass due to publisher paywall (Cloudflare-gated PDF), so this claim carries residual risk despite the resolvable, title-matched DOI.",
+      "value": {
+        "rates": [
+          1.0
+        ]
+      },
+      "doi": "10.1021/acs.macromol.8b01160",
+      "url": "https://doi.org/10.1021/acs.macromol.8b01160",
+      "title": "Structure, Dynamics, and Apparent Glass Transition of Stereoregular Poly(methyl methacrylate)/Graphene Interfaces through Atomistic Simulations",
+      "year": 2018,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "EvidenceStoreVerify1",
+        "migrated_from": null,
+        "added_at": "2026-08-25T16:56:28Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "4056dd582011",
+      "field": "cooling_rate",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "PMMA"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "OPLS-AA MD Tg-sweep study (non-tacticity-resolved, applicable to atactic PMMA as built by this SMILES) using approximately 1 K/ns cooling. DOI resolves to the correct ScienceDirect PII and title matches; the specific cooling-rate figure was confirmed by full-text access in a prior grounding pass (2026-08-23) and could not be re-confirmed by full text in this pass (publisher 403).",
+      "value": {
+        "rates": [
+          1.0
+        ]
+      },
+      "doi": "10.1016/j.polymer.2022.125044",
+      "url": "https://doi.org/10.1016/j.polymer.2022.125044",
+      "title": "All-atomistic molecular dynamics study of the glass transition of amorphous polymers",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "EvidenceStoreVerify1",
+        "migrated_from": null,
+        "added_at": "2026-08-25T16:56:28Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "0217fa5162f2",
+      "field": "tg_target",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "PMMA"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "Cites its own experimental validation target for atactic PMMA as Tg = 383 K, against which its OPLS-AA simulated Tg (481 K, +25.6% error) is compared. DOI resolves to the correct ScienceDirect article and title matches; the specific 383 K figure was confirmed by full-text access in a prior grounding pass (2026-08-23) and could not be re-confirmed by full text in this pass (publisher 403). This target is consistent with, and supports retaining, polymer_rules.json's existing PACR.experimental_tg_K.PMMA = 378 K class default for this ATACTIC (no stereocenters specified) SMILES -- unlike the isotactic-PMMA case previously logged in memory, this run's Tg target should NOT be shifted down to the 320-333 K isotactic band.",
+      "value": {
+        "range": [
+          383,
+          383
+        ]
+      },
+      "doi": "10.1016/j.polymer.2022.125044",
+      "url": "https://doi.org/10.1016/j.polymer.2022.125044",
+      "title": "All-atomistic molecular dynamics study of the glass transition of amorphous polymers",
+      "year": 2022,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "EvidenceStoreVerify1",
+        "migrated_from": null,
+        "added_at": "2026-08-25T16:56:28Z"
+      }
+    }
+  ],
+  "methodology_criteria": [
+    {
+      "criterion": "Prefer a field with a same-polymer or same-family published benchmark reporting signed density/Tg error against experiment, over a field chosen solely on general reputation.",
+      "how_to_apply": "Before adopting a fallback field for a novel/no-experimental-data polymer, search for any same-polymer or same-family multi-FF benchmark (as in the PDMS and PMMA/PIB cases found here); if none exists, treat the fallback choice as unvalidated rather than assuming general-purpose reputation transfers.",
+      "evidence_strength": "moderate",
+      "sources": [
+        "10.1021/acs.jpcb.4c08471",
+        "10.1016/j.commatsci.2025.113861"
+      ]
+    },
+    {
+      "criterion": "Do not assume atom-type/fragment coverage of a novel chemistry by a force field's parameterization set predicts lower simulated-property error; the literature has not established this relationship, and directly measuring it (as we did, -0.26 K, -0.64 density) is more informative than an a-priori coverage argument.",
+      "how_to_apply": "Treat 'this polymer contains atom types outside the field's training set' as a flag for verification-needed, not as a predictor of error direction or magnitude, when deciding whether to trust a force field on a novel polymer.",
+      "evidence_strength": "weak",
+      "sources": [
+        "10.1021/acs.macromol.5c01166"
+      ]
+    },
+    {
+      "criterion": "When no experimental data exists, use CED/solubility-parameter comparison against Hansen/Hildebrand group-contribution tables as an independent (density/Tg-orthogonal) reference-free check, expecting ~1 Hildebrand-unit discriminating accuracy.",
+      "how_to_apply": "Compute CED from the equilibrated MD cell and compare to a group-contribution-estimated solubility parameter for the polymer's chemistry; treat disagreement beyond ~1-2 Hildebrands as a flag against the force field/parameterization, independent of the density/Tg gates already in use.",
+      "evidence_strength": "moderate",
+      "sources": [
+        "10.1002/jcc.20098"
+      ]
+    },
+    {
+      "criterion": "Group-contribution Tg estimators (van Krevelen/Bicerano-style, or newer hybrid QSPR-GAP) can serve as a reference-free Tg sanity check to roughly 8-10 K or ~5-10% MRE, but only when the polymer's structural fragments are well represented in the estimator's training set; traditional (non-hybrid) group contribution is explicitly reported to degrade on fragments absent from training data.",
+      "how_to_apply": "Use a group-contribution Tg estimate as a secondary sanity bound on simulated Tg for novel polymers, but discount it (do not treat disagreement as force-field evidence) when the polymer's backbone chemistry is not well represented in the estimator's own training set.",
+      "evidence_strength": "moderate",
+      "sources": [
+        "10.1021/acsomega.0c04499",
+        "10.1021/acs.macromol.5c00178"
+      ]
+    },
+    {
+      "criterion": "A known systematic force-field bias (e.g., a class-wide density deficit) does not by itself justify switching fields; the largest-scale published pipeline (RadonPy) response to an admitted systematic GAFF2 density bias was a statistical/ML post-hoc correction, not a per-chemistry field switch.",
+      "how_to_apply": "If a systematic, well-characterized bias is found (as with our measured -5.9% PCFF density deficit), consider a calibrated post-hoc correction as a literature-precedented alternative to switching to an unvalidated fallback field, especially when the fallback field (e.g. GAFF2 for aromatic backbones) itself lacks chemistry-specific bulk validation.",
+      "evidence_strength": "moderate",
+      "sources": [
+        "10.1038/s41524-022-00906-4"
+      ]
+    },
+    {
+      "criterion": "High-throughput pipelines in the literature fix one force field for an entire cross-chemistry screening campaign rather than performing automated per-polymer force-field selection; there is no published precedent for a per-chemistry FF-selection algorithm to cite or emulate.",
+      "how_to_apply": "Do not present per-polymer automated FF selection as literature-validated methodology; frame it as a novel design choice if implemented, and validate it empirically per family rather than by appeal to precedent.",
+      "evidence_strength": "strong",
+      "sources": [
+        "10.1038/s41524-022-00906-4",
+        "10.1021/acsapm.0c00524"
+      ]
+    },
+    {
+      "criterion": "For an aromatic-ring backbone or pendant group specifically, PCFF/CFF91's own founding validation paper documents a same-family (benzene, toluene) density deficit of -6.3%/-6.5% against experiment, with a mechanistic origin (excess NVT pressure at the true density, i.e. the nonbonded parameters are too repulsive at correct packing) rather than a sampling artifact; COMPASS reduces both compounds' error to -1.1%/-1.2% under identical conditions in the same paper. This is chemistry-matched and mechanism-verified, not a general cross-polymer reputation claim -- it is the strongest single piece of evidence in this document for a specific field switch on a specific chemistry class.",
+      "how_to_apply": "When the repeat unit contains a benzene-like aromatic ring (phenyl pendant, phenylene backbone, etc.) and PCFF is the class default, treat this benzene/toluene benchmark as same-family evidence worth weighing alongside (not instead of) the class's own citations, and consider field_override='compass' as a candidate worth an admissibility check (ff_capability.py) before committing to it -- COMPASS's smaller typing-template vocabulary (96 vs PCFF's 422) means build-time admissibility must be verified per SMILES, it cannot be assumed from this benzene/toluene result. Do NOT extend this reasoning to non-aromatic chemistries -- see the PDMS counter-example above, where COMPASS is the worst of 5 fields tested and errs in the opposite direction.",
+      "evidence_strength": "moderate-to-strong for aromatic chemistries specifically; not applicable outside them",
+      "sources": [
+        "10.1021/jp980939v"
+      ]
+    },
+    {
+      "criterion": "For polymers whose Class-II family member (COMPASS, COMPASS II, PCFF, pcff+) has been benchmarked on the SAME polymer under a DIFFERENT Class-II variant than the class default, treat convergence or divergence between variants as informative: if two different Class-II variants land on nearly the same value for the same polymer (as with PVC bulk modulus: COMPASS 2.9470 GPa vs PolyJarvis's PCFF 2.7-2.9 GPa), that is evidence the effect is Class-II-family-wide rather than specific to the exact variant in use; if they diverge in sign (as with PEEK density: COMPASS II +2.2% over vs PolyJarvis's PCFF -5.1% under), that is evidence the effect is variant- or model-specific and should not be generalized across the Class-II family.",
+      "how_to_apply": "When searching for literature support for a PCFF-routed class, do not restrict the search to 'PCFF' alone -- COMPASS, COMPASS II, and other Class-II variants on the same polymer are informative even though they are not numerically identical to PCFF; report the variant explicitly and read agreement/disagreement in this family-wide-vs-variant-specific frame rather than treating any Class-II result as interchangeable with a PCFF result.",
+      "evidence_strength": "moderate",
+      "sources": [
+        "10.1007/s10118-019-2249-5",
+        "10.3390/polym12051054"
+      ]
+    },
+    {
+      "criterion": "When a literature figure surfaced by a web search summary appears to support a specific target polymer (e.g. 'PLA density error under three force fields'), trace the claim to its actual source paper and confirm what chemistry the number was actually measured on before citing it -- search-engine summarization can silently conflate a cited justification-reference (e.g. a small-molecule n-hexane benchmark used to justify a force-field choice in a PLA paper) with a finding about the target polymer itself.",
+      "how_to_apply": "Before recording any reported_errors figure, verify via WebFetch that the source's OWN abstract/text states the number was measured on the polymer or analog claimed, not merely that the polymer-focused paper CITES a differently-scoped benchmark as justification; when the chemistry doesn't match (e.g. an aliphatic hydrocarbon standing in for an ester-containing polyester), exclude the claim rather than reporting it under the target polymer's name.",
+      "evidence_strength": "strong (this is a documented near-miss caught during this session's own search, not a literature-derived claim)",
+      "sources": []
+    },
+    {
+      "criterion": "PCFF/CFF93, OPLS-AA, and TraPPE-UA's own founding papers all validate exclusively against small molecules, model compounds, or short oligomers (up to C12 alkanes for TraPPE-UA) -- none of the three founding papers this codebase's class-routing (server.py _PCFF_CLASSES/_OPLS_CLASSES/_TRAPPE_CLASSES) ultimately rests on contains a bulk amorphous polymer-melt validation of density, Tg, or mechanical properties. This is the SAME pattern section 5 already established for COMPASS (small-molecule/PEO-only founding validation), but for PCFF/CFF93 it is narrower still on the 3 classes where it applies: the paper formally cited as ff_justification_doi on PSTR/PAMD/PSFO (in addition to the on-chemistry PCBN) is specifically a polycarbonate model-compound/crystal-structure derivation (title: 'An ab Initio CFF93 All-Atom Force Field for Polycarbonates') -- an extrapolation from ONE polymer's small-molecule fragments to three compositionally unrelated polymer chemistries, not merely from small molecules to bulk polymers in general. The remaining 11 PCFF-routed classes each cite their own separate DOI and are not affected by this specific mis-citation.",
+      "how_to_apply": "Treat every current class-default force-field citation in polymer_rules.json as validating the FUNCTIONAL FORM and small-molecule parameter-fitting methodology of that force field, not as direct evidence of accuracy on any specific bulk amorphous polymer melt, unless a separate, chemistry-specific downstream paper (of the kind already collected in sections 6-15) is also cited. When routing a genuinely novel polymer to a class default, do not read the class's ff_justification_doi as polymer-melt validation by itself -- search for (or flag the absence of) chemistry-specific downstream literature exactly as sections 6-15 already do per class.",
+      "evidence_strength": "strong",
+      "sources": [
+        "10.1021/ja00086a030",
+        "10.1021/ja9621760",
+        "10.1021/jp972543+",
+        "10.1021/jp980939v"
+      ]
+    },
+    {
+      "criterion": "A citation whose TOPIC matches a polymer class (same chemistry family in the title/abstract) can still cite the WRONG FORCE FIELD entirely -- verify the force field actually named and used inside the paper's methods section, not just topical/chemistry match, before recording doi_verified/ff_justification_doi as meaningful support for a PCFF-routed (or any specific-FF-routed) class.",
+      "how_to_apply": "When verifying or searching for a ff_justification_doi, always extract and record the specific force field name used to RUN the simulations (not merely referenced in the background/related-work section), the same way sections 7-15 and this batch (sections 20-27) already do. A chemistry-on-topic paper using a different force field family (e.g. PPHS's cited DOI, on-topic polyphosphazenes but DREIDING, not PCFF) is not evidence for the class's actual routed force field and should be flagged, not treated as validating.",
+      "evidence_strength": "strong (directly demonstrated this round: PPHS's ff_justification_doi, 10.3390/polym14071451, is confirmed via full-text WebFetch to use DREIDING, not PCFF, despite being a topically on-chemistry polyphosphazene paper)",
+      "sources": [
+        "10.3390/polym14071451"
+      ]
+    },
+    {
+      "criterion": "A single MD paper can report multiple, disagreeing Tg (or other property) extraction methods for the same simulated system (e.g. specific-volume-break vs self-diffusion-onset); when transcribing a literature Tg/error figure into ff_note, record which extraction method the number came from, since the paper's own preferred/most-accurate method may differ from the number already circulating in prior notes.",
+      "how_to_apply": "Before transcribing a literature Tg (or density/modulus) figure, check whether the source paper computed it by more than one method and, if so, which method the authors themselves flag as more reliable; prefer that method's number, or record both with their method labels, rather than silently carrying forward whichever number was first transcribed.",
+      "evidence_strength": "moderate (demonstrated this round: Wen2020/PIMN's existing ff_note cites the rho(T)-method Ultem Tg, 525K/+7.1% error, while the same paper's own D(T)-method gives 504K/+2.9% error and is explicitly called more accurate by the paper's own authors)",
+      "sources": [
+        "10.1002/pol.20200050"
+      ]
+    }
+  ]
+}

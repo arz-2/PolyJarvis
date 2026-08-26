@@ -751,10 +751,16 @@ def test_run_campaign_workflow_writes_cache_on_acceptance(tmp_path, monkeypatch)
     monkeypatch.setattr(wcc, "write_characterization_cache",
                         lambda run_name, **kw: calls.append((run_name, kw)))
 
+    import ingest_internal_run_evidence as iire
+    ingest_calls = []
+    monkeypatch.setattr(iire, "ingest_from_completed_run",
+                        lambda run_name, **kw: ingest_calls.append((run_name, kw)))
+
     result = rdr.run_campaign_workflow(plan_path, repo_root=tmp_path)
 
     assert result["status"] == "accepted"
     assert calls == [("WCC_RUN", {"repo_root": tmp_path})]
+    assert ingest_calls == [("WCC_RUN", {"repo_root": tmp_path})]
 
 
 def test_run_campaign_workflow_skips_cache_write_when_not_accepted(tmp_path, monkeypatch):
@@ -766,10 +772,16 @@ def test_run_campaign_workflow_skips_cache_write_when_not_accepted(tmp_path, mon
     monkeypatch.setattr(wcc, "write_characterization_cache",
                         lambda run_name, **kw: calls.append((run_name, kw)))
 
+    import ingest_internal_run_evidence as iire
+    ingest_calls = []
+    monkeypatch.setattr(iire, "ingest_from_completed_run",
+                        lambda run_name, **kw: ingest_calls.append((run_name, kw)))
+
     result = rdr.run_campaign_workflow(plan_path, repo_root=tmp_path)
 
     assert result["status"] == "failed"
     assert calls == []
+    assert ingest_calls == []
 
 
 def test_run_campaign_workflow_cache_write_failure_does_not_propagate(tmp_path, monkeypatch, capsys):
@@ -782,7 +794,34 @@ def test_run_campaign_workflow_cache_write_failure_does_not_propagate(tmp_path, 
         raise RuntimeError("disk full")
     monkeypatch.setattr(wcc, "write_characterization_cache", _boom)
 
+    import ingest_internal_run_evidence as iire
+    monkeypatch.setattr(iire, "ingest_from_completed_run", lambda run_name, **kw: {"status": "written"})
+
     result = rdr.run_campaign_workflow(plan_path, repo_root=tmp_path)
 
     assert result["status"] == "accepted"  # the campaign result must survive a cache-write failure
+    assert "WARNING" in capsys.readouterr().err
+
+
+def test_run_campaign_workflow_evidence_ingest_failure_does_not_propagate(tmp_path, monkeypatch, capsys):
+    # The two post-acceptance steps are independent failure domains: an evidence-ingest
+    # crash must not affect the (already-successful) cache write, or the campaign result.
+    plan_path = _setup_workflow_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(rdr, "WorkflowEngine", _stub_engine({"status": "accepted"}))
+
+    import write_characterization_cache as wcc
+    wcc_calls = []
+    monkeypatch.setattr(wcc, "write_characterization_cache",
+                        lambda run_name, **kw: wcc_calls.append((run_name, kw)))
+
+    import ingest_internal_run_evidence as iire
+
+    def _boom(run_name, **kw):
+        raise RuntimeError("evidence store locked")
+    monkeypatch.setattr(iire, "ingest_from_completed_run", _boom)
+
+    result = rdr.run_campaign_workflow(plan_path, repo_root=tmp_path)
+
+    assert result["status"] == "accepted"
+    assert wcc_calls == [("WCC_RUN", {"repo_root": tmp_path})]  # cache write still ran
     assert "WARNING" in capsys.readouterr().err

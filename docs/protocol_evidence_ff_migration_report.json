@@ -1,0 +1,226 @@
+{
+  "source": "/home/arz2/PolyJarvis_v2/docs/ff_selection_literature.json",
+  "sections_processed": 27,
+  "findings_processed": 37,
+  "records_emitted": 35,
+  "class_source_counts": {
+    "examples_or_member_table": 5,
+    "section_key_hint": 16,
+    "unmapped": 16
+  },
+  "unmapped_findings": [
+    {
+      "section": "1_benchmark_studies",
+      "doi": "10.1021/acs.macromol.5c01166",
+      "polymers": [
+        "cross-polymer survey, 82 studies"
+      ]
+    },
+    {
+      "section": "2_highthroughput_pipelines",
+      "doi": "10.1038/s41524-022-00906-4",
+      "polymers": [
+        "general pipeline, >1000 amorphous polymers"
+      ]
+    },
+    {
+      "section": "2_highthroughput_pipelines",
+      "doi": "10.1021/acsapm.0c00524",
+      "polymers": [
+        "315 polymers, cross-chemistry screening set"
+      ]
+    },
+    {
+      "section": "3_transferability_criteria",
+      "doi": "10.1021/acs.macromol.5c01166",
+      "polymers": [
+        "cross-polymer survey"
+      ]
+    },
+    {
+      "section": "4_reference_free_validation",
+      "doi": "10.1021/acsomega.0c04499",
+      "polymers": [
+        "198 homopolymers (in-sample)"
+      ]
+    },
+    {
+      "section": "4_reference_free_validation",
+      "doi": "10.1021/acs.macromol.5c00178",
+      "polymers": [
+        "146 poly(aryl ether ketone) family polymers"
+      ]
+    },
+    {
+      "section": "4_reference_free_validation",
+      "doi": "10.1002/jcc.20098",
+      "polymers": [
+        "multiple sensor-relevant polymers"
+      ]
+    },
+    {
+      "section": "5_compass_gaff2_validation_scope",
+      "doi": "10.1021/jp980939v",
+      "polymers": [
+        "PEO (explicit polymer case); alkanes/benzene as primary validation focus"
+      ]
+    },
+    {
+      "section": "5_compass_gaff2_validation_scope",
+      "doi": "10.1007/s00894-016-2909-0",
+      "polymers": [
+        "fragment-level extension targeting polymer-database functional groups, not amorphous-bulk polymer validation"
+      ]
+    },
+    {
+      "section": "5_compass_gaff2_validation_scope",
+      "doi": "10.1038/s41524-022-00906-4",
+      "polymers": [
+        ">1000 amorphous polymers, cross-chemistry"
+      ]
+    },
+    {
+      "section": "6_pcff_aromatic_density_mechanism_2026_08",
+      "doi": "10.1021/jp980939v",
+      "polymers": [
+        "benzene, toluene (small-molecule liquids, not polymer melts)"
+      ]
+    },
+    {
+      "section": "16_pcff_cff91_founding_paper_2026_08",
+      "doi": "10.1021/ja00086a030",
+      "polymers": [
+        "polycarbonate model compounds/fragments and crystal structures -- not a full linear amorphous polycarbonate melt, and not PSTR/PAMD/PSFO's own chemistries (the 3 other classes that formally cite this DOI as ff_justification_doi)"
+      ]
+    },
+    {
+      "section": "17_oplsaa_founding_paper_2026_08",
+      "doi": "10.1021/ja9621760",
+      "polymers": [
+        "none -- validation set is >50 small organic molecules/ions (torsional fitting) and 34 pure small-molecule organic liquids (nonbonded fitting/testing); no polymer or macromolecule is part of the founding validation set"
+      ]
+    },
+    {
+      "section": "18_trappeua_founding_paper_2026_08",
+      "doi": "10.1021/jp972543+",
+      "polymers": [
+        "none -- validation set is n-alkanes methane through dodecane (C1-C12), explicitly molecular/oligomeric, not polymeric; no discussion of polymer chain lengths or bulk polymer melts was found in the accessible abstract"
+      ]
+    },
+    {
+      "section": "19_gaff_founding_paper_2026_08",
+      "doi": "10.1002/jcc.20035",
+      "polymers": [
+        "none -- validation sets are 74 small-molecule crystal structures, 22 nucleic-acid base pairs, and 71 small-molecule conformational pairs; no polymer or repeat-unit-melt system is part of the founding validation"
+      ]
+    },
+    {
+      "section": "19_gaff_founding_paper_2026_08",
+      "doi": "10.1063/5.0019056",
+      "polymers": [
+        "none -- validation sets are 442 neutral organic solutes (hydration free energy in TIP3P water) and 895 organic solvent-solute pairs; every system is a single small molecule in a solvent box, not a polymer melt or repeat-unit chain"
+      ]
+    }
+  ],
+  "section_key_hint_findings": [
+    {
+      "section": "7_psfo_pcff_aromatic_sulfone_2026_08",
+      "doi": "10.1016/j.commatsci.2018.05.039",
+      "polymer_class": "PSFO"
+    },
+    {
+      "section": "8_pktn_pcff_aromatic_ether_ketone_2026_08",
+      "doi": "10.3390/polym12051054",
+      "polymer_class": "PKTN"
+    },
+    {
+      "section": "10_pvnl_pcff_pvc_chlorine_bulk_modulus_2026_08",
+      "doi": "10.1007/s10118-019-2249-5",
+      "polymer_class": "PVNL"
+    },
+    {
+      "section": "12_phal_oplsaa_fluoropolymer_2026_08",
+      "doi": "10.1016/j.ces.2019.05.007",
+      "polymer_class": "PHAL"
+    },
+    {
+      "section": "15_pdie_trappeua_polydiene_2026_08",
+      "doi": "10.1007/s00894-023-05658-6",
+      "polymer_class": "PDIE"
+    },
+    {
+      "section": "15_pdie_trappeua_polydiene_2026_08",
+      "doi": "10.1021/acs.jpcb.5b10789",
+      "polymer_class": "PDIE"
+    },
+    {
+      "section": "20_pimd_pcff_polyimide_kapton_2026_08",
+      "doi": "10.1002/pol.20200050",
+      "polymer_class": "PIMD"
+    },
+    {
+      "section": "20_pimd_pcff_polyimide_kapton_2026_08",
+      "doi": "10.3390/polym16060813",
+      "polymer_class": "PIMD"
+    },
+    {
+      "section": "21_pimn_pcff_polyetherimide_ultem_2026_08",
+      "doi": "10.1002/pol.20200050",
+      "polymer_class": "PIMN"
+    },
+    {
+      "section": "22_pphs_pcff_polyphosphazene_2026_08",
+      "doi": "10.3390/polym14071451",
+      "polymer_class": "PPHS"
+    },
+    {
+      "section": "22_pphs_pcff_polyphosphazene_2026_08",
+      "doi": "10.1016/s1089-3156(98)00042-7",
+      "polymer_class": "PPHS"
+    },
+    {
+      "section": "23_purt_pcff_polyurethane_tpu_2026_08",
+      "doi": "10.3390/polym18060679",
+      "polymer_class": "PURT"
+    },
+    {
+      "section": "24_ppnl_pcff_ppv_conjugated_2026_08",
+      "doi": "10.1002/mats.201600006",
+      "polymer_class": "PPNL"
+    },
+    {
+      "section": "25_psul_pcff_polyphenylene_sulfide_2026_08",
+      "doi": "10.1007/s10118-024-3072-1",
+      "polymer_class": "PSUL"
+    },
+    {
+      "section": "27_pura_gaff2_polyurea_2026_08",
+      "doi": "10.1021/acs.cgd.3c00785",
+      "polymer_class": "PURA"
+    },
+    {
+      "section": "27_pura_gaff2_polyurea_2026_08",
+      "doi": "10.3390/polym17010107",
+      "polymer_class": "PURA"
+    }
+  ],
+  "trust_tier_heuristic": "doi_verified True -> peer_reviewed_doi; else -> preprint (legacy file has no trust-tier field; this is a coarse default, reviewable per-record via the report)",
+  "validation_rejected": [
+    {
+      "section": "9_pacr_pcff_pmma_ester_2026_08",
+      "doi": null,
+      "errors": [
+        "missing 'doi'",
+        "doi_verified is not True \u2014 unverified findings must not enter the store"
+      ]
+    },
+    {
+      "section": "9_pacr_pcff_pmma_ester_2026_08",
+      "doi": null,
+      "errors": [
+        "missing 'doi'",
+        "doi_verified is not True \u2014 unverified findings must not enter the store"
+      ]
+    }
+  ]
+}

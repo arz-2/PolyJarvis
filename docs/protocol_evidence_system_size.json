@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-25T16:54:06Z",
+  "records": [
+    {
+      "schema_version": 1,
+      "record_id": "8ea6425ed232",
+      "field": "system_size",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "PMMA"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "MD study of linear PMMA (tacticity unspecified) ran explicit chain-length convergence test: shear stress-strain behavior converged by DP=200 monomers/chain; production used 12 chains x 252 monomers, which the authors note sufficiently exceeds PMMA's entanglement molecular weight (Me ~10 kg/mol, i.e. DP~100). Also verified periodic-box-size independence.",
+      "value": {
+        "dp_typical": 252,
+        "nchain": 12,
+        "convergence_basis": "entanglement_mw",
+        "me_estimated_gmol": null,
+        "me_estimation_note": null
+      },
+      "doi": "10.1002/polb.23437",
+      "url": "https://doi.org/10.1002/polb.23437",
+      "title": "Crosslinking PMMA: Molecular Dynamics Investigation of the Shear Response (Min, Silberstein, Aluru, 2014)",
+      "year": 2014,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "EvidenceStoreVerify1",
+        "migrated_from": null,
+        "added_at": "2026-08-25T16:54:06Z"
+      }
+    }
+  ]
+}
