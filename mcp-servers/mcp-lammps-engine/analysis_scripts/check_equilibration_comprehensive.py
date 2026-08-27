@@ -9,7 +9,8 @@ Runs all convergence and structural checks in one pass and returns:
   - d05_markdown: ready-to-paste D-05 block for run_log.md
 
 Hard gates (block overall_pass):
-  A. Density drift, energy drift, density SEM, energy SEM
+  A. Density drift, energy drift (TotEng + per-term bond/angle/dihedral/vdW/coul/kspace),
+     density SEM, energy SEM
   B. Rg CV across chains (>30%)
   C. P2 nematic order (>0.10), Poisson-corrected density homogeneity CV (>cv_signal_max),
      finite size: minimum image (L >= 2*cutoff_A) and chain self-imaging (L >= 2*Rg)
@@ -121,6 +122,44 @@ def _analyse_property(values, name, drift_threshold_pct, drift_pvalue, block_cou
     return res
 
 
+_ENERGY_COMPONENT_COLS = [
+    ("E_bond", "bond"), ("E_angle", "angle"), ("E_dihed", "dihedral"),
+    ("E_vdwl", "vdw"), ("E_coul", "coul"), ("E_long", "kspace"),
+]
+
+
+def _analyse_energy_components(prod, drift_threshold_pct, drift_pvalue):
+    """Per-term drift test folded into gate B, alongside the aggregate TotEng drift.
+
+    A canceling drift can hide inside the aggregate: bond energy still relaxing
+    downward while vdW drifts upward can net a flat TotEng while neither term is
+    actually equilibrated. Mirrors RadonPy's own check_eq(), which gates
+    bond/angle/dihedral/vdW/Kspace energies independently rather than only the
+    total (radonpy/sim/lammps.py: analyze_thermo/check_eq) -- same idea, reusing
+    this script's own drift statistic (regression slope + p-value) rather than
+    RadonPy's rolling-SMA-dispersion one. E_impro/E_tail are excluded: many force
+    fields carry no improper term (a constant zero column has no meaningful drift
+    to test) and the tail correction is a near-constant volume-only correction,
+    not an independently-relaxing energy term.
+    """
+    components = {}
+    all_pass = True
+    for col, label in _ENERGY_COMPONENT_COLS:
+        if col not in prod.columns:
+            continue
+        values = prod[col].values
+        n = len(values)
+        mean_val = float(np.mean(values))
+        x = np.arange(n, dtype=float)
+        slope, _, _, p_val, _ = sp_stats.linregress(x, values)
+        total_drift = abs(slope * n)
+        drift_pct = (total_drift / abs(mean_val) * 100) if abs(mean_val) > 1e-12 else 0.0
+        d_pass = not (drift_pct > drift_threshold_pct and p_val < drift_pvalue)
+        components[label] = {"pass": bool(d_pass), "drift_pct": r(drift_pct, 4), "p_value": r(p_val, 4)}
+        all_pass = all_pass and d_pass
+    return {"components": components, "pass": bool(all_pass)}
+
+
 def _residual_stress(prod, pressure_cols):
     """Time-averaged deviatoric stress of the production window.
 
@@ -212,6 +251,14 @@ def check_thermo(log_file, eq_fraction, drift_threshold_pct, drift_pvalue, block
             )
         else:
             results[label] = {"error": f"Column '{col}' not found", "equilibrated": False}
+
+    # Gate B: per-energy-term drift, folded into the aggregate TotEng drift result
+    if "energy" in results and "error" not in results["energy"]:
+        component_drift = _analyse_energy_components(prod, drift_threshold_pct, drift_pvalue)
+        results["energy"]["component_drift"] = component_drift
+        results["energy"]["equilibrated"] = bool(
+            results["energy"]["equilibrated"] and component_drift["pass"]
+        )
 
     # tau_eff and independent-sample count for density
     tau_eff_frac = None
@@ -807,6 +854,13 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
     lines.append(f"| Density drift | {dd.get('drift_pct','?')}% (p={dd.get('p_value','?')}) | <1%, p<0.01 | {density_drift_result} |")
     ed = e.get("drift", {})
     lines.append(f"| Energy drift | {ed.get('drift_pct','?')}% (p={ed.get('p_value','?')}) | <1%, p<0.01 | {_gate(ed.get('pass',False))} |")
+    cd = e.get("component_drift", {})
+    if cd:
+        comp_detail = ", ".join(
+            f"{label}={c.get('drift_pct','?')}%{'✗' if not c.get('pass', True) else ''}"
+            for label, c in cd.get("components", {}).items()
+        )
+        lines.append(f"| Energy component drift | {comp_detail or 'n/a'} | <1%, p<0.01 each | {_gate(cd.get('pass', False))} |")
     db = d.get("block_sem", {})
     density_sem_result = _gate(db.get('pass', False)) if is_npt else "N/A (NVT — fixed volume)"
     lines.append(f"| Density block-SEM | {db.get('sem_pct','?')}% | <1% | {density_sem_result} |")
