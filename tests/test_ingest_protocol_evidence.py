@@ -108,6 +108,31 @@ def test_system_size_ingest_populates_system_size_value(tmp_path):
     assert record["value"]["nchain"] == 40
 
 
+def test_system_size_ingest_lifts_kuhn_fields_when_present(tmp_path):
+    advisory = {**SYSTEM_SIZE_ADVISORY,
+               "system_size": {**SYSTEM_SIZE_ADVISORY["system_size"],
+                               "kuhn_length_A": 20.0, "kuhn_molar_mass_gmol": 1500.0,
+                               "kuhn_source_note": "test fixture derivation"}}
+    store_path = str(tmp_path / "protocol_evidence_system_size.json")
+    ipe.ingest("system_size", advisory, run_name="PE1", store_path=store_path)
+
+    store = pes.load_store(store_path)
+    value = store["records"][0]["value"]
+    assert value["kuhn_length_A"] == 20.0
+    assert value["kuhn_molar_mass_gmol"] == 1500.0
+    assert value["kuhn_source_note"] == "test fixture derivation"
+
+
+def test_system_size_ingest_kuhn_fields_default_to_none_when_absent(tmp_path):
+    store_path = str(tmp_path / "protocol_evidence_system_size.json")
+    ipe.ingest("system_size", SYSTEM_SIZE_ADVISORY, run_name="PE1", store_path=store_path)
+
+    store = pes.load_store(store_path)
+    value = store["records"][0]["value"]
+    assert value["kuhn_length_A"] is None
+    assert value["kuhn_molar_mass_gmol"] is None
+
+
 def test_ingest_canonicalizes_smiles_at_write_time(tmp_path, monkeypatch):
     # canon_smiles.canonicalize shells into a conda env; stub it so this test exercises
     # ingest's own call-and-store-result logic, not real RDKit.

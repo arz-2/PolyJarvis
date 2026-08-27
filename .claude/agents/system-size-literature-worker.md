@@ -75,10 +75,33 @@ provenance color. Search in priority order:
    proportionality constant carries real literature scatter (~18-25 across polymer chemistries),
    and that scatter is a property of the method, not of how well you cited it.
 
+1.5. **A Kuhn length / Kuhn segment molar mass, for `tg` requests on a semi-rigid or stiff
+   backbone** — `solve_system_size()`'s rigidity/Kuhn DP recommendation (see
+   `orchestration/scripts/backbone_rigidity.py` and `select_system_size.py`'s `_kuhn_floor`)
+   needs a real Kuhn length (`lK`, Å) and Kuhn segment molar mass (`M_K`, g/mol) for any
+   backbone its RDKit classifier calls semi-rigid/stiff, to require ~7 Kuhn segments per chain.
+   There is no static per-class Kuhn table in this repo (only PDMS has one, in
+   `docs/protocol_evidence_system_size.json`, and only for entanglement Me, not this) — search
+   fresh, per SMILES, every time, same as priorities 1-2 above. Fan out
+   `"<polymer name> Kuhn length molecular dynamics"`, `"<polymer name> characteristic ratio
+   persistence length"`. If a source reports C∞ or persistence length (`lp`) instead of `lK`
+   directly, you may derive `lK` (e.g. `lK ~= 2*lp` for a wormlike/Gaussian chain, or `lK = C_inf
+   * l0` given the average backbone bond length `l0`) **only if you show the exact formula and
+   the source for it** in `kuhn_source_note` — never hand the caller a raw C∞/lp and expect it to
+   guess the conversion, same discipline as priority-2's Me derivation. If you cannot verify a
+   value with real chain-dimension data (SANS, θ-solvent intrinsic viscosity, or atomistic/CG MD
+   Rg/end-to-end-distance) for THIS repeat unit specifically — not a structurally similar
+   polymer, not a soluble analog with a different backbone substituent — **refuse**: leave
+   `kuhn_length_A`/`kuhn_molar_mass_gmol` `null` and say so in `dominant_uncertainty`. A
+   fabricated-sounding Kuhn length is worse than none: `select_system_size.py`'s `_kuhn_floor`
+   falls back cleanly to the class's `dp_min` floor when this is null, exactly the same
+   refuse-rather-than-fabricate contract as priority-1/2's `null` handling.
+
 Only ground this when `properties_requested` includes `tg` and/or `bulk_modulus` (density alone
 doesn't have a strong DP-dependence worth searching for — if `properties_requested` is exactly
 `{density}`, still do a quick pass but expect low-value results and say so rather than forcing a
-weak citation).
+weak citation). Priority 1.5 only matters when `tg` is requested; skip it for a bulk_modulus-only
+request.
 
 ## Procedure
 
@@ -92,8 +115,9 @@ weak citation).
    and the source's `trust_tier`).
    - An `exact_smiles` or `exact_class` hit at `trust_tier: "peer_reviewed_doi"` OR
      `"internal_validated_run"` is strong enough that you **may skip the fresh search below** —
-     fold the hit's `value` (`dp_typical`, `nchain`, `convergence_basis`, `me_estimated_gmol`)
-     directly into your output's `system_size` block. `internal_validated_run` is a tier only
+     fold the hit's `value` (`dp_typical`, `nchain`, `convergence_basis`, `me_estimated_gmol`,
+     and — if present — `kuhn_length_A`/`kuhn_molar_mass_gmol`) directly into your output's
+     `system_size` block. `internal_validated_run` is a tier only
      `ingest_internal_run_evidence.py` ever assigns (from a completed PolyJarvis run) — you will
      only ever see it in query results, never assign it yourself; your own sources are always
      `peer_reviewed_doi`/`preprint`/`vendor`/`educational`.
@@ -173,6 +197,9 @@ store. The only file you `Write` directly is `output_path`.
     "confidence": "high|medium|low",
     "me_estimated_gmol": <float|null>,
     "me_estimation_note": "<formula/constant used, and its DOI, or null>",
+    "kuhn_length_A": <float|null>,
+    "kuhn_molar_mass_gmol": <float|null>,
+    "kuhn_source_note": "<direct citation, or the C_inf/lp->lK derivation formula and its source, or null>",
     "sources": [ ... ]
   },
   "dominant_uncertainty": "<short phrase>",
@@ -185,13 +212,17 @@ Each entry in `sources`:
 {"title": "...", "doi": "10.xxxx/...", "url": "https://doi.org/10.xxxx/...", "year": <int>, "trust_tier": "peer_reviewed_doi|preprint|vendor|educational", "claim": "<the specific convergence fact this source supports>", "verified": true, "origin_record_id": "<optional -- only when folded verbatim from a step 0 store hit>"}
 ```
 
-Rules: only `verified: true` sources may back `dp_typical`/`nchain`/`me_estimated_gmol`. If
-nothing verified, set `dp_typical`/`nchain`/`me_estimated_gmol` to `null`, `confidence: "low"`,
-and an empty `sources: []` (or list unverified candidates with `verified: false` for
-transparency — the calling session will ignore them). `me_estimated_gmol` and
-`me_estimation_note` stay `null` unless priority-2 (packing-length) actually applies — most
-runs will never populate them, since priority-1 (a direct convergence-DP citation) or a
-documented class table `Me` already covers the common case.
+Rules: only `verified: true` sources may back `dp_typical`/`nchain`/`me_estimated_gmol`/
+`kuhn_length_A`/`kuhn_molar_mass_gmol`. If nothing verified, set `dp_typical`/`nchain`/
+`me_estimated_gmol`/`kuhn_length_A`/`kuhn_molar_mass_gmol` to `null`, `confidence: "low"`, and
+an empty `sources: []` (or list unverified candidates with `verified: false` for transparency —
+the calling session will ignore them). `me_estimated_gmol`/`me_estimation_note` stay `null`
+unless priority-2 (packing-length) actually applies; `kuhn_length_A`/`kuhn_molar_mass_gmol`/
+`kuhn_source_note` stay `null` unless priority-1.5 actually finds something — most runs will
+never populate any of these, since priority-1 (a direct convergence-DP citation) or a documented
+class table `Me` already covers the common case, and a null Kuhn value is a normal, expected
+outcome (this repo's own real-world check found genuine literature Kuhn data does not exist for
+every polymer, even some already in production use here — refusing is not a failure mode).
 
 ## Required output format
 
@@ -207,6 +238,8 @@ RESULT:
   convergence_basis: <fox_flory_plateau|entanglement_mw|class_analogy|packing_length_estimate|null>
   confidence: <high|medium|low>
   me_estimated_gmol: <float or null>
+  kuhn_length_A: <float or null>
+  kuhn_molar_mass_gmol: <float or null>
   n_verified_sources: <integer>
   dominant_uncertainty: <short phrase>
   notes: <one sentence; "no verified literature found — planner should use rules defaults" if empty>

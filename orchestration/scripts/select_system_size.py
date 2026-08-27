@@ -65,6 +65,9 @@ select_forcefield.py -- callers parse JSON, never a traceback).
 """
 import argparse
 import json
+import math
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -79,6 +82,18 @@ FOX_FLORY_FLEXIBLE_FLOOR_DP = 20
 FOX_FLORY_STIFF_FLOOR_DP = 50
 
 PCFF_NCHAIN_PRODUCTION_MINIMUM = 20  # Bejagam 2020; nchain=10 is Hayashi2022 throughput compromise
+
+# Per-SMILES rigidity/Kuhn-based DP recommendation (solve_system_size() only -- see that
+# function's docstring for why this must never reach select_system_size() itself). This
+# generalizes the class-level STIFF_BACKBONE_CLASSES allowlist above into a real per-
+# molecule computation, but does not replace that allowlist or its Fox-Flory floor: this
+# is a separate, additive recommendation source, same pattern as _literature_dp_recommendation.
+DP_MW_BASELINE_GMOL = 5000          # 5 kg/mol target chain mass, confirmed with user
+KUHN_SEGMENTS_PER_CHAIN_TARGET = 7  # midpoint of a user-specified 5-10 Kuhn-segment target;
+                                     # a placeholder constant pending empirical (deferred) tuning
+DP_TYPICAL_HARD_CEILING = 1000      # mirrors scientific_control.py's OVERRIDE_RANGES["dp_typical"]
+                                     # upper bound; duplicated here rather than imported to avoid
+                                     # a circular import (scientific_control.py imports this module)
 
 
 def _fox_flory_floor(polymer_class: str) -> tuple:
@@ -127,6 +142,75 @@ def _entanglement_floor(polymer_class: str, smiles: str, cls: dict):
     note = (f"entanglement MW Me={me} g/mol for member {member!r} (Mark 2007 Ch.25) / "
             f"repeat-unit MW {mw_per_monomer:.1f} g/mol -> DP@Me={dp_at_me}")
     return dp_at_me, note
+
+
+def _backbone_rigidity(smiles: str, timeout: int = 30):
+    """Subprocess wrapper for backbone_rigidity.py -- RDKit lives in the radonpy conda
+    env, not base (same pattern as stage_params.py's _estimate_tg_group_contribution).
+    Returns the parsed result dict, or None on any failure (missing rdkit/conda, timeout,
+    unparseable SMILES) -- advisory only, never worth crashing plan resolution over."""
+    script = Path(__file__).resolve().parent / "backbone_rigidity.py"
+    bash_script = (
+        "source ~/miniforge3/etc/profile.d/conda.sh\n"
+        "conda activate radonpy\n"
+        f'python3 {script} --smiles "$BACKBONE_RIGIDITY_SMILES" --output json\n'
+    )
+    run_env = dict(os.environ)
+    run_env["BACKBONE_RIGIDITY_SMILES"] = smiles
+    try:
+        r = subprocess.run(["bash", "-c", bash_script], capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL, timeout=timeout, env=run_env)
+        result = json.loads(r.stdout.strip())
+    except Exception:
+        return None
+    return result if isinstance(result, dict) and "error" not in result else None
+
+
+def _dp_from_mw(m_repeat_gmol: float) -> int:
+    """DP_MW = ceil(5000 / M_repeat) -- the flexible-backbone baseline, and the floor
+    every rigidity class starts from (semi-rigid/stiff only ever raise it via Kuhn)."""
+    return math.ceil(DP_MW_BASELINE_GMOL / m_repeat_gmol)
+
+
+def _dp_from_kuhn(kuhn_molar_mass_gmol: float, m_repeat_gmol: float,
+                  n_target: int = KUHN_SEGMENTS_PER_CHAIN_TARGET) -> int:
+    """DP_Kuhn = ceil(n_target * M_K / M_repeat) -- a chain of n_target Kuhn segments has
+    total molar mass n_target*M_K; convert to DP via the SAME repeat-unit MW convention
+    (_monomer_atoms_and_mw) used everywhere else in this file, never a second MW estimate."""
+    return math.ceil(n_target * kuhn_molar_mass_gmol / m_repeat_gmol)
+
+
+def _kuhn_floor(rigidity: dict, literature_grounding: dict, m_repeat_gmol: float, cls: dict):
+    """(dp_kuhn, note) or (None, uncertainty_dict). Only ever called for rigidity_class in
+    {"semi_rigid", "stiff"} -- flexible skips this entirely and uses DP_MW alone.
+
+    Mirrors _entanglement_floor's refuse-rather-than-fabricate shape exactly: a real,
+    literature-sourced Kuhn value (from literature_grounding's system_size block, put
+    there by system-size-literature-worker's live per-SMILES search -- there is no static
+    per-class Kuhn table to look up, unlike PDMS's one existing example in
+    docs/protocol_evidence_system_size.json) beats a structural guess; no literature value
+    beats falling back to the class's own dp_min floor, never an invented rotatable-bond-
+    derived numeric estimate -- that is exactly the "invented-physics shortcut" this
+    module's own docstring already rules out for a different quantity (Rg/C_inf)."""
+    ss = (literature_grounding or {}).get("system_size") or {}
+    m_k = ss.get("kuhn_molar_mass_gmol")
+    l_k = ss.get("kuhn_length_A")
+    if not isinstance(m_k, (int, float)) or not m_k:
+        dp_min = cls.get("dp_min")
+        return None, {
+            "name": "KUHN_LENGTH_UNKNOWN", "dominant": False,
+            "class": rigidity.get("rigidity_class"),
+            "detail": (f"backbone classified {rigidity.get('rigidity_class')} "
+                      f"({rigidity.get('classification_note')}) but no literature Kuhn-"
+                      "length/Kuhn-segment-mass value was found for this SMILES -- refusing "
+                      "to estimate Kuhn length from rotatable-bond counting or any other "
+                      f"structural heuristic; falling back to dp_min={dp_min}"),
+        }
+    dp_kuhn = _dp_from_kuhn(m_k, m_repeat_gmol)
+    note = (f"Kuhn segment molar mass M_K={m_k} g/mol (lK={l_k} A) x "
+           f"{KUHN_SEGMENTS_PER_CHAIN_TARGET} target segments/chain / repeat-unit MW "
+           f"{m_repeat_gmol:.1f} g/mol -> DP_Kuhn={dp_kuhn}")
+    return dp_kuhn, note
 
 
 # Canonical order (not the arbitrary iteration order of a set) so evidence text/floors
@@ -378,6 +462,7 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
 
     recommended = {}
     reasons = []
+    uncertainties = list(base.get("uncertainties", []))
 
     recommended_dp = required_floor
     if lit_dp is not None:
@@ -409,6 +494,61 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
             reasons.append(f"{lit_note} -- confidence too low to raise an already-"
                           f"established floor {required_floor}; floor stands")
 
+    # Per-SMILES rigidity/Kuhn-based DP recommendation, tg only -- generalizes the
+    # class-level Fox-Flory floor above into a real per-molecule computation. Additive:
+    # only ever RAISES recommended_dp, same convention as the literature-DP branch above.
+    if properties and "tg" in set(properties):
+        try:
+            _, m_repeat = _monomer_atoms_and_mw(smiles, is_ua=False)
+        except Exception as e:  # noqa: BLE001 -- an RDKit failure must not crash the solve
+            m_repeat = None
+            uncertainties.append({"name": "backbone_rigidity_mw_estimate_failed",
+                                  "dominant": False, "detail": f"{type(e).__name__}: {e}"})
+        if m_repeat:
+            rigidity = _backbone_rigidity(smiles)
+            if rigidity is None:
+                uncertainties.append({
+                    "name": "backbone_rigidity_estimate_failed", "dominant": False,
+                    "detail": "backbone_rigidity.py subprocess failed or timed out -- "
+                              "rigidity/Kuhn-based DP recommendation skipped for this SMILES",
+                })
+            else:
+                dp_mw = _dp_from_mw(m_repeat)
+                rclass = rigidity.get("rigidity_class")
+                if rclass == "flexible":
+                    dp_candidate = dp_mw
+                    rigidity_note = f"{rigidity.get('classification_note')}; DP_MW={dp_mw}"
+                else:  # semi_rigid or stiff -- unified Kuhn path, no separate ad hoc multiplier
+                    dp_kuhn, kuhn_note = _kuhn_floor(rigidity, literature_grounding,
+                                                     m_repeat, cls)
+                    if dp_kuhn is not None:
+                        dp_candidate = max(dp_mw, dp_kuhn)
+                        rigidity_note = (f"{rigidity.get('classification_note')}; {kuhn_note}; "
+                                        f"DP=max(DP_MW={dp_mw}, DP_Kuhn={dp_kuhn})")
+                    else:
+                        uncertainties.append(kuhn_note)
+                        dp_min = cls.get("dp_min") or 0
+                        dp_candidate = max(dp_mw, dp_min)
+                        rigidity_note = (f"{kuhn_note['detail']}; "
+                                        f"DP=max(DP_MW={dp_mw}, dp_min={dp_min})={dp_candidate}")
+
+                if dp_candidate > DP_TYPICAL_HARD_CEILING:
+                    uncertainties.append({
+                        "name": "rigidity_dp_clamped", "dominant": False,
+                        "detail": (f"rigidity/Kuhn DP recommendation {dp_candidate} exceeds "
+                                  f"the dp_typical override ceiling {DP_TYPICAL_HARD_CEILING} "
+                                  "(scientific_control.py's OVERRIDE_RANGES) -- clamped."),
+                        "unclamped_dp": dp_candidate,
+                    })
+                    dp_candidate = DP_TYPICAL_HARD_CEILING
+
+                if recommended_dp is None or dp_candidate > recommended_dp:
+                    recommended_dp = dp_candidate
+                    reasons.append(f"rigidity/Kuhn DP recommendation: {rigidity_note}")
+                else:
+                    reasons.append(f"rigidity/Kuhn DP recommendation ({rigidity_note}) does "
+                                  f"not exceed the existing recommendation {recommended_dp}")
+
     if recommended_dp is not None and dp != recommended_dp:
         recommended["dp_typical"] = recommended_dp
         if not reasons:  # pure floor-clearing, no literature involved
@@ -437,8 +577,8 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
                           "(no pre-build Rg predictor exists, so this stays a floor, not "
                           "a continuous cost/accuracy curve)")
 
-    return {**base, "recommended_params": recommended, "recommendation_reasons": reasons,
-            "floor_was_unknown": floor_was_unknown}
+    return {**base, "uncertainties": uncertainties, "recommended_params": recommended,
+            "recommendation_reasons": reasons, "floor_was_unknown": floor_was_unknown}
 
 
 def main():

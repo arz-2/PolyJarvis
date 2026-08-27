@@ -19,10 +19,13 @@ Usage:
 import argparse
 import json
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 try:
     from rdkit import Chem
-    from rdkit.Chem import RWMol
+    from _repeat_unit_mol import prepare_repeat_unit as _prepare_repeat_unit_full
 except ImportError:
     print(json.dumps({
         "error": "RDKit not available. Install via: conda install -c conda-forge rdkit",
@@ -32,42 +35,10 @@ except ImportError:
 
 
 def _prepare_repeat_unit(smiles: str):
-    """Parse a polymer repeat-unit SMILES, removing chain-end wildcards (*) and
-    preserving the correct H count on wildcard-adjacent atoms.
-
-    In a polymer SMILES like *CC*, the terminal C atoms each have an implicit H
-    count of 2 (backbone CH2) — one bond goes to * (the chain), one to the
-    next backbone atom. Replacing * with [H] would add a spurious H, turning
-    CH2 into CH3. This function freezes the H count BEFORE removing * atoms so
-    that the resulting molecule reflects the true backbone connectivity.
-    """
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return None
-    rw = RWMol(mol)
-
-    # Identify wildcard atoms (atomic num 0 = *)
-    wc_idxs = [a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() == 0]
-
-    for wc_idx in wc_idxs:
-        wc_atom = rw.GetAtomWithIdx(wc_idx)
-        for nb in wc_atom.GetNeighbors():
-            n = rw.GetAtomWithIdx(nb.GetIdx())
-            # GetTotalNumHs() returns implicit+explicit Hs as seen with * present
-            h = n.GetTotalNumHs()
-            n.SetNoImplicit(True)
-            n.SetNumExplicitHs(h)
-
-    # Remove wildcards from highest index downward (preserves lower indices)
-    for wc_idx in sorted(wc_idxs, reverse=True):
-        rw.RemoveAtom(wc_idx)
-
-    try:
-        Chem.SanitizeMol(rw)
-    except Exception:
-        return None
-
-    return rw.GetMol()
+    """Mol only (this file never needs the backbone-path endpoints) -- see
+    _repeat_unit_mol.prepare_repeat_unit for the shared wildcard-stripping logic."""
+    mol, _head, _tail = _prepare_repeat_unit_full(smiles)
+    return mol
 
 
 # ---------------------------------------------------------------------------

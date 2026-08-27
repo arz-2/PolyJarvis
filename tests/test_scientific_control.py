@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import canon_smiles  # noqa: E402
+import select_system_size as sss  # noqa: E402
 import scientific_control  # noqa: E402
 from scientific_control import (  # noqa: E402
     DeterministicScriptChain,
@@ -369,10 +370,16 @@ PHYC_INTENT = ScientificIntent(
 )
 
 
-def test_materializer_auto_fills_the_floor_clearing_dp_when_unset():
+def test_materializer_auto_fills_the_floor_clearing_dp_when_unset(monkeypatch):
     """PHYC's class default dp_typical is well above its Fox-Flory floor (20) -- the agent
     left dp_typical unset, so materialize_plan() should fill in the floor-clearing minimum
-    via solve_system_size() rather than the bloated class default."""
+    via solve_system_size() rather than the bloated class default.
+
+    This tests the Fox-Flory auto-fill specifically, not the separate rigidity/Kuhn DP
+    recommendation (tested in test_select_system_size.py) -- neutralize the latter so it
+    doesn't shell into a real RDKit subprocess here (PE's real DP_MW=179 would otherwise
+    raise the recommendation above 20 and break this test's own assertion)."""
+    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: None)
     decision = PlanDecision(
         polymer_class="PHYC", properties=("tg",),
         rationale=("Just need Tg.",), dominant_uncertainty="none", confidence="high",
@@ -397,6 +404,9 @@ def test_materializer_explicit_override_wins_over_the_auto_fill():
 
 
 def test_materializer_folds_in_literature_grounding_when_present(tmp_path, monkeypatch):
+    """Tests literature-grounding fold-in specifically; neutralize the separate
+    rigidity/Kuhn DP recommendation for the same reason as the auto-fill test above."""
+    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: None)
     (tmp_path / "data" / "D04_LIT_TEST" / "raw").mkdir(parents=True)
     (tmp_path / "data" / "D04_LIT_TEST" / "raw" / "literature_grounding_system_size.json").write_text(
         json.dumps({"system_size": {"dp_typical": 90, "nchain": None,

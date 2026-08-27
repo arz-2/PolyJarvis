@@ -173,6 +173,9 @@ def _records_from_system_size_advisory(advisory: dict, run_name: str) -> tuple[l
             "convergence_basis": system_size.get("convergence_basis"),
             "me_estimated_gmol": system_size.get("me_estimated_gmol"),
             "me_estimation_note": system_size.get("me_estimation_note"),
+            "kuhn_length_A": system_size.get("kuhn_length_A"),
+            "kuhn_molar_mass_gmol": system_size.get("kuhn_molar_mass_gmol"),
+            "kuhn_source_note": system_size.get("kuhn_source_note"),
         }
         record = pes.build_record(
             field="system_size",

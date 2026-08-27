@@ -51,6 +51,19 @@ def _identity_canonicalize(monkeypatch):
     monkeypatch.setattr(canon_smiles, "canonicalize", lambda smi, *a, **k: smi)
 
 
+@pytest.fixture(autouse=True)
+def _no_real_rdkit_for_rigidity_by_default(monkeypatch):
+    """This file's own invariant (see module docstring) is no real RDKit call.
+    solve_system_size()'s tg-only rigidity/Kuhn branch calls _monomer_atoms_and_mw and
+    _backbone_rigidity unconditionally whenever "tg" is requested -- default both to
+    inert stand-ins here (rigidity=None degrades to a no-op uncertainty, never touching
+    recommended_dp) so every pre-existing tg-only test keeps testing only what it was
+    written to test. Tests of the new rigidity/Kuhn feature itself override
+    sss._backbone_rigidity (and, where relevant, sss._monomer_atoms_and_mw) explicitly."""
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (10, 1000.0))
+    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: None)
+
+
 def _patch_class_member_smiles(monkeypatch, polymer_class, member_smiles):
     """Real class entry with member_smiles overridden to the test's own SMILES constants,
     so matching is trivial under the identity-patched canonicalizer without depending on
@@ -438,3 +451,93 @@ def test_me_estimated_gmol_computes_dp_at_me_the_same_way_a_documented_table_me_
     assert r["decision"]["required_dp_floor"] is None
     assert r["recommended_params"]["dp_typical"] == round(7415.0 / 74.15)  # == 100
     assert any("packing-length Me estimate" in reason for reason in r["recommendation_reasons"])
+
+
+# --- rigidity/Kuhn-based DP recommendation (tg only) -------------------------------
+#
+# _backbone_rigidity/_monomer_atoms_and_mw default to inert stand-ins for every test in
+# this file (see the autouse fixture above) -- these tests explicitly override them to
+# exercise the new feature. Real backbone_rigidity.py classification correctness (does a
+# given SMILES actually come out flexible/semi_rigid/stiff) is tested separately in
+# test_backbone_rigidity.py against real RDKit; these tests only cover
+# solve_system_size()'s arithmetic given a rigidity result.
+
+_FLEXIBLE = {"rigidity_class": "flexible", "classification_note": "flexible (stub)"}
+_STIFF = {"rigidity_class": "stiff", "classification_note": "stiff (stub)"}
+
+
+def test_rigidity_flexible_uses_dp_mw_alone(monkeypatch):
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (2, 100.0))
+    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: _FLEXIBLE)
+    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], dp_typical=10, nchain=20)
+    # DP_MW = ceil(5000/100) = 50; PACR's Fox-Flory floor for tg is 20 -- DP_MW dominates.
+    assert r["recommended_params"]["dp_typical"] == 50
+    assert any("DP_MW=50" in reason for reason in r["recommendation_reasons"])
+
+
+def test_rigidity_stiff_with_literature_kuhn_raises_above_dp_mw(monkeypatch):
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (2, 100.0))
+    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: _STIFF)
+    lit = {"system_size": {"kuhn_molar_mass_gmol": 3000.0, "kuhn_length_A": 25.0}}
+    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], dp_typical=10, nchain=20,
+                          literature_grounding=lit)
+    # DP_MW = ceil(5000/100) = 50; DP_Kuhn = ceil(7*3000/100) = 210 -- Kuhn dominates.
+    assert r["recommended_params"]["dp_typical"] == 210
+    assert any("DP_Kuhn=210" in reason for reason in r["recommendation_reasons"])
+
+
+def test_rigidity_stiff_without_literature_kuhn_falls_back_to_dp_min(monkeypatch):
+    """Refuse-rather-than-fabricate: no literature Kuhn value -> KUHN_LENGTH_UNKNOWN,
+    fall back to max(DP_MW, dp_min), never an invented structural estimate."""
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (2, 100.0))
+    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: _STIFF)
+    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], dp_typical=10, nchain=20)
+    # DP_MW=50, PACR dp_min=30 -> max(50,30)=50; PACR's own Fox-Flory floor (20) is lower.
+    assert r["recommended_params"]["dp_typical"] == 50
+    assert any(u["name"] == "KUHN_LENGTH_UNKNOWN" for u in r["uncertainties"])
+
+
+def test_rigidity_estimate_failure_is_advisory_only(monkeypatch):
+    """backbone_rigidity.py subprocess failing (missing rdkit/conda, timeout) must not
+    crash the solve or silently change the recommendation -- just note it."""
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (2, 100.0))
+    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: None)
+    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], dp_typical=10, nchain=20)
+    assert any(u["name"] == "backbone_rigidity_estimate_failed" for u in r["uncertainties"])
+    # Falls back to the plain Fox-Flory floor (20), unaffected by the rigidity check.
+    assert r["recommended_params"]["dp_typical"] == 20
+
+
+def test_rigidity_skipped_entirely_for_a_bulk_modulus_only_request(monkeypatch):
+    """The rigidity/Kuhn branch is tg-specific -- it must not fire (or call RDKit at all)
+    for a bulk_modulus-only request."""
+    calls = []
+    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: calls.append(smiles) or _STIFF)
+    solve_system_size("PHYC", PHYC_SMILES, properties=["bulk_modulus"], dp_typical=50)
+    assert calls == []
+
+
+def test_dp_from_mw_baseline_is_5000_gmol():
+    assert sss._dp_from_mw(100.0) == 50  # ceil(5000/100)
+    assert sss._dp_from_mw(28.05) == 179  # PE's real repeat-unit MW
+
+
+def test_dp_from_kuhn_uses_the_named_target_constant():
+    assert sss.KUHN_SEGMENTS_PER_CHAIN_TARGET == 7
+    assert sss._dp_from_kuhn(kuhn_molar_mass_gmol=1500.0, m_repeat_gmol=288.3) == 37
+
+
+def test_kuhn_floor_refuses_without_fabricating_when_no_literature_value(monkeypatch):
+    cls = {"dp_min": 42}
+    dp, uncertainty = sss._kuhn_floor(_STIFF, literature_grounding=None,
+                                      m_repeat_gmol=100.0, cls=cls)
+    assert dp is None
+    assert uncertainty["name"] == "KUHN_LENGTH_UNKNOWN"
+    assert "42" in uncertainty["detail"]  # names the dp_min it will fall back to
+
+
+def test_kuhn_floor_computes_dp_kuhn_from_a_grounded_value():
+    lit = {"system_size": {"kuhn_molar_mass_gmol": 1500.0, "kuhn_length_A": 20.0}}
+    dp, note = sss._kuhn_floor(_STIFF, lit, m_repeat_gmol=288.3, cls={"dp_min": 50})
+    assert dp == 37
+    assert "DP_Kuhn=37" in note
