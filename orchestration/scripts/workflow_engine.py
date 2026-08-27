@@ -112,6 +112,8 @@ PARAMETER_STAGE: dict[str, str] = {
     "bm_temperature_K": "mechanical", "bm_thermo_freq": "mechanical",
     "mechanical_method": "mechanical", "mechanical_resample_points": "mechanical",
     "mechanical_sampling_factor": "mechanical",
+    "bm_per_point_max_extensions": "mechanical", "bm_per_point_stability_pct": "mechanical",
+    "bm_per_point_min_n_eff": "mechanical",
     # Only consumed by _exp_K_range (analyze-bm's exp_K_range grading target) -- mechanical.
     "exp_K_min_GPa": "mechanical", "exp_K_max_GPa": "mechanical",
 }

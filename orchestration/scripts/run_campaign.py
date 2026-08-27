@@ -987,6 +987,87 @@ def _fluctuation_K_for_pressure_ladder(cls: dict, p: dict):
     return estimate_fluctuation_K_GPa(p["npt_prod_log_path"], eq_fraction=0.5)
 
 
+def _bm_point_adaptive_extend(cls: dict, lammps, p: dict, pressure: float, bm_work_dir: str,
+                               log_path: str, data_path: str, gpu_per_run: int,
+                               run_name: str) -> dict:
+    """Tg-Phase-2-style per-point sampling-adequacy check for one bulk-modulus pressure point.
+
+    The initial hold (run_bulk_modulus_series, already completed by the time this is called) is
+    checked for stability (half_window_stability on Volume) and adequate autocorrelation-corrected
+    sampling (compute_tau_eff/effective_sample_size, the same n_eff estimator
+    extract_bulk_modulus_murnaghan.py already computes per point but never gates on). If either
+    check fails, one more hold at the SAME pressure is submitted directly against the "npt"
+    template (bypassing run_bulk_modulus_series/run_lammps_chain, which has no LOG_APPEND support),
+    chained from this point's own last WRITE_DATA_FILE and appended to the same log -- mirroring
+    _run_tg_sweep_adaptive exactly, just condensed to a single point instead of a waypoint list.
+
+    Bounded by bm_per_point_max_extensions; advisory only -- an unresolved point after its cap is
+    still recorded and used, exactly as the aggregate Murnaghan fit's own plateau/leave-one-out
+    diagnostics (and murnaghan_resample/murnaghan_ladder_extend) would already flag/handle it
+    today. Those remedies are NOT redundant with this check: they answer a different question
+    (relative cross-point nonmonotonicity; ladder-range inadequacy for the fit), not "did this
+    one point's own hold converge" -- both stay untouched.
+    """
+    from check_block_gate import half_window_stability
+    from analysis_utils import parse_lammps_log, compute_tau_eff, effective_sample_size
+
+    extensions = 0
+    n_before = 0  # extensions == 0: the log run_bulk_modulus_series just produced is entirely
+                  # this point's own hold (a fresh single-pressure log, unlike the Tg sweep's
+                  # shared multi-waypoint log) -- the whole file is this hold's own rows.
+    while True:
+        try:
+            df = parse_lammps_log(log_path)
+        except Exception:
+            return {"outcome": "PROBE_FAILED", "extensions_used": extensions,
+                    "final_data_path": data_path}
+        vol_col = next((c for c in ("Volume", "Vol", "vol") if c in df.columns), None)
+        if vol_col is None or len(df) < 4:
+            return {"outcome": "PROBE_FAILED", "extensions_used": extensions,
+                    "final_data_path": data_path}
+
+        # On a later loop the log has grown by one more appended hold; isolate that hold's own
+        # rows the same way _run_tg_sweep_adaptive does for each sweep waypoint.
+        window = df[vol_col].values[n_before:]
+        stability = half_window_stability(window, p["bm_per_point_stability_pct"])
+        tau_frames, _ = compute_tau_eff(window)
+        n_eff = effective_sample_size(len(window), tau_frames)
+        stable = bool(stability.get("available") and stability.get("stable"))
+        adequate = bool(n_eff >= p["bm_per_point_min_n_eff"])
+
+        if (stable and adequate) or extensions >= p["bm_per_point_max_extensions"]:
+            return {"outcome": "PASS" if (stable and adequate) else "EXHAUSTED",
+                    "n_eff": n_eff, "stable": stable, "extensions_used": extensions,
+                    "final_data_path": data_path}
+
+        extensions += 1
+        n_before = len(df)
+        with gpu_claim(run_name, gpu_per_run) as gpu_ids:
+            script = lammps.generate_script(
+                template_name="npt", data_file=data_path,
+                output_script=f"{bm_work_dir}/ext_{extensions}.in", velocity_seed=p["velocity_seed"],
+                params={"T_START": p["temp_K"], "T_FINAL": p["temp_K"],
+                        "P_START": pressure, "P_FINAL": pressure,
+                        "T_DAMP": p["thermostat_damp_fs"], "P_DAMP": p["barostat_damp_fs"],
+                        "N_STEPS": p["npt_steps"], "TIMESTEP": p["dt_fs"],
+                        "THERMO_FREQ": p["thermo_freq"], "LOG_FILE": log_path, "LOG_APPEND": True,
+                        "DUMP_FILE": "", "WRITE_DATA_FILE": f"{bm_work_dir}/ext_{extensions}_out.data",
+                        "use_gpu": True, "engine": p["engine"],
+                        "use_pppm": p["use_long_range"] and not p["lammps_flags"]["use_trappe"],
+                        **p["lammps_flags"]},
+            )
+            run = lammps.run_lammps_script(
+                script=script["output_script"], work_dir=bm_work_dir, log_file="ext_run.log",
+                gpu_ids=gpu_ids, mpi=p["mpi_ranks"], engine=p["engine"],
+                data_file=data_path, lj_cutoff=p["cutoff_A"],
+            )
+            result = wait_for_run(lammps, run["run_id"], f"bm point P={pressure:g} ext {extensions}")
+        if result.get("status") != "completed":
+            return {"outcome": "PROBE_FAILED", "extensions_used": extensions,
+                    "final_data_path": data_path}
+        data_path = f"{bm_work_dir}/ext_{extensions}_out.data"
+
+
 def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: str) -> dict:
     args.is_glassy = "true" if is_glassy else "false"
     gpu_per_run = cls.get("gpu_per_run") or 1
@@ -1016,7 +1097,7 @@ def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: 
                     thermo_freq=p["thermo_freq"],
                     thermostat_damp_fs=p["thermostat_damp_fs"],
                     barostat_damp_fs=p["barostat_damp_fs"],
-                    use_long_range=cls.get("electrostatics", "pppm") == "pppm",
+                    use_long_range=p["use_long_range"],
                     use_trappe=p["lammps_flags"]["use_trappe"],
                     use_pcff=p["lammps_flags"]["use_pcff"],
                     use_opls=p["lammps_flags"]["use_opls"], engine=p["engine"],
@@ -1035,6 +1116,14 @@ def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: 
                 analysis_logs.append(series["log_files"][0])
                 analysis_pressures.append(pressure)
                 break
+        if point["status"] == "accepted":
+            bm_work_dir = (f"{p['work_dir']}/bm_series/p_{pressure:g}/attempt_{point_attempt}"
+                           f"/bm_P{int(pressure)}")
+            data_path = f"{bm_work_dir}/bm_P{int(pressure)}_out.data"
+            point["stability_check"] = _bm_point_adaptive_extend(
+                cls, lammps, p, pressure, bm_work_dir, point["log_file"], data_path,
+                gpu_per_run, args.run_name,
+            )
         point_status[str(pressure)] = point
         atomic_write_json(point_state_path, {"points": point_status})
 

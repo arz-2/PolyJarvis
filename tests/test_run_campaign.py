@@ -22,7 +22,7 @@ from hw_common import load_rules, get_class_entry  # noqa: E402
 import run_campaign as rdr  # noqa: E402
 from run_campaign import (  # noqa: E402
     _base_args, wait_for_analysis, do_equil_and_check, do_summary, do_build, COMPRESSION_RATIO,
-    _bracket_tg_start_temp, _run_tg_sweep_adaptive,
+    _bracket_tg_start_temp, _run_tg_sweep_adaptive, _bm_point_adaptive_extend,
 )
 
 RULES = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
@@ -1097,3 +1097,224 @@ def test_thermal_dispatch_passes_none_when_equil_density_absent(tmp_path, monkey
     executor.execute("thermal", context)
 
     assert calls == [None]
+
+
+# ── Bulk modulus: _bm_point_adaptive_extend ─────────────────────────────────
+
+def _write_bm_log(path, volumes, append=False):
+    """A minimal real LAMMPS-log-shaped thermo table with a Volume column --
+    parse_lammps_log (unmocked in these tests) reads this for real."""
+    lines = ["   Step          Temp           Volume"]
+    for i, v in enumerate(volumes):
+        lines.append(f"      {i * 1000}            300.0         {v}")
+    text = "\n".join(lines) + "\n"
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a" if append else "w") as f:
+        f.write(text)
+
+
+class _FakeBmExtLammps:
+    """Stand-in for _bm_point_adaptive_extend's extension-hold calls (generate_script +
+    run_lammps_script against the "npt" template) only -- the initial hold's own log/data are
+    pre-written directly by each test, mirroring do_mechanical's real flow where
+    run_bulk_modulus_series already produced them before this helper is ever called."""
+
+    def __init__(self, volume_queue, fail_on_call=None):
+        self._volume_queue = list(volume_queue)
+        self._pending = None
+        self._call_n = 0
+        self._fail_on_call = fail_on_call
+
+    def generate_script(self, template_name, data_file, output_script, velocity_seed, params):
+        self._pending = {
+            "log_file": params["LOG_FILE"],
+            "log_append": bool(params.get("LOG_APPEND", False)),
+            "write_data_file": params["WRITE_DATA_FILE"],
+        }
+        return {"output_script": output_script}
+
+    def run_lammps_script(self, script, work_dir, log_file, gpu_ids, mpi, engine,
+                           data_file, lj_cutoff):
+        self._call_n += 1
+        p = self._pending
+        Path(work_dir).mkdir(parents=True, exist_ok=True)
+        if self._fail_on_call == self._call_n:
+            return {"run_id": f"run-{self._call_n}"}
+        volumes = self._volume_queue.pop(0) if self._volume_queue else [8000.0] * 10
+        _write_bm_log(p["log_file"], volumes, append=p["log_append"])
+        Path(p["write_data_file"]).write_text("# fake\n")
+        return {"run_id": f"run-{self._call_n}"}
+
+
+@pytest.fixture
+def bm_args_cls(tmp_path):
+    args = _base_args("BMTEST1", "POXI", str(tmp_path / "plan.json"))
+    args.data_path = str(tmp_path / "equil_out.data")
+    args.work_dir = str(tmp_path / "mechanical")
+    args.gpu_ids = [0]
+    args.mpi_ranks = 1
+    args.engine = "gpu"
+    args.velocity_seed = 12345
+    cls = {
+        "dt_fs": 1.0, "bm_pressures_atm": [0, 1000, 3000], "bm_npt_steps": 1000,
+        "bm_temperature_K": 300.0, "bm_thermo_freq": 100, "electrostatics": "pppm",
+        "thermostat_damp_fs": 100.0, "barostat_damp_fs": 1000.0, "cutoff_A": 12.0,
+        "preferred_ff": "pcff",
+        "bm_per_point_max_extensions": 2, "bm_per_point_stability_pct": 1.0,
+        "bm_per_point_min_n_eff": 5.0,
+    }
+    return args, cls
+
+
+def _flat_volumes(n=30, value=8000.0, noise=4.0):
+    import random
+    rng = random.Random(2)
+    return [round(value + rng.uniform(-noise, noise), 4) for _ in range(n)]
+
+
+def _rising_volumes(n=30, start=7600.0, end=8400.0):
+    import random
+    rng = random.Random(3)
+    step = (end - start) / (n - 1)
+    return [round(start + step * i + rng.uniform(-4.0, 4.0), 4) for i in range(n)]
+
+
+def _patch_wait_for_run_bm(monkeypatch):
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: (
+        {"status": "failed"} if run_id == f"run-{lammps._fail_on_call}" else {"status": "completed"}
+    ))
+
+
+def test_bm_point_stable_first_hold_passes_no_extension(bm_args_cls, tmp_path):
+    args, cls = bm_args_cls
+    p = resolve_stage_params("murnaghan", args, cls)
+    log_path = str(tmp_path / "bm_P0.log")
+    data_path = str(tmp_path / "bm_P0_out.data")
+    _write_bm_log(log_path, _flat_volumes())
+    Path(data_path).write_text("# fake\n")
+    lammps = _FakeBmExtLammps(volume_queue=[])
+
+    result = _bm_point_adaptive_extend(cls, lammps, p, 0.0, str(tmp_path), log_path, data_path,
+                                        gpu_per_run=1, run_name=args.run_name)
+
+    assert result["outcome"] == "PASS"
+    assert result["extensions_used"] == 0
+    assert result["final_data_path"] == data_path
+    assert lammps._call_n == 0  # no extension submitted -- no wasted compute in the common case
+
+
+def test_bm_point_unstable_first_hold_passes_after_one_extension(bm_args_cls, tmp_path, monkeypatch):
+    _patch_wait_for_run_bm(monkeypatch)
+    args, cls = bm_args_cls
+    p = resolve_stage_params("murnaghan", args, cls)
+    log_path = str(tmp_path / "bm_P0.log")
+    data_path = str(tmp_path / "bm_P0_out.data")
+    _write_bm_log(log_path, _rising_volumes())
+    Path(data_path).write_text("# fake\n")
+    lammps = _FakeBmExtLammps(volume_queue=[_flat_volumes()])
+
+    result = _bm_point_adaptive_extend(cls, lammps, p, 0.0, str(tmp_path), log_path, data_path,
+                                        gpu_per_run=1, run_name=args.run_name)
+
+    assert result["outcome"] == "PASS"
+    assert result["extensions_used"] == 1
+    assert result["final_data_path"] == str(Path(tmp_path) / "ext_1_out.data")
+    # the appended log now holds both the original (rising) rows and the extension's own rows,
+    # each as its own thermo table (parse_lammps_log concatenates multiple tables in one file --
+    # a real LAMMPS log looks the same across multiple `run` commands).
+    logged = Path(log_path).read_text()
+    assert logged.count("Volume") == 2
+
+
+def test_bm_point_exhausts_extension_cap_without_stabilizing(bm_args_cls, tmp_path, monkeypatch):
+    _patch_wait_for_run_bm(monkeypatch)
+    args, cls = bm_args_cls
+    p = resolve_stage_params("murnaghan", args, cls)
+    log_path = str(tmp_path / "bm_P0.log")
+    data_path = str(tmp_path / "bm_P0_out.data")
+    _write_bm_log(log_path, _rising_volumes())
+    Path(data_path).write_text("# fake\n")
+    lammps = _FakeBmExtLammps(volume_queue=[_rising_volumes(), _rising_volumes()])
+
+    result = _bm_point_adaptive_extend(cls, lammps, p, 0.0, str(tmp_path), log_path, data_path,
+                                        gpu_per_run=1, run_name=args.run_name)
+
+    assert result["outcome"] == "EXHAUSTED"
+    assert result["extensions_used"] == p["bm_per_point_max_extensions"]
+
+
+def test_bm_point_extension_run_failure_is_advisory(bm_args_cls, tmp_path, monkeypatch):
+    _patch_wait_for_run_bm(monkeypatch)
+    args, cls = bm_args_cls
+    p = resolve_stage_params("murnaghan", args, cls)
+    log_path = str(tmp_path / "bm_P0.log")
+    data_path = str(tmp_path / "bm_P0_out.data")
+    _write_bm_log(log_path, _rising_volumes())
+    Path(data_path).write_text("# fake\n")
+    lammps = _FakeBmExtLammps(volume_queue=[_flat_volumes()], fail_on_call=1)
+
+    result = _bm_point_adaptive_extend(cls, lammps, p, 0.0, str(tmp_path), log_path, data_path,
+                                        gpu_per_run=1, run_name=args.run_name)
+
+    assert result["outcome"] == "PROBE_FAILED"
+    assert result["extensions_used"] == 1
+    assert result["final_data_path"] == data_path  # prior good data untouched, not the failed ext
+
+
+class _FakeBmSeriesLammps(_FakeBmExtLammps):
+    """Combines run_bulk_modulus_series (do_mechanical's initial per-point call) with the
+    generate_script/run_lammps_script pair _bm_point_adaptive_extend uses for any extension --
+    exercises do_mechanical's own wiring (path reconstruction, point_status/pressure_points.json
+    bookkeeping), not just the helper in isolation."""
+
+    def __init__(self, initial_volumes_by_pressure, extension_volume_queue=None):
+        super().__init__(volume_queue=extension_volume_queue or [])
+        self._initial_volumes_by_pressure = initial_volumes_by_pressure
+        self.last_extract_call = None
+
+    def run_bulk_modulus_series(self, data_file, work_dir, pressures_atm, temp_K, run_name,
+                                 gpu_ids, mpi, velocity_seed, npt_steps, dt_fs, thermo_freq,
+                                 thermostat_damp_fs, barostat_damp_fs, use_long_range,
+                                 use_trappe, use_pcff, use_opls, engine):
+        pressure = int(pressures_atm[0])
+        tag = f"bm_P{pressure}"
+        stage_dir = Path(work_dir) / tag
+        log_path = stage_dir / f"{tag}.log"
+        data_path = stage_dir / f"{tag}_out.data"
+        _write_bm_log(str(log_path), self._initial_volumes_by_pressure[pressure])
+        data_path.parent.mkdir(parents=True, exist_ok=True)
+        data_path.write_text("# fake\n")
+        return {"status": "submitted", "chain_id": f"chain-{tag}", "log_files": [str(log_path)]}
+
+    def extract_bulk_modulus_murnaghan(self, log_files, pressures_atm, output_dir, graphs_dir,
+                                        npt_prod_log):
+        self.last_extract_call = {"log_files": list(log_files), "pressures_atm": list(pressures_atm)}
+        return {"run_id": None, "bm_gate_verdict": "BM_REPORTABLE", "bulk_modulus_GPa": 3.0}
+
+
+def test_do_mechanical_point_extension_flows_into_analysis_call(bm_args_cls, monkeypatch):
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: {"status": "completed"})
+    args, cls = bm_args_cls
+    lammps = _FakeBmSeriesLammps(
+        initial_volumes_by_pressure={
+            0: _rising_volumes(), 1000: _flat_volumes(), 3000: _flat_volumes(),
+        },
+        extension_volume_queue=[_flat_volumes()],
+    )
+
+    result = rdr.do_mechanical(args, cls, lammps, is_glassy=False, npt_prod_data_path=args.data_path)
+
+    assert result["bm_gate_verdict"] == "BM_REPORTABLE"
+    # The P=0 point needed one extension; its accepted log path is unchanged (the extension
+    # appends to the same file run_bulk_modulus_series produced), so extract_bulk_modulus_murnaghan
+    # still received exactly 3 logs, one per pressure -- zero contract change downstream.
+    assert len(lammps.last_extract_call["pressures_atm"]) == 3
+    assert set(lammps.last_extract_call["pressures_atm"]) == {0, 1000, 3000}
+
+    pressure_points_path = Path(args.work_dir) / "pressure_points.json"
+    saved = json.loads(pressure_points_path.read_text())["points"]
+    by_pressure = {v["pressure_atm"]: v for v in saved.values()}
+    assert by_pressure[0]["stability_check"]["extensions_used"] == 1
+    assert by_pressure[0]["stability_check"]["outcome"] == "PASS"
+    assert by_pressure[1000]["stability_check"]["extensions_used"] == 0
+    assert by_pressure[3000]["stability_check"]["extensions_used"] == 0
