@@ -787,11 +787,14 @@ def generate_script(
                        Common params: T_START, T_FINAL, N_STEPS, T_DAMP,
                        P_START, P_FINAL, P_DAMP, use_gpu, LOG_FILE, DUMP_FILE.
         velocity_seed: REQUIRED, non-null. Pins every RNG seed the script carries — the
-                       `velocity all create` seed, the npt_tg_step staircase's per-temperature
-                       reseed, and the nemd_langevin thermostat seeds (SEED_HOT = seed,
-                       SEED_COLD = seed + 1, unless params sets them). Pass the same value
-                       every call for a run and record it in run_log.md. Templates that
-                       inherit velocities from the .data file ignore it.
+                       `velocity all create` seed, and the nemd_langevin thermostat seeds
+                       (SEED_HOT = seed, SEED_COLD = seed + 1, unless params sets them). Pass
+                       the same value every call for a run and record it in run_log.md.
+                       Templates that inherit velocities from the .data file ignore it. A Tg
+                       sweep chains many single-temperature npt_tg_step calls (one per waypoint,
+                       each reading the previous call's WRITE_DATA_FILE) rather than one
+                       multi-temperature script — pass this run's one velocity_seed to every
+                       call in the chain.
 
     Returns:
         dict with script content, output path, and params used.
@@ -819,28 +822,12 @@ def generate_script(
             velocity_seed=velocity_seed,
         )
 
-        # For Tg staircases, compute and return the number of temperature steps so workers
-        # can pass n_stages to run_lammps_script without re-implementing the list logic.
-        n_tg_stages = 0
-        if template_name == "npt_tg_step" and "T_END" in params and "T_STEP" in params:
-            merged = {**TEMPLATE_DEFAULTS["npt_tg_step"], **params}
-            _t = float(merged.get("T_START", 450.0))
-            _end = float(params["T_END"])
-            _step = float(params["T_STEP"])
-            _temps: list = []
-            while _t > _end + 1e-6:
-                _temps.append(_t); _t -= _step
-            if not _temps or abs(_temps[-1] - _end) > 1e-6:
-                _temps.append(_end)
-            n_tg_stages = len(_temps)
-
         return {
             "status":         "success",
             "template":       template_name,
             "output_script":  output_script,
             "params_used":    {**TEMPLATE_DEFAULTS[template_name], **params},
             "system_info":    gen.get_system_info(),
-            "n_tg_stages":    n_tg_stages,
             "script_preview": script[:1500] + "\n..." if len(script) > 1500 else script,
         }
 
@@ -2889,7 +2876,9 @@ def check_equilibration_comprehensive(
 
     Hard gates (block overall_pass=True):
       A. Density drift (regression p-value + magnitude)
-      B. Energy drift
+      B. Energy drift (aggregate TotEng, plus each present bond/angle/dihedral/vdW/coul/kspace
+         term independently -- a canceling drift between terms can otherwise hide inside a flat
+         TotEng; mirrors RadonPy's own per-term check_eq() gates)
       C. Density block-SEM < 1% of mean (Flyvbjerg-Petersen)
       D. Energy block-SEM < 1% of mean
       E. Rg CV across chains < 30%  (unequal conformation flag)

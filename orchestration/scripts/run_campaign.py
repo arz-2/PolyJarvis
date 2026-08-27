@@ -672,7 +672,198 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
 
 # ─── Stage: thermal track ──────────────────────────────────────────────────
 
-def do_thermal(args, cls: dict, lammps) -> dict:
+def _tg_lammps_common_params(p: dict) -> dict:
+    """Shared LAMMPS deck knobs for both the bracket probes and the per-T sweep -- reused so
+    the two never drift apart on FF/electrostatics/hardware selection."""
+    return {
+        "T_DAMP": p["thermostat_damp_fs"], "P_DAMP": p["barostat_damp_fs"],
+        "TIMESTEP": p["dt_fs"], "use_gpu": True, "engine": p["engine"],
+        "use_pppm": p["use_long_range_electrostatics"] and not p["lammps_flags"]["use_trappe"],
+        **{f"use_{k.split('_')[1]}": v for k, v in p["lammps_flags"].items()},
+    }
+
+
+def _bracket_tg_start_temp(args, cls: dict, lammps, p: dict) -> dict:
+    """RadonPy-inspired pre-sweep probe: verify T_start_K sits unambiguously in the melt
+    branch before committing to the (multi-ns) per-temperature sweep, using this run's own
+    measured density-vs-T trend rather than the class's static tg_t_high_K constant alone.
+
+    A short NPT ramp from the cold T_workflow_K structure up to the candidate T_start_K is
+    checked for a statistically significant, monotonically NEGATIVE density trend near its top
+    (monotonic_trend alone is sign-agnostic -- an explicit slope<0 check is required). Density
+    is a state function, not path-dependent: a bare ramp-and-read conflates "still relaxing
+    from the jump" with "hasn't melted," so this bracket only decides WHETHER to raise the
+    candidate -- genuine equilibration at the accepted candidate happens in Phase 2
+    (_run_tg_sweep_adaptive), which holds every point (including the first) until stable.
+
+    Necessary but not sufficient: the glassy branch also has negative dRho/dT (~half the melt
+    branch's expansivity), so this cannot alone distinguish "comfortably melt" from "comfortably
+    glass but still cooling normally." Advisory only -- never raises, never blocks do_thermal;
+    an exhausted or failed bracket just proceeds with its best candidate. extract_thermal.py's
+    own downstream fit-quality gates remain the real correctness backstop.
+    """
+    from check_block_gate import monotonic_trend
+    from analysis_utils import parse_lammps_log
+
+    T_workflow_K = p["T_workflow_K"]
+    T_step_K = p["T_step_K"]
+    ceiling_K = cls.get("annealing_T_high_K", 700.0)
+    max_iters = p["tg_bracket_max_iters"]
+    probe_steps = p["tg_bracket_probe_steps"]
+    drift_threshold_pct = p["tg_bracket_drift_threshold_pct"]
+    common = _tg_lammps_common_params(p)
+
+    candidate = p["T_start_K"]
+    from_data = p["equil_data_path"]
+    from_T = T_workflow_K
+    iterations: list[dict] = []
+
+    for i in range(1, max_iters + 1):
+        probe_dir = f"{p['work_dir']}/tg_bracket/probe_{i:02d}"
+        script = lammps.generate_script(
+            template_name="npt", data_file=from_data,
+            output_script=f"{probe_dir}/probe.in", velocity_seed=p["velocity_seed"],
+            params={**common, "LOG_FILE": "probe.log", "T_START": from_T, "T_FINAL": candidate,
+                    "N_STEPS": probe_steps, "THERMO_FREQ": 500, "use_restart": False,
+                    "P_START": p["pressure_atm"], "P_FINAL": p["pressure_atm"]},
+        )
+        run = lammps.run_lammps_script(
+            script=script["output_script"], work_dir=probe_dir, log_file="probe_run.log",
+            gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"], engine=p["engine"],
+            data_file=from_data, lj_cutoff=p["cutoff_A"],
+        )
+        result = wait_for_run(lammps, run["run_id"], f"tg bracket probe {i}")
+        if result.get("status") != "completed":
+            iterations.append({"iteration": i, "candidate_T_K": candidate, "outcome": "run_failed"})
+            return {"T_start_K": candidate, "start_data_path": from_data,
+                    "iterations": iterations, "outcome": "PROBE_FAILED"}
+
+        try:
+            df = parse_lammps_log(f"{probe_dir}/probe.log")
+        except Exception:
+            df = None
+        if df is None or "Density" not in df.columns or len(df) < 4:
+            iterations.append({"iteration": i, "candidate_T_K": candidate, "outcome": "unparseable_log"})
+            return {"T_start_K": candidate, "start_data_path": from_data,
+                    "iterations": iterations, "outcome": "PROBE_FAILED"}
+
+        window_frac = (1.0 / 3.0) if i == 1 else 0.8
+        window = df["Density"].values[-max(int(len(df) * window_frac), 4):]
+        trend = monotonic_trend(window, drift_threshold_pct=drift_threshold_pct)
+        melt_like = bool(trend.get("available") and trend.get("monotonic_trend")
+                          and trend.get("slope", 0.0) < 0)
+        iterations.append({"iteration": i, "candidate_T_K": candidate, "trend": trend,
+                            "melt_like": melt_like})
+        from_data = f"{probe_dir}/npt_out.data"
+
+        if melt_like:
+            return {"T_start_K": candidate, "start_data_path": from_data,
+                    "iterations": iterations, "outcome": "PASS"}
+
+        from_T = candidate
+        candidate = min(candidate + 2 * T_step_K, ceiling_K)
+
+    return {"T_start_K": candidate, "start_data_path": from_data,
+            "iterations": iterations, "outcome": "EXHAUSTED"}
+
+
+def _run_tg_sweep_adaptive(args, cls: dict, lammps, p: dict, start_data_path: str) -> dict:
+    """Per-temperature adaptive sampling: one npt_tg_step hold per waypoint (T_start_K down to
+    T_end_K in T_step_K decrements), chained via each point's own WRITE_DATA_FILE, all appending
+    to the same shared tg_sweep.log/per_t_structs.dump -- so the accumulated files are
+    shape-identical to the old monolithic staircase deck and extract_thermal.py's existing
+    plateau-jump-detection parsing needs no changes.
+
+    Extends ONLY the specific temperature whose hold isn't yet stable (half_window_stability)
+    or adequately sampled (n_eff, the same autocorrelation-based estimator
+    check_equilibration_comprehensive.py already uses), instead of the old _tg_sampling remedy's
+    blind whole-sweep-doubling. Bounded per-point (tg_per_t_max_extensions); advisory only -- an
+    unresolved point after its cap is still recorded and the sweep moves on, exactly as
+    extract_thermal.py's own post-hoc plateau check would already flag it today.
+    """
+    from check_block_gate import half_window_stability
+    from analysis_utils import parse_lammps_log, compute_tau_eff, effective_sample_size
+
+    T_start_K, T_end_K, T_step_K = p["T_start_K"], p["T_end_K"], p["T_step_K"]
+    n_steps_per_t = p["n_steps_per_t"]
+    max_ext = p["tg_per_t_max_extensions"]
+    stability_pct = p["tg_per_t_stability_pct"]
+    min_n_eff = p["tg_per_t_min_n_eff"]
+    common = _tg_lammps_common_params(p)
+
+    temps: list[float] = []
+    t = T_start_K
+    while t > T_end_K + 1e-6:
+        temps.append(t)
+        t -= T_step_K
+    if not temps or abs(temps[-1] - T_end_K) > 1e-6:
+        temps.append(T_end_K)
+
+    sweep_dir = p["tg_sweep_dir"]
+    log_path = f"{sweep_dir}/tg_sweep.log"
+    from_data = start_data_path
+    per_t: list[dict] = []
+
+    for T in temps:
+        extensions = 0
+        while True:
+            n_before = 0
+            if Path(log_path).exists():
+                try:
+                    n_before = len(parse_lammps_log(log_path))
+                except Exception:
+                    n_before = 0
+
+            out_data = f"{sweep_dir}/tg_step_T{int(T)}_e{extensions}_out.data"
+            script = lammps.generate_script(
+                template_name="npt_tg_step", data_file=from_data,
+                output_script=f"{sweep_dir}/tg_step_T{int(T)}_e{extensions}.in",
+                velocity_seed=p["velocity_seed"],
+                params={**common, "LOG_FILE": "tg_sweep.log", "LOG_APPEND": True,
+                        "DUMP_FILE": "", "WRITE_DATA_FILE": out_data,
+                        "WRITE_PER_T_DUMP": extensions == 0, "PER_T_DUMP_FILE": "per_t_structs.dump",
+                        "T_TARGET": T, "N_STEPS": n_steps_per_t, "THERMO_FREQ": 500,
+                        "P_TARGET": p["pressure_atm"]},
+            )
+            run = lammps.run_lammps_script(
+                script=script["output_script"], work_dir=sweep_dir, log_file="tg_sweep_run.log",
+                gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"], engine=p["engine"],
+                data_file=from_data, lj_cutoff=p["cutoff_A"],
+            )
+            result = wait_for_run(lammps, run["run_id"], f"tg sweep T={T}K (ext {extensions})")
+            if result.get("status") != "completed":
+                per_t.append({"T_K": T, "outcome": "PROBE_FAILED", "extensions_used": extensions})
+                break
+
+            from_data = out_data
+            try:
+                df_after = parse_lammps_log(log_path)
+            except Exception:
+                df_after = None
+            if df_after is None or "Density" not in df_after.columns or len(df_after) <= n_before:
+                per_t.append({"T_K": T, "outcome": "PROBE_FAILED", "extensions_used": extensions})
+                break
+
+            window = df_after["Density"].values[n_before:]
+            stability = half_window_stability(window, stability_pct)
+            tau_frames, _ = compute_tau_eff(window)
+            n_eff = effective_sample_size(len(window), tau_frames)
+            stable = bool(stability.get("available") and stability.get("stable"))
+            adequate = bool(n_eff >= min_n_eff)
+
+            if (stable and adequate) or extensions >= max_ext:
+                per_t.append({
+                    "T_K": T, "outcome": "PASS" if (stable and adequate) else "EXHAUSTED",
+                    "mean_density_gcm3": float(window[len(window) // 2:].mean()),
+                    "n_eff": n_eff, "stable": stable, "extensions_used": extensions,
+                })
+                break
+            extensions += 1
+
+    return {"per_t": per_t, "outcome": "COMPLETE"}
+
+
+def do_thermal(args, cls: dict, lammps, equil_density_gcm3=None) -> dict:
     """Single-rate-primary: run one sweep at the class's primary configured rate (highest by
     default; tg_slope_gate_fallback="slowest_rate" classes — PKTN, PSFO — run rates[0] instead,
     since their highest-rate fit is documented as degenerate/inverted)."""
@@ -692,33 +883,22 @@ def do_thermal(args, cls: dict, lammps) -> dict:
         p = resolve_stage_params("tg", args, cls)
         with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
             args.gpu_ids = gpu_ids
-            script = lammps.generate_script(
-                template_name="npt_tg_step", data_file=p["equil_data_path"],
-                output_script=f"{p['tg_sweep_dir']}/tg_sweep.in",
-                velocity_seed=p["velocity_seed"],
-                # The per-T dump (one final frame per temperature) is what extract_thermal's
-                # structural block reads. The reasoned path's tg prompt already asks for it;
-                # emit it here too so both paths produce the same artifacts.
-                params={"LOG_FILE": "tg_sweep.log", "DUMP_FILE": "",
-                       "WRITE_PER_T_DUMP": True, "PER_T_DUMP_FILE": "per_t_structs.dump",
-                       "T_START": p["T_start_K"], "T_END": p["T_end_K"], "T_STEP": p["T_step_K"],
-                       "N_STEPS_PER_T": p["n_steps_per_t"],
-                       "T_DAMP": p["thermostat_damp_fs"],
-                       "P_DAMP": p["barostat_damp_fs"],
-                       "P_START": p["pressure_atm"], "P_FINAL": p["pressure_atm"],
-                       "TIMESTEP": p["dt_fs"],
-                       "use_pppm": p["use_long_range_electrostatics"] and not p["lammps_flags"]["use_trappe"],
-                       "use_gpu": True, "engine": p["engine"], **{f"use_{k.split('_')[1]}": v
-                       for k, v in p["lammps_flags"].items()}},
-            )
-            run = lammps.run_lammps_script(
-                script=script["output_script"], work_dir=p["tg_sweep_dir"], log_file="tg_sweep_run.log",
-                gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"], engine=p["engine"],
-                data_file=p["equil_data_path"], lj_cutoff=p["cutoff_A"],
-            )
-            result = wait_for_run(lammps, run["run_id"], f"tg sweep rate={rate}")
-        if result.get("status") != "completed":
-            raise SystemExit(f"Tg sweep (rate={rate}) did not complete: {result}")
+            bracket = _bracket_tg_start_temp(args, cls, lammps, p)
+            sweep = _run_tg_sweep_adaptive(args, cls, lammps, p, bracket["start_data_path"])
+
+        # bracket["outcome"] may be PROBE_FAILED (the very first probe couldn't even run/parse,
+        # almost certainly a real deck/hardware problem rather than a "wasn't melt enough" case)
+        # or EXHAUSTED (candidate raised to its ceiling without ever confirming a melt-like
+        # trend) -- both are advisory: _run_tg_sweep_adaptive still ran from bracket's best
+        # candidate/structure either way, and any genuinely bad outcome is caught by
+        # extract_thermal's own fit-quality gates below, not here.
+
+        equil_sanity = None
+        if equil_density_gcm3 is not None and sweep.get("per_t"):
+            first_point = sweep["per_t"][0]
+            probe_density = first_point.get("mean_density_gcm3")
+            if probe_density is not None:
+                equil_sanity = bool(probe_density < equil_density_gcm3)
 
         ap = resolve_stage_params("analyze-tg", args, cls)
         thermal = wait_for_analysis(lammps, lammps.extract_thermal(
@@ -731,7 +911,9 @@ def do_thermal(args, cls: dict, lammps) -> dict:
                          "fit_quality": thermal.get("fit_quality"), "r_squared": thermal.get("r_squared"),
                          "output_dir": ap["output_dir"], "used_highest_rate": idx == len(tg_rates) - 1,
                          "tg_gate_verdict": thermal.get("tg_gate_verdict"),
-                         "velocity_seed": p["velocity_seed"]})
+                         "velocity_seed": p["velocity_seed"],
+                         "tg_bracket": bracket, "tg_per_t_sampling": sweep.get("per_t"),
+                         "tg_bracket_equil_density_sanity": equil_sanity})
 
     highest = per_rate[-1] if per_rate else None
 
@@ -1126,7 +1308,7 @@ class CampaignStageExecutor:
                                                 details=detail),),
                                        self._artifacts(attempt_dir), outputs)
             elif stage == "thermal":
-                outputs = do_thermal(args, cls, self.lammps)
+                outputs = do_thermal(args, cls, self.lammps, equil.get("density_gcm3"))
             elif stage == "mechanical":
                 is_glassy = (thermal.get("is_glassy") if thermal else
                               resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0)

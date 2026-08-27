@@ -25,6 +25,8 @@
 #   THERMO_FREQ, DUMP_FREQ
 #   SHAKE_BLOCK, UNSHAKE_BLOCK
 #   INIT_VELOCITY_BLOCK - rescale velocities to T_TARGET
+#   WRITE_PER_T_DUMP / PER_T_DUMP_FILE - optional one-frame snapshot appended to a shared
+#       multi-frame dump (one frame per temperature across the whole sweep's chained calls)
 # ============================================================
 
 log {LOG_FILE} {LOG_APPEND}
@@ -75,6 +77,7 @@ unfix npt_tg
 {UNDUMP_BLOCK}
 
 {LAST_DUMP_BLOCK}
+{PER_T_DUMP_BLOCK}
 write_data {WRITE_DATA_FILE}
 
 print "STAGE COMPLETE: Tg step T={T_TARGET}K P={P_TARGET}atm steps={N_STEPS}"

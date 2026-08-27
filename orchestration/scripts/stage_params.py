@@ -372,7 +372,14 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     else:
         n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
     work_dir = args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/thermal'
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600), 'T_end_K': _pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200), 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': getattr(args, 'tg_start_data', None) or args.data_path, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0)}
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600), 'T_end_K': _pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200), 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': getattr(args, 'tg_start_data', None) or args.data_path, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0),
+            'T_workflow_K': _resolve_t_workflow(args, cls),
+            'tg_bracket_max_iters': int(cls.get('tg_bracket_max_iters', 3)),
+            'tg_bracket_probe_steps': int(cls.get('tg_bracket_probe_steps', 150000)),
+            'tg_bracket_drift_threshold_pct': cls.get('tg_bracket_drift_threshold_pct', 0.5),
+            'tg_per_t_max_extensions': int(cls.get('tg_per_t_max_extensions', 2)),
+            'tg_per_t_stability_pct': cls.get('tg_per_t_stability_pct', 1.0),
+            'tg_per_t_min_n_eff': cls.get('tg_per_t_min_n_eff', 5.0)}
 
 def _resolve_deform_params(args, cls: dict) -> dict:
     """Resolve deterministic deformation arguments."""

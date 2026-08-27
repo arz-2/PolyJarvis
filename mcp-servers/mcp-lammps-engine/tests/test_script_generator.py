@@ -327,38 +327,32 @@ def test_gaff2_no_autodetect_no_raise(tmp_path):
     assert not any("auto-detected" in str(x.message) for x in w)
 
 
-# ── B2: npt_tg_step guard ─────────────────────────────────────────────────────
+# ── B2: npt_tg_step per-point structural snapshot ──────────────────────────────
 
-def test_npt_tg_step_missing_ramp_raises(tmp_path):
-    """npt_tg_step without T_END and T_STEP raises ValueError immediately."""
-    out = str(tmp_path / "sweep.in")
-    with pytest.raises(ValueError, match="T_END.*T_STEP|T_END and T_STEP"):
-        ScriptGenerator(data_file=str(PCFF_DATA)).generate(
-            "npt_tg_step", output_path=out,
-            params={"use_pcff": True, "T_START": 600.0}
-        )
-
-
-def test_npt_tg_step_missing_only_t_step_raises(tmp_path):
-    """npt_tg_step with T_END but no T_STEP → ValueError."""
-    out = str(tmp_path / "sweep.in")
-    with pytest.raises(ValueError):
-        ScriptGenerator(data_file=str(PCFF_DATA)).generate(
-            "npt_tg_step", output_path=out,
-            params={"use_pcff": True, "T_START": 600.0, "T_END": 200.0}
-        )
-
-
-def test_npt_tg_step_with_ramp_emits_staircase(tmp_path):
-    """npt_tg_step with T_END + T_STEP generates a LAMMPS staircase (variable loop)."""
-    out = str(tmp_path / "sweep.in")
+def test_npt_tg_step_write_per_t_dump_appends_snapshot_block(tmp_path):
+    """WRITE_PER_T_DUMP appends a one-frame, append-mode dump block after the main run."""
+    out = str(tmp_path / "tg_step.in")
     script = ScriptGenerator(data_file=str(PCFF_DATA)).generate(
         "npt_tg_step", output_path=out,
-        params={"use_pcff": True, "T_START": 300.0, "T_END": 200.0, "T_STEP": 20.0,
-                "N_STEPS_PER_T": 100}
+        params={"use_pcff": True, "T_TARGET": 300.0, "N_STEPS": 100,
+                "WRITE_PER_T_DUMP": True, "PER_T_DUMP_FILE": "per_t_structs.dump"}
     )
-    # Staircase uses LAMMPS variable + loop/jump flow control
-    assert "variable temps index" in script or "jump" in script
+    assert "dump per_t_snap all atom 1 per_t_structs.dump" in script
+    assert "dump_modify per_t_snap append yes" in script
+    assert "run 0" in script
+    # Must render BEFORE write_data/quit -- anything after quit never executes.
+    assert script.index("dump per_t_snap") < script.index("write_data")
+    assert script.index("dump per_t_snap") < script.rindex("quit")
+
+
+def test_npt_tg_step_without_per_t_dump_flag_omits_snapshot_block(tmp_path):
+    """Default (WRITE_PER_T_DUMP unset) emits no per-point snapshot block."""
+    out = str(tmp_path / "tg_step.in")
+    script = ScriptGenerator(data_file=str(PCFF_DATA)).generate(
+        "npt_tg_step", output_path=out,
+        params={"use_pcff": True, "T_TARGET": 300.0, "N_STEPS": 100}
+    )
+    assert "per_t_snap" not in script
 
 
 # ── B3: KOKKOS deck regression ────────────────────────────────────────────────

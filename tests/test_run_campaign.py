@@ -6,6 +6,7 @@ prove the executor and the protocol resolver cannot silently diverge.
 Does NOT submit any simulation -- --dry-run never calls the MCP servers.
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ from hw_common import load_rules, get_class_entry  # noqa: E402
 import run_campaign as rdr  # noqa: E402
 from run_campaign import (  # noqa: E402
     _base_args, wait_for_analysis, do_equil_and_check, do_summary, do_build, COMPRESSION_RATIO,
+    _bracket_tg_start_temp, _run_tg_sweep_adaptive,
 )
 
 RULES = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
@@ -825,3 +827,273 @@ def test_run_campaign_workflow_evidence_ingest_failure_does_not_propagate(tmp_pa
     assert result["status"] == "accepted"
     assert wcc_calls == [("WCC_RUN", {"repo_root": tmp_path})]  # cache write still ran
     assert "WARNING" in capsys.readouterr().err
+
+
+# ─── Tg-sweep adaptive per-temperature sampling ───────────────────────────────
+# _bracket_tg_start_temp (Phase 1: is T_start_K high enough?) and
+# _run_tg_sweep_adaptive (Phase 2: is each temperature adequately sampled?) --
+# see the plan file for the design this implements.
+
+def _write_lammps_log(path, densities, append=False):
+    """A minimal real LAMMPS-log-shaped thermo table -- parse_lammps_log (unmocked in these
+    tests) reads this for real, exercising the real parsing/trend-check logic."""
+    lines = ["   Step          Temp           Density"]
+    for i, d in enumerate(densities):
+        lines.append(f"      {i * 1000}            300.0         {d}")
+    text = "\n".join(lines) + "\n"
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a" if append else "w") as f:
+        f.write(text)
+
+
+class _FakeTgLammps:
+    """Minimal in-process stand-in covering only what _bracket_tg_start_temp/
+    _run_tg_sweep_adaptive call. Each generate_script call is remembered; the matching
+    run_lammps_script call writes a real LAMMPS-log-shaped density trace (popped from a
+    scripted per-job queue) to the log/data paths the real deck would have produced."""
+
+    def __init__(self, density_queue, fail_on_call=None):
+        self._density_queue = list(density_queue)
+        self._pending = None
+        self._call_n = 0
+        self._fail_on_call = fail_on_call  # 1-indexed call number to simulate a run failure on
+
+    def generate_script(self, template_name, data_file, output_script, velocity_seed, params):
+        default_data = "npt_out.data" if template_name == "npt" else "tg_step_out.data"
+        self._pending = {
+            "log_file": params["LOG_FILE"],
+            "log_append": bool(params.get("LOG_APPEND", False)),
+            "write_data_file": params.get("WRITE_DATA_FILE", default_data),
+        }
+        return {"output_script": output_script}
+
+    def run_lammps_script(self, script, work_dir, log_file, gpu_ids, mpi, engine,
+                           data_file, lj_cutoff):
+        self._call_n += 1
+        p = self._pending
+        Path(work_dir).mkdir(parents=True, exist_ok=True)
+        if self._fail_on_call == self._call_n:
+            return {"run_id": f"run-{self._call_n}"}
+        densities = self._density_queue.pop(0) if self._density_queue else [1.0] * 10
+        _write_lammps_log(Path(work_dir) / p["log_file"], densities, append=p["log_append"])
+        data_path = p["write_data_file"]
+        (Path(data_path) if os.path.isabs(data_path) else Path(work_dir) / data_path).write_text("# fake\n")
+        return {"run_id": f"run-{self._call_n}"}
+
+
+@pytest.fixture
+def tg_args_cls(tmp_path):
+    args = _base_args("TGTEST1", "POXI", str(tmp_path / "plan.json"))
+    args.data_path = str(tmp_path / "equil_out.data")
+    args.work_dir = str(tmp_path / "thermal")
+    args.gpu_ids = [0]
+    args.mpi_ranks = 1
+    args.engine = "gpu"
+    args.velocity_seed = 12345
+    cls = {
+        "dt_fs": 1.0, "tg_rates_K_per_ns": [], "tg_t_step_K": 20, "tg_t_high_K": 440.0,
+        "tg_t_low_K": 400.0, "tg_steps_per_t": 1000, "tg_min_steps_per_T": 1000,
+        "electrostatics": "pppm", "P_equil_atm": 1.0, "thermostat_damp_fs": 100.0,
+        "barostat_damp_fs": 1000.0, "cutoff_A": 12.0, "annealing_T_high_K": 700.0,
+        "T_workflow_K": 300.0, "preferred_ff": "pcff",
+        "tg_bracket_max_iters": 3, "tg_bracket_probe_steps": 1000,
+        "tg_bracket_drift_threshold_pct": 0.5, "tg_per_t_max_extensions": 2,
+        "tg_per_t_stability_pct": 1.0, "tg_per_t_min_n_eff": 5.0,
+    }
+    return args, cls
+
+
+def _falling_densities(n=30, start=1.00, end=0.90):
+    import random
+    rng = random.Random(0)
+    step = (end - start) / (n - 1)
+    return [round(start + step * i + rng.uniform(-0.0005, 0.0005), 6) for i in range(n)]
+
+
+def _flat_densities(n=30, value=0.95, noise=0.0005):
+    import random
+    rng = random.Random(1)
+    return [round(value + rng.uniform(-noise, noise), 6) for i in range(n)]
+
+
+def _rising_densities(n=30, start=0.90, end=0.95):
+    return _falling_densities(n=n, start=start, end=end)
+
+
+# ── Phase 1: _bracket_tg_start_temp ────────────────────────────────────────────
+
+def _patch_wait_for_run(monkeypatch):
+    """wait_for_run() polls lammps.watch_run(), which _FakeTgLammps doesn't implement --
+    patch it to read status straight off the fake's own bookkeeping instead."""
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: (
+        {"status": "failed"} if run_id == f"run-{lammps._fail_on_call}" else {"status": "completed"}
+    ))
+
+
+def test_bracket_first_candidate_melt_like_passes_unchanged(tg_args_cls, monkeypatch):
+    _patch_wait_for_run(monkeypatch)
+    args, cls = tg_args_cls
+    p = resolve_stage_params("tg", args, cls)
+    lammps = _FakeTgLammps(density_queue=[_falling_densities()])
+
+    result = _bracket_tg_start_temp(args, cls, lammps, p)
+
+    assert result["outcome"] == "PASS"
+    assert result["T_start_K"] == p["T_start_K"]
+    assert len(result["iterations"]) == 1
+
+
+def test_bracket_fail_then_pass_raises_candidate(tg_args_cls, monkeypatch):
+    _patch_wait_for_run(monkeypatch)
+    args, cls = tg_args_cls
+    p = resolve_stage_params("tg", args, cls)
+    lammps = _FakeTgLammps(density_queue=[_rising_densities(), _falling_densities()])
+
+    result = _bracket_tg_start_temp(args, cls, lammps, p)
+
+    assert result["outcome"] == "PASS"
+    assert result["T_start_K"] == p["T_start_K"] + 2 * p["T_step_K"]
+    assert len(result["iterations"]) == 2
+    assert result["iterations"][0]["melt_like"] is False
+    assert result["iterations"][1]["melt_like"] is True
+
+
+def test_bracket_exhausts_and_clamps_at_ceiling(tg_args_cls, monkeypatch):
+    _patch_wait_for_run(monkeypatch)
+    args, cls = tg_args_cls
+    cls["annealing_T_high_K"] = p_ceiling = cls["tg_t_high_K"] + 2 * cls["tg_t_step_K"]
+    p = resolve_stage_params("tg", args, cls)
+    lammps = _FakeTgLammps(density_queue=[_rising_densities()] * 5)  # always fails
+
+    result = _bracket_tg_start_temp(args, cls, lammps, p)
+
+    assert result["outcome"] == "EXHAUSTED"
+    assert result["T_start_K"] <= p_ceiling
+    assert len(result["iterations"]) == p["tg_bracket_max_iters"]
+
+
+def test_bracket_run_failure_is_advisory_not_raising(tg_args_cls, monkeypatch):
+    _patch_wait_for_run(monkeypatch)
+    args, cls = tg_args_cls
+    p = resolve_stage_params("tg", args, cls)
+    lammps = _FakeTgLammps(density_queue=[_falling_densities()], fail_on_call=1)
+
+    result = _bracket_tg_start_temp(args, cls, lammps, p)
+
+    assert result["outcome"] == "PROBE_FAILED"
+    assert result["T_start_K"] == p["T_start_K"]
+
+
+# ── Phase 2: _run_tg_sweep_adaptive ────────────────────────────────────────────
+
+def test_sweep_all_points_stable_no_extensions(tg_args_cls, monkeypatch):
+    _patch_wait_for_run(monkeypatch)
+    args, cls = tg_args_cls
+    p = resolve_stage_params("tg", args, cls)
+    # 3 waypoints (440, 420, 400) at tg_t_step_K=20 -- one flat, stable series each.
+    lammps = _FakeTgLammps(density_queue=[_flat_densities() for _ in range(3)])
+
+    result = _run_tg_sweep_adaptive(args, cls, lammps, p, p["equil_data_path"])
+
+    assert result["outcome"] == "COMPLETE"
+    assert len(result["per_t"]) == 3
+    assert [pt["T_K"] for pt in result["per_t"]] == [440.0, 420.0, 400.0]
+    assert all(pt["extensions_used"] == 0 and pt["outcome"] == "PASS" for pt in result["per_t"])
+
+
+def test_sweep_one_point_needs_one_extension(tg_args_cls, monkeypatch):
+    _patch_wait_for_run(monkeypatch)
+    args, cls = tg_args_cls
+    p = resolve_stage_params("tg", args, cls)
+    # First waypoint: unstable (rising) hold, then a flat hold on its extension. Remaining
+    # two waypoints pass on the first try.
+    lammps = _FakeTgLammps(density_queue=[
+        _rising_densities(), _flat_densities(), _flat_densities(), _flat_densities(),
+    ])
+
+    result = _run_tg_sweep_adaptive(args, cls, lammps, p, p["equil_data_path"])
+
+    assert result["outcome"] == "COMPLETE"
+    assert len(result["per_t"]) == 3
+    assert result["per_t"][0]["extensions_used"] == 1
+    assert result["per_t"][0]["outcome"] == "PASS"
+    assert result["per_t"][1]["extensions_used"] == 0
+    assert result["per_t"][2]["extensions_used"] == 0
+
+
+def test_sweep_point_exhausts_extension_cap_and_continues(tg_args_cls, monkeypatch):
+    _patch_wait_for_run(monkeypatch)
+    args, cls = tg_args_cls
+    p = resolve_stage_params("tg", args, cls)
+    # First waypoint never stabilizes across its base attempt + 2 extensions (cap=2);
+    # remaining waypoints pass on the first try.
+    lammps = _FakeTgLammps(density_queue=[
+        _rising_densities(), _rising_densities(), _rising_densities(),
+        _flat_densities(), _flat_densities(),
+    ])
+
+    result = _run_tg_sweep_adaptive(args, cls, lammps, p, p["equil_data_path"])
+
+    assert len(result["per_t"]) == 3
+    assert result["per_t"][0]["extensions_used"] == p["tg_per_t_max_extensions"]
+    assert result["per_t"][0]["outcome"] == "EXHAUSTED"
+    assert result["per_t"][1]["outcome"] == "PASS"
+
+
+def test_sweep_job_failure_is_advisory_and_continues(tg_args_cls, monkeypatch):
+    _patch_wait_for_run(monkeypatch)
+    args, cls = tg_args_cls
+    p = resolve_stage_params("tg", args, cls)
+    lammps = _FakeTgLammps(density_queue=[_flat_densities(), _flat_densities()], fail_on_call=1)
+
+    result = _run_tg_sweep_adaptive(args, cls, lammps, p, p["equil_data_path"])
+
+    assert len(result["per_t"]) == 3
+    assert result["per_t"][0]["outcome"] == "PROBE_FAILED"
+    assert result["per_t"][1]["outcome"] == "PASS"
+
+
+# ── Executor wiring ─────────────────────────────────────────────────────────
+
+def test_thermal_dispatch_passes_equil_density_when_present(tmp_path, monkeypatch):
+    from run_campaign import CampaignStageExecutor
+    import run_campaign as rc
+
+    calls = []
+    monkeypatch.setattr(rc, "do_thermal",
+                        lambda args, cls, lammps, equil_density_gcm3=None:
+                        calls.append(equil_density_gcm3) or {"per_rate": []})
+
+    attempt_dir = tmp_path / "attempt-0001"
+    attempt_dir.mkdir()
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    context = {"attempt_dir": str(attempt_dir), "parameters": {},
+              "dependencies": {"equilibration": {"outputs": {"density_gcm3": 1.05}}},
+              "prior_attempts": []}
+
+    executor.execute("thermal", context)
+
+    assert calls == [1.05]
+
+
+def test_thermal_dispatch_passes_none_when_equil_density_absent(tmp_path, monkeypatch):
+    from run_campaign import CampaignStageExecutor
+    import run_campaign as rc
+
+    calls = []
+    monkeypatch.setattr(rc, "do_thermal",
+                        lambda args, cls, lammps, equil_density_gcm3=None:
+                        calls.append(equil_density_gcm3) or {"per_rate": []})
+
+    attempt_dir = tmp_path / "attempt-0001"
+    attempt_dir.mkdir()
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    context = {"attempt_dir": str(attempt_dir), "parameters": {},
+              "dependencies": {"equilibration": {"outputs": {}}},
+              "prior_attempts": []}
+
+    executor.execute("thermal", context)
+
+    assert calls == [None]

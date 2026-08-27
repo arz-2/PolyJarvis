@@ -102,8 +102,9 @@ PARAMETER_STAGE: dict[str, str] = {
     "tg_primary_rate_index": "thermal", "tg_rates_K_per_ns": "thermal",
     "tg_slope_gate_fallback": "thermal",
     "tg_steps_per_t": "thermal", "tg_min_steps_per_T": "thermal",
-    # tg_sampling's own ladder-bookkeeping key -- see the equilibration block's comment above.
-    "baseline_tg_steps_per_t": "thermal",
+    "tg_bracket_max_iters": "thermal", "tg_bracket_probe_steps": "thermal",
+    "tg_bracket_drift_threshold_pct": "thermal", "tg_per_t_max_extensions": "thermal",
+    "tg_per_t_stability_pct": "thermal", "tg_per_t_min_n_eff": "thermal",
     "K_strain_max": "mechanical", "K_deform_rate_inv_s": "mechanical",
     "K_deform_rate_slow_inv_s": "mechanical", "bm_pressures_atm": "mechanical",
     "deform_eq_steps": "mechanical", "deform_strain_start": "mechanical",
@@ -332,19 +333,6 @@ def _melt_homogeneity(params: dict[str, Any], finding: Finding, attempt: int) ->
     return revised
 
 
-def _tg_sampling(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[str, Any]:
-    baseline = int(params.get("baseline_tg_steps_per_t") or params.get("tg_steps_per_t") or 1)
-    revised = dict(params)
-    revised["baseline_tg_steps_per_t"] = baseline
-    revised["tg_steps_per_t"] = baseline * 2
-    if attempt > 1:
-        current_step = float(params.get("tg_t_step_K", 20))
-        if current_step <= 5.0:
-            raise ValueError("Tg temperature-step floor exhausted")
-        revised["tg_t_step_K"] = max(5.0, current_step / 2.0)
-    return revised
-
-
 def _tg_review(params: dict[str, Any], _finding: Finding, _attempt: int) -> dict[str, Any]:
     return _merge(params, tg_t_step_K=max(5.0, float(params.get("tg_t_step_K", 20)) / 2.0))
 
@@ -436,8 +424,6 @@ def default_remedies() -> tuple[Remedy, ...]:
                _raise_minimize_tolerance, "equilibration"),
         Remedy("melt_homogeneity", frozenset({"HOMOG_HETEROGENEOUS", "DENSITY_HETEROGENEITY"}),
                2, _melt_homogeneity, "equilibration"),
-        Remedy("tg_sampling", frozenset({"TG_NOT_REPORTABLE"}), 7,
-               _tg_sampling, "thermal"),
         Remedy("tg_breakpoint", frozenset({"TG_REVIEW"}), 1, _tg_review, "thermal"),
         Remedy("deformation_fallback", frozenset({"BM_FALLBACK_DEFORM"}), 1,
                _deformation, "mechanical"),

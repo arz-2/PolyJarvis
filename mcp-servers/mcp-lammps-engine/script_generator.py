@@ -1008,20 +1008,6 @@ class ScriptGenerator:
         # Build all substitution blocks
         subs = self._build_substitutions(template_name, cfg, data_file, raw_params=params)
 
-        # Staircase expansion: npt_tg_step + T_END + T_STEP → full cooling loop.
-        # A Tg sweep MUST be a multi-temperature ramp. Guard against the silent failure where
-        # the npt_tg_step template is requested without ramp bounds and falls through to a
-        # single-temperature NPT render (an invalid Tg sweep — no per-T dump, no cooling).
-        if template_name == "npt_tg_step":
-            missing = [k for k in ("T_END", "T_STEP") if params.get(k) is None]
-            if missing:
-                raise ValueError(
-                    f"Tg sweep (template 'npt_tg_step') requires ramp bounds {missing} "
-                    f"(plus T_START); without them this would emit a single-temperature NPT, "
-                    f"not a cooling sweep. Pass T_START, T_END and T_STEP.")
-            script = self._generate_tg_staircase(cfg, subs, output_path)
-            return script
-
         # Load template
         tpl_path = self.templates_dir / f"{template_name}.in"
         with open(tpl_path, "r") as f:
@@ -1031,127 +1017,6 @@ class ScriptGenerator:
         script = self._fill_template(template, subs)
 
         # Write output
-        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-        with open(output_path, "w") as f:
-            f.write(script)
-
-        return script
-
-    def _generate_tg_staircase(self, cfg: dict, subs: dict, output_path: str) -> str:
-        """
-        Generate a full Tg cooling staircase script using a LAMMPS variable-index loop.
-        Triggered when T_END and T_STEP are both present in the caller's params.
-        Velocities are initialized once at T_START; subsequent steps inherit momenta.
-        """
-        t_start    = float(cfg.get("T_START",       450.0))
-        t_end      = float(cfg.get("T_END",         100.0))
-        t_step     = float(cfg.get("T_STEP",         20.0))
-        n_steps    = int(cfg.get("N_STEPS_PER_T",
-                         cfg.get("N_STEPS",         500000)))
-        p_target   = cfg.get("P_TARGET",   1.0)
-        p_damp     = cfg.get("P_DAMP",  1000.0)
-        t_damp     = cfg.get("T_DAMP",   100.0)
-        timestep   = cfg.get("TIMESTEP",    1.0)
-        thermo_freq = int(cfg.get("THERMO_FREQ", 500))
-        log_file   = subs["LOG_FILE"]
-        write_per_t_dump = bool(cfg.get("WRITE_PER_T_DUMP", False))
-        per_t_dump_file  = str(cfg.get("PER_T_DUMP_FILE", "per_t_structs.dump"))
-
-        # Defense-in-depth (never raises): too few ps per temperature collapses the bilinear
-        # Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400). Feasibility is enforced upstream at
-        # plan time; this only annotates the deck if a low N_STEPS_PER_T slips through.
-        ps_per_t  = n_steps * timestep * 1e-3
-        floor_ps  = float(cfg.get("TG_MIN_PS_PER_T", 200.0))
-        floor_comment = ""
-        if ps_per_t < floor_ps:
-            msg = (f"Tg staircase: {n_steps} steps x {timestep} fs = {ps_per_t:.0f} ps/T, "
-                   f"below the {floor_ps:.0f} ps/T floor — bilinear Tg fit may be degenerate.")
-            warnings.warn(msg)
-            floor_comment = f"# WARNING: {msg}\n"
-
-        # Build temperature list: T_START down to T_END, always include T_END
-        temps: list[float] = []
-        t = t_start
-        while t > t_end + 1e-6:
-            temps.append(t)
-            t -= t_step
-        if not temps or abs(temps[-1] - t_end) > 1e-6:
-            temps.append(t_end)
-
-        temp_list_str = " ".join(str(int(t) if t == int(t) else t) for t in temps)
-
-        seed = (int(cfg["_velocity_seed"]) if cfg.get("_velocity_seed") is not None
-                else random.randint(10000, 999999))
-
-        if write_per_t_dump:
-            per_t_dump_block = (
-                f"  dump per_t_snap all atom 1 {per_t_dump_file}\n"
-                f"  dump_modify per_t_snap append yes\n"
-                f"  run 0\n"
-                f"  undump per_t_snap\n"
-            )
-        else:
-            per_t_dump_block = ""
-
-        # Progress reporting: write a JSON event per temperature step if PROGRESS_FILE given.
-        pf = cfg.get("PROGRESS_FILE", "")
-        progress_line = (
-            '  shell echo \'{"stage":"T${temps}","status":"done"}\''
-            f' >> {pf}\n'
-            if pf else ""
-        )
-
-        script = f"""\
-# ============================================================
-# PolyJarvis LAMMPS Engine - Tg Sweep Staircase
-# T_START={t_start} → T_END={t_end} K, step={t_step} K
-# {len(temps)} temperature points × {n_steps} steps/T
-# ============================================================
-{floor_comment}
-log {log_file} append
-units real
-atom_style full
-boundary p p p
-
-# --- Force Field Styles ---
-{subs["PAIR_STYLE_BLOCK"]}
-dielectric 1.000000
-bond_style {subs["BOND_STYLE"]}
-angle_style {subs["ANGLE_STYLE"]}
-dihedral_style {subs["DIHEDRAL_STYLE"]}
-improper_style {subs["IMPROPER_STYLE"]}
-{subs["SPECIAL_BONDS"]}
-pair_modify {subs["PAIR_MODIFY"]}
-neighbor 2.0 bin
-neigh_modify delay 0 every 1 check yes
-neigh_modify one 4000
-{subs["GPU_PACKAGE"]}
-
-read_data {subs["DATA_FILE"]}
-{subs["INCLUDE_PARAMS_BLOCK"]}
-
-# --- Thermo Output ---
-thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
-thermo_modify flush yes
-thermo {thermo_freq}
-
-# --- Velocity initialization at T_START (once only — Rule A) ---
-velocity all create {t_start} {seed} mom yes rot yes dist gaussian
-
-# --- Temperature staircase (inherits momenta across steps — Rule A) ---
-variable temps index {temp_list_str}
-label TEMP_LOOP
-  timestep {timestep}
-  fix npt_tg all npt temp ${{temps}} ${{temps}} {t_damp} iso {p_target} {p_target} {p_damp}
-  run {n_steps}
-  unfix npt_tg
-{progress_line}{per_t_dump_block}  print "STAGE COMPLETE: Tg step T=${{temps}}K P={p_target}atm steps={n_steps}"
-  next temps
-  jump SELF TEMP_LOOP
-
-write_data tg_step_out.data
-"""
-
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         with open(output_path, "w") as f:
             f.write(script)
@@ -1450,6 +1315,24 @@ write_data tg_step_out.data
             subs["DUMP_BLOCK"]      = "# Dump disabled (thermo-only run)"
             subs["UNDUMP_BLOCK"]    = ""
             subs["LAST_DUMP_BLOCK"] = ""
+
+        # ── Optional per-point structural snapshot (npt_tg_step only) ──────
+        # One frame per submitted job, appended to a shared multi-frame dump via `run 0`
+        # (writes at the current, already-equilibrated state without integrating further) --
+        # extract_thermal.py's _analyze_per_t_dump reads the accumulated file as one frame per
+        # temperature. Must render BEFORE `write_data`/`quit` in the template, not appended
+        # after the whole script -- npt_tg_step.in ends with `quit`, so anything textually
+        # after the filled template would never execute.
+        if cfg.get("WRITE_PER_T_DUMP", False):
+            per_t_dump_file = str(cfg.get("PER_T_DUMP_FILE", "per_t_structs.dump"))
+            subs["PER_T_DUMP_BLOCK"] = (
+                f"dump per_t_snap all atom 1 {per_t_dump_file}\n"
+                f"dump_modify per_t_snap append yes\n"
+                f"run 0\n"
+                f"undump per_t_snap"
+            )
+        else:
+            subs["PER_T_DUMP_BLOCK"] = ""
 
         # ── Common placeholders present in all templates ───────────────────
         if use_pcff:
