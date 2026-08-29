@@ -34,6 +34,7 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 import remedy_economics  # noqa: E402
 
 POLICY = REPO_ROOT / "orchestration" / "decision_policy.json"
+RATIONALE_DOC = REPO_ROOT / "docs" / "decision_rationale.md"
 THRESHOLDS = remedy_economics.load_thresholds(POLICY)
 
 
@@ -219,17 +220,22 @@ def test_thresholds_come_from_the_policy_not_a_second_copy():
     assert "VARIANCE_LIMITED_SIGMA" not in src and "MIN_MARGIN_FACTOR" not in src
 
 
-def test_policy_declares_the_class_a_carve_out():
-    policy = json.loads(POLICY.read_text())
-    block = policy["policies"]["equilibration"]["remedy_economics"]
-    assert "class_A_is_always_worth_paying" in block
-    assert block["default_source"].endswith("remedy_economics.py")
+def test_rationale_doc_declares_the_class_a_carve_out():
+    # class_A_is_always_worth_paying and remedy_economics' own default_source are prose,
+    # not code-read fields -- they live in docs/decision_rationale.md, not
+    # decision_policy.json. See tests/test_decision_policy_schema.py for what
+    # decision_policy.json itself is still required to carry.
+    doc = RATIONALE_DOC.read_text()
+    assert "class_A_is_always_worth_paying" in doc
+    assert "remedy_economics.py" in doc
 
 
-def test_policy_declares_murnaghan_ladder_rationale():
-    policy = json.loads(POLICY.read_text())
-    block = policy["policies"]["equilibration"]["remedy_economics"]
-    assert "rationale_murnaghan_ladder" in block
-    assert "gate_class" in block["rationale_murnaghan_ladder"].lower() or \
-        "class c" in block["rationale_murnaghan_ladder"].lower()
-    assert "bm_compression_limit_atm" in block["rationale_murnaghan_ladder"]
+def test_rationale_doc_declares_murnaghan_ladder_rationale():
+    doc = RATIONALE_DOC.read_text()
+    # "rationale_murnaghan_ladder" also appears as a cross-reference earlier in the
+    # doc (applies_to points at it), so split on its own bolded definition, not the
+    # bare word, to land on the actual paragraph.
+    assert "**rationale_murnaghan_ladder**" in doc
+    section = doc.split("**rationale_murnaghan_ladder**", 1)[1][:2000]
+    assert "gate_class" in section.lower() or "class c" in section.lower()
+    assert "bm_compression_limit_atm" in section

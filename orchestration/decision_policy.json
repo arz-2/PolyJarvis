@@ -1,193 +1,42 @@
 {
   "_metadata": {
-    "description": "Fixed evaluation framework for scientific-agent decisions. scientific_control.py gives these criteria to the planning agent, materializes its narrow decision into run_plan.json, and validate_run_plan.py blocks structurally incomplete plans before simulation.",
     "version": "1.0",
-    "created": "2026-06-17",
-    "consumed_by": ["scientific_control.py", "validate_run_plan.py"],
-    "see_also": "polymer_rules.json:electrostatics_decision_guide is the prototype for this structure (D-03 policy).",
-    "evidence_levels": {
-      "high":   "Class-specific MD validation paper reproduces a target property (density or Tg) within ~10%, with DOI.",
-      "medium": "Force field validated for a related class or by builder constraint; no class-specific MD Tg/density paper yet.",
-      "low":    "No validation; choice made by analogy or builder availability only. Reasoned planning REQUIRED."
-    }
+    "consumed_by": [
+      "scientific_control.py",
+      "validate_run_plan.py"
+    ],
+    "see_also": "docs/decision_rationale.md holds the rationale, evidence levels, confidence-gate description, and per-decision prose this file omits."
   },
-
-  "confidence_gate": {
-    "description": "Planning context is keyed per exact canonical SMILES, never merely by class. A validated protocol is evidence the scientific agent may select; it does not bypass the planning-agent call. polymer_rules.json remains a starting-hypothesis scaffold, not a trust signal.",
-    "gate_direction": "The plan_mode↔system-validation gate is ASYMMETRIC. Only `deterministic` for a SMILES that is not `protocol_validated` (or whose validated_properties don't cover this run's requested properties) is a bypass that the Critic must ESCALATE. `reasoned` for an already-validated SMILES is the SAFE direction — never escalate it; it subjects every decision to full step-3 enforcement instead of fast-path auto-approve. A budget-forced deviation to a non-default ladder for an otherwise-validated SMILES (e.g. a rate ladder infeasible in a tight wall-clock budget) is exactly what reasoned mode exists for.",
-    "validated": {
-      "plan_mode": "deterministic",
-      "condition": "system_characterization_cache.json[canonical_smiles].protocol_validated == true AND validated_properties ⊇ properties_requested",
-      "behavior": "The scientific planning agent still runs, sees the exact-SMILES characterization record, and normally selects the validated protocol without overrides. Code materializes and validates the plan; deterministic stage scripts execute it. emc_seed/velocity_seed remain runtime values and are logged after submission.",
-      "rationale": "This exact molecule's protocol is validated; reproducibility outranks re-derivation. Do not re-reason a settled, cited decision."
-    },
-    "novel_or_partially_validated": {
-      "plan_mode": "reasoned",
-      "behavior": "The scientific planning agent reasons each decision against the policy below, records evidence/confidence/alternatives, and names the dominant uncertainty. validate_run_plan.py blocks missing criteria or evidence before deterministic execution.",
-      "applies_to": "canonical_smiles absent from system_characterization_cache.json, protocol_validated=false, or validated_properties does not cover the requested properties. Cached measured timing values may still be reused as evidence and bounded overrides."
-    }
-  },
-
-  "policies": {
-    "hardware": {
-      "decision_id": "D-08_hardware",
-      "evidence_required": false,
-      "evaluate": ["forcefield_cost_structure", "atom_count", "concurrent_load", "benchmark_evidence", "cell_size_vs_benchmark_cell", "host_match"],
-      "require": [
-        "mpi>=4 for any PPPM/charged class2 system ON THE GPU PACKAGE (engine=gpu): mpi=1 starves kspace ~75x there — never launch it. This does NOT apply to engine=kokkos, where kspace is GPU-resident and mpi=1 IS the correct PCFF/OPLS default (by_forcefield.pcff). Only flag mpi=1 when engine=gpu.",
-        "UA classes (TraPPE: PHYC/PDIE) route to GPU package with `neigh yes`, mpi=1, 1 GPU/run (neighbor build is ~71% of the loop and offloads to the GPU; script_generator emits `neigh yes` automatically for use_trappe). This is 3.7x vs CPU mpi=4 and beats KOKKOS on small UA cells (run-0 parity PASS 2026-06-20). NOT pair-only GPU (neigh on CPU ties CPU) and NOT CPU mpi=4 (the old default). PSTR (Polystyrenics) is PCFF, not TraPPE-UA — do not include it here.",
-        "small (<10k-atom) cells use 1 GPU per run, not 4 (comm overhead, GPU underfill)",
-        "Sum of mpi across concurrent runs <= 18 physical cores (one GPU-heavy run per GPU)",
-        "a multi-GPU pin (gpu_per_run>=2) requires BOTH an estimated cell >~10k atoms AND benchmark support: a real measured point (directional_probe.recommended_by_ff[fam] OR any directional_probe.size_points[fam] entry) with gpu>=2, on a host matching hardware_policy.host (hw_common.host_matches() — the SAME live-host check cost_model.estimate_ns_per_day() uses for pricing confidence). No such point exists for any family today, so every gpu>=2 pin currently fails this and must fall back to 1 GPU.",
-        "when hardware_policy.values_are_benchmarked=false OR the live host (nvidia-smi) does not match hardware_policy.host (hw_common.host_matches() — the single host-match check every D-08/cost_model consumer shares; directional_probe.measured_on still exists as provenance text but is no longer consulted for enforcement), any non-default D-08 pin MUST be accompanied by a planned hardware_benchmark probe and confidence:low — else keep the by_forcefield default"
-      ],
-      "prefer": [
-        "the by_forcefield default IS the only engine/mpi/gpu config with any real measured throughput today (recommended_by_ff[fam] and every hardware_policy.directional_probe.size_points[fam] point were all measured at that exact config, per size_points._note) — there is no second config to prefer over it. Choosing hardware now means pricing that one candidate honestly at the plan's actual cell size, via cost_model.estimate_ns_per_day()'s real log-log interpolation between size_points' measured (atoms, ns_per_day) pairs, not a fixed [0.5x, 2x] window around one point.",
-        "confidence follows cost_model's tiers: \"high\" when the plan's cell size falls within the real measured size_points range on a host-matched box; \"medium\" when interpolated/exact-matched but off-host or from a single-point family; \"low\" when extrapolating outside the measured range; \"none\" when the family (e.g. gaff) has no benchmark data at all. Treat an absolute ns/day number as a HINT scaled by this confidence, never as a bare fact — the same caution the old RATIO-vs-contended-sweep language named for the TraPPE neigh-yes flip (3.7x ratio, 0.000% parity, 2026-06-20) still applies to any newly measured point."
-      ],
-      "rationale": "Hardware config is a function of FF cost structure (UA lj/cut vs PCFF class2+pppm) AND cell size (the GPU-saturation / PPPM all-to-all crossover), so it belongs in policy, not ad-hoc submit-time choice. The live anti-patterns: mpi=1 PCFF on the GPU-package (~2.4 ns/day, ~75x slow — but mpi=1 IS correct for PCFF/OPLS on KOKKOS, where kspace is on the GPU); and UA on the GPU with neigh on the CPU (pair-only offload ties CPU). UA on the GPU with `neigh yes` is the CORRECT default (3.7x), NOT an anti-pattern. A D-08_hardware deviation flows through decided_params (engine/gpu_per_run/mpi_ranks) into stage_params.apply_plan. The conservative gate above keeps the default until a CLEAN (values_are_benchmarked=true), host-matched, in-size benchmark exists.",
-      "evidence_source": "polymer_rules.json:hardware_policy.directional_probe.{recommended_by_ff,size_points,cells_atoms,measured_on,date,values_are_benchmarked}",
-      "default_source": "polymer_rules.json:hardware_policy.by_forcefield.<FF_FAMILY> (the only priced config per family today — recommended_by_ff/size_points describe its own measured throughput, not an alternative to switch to)",
-      "tooling": "orchestration/scripts/select_hardware.py implements this policy's require/prefer clauses (FF-alias resolution, cell-atom estimate, real cost_model.estimate_ns_per_day() pricing at the plan's own cell size, deviate-from-default diff, staleness flagging) mechanically. The multi-GPU require clause above (\"directional_probe...gpu>=2 on a matching host\") is enforced separately from pricing confidence by validate_run_plan.py's _family_has_multi_gpu_benchmark: since every measured point in this repo (both recommended_by_ff and size_points) used gpu=1, a well-supported (high-confidence) ns_per_day number at a given atom count is NOT evidence that a gpu_per_run>=2 pin is itself benchmarked — those are different claims, and a gpu>=2 pin still requires its own real gpu>=2 measured point regardless of how well-priced the 1-GPU throughput is. The Planner calls select_hardware.py and transcribes its D-08 decision row + any decided_params override + uncertainties entry verbatim — it does NOT re-derive these thresholds in prose, so this policy stays the single source of truth for the numbers."
-    },
-    "forcefield": {
-      "decision_id": "D-01_ff",
-      "evidence_required": true,
-      "evaluate": ["literature_support", "parameter_coverage", "validation_data", "computational_cost"],
-      "evidence_fields": ["ff_justification_doi", "ff_note", "citations"],
-      "require": ["the chosen FF must have parameter coverage for every atom type in the SMILES", "force field assigned AFTER polymerization for RadonPy path"],
-      "rationale": "FF choice dominates property accuracy. A choice without literature_support + validation_data is low-confidence and the Critic must flag it. Alternatives with their known error must be recorded.",
-      "default_source": "polymer_rules.json:classes.<CLASS>.preferred_ff",
-      "tooling": "orchestration/scripts/select_forcefield.py implements this policy's require clauses mechanically: ff_capability.py builds the SMILES under each field as a HARD admissibility gate (parameter coverage is measured, never read off a table), ff_provenance.py flags parameters that were locally patched, silently zeroed, or taken from a wildcard fallback, and ff_domain.py's archive prior is REPORTED ONLY. The Planner calls it and transcribes its D-01 decision row, decided_params override and uncertainties entry verbatim.",
-      "evidence_source": "orchestration/scripts/ff_capability.py (admissibility, measured per SMILES); orchestration/scripts/ff_provenance.py + emc_fields/manifest.json (parameter provenance); polymer_rules.json:classes.<CLASS>.{preferred_ff,ff_justification_doi,ff_note}",
-      "archive_prior_is_not_a_ranking": "ff_domain.py's leave-one-family-out backtest on this archive measures corr(extrapolated atom fraction, |density error|) = -0.64 and |K error| = -0.26 — both NEGATIVE, i.e. more extrapolation went with better agreement. The signal is confounded and must never gate or rank a field; it records what an archive-carried accuracy prior is worth, nothing more.",
-      "provenance_flag_is_acknowledgeable": "A blocking provenance flag does not veto a field — several classes have exactly one route (PSIL builds only because of a local OPLS patch). It is cleared by an uncertainties entry naming the flagged field, so the plan carries the parameter's origin as a stated uncertainty instead of inheriting it silently."
-    },
-    "charges": {
-      "decision_id": "D-02_charges",
-      "evidence_required": false,
-      "evaluate": ["backbone_polarity", "charge_method_cost", "ff_embedded_vs_qm"],
-      "require": ["charge method consistent with the chosen FF (e.g. TraPPE-UA embeds charges; PCFF uses bond-increment/Gasteiger)"],
-      "rationale": "Apolar UA backbones embed charges in the FF (no QM). Polar all-atom systems need explicit charges. Solubility/CED accuracy degrades for Gasteiger-charged apolar systems — flag charge_method downstream.",
-      "default_source": "polymer_rules.json:classes.<CLASS>.charge_method"
-    },
-    "electrostatics": {
-      "decision_id": "D-03_electrostatics",
-      "evidence_required": true,
-      "evaluate": ["backbone_heteroatoms", "max_partial_charge", "computational_cost"],
-      "require": ["heteroatom-containing or |q|>0.1e backbones MUST use pppm; pure C/H backbones MAY use lj_cut"],
-      "rationale": "Already encoded as polymer_rules.json:electrostatics_decision_guide. This policy points the Critic at that guide; neglecting long-range Coulomb biases density/Tg by 5-20% for polar polymers.",
-      "default_source": "polymer_rules.json:electrostatics_decision_guide"
-    },
-    "system_size": {
-      "decision_id": "D-04_system_size",
-      "evidence_required": false,
-      "evaluate": ["property_target", "finite_size_effects", "gpu_budget"],
-      "require": ["DP above the Fox-Flory plateau (DP>=20) for Tg targets", "bulk_modulus targets: entanglement-MW DP/nchain (per-class) is reported for context, NOT a require -- user-directed benchmark acceptance criterion, 2026-08-25: entanglement Me gates plateau shear modulus/viscoelastic relaxation (reptation dynamics), not the isothermal bulk modulus K_T=-V(dP/dV)_T, an EOS/local-packing quantity. The actual acceptance criterion is chain-length CONVERGENCE of density/K (a DP sweep confirming both plateau), not DP>=DP@Me -- no DP floor is mechanically enforced for bulk_modulus alone","cell large enough to avoid self-imaging — MECHANIZED as spatial.finite_size by check_equilibration_comprehensive (needs cutoff_A, threaded from polymer_rules.json via stage_params.py). Two binding Class A criteria on L = min(Lx,Ly,Lz): L >= 2*cutoff_A (minimum image; below it an atom interacts with its own periodic image and the pair potential itself is wrong) and L >= 2*Rg (each chain overlaps its own image, biasing packing and therefore density and the moduli). L >= R_ee is reported but ADVISORY — running slightly below it is common in published polymer MD and far weaker evidence than the 2*Rg criterion. Both binding failures are STRUCTURAL: no trajectory length fixes a box dimension, so the remedy is to raise nchain and rebuild (L grows as nchain^(1/3) at fixed density)"],
-      "rationale_finite_size": "This clause existed as prose from the start and nothing checked it. Measuring the 36-run archive: minimum image is satisfied everywhere (L/2*cutoff 1.49-2.44, 0 violations), but FOUR runs violate chain self-imaging — PEEK1 at L/2Rg=0.74, PSU4 0.78, PSU2 0.99, PE2 0.96 — and seven have L < R_ee. The two worst sit in exactly the families with independently documented density anomalies (PEEK ~5% under-dense, PSU -4% systematic), and PEEK1 also carries the degenerate 0.0 K transition width. Several independent signals therefore converge on those cells simply being too small for their chains — a physical explanation for anomalies previously attributed to force-field bias. Supersedes the INCONCLUSIVE_SIZE homogeneity guard, which could only fire below ~300 atoms (the adaptive voxel grid pins atoms/voxel near 25 by construction) and so never fired on a real cell.",
-      "rationale": "Too-small DP biases Tg low and K high. Too-large wastes GPU budget. The probe option (fast small-cell density screen, ROADMAP E3) reduces finite-size uncertainty cheaply before committing the full cell.",
-      "default_source": "polymer_rules.json:classes.<CLASS>.{dp_typical,nchain,density_initial_gcm3}",
-      "tooling": "orchestration/scripts/select_system_size.py implements this policy's Fox-Flory require clause mechanically: the DP floor is a function of properties_requested (Fox-Flory for tg, no floor for bulk_modulus alone or density-only). Entanglement Me for bulk_modulus is resolved per-member via the run's own SMILES against polymer_rules.json's member_smiles table (hw_common.resolve_member; never generalized across a multi-member class, and never keyed off run_name) and reported as an entanglement_dp_advisory uncertainty, but never feeds required_dp_floor/decided_params_override (advisory only, see the require clause above). A class default already above the Fox-Flory floor is reported as size_over_provisioned rather than silently shrunk -- this function itself is UNCHANGED and stays the live check validate_run_plan.py's _system_size_findings re-runs against every plan's own smiles/properties/decided_params at validation time (same pattern as D-08's _hardware_findings re-running select_hardware.py), including frozen protocol_validated replays, so it must never auto-shrink anything. Real cost-minimization lives one layer up, additively: solve_system_size() (same file) is called only from scientific_control.py's materialize_plan(), which only ever produces plan_mode=\"reasoned\" plans (never a replay) -- it fills dp_typical/nchain with the floor-clearing minimum whenever the Planner's own decision left them unset (shrinking a bloated class default toward, never below, the mechanized floor), prefers a literature-grounded per-SMILES DP/Me over the class default when system-size-literature-worker found one, and self-acknowledges a still-over-provisioned result (system_size_over_provisioned in uncertainties[]) so the validator's own symmetric check never has to guess why. A Planner's explicit override always wins over the auto-fill. A Planner MAY still call select_system_size.py directly and transcribe its D-04 decision row + any decided_params override + uncertainties entry into the plan for provenance/self-documentation -- it does NOT re-derive these thresholds in prose -- but that transcription is no longer what makes the check bind. orchestration/scripts/plan_system_size_arms.py is the opt-in follow-on: when a class has a documented Me, it splits one run into two independently-sized arms instead of paying the union's floor for the whole pipeline, deciding via a real GPU-hours comparison (cost_model.py, tg-sweep cost at each floor) when the caller supplies an equil_gpu_hours_per_1k_atoms estimate for the extra build+equil pipeline a split needs, falling back to the original tg/bulk_modulus-floor divergence ratio (labeled explicitly as a proxy, not a cost measurement) when it doesn't (run_name is used there only to name the two arms, never for member identity); orchestration/scripts/merge_arm_summaries.py combines the two arms' results afterward. The L>=2*Rg finite-size half of this policy's require clause remains separately mechanized by check_equilibration_comprehensive/validate_run_plan.py's _finite_size_findings, not this script."
-    },
-    "equilibration": {
-      "decision_id": "D-05_convergence",
-      "evidence_required": false,
-      "evaluate": ["density_convergence", "energy_convergence", "chain_statistic_convergence"],
-      "require": ["check_equilibration_comprehensive overall_pass=True before ANY property extraction (cross-stage rule 2); EXCEPT glassy systems with DP>=30 OR ct_gate_reliable=false, which use require_glassy (see below); EXCEPT rubbery systems (T_workflow_K > Tg_K), which use require_rubbery (see below)"],
-      "require_glassy": ["for regime=glassy AND (DP>=30 OR class ct_gate_reliable=false): gate on Poisson-corrected density homogeneity signal CV<=0.11 AND P2 nematic<0.10 AND energy drift/SEM within bounds AND n_eff_density>=20 AND density_value_binding (see below). The melt chain-self-diffusion metrics (C(t) decay, MSD diffusivity, MSID slope, Rg chain-chain CV) are ADVISORY (logged, non-blocking). overall_pass may be False on these advisory metrics without blocking property extraction. Density-vs-experiment agreement is NEVER a gate criterion, here or anywhere in D-05 -- a novel system may have no curated experimental density at all, and a known system must not be gated on it either (see density_value_binding, which is a self-consistency check, not an agreement check)."],
-      "require_rubbery": ["for regime=rubbery (T_workflow_K > Tg_K, e.g. PE/PP/PIB/PBD/PI at 300K): gate on density block-SEM < 1% AND Poisson-corrected density homogeneity signal CV <= 0.11 AND energy drift/SEM within bounds AND n_eff_density >= 20. The terminal chain-reptation metrics (C(t) full decay, MSD diffusivity, tau_relax, MSID slope, Rg chain-chain CV) are ADVISORY (logged, non-blocking). overall_pass may be False on these reptation-limited metrics without blocking property extraction, provided the density/energy gating criteria pass."],
-      "density_value_binding": ["Unconditional self-consistency check for every glassy run with both a melt and a 300K glass state (regardless of whether any curated experimental density exists): tool:assess_cooling_contraction(melt_data=<the cool_block_NN tagged as the melt/production reference -- see generate_equilibration_workflow's own melt_data_path return field>, glass_data=npt_final_out.data, tg_K, t_equil_K) computes contraction_shortfall = actual melt->glass density contraction / the contraction the system's OWN alpha_glass/alpha_melt thermal-expansion coefficients predict (generic literature-typical constants, never a class-curated value -- see rationale_density_value_binding). Route on the verdict:",
-       "  - UNDER_ANNEALED_COOLING (contraction_shortfall < 0.97): the cell densified less on cooling than its own thermal-expansion physics predicts -- frozen-in free volume. BINDING (Class A, see gate_classes below). Recover via re_melt_slow_recool (see equilibration recovery). Do NOT EXTEND at 300 K (a glass cannot densify below Tg).",
-       "  - OK (contraction_shortfall >= 0.97), or INSUFFICIENT_DATA (glass density unmeasurable): non-blocking.",
-       "  - extrapolation_reliable=False (cooling span >300 K, e.g. PEEK): the contraction prediction is indicative only; treat the verdict as a starting hypothesis, not a firm diagnosis.",
-       "  Rationale: convergence (drift/SEM flat) proves the cell stopped moving, not that it stopped at a physically consistent value. This is purely a self-consistency check -- it never compares to an experimental or curated value, so it applies uniformly to novel and well-characterized systems alike."],
-      "rationale": "This is the philosophy's 'convince me it is equilibrated' gate — already implemented as check_equilibration_comprehensive. The policy makes it a hard plan success_criterion, not an afterthought. The Validator enforces it after the equil stage.",
-      "minimize_convergence": "Precedes every gate above: LAMMPS' minimize command always exits 0, even when it stops at MAXITER/MAXEVAL without meeting ETOL/FTOL, so a chain-script-level check (grep the minimize stage's own log for its stopping-criterion line; convergent iff it names 'tolerance' or 'linesearch alpha is zero', never 'max iterations'/'max force evaluations') halts the chain as MINIMIZE_NOT_CONVERGED before NVT/NPT ever commits an unrelaxed structure. Not itself part of the require_glassy/require_rubbery gate machinery -- a pre-gate structural check. Remedy: raise_minimize_tolerance (workflow_engine.py) escalates minimize_maxiter/minimize_maxeval x4 and loosens minimize_etol/minimize_ftol x10 per attempt (cap 2), full restart each time (minimize is stage 0, nothing to resume from).",
-      "rationale_glassy": "For glassy high-MW polymers (DP>=30), and for rigid-aromatic classes with ct_gate_reliable=false (PSFO/PKTN at any DP — C(t) is structurally undefined via atom-type backbone), melt chain self-diffusion is unattainable on MD timescales (measured tau_relax ~3.6e9 ps for DP=60 PVC; a 1-2 ns extend moves C(t) only ~0.4%->0.5%), so overall_pass=True is unsatisfiable by construction. The 5-cycle high-T anneal substitutes for melt self-diffusion. The metrics that actually bound structural quality for density/Tg/glassy-K_T — density plateau, homogeneity CV, P2 — are gating; the diffusion-limited metrics are advisory. Authorized 2026-06-20 (PVC1 route-back, user-approved). Applies campaign-wide to glassy revision polymers.",
-      "rationale_rubbery": "For rubbery high-MW polymers at T_workflow_K > Tg_K, terminal chain reptation time >> accessible MD simulation time even at high melt temperature (measured tau_relax ~88 ns KWW for DP-120 PE at 550 K; MSD alpha=0.28 subdiffusive). The requested properties — density (packing/cohesion), Tg (segmental kinetics), rubbery-K (P-V EOS volumetric response) — are governed by local packing and cohesive energy, not terminal reptation; each property has its own downstream gate (density block-SEM, Tg bilinear R^2, Murnaghan volume convergence per pressure point). Authorized 2026-06-22 (user-approved, PE1 critic round-2 precedent). Applies campaign-wide to PHYC/PDIE rubbery replicates.",
-      "eq_annealing_cycles_is_a_real_runtime_knob": "Superseded again by the 8-stage adaptive equilibration redesign: eq_annealing_cycles (a cycle COUNT) no longer exists as a concept. Densification now precedes annealing (anneal used to run on the low-density as-built cell before compression -- the bug this redesign fixes), and annealing itself is one continuously-extendable NVT hold at max_temp (anneal_heat, a fixed short ramp, then anneal_hold, generated with only its first block) bounded by anneal_cap_steps (a TIME cap, not a cycle count) -- see server.py's generate_equilibration_workflow. workflow_engine._continue_npt's restart-continuation mechanism (read_restart, appended log/dump, extend_only=True) is what lengthens anneal_hold, npt_densify_hold, any cool_block_NN, nvt_kinetic_stability, or npt_final -- never a fresh stage with a larger N_STEPS. UNDER_ANNEALED_COOLING's remedy (workflow_engine._cooling) now escalates cool_block_hold_steps and resumes from the anneal_hold checkpoint, since cool_block (max_temp -> final_T_K, blockwise) is the sole stage sequence that crosses Tg in this design -- there is no separate npt_cool300 stage anymore.",
-      "gate_classes": {
-        "purpose": "A gate rejects physically/thermodynamically inadmissible results; predicting agreement with experiment is a separate job needing separate evidence. Classify a check before arguing about whether to bind it.",
-        "A_admissibility": "Binds on physical or thermodynamic impossibility. Justified by the physics it violates, NOT by how often it fires — a validity gate that never fires on the archive is still correct, because its value is what it rejects in future. Never fixable by EXTEND, never excused as known force-field bias. Members: p2 (amorphousness), density_homogeneity, finite_size (minimum image and chain self-imaging), density_value_binding (melt->glass contraction failing its own thermal-expansion prediction is a structural cooling-protocol defect, not a sampling deficiency -- remedy is re-melt+slow-recool, never EXTEND, matching every other Class A member), plus the mechanical/thermal admissibility sets under property_method and tg_protocol.",
-        "B_convergence": "Binds on insufficient sampling of an otherwise valid state; judged by statistical adequacy. Remedy is EXTEND. Members: density/energy drift and block-SEM, n_eff_density, Murnaghan ladder identifiability (bm_convergence_verdict=BM_LADDER_NOT_CONVERGED with confidence=high, i.e. plateau_confirmed=False -- the fit's own next-larger-trim self-consistency check; see property_method's rationale_bm_admissibility for why the sibling leave-one-out/B0'-band diagnostics stay confidence=low and non-binding pending archive calibration).",
-        "C_agreement": "Binds on distance from experiment; the ONLY class where correlation with known-good reference values is the right evidence. No D-05 (equilibration) member is in this class anymore -- density_in_band/density_value_binding-as-agreement-check were retired campaign-wide (a novel system may have no curated experimental density, and even a known system must not be gated on it). Class C stays conceptually live elsewhere in this policy for Tg/K-vs-experiment grading (tg_protocol, property_method) -- those are unaffected.",
-        "D_advisory": "Timescale-limited quantities unattainable within accessible MD, so binding them makes the gate unsatisfiable by construction. Logged, never blocking. Members: ct, msd_not_trapped, msid_gaussian, rg; plus residual_stress until its magnitude bound is calibrated.",
-        "verdict_vocabulary": "Subsystem-prefixed so a bare token in a run_log, RECOVERY block or summary row names the field that produced it. equil_verdict: PASS | EXTEND | STRUCTURAL_FAIL | FAIL (unprefixed, Foundation-only, unambiguous). tg_gate_verdict: TG_REPORTABLE | TG_REVIEW | TG_NOT_REPORTABLE. bm_gate_verdict: BM_REPORTABLE | BM_FALLBACK_DEFORM | BM_INADMISSIBLE. bm_convergence_verdict: BM_LADDER_CONVERGED | BM_LADDER_NOT_CONVERGED (additive to bm_gate_verdict, never folded into its three values -- answers whether the pressure RANGE identified B0', not whether the fit is admissible; see gate_classes.B_convergence and property_method.rationale_bm_admissibility). deform_gate_verdict: DEFORM_REPORTABLE | DEFORM_INADMISSIBLE. density_homogeneity.verdict: HOMOG_PASS | HOMOG_HETEROGENEOUS. finite_size.verdict: SIZE_PASS | SIZE_CHAIN_SELF_IMAGE | SIZE_MIN_IMAGE_VIOLATION.",
-        "never_bind_a_z_score": "A significance threshold grows as sqrt(n), so it gets HARDER to pass the longer a cell is equilibrated — the same defect as binding C(t). Bind magnitudes against a physical scale and read z only as resolved/unresolved."
-      },
-      "rationale_homogeneity_signal_cv": "The raw voxel CV mixes real heterogeneity with counting shot noise, and the noise floor moves with cell size: integer rounding of the adaptive grid (target ~25 atoms/voxel) leaves 20.5-32.8 atoms/voxel across the 36-run archive, so poisson_cv spans 0.175-0.221 and a fixed raw-CV bound of 0.25 implies an effective signal threshold varying 0.117-0.179 — a 1.5x swing in strictness driven by cell size alone. It mis-ranked 15 ordered pairs (PS3 signal CV 0.168 PASSED while PSU3 at 0.124 FAILED). Gating the noise-subtracted signal CV makes the criterion mean the same thing at every cell size. Threshold 0.11 is calibrated on the archive: the three families with independently confirmed heterogeneous underpacking (PMMA -6%, PS aromatic-PCFF underpack, PSU -4%) span 0.120-0.192 while every other family spans 0.000-0.094 — a clean gap with perfect family-level separation. PEEK lands on the pass side at 0.021-0.072, correctly: its ~5% under-density is uniform force-field underbinding, not spatial heterogeneity, and the two need different remedies. The new rule is a strict superset of the old — nothing that failed now passes.",
-      "rationale_n_eff_density": "n_eff = n_production/tau_eff, with tau_eff the integrated statistical inefficiency. Two bugs previously made this unusable: compute_tau_eff averaged the blocking curve's TAIL (largest block sizes, 4-8 blocks) instead of its plateau, underestimating tau by 4.3-38.9x, and n_eff carried a spurious extra factor of 2 on top of an already-integrated tau. Fixed, the archive spans n_eff 11-899 and only PMMA1 (11) and PEEK4 (17) fall below 20. Class B, so it routes EXTEND — more NPT at the same temperature is exactly the remedy. Do not raise to 30-50: that fires on runs whose density is demonstrably converged.",
-      "rationale_residual_stress": "Under fix npt iso only the pressure TRACE is controlled, so the box is cubic by construction and box-shape isotropy is a vacuous check (measured spread exactly 0.00%). A persistent difference among Pxx/Pyy/Pzz is NOT vacuous: it is a departure from mechanical equilibrium, and the Murnaghan EOS assumes a hydrostatic reference state. Measured: melts are stress-isotropic (z=0.06-3.1) while glassy cells carry 100-290 atm of resolved deviatoric stress (z=3.8-12.3), i.e. 10-29% of the +/-1000 atm pressure increment — frozen in during cooling, though sign flips implicate anneal-cycle count more than cooling rate. It does not correlate with K (within-family Spearman 0.090, p=0.674), which is the expected and irrelevant result for a Class A condition on an archive with no admissible comparison group. Emitted and logged now; bind the MAGNITUDE as a fraction of bm_pressures_atm once calibrated, never the z-score.",
-      "rationale_density_value_binding": "A converged glassy 300K state can still be kinetically trapped independent of whether the true experimental density is known — the shortfall between predicted and observed melt->glass contraction is a self-contained signal, needing no experimental or curated thermal-expansion reference. Originally authorized 2026-06-29 on a PMMA forensic case (melt 1.055 g/cm3 matches experiment, glass contracted only +5.8% on cooling vs +12% the system's own thermal-expansion coefficients predicted -- contraction_shortfall ~0.945, well under the 0.97 threshold) using PACR's class-curated alpha_glass/alpha_melt; the PMMA case still fires UNDER_ANNEALED_COOLING under the reframed, always-generic-alpha computation. Reframed 2026-08-20: the gate no longer requires or reads exp_density_gcm3/alpha_glass_per_K/alpha_melt_per_K at all -- it fires unconditionally on contraction_shortfall alone, so it now covers systems with no curated experimental data too, not fewer than before.",
-      "remedy_economics": {
-        "purpose": "Decide whether a recovery rung is worth spending BEFORE spending it. A rung buys accuracy with wall time, which only works when the residual is a sampling term. Classify the residual first, then price the lever.",
-        "tooling": "orchestration/scripts/remedy_economics.py implements this policy mechanically (residual classification, log-linear closure forecast, break-even lever, margin factor, cost to the physical target). recover.md's ladder calls it and the recovery-agent transcribes its verdict + reason verbatim - neither re-derives these thresholds in prose, so this policy stays the single source of truth for the numbers.",
-        "applies_to": "Every ladder rung that trades wall time for a property value: RE-ANNEAL multipliers, HEAVY-MELT-ANNEAL MULT, EXTEND beyond the first, any proposal to re-run a Tg sweep at a slower rate, and widening the Murnaghan pressure ladder beyond the first BM_LADDER_NOT_CONVERGED point (see rationale_murnaghan_ladder). NOT to REBUILD-LARGER (see class_A_is_always_worth_paying).",
-        "test_1_residual_type": "gap_over_sem = |target_floor - current| / SEM. At or below 3*SEM the residual is VARIANCE and more sampling is the right lever. Above it the residual is BIAS and wall time cannot reduce it - no rung length changes a biased estimator's expectation. A Class B gate whose gap is bias has been mis-classified; re-classify before extending.",
-        "test_2_closure": "Fit metric = A + B*ln(lever) over the rungs already spent, solve for the break-even lever at target_floor, and take margin_factor as break_even/delivered (or its inverse when a larger lever is the improvement). Below 1.0 the rung is forecast to fail outright. Below min_margin_factor it is a bet the forecast cannot call, and the rung is not worth its wall time. A single spent rung determines no slope: spend exactly one to measure it, then re-run this check before spending a second.",
-        "test_3_converged_or_lever_dependent": "Extrapolate to the PHYSICAL target (the experimental value, never the band edge) and price it at the last rung's measured wall time. Above converged_cost_ceiling_hours the property is lever-limited: a rung that buys a passing but lever-dependent number is worse than an annotated failing one, because the annotation is what survives into the manuscript. STOP and annotate even when test 2 passes.",
-        "thresholds": {"variance_limited_sigma": 3.0, "min_margin_factor": 2.0, "converged_cost_ceiling_hours": 200.0},
-        "class_A_is_always_worth_paying": "Class A admissibility failures are bias that the class's own structural remedy removes COMPLETELY and at a bounded one-time cost - rebuild the cell, re-route the method. They are the one case where spending is unconditionally correct, and the economics tests do not apply. PEEK1 at L/2Rg=0.822 paid a full Phase A restart and got the whole term removed; that is the trade this policy exists to distinguish from PMMA1's.",
-        "rationale": "Every residual in the 2026-08-11 runs was bias, not variance: PMMA1 density SEM 0.0003 g/cm3 against a 0.064 gap to 1.19 (~210x), cis-PBD1 Tg fit uncertainty 8.9 K against a 45.2 K method gap and a 34-57 K rate offset, PEEK1 L/2Rg=0.822 which no trajectory length fixes. Each stopping call was correct and each was made by a human at the point the mechanized ladder said 'spend the next rung'. The ladder prices nothing: it escalates 2x then 4x regardless of whether the forecast clears. On PMMA1 the recovery-agent had already done this arithmetic by hand (break-even 83.6 K/ns, 4x delivering 62.5, ~1.3x margin, and a physical target ~2 orders of magnitude out of reach) and still had to route the decision to a human because no policy licensed it to stop. This block licenses it.",
-        "rationale_min_margin_factor": "2.0 is a judgement calibrated on one case, not a derived constant, and is the clause to revisit first as evidence accumulates. PMMA1's rung-2 forecast carried 1.33x and the human stopped; the archive contains no spent rung with a recorded forecast on the other side of the line. Note that a two-point history has zero residual degrees of freedom, so the fit reports no prediction band - margin_factor deliberately measures headroom in the LEVER rather than dressing a two-point extrapolation in a standard error it cannot support.",
-        "rationale_murnaghan_ladder": "BM_LADDER_NOT_CONVERGED (confidence=high, i.e. plateau_confirmed=False) prices identically to mechanical_sampling_factor: --gate-class C, --lever bm_compression_limit_atm, --lever-direction higher, --cost-exponent 1.0 (see tests/test_remedy_economics.py's murnaghan_sampling_factor tests for the identical pattern on a sibling Murnaghan lever). This is deliberate even though gate_classes above correctly classifies the underlying defect (an under-sampled pressure range) as Class B convergence: decide()'s gate_class=B path returns immediately after the binary variance-vs-bias residual test and never reaches the log-linear closure/margin-factor machinery that 'how much wider is worth it' actually needs -- that machinery is Class-C-only. Taxonomy and pricing procedure answer different questions here. --sem/--physical-target are omitted, same reasoning as mechanical_sampling_factor: the metric (plateau/leave-one-out instability, a %) is not itself an SEM with a true value to converge toward. Only the first widening (local_cap=1, see murnaghan_ladder_extend in workflow_engine.py) is free/automatic, matching every other mechanical-track remedy and this policy's own applies_to clause (EXTEND beyond the first); a second widening requires this pricing call before it is authorised.",
-        "rationale_converged_cost_ceiling_hours": "200 h is invented, not derived - the same honesty that applies to min_margin_factor, and it fires the more consequential verdict of the two (a rung that would clear the gate is refused because the value behind it would still be lever-dependent). It is set at roughly one campaign's worth of GPU time on this workstation, so 'reaching the true value costs more than the whole campaign' is the thing it detects. The verdicts it has to separate are not close to it: PMMA1's physical target prices at 2503 h and every SPEND case at well under 50 h, so nothing in the archive lands near the boundary and no evidence yet constrains it further. Revisit it only when a run does land near it.",
-        "rationale_not_an_empirical_prior": "These tests rest on physics arithmetic, never on historical rung hit-rates. PEEK1's gate code was fixed by a concurrent session between its EXTEND and PASS verdicts, so that PASS is not evidence the extension was necessary - the archive cannot support a 'does EXTEND usually work' prior, and this policy does not ask it to.",
-        "default_source": "orchestration/scripts/remedy_economics.py"
-      },
-      "default_source": "tool:check_equilibration_comprehensive + tool:assess_cooling_contraction (density-value routing)"
-    },
-    "tg_protocol": {
-      "decision_id": "D-06_tg_fit_quality",
-      "evidence_required": false,
-      "evaluate": ["t_range_brackets_experimental_tg", "n_temperature_bins", "bilinear_fit_r_squared", "cooling_rate_artifact", "tg_rates_clear_steps_floor", "primary_rate_selection_convention"],
-      "require": ["never report Tg without verifying bilinear fit R^2 (cross-stage rule 3)", "reportability is mechanized as extract_thermal's tg_gate_verdict — route on it, never re-derive it: NOT_REPORTABLE (fit_quality=POOR or primary_fit_invalid) blocks reporting the Tg; REVIEW (|Tg_K - Tg_alternative_K| > 20 K) halts to human review first. Class A admissibility conditions already enforced inside that rating: transition_width_c_K < 5 K (a zero-width glass transition is impossible — a sharp-kink fit artifact that can still score r^2 > 0.997, as PMMA1 did at 0.1 K width and EXCELLENT), slope_signs_valid (both dR/dT < 0), slope_ordering_valid (alpha_rubbery > alpha_glassy), and tg_pinned_to_sweep_endpoint. Blocking the REPORT is separate from the is_glassy ROUTING, which may still fall back to the plan's experimental_tg_K", "T sweep range must bracket experimental_tg_K with margin", "default single-rate-primary sweeps at the HIGHEST configured tg_rates_K_per_ns entry, so that entry especially must clear tg_min_steps_per_T: N=tg_t_step_K/(rate*dt_fs*1e-6) >= floor (default 200000 steps=200ps@dt=1fs; TraPPE-UA dt=2fs floor=100000). Critic MUST recompute N independently — never trust the decision's prose arithmetic. Retired [40,160,400] gave 50/125ps degenerate fits (cis-PBD2, PEEK2)", "classes whose highest configured rate is documented as unreliable (PKTN, PSFO — cold-start/degenerate fit on the rigid-aromatic staircase) must carry tg_slope_gate_fallback=\"slowest_rate\" in polymer_rules/decided_params so the thermal track runs tg_rates_K_per_ns[0] instead of the highest-rate default; the critic verifies this is set for any class with known highest-rate degeneracy, not transcribed blindly."],
-      "rationale_tg_method_gap_exemption": "The primary/alternative Tg gap exceeds 20 K on 4 of the 8 archived Tg runs (PEEK1 32.7, PSU1 40.3, cis-PBD1 41.6, cis-PBD2 80.1) — half the thermal track, concentrated in the rigid-aromatic classes whose highest-rate staircase degeneracy is already documented. Binding it without the tg_slope_gate_fallback exemption would repeat the C(t) mistake: a gate that fires mostly where a known, already-handled artifact lives. Exempt classes record the gap as a reason without forcing REVIEW, so cis-PBD1 (PDIE, no documented degeneracy) still routes REVIEW while PSU1 does not.",
-      "rationale_dcp_reported_not_gated": "A glass transition with essentially no heat-capacity step is not a glass transition, so a dCp floor looks like a natural Class A gate. It is emitted (dCp_weak_step_flag) but NOT bound: the two lowest archived values, PEEK1 0.037 and cis-PBD2 0.018 J/g/K against a typical 0.1-0.3, are already caught by transition_width_degenerate and slope_sign_invalid respectively. A floor would add no independent discrimination while inventing a threshold the data cannot justify, and a weak-but-real transition can legitimately show a small step.",
-      "rationale": "A too-narrow T range gives R^2<0.80 / <4 bins (known /recover failure mode). Planning the range from experimental_tg_K +/- margin catches this before the sweep runs.",
-      "default_source": "polymer_rules.json:tg_protocol_reference"
-    },
-    "property_method": {
-      "decision_id": "D-07_property_method",
-      "evidence_required": true,
-      "evaluate": ["phase_glassy_vs_rubbery", "method_physics_validity", "gpu_vs_cpu", "rate_artifact"],
-      "require": [
-        "glassy bulk_modulus via Murnaghan NPT compression at 300 K (primary — symmetric, cell-size independent; Wu 2019 Comput. Mater. Sci. validated); uniaxial deformation fallback if Murnaghan fails (fit_converged=False only — B0_prime outside [4, 20] is a WARNING annotation, not a fallback trigger), paired with a slower-rate rate-sensitivity check; Born+NVT REMOVED (PCFF+PPPM virial incompatibility — K_Born 8-15x too high, Var(P) ~10^7x too high, failed 3/3 pipeline runs PMMA4/PVC1/PEEK1 2026-06-21; see BM_ANALYSIS.md)",
-        "rubbery bulk_modulus via Murnaghan EOS sweep at T>Tg; volume fluctuation is cross-check only. With no class-level bm_pressures_atm, Murnaghan now always submits (2026-08-09) via guides/MURNAGHAN.md's two-leg PROBE protocol (compression to 15000 atm + a shallow -200 atm tension probe; a clean probe earns a follow-up leg at the POXI-validated -1000 atm depth) instead of the old all-null/fluctuation-only skip -- a measured cohesive-energy-density signal was investigated as a per-system predictor for this but found directionally right, not precise enough to gate on, so the protocol is empirical (per-system probe outcome) rather than predictive",
-        "reportability is mechanized as bm_gate_verdict (Murnaghan) and deform_gate_verdict (deformation) — route on them, never re-derive. INADMISSIBLE blocks writing a K and halts to human review; FALLBACK_TO_DEFORM routes to the deformation path; r_squared>=0.999 and B0_prime outside [4,20] stay WARNINGS and never block. Deformation extraction MUST be passed deform_direction matching the deck's strain axis — a y/z leg analysed as x puts a loading slope into the transverse average, corrupting C11/C12/G/E/nu and isotropy_delta_pct and often flipping G and E negative (PLA2 deform_y: G -0.599 -> +1.105 GPa, isotropy 56.25% -> 4.62%). K is invariant, being one third of the response trace, so the historical 'G<0 is small-cell anisotropy' explanation was describing this bug, not physics",
-        "a family K is reportable only with >=3 replicates carrying a value, and no replicate flagged by aggregate_replicates.py's dispersion check (>4 leave-one-out SDs AND >10% from the other replicates' mean)",
-        "is_glassy from measured Tg>300K when tg requested, else from experimental_tg_K glassy_hint -- superseded for multi-member classes by the pinned-Tg clause below",
-        "for a multi-member class (experimental_tg_K is an OBJECT keyed by member name, e.g. PVNL {PVA:303,PVC:354,PVAc:304}; also PACR, POXI), the planner MUST resolve which member the SMILES is (by substituent — PVNL: *CC(Cl)*=PVC, *CC(O)*=PVA, *CC(OC(C)=O)*=PVAc) and pin THAT member's exp Tg/density/K in the D-04 evidence and assumptions[]. Drive is_glassy off the pinned exp Tg, never the noisy MD Tg — otherwise is_glassy/grading use the wrong target"
-      ],
-      "rationale_bm_admissibility": "Bulk-modulus reportability is mechanized as bm_gate_verdict (Murnaghan) and deform_gate_verdict (deformation fallback) — route on them, never re-derive. INADMISSIBLE covers what physics entails: K<=0, B0'<=0, volume_monotonic=false (dV/dP>0 violates mechanical stability — re-run the offending pressure point, do not re-fit), V0 outside the sampled volume range by >25% of its width (unsupported zero-pressure reference; the archive's worst legitimate extrapolation is 4.4%), r_squared<0.99 (Murnaghan form does not describe the data at all), and deform isotropy_delta_pct>=20%. That last one is NOT because K is ill-defined under anisotropy — K=(C11+2*C12)/3 is one third of the response trace and is invariant to which axis is labelled loading. It is because a SINGLE-direction Voigt K is a biased estimator when the cell is genuinely anisotropic: only one of three inequivalent directions was sampled. Evidence: PLA2's three legs give K 3.275/3.421/3.553 (8.1% spread) and its most anisotropic leg (deform_x, 28.1%) is also its worst K outlier, while PVC1's single anisotropic leg (24.2%) returns K=1.68 GPa against a Murnaghan 2.85 — 41% low. Shear-derived moduli are hit ~5x harder than K (PLA2 G spread 44.6% vs K 8.1%), so G/E/nu are the worst casualties, but K is affected enough to block. Zero of 36 archived runs violate any of these, which is the expected result for admissibility gates and no argument against them. r_squared>=0.999 is deliberately NOT binding: it has no power to predict B0 accuracy (mean |dB0| vs family mean 4.39% below 0.999 vs 4.37% at or above, Welch p=0.990; Spearman -0.066) and at that threshold rejects the two most accurate runs in the archive (PVC1 r2=0.99596 at 0.48% from its family mean, PEEK4 r2=0.99812 at 0.29%) while passing cis-PBD3 at 16.3% low. It stays a warning and the trim-selection criterion. Leave-one-out dB0 is emitted without a threshold: whole-replicate dispersion is 4.4% mean / 16.6% worst, so a >10% single-point shift is not yet shown to be pathological, and no archived or live run carries leave_one_out_refits to calibrate against. bm_convergence_verdict (assess_ladder_convergence in extract_bulk_modulus_murnaghan.py) makes this operational without overriding any of the above: it is additive to bm_gate_verdict, never folded into BM_REPORTABLE/BM_FALLBACK_DEFORM/BM_INADMISSIBLE, and answers a different question (is the pressure range wide enough to identify B0', not is the fit admissible). Its confidence split respects the calibration gap documented above -- confidence=high (the one case that auto-remedies, see gate_classes.B_convergence and remedy_economics.rationale_murnaghan_ladder) fires ONLY on plateau_confirmed=False, a self-consistency property of the fit under trimming, not an archive-calibrated accuracy claim; loo_unstable (>10%) and b0_prime_out_of_band, individually or combined without plateau_confirmed=False, stay confidence=low and are left for a human/agent to review, exactly matching this rationale's own stance that neither is yet shown to be pathological.",
-      "rationale_replicate_dispersion": "The only check that catches a run passing every per-run gate while disagreeing with its siblings — cis-PBD3's K is 16.3% below its family mean at r_squared=0.9985 with no admissibility violation. Measured in LEAVE-ONE-OUT SDs because a pooled-SD rule is unsatisfiable at small n: the largest deviation one point can have is (n-1)/sqrt(n) pooled SDs, i.e. 1.5 at n=4, so a 'beyond 2 SD' rule can never fire on a 4-replicate family — the outlier inflates the SD it is compared against. Excluding the candidate first gives cis-PBD3 16.0 LOO-SD against 2.1-3.4 for every other family's worst point. Requires BOTH >4 LOO-SD and >10% deviation: LOO-SD alone flags trivially small gaps when the remaining replicates agree tightly (PVC3, 2.7 LOO-SD on 3.0%), and a percentage alone flags ordinary scatter (PS4 15.3%, PLA3 13.7%). A property needs >=3 replicates with values to be reportable.",
-      "rationale": "Born+NVT PCFF virial incompatibility confirmed 2026-06-21 across PMMA4, PVC1, PEEK1. Even a 4-ns run (PEEK1) gave K_T=-49.6 GPa. Wu (2019) Comput. Mater. Sci. validates NPT compression as faster and more reliable than volume-fluctuation for polymer K. Murnaghan reuses existing run_bulk_modulus_series tooling; glassy path uses npt_final_out.data at 300 K (npt_final is unconditionally the terminal equilibration stage now, regardless of regime) — with no bm_pressures_atm, guides/MURNAGHAN.md's fallback is the 5-point ladder [-1000,0,3000,7000,15000] atm (glassy single-leg, not rubbery PROBE, not symmetric ±1000).",
-      "default_source": "polymer_rules.json:classes.<CLASS>.{bm_pressures_atm,exp_K_GPa}"
-    }
-  },
-
   "stage_schema_requirements": {
     "description": "Schema that every planned_stages entry must satisfy. The Critic enforces this in step 3 for reasoned plans; make_deterministic_plan.py satisfies it automatically via the STAGE_TRACK dict.",
-    "required_fields": ["stage", "track", "success_criteria"],
-    "valid_tracks": ["foundation", "thermal", "mechanical", "summary"],
+    "required_fields": [
+      "stage",
+      "track",
+      "success_criteria"
+    ],
+    "valid_tracks": [
+      "foundation",
+      "thermal",
+      "mechanical",
+      "summary"
+    ],
     "track_map": {
-      "build":        "foundation",
-      "equil":        "foundation",
-      "equil-check":  "foundation",
-      "tg":           "thermal",
-      "analyze-tg":   "thermal",
-      "murnaghan":    "mechanical",
-      "deform":       "mechanical",
-      "analyze-bm":   "mechanical",
-      "run-summary":  "summary"
+      "build": "foundation",
+      "equil": "foundation",
+      "equil-check": "foundation",
+      "tg": "thermal",
+      "analyze-tg": "thermal",
+      "murnaghan": "mechanical",
+      "deform": "mechanical",
+      "analyze-bm": "mechanical",
+      "run-summary": "summary"
     }
   },
-
   "uncertainty_reduction_probes": {
     "description": "Optional cheap experiments a reasoned plan may schedule BEFORE the full pipeline to reduce the dominant uncertainty. Each maps to an existing or planned ROADMAP capability.",
     "fast_density_screen": {
       "reduces": "ff_transferability, system_size finite-size error",
-      "mechanism": "small-cell short NPT; compare density to experimental within +/-10%; max 2 FF retries (ROADMAP E3, currently BLOCKED on A1/A2 — record as planned, not executed, until unblocked).",
+      "mechanism": "small-cell short NPT; compare density to experimental within +/-10%; max 2 FF retries (ROADMAP E3, currently BLOCKED on A1/A2 \u2014 record as planned, not executed, until unblocked).",
       "cost": "minutes"
     },
     "literature_anchor": {
@@ -196,9 +45,106 @@
       "cost": "no simulation"
     },
     "hardware_benchmark": {
-      "reduces": "hardware_optimum — the mpi/gpu config uncertainty for an off-table FF, an unusually sized cell, or a host whose hardware_policy is not cleanly benchmarked (values_are_benchmarked=false or host mismatch)",
+      "reduces": "hardware_optimum \u2014 the mpi/gpu config uncertainty for an off-table FF, an unusually sized cell, or a host whose hardware_policy is not cleanly benchmarked (values_are_benchmarked=false or host mismatch)",
       "mechanism": "hardware/calibrate_hardware.py (wrapping hardware/benchmark_hardware.py) sweeps the mpi/gpu matrix on the built .data per template cost class, reports ns/day + Pair/Kspace/Neigh/Comm breakdown, names the winner, and writes directional_probe + by_forcefield (the latter only on a clean uncontended sweep). Runs politely around live runs (idle GPU + spare cores only, niced, sequential).",
       "cost": "minutes"
+    }
+  },
+  "policies": {
+    "hardware": {
+      "decision_id": "D-08_hardware",
+      "evidence_required": false,
+      "evaluate": [
+        "forcefield_cost_structure",
+        "atom_count",
+        "concurrent_load",
+        "benchmark_evidence",
+        "cell_size_vs_benchmark_cell",
+        "host_match"
+      ],
+      "default_source": "polymer_rules.json:hardware_policy.by_forcefield.<FF_FAMILY> (the only priced config per family today \u2014 recommended_by_ff/size_points describe its own measured throughput, not an alternative to switch to)"
+    },
+    "forcefield": {
+      "decision_id": "D-01_ff",
+      "evidence_required": true,
+      "evaluate": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "default_source": "polymer_rules.json:classes.<CLASS>.preferred_ff"
+    },
+    "charges": {
+      "decision_id": "D-02_charges",
+      "evidence_required": false,
+      "evaluate": [
+        "backbone_polarity",
+        "charge_method_cost",
+        "ff_embedded_vs_qm"
+      ],
+      "default_source": "polymer_rules.json:classes.<CLASS>.charge_method"
+    },
+    "electrostatics": {
+      "decision_id": "D-03_electrostatics",
+      "evidence_required": true,
+      "evaluate": [
+        "backbone_heteroatoms",
+        "max_partial_charge",
+        "computational_cost"
+      ],
+      "default_source": "polymer_rules.json:electrostatics_decision_guide"
+    },
+    "system_size": {
+      "decision_id": "D-04_system_size",
+      "evidence_required": false,
+      "evaluate": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "default_source": "polymer_rules.json:classes.<CLASS>.{dp_typical,nchain,density_initial_gcm3}"
+    },
+    "equilibration": {
+      "decision_id": "D-05_convergence",
+      "evidence_required": false,
+      "evaluate": [
+        "density_convergence",
+        "energy_convergence",
+        "chain_statistic_convergence"
+      ],
+      "default_source": "tool:check_equilibration_comprehensive + tool:assess_cooling_contraction (density-value routing)",
+      "remedy_economics": {
+        "thresholds": {
+          "variance_limited_sigma": 3.0,
+          "min_margin_factor": 2.0,
+          "converged_cost_ceiling_hours": 200.0
+        }
+      }
+    },
+    "tg_protocol": {
+      "decision_id": "D-06_tg_fit_quality",
+      "evidence_required": false,
+      "evaluate": [
+        "t_range_brackets_experimental_tg",
+        "n_temperature_bins",
+        "bilinear_fit_r_squared",
+        "cooling_rate_artifact",
+        "tg_rates_clear_steps_floor",
+        "primary_rate_selection_convention"
+      ],
+      "default_source": "polymer_rules.json:tg_protocol_reference"
+    },
+    "property_method": {
+      "decision_id": "D-07_property_method",
+      "evidence_required": true,
+      "evaluate": [
+        "phase_glassy_vs_rubbery",
+        "method_physics_validity",
+        "gpu_vs_cpu",
+        "rate_artifact"
+      ],
+      "default_source": "polymer_rules.json:classes.<CLASS>.{bm_pressures_atm,exp_K_GPa}"
     }
   }
 }

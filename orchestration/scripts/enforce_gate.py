@@ -188,7 +188,6 @@ def enforce(run_name, repo_root: Path):
     plan = load_json(raw / "run_plan.json")
     comp = load_json(raw / "equilibration.json")
     cooling = load_json(raw / "cooling_contraction.json")  # may not exist
-    policy = load_json(repo_root / "orchestration" / "decision_policy.json")
     rules = load_json(repo_root / "guides" / "polymer_rules.json")
 
     if plan is None or comp is None:
