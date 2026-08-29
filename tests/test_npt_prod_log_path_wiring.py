@@ -64,7 +64,7 @@ def test_equil_check_dry_run_preview_falls_back_to_flat_convention():
     args = _args()  # data_path=None, matching --dry-run preview
     p = _resolve_equil_check_params(args, RUBBERY_CLS)
     assert p["npt_prod_log_path"] == (
-        "/home/arz2/PolyJarvis_v2/data/PE1/lammps/equil/npt_final/npt_final.log"
+        f"{REPO}/data/PE1/lammps/equil/npt_final/npt_final.log"
     )
 
 
@@ -82,7 +82,7 @@ def test_analyze_bm_dry_run_preview_falls_back_to_flat_convention():
     args = _args()
     p = _resolve_analyze_bm_params(args, RUBBERY_CLS)
     assert p["npt_prod_log_path"] == (
-        "/home/arz2/PolyJarvis_v2/data/PE1/lammps/equil/npt_final/npt_final.log"
+        f"{REPO}/data/PE1/lammps/equil/npt_final/npt_final.log"
     )
 
 
