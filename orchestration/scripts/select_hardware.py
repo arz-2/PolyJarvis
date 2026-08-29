@@ -15,13 +15,12 @@ ff_family} to stdout (exit 0), or {"error": "..."} (exit 1).
 """
 import argparse
 import json
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hw_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family
+from mol_python import run_in_mol_env
 import cost_model
 
 _RDKIT_SNIPPET = """\
@@ -50,30 +49,17 @@ def _monomer_atoms_and_mw(smiles: str, is_ua: bool, env: str = "radonpy",
     """(atom count, molar mass g/mol) for one repeat unit. Count is heavy-atom for UA FFs
     (e.g. TraPPE) or all-atom with H for all-atom FFs (PCFF/OPLS/GAFF); the mass is always
     all-atom. `*` connection-point atoms are stripped first --
-    RDKit would otherwise count them as real (wildcard) atoms. Same conda-activate
-    subprocess pattern as canon_smiles.py's canonicalize() -- RDKit lives outside `base`."""
-    import os
-    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
-        f.write(_RDKIT_SNIPPET)
-        snippet_path = f.name
-    try:
-        script = (
-            "source ~/miniforge3/etc/profile.d/conda.sh\n"
-            f"conda activate {env}\n"
-            f"python3 {snippet_path}\n"
-        )
-        run_env = dict(os.environ)
-        run_env["SELECT_HW_SMILES"] = smiles
-        run_env["SELECT_HW_UA"] = "1" if is_ua else "0"
-        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
-                           stdin=subprocess.DEVNULL, timeout=timeout, env=run_env)
-        out = r.stdout.strip()
-        if r.returncode != 0 or not out:
-            raise RuntimeError(r.stderr.strip() or "empty output from RDKit atom-count")
-        n_atoms, mw = out.splitlines()[-1].split()
-        return int(n_atoms), float(mw)
-    finally:
-        Path(snippet_path).unlink(missing_ok=True)
+    RDKit would otherwise count them as real (wildcard) atoms. Reaches RDKit via
+    mol_python.run_in_mol_env(), the same seam canon_smiles.py's canonicalize() uses."""
+    r = run_in_mol_env(script=_RDKIT_SNIPPET, env=env, timeout=timeout, extra_env={
+        "SELECT_HW_SMILES": smiles,
+        "SELECT_HW_UA": "1" if is_ua else "0",
+    })
+    out = r.stdout.strip()
+    if r.returncode != 0 or not out:
+        raise RuntimeError(r.stderr.strip() or "empty output from RDKit atom-count")
+    n_atoms, mw = out.splitlines()[-1].split()
+    return int(n_atoms), float(mw)
 
 
 def select_hardware(polymer_class: str, smiles: str, dp_typical: int | None,

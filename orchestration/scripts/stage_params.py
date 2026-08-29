@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import subprocess
 import sys
 from pathlib import Path
 from hw_common import load_rules, resolve_ff_family, get_class_entry, host_matches, live_host, resolve_member_value
+from mol_python import run_in_mol_env
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 RULES_PATH = REPO_ROOT / 'guides' / 'polymer_rules.json'
 
@@ -106,23 +105,15 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
             'use_dreiding': 'dreiding' in ff}
 
 def _estimate_tg_group_contribution(smiles: str, timeout: int = 30) -> dict | None:
-    """Shell into the `radonpy` conda env to run estimate_tg_group_contribution.py -- RDKit
-    lives there, not in `base` (same subprocess pattern as canon_smiles.py; the SMILES is
-    passed via an env var, never interpolated into the shell command text, so shell-meaningful
-    characters in a SMILES string can't corrupt the quoting). Returns the parsed result dict,
-    or None on any failure (missing rdkit/conda, timeout, unparseable SMILES, no motif match)
-    -- this is an advisory low-confidence estimate, never worth crashing plan resolution over."""
+    """Run estimate_tg_group_contribution.py in the `radonpy` conda env -- RDKit lives
+    there, not in `base`, reached via mol_python.run_in_mol_env() (same seam
+    canon_smiles.py uses). Returns the parsed result dict, or None on any failure
+    (missing rdkit/conda, timeout, unparseable SMILES, no motif match) -- this is an
+    advisory low-confidence estimate, never worth crashing plan resolution over."""
     script = REPO_ROOT / 'orchestration' / 'scripts' / 'estimate_tg_group_contribution.py'
-    bash_script = (
-        "source ~/miniforge3/etc/profile.d/conda.sh\n"
-        "conda activate radonpy\n"
-        f'python3 {script} --smiles "$TG_ESTIMATE_SMILES" --output json\n'
-    )
-    run_env = dict(os.environ)
-    run_env['TG_ESTIMATE_SMILES'] = smiles
     try:
-        r = subprocess.run(["bash", "-c", bash_script], capture_output=True, text=True,
-                            stdin=subprocess.DEVNULL, timeout=timeout, env=run_env)
+        r = run_in_mol_env(script_path=script, args=["--smiles", smiles, "--output", "json"],
+                            timeout=timeout)
         result = json.loads(r.stdout.strip())
     except Exception:
         return None

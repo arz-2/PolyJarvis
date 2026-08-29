@@ -66,14 +66,13 @@ select_forcefield.py -- callers parse JSON, never a traceback).
 import argparse
 import json
 import math
-import os
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hw_common import load_rules, get_class_entry, resolve_member  # noqa: E402
 from select_hardware import _monomer_atoms_and_mw               # noqa: E402
+from mol_python import run_in_mol_env                            # noqa: E402
 
 # Fox-Flory plateau (Patrone 2016, polymer_rules.json:_metadata.global_notes). Data, not
 # a classifier: these are the three classes the notes name as stiff backbones.
@@ -145,21 +144,15 @@ def _entanglement_floor(polymer_class: str, smiles: str, cls: dict):
 
 
 def _backbone_rigidity(smiles: str, timeout: int = 30):
-    """Subprocess wrapper for backbone_rigidity.py -- RDKit lives in the radonpy conda
-    env, not base (same pattern as stage_params.py's _estimate_tg_group_contribution).
-    Returns the parsed result dict, or None on any failure (missing rdkit/conda, timeout,
-    unparseable SMILES) -- advisory only, never worth crashing plan resolution over."""
+    """Wrapper for backbone_rigidity.py -- RDKit lives in the radonpy conda env, not
+    base, reached via mol_python.run_in_mol_env() (same seam
+    stage_params.py's _estimate_tg_group_contribution uses). Returns the parsed result
+    dict, or None on any failure (missing rdkit/conda, timeout, unparseable SMILES) --
+    advisory only, never worth crashing plan resolution over."""
     script = Path(__file__).resolve().parent / "backbone_rigidity.py"
-    bash_script = (
-        "source ~/miniforge3/etc/profile.d/conda.sh\n"
-        "conda activate radonpy\n"
-        f'python3 {script} --smiles "$BACKBONE_RIGIDITY_SMILES" --output json\n'
-    )
-    run_env = dict(os.environ)
-    run_env["BACKBONE_RIGIDITY_SMILES"] = smiles
     try:
-        r = subprocess.run(["bash", "-c", bash_script], capture_output=True, text=True,
-                           stdin=subprocess.DEVNULL, timeout=timeout, env=run_env)
+        r = run_in_mol_env(script_path=script, args=["--smiles", smiles, "--output", "json"],
+                            timeout=timeout)
         result = json.loads(r.stdout.strip())
     except Exception:
         return None

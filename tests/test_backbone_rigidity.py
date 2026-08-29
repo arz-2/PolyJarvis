@@ -10,7 +10,6 @@ path), while PEEK's and PSU's in-chain aromatic rings correctly should. PET anch
 semi-rigid band between them.
 """
 import json
-import subprocess
 import sys
 from pathlib import Path
 
@@ -18,6 +17,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "orchestration" / "scripts" / "backbone_rigidity.py"
+
+sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
+from mol_python import run_in_mol_env  # noqa: E402
 
 REFERENCE_POLYMERS = [
     ("PE", "*CC*", "flexible"),
@@ -35,16 +37,8 @@ REFERENCE_POLYMERS = [
 
 
 def _run(smiles: str) -> dict:
-    bash_script = (
-        "source ~/miniforge3/etc/profile.d/conda.sh\n"
-        "conda activate radonpy\n"
-        f'python3 {SCRIPT} --smiles "$TEST_BACKBONE_RIGIDITY_SMILES" --output json\n'
-    )
-    import os
-    env = dict(os.environ)
-    env["TEST_BACKBONE_RIGIDITY_SMILES"] = smiles
-    r = subprocess.run(["bash", "-c", bash_script], capture_output=True, text=True,
-                       stdin=subprocess.DEVNULL, timeout=30, env=env)
+    r = run_in_mol_env(script_path=SCRIPT, args=["--smiles", smiles, "--output", "json"],
+                        timeout=30)
     return json.loads(r.stdout.strip())
 
 

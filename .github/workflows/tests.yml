@@ -24,4 +24,9 @@ jobs:
 
       - name: Run tests
         # pytest.ini already skips @requires_binaries tests by default.
+        # POLYJARVIS_MOL_PYTHON points mol_python.run_in_mol_env() at this same venv's
+        # interpreter (rdkit is in requirements-test.txt) instead of the conda-activate
+        # fallback, which needs a local conda install this runner doesn't have.
+        env:
+          POLYJARVIS_MOL_PYTHON: python
         run: pytest -v

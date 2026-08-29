@@ -31,10 +31,12 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mol_python import run_in_mol_env  # noqa: E402
+
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LMP = os.path.expanduser("~/lammps-install-kokkos/bin/lmp")
 EMC_BUILDER = os.path.join(REPO, "mcp-servers", "mcp-emc-server", "smiles_to_emc.py")
-MOL_PYTHON = os.path.expanduser("~/miniforge3/envs/mol-builder/bin/python")
 
 # style requirements are the field's functional form, not a preference: a Class II
 # field cannot be run with harmonic bonds. `pair` assumes long-range electrostatics,
@@ -205,8 +207,8 @@ _RADONPY_CLS = {"gaff": ("gaff", "GAFF"), "gaff2": ("gaff2", "GAFF2"),
 def _try_radonpy(smiles, field):
     module, cls = _RADONPY_CLS[field]
     try:
-        r = subprocess.run([MOL_PYTHON, "-c", _RADONPY_PROBE % dict(module=module, cls=cls),
-                            smiles], capture_output=True, text=True, timeout=600)
+        r = run_in_mol_env(script=_RADONPY_PROBE % dict(module=module, cls=cls),
+                            args=[smiles], env="mol-builder", timeout=600)
         for line in reversed(r.stdout.splitlines()):
             if line.startswith("{"):
                 d = json.loads(line)

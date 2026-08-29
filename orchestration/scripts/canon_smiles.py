@@ -4,11 +4,11 @@ canon_smiles.py — canonicalize a SMILES via RDKit.
 
 The system-probe novelty gate (guides/system_characterization_cache.json) is keyed by
 canonical SMILES so two atom-orderings of the same monomer collapse to one cache entry.
-RDKit lives in the `radonpy` and `mol-builder` conda envs (not `base`); this shells into
-`radonpy` by the same source-conda.sh/activate pattern the MCP servers use internally
-(mcp-servers/mcp-lammps-engine/server.py:_conda_run). The SMILES is passed via an env var,
-never interpolated into the shell/python-c command text, so stereo markers (`/`, `\\`) and
-other shell-meaningful characters in a SMILES string can't corrupt the quoting.
+RDKit lives in the `radonpy`/`mol-builder` conda envs (not `base`); this reaches it via
+mol_python.run_in_mol_env(), the one seam every RDKit/RadonPy caller in this repo shells
+through. The SMILES is passed via an env var, never interpolated into the shell/python-c
+command text, so stereo markers (`/`, `\\`) and other shell-meaningful characters in a
+SMILES string can't corrupt the quoting.
 
 Usage: python3 orchestration/canon_smiles.py "<smiles>" [--env radonpy]
 Prints: {"smiles": "<input>", "canonical_smiles": "<output>"}  (exit 0)
@@ -16,10 +16,12 @@ Prints: {"smiles": "<input>", "canonical_smiles": "<output>"}  (exit 0)
 """
 import argparse
 import json
-import os
 import subprocess
 import sys
-import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mol_python import run_in_mol_env  # noqa: E402
 
 _PY_SNIPPET = """\
 import os
@@ -35,24 +37,10 @@ print(Chem.MolToSmiles(mol, canonical=True, isomericSmiles=isomeric))
 
 def canonicalize(smiles: str, env: str = "radonpy", timeout: int = 30, *,
                   isomeric: bool = True) -> str:
-    # Written to a temp file, not `python3 -c "..."`, so SMILES-unrelated newline/quoting
-    # concerns in the snippet itself never interact with bash's double-quote parsing.
-    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
-        f.write(_PY_SNIPPET)
-        snippet_path = f.name
-    try:
-        script = (
-            "source ~/miniforge3/etc/profile.d/conda.sh\n"
-            f"conda activate {env}\n"
-            f"python3 {snippet_path}\n"
-        )
-        run_env = dict(os.environ)
-        run_env["CANON_SMILES_INPUT"] = smiles
-        run_env["CANON_SMILES_ISOMERIC"] = "1" if isomeric else "0"
-        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
-                           stdin=subprocess.DEVNULL, timeout=timeout, env=run_env)
-    finally:
-        os.unlink(snippet_path)
+    r = run_in_mol_env(script=_PY_SNIPPET, env=env, timeout=timeout, extra_env={
+        "CANON_SMILES_INPUT": smiles,
+        "CANON_SMILES_ISOMERIC": "1" if isomeric else "0",
+    })
     out = r.stdout.strip()
     if r.returncode != 0 or not out:
         raise RuntimeError(r.stderr.strip() or "empty output from RDKit canonicalization")

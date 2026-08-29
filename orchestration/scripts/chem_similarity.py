@@ -3,11 +3,10 @@
 chem_similarity.py — SMILES structural similarity via RDKit Morgan/Tanimoto.
 
 RDKit lives in the `radonpy`/`mol-builder` conda envs, not `base` — same constraint
-canon_smiles.py documents. This shells into `radonpy` by the same
-source-conda.sh/activate pattern, passing the candidate list through a temp JSON file
-(not argv/shell text) so a large batch (e.g. every class's member_smiles at once) never
-hits shell-quoting or argv-length limits, and so SMILES stereo markers (`/`, `\\`) can't
-corrupt anything.
+canon_smiles.py documents. This reaches it via mol_python.run_in_mol_env(), passing the
+candidate list through a temp JSON file (not argv/shell text) so a large batch (e.g.
+every class's member_smiles at once) never hits shell-quoting or argv-length limits,
+and so SMILES stereo markers (`/`, `\\`) can't corrupt anything.
 
 This module's compute_similarities() is the one seam every caller (query_protocol_evidence.py)
 goes through and the one seam tests monkeypatch — same convention already used for
@@ -25,6 +24,10 @@ import os
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mol_python import run_in_mol_env  # noqa: E402
 
 _PY_SNIPPET = """\
 import json
@@ -73,25 +76,14 @@ def compute_similarities(query_smiles: str, candidate_smiles: list[str],
     A candidate (or the query) that fails to parse is dropped from `scores` and noted in
     `errors` rather than raising — one bad SMILES in a large batch must not sink the
     whole retrieval call."""
-    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f_snippet:
-        f_snippet.write(_PY_SNIPPET)
-        snippet_path = f_snippet.name
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f_input:
         json.dump({"query": query_smiles, "candidates": list(candidate_smiles),
                     "radius": radius, "n_bits": n_bits}, f_input)
         input_path = f_input.name
     try:
-        script = (
-            "source ~/miniforge3/etc/profile.d/conda.sh\n"
-            f"conda activate {env}\n"
-            f"python3 {snippet_path}\n"
-        )
-        run_env = dict(os.environ)
-        run_env["CHEM_SIMILARITY_INPUT"] = input_path
-        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
-                           stdin=subprocess.DEVNULL, timeout=timeout, env=run_env)
+        r = run_in_mol_env(script=_PY_SNIPPET, env=env, timeout=timeout,
+                            extra_env={"CHEM_SIMILARITY_INPUT": input_path})
     finally:
-        os.unlink(snippet_path)
         os.unlink(input_path)
 
     out = r.stdout.strip()
