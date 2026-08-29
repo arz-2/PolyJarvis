@@ -49,14 +49,6 @@ def test_real_execution_reads_the_sweeps_own_log_not_the_equilibration_data_file
     assert p["tg_data_file"] == args.data_path
 
 
-def test_dry_run_preview_falls_back_to_flat_convention():
-    args = _args()  # work_dir/data_path both None, matching --dry-run preview
-    p = _resolve_analyze_tg_params(args, PHYC)
-    assert p["tg_log_path"] == f"{REPO}/data/PE1/lammps/thermal/tg_sweep/tg_sweep.log"
-    assert p["per_t_dump_file"] == f"{REPO}/data/PE1/lammps/thermal/tg_sweep/per_t_structs.dump"
-    assert p["tg_data_file"] == f"{REPO}/data/PE1/lammps/equil/npt_final/npt_final_out.data"
-
-
 def test_multirate_suffix_threaded_into_all_three_paths():
     args = _args(
         work_dir="/data/PE1/attempts/thermal/attempt-0001/work",

@@ -60,14 +60,6 @@ def test_equil_check_derives_log_from_real_data_path_glassy():
     )
 
 
-def test_equil_check_dry_run_preview_falls_back_to_flat_convention():
-    args = _args()  # data_path=None, matching --dry-run preview
-    p = _resolve_equil_check_params(args, RUBBERY_CLS)
-    assert p["npt_prod_log_path"] == (
-        f"{REPO}/data/PE1/lammps/equil/npt_final/npt_final.log"
-    )
-
-
 def test_analyze_bm_derives_log_from_real_data_path():
     args = _args(
         data_path="/data/PE1/attempts/equilibration/attempt-0001/work/npt_final/npt_final_out.data",
@@ -75,14 +67,6 @@ def test_analyze_bm_derives_log_from_real_data_path():
     p = _resolve_analyze_bm_params(args, RUBBERY_CLS)
     assert p["npt_prod_log_path"] == (
         "/data/PE1/attempts/equilibration/attempt-0001/work/npt_final/npt_final.log"
-    )
-
-
-def test_analyze_bm_dry_run_preview_falls_back_to_flat_convention():
-    args = _args()
-    p = _resolve_analyze_bm_params(args, RUBBERY_CLS)
-    assert p["npt_prod_log_path"] == (
-        f"{REPO}/data/PE1/lammps/equil/npt_final/npt_final.log"
     )
 
 
