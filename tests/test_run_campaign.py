@@ -1205,6 +1205,8 @@ def test_bm_point_stable_first_hold_passes_no_extension(bm_args_cls, tmp_path):
 
 def test_bm_point_unstable_first_hold_passes_after_one_extension(bm_args_cls, tmp_path, monkeypatch):
     _patch_wait_for_run_bm(monkeypatch)
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
     args, cls = bm_args_cls
     p = resolve_stage_params("murnaghan", args, cls)
     log_path = str(tmp_path / "bm_P0.log")
@@ -1228,6 +1230,8 @@ def test_bm_point_unstable_first_hold_passes_after_one_extension(bm_args_cls, tm
 
 def test_bm_point_exhausts_extension_cap_without_stabilizing(bm_args_cls, tmp_path, monkeypatch):
     _patch_wait_for_run_bm(monkeypatch)
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
     args, cls = bm_args_cls
     p = resolve_stage_params("murnaghan", args, cls)
     log_path = str(tmp_path / "bm_P0.log")
@@ -1245,6 +1249,8 @@ def test_bm_point_exhausts_extension_cap_without_stabilizing(bm_args_cls, tmp_pa
 
 def test_bm_point_extension_run_failure_is_advisory(bm_args_cls, tmp_path, monkeypatch):
     _patch_wait_for_run_bm(monkeypatch)
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
     args, cls = bm_args_cls
     p = resolve_stage_params("murnaghan", args, cls)
     log_path = str(tmp_path / "bm_P0.log")
@@ -1294,6 +1300,8 @@ class _FakeBmSeriesLammps(_FakeBmExtLammps):
 
 def test_do_mechanical_point_extension_flows_into_analysis_call(bm_args_cls, monkeypatch):
     monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: {"status": "completed"})
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
     args, cls = bm_args_cls
     lammps = _FakeBmSeriesLammps(
         initial_volumes_by_pressure={
