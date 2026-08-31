@@ -29,7 +29,11 @@ data/*
 !data/TEMPLATE/
 # the sqlite payload is curated from copyrighted sources (Polymer Handbook, MatWeb) and stays
 # local; the schema + query/ingest code is tracked so a clone can rebuild it
-db/polymer_db.sqlite
+db/experimental_db.sqlite
+# PolyDatabase (polydatabase.com) MD-simulation-literature index, rebuilt locally from the
+# public CC-BY Zenodo dataset via db/ingest_scripts/import_polydatabase.py — gitignored for
+# size/rebuildability, not copyright; schema + ingest/query code is tracked
+db/polydatabase_md.sqlite
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 .DS_Store

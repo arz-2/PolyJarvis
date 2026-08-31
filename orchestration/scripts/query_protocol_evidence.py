@@ -2,7 +2,7 @@
 """
 query_protocol_evidence.py — deterministic retrieval over the protocol evidence stores.
 
-Replaces "the ff-protocol-literature-worker reads the whole legacy JSON file and reasons
+Replaces "the literature-grounding-worker reads the whole legacy JSON file and reasons
 over it" with a real query. Always exits 0; errors surface as {"error": ...} in the JSON
 payload printed to stdout (same convention as select_forcefield.py/select_system_size.py)
 so callers parse JSON, never a traceback.

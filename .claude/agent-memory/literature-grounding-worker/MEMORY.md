@@ -1,4 +1,30 @@
-# System-Size Literature Worker Memory
+# Literature-Grounding Worker Memory
+
+Merged 2026-08-29 from the former `ff-protocol-literature-worker` and
+`system-size-literature-worker` agent-memory directories when the two agents were combined
+into one (`literature-grounding-worker.md`). Entries below are unchanged from their original
+memory, split by which half of the combined agent's scope they belong to.
+
+## FF / protocol grounding (forcefield, electrostatics, cooling rate, density/Tg target, CTE)
+
+- [PMMA isotactic Tg + cooling rate findings (2026-08-23)](pmma_isotactic_tg_and_cooling_rate.md) — isotactic Tg 320-333K vs class-default 378K; all verified PMMA MD studies use ~1 K/ns cooling
+- [PMMA atactic vs isotactic SMILES disambiguation (2026-08-25)](pmma_atactic_vs_isotactic_smiles_disambiguation.md) — bare `*CC(*)(C)C(=O)OC` is atactic, use 383K/378K target not the 320-333K isotactic band
+- [PACR rules-audit density/Tg corroboration (2026-08-26)](pacr_rules_audit_pmma_density_tg_corroboration.md) — new source (10.3390/ma12203315) confirms PMMA density/Tg/electrostatics defaults; flags PCFF lit-vs-internal-run density-error magnitude tension
+- [PSTR rules-audit corroboration (2026-08-26)](pstr_rules_audit_ps_ff_density_tg_corroboration.md) — arXiv preprints confirm PS PCFF/pppm/1.05 g cm-3/373K defaults; COMPASS-switch question stays open, unverifiable this session
+- [Publisher WebFetch 403s, arXiv fallback](feedback_publisher_webfetch_403_arxiv_fallback.md) — ACS/AIP/ScienceDirect/RSC/PMC/ResearchGate/MDPI often block WebFetch; arXiv reliably works
+- [PDIE rules-audit FF/electrostatics/Tg corroboration (2026-08-26)](pdie_rules_audit_ff_electrostatics_tg_corroboration.md) — TraPPE-UA/lj_cut/Tg~181K all corroborated (DMA-to-DSC offset trick for Tg); CTE still ungrounded, ScienceDirect 403'd
+- [PSUL/PPS rules-audit gap confirmed (2026-08-26)](psul_pps_rules_audit_gap_confirmed.md) — fresh search reproduced only the COMPASS-II-not-PCFF hit; genuine literature gap, not a stale search
+- [POXI/PEO rules-audit FF + cooling-rate findings (2026-08-26)](poxi_peo_rules_audit_ff_cooling_rate_findings.md) — pppm/density/tg AGREE; PCFF has no verified same-chemistry paper (PCFF+ candidate 403'd); verified cooling rate 4 K/ns, class uses [25,50,100]
+- [PANH rules-audit gap confirmed (2026-08-26)](panh_rules_audit_gap_confirmed.md) — zero MD literature exists for any polyanhydride chemistry; reproduces existing ff_note gap, does not close it; Afzal2021 coverage unverifiable (403)
+- [PURA rules-audit gap reconfirmed (2026-08-26)](pura_rules_audit_gap_reconfirmed.md) — no MD study validates GAFF2 on pure polyurea; 2 store hits non-corroborating, 2 fresh ScienceDirect leads 403'd unverifiable
+- [PIMN/linear-PEI rules-audit gap reconfirmed (2026-08-26)](pimn_linear_pei_rules_audit_gap_reconfirmed.md) — class's only verified PCFF hit is Ultem (aromatic), not linear PEI; 2 on-chemistry leads found but paywalled/unverifiable; kept PCFF/pppm default
+- [PSIL/PDMS rules-audit FF+electrostatics confirmed (2026-08-26)](psil_pdms_rules_audit_ff_electrostatics_confirmed.md) — OPLS-AA beats DREIDING 0.0414 vs 0.1337 g/cm3 RMSE; PPPM confirmed via PMC mirror; cooling/density/Tg/CTE stay ungrounded (PDMS Tg far below any studied MD range)
+- [PKTN/PEEK rules-audit FF/density/Tg corroboration (2026-08-26)](pktn_peek_rules_audit_ff_density_tg_corroboration.md) — PCFF-vs-COMPASS-II density sign flip noted; 1.328 g/cm3 confirmed semicrystalline (not amorphous); Tg 418K corroborated; Semantic Scholar API worked when MDPI 403'd
+- [PPHS rules-audit gap reconfirmed (2026-08-26)](pphs_rules_audit_gap_reconfirmed.md) — no MD study validates PCFF on polyalkoxyphosphazenes; formal ff_justification_doi actually uses DREIDING; WebSearch budget exhausted this round
+- [PSFO rules-audit gap reconfirmed (2026-08-26)](psfo_rules_audit_gap_reconfirmed.md) — no PCFF-vs-experiment PSU/PES/PPSU density/Tg number found; PPESK 2018 + PSU/PSMA-blend 2021 preprint are the best Class-II sightings, neither gives a signed error
+- [PPNL/PPV rules-audit gap confirmed (2026-08-26)](ppnl_ppv_rules_audit_gap_confirmed.md) — PCFF/Tg=416K reconfirmed but FF name still unconfirmable (Wiley 403); electrostatics/cooling/density/CTE remain ungrounded; curl-vs-WebSearch workaround when WebSearch budget exhausted
+
+## System-size grounding (DP/nchain convergence, entanglement Me, Kuhn length)
 
 - [PMMA/PACR isotactic DP convergence findings (2026-08-23)](project_pmma_isotactic_dp_convergence.md) — Min 2014 DOI verified DP=200/nchain=12 (atactic proxy); Sahputra 2018 isotactic-specific found modulus unconverged at DP=400/nchain=5; PACR class defaults (dp=50) fall short of both
 - [Publisher domains block WebFetch (2026-08-24)](feedback_publisher_domains_block_webfetch.md) — ACS/RSC/MDPI/ResearchGate 403 every time; route via arXiv abstract/PDF (Read the saved binary) or PMC instead
@@ -19,3 +45,7 @@
 - [PKTN (PEEK) class-defaults audit (2026-08-26)](project_pktn_peek_dp_convergence_audit_2026-08-26.md) — dp=50/dp_min=50/nchain=8 NEITHER confirmed NOR contradicted; only verified PEEK MD paper (PMC7285100) uses fixed DP=4 oligomer w/ no sweep; RSC blocks Mittal2024 (DP-effect paper); crossref API worked as WebSearch-budget-exhausted fallback
 - [PPHS (polyphosphazene) class-defaults audit (2026-08-26)](project_pphs_class_defaults_audit_2026-08-26.md) — dp=30/dp_min=20/nchain=10 NEITHER confirmed NOR contradicted; only verified source (Chen&Demir2022, PMC9002744) explicitly states DP-convergence testing doesn't exist for polyphosphazenes and studies wrong substituent (TFE not ethoxy)
 - [PPNL (PPV/conjugated) class-defaults audit (2026-08-26)](project_ppnl_class_defaults_audit_2026-08-26.md) — dp_typical=25 UNDERCUT by verified P3HT CGMD DP>=50 elastic-behavior floor (arXiv:2010.01962, cross-chemistry class_analogy, confidence medium); class's own PPV citation (Venkatanarayanan2016) stays unverifiable (Wiley paywall, no OA); nchain=10 unaddressed
+
+## Shared, cross-cutting
+
+- **WebFetch publisher blocks recur across both scopes** — ACS/AIP/ScienceDirect/RSC/PMC/ResearchGate/MDPI/Wiley/Springer commonly 403 WebFetch regardless of which field you're grounding; arXiv, PMC mirrors, and Semantic Scholar/Crossref APIs are the reliable fallbacks. Try these before reporting a field as unverifiable.

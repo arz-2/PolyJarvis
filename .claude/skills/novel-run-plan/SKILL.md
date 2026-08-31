@@ -44,21 +44,23 @@ This step runs **exactly once** per run. Re-running it requires `--force` and de
 This skill only proceeds past step 1 in `reasoned` mode (novel / not yet `protocol_validated` for
 the requested properties), so this step always fires — no coverage judgment call needed.
 
-Launch both literature-grounding agents **in parallel** (single message, two `Agent` calls):
-- `Agent(subagent_type="ff-protocol-literature-worker", ...)` — `polymer_name` (if resolved),
+Launch the single literature-grounding agent:
+- `Agent(subagent_type="literature-grounding-worker", ...)` — `polymer_name` (if resolved),
   `polymer_class`, `smiles`, `properties_requested`,
-  `output_path: data/<run_name>/raw/literature_grounding_ff_protocol.json`
-- `Agent(subagent_type="system-size-literature-worker", ...)` — same inputs,
-  `output_path: data/<run_name>/raw/literature_grounding_system_size.json`
+  `ff_output_path: data/<run_name>/raw/literature_grounding_ff_protocol.json`,
+  `system_size_output_path: data/<run_name>/raw/literature_grounding_system_size.json`
 
-Each worker now queries its own persistent evidence store first (`docs/protocol_evidence_ff.json` /
-`docs/protocol_evidence_system_size.json`) before searching, and writes any newly-verified findings
-back into that store as its last step — this is worker-internal plumbing, invisible to this skill.
+It grounds both the FF/protocol fields and the system-size fields in one invocation (formerly two
+separate agents run in parallel — combined 2026-08-29). It queries its own persistent evidence
+stores first (`docs/protocol_evidence_ff.json` / `docs/protocol_evidence_system_size.json`) before
+searching, and writes any newly-verified findings back into each store as its last step — this is
+worker-internal plumbing, invisible to this skill.
 
-Wait for both `RESULT:` blocks, then read both JSON files. Each is DOI-verified, MD-simulation-study-only
-evidence — advisory only, consumed in step 5 below. If either worker reports `error:` (all searches
-failed or it couldn't write its file), proceed with `polymer_rules.json` defaults only and note the
-gap in step 5's `dominant_uncertainty` — never block this skill on a literature-search failure.
+Wait for its `RESULT:` block, then read both JSON files. Each is DOI-verified, MD-simulation-study-only
+evidence — advisory only, consumed in step 5 below. If the worker reports `error:` (both parts
+failed) or one `RESULT:` field shows a per-part `"error: <reason>"`, proceed with
+`polymer_rules.json` defaults for whichever part is missing and note the gap in step 5's
+`dominant_uncertainty` — never block this skill on a literature-search failure.
 
 ## 5. Annotate the scaffold, row by row, grounded in literature
 

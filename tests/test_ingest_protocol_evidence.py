@@ -1,6 +1,6 @@
 """ingest_protocol_evidence.py — the write-back half of the query-first/search-on-miss
-loop. Feeds it fixture advisory JSONs shaped exactly like ff-protocol-literature-worker's
-and system-size-literature-worker's real output schema (see their .md files) and checks:
+loop. Feeds it fixture advisory JSONs shaped exactly like literature-grounding-worker's
+real Part A / Part B output schemas (see its .md file) and checks:
 correct provenance, only verified:true sources persisted, and idempotency (re-ingesting
 the same advisory JSON is a no-op the second time)."""
 import sys

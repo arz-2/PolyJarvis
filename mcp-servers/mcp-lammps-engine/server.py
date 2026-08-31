@@ -1627,9 +1627,11 @@ def generate_equilibration_workflow(
                         Every resumable stage runs with init_velocity=None (no `velocity all
                         create`), so it always inherits velocities from whatever .data file
                         it's given — resuming is not a special case, it's how every stage
-                        boundary in the full chain already works. "anneal_hold" redoes both
-                        anneal_heat and anneal_hold from data_file (anneal_heat is cheap to
-                        discard, like minimize). "cool_block" means the entire blockwise
+                        boundary in the full chain already works. "anneal_hold" means both
+                        anneal_heat and anneal_hold already ran — starts at cool_block_01 using
+                        data_file as anneal_hold's own already-converged output (skips
+                        regenerating either stage; see the `_resume_idx < 4` guard below).
+                        "cool_block" means the entire blockwise
                         cooldown already ran — starts at nvt_kinetic_stability using data_file
                         as the last cool_block's own output. To regenerate the cooldown itself
                         (e.g. a different cool_block_dT_K), use resume_from="anneal_hold"
@@ -4077,6 +4079,9 @@ def _run_generate_run_summary(
     graphs_dir: Optional[str] = None,
     n_replicates: Optional[int] = None,
     tg_path: Optional[str] = None,
+    equilibration_path: Optional[str] = None,
+    mechanical_path: Optional[str] = None,
+    bulk_modulus_deform_path: Optional[str] = None,
 ) -> dict:
     """Background worker — runs generate_run_summary.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/generate_run_summary.py"]
@@ -4101,6 +4106,9 @@ def _run_generate_run_summary(
     if graphs_dir:                  parts.append(f"--graphs_dir {graphs_dir}")
     if n_replicates is not None:    parts.append(f"--n_replicates {n_replicates}")
     if tg_path:                     parts.append(f"--tg_path {tg_path}")
+    if equilibration_path:          parts.append(f"--equilibration_path {equilibration_path}")
+    if mechanical_path:             parts.append(f"--mechanical_path {mechanical_path}")
+    if bulk_modulus_deform_path:    parts.append(f"--bulk_modulus_deform_path {bulk_modulus_deform_path}")
 
     command = " ".join(parts)
     logger.info(f"Running generate_run_summary via CLI: {command}")
@@ -4134,6 +4142,9 @@ def generate_run_summary(
     d06: Optional[str] = None,
     n_replicates: Optional[int] = None,
     tg_path: Optional[str] = None,
+    equilibration_path: Optional[str] = None,
+    mechanical_path: Optional[str] = None,
+    bulk_modulus_deform_path: Optional[str] = None,
 ) -> dict:
     """
     Aggregate all Stage 4 analysis outputs into a single run_summary.json.
@@ -4174,6 +4185,16 @@ def generate_run_summary(
                           tg_r40/thermal.json — the slowest-rate folder). When
                           supplied, skips rglob discovery; prevents alphabetical-order
                           bugs when multiple rate folders coexist.
+        equilibration_path, mechanical_path, bulk_modulus_deform_path:
+                          Explicit paths to the accepted equilibration/mechanical
+                          attempts' own equilibration.json/mechanical.json/
+                          bulk_modulus_deform.json. Under the attempt-based run layout
+                          these files live under a DIFFERENT stage's own attempt raw
+                          dir, never under this call's own output_dir — the plain
+                          same-dir lookup can never find them without these (mirrors
+                          tg_path's existing precedent for exactly this reason).
+                          Omit only for a flat (non-attempt-based) run where every
+                          stage shares one output_dir.
 
     Returns:
         dict with status and summary_json path on success.
@@ -4190,7 +4211,8 @@ def generate_run_summary(
             date_start=date_start, date_end=date_end,
             d01=d01, d02=d02, d03=d03, d04=d04, d05=d05, d06=d06,
             graphs_dir=graphs_dir, n_replicates=n_replicates,
-            tg_path=tg_path,
+            tg_path=tg_path, equilibration_path=equilibration_path,
+            mechanical_path=mechanical_path, bulk_modulus_deform_path=bulk_modulus_deform_path,
         )),
         daemon=True,
     )

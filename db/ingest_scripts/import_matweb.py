@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-import_matweb.py — Load MatWeb property data into polymer_db.sqlite and
+import_matweb.py — Load MatWeb property data into experimental_db.sqlite and
 patch missing fields in guides/polymer_rules.json.
 
 Input: data/matweb_refs.json  (produced by fetch_matweb_refs.py)
 
-Changes to polymer_db.sqlite:
+Changes to experimental_db.sqlite:
   1. Adds "MatWeb" to sources table (skips if already present).
   2. Updates poly_class on the canonical polymer row for each class.
   3. Inserts density_measurements (RT amorphous, phase='amorphous') if not
@@ -36,10 +36,10 @@ from pathlib import Path
 
 REPO_ROOT   = Path(__file__).resolve().parent.parent.parent
 DEFAULT_REFS = REPO_ROOT / "data" / "matweb_refs.json"
-DB_PATH      = REPO_ROOT / "db" / "polymer_db.sqlite"
+DB_PATH      = REPO_ROOT / "db" / "experimental_db.sqlite"
 RULES_PATH   = REPO_ROOT / "guides" / "polymer_rules.json"
 
-# Canonical polymer_id in polymer_db.sqlite for each PolyJarvis class.
+# Canonical polymer_id in experimental_db.sqlite for each PolyJarvis class.
 # These are the primary single-chain, amorphous, unfilled grades.
 CANONICAL_DB_IDS: dict[str, int] = {
     "PHYC": 1951,   # "Polyethylene" (generic amorphous)

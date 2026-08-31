@@ -72,6 +72,80 @@ def _not(v):
     return (not v) if v is not None else None
 
 
+def _convergence_caveats(eq_comp):
+    """Surface accepted-but-suspect chain-relaxation conditions that convergence.verdict alone
+    hides. kinetic_trap_flag/ct/msid_gaussian are deliberately advisory (never gated), per
+    enforce_gate.py's ALWAYS_ADVISORY set and decision_policy.json's documented rationale (full
+    chain relaxation is often unattainable within MD timescales for rubbery/high-DP systems, so
+    binding on it would make overall_pass unsatisfiable by construction) -- but "advisory" should
+    not mean "invisible". Without this, a reader sees convergence.verdict=PASS and would have to
+    separately notice structural_checks fields (a different section) to connect the two.
+    """
+    caveats = []
+
+    # kinetic_trap_flag/C(t): only meaningful in the rubbery/melt regime. Below Tg, limited chain
+    # diffusion is EXPECTED (chains are arrested by design), not a red flag -- see PEG1's own
+    # warning text, "expected below Tg, problematic in melt state." A glassy run's own
+    # kinetic_trap_flag=True is therefore NOT surfaced.
+    if _dig(eq_comp, "gate", "regime") == "rubbery":
+        if _dig(eq_comp, "chain", "msd", "kinetic_trap_flag") is True:
+            regime_note = _dig(eq_comp, "chain", "msd", "diffusion_regime") or "sub-diffusive"
+            caveats.append(
+                f"kinetic_trap_flag=True ({regime_note}) in a rubbery/melt run -- chains have not "
+                "displaced their own size (MSD_max < Rg^2). density/Tg/bulk_modulus were measured on "
+                "a structure whose chain-scale conformation may not represent true equilibrium."
+            )
+        ct_decay = _dig(eq_comp, "chain", "ct", "decay_fraction_at_end")
+        if ct_decay is not None and ct_decay < 0.1:
+            tau = _dig(eq_comp, "chain", "ct", "tau_relax_ps")
+            traj = _dig(eq_comp, "chain", "ct", "trajectory_ps")
+            gap_note = f" (tau_relax={tau:.3g} ps vs trajectory={traj:.0f} ps)" if tau and traj else ""
+            caveats.append(
+                f"C(t) only {ct_decay * 100:.0f}% decayed by end of trajectory{gap_note} -- "
+                "whole-chain conformational relaxation is far from complete."
+            )
+
+    # GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED (Auhl et al., cond-mat/0306026): a large-s MSID
+    # distortion riding on top of otherwise-healthy small/intermediate-s statistics -- the
+    # signature of a long-wavelength chain conformation that was never correct (most likely
+    # inherited from the build) and that ordinary MD, bounded by reachable timescales, cannot
+    # repair. Named/anticipated in check_equilibration_comprehensive.py's own MSID regime-split
+    # code and test_msid_regime_split.py, but never actually wired into a visible signal until
+    # now. Unlike kinetic_trap_flag, this is NOT regime-gated: a glassy run's conformation is
+    # whatever the melt phase produced before cooling froze it in, so the defect (if present)
+    # matters just as much there -- arguably more, since cooling can never fix it either.
+    large_s = _dig(eq_comp, "chain", "msid", "large_s")
+    if large_s and large_s.get("gaussian_pass") is False:
+        slope = large_s.get("slope")
+        s_range = large_s.get("s_range")
+        s_note = f" (s={s_range[0]}-{s_range[1]})" if s_range else ""
+        caveats.append(
+            f"GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED: large-s MSID slope={slope}{s_note}, "
+            "expected 1.0 +/-20% for melt-screened (ideal-chain) statistics -- long-wavelength "
+            "chain shape has not relaxed to equilibrium. Local packing/short-range structure can "
+            "still be sound; whole-chain conformation may not represent true equilibrium."
+        )
+
+    # anneal_hold_msid_gate (opt-in, per-class): the gate stopped without confirming large-s
+    # MSID actually converged -- either its extension cap was reached first (EXHAUSTED) or an
+    # extension run itself crashed (EXTENSION_FAILED, PROBE_FAILED). Advisory, same as the
+    # GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED caveat above -- cool_block_01 still ran from
+    # whatever anneal_hold data existed at that point, not a hard failure.
+    ahc = eq_comp.get("anneal_hold_convergence") if isinstance(eq_comp, dict) else None
+    if ahc and ahc.get("outcome") in ("EXHAUSTED", "EXTENSION_FAILED", "PROBE_FAILED"):
+        slope_history = ahc.get("slope_history") or []
+        last_slope = slope_history[-1] if slope_history else None
+        caveats.append(
+            f"ANNEAL_HOLD_MSID_GATE_{ahc['outcome']}: the anneal_hold MSID-convergence gate "
+            f"stopped after {ahc.get('extensions_used', 0)} extension(s) "
+            f"({ahc.get('cumulative_hold_ns', '?')} ns cumulative hold) without confirming "
+            f"large-s MSID reached the +-20% gaussian_pass band (last measured slope="
+            f"{last_slope}). Cooling proceeded from anneal_hold's best available structure "
+            "rather than a confirmed-converged one."
+        )
+    return caveats
+
+
 def main():
     p = argparse.ArgumentParser(description="Aggregate Stage 4 outputs into run_summary.json")
     p.add_argument("--output_dir",      required=True)
@@ -106,6 +180,19 @@ def main():
                    help="Explicit path to the canonical thermal.json (e.g. the slowest-rate "
                         "folder). When supplied, skips rglob discovery and uses this file directly. "
                         "Prevents alphabetical-order bugs when multiple rate folders coexist.")
+    p.add_argument("--equilibration_path", default=None,
+                   help="Explicit path to the accepted equilibration attempt's equilibration.json. "
+                        "Under the attempt-based run layout this file lives under a DIFFERENT "
+                        "stage's own attempt raw dir (data/<run>/attempts/equilibration/attempt-N/"
+                        "raw/), never under this summary attempt's own --output_dir, so the plain "
+                        "same-dir lookup below can never find it without this.")
+    p.add_argument("--mechanical_path", default=None,
+                   help="Explicit path to the accepted mechanical attempt's mechanical.json -- "
+                        "same cross-attempt-directory reasoning as --equilibration_path.")
+    p.add_argument("--bulk_modulus_deform_path", default=None,
+                   help="Explicit path to the accepted mechanical attempt's "
+                        "bulk_modulus_deform.json (deformation-fallback runs only) -- same "
+                        "cross-attempt-directory reasoning as --equilibration_path.")
     args = p.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -133,15 +220,32 @@ def main():
         })
         return {}
 
+    def _load_cross_attempt(name, explicit_path, flag_name):
+        """Like _load, but for an artifact that lives under a DIFFERENT stage's own attempt raw
+        dir (equilibration.json/mechanical.json/bulk_modulus_deform.json under the attempt-based
+        run layout -- see --equilibration_path's help). explicit_path (already known from that
+        stage's own returned outputs, threaded through by the caller) is checked first; only
+        falls back to the plain same-dir lookup (which will not find a cross-attempt-directory
+        file, matching the historical bug this replaces) when no explicit path was given."""
+        if explicit_path:
+            path = Path(explicit_path)
+            if path.exists():
+                return _load_json(path)
+            artifacts_missing.append({"file": name, "found_in": None,
+                                       "note": f"--{flag_name} given but not found: {explicit_path}"})
+            return {}
+        return _load(name)
+
     tg           = _load("thermal.json")
     # equilibration.json holds check_equilibration_comprehensive's own nested schema
     # (thermo.*/chain.*/spatial.*) at its top level, plus "density" (extract_equilibrated_
     # density's result) and "gate" (enforce_equilibration_gate's verdict) as sibling keys.
-    eq_comp      = _load("equilibration.json")
+    eq_comp      = _load_cross_attempt("equilibration.json", args.equilibration_path, "equilibration_path")
     eq_dens      = eq_comp.get("density") or {}
     eq_gate      = eq_comp.get("gate") or {}
-    bulk_deform  = _load("bulk_modulus_deform.json")
-    bulk_murnaghan = _load("mechanical.json")
+    bulk_deform  = _load_cross_attempt("bulk_modulus_deform.json", args.bulk_modulus_deform_path,
+                                        "bulk_modulus_deform_path")
+    bulk_murnaghan = _load_cross_attempt("mechanical.json", args.mechanical_path, "mechanical_path")
 
     # -----------------------------------------------------------------------
     # Results section
@@ -315,12 +419,22 @@ def main():
             "density_equilibrated": _dig(eq_comp, "thermo", "density_drift", "pass"),
             "energy_equilibrated":  _dig(eq_comp, "thermo", "energy_drift", "pass"),
             "density_drift_pct":    _dig(eq_comp, "thermo", "density_drift", "drift_pct"),
+            # Accepted-but-suspect chain-relaxation conditions verdict alone hides -- see
+            # _convergence_caveats. Empty list when none apply (including when eq_comp itself
+            # never loaded), never null, so a consumer can always safely do `if caveats:`.
+            "caveats":            _convergence_caveats(eq_comp),
         },
         "structural_checks": {
             "rg_cv":              _dig(eq_comp, "chain", "rg", "cv"),
             "rg_spread_flag":     _not(_dig(eq_comp, "chain", "rg", "pass")) if eq_comp else None,
             "kinetic_trap_flag":  _dig(eq_comp, "chain", "msd", "kinetic_trap_flag"),
             "diffusion_regime":   _dig(eq_comp, "chain", "msd", "diffusion_regime"),
+            # msid_* previously had no home in run_summary.json at all -- see
+            # GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED in convergence.caveats for the plain-English
+            # flag; these are the raw numbers behind it.
+            "msid_slope":                _dig(eq_comp, "chain", "msid", "slope"),
+            "msid_large_s_slope":        _dig(eq_comp, "chain", "msid", "large_s", "slope"),
+            "msid_large_s_gaussian_pass": _dig(eq_comp, "chain", "msid", "large_s", "gaussian_pass"),
             "ordered_flag":       _not(_dig(eq_comp, "spatial", "p2", "pass")) if eq_comp else None,
             "p2_mean":            _dig(eq_comp, "spatial", "p2", "p2_mean"),
             "heterogeneous_flag": (_not(_dig(eq_comp, "spatial", "density_homogeneity", "pass"))

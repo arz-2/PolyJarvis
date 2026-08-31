@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Query polymer_db.sqlite for experimental values best matching a simulated system.
+Query experimental_db.sqlite for experimental values best matching a simulated system.
 
 Matching priority:
   1. --polymer_name  → exact then LIKE (copolymers excluded)   → match_confidence=high
@@ -38,7 +38,7 @@ import statistics
 import sys
 import re
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "polymer_db.sqlite")
+DB_PATH = os.path.join(os.path.dirname(__file__), "experimental_db.sqlite")
 
 # Per-class canonical LIKE patterns for the class-level fallback.
 # Maps poly_class → list of patterns to try in order; first that returns ≥1 row wins.
@@ -410,7 +410,7 @@ def get_thermal_conductivity_data(conn: sqlite3.Connection, polymer_ids: list[in
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Query polymer_db for best experimental match")
+    parser = argparse.ArgumentParser(description="Query experimental_db for best experimental match")
     parser.add_argument("--polymer_name", default=None, help="Canonical polymer name for DB lookup")
     parser.add_argument("--polymer_class", default=None, help="PolyJarvis class code (fallback)")
     parser.add_argument("--T_sim_K", type=float, default=300.0, help="Simulation temperature in K")

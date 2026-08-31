@@ -4,12 +4,11 @@ ingest_protocol_evidence.py — write-back a worker's advisory JSON into the per
 protocol evidence store.
 
 This is the ONLY writer of docs/protocol_evidence_ff.json / protocol_evidence_system_size.json
-besides the one-time migrate_ff_selection_literature.py migration. ff-protocol-literature-worker
-and system-size-literature-worker call this as their last step (via Bash) rather than
-writing to the store directly — code, not the LLM subagent, owns the store's provenance
-(CLAUDE.md), and this also sidesteps the two-workers-run-in-parallel race since each
-worker only ever writes its own per-run advisory JSON plus calls this script against its
-own store.
+besides the one-time migrate_ff_selection_literature.py migration. literature-grounding-worker
+calls this twice (once per store, via Bash) as the last step of each of its two parts, rather
+than writing to either store directly — code, not the LLM subagent, owns the store's provenance
+(CLAUDE.md). (Before the 2026-08-29 merge, two separate agents each called this against their
+own store; a single agent now makes both calls sequentially.)
 
 Only `verified: true` sources are ingested — an unverified candidate in the advisory JSON
 is silently skipped (it was already excluded from backing any recommendation by the

@@ -320,12 +320,20 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
                          extend_temp: float = None, extend_ns: float = 1.5,
                          extend_base_stage: str = None, extend_ensemble: str = "npt",
                          extend_temp_K: float = None,
-                         resume_from: str = None, resume_data_path: str = None) -> dict:
+                         resume_from: str = None, resume_data_path: str = None,
+                         stop_after_stage: str = None) -> dict:
     """resume_from is one of generate_equilibration_workflow's 8 checkpoint names (see
     server.py) -- e.g. "anneal_hold" to regenerate cooling+tail with different parameters
     after a remedy adjusts them, or "cool_block"/"nvt_kinetic_stability" to redo only the
     tail. extend_from_data (paired with extend_base_stage/extend_ensemble) is a genuine
-    restart-continuation of one already-run adaptive stage, not a resubmission."""
+    restart-continuation of one already-run adaptive stage, not a resubmission.
+
+    stop_after_stage (fresh-chain submissions only, i.e. extend_from_data and resume_from both
+    None): submit only the leading slice of the 8-stage protocol through and including this
+    stage name, e.g. "anneal_hold" for the anneal_hold_msid_gate's chain 1. A plain client-side
+    slice of workflow["stages"]/["run_order"] before run_lammps_chain -- generate_
+    equilibration_workflow itself is untouched, it always plans the full chain; only the
+    submitted subset changes."""
     p = resolve_stage_params("equil", args, cls)
     flags = p["lammps_flags"]
     velocity_seed = p["velocity_seed"]
@@ -433,6 +441,12 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
     if workflow.get("status") == "error":
         raise SystemExit(f"generate_equilibration_workflow failed: {workflow}")
 
+    if stop_after_stage is not None:
+        run_order = workflow.get("run_order") or [s["name"] for s in workflow["stages"]]
+        idx = run_order.index(stop_after_stage)
+        workflow = {**workflow, "stages": workflow["stages"][:idx + 1],
+                    "run_order": run_order[:idx + 1]}
+
     chain = lammps.run_lammps_chain(
         stages=workflow["stages"], gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"],
         data_file=resume_data_path or extend_from_data or p["data_path"], engine=p["engine"],
@@ -446,6 +460,51 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
 
 def _stage_dump_path(stage: dict) -> str:
     return f"{stage['work_dir']}/{stage['params']['DUMP_FILE']}"
+
+
+def _resolve_backbone_types(args, cls: dict, lammps, build_data_path: str, p: dict):
+    """Resolve backbone_types (from decided_params, else auto-derived from bond topology and
+    persisted). Returns (backbone_types, backbone_derivation, halt_detail) -- exactly one of
+    backbone_types or halt_detail is non-None. Factored out of do_equil_and_check's while-loop
+    so the anneal_hold_msid_gate's chain-1-only probe (which needs backbone_types before chain
+    2 even exists) and the post-chain equil-check loop share one derive-or-halt path."""
+    backbone_types = p["backbone_types"]
+    if backbone_types is not None:
+        return backbone_types, None, None
+    # Atom-name-only lookup can't tell backbone from pendant-branch atoms (confirmed live:
+    # PACR/PMMA shares a generic aliphatic carbon type between CH2 backbone atoms and pendant
+    # methyl branches) — but bond TOPOLOGY can: derive_backbone_types walks the heavy-atom bond
+    # graph's diameter, which needs no types at all and excludes branches by construction (they
+    # are shorter than continuing along the main path).
+    derived = wait_for_analysis(lammps, lammps.derive_backbone_types(
+        data_file=build_data_path,
+    ), "backbone_types derivation")
+    if derived.get("status") == "success" and derived.get("backbone_types"):
+        backbone_types = derived["backbone_types"]
+        cls["backbone_types"] = backbone_types
+        plan_on_disk = load_plan(args.plan)
+        plan_on_disk.setdefault("decided_params", {})["backbone_types"] = backbone_types
+        atomic_write_json(Path(args.plan), plan_on_disk)
+        backbone_derivation = {
+            "trigger": "backbone_types unresolved",
+            "action": f"auto-derived {backbone_types} from build_data_path bond topology "
+                      "(heavy_atom_graph_diameter) and persisted to decided_params",
+            "outcome": "RESOLVED — automatic",
+        }
+        return backbone_types, backbone_derivation, None
+    # Genuine last resort — the chain itself has fewer than 2 heavy atoms, or no bond topology
+    # at all. inspect_data_file only for diagnostics attached to this halt.
+    diag = lammps.inspect_data_file(
+        data_file=build_data_path, lj_cutoff=p["cutoff_A"] or 12.0,
+        target_density_gcm3=None, nchain=None,
+    )
+    detail = {
+        "reason": "bond-topology derivation could not resolve a backbone for this "
+                  "cell: " + str(derived.get("error", "unknown")),
+        "atom_type_names": diag.get("info", {}).get("atom_type_names"),
+        "build_data_path": build_data_path,
+    }
+    return None, None, detail
 
 
 def do_equil_and_check(args, cls: dict, lammps) -> dict:
@@ -475,49 +534,153 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                     if args.work_dir else None)
 
     gpu_per_run = cls.get("gpu_per_run") or 1
-    with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
-        args.gpu_ids = gpu_ids
-        if pending_path is not None and pending_path.is_file():
-            submission = json.loads(pending_path.read_text())
-        else:
-            continuation_path = getattr(args, "pending_continuation_path", None)
-            resume_from = getattr(args, "equil_resume_from", None)
-            if resume_from is not None:
-                submission = _submit_equil_chain(
-                    args, cls, lammps, resume_from=resume_from,
-                    resume_data_path=getattr(args, "equil_resume_data_path", None),
-                )
-            elif continuation_path:
-                # continuation_path is the prior attempt's npt_prod_RESTART_path (a .restart
-                # file), not its .data output -- see CampaignStageExecutor.execute, which sets
-                # it from prior_outputs["npt_prod_restart_path"]. extend_base_stage defaults to
-                # "npt_final" (the terminal-stage EXTEND case); a remedy that instead wants to
-                # continue a different adaptive stage sets equilibration_extend_base_stage/
-                # _ensemble explicitly (see workflow_engine._continue_npt).
-                submission = _submit_equil_chain(
-                    args, cls, lammps, extend_from_data=continuation_path,
-                    extend_temp=getattr(args, "continuation_temp_K", None),
-                    extend_ns=float(getattr(args, "npt_continuation_ns", 1.5)),
-                    extend_base_stage=getattr(args, "equilibration_extend_base_stage", "npt_final"),
-                    extend_ensemble=getattr(args, "equilibration_extend_ensemble", "npt"),
-                )
-            else:
-                submission = _submit_equil_chain(args, cls, lammps)
-            if pending_path is not None:
-                atomic_write_json(pending_path, submission)
-        result = wait_for_run(lammps, submission["chain_id"], "equilibration chain")
-    if result.get("status") != "completed":
-        if result.get("stage") == "minimize_not_converged":
-            # minimize is stage 0 of the chain -- nothing else in THIS submission completed,
-            # so there is no real stage_checkpoints to resume from (unlike EXTEND_EXHAUSTED/
-            # STRUCTURAL_FAIL below, which fire after real stages have run).
-            return {"halted": True, "reason": "MINIMIZE_NOT_CONVERGED", "detail": result,
-                    "stage_checkpoints": {}}
-        raise SystemExit(f"Equilibration chain did not complete: {result}")
-    if pending_path is not None:
-        pending_path.unlink(missing_ok=True)
+    continuation_path = getattr(args, "pending_continuation_path", None)
+    resume_from = getattr(args, "equil_resume_from", None)
+    reattaching = pending_path is not None and pending_path.is_file()
+    # A gated-path reattach state carries "gate_phase" ("chain1" mid-wait, or "chain1_done" —
+    # chain 1 finished before death, gate loop/chain 2 never persisted); the normal path's own
+    # flat {"chain_id", "workflow"} shape (also reused verbatim by chain 2's own persist below)
+    # has no such key, so it stays routed to the plain else-branch unchanged.
+    pending_state = json.loads(pending_path.read_text()) if reattaching else None
+    gate_phase = (pending_state or {}).get("gate_phase")
+    gate_enabled = (resolve_stage_params("equil", args, cls)["anneal_hold_msid_gate_enabled"]
+                    and resume_from is None and not continuation_path
+                    and (not reattaching or gate_phase is not None))
+    anneal_hold_gate_result = None
 
-    workflow = submission["workflow"]
+    if gate_enabled:
+        # Two-chain path: chain 1 (minimize..anneal_hold) -> adaptive MSID gate on anneal_hold's
+        # own trajectory -> chain 2 (cool_block_01..npt_final, via resume_from="anneal_hold").
+        # Opt-in (anneal_hold_msid_gate_enabled, default off) -- see _anneal_hold_adaptive_extend
+        # for the validated remedy this implements and why. EXTEND/resume_from continuations of an
+        # EARLIER attempt never take this branch -- gate_enabled is False for those -- so a
+        # resumed run for one of THOSE remedies replays the normal single-chain path even for a
+        # gate-enabled class.
+        #
+        # Reattach coverage: chain 1 is the expensive piece (minimize..anneal_hold, most of the
+        # protocol) -- losing it to an unattached process death would silently double it. If
+        # gate_phase=="chain1_done" (chain 1 finished, death happened later), chain 1 is reused
+        # from its persisted workflow with no resubmission at all. If gate_phase=="chain1" (death
+        # was mid-chain-1-wait), the persisted chain_id is reattached to directly. Only a death
+        # DURING the gate loop's own extension(s) still re-does work -- the loop's own in-flight
+        # extension state (probe history, which increment was running) isn't persisted, so a
+        # chain1_done reattach restarts the loop fresh from chain 1's own un-extended anneal_hold
+        # output. That's a bounded, small re-do (capped by anneal_hold_max_extensions), not the
+        # multi-stage chain-1 resubmission this guard exists to prevent.
+        if reattaching and gate_phase == "chain1_done":
+            chain1 = {"workflow": pending_state["workflow"]}
+        else:
+            with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
+                args.gpu_ids = gpu_ids
+                if reattaching and gate_phase == "chain1":
+                    chain1 = {"chain_id": pending_state["chain_id"], "workflow": pending_state["workflow"]}
+                else:
+                    chain1 = _submit_equil_chain(args, cls, lammps, stop_after_stage="anneal_hold")
+                    if pending_path is not None:
+                        atomic_write_json(pending_path, {
+                            "gate_phase": "chain1", "chain_id": chain1["chain_id"],
+                            "workflow": chain1["workflow"]})
+                chain1_result = wait_for_run(lammps, chain1["chain_id"],
+                                             "equilibration chain 1 (minimize..anneal_hold)")
+            if chain1_result.get("status") != "completed":
+                if chain1_result.get("stage") == "minimize_not_converged":
+                    return {"halted": True, "reason": "MINIMIZE_NOT_CONVERGED", "detail": chain1_result,
+                            "stage_checkpoints": {}}
+                raise SystemExit(f"Equilibration chain 1 did not complete: {chain1_result}")
+            if pending_path is not None:
+                atomic_write_json(pending_path, {"gate_phase": "chain1_done",
+                                                 "workflow": chain1["workflow"]})
+
+        anneal_hold_stage = chain1["workflow"]["stages"][-1]
+        p_bt = resolve_stage_params("equil-check", args, cls)
+        backbone_types, derivation, halt_detail = _resolve_backbone_types(
+            args, cls, lammps, build_data_path, p_bt)
+        if halt_detail is not None:
+            chain1_checkpoints = {s["name"]: s["output_data"]
+                                  for s in chain1["workflow"]["stages"] if s.get("name")}
+            return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED", "detail": halt_detail,
+                    "stage_checkpoints": chain1_checkpoints}
+        if derivation is not None:
+            backbone_derivation = derivation
+
+        p_anneal = resolve_stage_params("equil", args, cls)
+        anneal_hold_gate_result = _anneal_hold_adaptive_extend(
+            args, cls, lammps, p_anneal, anneal_hold_stage, backbone_types, gpu_per_run)
+        _record_anneal_hold_convergence(args.output_dir, anneal_hold_gate_result)
+
+        with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
+            args.gpu_ids = gpu_ids
+            submission = _submit_equil_chain(
+                args, cls, lammps, resume_from="anneal_hold",
+                resume_data_path=anneal_hold_gate_result["anneal_hold_data_path"])
+            # Merge chain 1's own leading stages with the GATE's final (possibly extended)
+            # anneal_hold stage and chain 2's tail -- resume_from chains only contain their own
+            # tail stages, so a later remedy resuming from an EARLIER checkpoint (nvt_warmup,
+            # npt_densify, ...) still needs chain 1's stages recorded here. Built BEFORE
+            # wait_for_run and persisted to pending_path immediately, same reattach-guard reason
+            # as the normal path (comment above pending_path's declaration): a death during this
+            # multi-hour wait must reattach to chain 2's own chain_id and recover this exact
+            # merged shape on resume, not resubmit it. This flat {"chain_id","workflow"} shape
+            # (no "gate_phase" key) is deliberately the SAME shape the normal path's own reattach
+            # branch already reads (see gate_phase's definition above) -- a reattach here falls
+            # through to that plain else-branch, gate_enabled computed False, and just waits on
+            # this chain_id directly.
+            chain1_lead = chain1["workflow"]["stages"][:-1]
+            merged_anneal_hold = anneal_hold_gate_result["anneal_hold_stage"]
+            workflow = {**submission["workflow"],
+                        "stages": chain1_lead + [merged_anneal_hold] + submission["workflow"]["stages"],
+                        "run_order": ([s["name"] for s in chain1_lead] + ["anneal_hold"]
+                                      + (submission["workflow"].get("run_order") or []))}
+            if pending_path is not None:
+                atomic_write_json(pending_path,
+                                  {"chain_id": submission["chain_id"], "workflow": workflow})
+            result = wait_for_run(lammps, submission["chain_id"],
+                                  "equilibration chain 2 (cool_block_01..npt_final)")
+        if result.get("status") != "completed":
+            raise SystemExit(f"Equilibration chain 2 did not complete: {result}")
+        if pending_path is not None:
+            pending_path.unlink(missing_ok=True)
+    else:
+        with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
+            args.gpu_ids = gpu_ids
+            if reattaching:
+                submission = json.loads(pending_path.read_text())
+            else:
+                if resume_from is not None:
+                    submission = _submit_equil_chain(
+                        args, cls, lammps, resume_from=resume_from,
+                        resume_data_path=getattr(args, "equil_resume_data_path", None),
+                    )
+                elif continuation_path:
+                    # continuation_path is the prior attempt's npt_prod_RESTART_path (a .restart
+                    # file), not its .data output -- see CampaignStageExecutor.execute, which sets
+                    # it from prior_outputs["npt_prod_restart_path"]. extend_base_stage defaults to
+                    # "npt_final" (the terminal-stage EXTEND case); a remedy that instead wants to
+                    # continue a different adaptive stage sets equilibration_extend_base_stage/
+                    # _ensemble explicitly (see workflow_engine._continue_npt).
+                    submission = _submit_equil_chain(
+                        args, cls, lammps, extend_from_data=continuation_path,
+                        extend_temp=getattr(args, "continuation_temp_K", None),
+                        extend_ns=float(getattr(args, "npt_continuation_ns", 1.5)),
+                        extend_base_stage=getattr(args, "equilibration_extend_base_stage", "npt_final"),
+                        extend_ensemble=getattr(args, "equilibration_extend_ensemble", "npt"),
+                    )
+                else:
+                    submission = _submit_equil_chain(args, cls, lammps)
+                if pending_path is not None:
+                    atomic_write_json(pending_path, submission)
+            result = wait_for_run(lammps, submission["chain_id"], "equilibration chain")
+        if result.get("status") != "completed":
+            if result.get("stage") == "minimize_not_converged":
+                # minimize is stage 0 of the chain -- nothing else in THIS submission completed,
+                # so there is no real stage_checkpoints to resume from (unlike EXTEND_EXHAUSTED/
+                # STRUCTURAL_FAIL below, which fire after real stages have run).
+                return {"halted": True, "reason": "MINIMIZE_NOT_CONVERGED", "detail": result,
+                        "stage_checkpoints": {}}
+            raise SystemExit(f"Equilibration chain did not complete: {result}")
+        if pending_path is not None:
+            pending_path.unlink(missing_ok=True)
+        workflow = submission["workflow"]
     # Every stage THIS call actually built, by name -> its own write_data output. A later
     # attempt's remedy (melt_hold's anneal-cycle extension, a future npt_cool300 remedy) needs a
     # real checkpoint path to resume from — CampaignStageExecutor.execute locates it by walking
@@ -557,43 +720,15 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
         p = resolve_stage_params("equil-check", args, cls)
         # The resolver's value, not the raw CLI arg: the halt below says the list comes from
         # decided_params, and only the resolver reads it from there (via the plan-overlaid cls).
-        backbone_types = p["backbone_types"]
-        if backbone_types is None:
-            # Atom-name-only lookup can't tell backbone from pendant-branch atoms (confirmed
-            # live: PACR/PMMA shares a generic aliphatic carbon type between CH2 backbone atoms
-            # and pendant methyl branches) — but bond TOPOLOGY can: derive_backbone_types walks
-            # the heavy-atom bond graph's diameter, which needs no types at all and excludes
-            # branches by construction (they're shorter than continuing along the main path).
-            derived = wait_for_analysis(lammps, lammps.derive_backbone_types(
-                data_file=build_data_path,
-            ), "backbone_types derivation")
-            if derived.get("status") == "success" and derived.get("backbone_types"):
-                backbone_types = derived["backbone_types"]
-                cls["backbone_types"] = backbone_types
-                plan_on_disk = load_plan(args.plan)
-                plan_on_disk.setdefault("decided_params", {})["backbone_types"] = backbone_types
-                atomic_write_json(Path(args.plan), plan_on_disk)
-                backbone_derivation = {
-                    "trigger": "backbone_types unresolved",
-                    "action": f"auto-derived {backbone_types} from build_data_path bond topology "
-                              "(heavy_atom_graph_diameter) and persisted to decided_params",
-                    "outcome": "RESOLVED — automatic",
-                }
-            else:
-                # Genuine last resort — the chain itself has fewer than 2 heavy atoms, or no bond
-                # topology at all. inspect_data_file only for diagnostics attached to this halt.
-                diag = lammps.inspect_data_file(
-                    data_file=build_data_path, lj_cutoff=p["cutoff_A"] or 12.0,
-                    target_density_gcm3=None, nchain=None,
-                )
-                detail = {
-                    "reason": "bond-topology derivation could not resolve a backbone for this "
-                              "cell: " + str(derived.get("error", "unknown")),
-                    "atom_type_names": diag.get("info", {}).get("atom_type_names"),
-                    "build_data_path": build_data_path,
-                }
-                return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED", "detail": detail,
-                        "stage_checkpoints": stage_checkpoints}
+        # Already resolved above when gate_enabled took the two-chain path (cls["backbone_types"]
+        # is set as a side effect of a real derivation) -- this call then just returns it back.
+        backbone_types, derivation, halt_detail = _resolve_backbone_types(
+            args, cls, lammps, build_data_path, p)
+        if halt_detail is not None:
+            return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED", "detail": halt_detail,
+                    "stage_checkpoints": stage_checkpoints}
+        if derivation is not None:
+            backbone_derivation = derivation
 
         comp = wait_for_analysis(lammps, lammps.check_equilibration_comprehensive(
             log_file=p["npt_prod_log_path"], dump_file=p["melt_dump_path"],
@@ -621,7 +756,15 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                       "density_gcm3": density.get("plateau_density_mean"),
                       "velocity_seed": velocity_seed, "extend_history": extend_history,
                       "backbone_derivation": backbone_derivation,
-                      "stage_checkpoints": stage_checkpoints}
+                      "anneal_hold_convergence": ({k: v for k, v in anneal_hold_gate_result.items()
+                                                   if k != "anneal_hold_stage"}
+                                                  if anneal_hold_gate_result else None),
+                      "stage_checkpoints": stage_checkpoints,
+                      # equilibration.json's own on-disk path -- see do_mechanical's
+                      # mechanical_json_path for why this needs to be explicit rather than
+                      # searched (it lives under THIS equilibration attempt's raw dir, not the
+                      # summary attempt's own output_dir).
+                      "equilibration_json_path": comprehensive_json}
             return result
 
         if equil_verdict == "EXTEND":
@@ -1068,6 +1211,198 @@ def _bm_point_adaptive_extend(cls: dict, lammps, p: dict, pressure: float, bm_wo
         data_path = f"{bm_work_dir}/ext_{extensions}_out.data"
 
 
+def _anneal_hold_adaptive_extend(args, cls: dict, lammps, p: dict, anneal_hold_stage: dict,
+                                  backbone_types: list, gpu_per_run: int) -> dict:
+    """MSID-convergence gate for anneal_hold: extend it via genuine restart-continuation
+    (extend_only=True, base_stage_name="anneal_hold" -- server.py:1888-1962, already
+    implemented, never previously invoked with this base stage) until large-s MSID either
+    passes the +-20% gaussian_pass band or stops moving, instead of committing to a fixed
+    schedule and letting cool_block_01 lock in whatever bias anneal_hold hasn't yet erased.
+
+    Mirrors _run_tg_sweep_adaptive/_bm_point_adaptive_extend's control-flow shape (run one
+    increment -> compute a convergence criterion from fresh output -> extend-or-stop, capped,
+    advisory-only) -- but unlike those two, which deliberately discard thermostat state between
+    probes (read_data + LOG_APPEND, appropriate for independent short holds), this uses the
+    codebase's actual restart-continuation mechanism, since anneal_hold is one genuine
+    trajectory, not independent samples.
+
+    Validated empirically (PEG1/POXI Phase 0, 2026-08-29): large-s MSID slope rose
+    0.663 -> 0.849 -> 0.923 across two 2.5ns restart-continued extensions from a 1ns baseline,
+    then plateaued (0.923 / 0.915 / 0.901, ~1-2.5% relative jitter at short separation) once
+    inside the gaussian_pass band. Phase 0 also found that extensions from a converged
+    checkpoint can themselves crash under real LAMMPS/CUDA errors (PPPM out-of-range atoms;
+    cudaErrorIllegalAddress), each preceded by fmax spiking within a single thermo interval --
+    consistent with a stochastic hot-atom event in a long uninterrupted NVT hold, not a setup
+    bug. EXTENSION_FAILED below is a first-class, advisory outcome for exactly that: fall back
+    to the last good restart/data and stop extending, never treat it as fatal.
+
+    Bounded by anneal_hold_max_extensions; advisory only -- an unresolved hold after its cap
+    (or a probe/extension failure) is still recorded in the returned dict and chain 2 proceeds
+    from whatever anneal_hold data exists, exactly like the Tg/BM per-point loops' own
+    EXHAUSTED/PROBE_FAILED handling.
+
+    Rg veto (2026-08-30): a flat MSID pairwise slope-diff alone can call STABLE while Rg is
+    still visibly drifting -- MSID measures backbone-length-scale scaling, Rg measures overall
+    chain size, and the two need not converge in lockstep. The STABLE path (only that path --
+    never PASS, never a second AND-condition on the whole gate) is vetoed when mean_Rg_A moved
+    more than anneal_hold_rg_veto_pct between the last two probes, keeping the loop extending
+    instead of stopping on a possibly-incomplete signal. Deliberately scoped this narrowly
+    rather than mirroring RadonPy's own Rg-convergence check as a blanket requirement: RadonPy's
+    own check_eq() bundles Rg with density/energy/etc into one flag and, on failure, still
+    reports density/Rg/bulk_modulus after exhausting its retry budget -- only thermal
+    conductivity gets suppressed (radonpy/sim/lammps.py:2613-2756, AutoMD_scripts/1_eq.py:
+    210-247, verified directly 2026-08-30). Density/bulk_modulus are local-packing/EOS
+    properties that don't need full chain-scale relaxation to be trustworthy; Tg and
+    entanglement/viscoelastic properties do -- so the veto targets where a stale STABLE call
+    would actually mislead (this hold, before the fixed cool-down schedule locks it in) without
+    resurrecting a universal hard gate that RadonPy's own precedent (and its own polymer's
+    4+ consecutive Rg-check failures) shows would rarely or never pass for this chemistry.
+    """
+    max_ext = p["anneal_hold_max_extensions"]
+    stability_pct = p["anneal_hold_stability_pct"]
+    rg_veto_pct = p["anneal_hold_rg_veto_pct"]
+    extend_ns = p["anneal_hold_extend_ns"]
+    dt = p["dt_fs"]
+    extend_steps = int(extend_ns * 1e6 / dt)
+
+    stage = anneal_hold_stage
+    dump_every = int(stage["params"].get("DUMP_FREQ", 1000))
+    steps_so_far = int(stage["params"].get("N_STEPS") or 0)
+    restart_path = stage.get("output_restart")
+
+    slope_history: list = []
+    rg_history: list = []
+    probe_history: list = []
+    extensions = 0
+    outcome = None
+    rg_veto_triggered = False
+
+    while True:
+        # extensions==0: this probe covers the whole chain-1 anneal_hold hold, same as any
+        # other equil-check probe (function default skip_frames applies). extensions>=1: skip
+        # everything before THIS increment so the probe measures only its own relaxation, not
+        # diluted by earlier (already-probed, possibly still-unrelaxed) frames.
+        probe_dir = f"{stage['work_dir']}/msid_probe/ext_{extensions:02d}"
+        probe_kwargs = dict(
+            log_file=f"{stage['work_dir']}/{stage['params']['LOG_FILE']}",
+            dump_file=_stage_dump_path(stage), data_file=stage["output_data"],
+            backbone_types=backbone_types, ct_min_decay=None,
+            output_dir=probe_dir, graphs_dir=f"{probe_dir}/graphs",
+            cutoff_A=p["cutoff_A"], timestep_fs=dt, dump_every=dump_every,
+        )
+        if extensions > 0 and dump_every:
+            probe_kwargs["skip_frames"] = steps_so_far // dump_every
+        try:
+            probe = wait_for_analysis(lammps, lammps.check_equilibration_comprehensive(
+                **probe_kwargs), f"anneal_hold MSID probe (ext {extensions})")
+        except SystemExit as exc:
+            probe = {"status": "failed", "error": str(exc)}
+
+        large_s = (((probe or {}).get("chain") or {}).get("msid") or {}).get("large_s") or {}
+        slope = large_s.get("slope")
+        gaussian_pass = bool(large_s.get("gaussian_pass"))
+        # Rg is a free side-observation, not a gate condition: check_equilibration_comprehensive
+        # already computes it in the same call as MSID (structural.rg), so recording it here costs
+        # nothing and lets a later revision see whether Rg tracks or lags MSID's own convergence
+        # before committing to a real temporal-Rg stopping condition (RadonPy's independent
+        # equilibration of this same polymer has repeatedly failed ITS OWN Rg-convergence check --
+        # corroborating evidence, but not yet a validated basis for a second AND-condition here).
+        mean_rg_A = (((probe or {}).get("chain") or {}).get("rg") or {}).get("mean_Rg_A")
+        probe_history.append({"extension": extensions, "slope": slope,
+                              "gaussian_pass": gaussian_pass, "mean_rg_A": mean_rg_A,
+                              "skip_frames": probe_kwargs.get("skip_frames")})
+
+        if probe.get("status") != "success" or slope is None:
+            outcome = "PROBE_FAILED"
+            break
+        slope_history.append(slope)
+        rg_history.append(mean_rg_A)
+        if gaussian_pass:
+            outcome = "PASS"
+            break
+        if len(slope_history) >= 2 and slope_history[-2]:
+            rel_diff = abs(slope_history[-1] - slope_history[-2]) / abs(slope_history[-2])
+            if rel_diff <= stability_pct / 100.0:
+                # MSID looks flat -- but a flat slope isn't proof the chain has explored its
+                # conformational space if Rg is still visibly drifting alongside it. Veto only
+                # this early-stop path (never PASS, never a second AND-condition on the whole
+                # gate -- see anneal_hold_rg_veto_pct in stage_params.py for why this stays a
+                # permissive placeholder rather than mirroring RadonPy's own near-unsatisfiable
+                # 1%-of-mean Rg criterion). Missing/None Rg fails open -- Rg is still an
+                # optional side-observation, not a hard prerequisite for this stop condition.
+                rg_prev, rg_cur = rg_history[-2], rg_history[-1]
+                if rg_prev is None or rg_cur is None or rg_prev == 0:
+                    outcome = "STABLE"
+                    break
+                rg_rel_diff = abs(rg_cur - rg_prev) / abs(rg_prev)
+                if rg_rel_diff <= rg_veto_pct / 100.0:
+                    outcome = "STABLE"
+                    break
+                rg_veto_triggered = True
+                probe_history[-1]["rg_veto"] = True
+        if extensions >= max_ext:
+            outcome = "EXHAUSTED"
+            break
+
+        attempt_idx = extensions + 1
+        with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
+            args.gpu_ids = gpu_ids
+            # extend_temp is NOT the extension's actual hold temperature -- generate_equilibration_
+            # workflow's own extend_only branch hardcodes T_START=T_FINAL=max_temp for
+            # base_stage_name="anneal_hold" regardless of what's passed here (server.py's
+            # `elif base_stage_name == "anneal_hold": ext_T = max_temp`). extend_temp only feeds
+            # the unconditional `max_temp >= temp + anneal_margin_K` validation gate that runs
+            # BEFORE that branch -- passing T_anneal_high_K (==max_temp for this class) here
+            # trips that gate every time (max_temp can never exceed itself by a positive margin).
+            # Leave it unset so _submit_equil_chain's own default (p["T_workflow_K"], always
+            # comfortably below max_temp) satisfies the gate instead -- confirmed against a real
+            # PROCESS_FAILED failure from this exact call (PEG1_gate_validation attempt-0001,
+            # 2026-08-30: "max_temp=580.0 does not meet temp=580.0 plus ... anneal_margin_K=100.0").
+            submission = _submit_equil_chain(
+                args, cls, lammps, extend_from_data=restart_path, extend_ns=extend_ns,
+                extend_base_stage="anneal_hold", extend_ensemble="nvt")
+            ext_result = wait_for_run(lammps, submission["chain_id"],
+                                      f"anneal_hold extend {attempt_idx}")
+        if ext_result.get("status") != "completed":
+            probe_history.append({"extension": attempt_idx, "outcome": "EXTENSION_FAILED",
+                                  "detail": ext_result})
+            outcome = "EXTENSION_FAILED"
+            break
+        extensions = attempt_idx
+        stage = submission["workflow"]["stages"][0]
+        restart_path = stage.get("output_restart")
+        steps_so_far += extend_steps
+
+    return {
+        "outcome": outcome, "extensions_used": extensions,
+        "slope_history": slope_history, "rg_history": rg_history,
+        "probe_history": probe_history,
+        "rg_veto_triggered": rg_veto_triggered,
+        "cumulative_hold_ns": steps_so_far * dt / 1e6,
+        "anneal_hold_stage": stage,
+        "anneal_hold_data_path": stage["output_data"],
+        "anneal_hold_restart_path": stage.get("output_restart"),
+    }
+
+
+def _record_anneal_hold_convergence(output_dir: str, gate_result: dict) -> None:
+    """Merge the gate's outcome into equilibration.json under 'anneal_hold_convergence' --
+    same read-merge-write convention extract_equilibrated_density.py already uses for its own
+    'density' key (equilibration.json accumulates sections from several independent writers,
+    never a single owner)."""
+    path = Path(output_dir) / "equilibration.json"
+    merged = {}
+    if path.exists():
+        try:
+            merged = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            merged = {}
+    merged["anneal_hold_convergence"] = {
+        k: v for k, v in gate_result.items() if k != "anneal_hold_stage"
+    }
+    atomic_write_json(path, merged)
+
+
 def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: str) -> dict:
     args.is_glassy = "true" if is_glassy else "false"
     gpu_per_run = cls.get("gpu_per_run") or 1
@@ -1151,6 +1486,12 @@ def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: 
     # reportability gate emitted by the analysis.
     accepted = murn.get("bm_gate_verdict") == "BM_REPORTABLE"
 
+    # mechanical.json's own on-disk path -- do_summary needs this explicitly, since it lives
+    # under THIS (mechanical) attempt's raw dir, not the summary attempt's own output_dir that
+    # generate_run_summary.py otherwise searches (see generate_run_summary.py's
+    # equilibration_path/mechanical_path/bulk_modulus_deform_path args).
+    mechanical_json_path = str(Path(bp["output_dir"]) / "mechanical.json")
+
     if accepted:
         result = {"method": "murnaghan", "bulk_modulus_GPa": murn.get("bulk_modulus_GPa"),
                   "B0_prime": murn.get("B0_prime"),
@@ -1160,7 +1501,8 @@ def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: 
                   "bm_convergence_reasons": murn.get("bm_convergence_reasons"),
                   "bm_convergence_confidence": murn.get("bm_convergence_confidence"),
                   "murnaghan_result": murn, "velocity_seed": p["velocity_seed"],
-                  "pressure_selection": pressure_selection.to_dict()}
+                  "pressure_selection": pressure_selection.to_dict(),
+                  "mechanical_json_path": mechanical_json_path}
         return result
 
     result = {"method": "murnaghan", "bulk_modulus_GPa": murn.get("bulk_modulus_GPa"),
@@ -1172,7 +1514,8 @@ def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: 
               "bm_convergence_confidence": murn.get("bm_convergence_confidence"),
               "is_glassy": is_glassy,
               "murnaghan_result": murn, "velocity_seed": p["velocity_seed"],
-              "pressure_selection": pressure_selection.to_dict()}
+              "pressure_selection": pressure_selection.to_dict(),
+              "mechanical_json_path": mechanical_json_path}
     return result
 
 
@@ -1212,14 +1555,17 @@ def do_deformation(args, cls: dict, lammps) -> dict:
              "deform_gate_verdict": deform_extract.get("deform_gate_verdict"),
              "deform_gate_reasons": deform_extract.get("deform_gate_reasons"),
              "rate_sensitivity": deform_extract.get("rate_sensitivity"),
-             "velocity_seed": resolve_stage_params("deform", args, cls)["velocity_seed"]}
+             "velocity_seed": resolve_stage_params("deform", args, cls)["velocity_seed"],
+             # bulk_modulus_deform.json's own on-disk path -- see do_mechanical's
+             # mechanical_json_path for why this needs to be explicit rather than searched.
+             "bulk_modulus_deform_json_path": str(Path(bp["output_dir"]) / "bulk_modulus_deform.json")}
     return result
 
 
 # ─── Stage: summary ─────────────────────────────────────────────────────────
 
 def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_verdict: str,
-               raw_dir: Path) -> dict:
+               raw_dir: Path, equil_result: dict = None, mechanical_result: dict = None) -> dict:
     exp_lookup_path = raw_dir / "exp_lookup.json"
     properties = ({"density", "tg", "bulk_modulus"} if args.properties in (None, "all")
                   else {x.strip().lower() for x in args.properties.split(",") if x.strip()})
@@ -1250,6 +1596,15 @@ def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_v
     # (rather than assume the string) so a future non-PASS path to this stage can't silently lie.
     args.d05 = equil_verdict or "PASS"
     sp = resolve_stage_params("run-summary", args, cls)
+    # equilibration.json/mechanical.json/bulk_modulus_deform.json live under THEIR OWN stage's
+    # attempt raw dir (data/<run>/attempts/<stage>/attempt-N/raw/), never under this summary
+    # attempt's own output_dir (sp["output_dir"]) -- generate_run_summary.py's plain same-dir
+    # lookup can never find them there, so these explicit cross-attempt-directory paths (already
+    # known from each stage's own returned outputs) are required, mirroring tg_path's existing
+    # precedent for exactly this reason.
+    equilibration_path = (equil_result or {}).get("equilibration_json_path")
+    mechanical_path = (mechanical_result or {}).get("mechanical_json_path")
+    bulk_modulus_deform_path = (mechanical_result or {}).get("bulk_modulus_deform_json_path")
     summary = wait_for_analysis(lammps, lammps.generate_run_summary(
         output_dir=sp["output_dir"], graphs_dir=sp["graphs_dir"], run_name=args.run_name,
         smiles=args.smiles or "", polymer_class=args.polymer_class.upper(), ff=sp["ff"],
@@ -1257,6 +1612,8 @@ def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_v
         d01=sp["d01_ff"], d02=sp["d02_charges"], d03=sp["d03_electrostatics"], d04=sp["d04_system_size"],
         d05=args.d05, d06=args.tg_fit_quality or "N/A (not requested)",
         n_replicates=args.n_replicates, tg_path=tg_path,
+        equilibration_path=equilibration_path, mechanical_path=mechanical_path,
+        bulk_modulus_deform_path=bulk_modulus_deform_path,
     ), "run-summary generation")
     summary["run_summary_path"] = str(Path(sp["output_dir"]) / "run_summary.json")
     return summary
@@ -1323,6 +1680,7 @@ class CampaignStageExecutor:
         build = self._outputs(context, "build")
         equil = self._outputs(context, "equilibration")
         thermal = self._outputs(context, "thermal") or None
+        mechanical = self._outputs(context, "mechanical") or None
         if build:
             args.data_path = build.get("data_path")
             args.build_data_path = build.get("data_path")
@@ -1410,7 +1768,8 @@ class CampaignStageExecutor:
                 is_glassy = (thermal.get("is_glassy") if thermal else
                               resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0)
                 outputs = do_summary(args, cls, self.lammps, is_glassy, thermal,
-                                     equil.get("equil_verdict"), attempt_dir / "raw")
+                                     equil.get("equil_verdict"), attempt_dir / "raw",
+                                     equil_result=equil, mechanical_result=mechanical)
             else:
                 raise ValueError(f"unknown workflow stage {stage!r}")
         except SystemExit as exc:

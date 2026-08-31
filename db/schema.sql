@@ -1,5 +1,6 @@
 -- PolyJarvis experimental polymer property database
 -- Only real laboratory measurements (DSC, dilatometry, mechanical testing) — no MD data.
+-- For MD-simulation-literature records, see db/polydatabase_schema.sql / db/polydatabase_md.sqlite.
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
 

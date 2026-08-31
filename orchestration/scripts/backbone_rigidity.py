@@ -16,7 +16,7 @@ baseline (see that file's _kuhn_floor). This is purely a structural classificati
 counting) -- it estimates NO physical quantity (no Kuhn length, no persistence length,
 no Rg) and is not the "invented-physics shortcut" select_system_size.py's own docstring
 warns against; that estimation stays a literature-search responsibility (see
-.claude/agents/system-size-literature-worker.md), never a heuristic derived here.
+.claude/agents/literature-grounding-worker.md's Part B), never a heuristic derived here.
 
 Usage:
   python3 orchestration/scripts/backbone_rigidity.py --smiles "*CC(*)c1ccccc1"

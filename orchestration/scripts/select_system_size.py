@@ -179,7 +179,7 @@ def _kuhn_floor(rigidity: dict, literature_grounding: dict, m_repeat_gmol: float
 
     Mirrors _entanglement_floor's refuse-rather-than-fabricate shape exactly: a real,
     literature-sourced Kuhn value (from literature_grounding's system_size block, put
-    there by system-size-literature-worker's live per-SMILES search -- there is no static
+    there by literature-grounding-worker's live per-SMILES search -- there is no static
     per-class Kuhn table to look up, unlike PDMS's one existing example in
     docs/protocol_evidence_system_size.json) beats a structural guess; no literature value
     beats falling back to the class's own dp_min floor, never an invented rotatable-bond-
@@ -373,7 +373,7 @@ def _literature_dp_recommendation(literature_grounding: dict, cls: dict, smiles:
     Two distinct sources, both reduced to the same "a per-molecule DP was grounded" shape:
       - system_size.dp_typical/nchain: a direct convergence-DP citation (worker priority 2).
       - system_size.me_estimated_gmol: a packing-length-derived Me estimate (worker priority
-        3, see .claude/agents/system-size-literature-worker.md) -- computed the SAME way a
+        3, see .claude/agents/literature-grounding-worker.md's Part B) -- computed the SAME way a
         documented table Me is (DP@Me = Me / repeat-unit MW), just literature-sourced rather
         than curated, so it is never re-derived here from a raw C-infinity value this script
         would have to trust blindly.

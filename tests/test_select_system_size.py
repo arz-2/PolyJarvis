@@ -338,7 +338,7 @@ def test_solve_no_change_when_class_default_already_at_the_floor():
 
 # --- literature grounding: makes the recommendation vary by molecule, not just class -----
 
-_LIT_GROUNDING_SCHEMA = {  # matches .claude/agents/system-size-literature-worker.md's schema
+_LIT_GROUNDING_SCHEMA = {  # matches .claude/agents/literature-grounding-worker.md's Part B schema
     "system_size": {"dp_typical": 200, "nchain": 12,
                     "convergence_basis": "entanglement_mw", "confidence": "medium"},
 }

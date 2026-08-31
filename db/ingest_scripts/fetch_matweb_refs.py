@@ -8,7 +8,7 @@ Tg (K), shear modulus (GPa), bulk modulus (GPa) where available.
 
 Output: data/matweb_refs.json
 Next step: db/ingest_scripts/import_matweb.py reads this JSON and loads
-the data into polymer_db.sqlite.
+the data into experimental_db.sqlite.
 
 Usage:
   python3 db/ingest_scripts/fetch_matweb_refs.py [options]

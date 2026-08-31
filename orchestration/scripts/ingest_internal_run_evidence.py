@@ -69,7 +69,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # decisions[].id -> the store `field` it grounds. Only D-01/D-03/D-04 map onto this
 # schema's fields (D-02_charges, D-05..D-08 aren't part of the FIELDS enum — see
-# ff-protocol-literature-worker.md's own field table for the same scope).
+# literature-grounding-worker.md's own field table (Part A) for the same scope).
 _DECISION_ID_TO_FIELD = {
     "D-01_ff": "forcefield",
     "D-03_electrostatics": "electrostatics",

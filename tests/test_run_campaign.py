@@ -23,6 +23,7 @@ import run_campaign as rdr  # noqa: E402
 from run_campaign import (  # noqa: E402
     _base_args, wait_for_analysis, do_equil_and_check, do_summary, do_build, COMPRESSION_RATIO,
     _bracket_tg_start_temp, _run_tg_sweep_adaptive, _bm_point_adaptive_extend,
+    _anneal_hold_adaptive_extend, _record_anneal_hold_convergence, _submit_equil_chain,
 )
 
 RULES = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
@@ -226,7 +227,8 @@ class _FakeEquilLammps:
     (covered separately above)."""
 
     def __init__(self, tmp_path, comp_results, gate_verdicts, atom_type_names=None,
-                 derived_backbone_types=None, workflow_stages=None, workflow_extra=None):
+                 derived_backbone_types=None, workflow_stages=None, workflow_extra=None,
+                 workflow_queue=None):
         self.tmp_path = tmp_path
         self._comp_results = list(comp_results)
         self._gate_verdicts = list(gate_verdicts)
@@ -246,6 +248,11 @@ class _FakeEquilLammps:
         # melt_dump_path/melt_data_path stage lookup.
         self._workflow_stages = workflow_stages
         self._workflow_extra = workflow_extra or {}
+        # A list of full workflow dicts, one popped per generate_equilibration_workflow() call --
+        # for the anneal_hold_msid_gate's chain1/chain2 split, where each call must return a
+        # DIFFERENT stage list (workflow_stages/_extra only support one fixed shape reused every
+        # call). Takes priority over workflow_stages when both are given.
+        self._workflow_queue = list(workflow_queue) if workflow_queue is not None else None
 
     def _sentinel(self):
         self._chain_n += 1
@@ -255,6 +262,8 @@ class _FakeEquilLammps:
 
     def generate_equilibration_workflow(self, **kwargs):
         self.generate_equilibration_workflow_calls.append(kwargs)
+        if self._workflow_queue is not None:
+            return self._workflow_queue.pop(0)
         if self._workflow_stages is not None:
             return {"stages": self._workflow_stages, **self._workflow_extra}
         stage = {"name": "npt_final",
@@ -1267,6 +1276,45 @@ def test_bm_point_extension_run_failure_is_advisory(bm_args_cls, tmp_path, monke
     assert result["final_data_path"] == data_path  # prior good data untouched, not the failed ext
 
 
+# ── Summary dispatch: cross-attempt-directory paths (PEG1 run_summary bug fix) ─────────────
+
+def test_summary_dispatch_threads_equilibration_and_mechanical_json_paths(tmp_path, monkeypatch):
+    """generate_run_summary.py can only find equilibration.json/mechanical.json when the caller
+    passes their real (cross-attempt-directory) paths explicitly -- do_equil_and_check/
+    do_mechanical surface those paths as equilibration_json_path/mechanical_json_path in their
+    own outputs dicts; CampaignStageExecutor.execute("summary", ...) must thread both through to
+    do_summary, which must thread them into generate_run_summary's call. Locks in the fix without
+    submitting any real simulation."""
+    from run_campaign import CampaignStageExecutor
+    import run_campaign as rc
+
+    calls = []
+    monkeypatch.setattr(rc, "do_summary",
+                        lambda args, cls, lammps, is_glassy, thermal, equil_verdict, raw_dir,
+                               equil_result=None, mechanical_result=None:
+                        calls.append((equil_result, mechanical_result)) or {})
+
+    attempt_dir = tmp_path / "attempt-0001"
+    attempt_dir.mkdir()
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    context = {"attempt_dir": str(attempt_dir), "parameters": {},
+              "dependencies": {
+                  "equilibration": {"outputs": {"equil_verdict": "PASS",
+                                                "equilibration_json_path": "/eq/attempt/raw/equilibration.json"}},
+                  "thermal": {"outputs": {"is_glassy": False}},
+                  "mechanical": {"outputs": {"mechanical_json_path": "/mech/attempt/raw/mechanical.json"}},
+              },
+              "prior_attempts": []}
+
+    executor.execute("summary", context)
+
+    assert len(calls) == 1
+    equil_result, mechanical_result = calls[0]
+    assert equil_result["equilibration_json_path"] == "/eq/attempt/raw/equilibration.json"
+    assert mechanical_result["mechanical_json_path"] == "/mech/attempt/raw/mechanical.json"
+
+
 class _FakeBmSeriesLammps(_FakeBmExtLammps):
     """Combines run_bulk_modulus_series (do_mechanical's initial per-point call) with the
     generate_script/run_lammps_script pair _bm_point_adaptive_extend uses for any extension --
@@ -1326,3 +1374,492 @@ def test_do_mechanical_point_extension_flows_into_analysis_call(bm_args_cls, mon
     assert by_pressure[0]["stability_check"]["outcome"] == "PASS"
     assert by_pressure[1000]["stability_check"]["extensions_used"] == 0
     assert by_pressure[3000]["stability_check"]["extensions_used"] == 0
+
+
+# ─── _anneal_hold_adaptive_extend(): MSID-convergence gate (PEG1 remedy, Phase 0-validated) ──
+
+class _FakeAnnealGateLammps:
+    """Stand-in for _anneal_hold_adaptive_extend's own calls: check_equilibration_comprehensive
+    (a scripted queue of large-s MSID probe results) and generate_equilibration_workflow/
+    run_lammps_chain for each extend_only=True continuation (routed through the real
+    _submit_equil_chain, exactly as production code calls it)."""
+
+    def __init__(self, probe_queue):
+        self._probe_queue = list(probe_queue)
+        self._ext_n = 0
+        self.check_equilibration_comprehensive_calls = []
+        self.generate_equilibration_workflow_calls = []
+
+    def check_equilibration_comprehensive(self, **kwargs):
+        self.check_equilibration_comprehensive_calls.append(kwargs)
+        return self._probe_queue.pop(0)
+
+    def generate_equilibration_workflow(self, **kwargs):
+        self.generate_equilibration_workflow_calls.append(kwargs)
+        self._ext_n += 1
+        stage_dir = f"/fake/anneal_hold_ext{self._ext_n}"
+        stage = {"name": "anneal_hold", "work_dir": stage_dir,
+                 "output_data": f"{stage_dir}/anneal_hold_out.data",
+                 "output_restart": f"{stage_dir}/anneal_hold_out.restart",
+                 "params": {"LOG_FILE": "anneal_hold.log", "DUMP_FILE": "anneal_hold.dump",
+                            "DUMP_FREQ": 1000,
+                            "N_STEPS": kwargs.get("anneal_check_every_steps")}}
+        return {"status": "success", "stages": [stage], "run_order": ["anneal_hold"]}
+
+    def run_lammps_chain(self, **kwargs):
+        return {"chain_id": f"chain-{self._ext_n}"}
+
+
+def _msid_probe(slope, gaussian_pass, mean_rg_A=None):
+    return {"status": "success",
+            "chain": {"msid": {"large_s": {"slope": slope, "gaussian_pass": gaussian_pass}},
+                      "rg": {"mean_Rg_A": mean_rg_A}}}
+
+
+@pytest.fixture
+def anneal_gate_args_cls():
+    args = _base_args("ANNEALGATE1", "POXI", "/fake/plan.json")
+    args.gpu_ids = [1]
+    args.mpi_ranks = 1
+    args.engine = "gpu"
+    args.velocity_seed = 777
+    args.data_path = "/fake/original/cell.data"
+    cls = {
+        "dt_fs": 1.0, "annealing_T_high_K": 580.0, "electrostatics": "pppm",
+        "thermostat_damp_fs": 100.0, "barostat_damp_fs": 1000.0, "cutoff_A": 9.5,
+        "preferred_ff": "pcff",
+        "anneal_hold_max_extensions": 2, "anneal_hold_stability_pct": 5.0,
+        "anneal_hold_extend_ns": 2.5,
+    }
+    p = resolve_stage_params("equil", args, cls)
+    return args, cls, p
+
+
+def _initial_anneal_hold_stage():
+    return {"name": "anneal_hold", "work_dir": "/fake/anneal_hold",
+            "output_data": "/fake/anneal_hold/anneal_hold_out.data",
+            "output_restart": "/fake/anneal_hold/anneal_hold_out.restart",
+            "params": {"LOG_FILE": "anneal_hold.log", "DUMP_FILE": "anneal_hold.dump",
+                       "DUMP_FREQ": 1000, "N_STEPS": 1000000}}
+
+
+def test_anneal_hold_gate_passes_on_first_probe_zero_extensions(anneal_gate_args_cls):
+    args, cls, p = anneal_gate_args_cls
+    lammps = _FakeAnnealGateLammps(probe_queue=[_msid_probe(0.95, True)])
+
+    result = _anneal_hold_adaptive_extend(args, cls, lammps, p, _initial_anneal_hold_stage(),
+                                          backbone_types=[1, 4, 5], gpu_per_run=1)
+
+    assert result["outcome"] == "PASS"
+    assert result["extensions_used"] == 0
+    assert result["anneal_hold_data_path"] == "/fake/anneal_hold/anneal_hold_out.data"
+    assert lammps.generate_equilibration_workflow_calls == []  # no extension submitted
+
+
+def test_anneal_hold_gate_stabilizes_via_slope_diff_after_extension(anneal_gate_args_cls, monkeypatch):
+    args, cls, p = anneal_gate_args_cls
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: {"status": "completed"})
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [1], "run": run_name} if action == "claim" else {"released": True}))
+    # Two probes below gaussian_pass (|slope-1|>0.20) but their relative difference (~1.4%) is
+    # comfortably under the 5% anneal_hold_stability_pct -- the STABLE stop condition must fire
+    # from the pairwise slope comparison alone, independent of gaussian_pass ever being True.
+    # (Mirrors PEG1 Phase 0's own 6.0/6.2/6.3ns plateau: 0.923/0.915/0.901, ~1-2.5% jitter.)
+    lammps = _FakeAnnealGateLammps(probe_queue=[_msid_probe(0.663, False, mean_rg_A=18.2),
+                                                 _msid_probe(0.672, False, mean_rg_A=18.5)])
+
+    result = _anneal_hold_adaptive_extend(args, cls, lammps, p, _initial_anneal_hold_stage(),
+                                          backbone_types=[1, 4, 5], gpu_per_run=1)
+
+    assert result["outcome"] == "STABLE"
+    assert result["extensions_used"] == 1
+    assert result["slope_history"] == [0.663, 0.672]
+    assert result["anneal_hold_data_path"] == "/fake/anneal_hold_ext1/anneal_hold_out.data"
+    # Rg rides along as a free side-observation from the same probe call -- advisory only, never
+    # part of the stop condition.
+    assert [h["mean_rg_A"] for h in result["probe_history"]] == [18.2, 18.5]
+    # extend_only continuation of anneal_hold's OWN restart, not a fresh stage
+    ext_call = lammps.generate_equilibration_workflow_calls[0]
+    assert ext_call["extend_only"] is True
+    assert ext_call["base_stage_name"] == "anneal_hold"
+    assert ext_call["extend_ensemble"] == "nvt"
+    assert ext_call["restart_file"] == "/fake/anneal_hold/anneal_hold_out.restart"
+    # Regression (real PEG1_gate_validation attempt-0001 failure, 2026-08-30): generate_
+    # equilibration_workflow's own unconditional `max_temp >= temp + anneal_margin_K` gate runs
+    # BEFORE its extend_only branch (which hardcodes T_START=T_FINAL=max_temp for
+    # base_stage_name="anneal_hold" regardless of the `temp` argument anyway) -- passing
+    # T_anneal_high_K as `temp` sets temp==max_temp, which can never clear a positive margin
+    # over itself. `temp` must stay strictly below `max_temp` here.
+    assert ext_call["temp"] < ext_call["max_temp"]
+
+
+def test_anneal_hold_gate_exhausts_cap_without_stabilizing(anneal_gate_args_cls, monkeypatch):
+    args, cls, p = anneal_gate_args_cls
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: {"status": "completed"})
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [1], "run": run_name} if action == "claim" else {"released": True}))
+    # Each probe moves the slope a lot (never gaussian_pass, never within stability_pct of the
+    # last one) -- the loop must stop at the cap (2), not run forever.
+    lammps = _FakeAnnealGateLammps(probe_queue=[
+        _msid_probe(0.60, False), _msid_probe(0.70, False), _msid_probe(0.80, False),
+    ])
+
+    result = _anneal_hold_adaptive_extend(args, cls, lammps, p, _initial_anneal_hold_stage(),
+                                          backbone_types=[1, 4, 5], gpu_per_run=1)
+
+    assert result["outcome"] == "EXHAUSTED"
+    assert result["extensions_used"] == p["anneal_hold_max_extensions"] == 2
+    assert len(lammps.generate_equilibration_workflow_calls) == 2
+
+
+def test_anneal_hold_gate_rg_veto_defers_stable_until_rg_settles(anneal_gate_args_cls, monkeypatch):
+    args, cls, p = anneal_gate_args_cls
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: {"status": "completed"})
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [1], "run": run_name} if action == "claim" else {"released": True}))
+    # Probe 1->2: slope moves 0.833% (well under the 5% anneal_hold_stability_pct -- would call
+    # STABLE on its own), but mean_Rg_A jumps 15.0->19.0 (26.7%, over the 10% default
+    # anneal_hold_rg_veto_pct) -- a flat MSID slope isn't proof the chain has explored its
+    # conformational space if Rg is still moving that much. The veto must defer STABLE and force
+    # another extension. Probe 2->3: both slope (0.496%) AND Rg (1.58%) settle -- STABLE fires.
+    lammps = _FakeAnnealGateLammps(probe_queue=[
+        _msid_probe(0.600, False, mean_rg_A=15.0),
+        _msid_probe(0.605, False, mean_rg_A=19.0),
+        _msid_probe(0.608, False, mean_rg_A=19.3),
+    ])
+
+    result = _anneal_hold_adaptive_extend(args, cls, lammps, p, _initial_anneal_hold_stage(),
+                                          backbone_types=[1, 4, 5], gpu_per_run=1)
+
+    assert result["outcome"] == "STABLE"
+    assert result["extensions_used"] == 2  # one extra extension forced by the veto
+    assert result["rg_history"] == [15.0, 19.0, 19.3]
+    assert result["rg_veto_triggered"] is True
+    # the veto is recorded on the specific probe where it fired, not a global-only flag
+    assert result["probe_history"][1].get("rg_veto") is True
+    assert "rg_veto" not in result["probe_history"][0]
+    assert "rg_veto" not in result["probe_history"][2]
+
+
+def test_anneal_hold_gate_rg_veto_still_bounded_by_extension_cap(anneal_gate_args_cls, monkeypatch):
+    args, cls, p = anneal_gate_args_cls
+    cls["anneal_hold_max_extensions"] = 1
+    p = resolve_stage_params("equil", args, cls)
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: {"status": "completed"})
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [1], "run": run_name} if action == "claim" else {"released": True}))
+    # Slope stabilizes immediately but Rg keeps drifting past the veto threshold -- the veto is
+    # advisory, not a second hard AND-condition: once the (now lowered) extension cap is hit, the
+    # loop must still stop (EXHAUSTED), not extend forever chasing Rg convergence.
+    lammps = _FakeAnnealGateLammps(probe_queue=[
+        _msid_probe(0.600, False, mean_rg_A=15.0),
+        _msid_probe(0.605, False, mean_rg_A=19.0),
+    ])
+
+    result = _anneal_hold_adaptive_extend(args, cls, lammps, p, _initial_anneal_hold_stage(),
+                                          backbone_types=[1, 4, 5], gpu_per_run=1)
+
+    assert result["outcome"] == "EXHAUSTED"
+    assert result["extensions_used"] == 1
+    assert result["rg_veto_triggered"] is True
+
+
+def test_anneal_hold_gate_missing_rg_fails_open_on_stable(anneal_gate_args_cls, monkeypatch):
+    args, cls, p = anneal_gate_args_cls
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: {"status": "completed"})
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [1], "run": run_name} if action == "claim" else {"released": True}))
+    # Rg is an optional side-observation (check_equilibration_comprehensive can omit/fail to
+    # compute it) -- a missing value must never block the pairwise-slope STABLE stop condition.
+    lammps = _FakeAnnealGateLammps(probe_queue=[_msid_probe(0.663, False, mean_rg_A=None),
+                                                 _msid_probe(0.672, False, mean_rg_A=None)])
+
+    result = _anneal_hold_adaptive_extend(args, cls, lammps, p, _initial_anneal_hold_stage(),
+                                          backbone_types=[1, 4, 5], gpu_per_run=1)
+
+    assert result["outcome"] == "STABLE"
+    assert result["rg_veto_triggered"] is False
+
+
+def test_anneal_hold_gate_extension_failure_is_advisory(anneal_gate_args_cls, monkeypatch):
+    args, cls, p = anneal_gate_args_cls
+    # Phase 0 (PEG1) observed real extension-run crashes (PPPM out-of-range atoms;
+    # cudaErrorIllegalAddress) -- the gate must fall back to the last good restart/data and
+    # stop, not treat this as fatal (the caller still proceeds to chain 2 either way).
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: {"status": "failed"})
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [1], "run": run_name} if action == "claim" else {"released": True}))
+    lammps = _FakeAnnealGateLammps(probe_queue=[_msid_probe(0.663, False)])
+
+    result = _anneal_hold_adaptive_extend(args, cls, lammps, p, _initial_anneal_hold_stage(),
+                                          backbone_types=[1, 4, 5], gpu_per_run=1)
+
+    assert result["outcome"] == "EXTENSION_FAILED"
+    assert result["extensions_used"] == 0  # the failed attempt never counted as a real extension
+    # last GOOD data/restart untouched -- not the failed extension's (nonexistent) output
+    assert result["anneal_hold_data_path"] == "/fake/anneal_hold/anneal_hold_out.data"
+
+
+def test_anneal_hold_gate_probe_failure_is_advisory(anneal_gate_args_cls):
+    args, cls, p = anneal_gate_args_cls
+    lammps = _FakeAnnealGateLammps(probe_queue=[{"status": "failed", "error": "log unparseable"}])
+
+    result = _anneal_hold_adaptive_extend(args, cls, lammps, p, _initial_anneal_hold_stage(),
+                                          backbone_types=[1, 4, 5], gpu_per_run=1)
+
+    assert result["outcome"] == "PROBE_FAILED"
+    assert result["extensions_used"] == 0
+
+
+def test_record_anneal_hold_convergence_merges_into_equilibration_json(tmp_path):
+    output_dir = tmp_path / "raw"
+    output_dir.mkdir()
+    eq_json = output_dir / "equilibration.json"
+    eq_json.write_text(json.dumps({"density": {"plateau_density_mean": 1.18}}))
+
+    gate_result = {"outcome": "PASS", "extensions_used": 1, "slope_history": [0.849, 0.923],
+                   "anneal_hold_stage": {"name": "anneal_hold", "work_dir": "/fake"},
+                   "anneal_hold_data_path": "/fake/anneal_hold_out.data"}
+    _record_anneal_hold_convergence(str(output_dir), gate_result)
+
+    merged = json.loads(eq_json.read_text())
+    assert merged["density"]["plateau_density_mean"] == 1.18  # prior section preserved
+    assert merged["anneal_hold_convergence"]["outcome"] == "PASS"
+    assert merged["anneal_hold_convergence"]["extensions_used"] == 1
+    assert "anneal_hold_stage" not in merged["anneal_hold_convergence"]  # internal, not for disk
+
+
+def test_submit_equil_chain_stop_after_stage_slices_the_workflow():
+    """stop_after_stage is a plain client-side slice of workflow["stages"]/["run_order"] before
+    run_lammps_chain -- generate_equilibration_workflow itself always plans the full 8-stage
+    chain; only the submitted subset changes."""
+    args = _base_args("SLICETEST1", "POXI", "/fake/plan.json")
+    args.gpu_ids = [0]
+    args.mpi_ranks = 1
+    args.engine = "gpu"
+    args.velocity_seed = 1
+    args.data_path = "/fake/cell.data"
+    cls = {"dt_fs": 1.0, "electrostatics": "pppm", "preferred_ff": "pcff"}
+
+    stage_names = ["minimize", "nvt_warmup", "npt_densify", "npt_ff_activate",
+                  "npt_densify_hold", "anneal_heat", "anneal_hold",
+                  "cool_block_01", "nvt_kinetic_stability", "npt_final"]
+    full_stages = [{"name": n, "output_data": f"/fake/{n}_out.data"} for n in stage_names]
+    submitted_stage_lists = []
+
+    class _Fake:
+        def generate_equilibration_workflow(self, **kwargs):
+            return {"status": "success", "stages": list(full_stages), "run_order": list(stage_names)}
+
+        def run_lammps_chain(self, **kwargs):
+            submitted_stage_lists.append(kwargs["stages"])
+            return {"chain_id": "chain-1"}
+
+    result = _submit_equil_chain(args, cls, _Fake(), stop_after_stage="anneal_hold")
+
+    submitted_names = [s["name"] for s in submitted_stage_lists[0]]
+    assert submitted_names == stage_names[:stage_names.index("anneal_hold") + 1]
+    assert result["workflow"]["stages"][-1]["name"] == "anneal_hold"
+
+
+def test_anneal_hold_gate_disabled_by_default_keeps_single_submission_path(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """Regression guard: anneal_hold_msid_gate_enabled defaults False -- do_equil_and_check must
+    take the existing single-generate_equilibration_workflow-call path, byte-identical to every
+    other class, unless a class explicitly opts in."""
+    args, cls = equil_check_args_cls
+    assert cls.get("anneal_hold_msid_gate_enabled", False) is False
+    args.backbone_types = [1, 2]
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
+    fake = _FakeEquilLammps(
+        tmp_path,
+        comp_results=[{"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}}],
+        gate_verdicts=[{"verdict": "PASS"}],
+    )
+
+    result = do_equil_and_check(args, cls, fake)
+
+    assert result["equil_verdict"] == "PASS"
+    assert result["anneal_hold_convergence"] is None
+    assert len(fake.generate_equilibration_workflow_calls) == 1  # one chain, not two
+
+
+def test_do_equil_and_check_gated_path_merges_chain1_and_chain2_stages(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """The most intricate part of the gated path -- workflow merging (chain 1's leading stages +
+    the gate's final anneal_hold stage + chain 2's tail), resume_data_path threading, and
+    stage_checkpoints assembled from the merged list -- covered end to end through
+    do_equil_and_check itself, not just _anneal_hold_adaptive_extend in isolation."""
+    args, cls = equil_check_args_cls
+    args.backbone_types = [1, 4, 5]  # explicit -- skip derivation, exercise the gate itself
+    args.output_dir = str(tmp_path / "raw")
+    args.work_dir = str(tmp_path / "work")
+    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    cls["anneal_hold_msid_gate_enabled"] = True
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [1], "run": run_name} if action == "claim" else {"released": True}))
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: {"status": "completed"})
+
+    minimize_stage = {"name": "minimize", "output_data": f"{tmp_path}/minimize_out.data",
+                      "work_dir": str(tmp_path), "params": {"DUMP_FILE": "minimize.dump"}}
+    anneal_hold_stage = {"name": "anneal_hold", "output_data": f"{tmp_path}/anneal_hold_out.data",
+                         "output_restart": f"{tmp_path}/anneal_hold_out.restart",
+                         "work_dir": str(tmp_path),
+                         "params": {"LOG_FILE": "anneal_hold.log", "DUMP_FILE": "anneal_hold.dump",
+                                    "DUMP_FREQ": 1000, "N_STEPS": 1000000}}
+    cool_block_stage = {"name": "cool_block_01", "output_data": f"{tmp_path}/cool_out.data",
+                        "work_dir": str(tmp_path), "params": {"DUMP_FILE": "cool.dump"}}
+    npt_final_stage = {"name": "npt_final", "output_data": f"{tmp_path}/npt_final_out.data",
+                       "output_restart": f"{tmp_path}/npt_final_out.restart",
+                       "work_dir": str(tmp_path), "params": {"DUMP_FILE": "npt_final.dump"}}
+
+    fake = _FakeEquilLammps(
+        tmp_path,
+        comp_results=[
+            # 1st call: the gate's own probe on anneal_hold's own trajectory -- passes on the
+            # first probe, zero extensions.
+            {"status": "success",
+             "chain": {"msid": {"large_s": {"slope": 0.95, "gaussian_pass": True}}}},
+            # 2nd call: the normal post-chain-2 equil-check comprehensive call, on npt_final.
+            {"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}},
+        ],
+        gate_verdicts=[{"verdict": "PASS"}],
+        workflow_queue=[
+            {"status": "success", "stages": [minimize_stage, anneal_hold_stage],
+             "run_order": ["minimize", "anneal_hold"]},
+            {"status": "success", "stages": [cool_block_stage, npt_final_stage],
+             "run_order": ["cool_block_01", "npt_final"]},
+        ],
+    )
+
+    result = do_equil_and_check(args, cls, fake)
+
+    assert result["equil_verdict"] == "PASS"
+    assert result["anneal_hold_convergence"]["outcome"] == "PASS"
+    assert result["anneal_hold_convergence"]["extensions_used"] == 0
+    # merged stage_checkpoints carries BOTH chain 1's and chain 2's stages -- a later remedy
+    # resuming from an earlier checkpoint (e.g. minimize) can still find it, even though chain 2
+    # (resume_from="anneal_hold") never generated it itself.
+    assert set(result["stage_checkpoints"]) == {"minimize", "anneal_hold", "cool_block_01", "npt_final"}
+    assert result["stage_checkpoints"]["anneal_hold"] == f"{tmp_path}/anneal_hold_out.data"
+    assert result["stage_checkpoints"]["npt_final"] == f"{tmp_path}/npt_final_out.data"
+    assert result["npt_prod_data_path"] == f"{tmp_path}/npt_final_out.data"
+    # exactly 2 generate_equilibration_workflow calls: chain 1 (sliced to stop at anneal_hold by
+    # _submit_equil_chain itself -- see test_submit_equil_chain_stop_after_stage_slices_the_workflow
+    # for that mechanism in isolation), chain 2 (resume_from="anneal_hold") -- no extension, since
+    # the gate passed on its first probe.
+    assert len(fake.generate_equilibration_workflow_calls) == 2
+    chain2_call = fake.generate_equilibration_workflow_calls[1]
+    assert chain2_call["resume_from"] == "anneal_hold"
+    assert chain2_call["data_file"] == f"{tmp_path}/anneal_hold_out.data"
+    # reattach-guard file cleaned up on success, not left behind
+    pending_path = Path(args.work_dir).parent / "pending_equil_submission.json"
+    assert not pending_path.exists()
+
+
+def test_do_equil_and_check_gated_reattach_chain1_done_skips_resubmission(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """gate_phase="chain1_done" reattach: chain 1 already finished before an earlier process
+    death -- must be reused from its persisted workflow with zero resubmission, not silently
+    re-run the most expensive part of the protocol (minimize..anneal_hold)."""
+    args, cls = equil_check_args_cls
+    args.backbone_types = [1, 4, 5]
+    args.output_dir = str(tmp_path / "raw")
+    args.work_dir = str(tmp_path / "work")
+    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    cls["anneal_hold_msid_gate_enabled"] = True
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [1], "run": run_name} if action == "claim" else {"released": True}))
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: {"status": "completed"})
+
+    anneal_hold_stage = {"name": "anneal_hold", "output_data": f"{tmp_path}/anneal_hold_out.data",
+                         "output_restart": f"{tmp_path}/anneal_hold_out.restart",
+                         "work_dir": str(tmp_path),
+                         "params": {"LOG_FILE": "anneal_hold.log", "DUMP_FILE": "anneal_hold.dump",
+                                    "DUMP_FREQ": 1000, "N_STEPS": 1000000}}
+    chain1_workflow = {"stages": [
+        {"name": "minimize", "output_data": f"{tmp_path}/minimize_out.data",
+         "work_dir": str(tmp_path), "params": {"DUMP_FILE": "minimize.dump"}},
+        anneal_hold_stage,
+    ]}
+    npt_final_stage = {"name": "npt_final", "output_data": f"{tmp_path}/npt_final_out.data",
+                       "output_restart": f"{tmp_path}/npt_final_out.restart",
+                       "work_dir": str(tmp_path), "params": {"DUMP_FILE": "npt_final.dump"}}
+
+    pending_path = Path(args.work_dir).parent / "pending_equil_submission.json"
+    pending_path.write_text(json.dumps({"gate_phase": "chain1_done", "workflow": chain1_workflow}))
+
+    fake = _FakeEquilLammps(
+        tmp_path,
+        comp_results=[
+            {"status": "success",
+             "chain": {"msid": {"large_s": {"slope": 0.95, "gaussian_pass": True}}}},
+            {"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}},
+        ],
+        gate_verdicts=[{"verdict": "PASS"}],
+        workflow_queue=[
+            {"status": "success", "stages": [npt_final_stage], "run_order": ["npt_final"]},
+        ],
+    )
+
+    result = do_equil_and_check(args, cls, fake)
+
+    assert result["equil_verdict"] == "PASS"
+    # exactly ONE generate_equilibration_workflow call -- chain 2 only, chain 1 reused as-is
+    assert len(fake.generate_equilibration_workflow_calls) == 1
+    assert fake.generate_equilibration_workflow_calls[0]["resume_from"] == "anneal_hold"
+    assert result["stage_checkpoints"]["minimize"] == f"{tmp_path}/minimize_out.data"
+    assert result["stage_checkpoints"]["anneal_hold"] == f"{tmp_path}/anneal_hold_out.data"
+
+
+def test_do_equil_and_check_gated_reattach_chain1_mid_wait_reuses_chain_id(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """gate_phase="chain1" reattach: death happened while waiting on chain 1 itself -- must
+    reattach to the persisted chain_id directly, not resubmit chain 1."""
+    args, cls = equil_check_args_cls
+    args.backbone_types = [1, 4, 5]
+    args.output_dir = str(tmp_path / "raw")
+    args.work_dir = str(tmp_path / "work")
+    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    cls["anneal_hold_msid_gate_enabled"] = True
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [1], "run": run_name} if action == "claim" else {"released": True}))
+    waited_run_ids = []
+    monkeypatch.setattr(rdr, "wait_for_run", lambda lammps, run_id, label: (
+        waited_run_ids.append(run_id) or {"status": "completed"}))
+
+    anneal_hold_stage = {"name": "anneal_hold", "output_data": f"{tmp_path}/anneal_hold_out.data",
+                         "output_restart": f"{tmp_path}/anneal_hold_out.restart",
+                         "work_dir": str(tmp_path),
+                         "params": {"LOG_FILE": "anneal_hold.log", "DUMP_FILE": "anneal_hold.dump",
+                                    "DUMP_FREQ": 1000, "N_STEPS": 1000000}}
+    chain1_workflow = {"stages": [anneal_hold_stage]}
+    npt_final_stage = {"name": "npt_final", "output_data": f"{tmp_path}/npt_final_out.data",
+                       "output_restart": f"{tmp_path}/npt_final_out.restart",
+                       "work_dir": str(tmp_path), "params": {"DUMP_FILE": "npt_final.dump"}}
+
+    pending_path = Path(args.work_dir).parent / "pending_equil_submission.json"
+    pending_path.write_text(json.dumps({"gate_phase": "chain1", "chain_id": "reattached-chain-1",
+                                        "workflow": chain1_workflow}))
+
+    fake = _FakeEquilLammps(
+        tmp_path,
+        comp_results=[
+            {"status": "success",
+             "chain": {"msid": {"large_s": {"slope": 0.95, "gaussian_pass": True}}}},
+            {"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}},
+        ],
+        gate_verdicts=[{"verdict": "PASS"}],
+        workflow_queue=[
+            {"status": "success", "stages": [npt_final_stage], "run_order": ["npt_final"]},
+        ],
+    )
+
+    result = do_equil_and_check(args, cls, fake)
+
+    assert result["equil_verdict"] == "PASS"
+    assert waited_run_ids[0] == "reattached-chain-1"  # chain 1 waited on the PERSISTED chain_id
+    # zero generate_equilibration_workflow calls for chain 1 -- only chain 2's own call
+    assert len(fake.generate_equilibration_workflow_calls) == 1
+    assert fake.generate_equilibration_workflow_calls[0]["resume_from"] == "anneal_hold"
