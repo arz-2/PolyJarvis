@@ -9,7 +9,12 @@ the schema directly.
 import json
 from pathlib import Path
 
+import sys
+from types import SimpleNamespace
+
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "orchestration" / "scripts"))
 
 RULES_PATH = Path(__file__).resolve().parent.parent / "guides" / "polymer_rules.json"
 RULES = json.loads(RULES_PATH.read_text())
@@ -242,3 +247,78 @@ def test_cutoff_respects_its_force_fields_parameterization(cid):
         f"{cid}: cutoff_A={entry['cutoff_A']} A is below the {floor} A its own "
         f"force field ({entry['preferred_ff']}) was parameterized with"
     )
+
+
+# ─── temperature_schedule(): adapts to Tg and the requested assessment temperature ──
+
+def _sched(cid, smiles=None, **overrides):
+    import stage_params as sp
+    entry = RULES["classes"][cid]
+    args = SimpleNamespace(smiles=smiles, exp_tg_K=None, final_T_K=None,
+                           T_equil_K=None, T_anneal_high_K=None)
+    for k, v in overrides.items():
+        setattr(args, k, v)
+    return sp.temperature_schedule(args, entry)
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_curated_members_keep_their_class_temperatures(cid):
+    """The class T_equil_K was chosen to clear the melting points of the members the class
+    curated -- the notes name those Tm values explicitly. A +/-80 K group-contribution estimate
+    must never second-guess that. Under the Boyer rule 10 of 43 curated members would otherwise
+    shift (PMMA +28 K, PSU/PES +40 K, PPNL +70 K); this pins that none of them do."""
+    entry = RULES["classes"][cid]
+    for _name, smis in (entry.get("member_smiles") or {}).items():
+        if not smis:
+            continue
+        sched = _sched(cid, smiles=smis[0])
+        assert sched["T_equil_K"] == entry["T_equil_K"], (
+            f"{cid}/{_name}: curated member's T_equil moved "
+            f"{entry['T_equil_K']} -> {sched['T_equil_K']}"
+        )
+        assert sched["schedule_source"] == "class_default"
+
+
+def test_novel_stiff_smiles_can_raise_t_equil():
+    """A SMILES the class never curated is an extrapolation: the class constant was sized for
+    other members and a stiffer novel one can need a hotter melt. Only ever raises."""
+    import stage_params as sp
+    entry = dict(RULES["classes"]["POXI"])          # class T_equil = 500 K
+    args = SimpleNamespace(smiles="*CC(c1ccccc1)(c1ccccc1)O*", exp_tg_K=600.0,
+                           final_T_K=None, T_equil_K=None, T_anneal_high_K=None)
+    sched = sp.temperature_schedule(args, entry)
+    assert sched["tg_is_curated"] is False
+    assert sched["schedule_source"] == "raised_for_novel_smiles"
+    assert sched["T_equil_K"] == max(600.0 + 200.0, 1.5 * 600.0)   # Boyer wins above Tg=400
+    assert sched["T_equil_K"] > entry["T_equil_K"]
+
+
+def test_novel_floppy_smiles_never_lowers_t_equil():
+    """Lowering risks under-melting on a low-confidence estimate; the class constant floors."""
+    import stage_params as sp
+    entry = dict(RULES["classes"]["PKTN"])          # class T_equil = 770 K
+    args = SimpleNamespace(smiles="*CC*", exp_tg_K=150.0, final_T_K=None,
+                           T_equil_K=None, T_anneal_high_K=None)
+    sched = sp.temperature_schedule(args, entry)
+    assert sched["T_equil_K"] == entry["T_equil_K"]
+    assert sched["schedule_source"] == "class_default"
+
+
+def test_anneal_ceiling_clears_the_requested_assessment_temperature():
+    """A run assessed at or above its own melt temperature would otherwise leave cool_block a
+    non-positive span to ramp through."""
+    sched = _sched("POXI", smiles="*CCO*", final_T_K=900.0)
+    assert sched["T_anneal_high_K"] >= 900.0 + 100.0
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_anneal_ceiling_always_clears_the_margin(cid):
+    """The invariant generate_equilibration_workflow enforces as a hard validation error."""
+    sched = _sched(cid)
+    assert sched["T_anneal_high_K"] >= sched["T_equil_K"] + 100.0
+    assert sched["T_anneal_high_K"] >= sched["final_T_K"] + 100.0
+
+
+def test_final_T_defaults_to_300_but_is_not_defined_by_it():
+    assert _sched("POXI", smiles="*CCO*")["final_T_K"] == 300.0
+    assert _sched("POXI", smiles="*CCO*", final_T_K=450.0)["final_T_K"] == 450.0

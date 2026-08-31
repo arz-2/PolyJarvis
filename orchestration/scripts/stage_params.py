@@ -276,13 +276,82 @@ planning layer) as well as there (backstop): a scientifically meaningful choice 
 anneal peak temperature should be decided once, visibly, not patched deep in the generator."""
 
 
+def _is_curated_member(cls: dict, smiles: str | None) -> bool:
+    """Whether this SMILES matches a member the class actually curated a Tg for.
+
+    The distinction the temperature schedule turns on. A class's T_equil_K was chosen to clear
+    the melting point of its curated members -- the class notes name those Tm values explicitly
+    ("PET Tm=533 K ... T_equil=620 K exceeds all Tm values"). For a curated member that
+    constant is known-adequate and must not be second-guessed by a +/-80 K group-contribution
+    estimate. For a SMILES the class never curated, it is an extrapolation, and a stiffer
+    novel member can need more."""
+    if not smiles:
+        return False
+    try:
+        return resolve_member_value(cls, 'experimental_tg_K', smiles) is not None
+    except Exception:  # noqa: BLE001 -- a matcher failure means "not curated", never a crash
+        return False
+
+
+def temperature_schedule(args, cls: dict) -> dict:
+    """The run's whole temperature schedule, adapted to this SMILES and the requested state.
+
+    Single place that decides the four temperatures the equilibration chain is built from, so
+    they cannot drift out of coherence with each other:
+
+      final_T_K   the ASSESSMENT temperature -- what the cell is gated at (npt_final, which
+                  cool_block always ramps to). 300 K is its default, not its definition.
+      T_equil_K   the melt-equilibration temperature. Must clear this polymer's melting point,
+                  which group contribution cannot see; the class constant therefore always acts
+                  as a FLOOR and is used unchanged for a curated member. For a novel SMILES it
+                  can only be RAISED, never lowered: max(Tg+200, 1.5*Tg) -- the additive term
+                  governs low-Tg polymers, Boyer's Tm/Tg ~ 1.5 ratio governs high-Tg ones,
+                  where a fixed +200 K undershoots (PEEK: Tg 418 -> +200 = 618 vs Tm 616).
+      T_anneal    the anneal ceiling, ANNEAL_MARGIN_K above whichever of T_equil/final_T_K is
+                  higher. Raising it is cheap and lowering it is not the saving it looks like:
+                  25 K of ceiling costs one cool block (~200k steps) while ONE avoided
+                  anneal_hold extension saves 1-2.5M, so break-even sits 125-312 K out. The
+                  ceiling is therefore bounded by physical validity (thermal degradation,
+                  Class II quartic bond instability, timestep validity), never by compute.
+
+    Returns the resolved values plus `schedule_source`, so a plan records whether a temperature
+    came from the class constant or was raised for a novel SMILES.
+    """
+    smiles = getattr(args, 'smiles', None)
+    tg = _regime_tg(args, cls)
+    curated = _is_curated_member(cls, smiles)
+
+    final_T = _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0)
+    class_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
+
+    T_equil, source = class_equil, 'class_default'
+    if not curated and isinstance(tg, (int, float)):
+        needed = max(tg + 200.0, 1.5 * tg)
+        if needed > class_equil:
+            T_equil, source = needed, 'raised_for_novel_smiles'
+
+    # The ceiling must clear the melt AND the assessment temperature. The second term only
+    # binds when a run asks to be assessed at or above its own melt temperature, which would
+    # otherwise leave cool_block with a non-positive span to ramp through.
+    # T_workflow stays in the max explicitly: it is normally T_equil (glassy) or final_T
+    # (rubbery), so it is already covered -- but it is independently overridable, and dropping
+    # it would silently lower the ceiling for a plan that pins T_workflow above both.
+    T_anneal = max(_pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0),
+                   T_equil + ANNEAL_MARGIN_K,
+                   final_T + ANNEAL_MARGIN_K,
+                   _resolve_t_workflow(args, cls) + ANNEAL_MARGIN_K)
+
+    return {'final_T_K': final_T, 'T_equil_K': T_equil, 'T_anneal_high_K': T_anneal,
+            'tg_K': tg, 'tg_is_curated': curated, 'schedule_source': source}
+
+
 def _resolve_equil_params(args, cls: dict) -> dict:
     """Resolve deterministic equilibration-chain arguments (8-stage adaptive protocol)."""
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
-    T_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
+    sched = temperature_schedule(args, cls)
+    T_equil = sched['T_equil_K']
     T_workflow = _resolve_t_workflow(args, cls)
-    T_anneal_high_raw = _pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0)
-    T_anneal_high = max(T_anneal_high_raw, T_workflow + ANNEAL_MARGIN_K)
+    T_anneal_high = sched['T_anneal_high_K']
 
     # t_equil_K: an explicit melt/production-reference tag for a RUBBERY chain (T_workflow ==
     # final_T_K) -- the direct successor to the retired add_melt_npt flag. A glassy chain
@@ -318,7 +387,7 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         'T_anneal_high_K': T_anneal_high,
         'anneal_margin_K': ANNEAL_MARGIN_K,
         'T_workflow_K': T_workflow,
-        'final_T_K': _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0),
+        'final_T_K': sched['final_T_K'],
         'P_equil_atm': cls.get('P_equil_atm', 1.0),
         'compression_max_pressure_atm': cls.get('compression_max_pressure_atm', 50000.0),
         'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0),
