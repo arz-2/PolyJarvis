@@ -170,3 +170,75 @@ def test_tg_slope_gate_fallback_valid():
     assert found == expected
     for cid in found:
         assert isinstance(CLASSES[cid].get("_tg_slope_gate_note"), str), cid
+
+
+# The staircase has to bracket the MD Tg, which is NOT the experimental Tg: at the
+# 10-100 K/ns rates MD can reach, the transition is frozen in 80-120 K high (see
+# PROPERTIES.md's tg_offset_corrected_K, reported as an annotation and never folded
+# into PASS/FAIL). A window that brackets only the experimental value can start below
+# the transition, leaving the bilinear fit with no breakpoint to find.
+MD_TG_OFFSET_K = 120.0
+
+
+def _member_tgs(entry):
+    """Numeric member Tg values, dropping the prose 'notes'/'note' siblings."""
+    raw = entry.get("experimental_tg_K")
+    if isinstance(raw, dict):
+        return [v for v in raw.values() if isinstance(v, (int, float))]
+    return [raw] if isinstance(raw, (int, float)) else []
+
+
+@pytest.mark.parametrize("cid", sorted(CLASSES))
+def test_tg_window_brackets_the_md_tg_not_just_the_experimental_one(cid):
+    """Every class's sweep must clear the MD Tg of its own CURATED members.
+
+    Scope limit, stated because it is easy to over-trust this test: it can only see
+    the members in experimental_tg_K. It does NOT catch a window that is too narrow
+    for the class's wider chemical space. POXI is the worked example -- its curated
+    members (PEO/PPO/PVME, exp Tg 198-242 -> MD ~362 K) cleared even the old 440 K
+    top, so this test passed, while 24 of the 66 POXI entries in RadonPy's PI1070 set
+    had an estimated MD Tg above 440 K. Detecting that required scoring the class's
+    actual chemical space with estimate_tg_group_contribution.py, and the real fix is
+    to resolve the window per-SMILES from that estimator rather than per class.
+    """
+    entry = CLASSES[cid]
+    tgs = _member_tgs(entry)
+    if not tgs:
+        pytest.skip(f"{cid} has no numeric member Tg to bracket")
+    md_upper = max(tgs) + MD_TG_OFFSET_K
+    assert entry["tg_t_high_K"] > md_upper, (
+        f"{cid}: sweep top {entry['tg_t_high_K']} K does not clear the MD Tg upper "
+        f"estimate {md_upper:.0f} K (max member exp Tg {max(tgs):.0f} + "
+        f"{MD_TG_OFFSET_K:.0f} K rate offset) -- the staircase would start below the "
+        "transition and the bilinear fit would find no breakpoint"
+    )
+    assert entry["tg_t_low_K"] < min(tgs), (
+        f"{cid}: sweep bottom {entry['tg_t_low_K']} K is not below the lowest member "
+        f"exp Tg {min(tgs):.0f} K -- no glassy branch to fit"
+    )
+
+
+# A force field's LJ cutoff is part of its parameterization, not a free knob.
+# Truncating dispersion earlier than the field was fit with systematically
+# under-counts attraction and biases density low (pair_modify tail yes bounds the
+# error but does not remove it; PPPM makes electrostatics cutoff-independent, so
+# this is dispersion-only). 9.5 A is the EMC/Materials-Studio Class II convention
+# and is correct for PCFF -- it is wrong when inherited by an OPLS-AA class.
+FF_CUTOFF_FLOOR_A = {
+    "opls/2024/opls-aa": 11.0,   # Jorgensen 1996: 11-13 A + switching function
+    "opls/2012/opls-aa": 11.0,
+    "trappe-ua": 14.0,           # 14 A is part of the TraPPE definition itself
+}
+
+
+@pytest.mark.parametrize("cid", sorted(CLASSES))
+def test_cutoff_respects_its_force_fields_parameterization(cid):
+    entry = CLASSES[cid]
+    floor = FF_CUTOFF_FLOOR_A.get(entry.get("preferred_ff"))
+    if floor is None:
+        pytest.skip(f"{cid}: no published cutoff floor pinned for "
+                    f"{entry.get('preferred_ff')!r}")
+    assert entry["cutoff_A"] >= floor, (
+        f"{cid}: cutoff_A={entry['cutoff_A']} A is below the {floor} A its own "
+        f"force field ({entry['preferred_ff']}) was parameterized with"
+    )

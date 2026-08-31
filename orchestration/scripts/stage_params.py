@@ -337,6 +337,28 @@ def _resolve_equil_params(args, cls: dict) -> dict:
                                       'minimize_maxiter', 50000)),
         'minimize_maxeval': int(_pick(getattr(args, 'minimize_maxeval', None), cls,
                                       'minimize_maxeval', 100000)),
+        # anneal_hold MSID-convergence gate (opt-in, off by default -- see
+        # _anneal_hold_adaptive_extend in run_campaign.py). Defaults sourced from PEG1/POXI
+        # Phase 0 validation: large-s MSID rose 0.663->0.849->0.923 across two 2.5ns
+        # restart-continued extensions and plateaued (0.923/0.915/0.901, ~1-2.5% relative
+        # jitter at short separation) once inside the +-20% gaussian_pass band --
+        # anneal_hold_stability_pct=5.0 sits above that observed noise floor with margin.
+        'anneal_hold_msid_gate_enabled': bool(cls.get('anneal_hold_msid_gate_enabled', False)),
+        'anneal_hold_max_extensions': int(cls.get('anneal_hold_max_extensions', 2)),
+        'anneal_hold_stability_pct': cls.get('anneal_hold_stability_pct', 5.0),
+        'anneal_hold_extend_ns': cls.get('anneal_hold_extend_ns', 2.5),
+        # Rg veto on the gate's STABLE early-stop path only (never on PASS, never a second
+        # AND-condition on the whole gate): if MSID's pairwise slope-diff would otherwise
+        # declare STABLE, but mean_Rg_A is still moving more than this % between the last two
+        # probes, keep extending instead -- a flat MSID slope isn't proof the chain has
+        # explored its conformational space if Rg hasn't settled alongside it. Deliberately
+        # permissive placeholder: unlike anneal_hold_stability_pct (calibrated from Phase 0's
+        # own slope-jitter data), no real multi-probe Rg-drift-magnitude data exists yet --
+        # PEG1_gate_validation's only live run passed MSID on its first probe (0 extensions),
+        # so there's a single Rg data point, not a trend. Tighten once a real run with >=2
+        # extensions supplies an actual jitter floor to calibrate against (same reasoning
+        # that set anneal_hold_stability_pct=5.0, just not yet available for Rg).
+        'anneal_hold_rg_veto_pct': cls.get('anneal_hold_rg_veto_pct', 10.0),
     }
 
 def _resolve_tg_rate(args, cls: dict):
