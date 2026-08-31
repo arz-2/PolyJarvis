@@ -380,3 +380,70 @@ def test_cooling_verdict_under_annealed_blocks_structural(tmp_path):
     assert "slower_cooling" in result["remedy"]
     assert "anneal_hold" in result["remedy"]
     assert "npt_cool_steps" not in result["remedy"]  # only npt_cool300_steps is actually touched
+
+
+# ─── resolve_regime(): assessment temperature vs Tg, not a hardcoded 300 K ─────
+#
+# The gate set is chosen by the state of the cell AT THE TEMPERATURE IT IS ASSESSED.
+# check_equilibration_comprehensive always gates npt_final, which cool_block ramps down to
+# final_T_K -- 300 K is that knob's default, not its definition, and it is user-facing.
+# The previous form compared T_workflow against a literal 300, which encoded `exp_Tg < 300`
+# indirectly and is correct only while final_T_K is 300.
+
+def test_regime_matches_the_legacy_proxy_at_300K():
+    """Behaviour-preserving at the default: for every curated class/member combination the
+    new (final_T_K vs Tg) rule must agree with the old (T_workflow <= 300) proxy. Verified
+    across all 48 combinations when this landed; this pins the equivalence."""
+    import stage_params as sp
+    rules = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
+    checked = 0
+    for cid, entry in rules["classes"].items():
+        members = list((entry.get("member_smiles") or {}).items()) or [("(class)", [None])]
+        for _name, smis in members:
+            smiles = smis[0] if smis else None
+            tg = sp._regime_exp_tg(entry, smiles)
+            t_workflow = (300.0 if isinstance(tg, (int, float)) and tg < 300
+                          else entry["T_equil_K"])
+            legacy = enforce_gate.resolve_regime_legacy(t_workflow)   # pre-fix proxy
+            new = enforce_gate.resolve_regime(300.0, tg)              # assess at the default
+            assert legacy == new, (
+                f"{cid}/{_name}: Tg={tg} T_workflow={t_workflow} -> legacy {legacy}, new {new}"
+            )
+            checked += 1
+    assert checked >= 40, f"only {checked} combinations checked"
+
+
+@pytest.mark.parametrize("final_t,tg,expected", [
+    (300.0, 200.0, "rubbery"),   # above Tg at the assessment temperature
+    (300.0, 400.0, "glassy"),    # below Tg
+    (350.0, 200.0, "rubbery"),   # the case the 300 K proxy got wrong: still above Tg
+    (250.0, 270.0, "glassy"),    # user cooled below Tg -> glass, though 250 < 300
+    (400.0, 400.0, "glassy"),    # exactly at Tg is not "above" it
+])
+def test_regime_follows_the_assessment_temperature(final_t, tg, expected):
+    assert enforce_gate.resolve_regime(final_t, tg) == expected
+
+
+def test_regime_falls_to_glassy_when_tg_is_unresolvable():
+    """Glassy is the stricter gate set (density_drift binds), so an unknown Tg must not
+    silently buy the more permissive rubbery clause."""
+    assert enforce_gate.resolve_regime(300.0, None) == "glassy"
+    assert enforce_gate.resolve_regime(None, 200.0) == "glassy"
+    # the retired proxy is still available for plans with no Tg at all, and still says <=300
+    assert enforce_gate.resolve_regime_legacy(300.0) == "rubbery"
+
+
+def test_live_and_retrospective_regimes_agree():
+    """enforce_live() receives args.regime from stage_params._regime; enforce() computes its
+    own via resolve_regime. A divergence adjudicates the same run two different ways."""
+    import stage_params as sp
+    rules = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
+    for cid, entry in rules["classes"].items():
+        members = list((entry.get("member_smiles") or {}).items()) or [("(class)", [None])]
+        for _name, smis in members:
+            args = SimpleNamespace(smiles=(smis[0] if smis else None), exp_tg_K=None,
+                                   final_T_K=None)
+            live = sp._regime(args, entry)
+            tg = sp._regime_exp_tg(entry, args.smiles)
+            retro = enforce_gate.resolve_regime(entry.get("final_T_K", 300.0), tg)
+            assert live == retro, f"{cid}/{_name}: live {live} vs retrospective {retro}"

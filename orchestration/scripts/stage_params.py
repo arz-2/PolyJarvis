@@ -206,27 +206,48 @@ def _resolve_t_workflow(args, cls: dict) -> float:
     rubbery (exp_Tg < 300) and T_equil_K for glassy. Mirrors generate_equilibration_workflow,
     whose chain ends at npt_production when T ≤ 300 (rubbery, 7-run) and appends npt_prod300
     when T > 300 (glassy, 9-run)."""
-    exp_tg_override = getattr(args, 'exp_tg_K', None)
-    if exp_tg_override is not None:
-        exp_tg = exp_tg_override
-    else:
-        exp_tg = _regime_exp_tg(cls, getattr(args, 'smiles', None))
+    exp_tg = _regime_tg(args, cls)
     if 'T_workflow_K' in cls:
         return cls['T_workflow_K']
     T_equil = _pick(getattr(args, 'T_equil_K', None), cls, 'T_equil_K', 600.0)
     return 300.0 if isinstance(exp_tg, (int, float)) and exp_tg < 300 else T_equil
 
 def _regime(args, cls: dict) -> str:
-    """Single regime oracle: 'rubbery' if the workflow produces above Tg, else 'glassy'.
+    """Single regime oracle: the state of the cell AT THE TEMPERATURE IT IS ASSESSED.
 
-    Defined as T_workflow ≤ 300 K (⇔ exp_Tg < 300, via _resolve_t_workflow) so it agrees by
-    construction with which equilibration chain was built (rubbery = 7-run ending at
-    npt_production; glassy = 9-run with npt_prod300) and with the property-track routing.
-    Consumed by the equil-check carve-out (require_rubbery), the analyze-tg data path,
-    the single-rate slope-gate exemption, and rubbery-K routing — one definition, fed everywhere.
-    NOTE: do NOT redefine as `T_workflow > exp_Tg + margin`; for a glassy polymer T_workflow is
-    the melt-equilibration temperature (~T_equil), which would mis-label glassy melts as rubbery."""
-    return 'rubbery' if _resolve_t_workflow(args, cls) <= 300.0 else 'glassy'
+    'rubbery' iff final_T_K > Tg, else 'glassy'. final_T_K is the assessment temperature --
+    check_equilibration_comprehensive always gates npt_final, the terminal stage, which
+    cool_block always ramps down to final_T_K regardless of regime (see
+    _resolve_equil_check_params). 300 K is only its default, not its definition.
+
+    Compare against final_T_K, NOT T_workflow. T_workflow is the melt/production REFERENCE
+    temperature -- for a glassy polymer it is the melt-equilibration T (~T_equil), a mid-ramp
+    tag, so `T_workflow > Tg` would call every glassy melt rubbery. That trap is why this was
+    previously written as `T_workflow <= 300`, which encoded `exp_Tg < 300` indirectly via
+    _resolve_t_workflow. Correct in its default case and verified equivalent to this form for
+    all 48 curated class/member combinations (see test_regime_matches_the_legacy_proxy_at_300K),
+    but it silently misclassifies as soon as final_T_K is set to anything but 300 -- and
+    final_T_K is a user-facing production temperature, overridable like any other knob.
+
+    Consumed by the equil-check carve-out (require_rubbery), the analyze-tg data path, the
+    single-rate slope-gate exemption, and rubbery-K routing -- one definition, fed everywhere.
+    An unresolvable Tg falls to 'glassy', the stricter gate set."""
+    tg = _regime_tg(args, cls)
+    final_T = _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0)
+    if not isinstance(tg, (int, float)):
+        return 'glassy'
+    return 'rubbery' if final_T > tg else 'glassy'
+
+
+def _regime_tg(args, cls: dict):
+    """The Tg the regime call is made against: an explicit --exp_tg_K wins, else the curated
+    or group-contribution-estimated value (_regime_exp_tg already pads an estimate toward
+    glassy by its own uncertainty). Split out so the regime and _resolve_t_workflow resolve Tg
+    identically rather than by two similar-looking code paths."""
+    override = getattr(args, 'exp_tg_K', None)
+    if override is not None:
+        return override
+    return _regime_exp_tg(cls, getattr(args, 'smiles', None))
 
 def _is_glassy(args, cls: dict) -> bool:
     """Whether the BM stages treat this cell as glassy. The orchestrator's `--is_glassy`, set from
@@ -485,7 +506,10 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
             # stays reserved for MSD/kinetic-trap/C(t)). Paired with npt_prod_data_path, which is
             # already npt_final's own .data.
             'struct_dump_path': getattr(args, 'struct_dump_path', None) or f'{lammps_base}/equil/npt_final/npt_final.dump',
-            'npt_prod_temp_K': final_T, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)), 'is_glassy': T_workflow > 300, 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+            # is_glassy derives from the regime oracle rather than re-testing T_workflow > 300:
+            # that proxy and _regime would disagree the moment final_T_K is not 300, and this
+            # dict feeds both the gate set (regime) and the mechanical routing (is_glassy).
+            'npt_prod_temp_K': final_T, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)), 'is_glassy': _regime(args, cls) == 'glassy', 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
 
 def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""

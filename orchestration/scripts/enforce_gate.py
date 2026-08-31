@@ -56,8 +56,61 @@ def load_json(path):
         return json.load(f)
 
 
-def resolve_regime(t_workflow_k):
+def resolve_regime(final_t_k, tg_k=None):
+    """State of the cell at the temperature it is assessed: 'rubbery' iff final_t_k > tg_k.
+
+    final_t_k is the assessment temperature -- check_equilibration_comprehensive always gates
+    npt_final, which cool_block ramps down to final_T_K regardless of regime. 300 K is that
+    knob's default, never its definition, and it is user-facing.
+
+    Must stay in lockstep with stage_params._regime: this is the retrospective path (enforce),
+    that one is the live path (enforce_live receives args.regime already resolved). A divergence
+    means the same run is adjudicated two different ways.
+
+    An unresolvable Tg or assessment temperature falls to 'glassy' -- the STRICTER gate set
+    (density_drift binds there and is advisory in rubbery), so an unknown must not buy the
+    more permissive clause. Callers with no resolvable Tg at all want resolve_regime_legacy."""
+    if not isinstance(final_t_k, (int, float)) or not isinstance(tg_k, (int, float)):
+        return "glassy"
+    return "rubbery" if final_t_k > tg_k else "glassy"
+
+
+def resolve_regime_legacy(t_workflow_k):
+    """The pre-2026-08-31 proxy: 'rubbery' iff T_workflow <= 300 K.
+
+    Kept ONLY for plans that carry no resolvable Tg -- neither a curated member value, a
+    frozen decided_params pin, nor a SMILES to match on. It encodes `exp_Tg < 300` indirectly
+    via _resolve_t_workflow's own branch, so it is correct exactly while final_T_K is 300 and
+    silently misclassifies otherwise. Never use it for new work; prefer resolve_regime."""
     return "rubbery" if t_workflow_k is not None and t_workflow_k <= 300.0 else "glassy"
+
+
+def _regime_tg_for_plan(plan, cls_rules):
+    """This run's Tg for the regime call, or None if nothing can resolve one.
+
+    Prefers a value the plan already froze (an agent override, or the point value
+    stage_params resolved at plan time) over re-deriving it here, so the retrospective verdict
+    is made against the same number the live run used. Falls back to a scalar class value.
+    Deliberately does NOT shell out to the group-contribution estimator: enforce() is an
+    offline re-audit and must not depend on the RDKit environment being reachable."""
+    dp = plan.get("decided_params", {}) or {}
+    for key in ("exp_tg_K", "experimental_tg_K", "exp_tg_point_K"):
+        v = dp.get(key)
+        if isinstance(v, (int, float)):
+            return v
+    v = cls_rules.get("experimental_tg_K")
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, dict):
+        smiles = plan.get("smiles")
+        if smiles:
+            try:
+                resolved = resolve_member_value(cls_rules, "experimental_tg_K", smiles)
+            except Exception:  # noqa: BLE001 -- offline re-audit must not hard-fail on lookup
+                resolved = None
+            if isinstance(resolved, (int, float)):
+                return resolved
+    return None
 
 
 def _stage_log_for(data_path):
@@ -196,10 +249,17 @@ def enforce(run_name, repo_root: Path):
 
     dp = plan.get("decided_params", {})
     polymer_class = plan.get("polymer_class", "")
-    t_workflow = dp.get("T_workflow_K")
-    regime = resolve_regime(t_workflow)
-
     cls_rules = (rules or {}).get("classes", {}).get(polymer_class, {})
+
+    # Assess against the temperature the cell was actually equilibrated to (final_T_K, whose
+    # default is 300 K but which a run may set), compared to this polymer's own Tg. Falls back
+    # to the legacy single-argument T_workflow form when no Tg can be resolved -- an old plan
+    # with neither a curated member value nor a SMILES to estimate from still adjudicates.
+    final_t = dp.get("final_T_K", 300.0)
+    tg = _regime_tg_for_plan(plan, cls_rules)
+    regime = (resolve_regime(final_t, tg) if tg is not None
+              else resolve_regime_legacy(dp.get("T_workflow_K")))
+
     dp_typical = dp.get("dp_typical") or cls_rules.get("dp_typical")
     ct_gate_reliable = cls_rules.get("ct_gate_reliable")
 
