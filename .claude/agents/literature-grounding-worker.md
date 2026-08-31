@@ -346,8 +346,8 @@ Part B: same shape, `"claim"` describes "<the specific convergence fact this sou
 
 **Do not** call any simulation tool, query `db/experimental_db.sqlite` (real lab measurements —
 out of scope for MD-protocol grounding), touch `polymer_rules.json` or `run_plan.json`/
-`decision.json`, or write directly to `docs/protocol_evidence_ff.json`,
-`docs/protocol_evidence_system_size.json`, or `docs/ff_selection_literature.json` — use
+`decision.json`, or write directly to `docs/protocol_evidence_ff.json` or
+`docs/protocol_evidence_system_size.json` — use
 `query_protocol_evidence.py`/`ingest_protocol_evidence.py` for all reads and writes to either
 store. `db/query_polydatabase.py` (step 0.5) is explicitly permitted — it's a read-only
 lead-finder over a distinct MD-literature dataset, not the experimental DB. The only files you
