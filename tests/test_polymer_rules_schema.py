@@ -322,3 +322,37 @@ def test_anneal_ceiling_always_clears_the_margin(cid):
 def test_final_T_defaults_to_300_but_is_not_defined_by_it():
     assert _sched("POXI", smiles="*CCO*")["final_T_K"] == 300.0
     assert _sched("POXI", smiles="*CCO*", final_T_K=450.0)["final_T_K"] == 450.0
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_curated_members_keep_their_class_sweep_window(cid):
+    """Same curated-vs-novel split as T_equil, for the same reason: a class window was sized
+    for the members the class curated, and those runs are validated against it."""
+    entry = RULES["classes"][cid]
+    for _name, smis in (entry.get("member_smiles") or {}).items():
+        if not smis:
+            continue
+        sched = _sched(cid, smiles=smis[0])
+        assert (sched["tg_t_low_K"], sched["tg_t_high_K"]) == \
+            (entry["tg_t_low_K"], entry["tg_t_high_K"]), f"{cid}/{_name}: window moved"
+        assert sched["window_source"] == "class_default"
+
+
+def test_novel_smiles_window_brackets_the_md_tg():
+    """A novel SMILES gets a Tg-derived window, and it must still CONTAIN the transition --
+    the sweep is sized around the MD Tg (estimate + ~120 K), not the experimental one.
+    Unlike T_equil this may narrow: a missed window fails loudly (no breakpoint ->
+    TG_NOT_REPORTABLE) rather than silently, as an under-melted cell would."""
+    import stage_params as sp
+    entry = dict(RULES["classes"]["POXI"])
+    for tg in (150.0, 250.0, 350.0, 500.0):
+        args = SimpleNamespace(smiles="*CC(c1ccccc1)(c1ccccc1)O*", exp_tg_K=tg,
+                               final_T_K=None, T_equil_K=None, T_anneal_high_K=None,
+                               tg_t_high_K=None, tg_t_low_K=None)
+        sched = sp.temperature_schedule(args, entry)
+        assert sched["window_source"] == "estimated_for_novel_smiles"
+        md_tg = tg + sp.MD_TG_OFFSET_K
+        assert sched["tg_t_low_K"] < md_tg < sched["tg_t_high_K"], (
+            f"Tg={tg}: window {sched['tg_t_low_K']}-{sched['tg_t_high_K']} misses MD Tg {md_tg}"
+        )
+        assert sched["tg_t_low_K"] < tg, "no glassy branch below the transition to fit"

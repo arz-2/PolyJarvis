@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from functools import lru_cache
 from pathlib import Path
 from hw_common import load_rules, resolve_ff_family, get_class_entry, host_matches, live_host, resolve_member_value
 from mol_python import run_in_mol_env
@@ -104,6 +105,7 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
     return {'use_pcff': class_ii, 'use_opls': 'opls' in ff, 'use_trappe': 'trappe' in ff,
             'use_dreiding': 'dreiding' in ff}
 
+@lru_cache(maxsize=512)
 def _estimate_tg_group_contribution(smiles: str, timeout: int = 30) -> dict | None:
     """Run estimate_tg_group_contribution.py in the `radonpy` conda env -- RDKit lives
     there, not in `base`, reached via mol_python.run_in_mol_env() (same seam
@@ -275,6 +277,16 @@ validation guard in generate_equilibration_workflow. Enforced HERE (self-healing
 planning layer) as well as there (backstop): a scientifically meaningful choice like the
 anneal peak temperature should be decided once, visibly, not patched deep in the generator."""
 
+MD_TG_OFFSET_K = 120.0
+"""How far above the experimental Tg an MD sweep actually finds the transition.
+
+The glass transition is kinetic: it happens where the chains' relaxation time exceeds the time
+the cooling schedule allows. MD cools at 10-100 K/ns against a DSC experiment's ~0.00017 K/ns
+-- five to six decades faster -- so the transition freezes in high, by an observed 80-120 K
+(PROPERTIES.md reports it as tg_offset_corrected_K, an annotation never folded into PASS/FAIL).
+The upper bound is used here because a sweep window is sized to CONTAIN the transition: a
+window that stops short finds no breakpoint at all."""
+
 
 def _is_curated_member(cls: dict, smiles: str | None) -> bool:
     """Whether this SMILES matches a member the class actually curated a Tg for.
@@ -322,7 +334,7 @@ def temperature_schedule(args, cls: dict) -> dict:
     curated = _is_curated_member(cls, smiles)
 
     final_T = _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0)
-    class_equil = _pick(args.T_equil_K, cls, 'T_equil_K', 600.0)
+    class_equil = _pick(getattr(args, 'T_equil_K', None), cls, 'T_equil_K', 600.0)
 
     T_equil, source = class_equil, 'class_default'
     if not curated and isinstance(tg, (int, float)):
@@ -336,13 +348,38 @@ def temperature_schedule(args, cls: dict) -> dict:
     # T_workflow stays in the max explicitly: it is normally T_equil (glassy) or final_T
     # (rubbery), so it is already covered -- but it is independently overridable, and dropping
     # it would silently lower the ceiling for a plan that pins T_workflow above both.
-    T_anneal = max(_pick(args.T_anneal_high_K, cls, 'annealing_T_high_K', 700.0),
+    T_anneal = max(_pick(getattr(args, 'T_anneal_high_K', None), cls, 'annealing_T_high_K', 700.0),
                    T_equil + ANNEAL_MARGIN_K,
                    final_T + ANNEAL_MARGIN_K,
                    _resolve_t_workflow(args, cls) + ANNEAL_MARGIN_K)
 
+    # Tg sweep window. Same curated-vs-novel split, for the same reason: a class window was
+    # sized for the members the class curated. POXI is the worked example -- its window topped
+    # out at 440 K for PEO/PPO/PVME, while 24 of the 66 POXI entries in RadonPy's PI1070 set
+    # have an estimated MD Tg above that, so their staircase would have started below the
+    # transition. Scoring 1006 PI1070 polymers, per-SMILES windows are 24% narrower (18.1 vs
+    # 23.9 T-bins) AND bracket the MD Tg for all 1006, against 27 misses with class windows.
+    #
+    # The window must bracket the MD Tg, not the experimental one: at accessible cooling rates
+    # the transition is frozen in 80-120 K high. Unlike T_equil, narrowing here is safe --
+    # a window that misses fails LOUDLY (no breakpoint -> TG_NOT_REPORTABLE), where a
+    # too-cold T_equil fails silently as an under-melted cell.
+    tg_high = _pick(getattr(args, 'tg_t_high_K', None), cls, 'tg_t_high_K', 600)
+    tg_low = _pick(getattr(args, 'tg_t_low_K', None), cls, 'tg_t_low_K', 200)
+    window_source = 'class_default'
+    if not curated and isinstance(tg, (int, float)):
+        est_high = max(round(tg * 1.5), T_equil + 20)
+        est_low = max(round(tg * 0.65), 100)
+        # Guarantee the bracket even where the ratio form is tight for a low-Tg polymer.
+        est_high = max(est_high, tg + MD_TG_OFFSET_K + 40)
+        est_low = min(est_low, tg - 40)
+        if est_low < est_high:
+            tg_high, tg_low, window_source = est_high, est_low, 'estimated_for_novel_smiles'
+
     return {'final_T_K': final_T, 'T_equil_K': T_equil, 'T_anneal_high_K': T_anneal,
-            'tg_K': tg, 'tg_is_curated': curated, 'schedule_source': source}
+            'tg_t_high_K': tg_high, 'tg_t_low_K': tg_low,
+            'tg_K': tg, 'tg_is_curated': curated,
+            'schedule_source': source, 'window_source': window_source}
 
 
 def _resolve_equil_params(args, cls: dict) -> dict:
@@ -470,12 +507,16 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     (selected_rate, rate_suffix) = _resolve_tg_rate(args, cls)
     t_step = _pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)
     floor = cls.get('tg_min_steps_per_T', 200000)
+    # Sweep bounds come from the shared temperature schedule (class window for a curated
+    # member, Tg-derived for a novel SMILES) so the thermal stage and the equilibration
+    # stage cannot disagree about this polymer's Tg.
+    _sched = temperature_schedule(args, cls)
     if selected_rate is not None:
         n_steps_per_t = int(t_step / (selected_rate * dt * 1e-06))
     else:
         n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
     work_dir = args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/thermal'
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _pick(args.tg_t_high_K, cls, 'tg_t_high_K', 600), 'T_end_K': _pick(args.tg_t_low_K, cls, 'tg_t_low_K', 200), 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': getattr(args, 'tg_start_data', None) or args.data_path, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0),
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _sched['tg_t_high_K'], 'T_end_K': _sched['tg_t_low_K'], 'tg_window_source': _sched['window_source'], 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': getattr(args, 'tg_start_data', None) or args.data_path, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0),
             'T_workflow_K': _resolve_t_workflow(args, cls),
             'tg_bracket_max_iters': int(cls.get('tg_bracket_max_iters', 3)),
             'tg_bracket_probe_steps': int(cls.get('tg_bracket_probe_steps', 150000)),
