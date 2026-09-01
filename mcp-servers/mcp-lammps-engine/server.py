@@ -4120,6 +4120,7 @@ def _run_generate_run_summary(
     equilibration_path: Optional[str] = None,
     mechanical_path: Optional[str] = None,
     bulk_modulus_deform_path: Optional[str] = None,
+    byproducts_spec: Optional[str] = None,
 ) -> dict:
     """Background worker — runs generate_run_summary.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/generate_run_summary.py"]
@@ -4147,6 +4148,7 @@ def _run_generate_run_summary(
     if equilibration_path:          parts.append(f"--equilibration_path {equilibration_path}")
     if mechanical_path:             parts.append(f"--mechanical_path {mechanical_path}")
     if bulk_modulus_deform_path:    parts.append(f"--bulk_modulus_deform_path {bulk_modulus_deform_path}")
+    if byproducts_spec:             parts.append(f"--byproducts_spec {byproducts_spec}")
 
     command = " ".join(parts)
     logger.info(f"Running generate_run_summary via CLI: {command}")
@@ -4183,6 +4185,7 @@ def generate_run_summary(
     equilibration_path: Optional[str] = None,
     mechanical_path: Optional[str] = None,
     bulk_modulus_deform_path: Optional[str] = None,
+    byproducts_spec: Optional[str] = None,
 ) -> dict:
     """
     Aggregate all Stage 4 analysis outputs into a single run_summary.json.
@@ -4223,6 +4226,12 @@ def generate_run_summary(
                           tg_r40/thermal.json — the slowest-rate folder). When
                           supplied, skips rglob discovery; prevents alphabetical-order
                           bugs when multiple rate folders coexist.
+        byproducts_spec:    Path to a JSON list of free measurements to surface alongside the
+                            requested results -- written by run_campaign.do_summary from
+                            orchestration/scripts/track_registry.py. A path rather than an import
+                            because track_registry lives in orchestration/ and these analysis
+                            scripts deploy separately, the same reasoning as the explicit
+                            cross-attempt paths below.
         equilibration_path, mechanical_path, bulk_modulus_deform_path:
                           Explicit paths to the accepted equilibration/mechanical
                           attempts' own equilibration.json/mechanical.json/
@@ -4251,6 +4260,7 @@ def generate_run_summary(
             graphs_dir=graphs_dir, n_replicates=n_replicates,
             tg_path=tg_path, equilibration_path=equilibration_path,
             mechanical_path=mechanical_path, bulk_modulus_deform_path=bulk_modulus_deform_path,
+            byproducts_spec=byproducts_spec,
         )),
         daemon=True,
     )

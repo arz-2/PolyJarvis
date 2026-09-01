@@ -1675,6 +1675,23 @@ def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_v
     equilibration_path = (equil_result or {}).get("equilibration_json_path")
     mechanical_path = (mechanical_result or {}).get("mechanical_json_path")
     bulk_modulus_deform_path = (mechanical_result or {}).get("bulk_modulus_deform_json_path")
+
+    # Free measurements this run's tracks produced without being asked for -- a Tg request
+    # already yields thermal expansion and a transition width, all sitting unread in thermal.json.
+    # Written as a FILE rather than imported by generate_run_summary: track_registry lives in
+    # orchestration/ and the analysis scripts deploy separately into the simulation host's conda
+    # env, so the same reasoning that makes equilibration_path an explicit path applies here.
+    byproducts_spec_path = None
+    byproducts = track_registry.byproducts_for(properties)
+    if byproducts:
+        byproducts_spec_path = str(raw_dir / "byproducts_spec.json")
+        atomic_write_json(Path(byproducts_spec_path), [
+            {"name": o.name, "produced_by": o.produced_by, "track": o.track,
+             "source_json": o.extractor_json, "field": o.extractor_field,
+             "gate_field": o.gate_field, "unit": o.unit}
+            for o in byproducts
+        ])
+
     summary = wait_for_analysis(lammps, lammps.generate_run_summary(
         output_dir=sp["output_dir"], graphs_dir=sp["graphs_dir"], run_name=args.run_name,
         smiles=args.smiles or "", polymer_class=args.polymer_class.upper(), ff=sp["ff"],
@@ -1684,6 +1701,7 @@ def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_v
         n_replicates=args.n_replicates, tg_path=tg_path,
         equilibration_path=equilibration_path, mechanical_path=mechanical_path,
         bulk_modulus_deform_path=bulk_modulus_deform_path,
+        byproducts_spec=byproducts_spec_path,
     ), "run-summary generation")
     summary["run_summary_path"] = str(Path(sp["output_dir"]) / "run_summary.json")
     return summary

@@ -72,6 +72,37 @@ def _not(v):
     return (not v) if v is not None else None
 
 
+def _collect_byproducts(spec_path, loaded):
+    """Surface free measurements with their own gate verdicts. Never raises: a byproduct that
+    cannot be read is simply absent, because nothing here may affect the run's own verdict."""
+    if not spec_path:
+        return {}
+    try:
+        spec = json.loads(Path(spec_path).read_text())
+    except Exception:
+        return {}
+    out = {}
+    for entry in spec if isinstance(spec, list) else []:
+        source = loaded.get(entry.get("source_json"))
+        if not isinstance(source, dict):
+            continue
+        value = source.get(entry.get("field"))
+        if value is None:
+            continue
+        gate_field = entry.get("gate_field")
+        verdict = source.get(gate_field) if gate_field else None
+        out[entry["name"]] = {
+            "value": value,
+            "unit": entry.get("unit") or "",
+            "produced_by": entry.get("produced_by"),
+            "track": entry.get("track"),
+            "source": f"{entry.get('source_json')}:{entry.get('field')}",
+            "gate": {"field": gate_field, "verdict": verdict},
+            "blocking": False,
+        }
+    return out
+
+
 def _convergence_caveats(eq_comp):
     """Surface accepted-but-suspect chain-relaxation conditions that convergence.verdict alone
     hides. kinetic_trap_flag/ct/msid_gaussian are deliberately advisory (never gated), per
@@ -193,6 +224,13 @@ def main():
                    help="Explicit path to the accepted mechanical attempt's "
                         "bulk_modulus_deform.json (deformation-fallback runs only) -- same "
                         "cross-attempt-directory reasoning as --equilibration_path.")
+    p.add_argument("--byproducts_spec", default=None,
+                   help="Path to a JSON list of byproducts to surface, written by "
+                        "run_campaign.do_summary from orchestration/scripts/track_registry.py. "
+                        "Each entry: {name, produced_by, track, source_json, field, gate_field, "
+                        "unit}. Passed as a file rather than imported because track_registry "
+                        "lives in orchestration/ and these analysis scripts deploy separately "
+                        "(same reason --equilibration_path is a path and not a lookup).")
     args = p.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -413,6 +451,21 @@ def main():
                 "method":         K_method,
             },
         },
+        # Measurements this run produced without being asked for -- a Tg request already computes
+        # thermal expansion, a transition width and a density at every swept temperature. All are
+        # already in the extractor JSONs; only the surfacing is new.
+        #
+        # A SIBLING of results, deliberately not a key inside it: aggregate_replicates,
+        # merge_arm_summaries and the polyjarvis_vs_radonpy scorer all read results by field path
+        # and would break on an unexpected sub-dict. results keeps its exact three-key shape.
+        #
+        # Each entry carries its own gate verdict. A failing byproduct ANNOTATES -- it is never
+        # in binding_gate_failure's vocabulary, so it cannot fail a run that did not ask for it.
+        # Sparse: an entry appears only if its field actually resolved, so a reader can tell
+        # "measured and doubtful" from "not measured".
+        "byproducts": _collect_byproducts(args.byproducts_spec, {
+            "thermal.json": tg, "equilibration.json": eq_comp,
+        }),
         "convergence": {
             "verdict":            args.d05 or (("PASS" if eq_comp.get("overall_pass") else "FAIL")
                                               if eq_comp else None),
