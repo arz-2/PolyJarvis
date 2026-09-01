@@ -553,6 +553,82 @@ def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_ch
     assert gate_call["melt_data"] == melt_data_path
 
 
+# ─── do_thermal(): where the Tg staircase starts ──────────────────────────────────
+#
+# The sweep measures where a COOLING liquid stiffens, so it has to start from a liquid.
+# The equilibration cooldown already wrote one at every waypoint on its way down; the
+# alternative is reheating the finished final_T_K cell, which is not a ramp at all --
+# _bracket_tg_start_temp's deck sets T_START and T_FINAL both to the candidate, a thermostat
+# step change applied to a cell packed at its final_T_K density.
+
+
+def _tg_start_params(tmp_path, **over):
+    p = {"T_start_K": 600.0, "final_T_K": 300.0, "cool_block_dT_K": 25.0,
+         "tg_start_data_path": None, "tg_start_T_K": None,
+         "equil_data_path": str(tmp_path / "npt_final_out.data")}
+    p.update(over)
+    return p
+
+
+def test_tg_sweep_starts_from_the_tagged_melt_cooled_cell(tmp_path):
+    tagged = tmp_path / "cool_block_03_out.data"
+    tagged.write_text("")
+    p = _tg_start_params(tmp_path, tg_start_data_path=str(tagged), tg_start_T_K=610.0)
+
+    def _never(*a, **k):
+        raise AssertionError("reheat probe must not run when a tagged cell is available")
+
+    result = rdr._select_tg_start_cell(None, {}, None, p)
+    assert result["outcome"] == "MELT_COOLED_START"
+    assert result["start_data_path"] == str(tagged)
+    assert result["start_T_K"] == 610.0
+
+
+def test_a_stale_tag_falls_back_to_reheating_rather_than_the_wrong_temperature(
+        tmp_path, monkeypatch):
+    """tg_t_high_K can be edited between the equilibration and thermal stages, or replayed from
+    a frozen plan. The tagged file still exists, but at the OLD sweep top -- starting there
+    would silently run the staircase from a different temperature than the deck declares."""
+    tagged = tmp_path / "cool_block_09_out.data"
+    tagged.write_text("")
+    # Tagged at 480 K for a sweep that now starts at 600 K: more than one block adrift.
+    p = _tg_start_params(tmp_path, tg_start_data_path=str(tagged), tg_start_T_K=480.0)
+    monkeypatch.setattr(rdr, "_bracket_tg_start_temp",
+                        lambda *a, **k: {"outcome": "PASS", "start_data_path": "probe.data"})
+
+    result = rdr._select_tg_start_cell(None, {}, None, p)
+    assert result["outcome"] == "PASS"
+    assert result["stale_tg_start_tag_T_K"] == 480.0
+
+
+def test_a_run_assessed_above_its_sweep_top_needs_no_probe(tmp_path):
+    """A rubbery run whose final_T_K already sits at or above the staircase's first point: its
+    npt_final IS an equilibrated cell there, so there is nothing to reheat and nothing tagged."""
+    p = _tg_start_params(tmp_path, T_start_K=350.0, final_T_K=400.0)
+    result = rdr._select_tg_start_cell(None, {}, None, p)
+    assert result["outcome"] == "ASSESSED_ABOVE_SWEEP_TOP"
+    assert result["start_data_path"] == p["equil_data_path"]
+
+
+def test_no_tag_reheats(tmp_path, monkeypatch):
+    """What a SMILES with an untrustworthy Tg estimate, or a legacy plan, lands on. The probe
+    path is retained rather than deleted precisely for this case."""
+    p = _tg_start_params(tmp_path)
+    monkeypatch.setattr(rdr, "_bracket_tg_start_temp",
+                        lambda *a, **k: {"outcome": "EXHAUSTED", "start_data_path": "probe.data"})
+    result = rdr._select_tg_start_cell(None, {}, None, p)
+    assert result["outcome"] == "EXHAUSTED"
+    assert "stale_tg_start_tag_T_K" not in result
+
+
+def test_a_tag_pointing_at_a_missing_file_reheats(tmp_path, monkeypatch):
+    p = _tg_start_params(tmp_path, tg_start_data_path=str(tmp_path / "gone.data"),
+                         tg_start_T_K=600.0)
+    monkeypatch.setattr(rdr, "_bracket_tg_start_temp",
+                        lambda *a, **k: {"outcome": "PASS", "start_data_path": "probe.data"})
+    assert rdr._select_tg_start_cell(None, {}, None, p)["outcome"] == "PASS"
+
+
 # ─── CampaignStageExecutor.execute(): STRUCTURAL_FAIL finding-code routing ─────────
 
 def test_structural_fail_routes_to_cooling_verdict_not_a_passing_finite_size_string(

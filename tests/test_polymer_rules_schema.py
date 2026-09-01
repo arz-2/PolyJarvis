@@ -422,3 +422,80 @@ def test_regime_still_uses_a_low_confidence_estimate(monkeypatch):
     args = SimpleNamespace(smiles="*NOVEL*", exp_tg_K=None, final_T_K=None)
     # Tg 120 + 80 K padding = 200 < 300 K assessment -> rubbery, from a very_low estimate
     assert sp._regime(args, RULES["classes"]["PKTN"]) == "rubbery"
+
+
+# ─── The anneal ceiling must clear the Tg sweep's own top ──────────────────────────
+#
+# The thermal stage starts its staircase from a cell the equilibration cooldown already
+# wrote: cool_block saves a .data file at every waypoint between the anneal ceiling and
+# final_T_K, and one of those has to sit at or above tg_t_high_K or there is nothing to
+# start from and the sweep falls back to reheating the finished final_T_K cell.
+#
+# The headroom is one cool block, not zero: anneal_hold runs NVT, so the cell AT the
+# ceiling still carries the densified 300 K volume rather than a melt density. The first
+# genuinely melt-density cell is cool_block_01's endpoint, one cool_block_dT_K down.
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_class_ceiling_clears_its_own_class_sweep_top(cid):
+    """The class-constant path -- what a SMILES with an untrustworthy Tg estimate takes, which
+    is 59% of RadonPy's PI1070 set. Each class's tg_t_high_K and annealing_T_high_K were sized
+    independently (window from the class's highest-Tg member + the MD offset; ceiling from
+    T_equil), and were never compared: PCBN/PIMD/PIMN/POXI/PPHS were all short until 2026-09-01.
+    """
+    entry = RULES["classes"][cid]
+    sched = _sched(cid)
+    assert sched["window_source"] == "class_default", "no SMILES -> no Tg -> class window"
+    dT = float(entry.get("cool_block_dT_K") or 25.0)
+    assert sched["tg_t_high_K"] + dT <= sched["T_anneal_high_K"], (
+        f"{cid}: sweep top {sched['tg_t_high_K']} K needs a ceiling of at least "
+        f"{sched['tg_t_high_K'] + dT} K, have {sched['T_anneal_high_K']} K"
+    )
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_class_ceilings_are_self_consistent_without_being_auto_raised(cid):
+    """Stronger than the test above, and the reason the five class ceilings were edited by hand
+    rather than left to the sweep term. The term is a backstop for a class whose window is later
+    widened without its ceiling following; if it BINDS today it means the shipped constants are
+    still internally inconsistent and something is being silently patched at runtime."""
+    sched = _sched(cid)
+    assert sched["ceiling_source"] != "sweep_start_headroom", (
+        f"{cid}: the class ceiling is being auto-raised to "
+        f"{sched['T_anneal_high_K']} K at runtime -- fix annealing_T_high_K in the data file"
+    )
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_curated_member_ceiling_clears_its_derived_sweep_top(cid):
+    """The per-SMILES path. A curated member's window is derived from its OWN measured Tg
+    (Tg+270) while its ceiling comes from the class T_equil (+100), so the two coincide only
+    when Tg < T_equil-195. Eight of the 43 members failed that -- PMMA, PAA, PS, P2VP, PVC,
+    BPA-PC, PPO/PPE, PMHS -- each short by 3-25 K."""
+    entry = RULES["classes"][cid]
+    dT = float(entry.get("cool_block_dT_K") or 25.0)
+    for name, smis in (entry.get("member_smiles") or {}).items():
+        if not smis:
+            continue
+        sched = _sched(cid, smiles=smis[0])
+        assert sched["tg_t_high_K"] + dT <= sched["T_anneal_high_K"], (
+            f"{cid}/{name}: derived sweep top {sched['tg_t_high_K']} K exceeds ceiling "
+            f"{sched['T_anneal_high_K']} K"
+        )
+        assert sched["tg_start_T_K"] == sched["tg_t_high_K"]
+
+
+def test_an_explicit_window_override_never_moves_the_ceiling():
+    """tg_t_high_K is hashed to the THERMAL stage (workflow_engine.PARAMETER_STAGE); the anneal
+    ceiling shapes the EQUILIBRATION chain. Letting an explicit override feed the ceiling would
+    rewrite the equilibration chain under an unchanged equilibration _input_hash -- the
+    over-dedupe trap where a store serves one run's cell for another's. A DERIVED window is
+    safe because it is a pure function of the SMILES, which is already build-hashed."""
+    baseline = _sched("PIMN", smiles="*CCN*")
+    override = _sched("PIMN", smiles="*CCN*", tg_t_high_K=900)
+    assert override["tg_t_high_K"] == 900
+    assert override["T_anneal_high_K"] == baseline["T_anneal_high_K"]
+    assert override["ceiling_source"] != "sweep_start_headroom"
+    # No guaranteed waypoint at 900 K, so no tag -- the thermal stage reheats instead of
+    # starting from a cell that may not exist.
+    assert override["tg_start_T_K"] is None

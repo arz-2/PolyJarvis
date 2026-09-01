@@ -384,17 +384,6 @@ def temperature_schedule(args, cls: dict) -> dict:
         if needed > class_equil:
             T_equil, source = needed, 'raised_for_novel_smiles'
 
-    # The ceiling must clear the melt AND the assessment temperature. The second term only
-    # binds when a run asks to be assessed at or above its own melt temperature, which would
-    # otherwise leave cool_block with a non-positive span to ramp through.
-    # T_workflow stays in the max explicitly: it is normally T_equil (glassy) or final_T
-    # (rubbery), so it is already covered -- but it is independently overridable, and dropping
-    # it would silently lower the ceiling for a plan that pins T_workflow above both.
-    T_anneal = max(_pick(getattr(args, 'T_anneal_high_K', None), cls, 'annealing_T_high_K', 700.0),
-                   T_equil + ANNEAL_MARGIN_K,
-                   final_T + ANNEAL_MARGIN_K,
-                   _resolve_t_workflow(args, cls) + ANNEAL_MARGIN_K)
-
     # Tg sweep window. Same curated-vs-novel split, for the same reason: a class window was
     # sized for the members the class curated. POXI is the worked example -- its window topped
     # out at 440 K for PEO/PPO/PVME, while 24 of the 66 POXI entries in RadonPy's PI1070 set
@@ -430,10 +419,65 @@ def temperature_schedule(args, cls: dict) -> dict:
             tg_high, tg_low = est_high, est_low
             window_source = 'curated_tg' if curated else 'estimated_tg'
 
+    # The ceiling must clear the melt, the assessment temperature, AND the sweep window --
+    # computed here, after the window, because the last term depends on it.
+    #
+    # The sweep term is what lets the thermal stage start from a melt-cooled cell instead of
+    # reheating the finished 300 K one. cool_block writes a .data file at every waypoint on the
+    # way down, so the cell the sweep needs already exists -- but only if the cooldown actually
+    # reaches the sweep's top. One cool block of headroom is required, not zero: anneal_hold
+    # runs NVT, so the cell AT the ceiling still carries the densified 300 K volume; the first
+    # genuinely melt-density cell is cool_block_01's endpoint, one dT below. Without this term
+    # the two temperatures coincide only by accident (window = Tg+270, ceiling = T_equil+100),
+    # which breaks for every member whose Tg exceeds T_equil-195 -- 8 of the 43 curated members,
+    # PMMA/PS/PVC/BPA-PC among them, each short by 3-25 K.
+    #
+    # ONLY the derived window feeds this. A derived window is a pure function of the SMILES,
+    # which is already build-hashed, so a window change invalidates the equilibration chain
+    # honestly. An EXPLICIT tg_t_high_K override is thermal-hashed, and propagating it here
+    # would rewrite the equilibration chain under an unchanged equilibration _input_hash --
+    # validate_run_plan raises a finding for that case instead (see _tg_window_ceiling_findings),
+    # telling the plan to raise annealing_T_high_K, which is equilibration-hashed.
+    #
+    # A CLASS-DEFAULT window is included, deliberately. It was excluded while the class ceilings
+    # had not been checked against the class windows -- feeding one in would have auto-raised a
+    # ceiling on a thermal-stability judgement nobody had made. All 21 class ceilings were
+    # reviewed on 2026-09-01 (PCBN/PIMD/PIMN/POXI/PPHS raised; see their
+    # _annealing_T_high_K_note entries), so the term can no longer bind on an unvetted number,
+    # and this is what puts the melt-cooled start on the path a run with an UNTRUSTWORTHY Tg
+    # estimate actually takes -- 59% of RadonPy's PI1070 set, which would otherwise all reheat.
+    #
+    # NOTE: because the derived window comes from the group-contribution estimator, changing the
+    # estimator now reshapes the equilibration chain. That is covered by the implementation_version
+    # bump discipline, but it is a real new coupling rather than an inherited one.
+    sweep_headroom = float(cls.get('cool_block_dT_K') or 25.0)
+    ceiling_terms = {
+        'class_default': _pick(getattr(args, 'T_anneal_high_K', None), cls,
+                               'annealing_T_high_K', 700.0),
+        'melt_margin': T_equil + ANNEAL_MARGIN_K,
+        'assessment_margin': final_T + ANNEAL_MARGIN_K,
+        # T_workflow stays explicit: it is normally T_equil (glassy) or final_T (rubbery), so it
+        # is already covered -- but it is independently overridable, and dropping it would
+        # silently lower the ceiling for a plan that pins T_workflow above both.
+        'workflow_margin': _resolve_t_workflow(args, cls) + ANNEAL_MARGIN_K,
+    }
+    if not explicit_window:
+        ceiling_terms['sweep_start_headroom'] = tg_high + sweep_headroom
+    ceiling_source = max(ceiling_terms, key=lambda k: ceiling_terms[k])
+    T_anneal = ceiling_terms[ceiling_source]
+
+    # tg_start_T_K is the sweep's own top, restated as the temperature the equilibration
+    # cooldown must tag a .data file at. None only for an EXPLICIT window override, which is
+    # excluded from the ceiling above and therefore has no guaranteed waypoint at or above it;
+    # the thermal stage then falls back to reheating rather than starting from a cell that may
+    # not exist.
     return {'final_T_K': final_T, 'T_equil_K': T_equil, 'T_anneal_high_K': T_anneal,
             'tg_t_high_K': tg_high, 'tg_t_low_K': tg_low,
+            'tg_start_T_K': None if explicit_window else tg_high,
+            'cool_block_dT_K': sweep_headroom,
             'tg_K': tg, 'tg_is_curated': curated, 'tg_trustworthy': trustworthy,
-            'schedule_source': source, 'window_source': window_source}
+            'schedule_source': source, 'window_source': window_source,
+            'ceiling_source': ceiling_source}
 
 
 def _resolve_equil_params(args, cls: dict) -> dict:
@@ -450,6 +494,12 @@ def _resolve_equil_params(args, cls: dict) -> dict:
     # exclusive by construction in generate_equilibration_workflow.
     want_melt_tag = (getattr(args, 'add_melt_npt', False) or bool(cls.get('add_melt_npt', False)))
     t_equil_K = T_equil if (want_melt_tag and T_workflow <= 300.0) else None
+
+    # tg_start_T_K: read-only metadata for generate_equilibration_workflow, so the cooldown
+    # reports which cool_block the Tg sweep should start from instead of the thermal stage
+    # reheating npt_final. None when the window came from a class constant -- the ceiling then
+    # carries no sweep headroom, so no cool_block is guaranteed to sit at or above the top.
+    tg_start_T_K = sched['tg_start_T_K']
     remedy_melt_ns = (getattr(args, 'melt_hold_ns', None) or cls.get('melt_hold_ns') or
                       getattr(args, 'melt_only_continuation_ns', None) or
                       cls.get('melt_only_continuation_ns'))
@@ -499,7 +549,7 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         'stage7_cap_steps': _step_pick('stage7_cap_steps'),
         'stage8_min_steps': _step_pick('stage8_min_steps'),
         'stage8_cap_steps': _step_pick('stage8_cap_steps'),
-        't_equil_K': t_equil_K,
+        't_equil_K': t_equil_K, 'tg_start_T_K': tg_start_T_K,
         'melt_hold_extra_steps': melt_hold_extra_steps,
         'gpu_ids': args.gpu_ids,
         'mpi_ranks': args.mpi_ranks,
@@ -572,6 +622,10 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     work_dir = args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/thermal'
     return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _sched['tg_t_high_K'], 'T_end_K': _sched['tg_t_low_K'], 'tg_window_source': _sched['window_source'], 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': getattr(args, 'tg_start_data', None) or args.data_path, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0),
             'T_workflow_K': _resolve_t_workflow(args, cls),
+            'tg_start_data_path': getattr(args, 'tg_start_data', None),
+            'tg_start_T_K': getattr(args, 'tg_start_T_K', None),
+            'cool_block_dT_K': float(cls.get('cool_block_dT_K') or 25.0),
+            'final_T_K': _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0),
             'tg_bracket_max_iters': int(cls.get('tg_bracket_max_iters', 3)),
             'tg_bracket_probe_steps': int(cls.get('tg_bracket_probe_steps', 150000)),
             'tg_bracket_drift_threshold_pct': cls.get('tg_bracket_drift_threshold_pct', 0.5),

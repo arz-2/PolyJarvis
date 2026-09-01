@@ -356,7 +356,8 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             cool_block_hold_cap_steps=p["cool_block_hold_cap_steps"],
             stage7_min_steps=p["stage7_min_steps"], stage7_cap_steps=p["stage7_cap_steps"],
             stage8_min_steps=p["stage8_min_steps"], stage8_cap_steps=p["stage8_cap_steps"],
-            t_equil_K=p["t_equil_K"], melt_hold_extra_steps=p["melt_hold_extra_steps"],
+            t_equil_K=p["t_equil_K"], tg_start_T_K=p["tg_start_T_K"],
+            melt_hold_extra_steps=p["melt_hold_extra_steps"],
             params_file="",
             resume_from=resume_from,
             polymer_name=args.run_name, press=p["P_equil_atm"],
@@ -384,7 +385,8 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             cool_block_hold_cap_steps=p["cool_block_hold_cap_steps"],
             stage7_min_steps=p["stage7_min_steps"], stage7_cap_steps=p["stage7_cap_steps"],
             stage8_min_steps=p["stage8_min_steps"], stage8_cap_steps=p["stage8_cap_steps"],
-            t_equil_K=p["t_equil_K"], melt_hold_extra_steps=p["melt_hold_extra_steps"],
+            t_equil_K=p["t_equil_K"], tg_start_T_K=p["tg_start_T_K"],
+            melt_hold_extra_steps=p["melt_hold_extra_steps"],
             params_file=p.get("emc_params_path") or "",
             minimize_etol=p["minimize_etol"], minimize_ftol=p["minimize_ftol"],
             minimize_maxiter=p["minimize_maxiter"], minimize_maxeval=p["minimize_maxeval"],
@@ -429,7 +431,8 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             stage7_cap_steps=p["stage7_cap_steps"],
             stage8_min_steps=override.get("stage8_min_steps", p["stage8_min_steps"]),
             stage8_cap_steps=p["stage8_cap_steps"],
-            t_equil_K=p["t_equil_K"], melt_hold_extra_steps=p["melt_hold_extra_steps"],
+            t_equil_K=p["t_equil_K"], tg_start_T_K=p["tg_start_T_K"],
+            melt_hold_extra_steps=p["melt_hold_extra_steps"],
             extend_only=True, restart_file=extend_from_data, base_stage_name=base,
             extend_ensemble=extend_ensemble, extend_temp_K=extend_temp_K,
             polymer_name=args.run_name, press=p["P_equil_atm"],
@@ -712,6 +715,14 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
         args.npt_prod_dump = _stage_dump_path(_kinetic_stage)
     if workflow.get("melt_data_path"):
         args.melt_data_path = workflow["melt_data_path"]
+    # tg_start_data_path: the cool_block the Tg sweep should start its staircase from -- a
+    # melt-cooled cell at (or at most one block above) the sweep's top, instead of reheating
+    # the finished final_T_K one. Unlike melt_data_path this has NO formula fallback in the
+    # resolver: which cool_block_NN it is varies per run, so it only survives a resume by being
+    # persisted in this stage's outputs dict and re-read by CampaignStageExecutor.execute.
+    if workflow.get("tg_start_data_path"):
+        args.tg_start_data = workflow["tg_start_data_path"]
+        args.tg_start_T_K = workflow.get("tg_start_T_K")
 
     attempts = 0
     while True:
@@ -764,7 +775,9 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                       # mechanical_json_path for why this needs to be explicit rather than
                       # searched (it lives under THIS equilibration attempt's raw dir, not the
                       # summary attempt's own output_dir).
-                      "equilibration_json_path": comprehensive_json}
+                      "equilibration_json_path": comprehensive_json,
+                      "tg_start_data_path": getattr(args, "tg_start_data", None),
+                      "tg_start_T_K": getattr(args, "tg_start_T_K", None)}
             return result
 
         if equil_verdict == "EXTEND":
@@ -910,6 +923,56 @@ def _bracket_tg_start_temp(args, cls: dict, lammps, p: dict) -> dict:
             "iterations": iterations, "outcome": "EXHAUSTED"}
 
 
+def _select_tg_start_cell(args, cls: dict, lammps, p: dict) -> dict:
+    """Which structure the Tg staircase starts from, in bracket-result shape.
+
+    The sweep measures where a COOLING liquid stiffens, so it has to start from a liquid. The
+    equilibration chain already made one and wrote it to disk: cool_block ramps the annealed
+    melt down to final_T_K and saves a .data file at every waypoint, and the anneal ceiling now
+    carries one block of headroom above the sweep top precisely so one of those waypoints sits
+    there (see temperature_schedule's sweep_start_headroom term). Using it costs nothing -- the
+    trajectory has already been run -- and it replaces a 150 ps reheat of the finished cell.
+
+    Why the reheat was wrong, not merely slower: the fallback probe hands npt_final (a cell
+    equilibrated at final_T_K) to a deck whose T_START and T_FINAL are BOTH the candidate
+    temperature -- a thermostat step change, not a ramp. Worse, that cell is packed at its
+    final_T_K density; a real melt is several percent less dense, and 150 ps is nowhere near
+    enough for the barostat to expand the box. The top plateaus of the staircase are then read
+    off a cell still relaxing from the jump, which biases the rubbery branch and hence the
+    breakpoint. PKTN/PSFO's inverted rate dependence (Tg FALLING as cooling gets faster, i.e. as
+    less time is spent contaminated at the top) is the signature of exactly this.
+
+    Three cases; the fallback is retained rather than deleted because it is what a run with an
+    untrustworthy Tg estimate legitimately lands on -- the ceiling carries no sweep headroom
+    there, so no tagged cell is guaranteed to exist.
+    """
+    T_start = p["T_start_K"]
+    tagged_path, tagged_T = p["tg_start_data_path"], p["tg_start_T_K"]
+    dT = p["cool_block_dT_K"]
+
+    # (a) The equilibration cooldown tagged a cell at or just above the sweep top. The
+    # temperature match is not decoration: tg_t_high_K can be edited between the equilibration
+    # and thermal stages (or replayed from a frozen plan), and a stale tag would silently start
+    # the staircase from the wrong temperature. Reject it and reheat rather than guess.
+    if tagged_path and isinstance(tagged_T, (int, float)) and Path(tagged_path).exists():
+        if -1e-6 <= tagged_T - T_start <= dT + 1e-6:
+            return {"T_start_K": T_start, "start_data_path": tagged_path,
+                    "start_T_K": tagged_T, "iterations": [], "outcome": "MELT_COOLED_START"}
+        fallback = _bracket_tg_start_temp(args, cls, lammps, p)
+        return {**fallback, "stale_tg_start_tag_T_K": tagged_T}
+
+    # (b) A rubbery run assessed at or above the sweep top: npt_final IS an equilibrated cell
+    # at/above the staircase's first point, so there is nothing to reheat and nothing to tag.
+    if p["final_T_K"] >= T_start - 1e-6:
+        return {"T_start_K": T_start, "start_data_path": p["equil_data_path"],
+                "start_T_K": p["final_T_K"], "iterations": [],
+                "outcome": "ASSESSED_ABOVE_SWEEP_TOP"}
+
+    # (c) No tagged cell -- an untrustworthy Tg estimate (class-default window, no headroom), a
+    # legacy plan, or a chain generated before tagging existed.
+    return _bracket_tg_start_temp(args, cls, lammps, p)
+
+
 def _run_tg_sweep_adaptive(args, cls: dict, lammps, p: dict, start_data_path: str) -> dict:
     """Per-temperature adaptive sampling: one npt_tg_step hold per waypoint (T_start_K down to
     T_end_K in T_step_K decrements), chained via each point's own WRITE_DATA_FILE, all appending
@@ -1026,7 +1089,7 @@ def do_thermal(args, cls: dict, lammps, equil_density_gcm3=None) -> dict:
         p = resolve_stage_params("tg", args, cls)
         with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
             args.gpu_ids = gpu_ids
-            bracket = _bracket_tg_start_temp(args, cls, lammps, p)
+            bracket = _select_tg_start_cell(args, cls, lammps, p)
             sweep = _run_tg_sweep_adaptive(args, cls, lammps, p, bracket["start_data_path"])
 
         # bracket["outcome"] may be PROBE_FAILED (the very first probe couldn't even run/parse,
@@ -1688,6 +1751,11 @@ class CampaignStageExecutor:
             args.n_atoms = build.get("n_atoms")
         if equil:
             args.data_path = equil.get("npt_prod_data_path")
+            # The thermal stage's sweep starts here, not from npt_final -- see do_thermal.
+            # Read back from the persisted manifest so a resumed run picks the same cool_block
+            # the original chain tagged (there is no formula that recovers it).
+            args.tg_start_data = equil.get("tg_start_data_path")
+            args.tg_start_T_K = equil.get("tg_start_T_K")
         if stage == "equilibration" and context["parameters"].get("npt_continuation_ns"):
             for prior in reversed(context.get("prior_attempts") or ()):
                 manifest_path = prior.get("manifest")

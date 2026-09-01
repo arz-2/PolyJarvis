@@ -1439,6 +1439,7 @@ def generate_equilibration_workflow(
     n_atoms: Optional[int] = None,
     params_file: str = "",
     t_equil_K: Optional[float] = None,
+    tg_start_T_K: Optional[float] = None,
     melt_hold_extra_steps: Optional[int] = None,
     final_T_K: float = 300.0,
     anneal_margin_K: float = 100.0,
@@ -1613,6 +1614,17 @@ def generate_equilibration_workflow(
                         between final_T_K and max_temp — the direct successor to the retired
                         add_melt_npt flag. Ignored if temp > final_T_K (the glassy case
                         already tags at temp; the two tags are mutually exclusive).
+        tg_start_T_K:   Optional Tg-sweep start temperature. Read-only METADATA: the cooldown
+                        grid is NOT altered to land on it (that would make the equilibration
+                        chain a function of a thermal-stage parameter). The COLDEST cool_block
+                        whose endpoint is still at or above it is reported as
+                        tg_start_data_path, so the thermal stage can start its staircase from a
+                        melt-cooled cell instead of reheating the finished final_T_K one. Both
+                        the path and its temperature are None when tg_start_T_K falls outside
+                        (final_T_K, max_temp - cool_block_dT_K] -- there is no NPT cell at or
+                        above it then. Deliberately NOT anneal_hold's output even when that sits
+                        exactly at tg_start_T_K: anneal_hold is NVT, so its cell still carries
+                        the densified 300 K volume rather than a melt density.
         melt_hold_extra_steps: Optional extra steps added to whichever cool_block is tagged
                         as the melt reference (temp, or t_equil_K) — the direct successor to
                         the retired melt_npt_steps isothermal-hold stage, folded into the
@@ -1667,6 +1679,10 @@ def generate_equilibration_workflow(
             melt_data_path  - output_data of the cool_block tagged as the melt/production
                               reference (temp, or t_equil_K), or None if temp == final_T_K
                               and no t_equil_K tag was requested
+            tg_start_data_path - output_data of the coldest cool_block whose endpoint is still
+                              at or above tg_start_T_K, or None (see tg_start_T_K above)
+            tg_start_T_K    - that block's own endpoint temperature (>= the requested
+                              tg_start_T_K by at most cool_block_dT_K), or None
             instructions    - how to execute this workflow
     """
     try:
@@ -1952,6 +1968,8 @@ def generate_equilibration_workflow(
                 "stages":             stages,
                 "run_order":          [sx["name"]],
                 "melt_data_path":     None,
+                "tg_start_data_path": None,
+                "tg_start_T_K":       None,
                 "preflight_warnings":  vr["warnings"],
                 "preflight_stats":     vr["stats"],
                 "instructions": (
@@ -1982,6 +2000,8 @@ def generate_equilibration_workflow(
         _resume_idx = _CHECKPOINTS.index(resume_from) if resume_from is not None else -1
         melt_tag_T = None
         melt_data_path = None
+        tg_start_data_path = None
+        tg_start_T_actual = None
 
         # 1. nvt_warmup — fixed, short 300 K settle (removes build artifacts)
         if _resume_idx < 0:
@@ -2115,6 +2135,11 @@ def generate_equilibration_workflow(
                 prev_output = s["output_data"]
                 if is_melt_block:
                     melt_data_path = s["output_data"]
+                # Walking downward, every endpoint reached so far is >= the next one, so the
+                # LAST block satisfying this is the coldest cell still at or above the sweep
+                # top -- overwrite rather than break.
+                if tg_start_T_K is not None and w_end >= tg_start_T_K - 1e-6:
+                    tg_start_data_path, tg_start_T_actual = s["output_data"], w_end
         # resume_from == "cool_block": the entire cooldown is already done; prev_output stands
         # in for its last block's output. To regenerate the cooldown itself (e.g. a different
         # cool_block_dT_K), resume_from="anneal_hold" instead — there is no "redo cooling but
@@ -2165,6 +2190,8 @@ def generate_equilibration_workflow(
             "npt_production_log": f"{final_stage['work_dir']}/{final_stage['params']['LOG_FILE']}",
             "npt_production_dir": final_stage["work_dir"],
             "melt_data_path":     melt_data_path,
+            "tg_start_data_path": tg_start_data_path,
+            "tg_start_T_K":       tg_start_T_actual,
             "preflight_warnings": vr["warnings"],
             "preflight_stats":    vr["stats"],
             "instructions": (

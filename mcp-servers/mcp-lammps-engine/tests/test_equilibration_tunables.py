@@ -188,6 +188,84 @@ def test_no_melt_tag_when_rubbery_and_no_t_equil_k(tmp_path):
     assert result["melt_data_path"] is None
 
 
+# ── Tg-sweep start tagging ───────────────────────────────────────────────────
+#
+# Read-only metadata: the cooldown grid is NOT altered to land on tg_start_T_K (that would
+# make the equilibration chain a function of a thermal-stage parameter, which hashes to the
+# thermal stage -- see PARAMETER_STAGE). The tag just names an existing block.
+
+
+def test_tg_start_tag_is_the_coldest_block_still_at_or_above_the_sweep_top(tmp_path):
+    """700 -> 300 in 100 K steps gives block ENDPOINTS 600/500/400/300 (the ceiling itself is
+    only a block START). A sweep starting at 450 K must get cool_block_02, whose endpoint of
+    500 K is the coldest one still above it -- not cool_block_01 at 600 K (needlessly hot, and
+    the sweep would have to cool 150 K before its first point) and not cool_block_03, whose
+    400 K endpoint is already below the sweep's own top."""
+    result = server.generate_equilibration_workflow(
+        **_base_kwargs(tmp_path, temp=500.0, max_temp=700.0, final_T_K=300.0,
+                      cool_block_dT_K=100.0, tg_start_T_K=450.0)
+    )
+    assert result["status"] == "success", result
+    by_name = {stage["name"]: stage for stage in result["stages"]}
+    assert result["tg_start_data_path"] == by_name["cool_block_02"]["output_data"]
+    assert result["tg_start_T_K"] == 500.0
+    assert by_name["cool_block_02"]["params"]["T_FINAL"] == 500.0
+    assert by_name["cool_block_03"]["params"]["T_FINAL"] == 400.0
+
+
+def test_tg_start_tag_is_never_the_anneal_hold_output(tmp_path):
+    """anneal_hold sits exactly at max_temp, but it runs NVT -- its cell still carries the
+    densified 300 K volume, not a melt density. A sweep starting AT the ceiling must therefore
+    find no cell rather than be handed a hot cell at the wrong density."""
+    result = server.generate_equilibration_workflow(
+        **_base_kwargs(tmp_path, temp=500.0, max_temp=700.0, final_T_K=300.0,
+                      cool_block_dT_K=100.0, tg_start_T_K=700.0)
+    )
+    assert result["status"] == "success", result
+    assert result["tg_start_data_path"] is None
+    assert result["tg_start_T_K"] is None
+
+
+def test_tg_start_tag_absent_when_the_cooldown_never_reaches_it(tmp_path):
+    result = server.generate_equilibration_workflow(
+        **_base_kwargs(tmp_path, temp=500.0, max_temp=700.0, final_T_K=300.0,
+                      cool_block_dT_K=100.0, tg_start_T_K=900.0)
+    )
+    assert result["status"] == "success", result
+    assert result["tg_start_data_path"] is None
+
+
+def test_tg_start_tag_absent_when_not_requested(tmp_path):
+    """Legacy/frozen plans pass no tg_start_T_K; the chain must be unchanged and untagged."""
+    tagged = server.generate_equilibration_workflow(
+        **_base_kwargs(tmp_path / "a", temp=500.0, max_temp=700.0, final_T_K=300.0,
+                      cool_block_dT_K=100.0, tg_start_T_K=500.0)
+    )
+    plain = server.generate_equilibration_workflow(
+        **_base_kwargs(tmp_path / "b", temp=500.0, max_temp=700.0, final_T_K=300.0,
+                      cool_block_dT_K=100.0)
+    )
+    assert plain["tg_start_data_path"] is None
+    # The tag must be metadata only: same stages, same step counts, same temperatures. Path
+    # params are excluded -- the two chains are generated into different work_dir_base roots.
+    assert plain["run_order"] == tagged["run_order"]
+    physical = lambda params: {k: v for k, v in params.items()
+                               if not (isinstance(v, str) and "/" in v)}
+    for a, b in zip(plain["stages"], tagged["stages"]):
+        assert physical(a["params"]) == physical(b["params"]), a["name"]
+
+
+def test_tg_start_tag_and_melt_tag_can_be_the_same_block(tmp_path):
+    """Nothing forces them apart -- a glassy run whose sweep top equals its melt reference
+    temperature legitimately tags one block twice."""
+    result = server.generate_equilibration_workflow(
+        **_base_kwargs(tmp_path, temp=500.0, max_temp=700.0, final_T_K=300.0,
+                      cool_block_dT_K=100.0, tg_start_T_K=500.0)
+    )
+    assert result["status"] == "success", result
+    assert result["tg_start_data_path"] == result["melt_data_path"]
+
+
 # ── anneal-margin validation ──────────────────────────────────────────────────
 
 def test_max_temp_too_close_to_temp_is_rejected(tmp_path):
