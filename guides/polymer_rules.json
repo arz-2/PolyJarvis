@@ -551,6 +551,7 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 250000,
       "tg_min_steps_per_T": 250000,
+      "_tg_min_steps_per_T_note": "500 ps per temperature (250,000 steps at dt=2 fs), deliberately 2.5x the 200 ps every 1 fs class gets. From PE3 run evidence (PolyJarvis commit 6691eb1, 2026-06-24): at dt=2 fs with T_step=20 K, rates above 40 K/ns fall below this floor and produce fit_swapped / inflated Tg, so tg_rates_K_per_ns was cut from [25,50,100] to [10,25,40] and the floor raised from 100,000 in the same change. The two numbers are one decision: the floor is what makes 40 K/ns this class's ceiling. CONSEQUENCE (2026-09-01): cool_block_hold_steps now derives from the primary sweep rate, so this floor also sets the cooldown to 40 K/ns -- 312,500 steps per block against the 100,000 the flat tier default gave, the largest cooling-cost increase of any class. That is the price of the cooldown and the staircase being one continuous descent at one rate. Note the floor is a MEASUREMENT requirement (each plateau must settle before the bilinear fit reads its density); cool_block is preparation and its blocks are adaptive (check_block_gate extends an unstable block anyway), so part of the nominal increase may be work those blocks were already doing. Worth measuring on the first TraPPE run rather than assumed.",
       "tg_rates_K_per_ns": [
         10,
         25,
@@ -1025,6 +1026,7 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 250000,
       "tg_min_steps_per_T": 250000,
+      "_tg_min_steps_per_T_note": "500 ps per temperature (250,000 steps at dt=2 fs), deliberately 2.5x the 200 ps every 1 fs class gets. From PE3 run evidence (PolyJarvis commit 6691eb1, 2026-06-24): at dt=2 fs with T_step=20 K, rates above 40 K/ns fall below this floor and produce fit_swapped / inflated Tg, so tg_rates_K_per_ns was cut from [25,50,100] to [10,25,40] and the floor raised from 100,000 in the same change. The two numbers are one decision: the floor is what makes 40 K/ns this class's ceiling. CONSEQUENCE (2026-09-01): cool_block_hold_steps now derives from the primary sweep rate, so this floor also sets the cooldown to 40 K/ns -- 312,500 steps per block against the 100,000 the flat tier default gave, the largest cooling-cost increase of any class. That is the price of the cooldown and the staircase being one continuous descent at one rate. Note the floor is a MEASUREMENT requirement (each plateau must settle before the bilinear fit reads its density); cool_block is preparation and its blocks are adaptive (check_block_gate extends an unstable block anyway), so part of the nominal increase may be work those blocks were already doing. Worth measuring on the first TraPPE run rather than assumed.",
       "tg_rates_K_per_ns": [
         10,
         25,
