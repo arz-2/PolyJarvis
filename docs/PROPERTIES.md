@@ -22,9 +22,15 @@ To request a subset, pass `--properties density,tg` to `run_campaign.py`. Omitti
 ## 2. Glass Transition Temperature (Tg)
 
 Tg is measured **single-rate-primary**: one stepped cooling sweep runs at the class's primary
-configured rate (the highest entry in `tg_rates_K_per_ns` by default; `tg_slope_gate_fallback:
-"slowest_rate"` classes — rigid aromatics whose highest-rate fit is documented as
-degenerate/inverted — run `tg_rates_K_per_ns[0]` instead).
+configured rate (the highest entry in `tg_rates_K_per_ns` by default; a class carrying
+`tg_slope_gate_fallback: "slowest_rate"` — one whose highest-rate fit is documented as
+degenerate/inverted — runs `tg_rates_K_per_ns[0]` instead).
+
+No class carries that fallback as of 2026-09-01. PKTN and PSFO did: their staircase reheated
+the finished 300 K cell, so the top plateaus under-equilibrated and a faster sweep, spending
+less time contaminated there, read a *lower* Tg — an inverted rate dependence. The sweep now
+starts from the cool_block the equilibration cooldown already wrote at the sweep's top
+temperature, so both returned to the highest rate.
 
 ### Sweep
 

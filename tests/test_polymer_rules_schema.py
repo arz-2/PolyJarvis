@@ -168,8 +168,15 @@ def test_dp_min_clears_its_own_fox_flory_floor(cid):
 def test_tg_slope_gate_fallback_valid():
     """tg_slope_gate_fallback marks classes whose highest configured Tg rate is
     documented as unreliable (degenerate/inverted fit); value names which rate
-    the thermal track sweeps by default instead of the highest-rate default."""
-    expected = {"PEST": "highest_rate", "PKTN": "slowest_rate", "PSFO": "slowest_rate"}
+    the thermal track sweeps by default instead of the highest-rate default.
+
+    PKTN and PSFO carried "slowest_rate" until 2026-09-01. Their inversion was diagnosed as a
+    cold-start artifact -- the staircase reheated the finished 300 K cell, so the top plateaus
+    under-equilibrated, and a FASTER sweep spent less time contaminated there. The melt-start
+    sweep removes that cause, so both returned to the highest rate. The key also gates
+    method_gap_exempt, so dropping it re-arms the primary/alt Tg gap gate for those two
+    classes: the next PEEK/PSU run tests the fix rather than assuming it."""
+    expected = {"PEST": "highest_rate"}
     found = {cid: c["tg_slope_gate_fallback"] for cid, c in CLASSES.items()
              if "tg_slope_gate_fallback" in c}
     assert found == expected

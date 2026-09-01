@@ -1071,8 +1071,13 @@ def _run_tg_sweep_adaptive(args, cls: dict, lammps, p: dict, start_data_path: st
 
 def do_thermal(args, cls: dict, lammps, equil_density_gcm3=None) -> dict:
     """Single-rate-primary: run one sweep at the class's primary configured rate (highest by
-    default; tg_slope_gate_fallback="slowest_rate" classes — PKTN, PSFO — run rates[0] instead,
-    since their highest-rate fit is documented as degenerate/inverted)."""
+    default; a tg_slope_gate_fallback="slowest_rate" class runs rates[0] instead, its
+    highest-rate fit being documented as degenerate/inverted).
+
+    No class carries that fallback as of 2026-09-01: PKTN and PSFO did, and their inversion was
+    the cold-start artifact the melt-start sweep fixes (see _select_tg_start_cell). The branch
+    stays because the fallback remains a valid, validated diagnosis for a class that genuinely
+    cannot resolve its highest rate."""
     tg_rates = cls.get("tg_rates_K_per_ns", [])
     gpu_per_run = cls.get("gpu_per_run") or 1
     per_rate = []

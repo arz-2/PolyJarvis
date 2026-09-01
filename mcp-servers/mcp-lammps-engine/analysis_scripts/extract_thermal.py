@@ -598,7 +598,10 @@ def main():
     parser.add_argument("--method_gap_exempt", action="store_true",
                         help="Record a method-gap exceedance as a reason but do not set REVIEW. "
                              "For classes with documented highest-rate degeneracy on the "
-                             "rigid-aromatic staircase (those carrying tg_slope_gate_fallback).")
+                             "rigid-aromatic staircase (those carrying tg_slope_gate_fallback). "
+                             "No class sets it as of 2026-09-01 -- the melt-start sweep removed "
+                             "the cold-start artifact it existed to absorb, so the gap gate is "
+                             "live everywhere again.")
     args = parser.parse_args()
 
     log_file = args.log_file

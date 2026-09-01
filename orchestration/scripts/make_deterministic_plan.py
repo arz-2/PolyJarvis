@@ -157,7 +157,7 @@ def build_planned_stages(cls: dict, properties: set, smiles: str | None = None) 
     ]
     if "tg" in properties:
         # Single-rate-primary: one sweep at the class's primary configured rate (highest by
-        # default; tg_slope_gate_fallback="slowest_rate" classes run rates[0] instead — their
+        # default; a tg_slope_gate_fallback="slowest_rate" class runs rates[0] instead — its
         # highest-rate fit is documented as degenerate/inverted).
         stages.append(_s("tg", {"bilinear_fit_r_squared_min": 0.80,
                                 "t_range_brackets_exp_tg": exp_tg_bracket}))
