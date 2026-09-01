@@ -29,6 +29,7 @@ if str(_ENGINE_SCRIPTS) not in sys.path:
 
 from stage_params import (resolve_stage_params, apply_plan, resolve_hardware, load_plan,  # noqa: E402
                           select_primary_tg_rate_index)
+import track_registry  # noqa: E402
 from analysis_utils import estimate_fluctuation_K_GPa  # noqa: E402
 from hw_common import load_rules, get_class_entry, resolve_member_value  # noqa: E402
 from protocol_policy import select_pressure_ladder  # noqa: E402
@@ -1636,7 +1637,7 @@ def do_deformation(args, cls: dict, lammps) -> dict:
 def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_verdict: str,
                raw_dir: Path, equil_result: dict = None, mechanical_result: dict = None) -> dict:
     exp_lookup_path = raw_dir / "exp_lookup.json"
-    properties = ({"density", "tg", "bulk_modulus"} if args.properties in (None, "all")
+    properties = (set(track_registry.VALID_PROPERTIES) if args.properties in (None, "all")
                   else {x.strip().lower() for x in args.properties.split(",") if x.strip()})
     # Provenance only: writes exp_lookup.json (the same artifact the exp-lookup-worker
     # produces) for a human to review. Deliberately NOT auto-applied into args.exp_*_min/max --
@@ -1692,12 +1693,10 @@ def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_v
 
 def _print_dry_run(args, cls: dict, properties: set):
     """Resolve every applicable stage without submitting anything."""
-    stages = ["build", "equil", "equil-check"]
-    if "tg" in properties:
-        stages += ["tg", "analyze-tg"]
-    if "bulk_modulus" in properties:
-        stages += ["murnaghan", "deform", "analyze-bm"]
-    stages.append("run-summary")
+    # Fallbacks included: a dry run resolves everything the run COULD execute, which is why
+    # deform appears here and not in plan["planned_stages"]. Both lists now come from the same
+    # table, so they can no longer disagree about it -- they did until 2026-09-01.
+    stages = track_registry.resolver_stages_for(properties)
     out = {}
     for stage in stages:
         try:
@@ -1946,12 +1945,7 @@ def run_campaign_workflow(plan_path: Path, *, dry_run: bool = False,
     properties = set(plan.get("properties") or ())
     args.properties = ",".join(sorted(properties))
     if dry_run:
-        stages = ["build", "equil", "equil-check"]
-        if "tg" in properties:
-            stages += ["tg", "analyze-tg"]
-        if "bulk_modulus" in properties:
-            stages += ["murnaghan", "deform", "analyze-bm"]
-        stages.append("run-summary")
+        stages = track_registry.resolver_stages_for(properties)
         return {name: resolve_stage_params(name, args, cls) for name in stages}
     lammps = _load_server_module("lammps_engine_server", LAMMPS_ENGINE_DIR / "server.py",
                                  LAMMPS_ENGINE_DIR, _mcp_env("mcp-lammps-engine"))

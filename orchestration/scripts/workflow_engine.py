@@ -23,6 +23,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 from protocol_policy import ATM_PER_GPA  # noqa: E402
+import track_registry  # noqa: E402  (stdlib-only, no repo-local imports)
 
 
 ENGINE_VERSION = "workflow-engine-v1"
@@ -576,14 +577,17 @@ class WorkflowEngine:
             stream.write(json.dumps(record, default=str) + "\n")
 
     def enabled_stages(self) -> tuple[str, ...]:
-        properties = set(self.plan.get("properties") or ())
-        stages = ["build", "equilibration"]
-        if "tg" in properties:
-            stages.append("thermal")
-        if "bulk_modulus" in properties:
-            stages.append("mechanical")
-        stages.append("summary")
-        return tuple(stages)
+        """Which macro stages this plan runs. THE runtime authority -- _dependencies,
+        invalidate_from and _input_hash all key off it.
+
+        Routed through track_registry rather than re-derived here. This is the one place the
+        engine's hermetic property is relaxed, deliberately: the registry is stdlib-only with no
+        repo-local imports (same footing as protocol_policy above), and a second hand-written
+        copy of this mapping is exactly what drifted across the other six sites. The ordering
+        contract -- output must be a subsequence of STAGE_ORDER -- is guarded by
+        test_track_registry_lockstep.
+        """
+        return track_registry.macro_stages_for(self.plan.get("properties") or ())
 
     def _load_or_create_state(self) -> dict[str, Any]:
         self.run_dir.mkdir(parents=True, exist_ok=True)

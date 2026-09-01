@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import track_registry  # noqa: E402
 import canon_smiles  # noqa: E402  -- module import (not `from ... import canonicalize`) so tests can monkeypatch canon_smiles.canonicalize
 from make_deterministic_plan import SNAPSHOT_KEYS  # noqa: E402  -- single source of truth, don't duplicate
 
@@ -47,7 +48,8 @@ FREEZE_KEYS = SNAPSHOT_KEYS + ["T_workflow_K"]
 
 # property -> the workflow_engine.py stage whose acceptance already proves that property's
 # binding gate (equil_verdict / tg_gate_verdict / bm_gate_verdict|deform_gate_verdict) passed.
-STAGE_FOR_PROPERTY = {"density": "equilibration", "tg": "thermal", "bulk_modulus": "mechanical"}
+STAGE_FOR_PROPERTY = {p: track_registry.stage_for_property(p)
+                      for p in sorted(track_registry.VALID_PROPERTIES)}
 
 
 def _canonicalize_or_none(smiles: str) -> Optional[str]:

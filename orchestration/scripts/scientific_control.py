@@ -18,6 +18,7 @@ from typing import Any, Optional, Protocol, Sequence
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 sys.path.insert(0, str(SCRIPT_DIR))
+import track_registry  # noqa: E402
 
 from hw_common import get_class_entry, load_rules  # noqa: E402
 from make_deterministic_plan import build_decisions, build_planned_stages, make_plan  # noqa: E402
@@ -26,7 +27,8 @@ import canon_smiles  # noqa: E402  -- module import so tests can monkeypatch can
 import cost_model  # noqa: E402
 
 
-VALID_PROPERTIES = frozenset({"density", "tg", "bulk_modulus"})
+# Re-exported from the registry -- imported by name in several modules.
+VALID_PROPERTIES = track_registry.VALID_PROPERTIES
 VALID_CONFIDENCE = frozenset({"low", "medium", "high"})
 VALID_RECOVERY_ACTIONS = frozenset({"retry", "revise_plan", "stop"})
 MAX_RECOVERY_ATTEMPTS = 2

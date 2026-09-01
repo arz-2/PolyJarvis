@@ -33,6 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hw_common import load_rules, get_class_entry  # noqa: E402
+import track_registry  # noqa: E402
 from make_deterministic_plan import build_decisions  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -87,7 +88,7 @@ def main():
         p.error("--run_name is required")
 
     props_str = args.properties.strip().lower()
-    properties = ({"density", "tg", "bulk_modulus"} if props_str == "all"
+    properties = (set(track_registry.VALID_PROPERTIES) if props_str == "all"
                   else {x.strip().lower() for x in props_str.split(",") if x.strip()})
 
     scaffold = make_decision_scaffold(args.polymer_class, properties)

@@ -30,6 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hw_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family  # shared rules access (single source of truth)
+import track_registry  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from stage_params import _exp_tg_point, _regime_exp_tg  # reuse the proven resolvers, don't duplicate them
 import canon_smiles  # noqa: E402  -- module import so tests can monkeypatch canon_smiles.canonicalize
@@ -124,17 +125,8 @@ def build_decisions(cls: dict) -> list:
     ]
 
 
-STAGE_TRACK = {
-    "build":       "foundation",
-    "equil":       "foundation",
-    "equil-check": "foundation",
-    "tg":          "thermal",
-    "analyze-tg":  "thermal",
-    "deform":      "mechanical",
-    "murnaghan":   "mechanical",
-    "analyze-bm":  "mechanical",
-    "run-summary": "summary",
-}
+# Re-exported: recovery_agent_cli, validate_run_plan and the tests all import this name.
+STAGE_TRACK = track_registry.STAGE_TRACK
 
 
 def build_planned_stages(cls: dict, properties: set, smiles: str | None = None) -> list:
@@ -150,29 +142,31 @@ def build_planned_stages(cls: dict, properties: set, smiles: str | None = None) 
         return {"stage": stage, "track": STAGE_TRACK[stage],
                 "success_criteria": criteria, **extra}
 
-    stages = [
-        _s("build",       {"data_file_written": True}),
-        _s("equil",       {"check_equilibration_comprehensive.overall_pass": True}),
-        _s("equil-check", {"equil_verdict": "PASS"}),
-    ]
-    if "tg" in properties:
-        # Single-rate-primary: one sweep at the class's primary configured rate (highest by
-        # default; a tg_slope_gate_fallback="slowest_rate" class runs rates[0] instead — its
-        # highest-rate fit is documented as degenerate/inverted).
-        stages.append(_s("tg", {"bilinear_fit_r_squared_min": 0.80,
-                                "t_range_brackets_exp_tg": exp_tg_bracket}))
-        stages.append(_s("analyze-tg", {}))
-    if "bulk_modulus" in properties:
-        # Murnaghan always submits now (2026-08-09): guides/MURNAGHAN.md's rubbery
-        # null-fallback resolves to the PROBE ladder instead of an all-null RESULT, so
-        # there is no longer a "rubbery without pressures -> fluctuation only, no submit
-        # stage" case. Glassy still carries the deform fallback; rubbery (empirical
-        # ladder or PROBE ladder) does not.
-        stages.append(_s("murnaghan", {"chain_submitted": True},
-                          **({"fallback": "deform"} if glassy_hint else {})))
-        stages.append(_s("analyze-bm", {}))
-    stages.append(_s("run-summary", {}))  # always terminal
-    return stages
+    # WHICH stages, and in what order, comes from track_registry. WHAT each stage must satisfy
+    # stays here: success_criteria need cls/smiles, and the registry deliberately owns no science.
+    _CRITERIA = {
+        "build":       {"data_file_written": True},
+        "equil":       {"check_equilibration_comprehensive.overall_pass": True},
+        "equil-check": {"equil_verdict": "PASS"},
+        # Single-rate-primary: one sweep at the class's primary configured rate (see
+        # stage_params.select_primary_tg_rate_index, shared with do_thermal and the cooldown).
+        "tg":          {"bilinear_fit_r_squared_min": 0.80,
+                        "t_range_brackets_exp_tg": exp_tg_bracket},
+        "analyze-tg":  {},
+        # Murnaghan always submits (2026-08-09): guides/MURNAGHAN.md's rubbery null-fallback
+        # resolves to the PROBE ladder instead of an all-null RESULT, so there is no longer a
+        # "rubbery without pressures -> fluctuation only, no submit stage" case.
+        "murnaghan":   {"chain_submitted": True},
+        "analyze-bm":  {},
+        "run-summary": {},
+    }
+    # Glassy carries the deform fallback; rubbery (empirical or PROBE ladder) does not. The
+    # registry knows deform IS murnaghan's fallback slot; whether it attaches is a regime call,
+    # which needs cls/smiles and therefore stays here.
+    _EXTRA = {"murnaghan": {"fallback": "deform"}} if glassy_hint else {}
+
+    return [_s(name, _CRITERIA[name], **_EXTRA.get(name, {}))
+            for name in track_registry.planned_stage_names(properties)]
 
 
 def _assert_tg_rates_feasible(cls: dict, polymer_class: str) -> None:
@@ -336,7 +330,7 @@ def main():
         p.error("--run_name is required")
 
     props_str = args.properties.strip().lower()
-    properties = ({"density", "tg", "bulk_modulus"} if props_str == "all"
+    properties = (set(track_registry.VALID_PROPERTIES) if props_str == "all"
                   else {x.strip().lower() for x in props_str.split(",") if x.strip()})
 
     cache_path = Path(args.cache_path) if args.cache_path else None

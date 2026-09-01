@@ -29,6 +29,11 @@ import json
 import subprocess
 import sys
 
+# A CHECKED COPY of track_registry.STAGE_TRACK, not derived from it: the values are
+# (track, step) and the step is not always the key -- equil-check reports as step "equil", and
+# the macro name "equilibration" is accepted as an alias. This is prompt text for /recover, so a
+# derivation carrying two special cases would be less readable than the table. Agreement with
+# the registry is asserted by tests/test_track_registry_lockstep.py.
 STAGE_TRACK = {
     "build": ("foundation", "build"),
     "equilibration": ("foundation", "equil"),
