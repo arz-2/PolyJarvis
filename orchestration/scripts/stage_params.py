@@ -241,6 +241,33 @@ def _regime(args, cls: dict) -> str:
     return 'rubbery' if final_T > tg else 'glassy'
 
 
+def _tg_is_trustworthy_for_scheduling(args, cls: dict, curated: bool) -> bool:
+    """Whether this run's Tg is solid enough to SIZE A PROTOCOL from, not merely to pick a
+    regime with.
+
+    A curated experimental value always is. A group-contribution estimate is only when the
+    estimator itself says so: it returns confidence='very_low' with an explicit warning
+    ("temperature estimates unreliable -- leave global_defaults unchanged") once more than 30%
+    of heavy atoms match no motif, and 633 of the 1077 polymers in RadonPy's PI1070 set trip
+    that -- 59% of the real chemical space. Sizing a sweep window or a melt temperature from
+    one of those would be worse than the class constant, which is at least a considered value
+    for related chemistry.
+
+    Note the asymmetry with the regime call: _regime uses the estimate at ANY confidence,
+    because there the question is only which side of Tg the assessment sits on, the estimate is
+    already padded toward glassy by TG_ESTIMATE_UNCERTAINTY_K, and an unresolvable answer falls
+    to the stricter gate set. Here the number itself is the protocol, so it has to be earned."""
+    if curated:
+        return True
+    smiles = getattr(args, 'smiles', None)
+    if getattr(args, 'exp_tg_K', None) is not None:
+        return True
+    if not smiles:
+        return False
+    est = _estimate_tg_group_contribution(smiles) or {}
+    return est.get('confidence') not in (None, 'very_low', 'unavailable')
+
+
 def _regime_tg(args, cls: dict):
     """The Tg the regime call is made against: an explicit --exp_tg_K wins, else the curated
     or group-contribution-estimated value (_regime_exp_tg already pads an estimate toward
@@ -286,6 +313,19 @@ the cooling schedule allows. MD cools at 10-100 K/ns against a DSC experiment's 
 (PROPERTIES.md reports it as tg_offset_corrected_K, an annotation never folded into PASS/FAIL).
 The upper bound is used here because a sweep window is sized to CONTAIN the transition: a
 window that stops short finds no breakpoint at all."""
+
+TG_BRANCH_K = 150.0
+"""How much temperature range the sweep keeps on each side of the transition.
+
+The Tg fit is bilinear: a glassy branch, a rubbery branch, and a breakpoint between them. Each
+branch needs enough points to define a slope, so the window is sized as a margin around the MD
+transition rather than as a ratio of Tg or an offset from the melt temperature. At the usual
+20 K step this is 7-8 points above the breakpoint and ~11 below -- the glassy side gets 1.5x
+because its slope is the shallower of the two (a smaller thermal expansion coefficient) and so
+needs a longer lever arm to resolve.
+
+Not a physical constant: it is a fit-quality budget, and the knob to widen if a class shows
+systematically poor r-squared rather than lowering tg_min_steps_per_T."""
 
 
 def _is_curated_member(cls: dict, smiles: str | None) -> bool:
@@ -336,8 +376,10 @@ def temperature_schedule(args, cls: dict) -> dict:
     final_T = _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0)
     class_equil = _pick(getattr(args, 'T_equil_K', None), cls, 'T_equil_K', 600.0)
 
+    trustworthy = _tg_is_trustworthy_for_scheduling(args, cls, curated)
+
     T_equil, source = class_equil, 'class_default'
-    if not curated and isinstance(tg, (int, float)):
+    if not curated and trustworthy and isinstance(tg, (int, float)):
         needed = max(tg + 200.0, 1.5 * tg)
         if needed > class_equil:
             T_equil, source = needed, 'raised_for_novel_smiles'
@@ -367,18 +409,30 @@ def temperature_schedule(args, cls: dict) -> dict:
     tg_high = _pick(getattr(args, 'tg_t_high_K', None), cls, 'tg_t_high_K', 600)
     tg_low = _pick(getattr(args, 'tg_t_low_K', None), cls, 'tg_t_low_K', 200)
     window_source = 'class_default'
-    if not curated and isinstance(tg, (int, float)):
-        est_high = max(round(tg * 1.5), T_equil + 20)
-        est_low = max(round(tg * 0.65), 100)
-        # Guarantee the bracket even where the ratio form is tight for a low-Tg polymer.
-        est_high = max(est_high, tg + MD_TG_OFFSET_K + 40)
-        est_low = min(est_low, tg - 40)
-        if est_low < est_high:
-            tg_high, tg_low, window_source = est_high, est_low, 'estimated_for_novel_smiles'
+    explicit_window = (getattr(args, 'tg_t_high_K', None) is not None
+                       or getattr(args, 'tg_t_low_K', None) is not None)
+    if not explicit_window and trustworthy and isinstance(tg, (int, float)):
+        # ALWAYS derive from a Tg, never from the class constant -- and from the best Tg
+        # available: a curated member's exact experimental value when it has one, the
+        # group-contribution estimate otherwise. A class window is sized for whichever member
+        # is most extreme, so every other member of that class pays for chemistry it does not
+        # have, and any member outside the curated spread is not covered at all.
+        # Size the window around the MD transition, not around T_equil. The bilinear fit needs
+        # a straight run of points on EACH side of the breakpoint, so what matters is how much
+        # branch sits above and below it -- not how hot the melt was. Tying the top to T_equil
+        # (as the estimator's own tg_t_high does) puts the sweep 460 K above the transition for
+        # a low-Tg member of a hot class: PTFE (Tg 160) in PHAL (T_equil 700) would sweep to
+        # 720 K, spending two thirds of its bins in a featureless melt.
+        md_tg = tg + MD_TG_OFFSET_K
+        est_high = round(md_tg + TG_BRANCH_K)
+        est_low = round(max(100.0, md_tg - 1.5 * TG_BRANCH_K))
+        if est_low < tg - 20 and est_low < est_high:
+            tg_high, tg_low = est_high, est_low
+            window_source = 'curated_tg' if curated else 'estimated_tg'
 
     return {'final_T_K': final_T, 'T_equil_K': T_equil, 'T_anneal_high_K': T_anneal,
             'tg_t_high_K': tg_high, 'tg_t_low_K': tg_low,
-            'tg_K': tg, 'tg_is_curated': curated,
+            'tg_K': tg, 'tg_is_curated': curated, 'tg_trustworthy': trustworthy,
             'schedule_source': source, 'window_source': window_source}
 
 

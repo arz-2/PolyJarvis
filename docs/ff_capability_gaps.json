@@ -7,7 +7,32 @@
       "repeat_unit_representation": "Not a field gap at all: the field types and parameterizes this chemistry correctly, but EMC assigns the wrong atom type because of how the repeat unit was CUT. EMC types the repeat group before resolving the * connection points, so an atom adjacent to a * cannot complete an environment pattern that specifies all its neighbours, and falls back to a generic type -- whose increment/parameter pairs with the correctly-typed neighbours then legitimately do not exist. Diagnosed by reading EMC's own 'increment pair {X, Y} not found' warning rather than the 'Missing force field parameters' error it aborts with. Fixed by re-cutting the repeat unit at a C-C bond whose carbons carry no heteroatom, which invents nothing. Only possible when the polymer HAS such a bond."
     },
     "created": "2026-08-26",
-    "source": "guides/polymer_rules.json re-audit session -- see individual class ff_note entries for the full literature grounding behind each row here"
+    "source": "guides/polymer_rules.json re-audit session -- see individual class ff_note entries for the full literature grounding behind each row here",
+    "emc_typing_survey_2026-08-31": {
+      "what": "Stratified sample of RadonPy's PI1070 (real PoLyInfo chemistry) built through each polymer's OWN class-preferred force field, tiny cells (dp=2, nchains=1) since typing is what is under test, not packing. Records EMC's per-pair 'increment pair {X, Y} not found' warnings rather than only the 'Missing force field parameters' abort.",
+      "result": "71 of 109 built (65%). The three RadonPy-routed classes (PAMD, PCBN, PURA) were not tested. Harness validated against curated members that do build (PSTR 8/8, PIMN 8/8, PPNL 6/6, and PDIE's own *CC=CC* control).",
+      "per_class_built": {
+        "PACR": "3/8",
+        "PANH": "1/1",
+        "PDIE": "0/8",
+        "PEST": "7/8",
+        "PHAL": "4/8",
+        "PHYC": "7/8",
+        "PIMD": "1/8",
+        "PIMN": "8/8",
+        "PKTN": "1/1",
+        "POXI": "4/8",
+        "PPHS": "1/1",
+        "PPNL": "6/6",
+        "PSFO": "3/4",
+        "PSTR": "8/8",
+        "PSUL": "7/8",
+        "PURT": "3/8",
+        "PVNL": "7/8"
+      },
+      "interpretation": "The class defaults are sound for the members each class curated; the ~35% failure rate is against the class's WIDER chemical space, which is exactly the population a novel-polymer platform is aimed at. Two classes fail structurally rather than marginally -- see the PDIE and PIMD entries below.",
+      "caveat": "A sample of 8 per class is enough to rank classes and to find the two structural failures, not to put a confidence interval on any single class's rate."
+    }
   },
   "gaps": [
     {
@@ -86,6 +111,39 @@
       "status": "open -- third-party EMC field-file gap, not attempted",
       "last_updated": "2026-08-31",
       "remaining_work": "Two increment rows (c4 o2s, c4 h1co) via emc_fields/, with the same transplant caveat as PEST."
+    },
+    {
+      "polymer_class": "PDIE",
+      "member": "PI (polyisoprene) -- a CURATED member, not a novel SMILES",
+      "smiles": "*CC=C(C)C*",
+      "literature_best_ff": "n/a -- this is an admissibility defect, not a force-field preference",
+      "currently_routed_to": "trappe-ua via EMC (the class default, which cannot build this member)",
+      "blocker_category": "third_party_field_gap",
+      "blocker_detail": "TraPPE-UA has no torsion coefficients for a TRISUBSTITUTED alkene. EMC names them: 'no torsion coefficients found for [c3h:c3:c4h2:c4h3]', '[c4h2:c3h:c3:c4h2]', '[c4h2:c3h:c3:c4h3]' -- c3 being an sp2 carbon bearing a methyl where PBD's c3h bears an H. PBD (*CC=CC*) builds cleanly at the same size; PI does not, at any size (retested at dp=20/nchains=5 to rule out a small-cell artifact). 0 of 8 sampled PI1070 polydienes built, and stripping the /C=C\\ stereo annotation does NOT recover them -- the failure is parameter coverage for substituted alkenes, not SMILES stereo parsing (a separate, already-documented issue where EMC silently discards stereo).",
+      "impact": "polymer_rules.json lists PI under PDIE.member_smiles with experimental_tg_K=200, so it presents as a supported member. A request for polyisoprene fails at build. The whole substituted-diene family (isoprene, chloroprene, and the branched dienes PoLyInfo carries) is affected; only the unsubstituted 1,4-butadiene backbone is buildable.",
+      "status": "open -- newly found 2026-08-31, not previously tracked",
+      "options": [
+        "Route PDIE's substituted members to a field that covers them (PCFF is Class II and does carry these torsions -- needs admissibility testing, and would split the class's FF by member).",
+        "Author the missing TraPPE-UA torsion rows via emc_fields/, the same tracked-patch route used for PSIL's siloxane types.",
+        "Mark PI unsupported in member_smiles so it stops presenting as available."
+      ],
+      "last_updated": "2026-08-31"
+    },
+    {
+      "polymer_class": "PIMD",
+      "member": "polyimides generally (largest class in PI1070: 208 of 1006)",
+      "smiles": "(class-wide)",
+      "literature_best_ff": "n/a -- admissibility defect",
+      "currently_routed_to": "pcff via EMC",
+      "blocker_category": "third_party_field_gap",
+      "blocker_detail": "1 of 8 sampled polyimides built. The missing pairs are all imide-nitrogen charge increments: {na, c_1} (6 occurrences), {c_2, na} (5), {c_1, na} (4) -- the imide N with its flanking carbonyl carbons. This is the same PCFF hole already documented for PURA ('pcff missing {na,c_2} amide-N increment', which is why PURA is RadonPy-routed), reaching a second and much larger class.",
+      "impact": "PIMD is the single largest class in the PI1070 chemical space and is ~12% buildable on its own class default. Kapton-like chemistry is a headline polyimide use case.",
+      "status": "open -- newly found 2026-08-31, not previously tracked",
+      "options": [
+        "Route PIMD to RadonPy/GAFF2 as PURA already is, for the same documented reason.",
+        "Author the {na, c_1}/{na, c_2} increment rows via emc_fields/ -- but see the PEST/PURT caveat: transplanting an increment onto a type whose LJ/bonded terms stay generic is an approximation, not a transcription."
+      ],
+      "last_updated": "2026-08-31"
     }
   ]
 }

@@ -325,17 +325,42 @@ def test_final_T_defaults_to_300_but_is_not_defined_by_it():
 
 
 @pytest.mark.parametrize("cid", sorted(RULES["classes"]))
-def test_curated_members_keep_their_class_sweep_window(cid):
-    """Same curated-vs-novel split as T_equil, for the same reason: a class window was sized
-    for the members the class curated, and those runs are validated against it."""
+def test_curated_member_window_derives_from_its_own_measured_tg(cid):
+    """The sweep window is ALWAYS derived from a Tg, never from the class constant -- and for
+    a curated member from that member's own exact experimental value, which is better than
+    both the class window and an estimate.
+
+    A class window is sized for whichever member is most extreme, so every other member pays
+    for chemistry it does not have, and any member outside the curated spread is not covered
+    at all (POXI's 440 K top missed 24 of its 66 PI1070 entries). Across the 43 curated
+    members this narrows the mean sweep from 24.2 to 20.6 T-bins with none failing to bracket.
+    """
+    import stage_params as sp
     entry = RULES["classes"][cid]
-    for _name, smis in (entry.get("member_smiles") or {}).items():
+    for name, smis in (entry.get("member_smiles") or {}).items():
         if not smis:
             continue
         sched = _sched(cid, smiles=smis[0])
-        assert (sched["tg_t_low_K"], sched["tg_t_high_K"]) == \
-            (entry["tg_t_low_K"], entry["tg_t_high_K"]), f"{cid}/{_name}: window moved"
-        assert sched["window_source"] == "class_default"
+        tg = sched["tg_K"]
+        if not isinstance(tg, (int, float)):
+            continue
+        assert sched["window_source"] == "curated_tg", (
+            f"{cid}/{name}: curated member should size its window from its own Tg, "
+            f"got {sched['window_source']}"
+        )
+        md_tg = tg + sp.MD_TG_OFFSET_K
+        assert sched["tg_t_low_K"] < md_tg < sched["tg_t_high_K"], (
+            f"{cid}/{name}: window {sched['tg_t_low_K']}-{sched['tg_t_high_K']} "
+            f"misses the MD Tg {md_tg:.0f}"
+        )
+        assert sched["tg_t_low_K"] < tg, "no glassy branch below the transition to fit"
+
+
+def test_an_explicit_window_override_is_never_second_guessed(cid="POXI"):
+    """A plan that pins tg_t_high_K/tg_t_low_K means it; the derivation must stand down."""
+    sched = _sched(cid, smiles="*CCO*", tg_t_high_K=777, tg_t_low_K=111)
+    assert (sched["tg_t_low_K"], sched["tg_t_high_K"]) == (111, 777)
+    assert sched["window_source"] == "class_default"
 
 
 def test_novel_smiles_window_brackets_the_md_tg():
@@ -350,9 +375,50 @@ def test_novel_smiles_window_brackets_the_md_tg():
                                final_T_K=None, T_equil_K=None, T_anneal_high_K=None,
                                tg_t_high_K=None, tg_t_low_K=None)
         sched = sp.temperature_schedule(args, entry)
-        assert sched["window_source"] == "estimated_for_novel_smiles"
+        assert sched["window_source"] == "estimated_tg"
         md_tg = tg + sp.MD_TG_OFFSET_K
         assert sched["tg_t_low_K"] < md_tg < sched["tg_t_high_K"], (
             f"Tg={tg}: window {sched['tg_t_low_K']}-{sched['tg_t_high_K']} misses MD Tg {md_tg}"
         )
         assert sched["tg_t_low_K"] < tg, "no glassy branch below the transition to fit"
+
+
+def test_a_low_confidence_estimate_never_sizes_the_protocol(monkeypatch):
+    """The estimator flags confidence='very_low' with an explicit "leave global_defaults
+    unchanged" warning once >30% of heavy atoms match no motif -- and 633 of the 1077 polymers
+    in RadonPy's PI1070 set trip that, 59% of the real chemical space. Sizing a sweep window or
+    a melt temperature from one of those would be worse than the class constant, which is at
+    least a considered value for related chemistry."""
+    import stage_params as sp
+    entry = RULES["classes"]["PKTN"]
+    monkeypatch.setattr(sp, "_estimate_tg_group_contribution",
+                        lambda smi, timeout=30: {"tg_estimated_K": 250,
+                                                 "confidence": "very_low",
+                                                 "warning": "55% of heavy atoms unmatched"})
+    sched = _sched("PKTN", smiles="*NOVEL*")
+    assert sched["tg_trustworthy"] is False
+    assert sched["schedule_source"] == "class_default"
+    assert sched["window_source"] == "class_default"
+    assert sched["T_equil_K"] == entry["T_equil_K"]
+    assert (sched["tg_t_low_K"], sched["tg_t_high_K"]) == \
+        (entry["tg_t_low_K"], entry["tg_t_high_K"])
+
+    monkeypatch.setattr(sp, "_estimate_tg_group_contribution",
+                        lambda smi, timeout=30: {"tg_estimated_K": 250,
+                                                 "confidence": "low", "warning": None})
+    ok = _sched("PKTN", smiles="*NOVEL*")
+    assert ok["tg_trustworthy"] is True
+    assert ok["window_source"] == "estimated_tg"
+
+
+def test_regime_still_uses_a_low_confidence_estimate(monkeypatch):
+    """Deliberate asymmetry: the regime only needs to know which side of Tg the assessment
+    sits on, the estimate is already padded toward glassy by TG_ESTIMATE_UNCERTAINTY_K, and an
+    unresolvable answer falls to the stricter gate set. The number is not the protocol there."""
+    import stage_params as sp
+    monkeypatch.setattr(sp, "_estimate_tg_group_contribution",
+                        lambda smi, timeout=30: {"tg_estimated_K": 120,
+                                                 "confidence": "very_low", "warning": "x"})
+    args = SimpleNamespace(smiles="*NOVEL*", exp_tg_K=None, final_T_K=None)
+    # Tg 120 + 80 K padding = 200 < 300 K assessment -> rubbery, from a very_low estimate
+    assert sp._regime(args, RULES["classes"]["PKTN"]) == "rubbery"
