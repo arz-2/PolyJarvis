@@ -759,6 +759,43 @@ def test_the_most_recent_prior_tag_wins(tmp_path, monkeypatch):
     assert seen["tg_start_T_K"] == 745.0
 
 
+def test_a_rebuilt_ramps_own_tag_beats_an_inherited_one(tmp_path, monkeypatch):
+    """The executor seeds args from the prior attempt BEFORE do_equil_and_check runs, and
+    do_equil_and_check overwrites from the generator whenever the chain produced a tag of its
+    own. So a slower_cooling retry -- which resumes from "anneal_hold" and rebuilds the ramp --
+    uses its OWN slower cooldown, never the one it was fired to replace."""
+    from run_campaign import CampaignStageExecutor
+    import run_campaign as rc
+
+    seen = {}
+
+    def _fake_equil(args, cls, lammps):
+        seen["inherited"] = getattr(args, "tg_start_data", None)
+        # What do_equil_and_check does with a chain that DID rebuild the ramp.
+        args.tg_start_data = "/runs/attempt-0002/cool_block_02_out.data"
+        args.tg_start_T_K = 500.0
+        return {"equil_verdict": "PASS", "npt_prod_data_path": "x.data",
+                "tg_start_data_path": args.tg_start_data,
+                "tg_start_T_K": args.tg_start_T_K}
+
+    monkeypatch.setattr(rc, "do_equil_and_check", _fake_equil)
+    mp = tmp_path / "prior.json"
+    mp.write_text(json.dumps({"parameters": {}, "outputs": {
+        "tg_start_data_path": "/runs/attempt-0001/cool_block_04_out.data",
+        "tg_start_T_K": 770.0}}))
+    attempt_dir = tmp_path / "attempt"
+    attempt_dir.mkdir()
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    result = executor.execute("equilibration", {
+        "attempt_dir": str(attempt_dir), "parameters": {}, "dependencies": {},
+        "prior_attempts": [{"manifest": str(mp)}]})
+
+    assert seen["inherited"] == "/runs/attempt-0001/cool_block_04_out.data"
+    assert result.outputs["tg_start_data_path"] == "/runs/attempt-0002/cool_block_02_out.data"
+    assert result.outputs["tg_start_T_K"] == 500.0
+
+
 def test_a_stale_tag_is_cleared_when_no_prior_attempt_has_one(tmp_path, monkeypatch):
     """args is a long-lived object reused across stage executions, so a value left by an earlier
     stage must never be mistaken for this equilibration's own tag."""

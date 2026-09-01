@@ -255,6 +255,23 @@ def test_tg_start_tag_absent_when_not_requested(tmp_path):
         assert physical(a["params"]) == physical(b["params"]), a["name"]
 
 
+def test_a_slower_cooling_retry_tags_its_own_rebuilt_ramp(tmp_path):
+    """slower_cooling (UNDER_ANNEALED_COOLING) is the ONE remedy that changes the cooling: it
+    doubles cool_block_hold_steps and resumes from "anneal_hold", which sits BEFORE "cool_block"
+    in the checkpoint order. So the ramp is rebuilt and must carry its own fresh tag -- the
+    retry's whole point is that the previous cooldown was wrong, and it must not be handed a
+    cell from the ramp it just replaced."""
+    kwargs = _base_kwargs(tmp_path, temp=500.0, max_temp=700.0, final_T_K=300.0,
+                          cool_block_dT_K=100.0, tg_start_T_K=450.0)
+    kwargs["resume_from"] = "anneal_hold"
+    result = server.generate_equilibration_workflow(**kwargs)
+    assert result["status"] == "success", result
+    assert result["run_order"][0] == "cool_block_01", "the ramp must be rebuilt"
+    by_name = {stage["name"]: stage for stage in result["stages"]}
+    assert result["tg_start_data_path"] == by_name["cool_block_02"]["output_data"]
+    assert result["tg_start_T_K"] == 500.0
+
+
 def test_tg_start_tag_and_melt_tag_can_be_the_same_block(tmp_path):
     """Nothing forces them apart -- a glassy run whose sweep top equals its melt reference
     temperature legitimately tags one block twice."""
