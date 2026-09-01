@@ -27,7 +27,8 @@ _ENGINE_SCRIPTS = REPO_ROOT / "mcp-servers" / "mcp-lammps-engine" / "analysis_sc
 if str(_ENGINE_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_ENGINE_SCRIPTS))
 
-from stage_params import resolve_stage_params, apply_plan, resolve_hardware, load_plan  # noqa: E402
+from stage_params import (resolve_stage_params, apply_plan, resolve_hardware, load_plan,  # noqa: E402
+                          select_primary_tg_rate_index)
 from analysis_utils import estimate_fluctuation_K_GPa  # noqa: E402
 from hw_common import load_rules, get_class_entry, resolve_member_value  # noqa: E402
 from protocol_policy import select_pressure_ladder  # noqa: E402
@@ -1083,10 +1084,9 @@ def do_thermal(args, cls: dict, lammps, equil_density_gcm3=None) -> dict:
     gpu_per_run = cls.get("gpu_per_run") or 1
     per_rate = []
     if tg_rates:
-        fallback = cls.get("tg_slope_gate_fallback")
-        planned_index = cls.get("tg_primary_rate_index")
-        idx = (int(planned_index) if planned_index is not None else
-               (0 if fallback == "slowest_rate" else len(tg_rates) - 1))
+        # Shared with _resolve_equil_params' cool_block rate matching -- the cooldown and the
+        # staircase are one continuous descent and must not drift apart on which rate that is.
+        idx = select_primary_tg_rate_index(cls)
         if not 0 <= idx < len(tg_rates):
             return {"halted": True, "reason": "TG_PRIMARY_RATE_INDEX_INVALID",
                     "detail": {"index": idx, "n_rates": len(tg_rates)}}

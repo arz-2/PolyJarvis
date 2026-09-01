@@ -506,3 +506,53 @@ def test_an_explicit_window_override_never_moves_the_ceiling():
     # No guaranteed waypoint at 900 K, so no tag -- the thermal stage reheats instead of
     # starting from a cell that may not exist.
     assert override["tg_start_T_K"] is None
+
+
+# ─── the cooldown runs at this class's own Tg-sweep rate ──────────────────────────
+#
+# cool_block and the Tg staircase are ONE continuous descent since the melt-start sweep
+# (2026-09-01): cool_block ramps the annealed melt down to tg_t_high_K and writes the cell the
+# staircase starts from, and the staircase continues to tg_t_low_K. Running the two halves at
+# different rates puts a rate discontinuity in the middle of one trajectory, and glass density
+# is rate-dependent -- ~1.1% per DECADE, measured over 21 archived multi-rate sweeps across 8
+# chemistries. Matching them also makes a density-only run (which has no staircase) produce a
+# glass with the same thermal history as a Tg run's.
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_cooldown_rate_matches_the_classes_own_sweep_rate(cid):
+    import stage_params as sp
+    entry = RULES["classes"][cid]
+    rates = entry.get("tg_rates_K_per_ns")
+    if not rates:
+        pytest.skip(f"{cid} configures no Tg rates")
+    dt = entry.get("dt_fs", 1.0)
+    dT = entry.get("cool_block_dT_K") or 25.0
+    hold = sp.rate_matched_cool_block_hold_steps(entry, dt, dT)
+    executed = dT / (hold * dt * 1e-06)
+    expected = rates[sp.select_primary_tg_rate_index(entry)]
+    assert abs(executed - expected) < 0.6, (
+        f"{cid}: cool_block executes {executed:.1f} K/ns against a sweep at {expected} K/ns"
+    )
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_no_class_pins_cool_block_hold_steps(cid):
+    """PACR (400,000) and PKTN (300,000) pinned it until 2026-09-01, both to slow cooling and
+    clear UNDER_ANNEALED_COOLING, and both notes recorded themselves as unvalidated hypotheses.
+    Neither could have worked -- halving the rate buys ~0.33% of density against 3-9% shortfalls
+    -- and the gate they answered is now advisory. A pin here silently desynchronises the
+    cooldown from the staircase, so it has to be a deliberate act with a note, not a leftover."""
+    entry = RULES["classes"][cid]
+    assert "cool_block_hold_steps" not in entry, (
+        f"{cid} pins cool_block_hold_steps, overriding the sweep-rate match"
+    )
+
+
+def test_the_primary_rate_index_is_shared_with_do_thermal():
+    """do_thermal picks the sweep rate and _resolve_equil_params picks the cooldown rate. They
+    are the same descent, so they read the same function -- this is the guard against the two
+    re-deriving it and drifting."""
+    import stage_params as sp
+    import run_campaign as rc
+    assert rc.select_primary_tg_rate_index is sp.select_primary_tg_rate_index

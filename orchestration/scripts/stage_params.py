@@ -480,6 +480,50 @@ def temperature_schedule(args, cls: dict) -> dict:
             'ceiling_source': ceiling_source}
 
 
+def select_primary_tg_rate_index(cls: dict) -> int:
+    """Which entry of tg_rates_K_per_ns this run actually sweeps at.
+
+    ONE definition, because three places need it and they must not drift: do_thermal (which rate
+    the staircase runs), _resolve_equil_params (which rate cool_block cools at, below), and
+    cost_model (which rate to price). Highest configured rate by default; a class carrying
+    tg_slope_gate_fallback="slowest_rate" runs rates[0] instead, and an explicit
+    tg_primary_rate_index pins it outright.
+    """
+    rates = cls.get('tg_rates_K_per_ns') or []
+    if not rates:
+        return 0
+    planned = cls.get('tg_primary_rate_index')
+    if planned is not None:
+        return int(planned)
+    return 0 if cls.get('tg_slope_gate_fallback') == 'slowest_rate' else len(rates) - 1
+
+
+def rate_matched_cool_block_hold_steps(cls: dict, dt_fs: float, dT_K: float):
+    """Steps per cool_block so the cooldown runs at this class's own Tg-sweep rate.
+
+    The equilibration cooldown and the Tg staircase are one continuous descent now: cool_block
+    ramps the annealed melt down to tg_t_high_K, where it writes the cell the staircase starts
+    from (see _select_tg_start_cell), and the staircase continues to tg_t_low_K. Running the two
+    halves at DIFFERENT rates makes that one trajectory with a rate discontinuity in the middle,
+    and glass density is rate-dependent (~1.1% per decade, measured over 21 archived multi-rate
+    sweeps across 8 chemistries) -- so the discontinuity is not cosmetic.
+
+    Matching them also makes density comparable ACROSS runs: a density-only run has no staircase,
+    but its cooldown now runs at the same rate the staircase would have used, so its glass has the
+    same thermal history as a Tg run's.
+
+    Returns None when the class configures no rates (nothing to match); the caller then falls
+    through to generate_equilibration_workflow's own atom-count tier default.
+    """
+    rates = cls.get('tg_rates_K_per_ns') or []
+    if not rates or not dT_K or not dt_fs:
+        return None
+    rate = rates[select_primary_tg_rate_index(cls)]
+    if not rate:
+        return None
+    return int(round(dT_K / (rate * dt_fs * 1e-06)))
+
+
 def _resolve_equil_params(args, cls: dict) -> dict:
     """Resolve deterministic equilibration-chain arguments (8-stage adaptive protocol)."""
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
@@ -543,7 +587,11 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         'anneal_cap_steps': _step_pick('anneal_cap_steps'),
         'cool_block_dT_K': _pick(getattr(args, 'cool_block_dT_K', None), cls,
                                  'cool_block_dT_K', None),
-        'cool_block_hold_steps': _step_pick('cool_block_hold_steps'),
+        # An explicit plan/class value still wins; otherwise derive it from this class's own
+        # sweep rate rather than falling to the generator's flat 2e5/dt tier default.
+        'cool_block_hold_steps': (_step_pick('cool_block_hold_steps')
+                                  or rate_matched_cool_block_hold_steps(
+                                      cls, dt, cls.get('cool_block_dT_K') or 25.0)),
         'cool_block_hold_cap_steps': _step_pick('cool_block_hold_cap_steps'),
         'stage7_min_steps': _step_pick('stage7_min_steps'),
         'stage7_cap_steps': _step_pick('stage7_cap_steps'),
