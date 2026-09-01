@@ -285,11 +285,25 @@ def plan_cost_estimate(plan: dict, hp: dict = None, rules: dict = None) -> dict:
         else:
             unpriced.append({"stage": "murnaghan", "reason": note})
 
-    if "deform" in planned_stage_names:
+    # The deform fallback is never its own planned_stages entry -- build_planned_stages attaches
+    # it as {"fallback": "deform"} on the murnaghan entry, and only for a glassy class. Gating on
+    # the bare stage name (as this did until 2026-09-01) made the branch UNREACHABLE for every
+    # deterministic plan, so the fallback went silently unpriced.
+    #
+    # Read the declaration, not track_registry.resolver_stages_for: the registry knows deform IS
+    # murnaghan's fallback slot, but whether it attaches is a per-plan regime call. Pricing it
+    # from the registry alone would charge every rubbery plan for a path it never has.
+    deform_declared = any(s.get("fallback") == "deform"
+                          for s in plan.get("planned_stages", []))
+    if "deform" in planned_stage_names or deform_declared:
         total_steps, note = _deform_total_steps(effective_class)
         stages["deform"] = gpu_hours(cell_atoms, total_steps, dt_fs, fam, gpu_per_run, hp, rules)
         stages["deform"]["steps"] = total_steps
         stages["deform"]["note"] = note
+        if deform_declared and "deform" not in planned_stage_names:
+            stages["deform"]["note"] = (
+                (note or "") + " [CONTINGENT: murnaghan's glassy fallback, charged only if "
+                "BM_INADMISSIBLE routes to it -- included in worst-case, not in the base run]")
 
     priced = [s for s in stages.values() if s.get("gpu_hours") is not None]
     total = round(sum(s["gpu_hours"] for s in priced), 4) if priced else None

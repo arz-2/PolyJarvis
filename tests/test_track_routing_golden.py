@@ -187,22 +187,45 @@ def test_dry_run_disagrees_with_the_plan_on_deform():
 
 # ─── the same divergence, seen from the cost side ─────────────────────────────────
 
-def test_cost_model_cannot_price_the_deform_fallback_today():
-    """cost_model gates its deform price on `"deform" in planned_stage_names` (:288), built from
-    plan["planned_stages"]. build_planned_stages never emits that name, so the branch is
-    UNREACHABLE for every deterministic plan and the deform fallback is silently unpriced.
+def test_cost_model_now_prices_the_declared_deform_fallback():
+    """INVERTED 2026-09-01 -- this pinned a bug and is now the fix's acceptance criterion.
 
-    This assertion is expected to INVERT when cost_model reads the registry (which carries deform
-    as a role="fallback" stage). It is the acceptance criterion for the cost half of the refactor,
-    and unlike the other goldens here it pins a bug rather than a contract."""
-    for cid in CLASS_SHAPES:
-        planned = mdp.build_planned_stages(RULES["classes"][cid], {"bulk_modulus"},
-                                           _first_member_smiles(cid))
-        names = {s.get("stage") for s in planned}
-        assert "deform" not in names, cid
-        # ...even though the class's own plan says a deform fallback exists.
-        murn = next(s for s in planned if s["stage"] == "murnaghan")
-        if murn.get("fallback") == "deform":
-            assert "deform" not in names, (
-                f"{cid}: plan declares a deform fallback that cost_model can never see"
-            )
+    cost_model gated its deform price on `"deform" in planned_stage_names`, built from
+    plan["planned_stages"]. build_planned_stages never emits that name -- it attaches
+    {"fallback": "deform"} to the murnaghan entry instead -- so the branch was unreachable for
+    every deterministic plan and the fallback went unpriced.
+
+    It now reads the declaration. Note it reads the PLAN, not the registry: the registry knows
+    deform is murnaghan's fallback slot, but whether that slot attaches is a per-plan regime
+    call, so pricing off the registry would charge every rubbery plan for a path it never has."""
+    import cost_model
+
+    glassy = mdp.build_planned_stages(RULES["classes"]["PACR"], {"bulk_modulus"},
+                                      _first_member_smiles("PACR"))
+    rubbery = mdp.build_planned_stages(RULES["classes"]["PSIL"], {"bulk_modulus"},
+                                       _first_member_smiles("PSIL"))
+
+    # Still absent from the plan's stage list -- that has not changed.
+    assert "deform" not in {s["stage"] for s in glassy}
+
+    def _declared(stages):
+        return any(s.get("fallback") == "deform" for s in stages)
+
+    assert _declared(glassy), "a glassy class must declare the fallback"
+    assert not _declared(rubbery), "a rubbery class must not"
+    # And the real pricer acts on it: same plan, fallback declared vs not.
+    def _priced(stages, cid):
+        entry = RULES["classes"][cid]
+        plan = {"planned_stages": stages,
+                "polymer_class": cid,
+                "smiles": _first_member_smiles(cid),
+                "decided_params": {"dp_typical": entry.get("dp_typical") or 50,
+                                   "nchain": entry.get("nchain") or 10}}
+        out = cost_model.plan_cost_estimate(plan)
+        return set((out.get("stages") or {})) if "error" not in out else None
+
+    glassy_priced, rubbery_priced = _priced(glassy, "PACR"), _priced(rubbery, "PSIL")
+    if glassy_priced is None or rubbery_priced is None:
+        pytest.skip("cost model needs hardware calibration unavailable in this environment")
+    assert "deform" in glassy_priced, "the declared fallback must now be priced"
+    assert "deform" not in rubbery_priced, "a rubbery plan declares none, so prices none"
