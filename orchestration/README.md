@@ -17,8 +17,8 @@ guides or generate worker prompts.
 | `select_hardware.py` | Hardware-policy resolution (D-08_hardware) |
 | `select_forcefield.py` | Force-field admissibility resolution (D-01_ff) |
 | `select_system_size.py` | Fox-Flory DP floor resolution (D-04_system_size; entanglement Me for bulk_modulus is advisory context, not a floor); re-run live by `validate_run_plan.py` on every plan, not just hand-transcribed |
-| `plan_system_size_arms.py` | Opt-in two-arm split when a run's tg and bulk_modulus DP floors diverge sharply — sizes each arm from its own property subset instead of the run-wide max |
-| `merge_arm_summaries.py` | Combines two split arms' `run_summary.json` into one report |
+| `plan_system_size_arms.py` | **DEPRECATED 2026-09-01** — one cell build per run. It sized its bulk_modulus arm from the entanglement floor that `select_system_size.py` excludes from the binding size |
+| `merge_arm_summaries.py` | **DEPRECATED 2026-09-01** — only ever merged `plan_system_size_arms.py`'s output |
 
 Control events live in `data/<run>/raw/control_state.json`; execution state lives in
 `data/<run>/workflow_state.json` (per-stage status/attempts) and each attempt's own

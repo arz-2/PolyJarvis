@@ -88,7 +88,7 @@ def main():
         p.error("--run_name is required")
 
     props_str = args.properties.strip().lower()
-    properties = (set(track_registry.VALID_PROPERTIES) if props_str == "all"
+    properties = (set(track_registry.DEFAULT_PROPERTIES) if props_str == "all"
                   else {x.strip().lower() for x in props_str.split(",") if x.strip()})
 
     scaffold = make_decision_scaffold(args.polymer_class, properties)

@@ -1637,7 +1637,7 @@ def do_deformation(args, cls: dict, lammps) -> dict:
 def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_verdict: str,
                raw_dir: Path, equil_result: dict = None, mechanical_result: dict = None) -> dict:
     exp_lookup_path = raw_dir / "exp_lookup.json"
-    properties = (set(track_registry.VALID_PROPERTIES) if args.properties in (None, "all")
+    properties = (set(track_registry.DEFAULT_PROPERTIES) if args.properties in (None, "all")
                   else {x.strip().lower() for x in args.properties.split(",") if x.strip()})
     # Provenance only: writes exp_lookup.json (the same artifact the exp-lookup-worker
     # produces) for a human to review. Deliberately NOT auto-applied into args.exp_*_min/max --

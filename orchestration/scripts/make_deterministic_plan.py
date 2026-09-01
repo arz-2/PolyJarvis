@@ -157,6 +157,10 @@ def build_planned_stages(cls: dict, properties: set, smiles: str | None = None) 
         # resolves to the PROBE ladder instead of an all-null RESULT, so there is no longer a
         # "rubbery without pressures -> fluctuation only, no submit stage" case.
         "murnaghan":   {"chain_submitted": True},
+        # Primary only when shear/Young's/Poisson were requested -- they exist only on the
+        # deformation path, so the registry forces mechanical_method and swaps this in for
+        # murnaghan. Otherwise it is murnaghan's contingent fallback and never a plan entry.
+        "deform":      {"chain_submitted": True},
         "analyze-bm":  {},
         "run-summary": {},
     }
@@ -330,7 +334,7 @@ def main():
         p.error("--run_name is required")
 
     props_str = args.properties.strip().lower()
-    properties = (set(track_registry.VALID_PROPERTIES) if props_str == "all"
+    properties = (set(track_registry.DEFAULT_PROPERTIES) if props_str == "all"
                   else {x.strip().lower() for x in props_str.split(",") if x.strip()})
 
     cache_path = Path(args.cache_path) if args.cache_path else None

@@ -201,8 +201,9 @@ _OBS: tuple[Observable, ...] = (
     Observable(
         "shear_modulus", "mechanical", "requestable",
         extractor_json="bulk_modulus_deform.json", extractor_field="G_GPa", unit="GPa",
-        status="declared", gate_macro_stage="mechanical", gate_field="deform_gate_verdict",
-        legacy_property="bulk_modulus",
+        gate_macro_stage="mechanical", gate_field="deform_gate_verdict",
+        legacy_property="shear_modulus",
+        summary_path=("results", "shear_modulus", "value"),
         forced_params={"mechanical_method": "deformation"},
         note="Already computed and already dispatchable -- extract_bulk_modulus_deform emits "
              "G_GPa/E_GPa/nu_Poisson, and run_campaign dispatches on mechanical_method, which is "
@@ -211,14 +212,16 @@ _OBS: tuple[Observable, ...] = (
     Observable(
         "youngs_modulus", "mechanical", "requestable",
         extractor_json="bulk_modulus_deform.json", extractor_field="E_GPa", unit="GPa",
-        status="declared", gate_macro_stage="mechanical", gate_field="deform_gate_verdict",
-        legacy_property="bulk_modulus", forced_params={"mechanical_method": "deformation"},
+        gate_macro_stage="mechanical", gate_field="deform_gate_verdict",
+        legacy_property="youngs_modulus",
+        summary_path=("results", "youngs_modulus", "value"), forced_params={"mechanical_method": "deformation"},
     ),
     Observable(
         "poisson_ratio", "mechanical", "requestable",
         extractor_json="bulk_modulus_deform.json", extractor_field="nu_Poisson", unit="",
-        status="declared", gate_macro_stage="mechanical", gate_field="deform_gate_verdict",
-        legacy_property="bulk_modulus", forced_params={"mechanical_method": "deformation"},
+        gate_macro_stage="mechanical", gate_field="deform_gate_verdict",
+        legacy_property="poisson_ratio",
+        summary_path=("results", "poisson_ratio", "value"), forced_params={"mechanical_method": "deformation"},
         note="nu_Poisson, not nu -- the extractor's own key name.",
     ),
 )
@@ -232,8 +235,15 @@ VALID_PROPERTIES = frozenset(
     o.legacy_property for o in _OBS
     if o.kind == "requestable" and o.status == "wired" and o.legacy_property
 )
-"""The plan["properties"] vocabulary: {"density", "tg", "bulk_modulus"}. A `declared` observable
-is routable here but has no name in the plan artifact yet."""
+"""Every name a plan may REQUEST. A `declared` observable is routable but not yet nameable."""
+
+DEFAULT_PROPERTIES = frozenset({"density", "tg", "bulk_modulus"})
+"""What `--properties all` means: the default suite, NOT every nameable property.
+
+Deliberately narrower than VALID_PROPERTIES. shear/Young's/Poisson force
+mechanical_method="deformation", so folding them into "all" would silently switch every
+"all" run's bulk modulus from the Murnaghan EOS fit to a deformation fit -- a different
+measurement with a different gate, chosen by nobody. They are opt-in by name."""
 
 STAGE_TRACK: dict[str, str] = {
     s.name: s.track for t in sorted(TRACKS.values(), key=lambda t: t.order) for s in t.stages
@@ -283,9 +293,22 @@ def macro_stages_for(properties) -> tuple[str, ...]:
 
 def resolver_stages_for(properties, include_fallbacks: bool = True) -> list[str]:
     """The executable resolver vocabulary. With fallbacks == both dry-run branches and
-    decision_policy's track_map; without == the plan artifact's stage list."""
-    return [s.name for t in _tracks_for(properties) for s in t.stages
-            if include_fallbacks or s.role == "primary"]
+    decision_policy's track_map; without == the plan artifact's stage list.
+
+    One substitution: requesting shear/Young's/Poisson forces mechanical_method="deformation"
+    (they only exist on that path), so `deform` becomes the mechanical track's PRIMARY and
+    murnaghan drops out. Without this the plan would name murnaghan with a `chain_submitted`
+    criterion while run_campaign dispatched do_deformation -- an artifact that disagrees with the
+    run it describes, which is the whole class of bug this registry exists to end. Requesting
+    bulk_modulus alone forces nothing and keeps murnaghan, so the goldens are untouched.
+    """
+    names = [st.name for t in _tracks_for(properties) for st in t.stages
+             if include_fallbacks or st.role == "primary"]
+    if forced_params_for(properties).get("mechanical_method") == "deformation":
+        names = [n for n in names if n != "murnaghan"]
+        if not include_fallbacks and "deform" not in names and "analyze-bm" in names:
+            names.insert(names.index("analyze-bm"), "deform")
+    return names
 
 
 def planned_stage_names(properties) -> list[str]:
@@ -295,11 +318,44 @@ def planned_stage_names(properties) -> list[str]:
 
 def stage_for_property(prop: str) -> str:
     """== write_characterization_cache.STAGE_FOR_PROPERTY: the macro stage whose acceptance
-    proves that property's binding gate passed."""
-    for o in _OBS:
-        if o.legacy_property == prop and o.kind == "requestable" and o.status == "wired":
-            return o.gate_macro_stage
-    raise KeyError(prop)
+    proves that property's binding gate passed.
+
+    Several observables can share one legacy_property -- shear/Young's/Poisson all map onto
+    bulk_modulus, since they come out of the same mechanical track. They necessarily agree on
+    gate_macro_stage (it is a property of the track), so the first match is the answer; the
+    assertion below states that rather than leaving it to luck.
+    """
+    stages = {o.gate_macro_stage for o in _OBS
+              if o.legacy_property == prop and o.kind == "requestable" and o.status == "wired"}
+    if not stages:
+        raise KeyError(prop)
+    assert len(stages) == 1, f"{prop} maps to observables on different macro stages: {stages}"
+    return stages.pop()
+
+
+def forced_params_for(properties) -> dict:
+    """decided_params this property set pins, e.g. shear_modulus -> mechanical_method=deformation.
+
+    Applied in materialize_plan BEFORE the agent's own overrides, so a plan may still override a
+    forced value deliberately -- but never has to know the routing rule. Conflicting pins from two
+    requested observables are a contradiction the caller must not paper over, so they raise.
+    """
+    out: dict = {}
+    # Requesting bulk_modulus AND a deformation modulus is not a conflict: the deform extractor
+    # emits K_GPa alongside G/E/nu, so one deformation run satisfies both. Only two observables
+    # pinning the SAME key to DIFFERENT values is a real contradiction, and that raises below.
+    for prop in sorted(set(properties or ())):
+        for o in _OBS:
+            if o.legacy_property != prop or o.kind != "requestable":
+                continue
+            for key, value in o.forced_params.items():
+                if out.get(key, value) != value:
+                    raise ValueError(
+                        f"{prop} pins {key}={value!r} but another requested observable "
+                        f"pins {key}={out[key]!r}"
+                    )
+                out[key] = value
+    return out
 
 
 def byproducts_of(prop: str) -> tuple[Observable, ...]:

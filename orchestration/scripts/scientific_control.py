@@ -414,6 +414,11 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
         effective_class.update(auto_filled)
 
     _validate_protocol_relationships(effective_class, set(decision.overrides))
+    # Routing consequences of the requested observables (shear/Young's/Poisson only exist on
+    # the deformation path, so they pin mechanical_method). Applied FIRST, so an agent override
+    # still wins -- the plan may contradict the routing deliberately, it just never has to know
+    # the rule. Every key here is asserted to be in PARAMETER_STAGE by the registry lockstep test.
+    plan["decided_params"].update(track_registry.forced_params_for(properties))
     plan["decided_params"].update(decision.overrides)
     plan["decided_params"].update(auto_filled)
     if "T_equil_K" in decision.overrides and "T_workflow_K" not in decision.overrides:

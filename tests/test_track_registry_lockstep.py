@@ -135,3 +135,45 @@ def test_the_plan_list_is_the_executable_list_minus_fallbacks(props):
     planned = tr.planned_stage_names(props)
     fallbacks = {s.name for t in tr.TRACKS.values() for s in t.stages if s.role == "fallback"}
     assert [s for s in executable if s not in fallbacks] == planned
+
+
+# ─── the deformation moduli, requestable by name ──────────────────────────────────
+
+def test_the_deformation_moduli_are_requestable():
+    """G/E/nu are already computed and already saved on every deformation run -- the extractor
+    emits G_GPa/E_GPa/nu_Poisson and run_campaign already dispatches on mechanical_method. Making
+    them requestable is three table entries, no new simulation stage, no decision_policy edit,
+    and therefore no pipeline-wide rehash."""
+    for name in ("shear_modulus", "youngs_modulus", "poisson_ratio"):
+        obs = tr.OBSERVABLES[name]
+        assert obs.kind == "requestable" and obs.status == "wired"
+        assert obs.legacy_property == name, "requestable by its own name, not via bulk_modulus"
+        assert name in tr.VALID_PROPERTIES
+        assert obs.forced_params == {"mechanical_method": "deformation"}
+
+
+def test_requesting_a_deformation_modulus_swaps_deform_in_for_murnaghan():
+    """Otherwise the plan would name murnaghan with a chain_submitted criterion while
+    run_campaign dispatched do_deformation -- an artifact disagreeing with the run it describes,
+    which is the exact class of bug this registry exists to end."""
+    assert tr.planned_stage_names({"bulk_modulus"})[-3:] == ["murnaghan", "analyze-bm",
+                                                             "run-summary"]
+    assert tr.planned_stage_names({"shear_modulus"})[-3:] == ["deform", "analyze-bm",
+                                                              "run-summary"]
+
+
+def test_bulk_modulus_alongside_a_deformation_modulus_is_not_a_conflict():
+    """One deformation run satisfies both -- extract_bulk_modulus_deform emits K_GPa alongside
+    G/E/nu. So the pair resolves to the deform path rather than raising."""
+    assert tr.forced_params_for({"bulk_modulus", "shear_modulus"}) == {
+        "mechanical_method": "deformation"}
+    assert "deform" in tr.planned_stage_names({"bulk_modulus", "shear_modulus"})
+
+
+def test_all_means_the_default_suite_not_every_nameable_property():
+    """--properties all must not silently switch a run's bulk modulus from the Murnaghan EOS fit
+    to a deformation fit. Those are different measurements with different gates, and folding the
+    new names into "all" would make that choice for every existing caller."""
+    assert tr.DEFAULT_PROPERTIES == {"density", "tg", "bulk_modulus"}
+    assert tr.DEFAULT_PROPERTIES < tr.VALID_PROPERTIES
+    assert tr.forced_params_for(tr.DEFAULT_PROPERTIES) == {}

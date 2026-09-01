@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
 """
+DEPRECATED 2026-09-01 -- one cell build per run. Do not use; kept for provenance only.
+
+Retired by decision, and the decision closed an inconsistency: this splitter sized its
+bulk_modulus arm from property_floors()'s entanglement_bm floor, which select_system_size.py
+deliberately EXCLUDES from the binding size (:262-277, user-directed 2026-08-25) on the grounds
+that entanglement Me gates the plateau shear modulus, not an EOS/local-packing quantity like K.
+So it built a second, larger, more expensive cell on a criterion the size selector had already
+been changed to stop honouring.
+
+select_system_size() already produces the single cell this replaces: property_floors() collapsed
+via max() over the requested properties. Nothing in the plan -> execute path ever called this
+script or merge_arm_summaries.py -- both were opt-in and manually invoked -- so retiring them
+changes no automated behaviour.
+
+ORIGINAL DOCSTRING FOLLOWS
+
 merge_arm_summaries.py — combine two arms' run_summary.json (from
 plan_system_size_arms.py's split) into one report.
 
