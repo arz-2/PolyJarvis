@@ -553,6 +553,41 @@ def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_ch
     assert gate_call["melt_data"] == melt_data_path
 
 
+def test_do_equil_and_check_persists_the_tg_start_tag_for_the_thermal_stage(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """The tg-start tag names a specific cool_block_NN, and which one it is varies per run --
+    unlike melt_data_path it has NO formula fallback in the resolver (stage_params.py's
+    npt_final path). So it only reaches the thermal stage of a RESUMED run by being written
+    into this stage's outputs dict and read back by CampaignStageExecutor.execute. In-process
+    capture onto args alone would work for a single-process run and die on resume."""
+    args, cls = equil_check_args_cls
+    args.backbone_types = [1, 2]
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
+
+    final_dir = tmp_path / "work" / "npt_final"
+    cool_block_dir = tmp_path / "work" / "cool_block_04"
+    final_dir.mkdir(parents=True)
+    cool_block_dir.mkdir(parents=True)
+    tg_start_data_path = str(cool_block_dir / "cool_block_04_out.data")
+    fake = _FakeEquilLammps(
+        tmp_path,
+        comp_results=[{"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}}],
+        gate_verdicts=[{"verdict": "PASS"}],
+        workflow_stages=[{"name": "npt_final", "work_dir": str(final_dir),
+                          "params": {"DUMP_FILE": "npt_final.dump"},
+                          "output_data": str(final_dir / "npt_final_out.data"),
+                          "output_restart": str(final_dir / "npt_final_out.restart")}],
+        workflow_extra={"tg_start_data_path": tg_start_data_path, "tg_start_T_K": 770.0},
+    )
+
+    result = do_equil_and_check(args, cls, fake)
+
+    assert result["equil_verdict"] == "PASS"
+    assert result["tg_start_data_path"] == tg_start_data_path
+    assert result["tg_start_T_K"] == 770.0
+
+
 # ─── do_thermal(): where the Tg staircase starts ──────────────────────────────────
 #
 # The sweep measures where a COOLING liquid stiffens, so it has to start from a liquid.
@@ -574,9 +609,6 @@ def test_tg_sweep_starts_from_the_tagged_melt_cooled_cell(tmp_path):
     tagged = tmp_path / "cool_block_03_out.data"
     tagged.write_text("")
     p = _tg_start_params(tmp_path, tg_start_data_path=str(tagged), tg_start_T_K=610.0)
-
-    def _never(*a, **k):
-        raise AssertionError("reheat probe must not run when a tagged cell is available")
 
     result = rdr._select_tg_start_cell(None, {}, None, p)
     assert result["outcome"] == "MELT_COOLED_START"
