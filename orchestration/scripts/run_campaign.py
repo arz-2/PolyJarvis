@@ -756,6 +756,7 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
             comprehensive_json=comprehensive_json, regime=p["regime"], dp=p["dp"],
             ct_gate_reliable=p["ct_gate_reliable"],
             tg_K=p["exp_tg_point_K"], t_equil_K=p["T_workflow_K"], glass_data=p["npt_prod_data_path"],
+            final_T_K=p["npt_prod_temp_K"],
             melt_data=p["melt_data_path"], out_dir=p["output_dir"],
         )
         equil_verdict = verdict.get("verdict")

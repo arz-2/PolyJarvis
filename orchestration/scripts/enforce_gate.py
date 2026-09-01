@@ -377,6 +377,9 @@ def enforce_live(args) -> dict:
                     "melt_log": _stage_log_for(args.melt_data),
                     "tg_K": args.tg_k,
                     "t_equil_K": args.t_equil_k,
+                    # The cold endpoint of the contraction is where npt_final actually ran,
+                    # not a hardcoded 300 -- see assess_cooling_contraction.assess.
+                    "final_T_K": getattr(args, "final_t_k", None) or 300.0,
                 },
                 "save_result_to": str(cooling_path),
             }

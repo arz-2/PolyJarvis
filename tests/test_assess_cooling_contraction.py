@@ -68,3 +68,110 @@ def test_never_reads_an_experimental_or_curated_value():
     assert "exp_density" not in params
     assert "exp_density_gcm3" not in params
     assert "band_pct" not in params
+
+
+# ─── the assessment temperature is final_T_K, not a hardcoded 300 ─────────────────
+#
+# rho_glass comes from npt_final, which runs at final_T_K. 300 K is only that parameter's
+# default. Using 300 unconditionally gets both the cold endpoint of the expected contraction
+# and the rubbery short-circuit wrong for any run assessed elsewhere -- the same trap
+# stage_params._regime documents for the regime oracle.
+
+
+def test_the_cold_endpoint_is_the_assessment_temperature():
+    """Same cell, same densities, assessed at 350 K instead of 300: the glassy segment is 50 K
+    shorter, so less contraction is expected and the shortfall rises."""
+    at_300 = assess(rho_melt=1.00, rho_glass=1.05, tg_K=450.0, t_equil_K=650.0)
+    at_350 = assess(rho_melt=1.00, rho_glass=1.05, tg_K=450.0, t_equil_K=650.0,
+                    final_T_K=350.0)
+    assert at_350["expected_contraction"] < at_300["expected_contraction"]
+    assert at_350["contraction_shortfall"] > at_300["contraction_shortfall"]
+    assert at_350["final_T_K"] == 350.0
+
+
+def test_a_cell_assessed_above_its_tg_is_rubbery_even_when_tg_exceeds_300():
+    """Tg=320 with final_T_K=350: the cell is never a glass at the temperature it is graded at,
+    so there is no cooling stage to under-anneal. Hardcoding 300 would call this glassy and
+    assess a contraction that never happened."""
+    result = assess(rho_melt=1.00, rho_glass=1.02, tg_K=320.0, t_equil_K=600.0,
+                    final_T_K=350.0)
+    assert result["regime"] == "rubbery_or_equilibrium"
+    assert result["verdict"] == "OK"
+    assert result["under_annealed_cooling"] is False
+
+
+def test_the_reliability_span_is_measured_from_the_assessment_temperature():
+    """span = T_equil - final_T_K. Assessed at 400 K, a 650 K melt is a 250 K span (reliable),
+    not the 350 K a hardcoded 300 would compute."""
+    assert assess(rho_melt=1.0, rho_glass=1.1, tg_K=450.0,
+                  t_equil_K=650.0)["extrapolation_reliable"] is False
+    assert assess(rho_melt=1.0, rho_glass=1.1, tg_K=450.0, t_equil_K=650.0,
+                  final_T_K=400.0)["extrapolation_reliable"] is True
+
+
+def test_default_stays_300_so_legacy_calls_are_unchanged():
+    a = assess(rho_melt=1.00, rho_glass=1.05, tg_K=373.0, t_equil_K=550.0)
+    b = assess(rho_melt=1.00, rho_glass=1.05, tg_K=373.0, t_equil_K=550.0, final_T_K=300.0)
+    assert a == b
+
+
+# ─── calibration against real archived runs ───────────────────────────────────────
+#
+# (rho_melt, rho_glass, tg_K, t_equil_K) transcribed from the archived
+# raw/cooling_contraction.json of runs in the sibling PolyJarvis checkout. Inlined rather than
+# read from that path: the repo's tests must not depend on a sibling working tree.
+#
+# GROUND TRUTH, established independently of this gate: an investigation of these same runs
+# (2026-08-12) found melt density correct and the glass 4.5-6.2% low, concluding the deficit
+# was a cooling artifact rather than a force-field one (the sigma-shrink hypothesis was
+# falsified). So these are known-under-annealed cells, and a gate that does NOT flag them is
+# the broken one.
+
+ARCHIVED = [
+    #  run       rho_melt  rho_glass   tg_K   t_equil_K
+    ("PEEK1",     1.0384,    1.1949,   418.0,   770.0),
+    ("PEEK2",     1.0541,    1.1915,   418.0,   770.0),
+    ("PMMA1",     1.0483,    1.1158,   378.0,   550.0),
+    ("PMMA4",     1.0573,    1.1072,   378.0,   550.0),
+    ("PSU2",      1.0503,    1.1851,   463.0,   700.0),
+    ("PS2",       0.9077,    0.9832,   373.0,   550.0),
+]
+
+
+def test_the_default_alphas_flag_every_independently_diagnosed_under_annealed_run():
+    for run, rho_melt, rho_glass, tg_K, t_equil_K in ARCHIVED:
+        result = assess(rho_melt, rho_glass, tg_K, t_equil_K)
+        assert result["verdict"] == "UNDER_ANNEALED_COOLING", (run, result)
+
+
+def test_substituting_the_runs_own_measured_alphas_would_silence_the_gate():
+    """Guards against an appealing but circular 'improvement'.
+
+    Each run measures its own expansivities in the thermal stage (extract_thermal's
+    cte_glassy_per_K / cte_rubbery_per_K), which looks like the obvious upgrade over generic
+    constants. It is not usable yet: those numbers come from the pre-2026-09-01 cold-start Tg
+    sweep, whose top plateaus read too dense and therefore FLATTEN the rubbery branch --
+    archived cte_rubbery lands at 2.8-4.7e-4 against a literature range of ~5-7e-4, biased low
+    in exactly that direction. Feeding them back in excuses the contamination with a
+    measurement the contamination produced, and un-flags runs independently diagnosed as
+    under-annealed.
+
+    PEEK1's own measured values are used here. When a melt-start sweep raises cte_rubbery
+    toward 5-6e-4, this test should be revisited -- that rise is the evidence that unlocks
+    per-run alphas as the real design."""
+    _, rho_melt, rho_glass, tg_K, t_equil_K = ARCHIVED[0]
+    assert assess(rho_melt, rho_glass, tg_K, t_equil_K)["verdict"] == "UNDER_ANNEALED_COOLING"
+    measured = assess(rho_melt, rho_glass, tg_K, t_equil_K,
+                      alpha_glass=2.130e-4, alpha_melt=3.866e-4)
+    assert measured["verdict"] == "OK"
+
+
+def test_the_threshold_cannot_be_tightened_without_better_alphas():
+    """The gate's own resolution limit, pinned so nobody narrows the 0.97 threshold without
+    first fixing the alphas. +/-1e-4 on alpha_melt -- well inside the literature spread for
+    polymer melts -- moves the shortfall by about the width of the threshold itself."""
+    kw = dict(rho_melt=1.0384, rho_glass=1.1949, tg_K=418.0, t_equil_K=770.0)
+    lo = assess(**kw, alpha_melt=5e-4)["contraction_shortfall"]
+    hi = assess(**kw, alpha_melt=7e-4)["contraction_shortfall"]
+    swing = lo - hi
+    assert 0.05 < swing < 0.09, swing          # ~7%, against a 3% threshold band

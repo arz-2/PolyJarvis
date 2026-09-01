@@ -3130,12 +3130,13 @@ def assess_cooling_contraction(
     tg_K: float,
     t_equil_K: float,
     melt_data: Optional[str] = None,
+    final_T_K: float = 300.0,
 ) -> dict:
     """
     Cooling-contraction self-consistency check — distinguishes an UNDER-ANNEALED (kinetically
     trapped) glass from a normally-cooled one, purely from the run's own data.
 
-    A converged 300 K density only means the cell stopped moving, not that it densified as
+    A converged density only means the cell stopped moving, not that it densified as
     much as it should have: a trapped glass converges low because free volume froze in during
     cooling. This computes densities directly from the final structures (box + masses),
     compares the melt→glass contraction against the system's own thermal-expansion prediction
@@ -3143,8 +3144,8 @@ def assess_cooling_contraction(
     material), and reports:
 
       - UNDER_ANNEALED_COOLING : the cell under-contracted relative to its own predicted
-        contraction → re-melt + SLOW re-cool (NOT EXTEND at 300 K — a glass cannot densify
-        below Tg).
+        contraction → re-melt + SLOW re-cool (NOT EXTEND at final_T_K — a glass cannot
+        densify below Tg).
       - OK                     : cooling contraction is self-consistent with the prediction.
       - INSUFFICIENT_DATA      : glass-state density could not be measured.
 
@@ -3154,11 +3155,14 @@ def assess_cooling_contraction(
     indicative, not firm.
 
     Args:
-        glass_data:  npt_prod300_out.data at 300 K (the glass state). Required.
-        tg_K:        (class) Tg in K. If <=300, treated as rubbery/equilibrium (no-op).
+        glass_data:  npt_final_out.data at final_T_K (the assessed state). Required.
+        tg_K:        (class) Tg in K. If <=final_T_K the cell is never a glass at the
+                     temperature it is graded at -> rubbery/equilibrium (no-op).
         t_equil_K:   melt/equilibration temperature (T_workflow) in K.
-        melt_data:   npt_production_out.data at T_equil (melt). Optional but required for the
-                     self-consistency computation; without it the verdict is OK/non-blocking.
+        melt_data:   the melt-reference cool_block output at T_equil. Optional but required for
+                     the self-consistency computation; without it the verdict is OK/non-blocking.
+        final_T_K:   assessment temperature (K) -- where glass_data was written, and the cold
+                     endpoint of the contraction. 300 is its default, not its definition.
 
     Returns:
         dict with rho_melt, rho_glass, expected_contraction, actual_contraction,
@@ -3168,7 +3172,8 @@ def assess_cooling_contraction(
     parts = [f"python {MDA_SCRIPTS_DIR}/assess_cooling_contraction.py",
              f"--glass_data {glass_data}",
              f"--tg_K {tg_K}",
-             f"--t_equil_K {t_equil_K}"]
+             f"--t_equil_K {t_equil_K}",
+             f"--final_T_K {final_T_K}"]
     if melt_data:
         parts.append(f"--melt_data {melt_data}")
     command = " ".join(parts)
@@ -3189,6 +3194,7 @@ def enforce_equilibration_gate(
     glass_data: Optional[str],
     melt_data: Optional[str],
     out_dir: Optional[str],
+    final_T_K: float = 300.0,
 ) -> dict:
     """
     Mechanized equilibration gate verdict — replaces prose PASS/EXTEND/FAIL judgment with a
@@ -3219,6 +3225,9 @@ def enforce_equilibration_gate(
         tg_K:               (Class) Tg (K) — used only to split the cooling path into a glassy
                             and a melt segment, never as an experimental target.
         t_equil_K:          Melt/equilibration temperature (T_workflow_K).
+        final_T_K:          Assessment temperature (K) — npt_final's own temperature, and the
+                            cold endpoint of the cooling-contraction check. 300 is its default,
+                            not its definition.
         glass_data:         npt_prod300_out.data (glass at 300K) — required only if
                             density_value_binding needs to run assess_cooling_contraction.
         melt_data:          npt_production_out.data (melt at T_equil) — same condition.
@@ -3247,6 +3256,7 @@ def enforce_equilibration_gate(
     live_args.ct_gate_reliable = ct_gate_reliable
     live_args.tg_k = tg_K
     live_args.t_equil_k = t_equil_K
+    live_args.final_t_k = final_T_K
     live_args.glass_data = glass_data
     live_args.melt_data = melt_data
     live_args.out_dir = out_dir
@@ -3258,7 +3268,8 @@ def enforce_equilibration_gate(
         parts = [f"python {MDA_SCRIPTS_DIR}/assess_cooling_contraction.py",
                  f"--glass_data {cc_args['glass_data']}",
                  f"--tg_K {cc_args['tg_K']}",
-                 f"--t_equil_K {cc_args['t_equil_K']}"]
+                 f"--t_equil_K {cc_args['t_equil_K']}",
+                 f"--final_T_K {cc_args.get('final_T_K', 300.0)}"]
         if cc_args.get("melt_data"):
             parts.append(f"--melt_data {cc_args['melt_data']}")
         if cc_args.get("melt_log"):
