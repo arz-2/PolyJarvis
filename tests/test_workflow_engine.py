@@ -331,7 +331,7 @@ def test_registered_remedy_action_rejects_mismatched_remedy_id(tmp_path):
     rejected outright -- it never gets to pick an arbitrary lever off-menu."""
     finding = Finding("EQUIL_DRIFT", "equilibration", confidence="low")
     fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
-    recovery = RegisteredRemedyRecovery("slower_cooling")
+    recovery = RegisteredRemedyRecovery("raise_minimize_tolerance")
     engine = WorkflowEngine(tmp_path, plan(), fake, recovery_agent=recovery)
 
     result = engine.run()
@@ -341,16 +341,16 @@ def test_registered_remedy_action_rejects_mismatched_remedy_id(tmp_path):
 
 
 def test_route_local_cap_exhaustion_escalates_after_automatic_retries(tmp_path):
-    """slower_cooling's local_cap is 2 -- a third UNDER_ANNEALED_COOLING finding on the same
+    """raise_minimize_tolerance's local_cap is 2 -- a third MINIMIZE_NOT_CONVERGED finding on the same
     route must escalate rather than apply a third automatic doubling."""
-    finding = Finding("UNDER_ANNEALED_COOLING", "equilibration")
+    finding = Finding("MINIMIZE_NOT_CONVERGED", "equilibration")
     fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))] * 3})
     engine = WorkflowEngine(tmp_path, plan(cool_block_hold_steps=1000), fake)
 
     result = engine.run()
 
     assert result["status"] == "escalation_required"
-    assert engine.state["remedy_counters"]["by_route"]["slower_cooling:equilibration"] == 2
+    assert engine.state["remedy_counters"]["by_route"]["raise_minimize_tolerance:equilibration"] == 2
     equil_calls = [call for call in fake.calls if call[0] == "equilibration"]
     assert len(equil_calls) == 3
 
@@ -400,7 +400,7 @@ def _read_recovery_log(tmp_path):
 
 
 def test_auto_remedy_appends_to_recovery_log(tmp_path):
-    finding = Finding("UNDER_ANNEALED_COOLING", "equilibration")
+    finding = Finding("MINIMIZE_NOT_CONVERGED", "equilibration")
     fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
     engine = WorkflowEngine(tmp_path, plan(cool_block_hold_steps=1000), fake)
 
@@ -408,8 +408,8 @@ def test_auto_remedy_appends_to_recovery_log(tmp_path):
 
     events = _read_recovery_log(tmp_path)
     assert [e["event"] for e in events] == ["auto_remedy"]
-    assert events[0]["remedy_id"] == "slower_cooling"
-    assert events[0]["code"] == "UNDER_ANNEALED_COOLING"
+    assert events[0]["remedy_id"] == "raise_minimize_tolerance"
+    assert events[0]["code"] == "MINIMIZE_NOT_CONVERGED"
     assert events[0]["run_name"] == "WF"
 
 

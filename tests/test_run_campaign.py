@@ -663,20 +663,26 @@ def test_a_tag_pointing_at_a_missing_file_reheats(tmp_path, monkeypatch):
 
 # ─── CampaignStageExecutor.execute(): STRUCTURAL_FAIL finding-code routing ─────────
 
-def test_structural_fail_routes_to_cooling_verdict_not_a_passing_finite_size_string(
+def test_structural_fail_prefers_the_real_cause_over_a_passing_finite_size_string(
         tmp_path, monkeypatch):
-    """detail["finite_size_verdict"] is "SIZE_PASS" -- a truthy string -- whenever finite size
-    was merely *evaluated*, independent of whether it passed. A real UNDER_ANNEALED_COOLING
-    halt with finite_size passing must still route to the cooling_verdict code, not fall into
-    an `or`-chain trap that picks "SIZE_PASS" just because it's non-empty and comes first --
-    that would hand RemedyRegistry a code with no registered remedy for a real, remediable
-    finding."""
+    """detail["finite_size_verdict"] is "SIZE_PASS" -- a truthy string -- whenever finite size was
+    merely *evaluated*, independent of whether it passed. A real structural halt with finite_size
+    passing must route to the actual failing gate, not fall into an `or`-chain trap that picks
+    "SIZE_PASS" just because it is non-empty and comes first.
+
+    Since 2026-09-01 the chain has one fewer link: cooling_verdict was removed with the
+    density_value_binding demotion (enforce_gate.STRUCTURAL_GATES). It sat AHEAD of homogeneity,
+    so leaving an advisory UNDER_ANNEALED_COOLING there would have hijacked a genuine homogeneity
+    failure and routed it to slower_cooling -- a remedy that no longer exists. This pins that a
+    cell carrying BOTH an advisory cooling verdict and a real homogeneity failure routes to
+    homogeneity."""
     from run_campaign import CampaignStageExecutor
     import run_campaign as rc
 
     halted_detail = {
         "verdict": "STRUCTURAL_FAIL", "finite_size_verdict": "SIZE_PASS",
-        "cooling_verdict": "UNDER_ANNEALED_COOLING", "homogeneity_verdict": "HOMOG_PASS",
+        "cooling_verdict": "UNDER_ANNEALED_COOLING",       # advisory, must NOT route
+        "homogeneity_verdict": "HOMOG_HETEROGENEOUS",      # the real cause
         "remedy_confidence": "high",
     }
     monkeypatch.setattr(rc, "do_equil_and_check", lambda args, cls, lammps: {
@@ -693,7 +699,7 @@ def test_structural_fail_routes_to_cooling_verdict_not_a_passing_finite_size_str
     result = executor.execute("equilibration", context)
 
     assert result.status == "remedy_required"
-    assert result.findings[0].code == "UNDER_ANNEALED_COOLING"
+    assert result.findings[0].code == "DENSITY_HETEROGENEITY"
 
 
 def _tg_tag_executor(tmp_path, monkeypatch, prior_outputs_list, seed_args=None):

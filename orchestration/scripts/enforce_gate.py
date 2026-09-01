@@ -225,11 +225,23 @@ def msd_msid_gates(chain: dict) -> dict:
 # state, and more NPT at the same temperature is exactly the remedy.
 EXTENDABLE_GATES = {"density_drift", "energy_drift", "density_sem", "energy_sem",
                     "n_eff_density"}
-# Gates whose failure means the cell is WRONG, not merely unconverged -- extending at 300K
-# cannot fix these (policy: "a glass cannot densify below Tg"). density_value_binding is a
-# Class A structural cooling-protocol defect (see decision_policy.json), not a sampling
-# deficiency -- its remedy is re-melt+slow-recool, never EXTEND, same as every other member.
-STRUCTURAL_GATES = {"density_homogeneity", "p2", "density_value_binding", "finite_size"}
+# Gates whose failure means the cell is WRONG, not merely unconverged -- extending at the
+# assessment temperature cannot fix these (policy: "a glass cannot densify below Tg").
+#
+# density_value_binding was a member until 2026-09-01 and is now ADVISORY. It was classified
+# Class A on the grounds that its structural remedy (re-melt + slow re-cool) removes the defect
+# completely at a bounded one-time cost -- decision_rationale's own "class_A_is_always_worth_paying"
+# criterion. Measurement retired that claim. Across 21 archived multi-rate sweeps, glass density
+# moves ~1.1% per DECADE of cooling rate, so the slower_cooling remedy (x2 then x4, capped)
+# recovers 0.33-0.67% against archived shortfalls of 3-9%: applying the maximum remedy to every
+# flagged run clears NONE of them. The gate therefore fails its own class's defining criterion.
+#
+# The shortfall it measures is real but is not a per-run defect: expected_contraction is built
+# from experimental-rate expansivities, and MD cools ~12 decades faster than a DSC scan, so every
+# MD glass is legitimately several percent short. That is a Class C agreement statement about an
+# inherent MD limitation, not a Class A admissibility failure. Still computed, still reported,
+# no longer binding -- see assess_cooling_contraction.assess's alpha-calibration note.
+STRUCTURAL_GATES = {"density_homogeneity", "p2", "finite_size"}
 
 
 def enforce(run_name, repo_root: Path):
@@ -284,8 +296,8 @@ def enforce(run_name, repo_root: Path):
         else:
             cooling_verdict = cooling.get("verdict")
             if cooling_verdict == "UNDER_ANNEALED_COOLING":
+                # ADVISORY since 2026-09-01 (see STRUCTURAL_GATES): reported, never binding.
                 dvb_status = f"satisfied ({cooling_verdict})"
-                binding_all_pass = False  # density_value_binding is itself binding
             elif cooling_verdict in ("OK", "INSUFFICIENT_DATA"):
                 dvb_status = f"satisfied ({cooling_verdict})"
             else:
@@ -293,8 +305,6 @@ def enforce(run_name, repo_root: Path):
 
     overall_pass_reported = comp.get("overall_pass")
     failing_binding = [k for k, v in binding_results.items() if v is False]
-    if dvb_status.startswith("satisfied (UNDER_ANNEALED_COOLING)"):
-        failing_binding.append("density_value_binding")
 
     if not failing_binding and overall_pass_reported is True:
         verdict = "PASS_CLEAN"
@@ -383,8 +393,9 @@ def enforce_live(args) -> dict:
                 },
                 "save_result_to": str(cooling_path),
             }
-        if cooling_verdict == "UNDER_ANNEALED_COOLING":
-            failing_binding.append("density_value_binding")
+        # ADVISORY since 2026-09-01 -- see STRUCTURAL_GATES. The verdict, the shortfall and
+        # its alpha band stay in the gate payload (cooling_verdict below) for the report and for
+        # the recovery agent's context; they simply no longer fail the stage.
 
     # --- 4-way verdict mapping ---
     if not failing_binding:

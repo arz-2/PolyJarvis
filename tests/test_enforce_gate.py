@@ -365,7 +365,19 @@ def test_cooling_verdict_insufficient_data_satisfies_without_blocking(tmp_path):
     assert result["verdict"] == "PASS"
 
 
-def test_cooling_verdict_under_annealed_blocks_structural(tmp_path):
+def test_cooling_verdict_under_annealed_is_reported_but_advisory(tmp_path):
+    """density_value_binding was Class A and routed STRUCTURAL_FAIL until 2026-09-01.
+
+    decision_rationale's own class_A_is_always_worth_paying criterion is that the class's
+    structural remedy removes the defect COMPLETELY at a bounded cost. Measurement retired that:
+    across 21 archived multi-rate sweeps glass density moves ~1.1% per DECADE of cooling rate, so
+    slower_cooling (x2 then x4, capped) recovers 0.33-0.67% against archived shortfalls of 3-9%.
+    The maximum remedy clears none of the flagged archived runs -- the gate failed its own class's
+    defining criterion.
+
+    The shortfall is still real and still reported. It is a Class C statement about an inherent MD
+    limitation (expected_contraction is built from experimental-rate expansivities, and MD cools
+    ~12 decades faster than DSC), not a per-run admissibility failure."""
     comp_path = _write_comp(tmp_path, kinetic_trap_flag=False)
     cooling_path = tmp_path / "cooling_contraction.json"
     cooling_path.write_text(json.dumps({"verdict": "UNDER_ANNEALED_COOLING",
@@ -375,11 +387,18 @@ def test_cooling_verdict_under_annealed_blocks_structural(tmp_path):
     args.melt_data = str(tmp_path / "npt_production_out.data")
     args.out_dir = str(tmp_path)
     result = enforce_gate.enforce_live(args)
-    assert result["verdict"] == "STRUCTURAL_FAIL"
-    assert "density_value_binding" in result["failing_binding_gates"]
-    assert "slower_cooling" in result["remedy"]
-    assert "anneal_hold" in result["remedy"]
-    assert "npt_cool_steps" not in result["remedy"]  # only npt_cool300_steps is actually touched
+
+    assert result["verdict"] != "STRUCTURAL_FAIL"
+    assert "density_value_binding" not in result["failing_binding_gates"]
+    # Reported, not silently dropped: the verdict must survive into the gate payload so the
+    # run summary and the recovery agent still see it.
+    assert result["cooling_verdict"] == "UNDER_ANNEALED_COOLING"
+
+
+def test_density_value_binding_is_not_a_structural_gate():
+    """Pins the membership itself, so re-adding it cannot pass unnoticed."""
+    assert "density_value_binding" not in enforce_gate.STRUCTURAL_GATES
+    assert "density_value_binding" not in enforce_gate.EXTENDABLE_GATES
 
 
 # ─── resolve_regime(): assessment temperature vs Tg, not a hardcoded 300 K ─────

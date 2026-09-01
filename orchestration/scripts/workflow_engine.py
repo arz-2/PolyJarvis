@@ -420,8 +420,13 @@ def default_remedies() -> tuple[Remedy, ...]:
                _forcefield, "build"),
         Remedy("continue_npt", frozenset({"EQUIL_DRIFT", "EQUIL_SEM", "EQUIL_N_EFF", "EXTEND"}),
                2, _continue_npt, "equilibration"),
-        Remedy("slower_cooling", frozenset({"UNDER_ANNEALED_COOLING"}), 2,
-               _cooling, "equilibration"),
+        # slower_cooling (UNDER_ANNEALED_COOLING) RETIRED 2026-09-01. Its gate is now advisory
+        # (enforce_gate.STRUCTURAL_GATES) because the remedy cannot clear it: glass density moves
+        # ~1.1% per DECADE of cooling rate (21 archived multi-rate sweeps), so x2 then x4 recovers
+        # 0.33-0.67% against archived shortfalls of 3-9% -- the maximum remedy clears none of the
+        # flagged archived runs. _cooling itself is kept below: it is still the correct mutation
+        # if a future, genuinely clearable cooling defect is found, and the agent_only escalation
+        # can still reach that behaviour by proposing cool_block_hold_steps directly.
         Remedy("raise_minimize_tolerance", frozenset({"MINIMIZE_NOT_CONVERGED"}), 2,
                _raise_minimize_tolerance, "equilibration"),
         Remedy("melt_homogeneity", frozenset({"HOMOG_HETEROGENEOUS", "DENSITY_HETEROGENEITY"}),

@@ -1848,10 +1848,17 @@ class CampaignStageExecutor:
                         # the finding to a code with no registered remedy. Only prefer it when it
                         # names a real failure (enforce_gate.py's own vocabulary: SIZE_MIN_IMAGE_
                         # VIOLATION | SIZE_CHAIN_SELF_IMAGE | SIZE_PASS | None).
+                        #
+                        # cooling_verdict was the second link in this chain until 2026-09-01.
+                        # density_value_binding is now ADVISORY (enforce_gate.STRUCTURAL_GATES),
+                        # so it can no longer BE the cause of a STRUCTURAL_FAIL -- and leaving it
+                        # here would be worse than useless: it sat AHEAD of homogeneity, so a
+                        # genuine homogeneity failure on a cell that also carried an advisory
+                        # UNDER_ANNEALED_COOLING would route to slower_cooling instead of
+                        # melt_homogeneity. Dropped with the demotion, not separately.
                         finite_size_code = detail.get("finite_size_verdict")
                         code = (finite_size_code
                                 if finite_size_code not in (None, "SIZE_PASS") else
-                                detail.get("cooling_verdict") or
                                 ("DENSITY_HETEROGENEITY"
                                  if detail.get("homogeneity_verdict") == "HOMOG_HETEROGENEOUS"
                                  else code))
