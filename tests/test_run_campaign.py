@@ -696,6 +696,80 @@ def test_structural_fail_routes_to_cooling_verdict_not_a_passing_finite_size_str
     assert result.findings[0].code == "UNDER_ANNEALED_COOLING"
 
 
+def _tg_tag_executor(tmp_path, monkeypatch, prior_outputs_list, seed_args=None):
+    """Run the equilibration stage with a chain that produces NO tg-start tag of its own (what
+    a resume at or past the "cool_block" checkpoint generates), and report what the executor
+    left on args for the thermal stage."""
+    from run_campaign import CampaignStageExecutor
+    import run_campaign as rc
+
+    seen = {}
+
+    def _fake_equil(args, cls, lammps):
+        seen["tg_start_data"] = getattr(args, "tg_start_data", "ABSENT")
+        seen["tg_start_T_K"] = getattr(args, "tg_start_T_K", "ABSENT")
+        return {"equil_verdict": "PASS", "npt_prod_data_path": "x.data"}
+
+    monkeypatch.setattr(rc, "do_equil_and_check", _fake_equil)
+
+    priors = []
+    for i, outputs in enumerate(prior_outputs_list):
+        mp = tmp_path / f"prior-{i}.json"
+        mp.write_text(json.dumps({"parameters": {}, "outputs": outputs}))
+        priors.append({"manifest": str(mp)})
+
+    attempt_dir = tmp_path / "attempt"
+    attempt_dir.mkdir(exist_ok=True)
+    args = SimpleNamespace(engine_owned_recovery=False, **(seed_args or {}))
+    executor = CampaignStageExecutor(args, {}, emc=None, lammps=None, plan_path="unused")
+    executor.execute("equilibration", {"attempt_dir": str(attempt_dir), "parameters": {},
+                                       "dependencies": {}, "prior_attempts": priors})
+    return seen
+
+
+def test_a_resumed_attempt_inherits_the_tg_start_tag_from_the_attempt_that_cooled(
+        tmp_path, monkeypatch):
+    """The tag is emitted only by the code path that BUILDS cool_blocks. An attempt resuming at
+    or past the "cool_block" checkpoint builds none, so the generator returns no tag -- and the
+    thermal stage would reheat npt_final even though the tagged cell is on disk.
+
+    Inheriting is not reaching back for something stale: resuming from "cool_block" means the
+    cooldown already ran and is not being redone, and the resumed chain's own first stage reads
+    that prior attempt's cool_block output as its input file. There is ONE cooldown in the run;
+    it lives in the earlier attempt's directory. A remedy that genuinely re-cools resumes from
+    "anneal_hold" instead, rebuilds the blocks, and emits a fresh tag that wins over this."""
+    seen = _tg_tag_executor(tmp_path, monkeypatch, [
+        {"tg_start_data_path": "/runs/attempt-0001/cool_block_04_out.data",
+         "tg_start_T_K": 770.0},
+    ])
+    assert seen["tg_start_data"] == "/runs/attempt-0001/cool_block_04_out.data"
+    assert seen["tg_start_T_K"] == 770.0
+
+
+def test_the_most_recent_prior_tag_wins(tmp_path, monkeypatch):
+    """Walk newest-first: a later attempt that DID rebuild the cooldown supersedes an earlier
+    one, so its tag must be the one inherited."""
+    seen = _tg_tag_executor(tmp_path, monkeypatch, [
+        {"tg_start_data_path": "/runs/attempt-0001/cool_block_04_out.data",
+         "tg_start_T_K": 770.0},
+        {"tg_start_data_path": "/runs/attempt-0002/cool_block_06_out.data",
+         "tg_start_T_K": 745.0},
+    ])
+    assert seen["tg_start_data"] == "/runs/attempt-0002/cool_block_06_out.data"
+    assert seen["tg_start_T_K"] == 745.0
+
+
+def test_a_stale_tag_is_cleared_when_no_prior_attempt_has_one(tmp_path, monkeypatch):
+    """args is a long-lived object reused across stage executions, so a value left by an earlier
+    stage must never be mistaken for this equilibration's own tag."""
+    seen = _tg_tag_executor(
+        tmp_path, monkeypatch, [{"npt_prod_data_path": "no-tag-here.data"}],
+        seed_args={"tg_start_data": "/stale/from-a-previous-stage.data",
+                   "tg_start_T_K": 999.0})
+    assert seen["tg_start_data"] is None
+    assert seen["tg_start_T_K"] is None
+
+
 def _write_prior_manifest(tmp_path, name, parameters, stage_checkpoints):
     manifest_path = tmp_path / f"{name}.json"
     manifest_path.write_text(json.dumps({

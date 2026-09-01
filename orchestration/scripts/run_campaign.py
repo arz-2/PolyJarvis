@@ -1740,6 +1740,38 @@ class CampaignStageExecutor:
                 if prior_outputs.get("murnaghan_result"):
                     cls["_prior_murnaghan_result"] = prior_outputs["murnaghan_result"]
                     break
+        if stage == "equilibration":
+            # The tg-start tag is produced ONLY by the code path that builds cool_blocks. An
+            # attempt that resumes at or past the "cool_block" checkpoint -- or an extend-only
+            # continuation -- generates none, so generate_equilibration_workflow returns no tag
+            # and the thermal stage would fall back to reheating npt_final even though the
+            # tagged cell is still on disk from an earlier attempt.
+            #
+            # Reaching back is safe here for a structural reason, not a hopeful one. The
+            # generator's checkpoint order is [... anneal_hold, cool_block, ...]: resuming from
+            # "anneal_hold" or earlier REBUILDS the cooldown and emits a fresh tag, so this walk
+            # never fires for it. The tag is missing only from "cool_block" onward -- which is
+            # exactly the resume point whose meaning is "the cooldown already ran, do not redo
+            # it", i.e. the prior attempt's blocks ARE the live cooldown this attempt stands on.
+            # A remedy that genuinely changes the cooling (a slower cool_block_hold_steps)
+            # resumes from "anneal_hold" and regenerates, so it can never inherit a cell from a
+            # cooldown it replaced.
+            #
+            # do_thermal validates the recovered tag exactly as it validates a fresh one -- the
+            # file must exist and its temperature must sit within one cool block of the sweep
+            # top -- so a window edit between attempts falls back to reheating rather than
+            # silently starting from the wrong temperature.
+            args.tg_start_data = None       # never inherit across stage executions
+            args.tg_start_T_K = None
+            for prior in reversed(context.get("prior_attempts") or ()):
+                manifest_path = prior.get("manifest")
+                if not manifest_path or not Path(manifest_path).is_file():
+                    continue
+                prior_outputs = json.loads(Path(manifest_path).read_text()).get("outputs") or {}
+                if prior_outputs.get("tg_start_data_path"):
+                    args.tg_start_data = prior_outputs["tg_start_data_path"]
+                    args.tg_start_T_K = prior_outputs.get("tg_start_T_K")
+                    break
         for key, value in context["parameters"].items():
             if hasattr(args, key):
                 setattr(args, key, value)
