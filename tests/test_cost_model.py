@@ -1,4 +1,4 @@
-"""cost_model.py: GPU-hours estimation off guides/polymer_rules.json's
+"""select_hardware.py's cost model: GPU-hours estimation off guides/polymer_rules.json's
 hardware_policy.directional_probe.size_points (3 real measured points per FF family,
 2026-08-24) with a single-point near-linear-assumption fallback for a family with no
 size_points at all (gaff, today).
@@ -16,7 +16,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-import cost_model as cm  # noqa: E402
+import select_hardware as cm  # noqa: E402
 
 # A minimal, self-contained hardware_policy fixture -- independent of whatever
 # guides/polymer_rules.json happens to contain right now, so these tests never drift if

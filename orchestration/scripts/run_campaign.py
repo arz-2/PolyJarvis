@@ -31,7 +31,7 @@ from stage_params import (resolve_stage_params, apply_plan, resolve_hardware, lo
                           select_primary_tg_rate_index)
 import track_registry  # noqa: E402
 from analysis_utils import estimate_fluctuation_K_GPa  # noqa: E402
-from hw_common import load_rules, get_class_entry, resolve_member_value  # noqa: E402
+from rules_common import load_rules, get_class_entry, resolve_member_value  # noqa: E402
 from protocol_policy import select_pressure_ladder  # noqa: E402
 from workflow_engine import (  # noqa: E402
     Finding, StageResult, WorkflowEngine, atomic_write_json, pressure_point_drop_allowed,
@@ -1998,10 +1998,10 @@ def run_campaign_workflow(plan_path: Path, *, dry_run: bool = False,
         # Separate, independently-failing step: turn this run's now-frozen
         # system_characterization_cache.json entry (if protocol_validated) into protocol
         # evidence for planning OTHER polymers, not just a same-SMILES replay. See
-        # ingest_internal_run_evidence.py's module docstring for why this is a second
+        # protocol_evidence.py's INGEST: INTERNAL VALIDATED RUNS section for why this is a second
         # script rather than inlined into write_characterization_cache().
         try:
-            from ingest_internal_run_evidence import ingest_from_completed_run
+            from protocol_evidence import ingest_from_completed_run
             ingest_from_completed_run(run_name, repo_root=repo_root)
         except Exception as exc:  # never fail an accepted campaign on an evidence-ingest problem
             print(f"WARNING: internal-run evidence ingest failed for {run_name}: {exc}",

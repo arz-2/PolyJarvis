@@ -14,7 +14,7 @@ State which of the three were parsed from $ARGUMENTS and which are missing, then
 
 - Canonicalize: `python3 orchestration/scripts/canon_smiles.py '<smiles>'` (radonpy env by default; `--env <env>` if renamed).
 - Look up the canonical SMILES in `guides/system_characterization_cache.json`.
-  - `protocol_validated: true` AND `validated_properties` covers every requested property → **not novel**: stop, use `python3 orchestration/scripts/make_deterministic_plan.py --run_name <name> --polymer_class <CLASS> --smiles '<smiles>' --properties <props>` instead.
+  - `protocol_validated: true` AND `validated_properties` covers every requested property → **not novel**: stop, use `python3 orchestration/scripts/make_deterministic_plan.py run-plan --run_name <name> --polymer_class <CLASS> --smiles '<smiles>' --properties <props>` instead.
   - Otherwise → `decision_policy.json`'s `confidence_gate.novel_or_partially_validated`: `plan_mode = reasoned`. Every decision below needs real reasoning and evidence, not a fast-path guess.
 
 `make_deterministic_plan.py` performs this same canonicalize-and-lookup check itself once `--smiles` is passed (`make_plan_from_cache`), replaying the exact frozen protocol a prior completed campaign for this SMILES validated rather than generic class defaults — so this step's manual lookup is belt-and-suspenders for your own reporting to the user, not load-bearing for what the script actually does.
@@ -29,7 +29,7 @@ State which of the three were parsed from $ARGUMENTS and which are missing, then
 Run once, before any annotation begins:
 
 ```bash
-python3 orchestration/scripts/make_decision_scaffold.py \
+python3 orchestration/scripts/make_deterministic_plan.py decision \
   --run_name <name> --polymer_class <CLASS> --smiles '<smiles>' --properties <props>
 ```
 
@@ -92,7 +92,7 @@ python3 orchestration/scripts/scientific_control.py \
   --decision-file data/<name>/raw/decision.json --dry-run
 ```
 
-This validates the decision, materializes `run_plan.json`, and resolves every stage's parameters without submitting anything. The decision file already exists from step 3 — this step never writes it, only reads and validates it. If validation fails, fix `data/<name>/raw/decision.json` in place and re-run this command; do **not** re-run `make_decision_scaffold.py`. Note that override validity itself (allowlist membership, type, numeric range) was already checked earlier, inside `scientific_control.py`, before this command ever materializes anything — a finding reported here is always a `decided_params`/`decisions`/`planned_stages` structural issue (criteria coverage, evidence presence, stage schema), never a rejected override.
+This validates the decision, materializes `run_plan.json`, and resolves every stage's parameters without submitting anything. The decision file already exists from step 3 — this step never writes it, only reads and validates it. If validation fails, fix `data/<name>/raw/decision.json` in place and re-run this command; do **not** re-run `make_deterministic_plan.py decision`. Note that override validity itself (allowlist membership, type, numeric range) was already checked earlier, inside `scientific_control.py`, before this command ever materializes anything — a finding reported here is always a `decided_params`/`decisions`/`planned_stages` structural issue (criteria coverage, evidence presence, stage schema), never a rejected override.
 
 **Read the resolved output back and check it against your own reasoning** — the dry-run's `result` is what actually reaches the simulation, not the `default_choice` values you read in step 5, and a divergence can happen silently. Fix any mismatch with `overrides`, re-run `--dry-run`, and confirm it landed before reporting. Only override a key you have reasoned evidence for.
 

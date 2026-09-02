@@ -6,9 +6,10 @@ The system-probe novelty gate (guides/system_characterization_cache.json) is key
 canonical SMILES so two atom-orderings of the same monomer collapse to one cache entry.
 RDKit lives in the `radonpy`/`mol-builder` conda envs (not `base`); this reaches it via
 mol_python.run_in_mol_env(), the one seam every RDKit/RadonPy caller in this repo shells
-through. The SMILES is passed via an env var, never interpolated into the shell/python-c
-command text, so stereo markers (`/`, `\\`) and other shell-meaningful characters in a
-SMILES string can't corrupt the quoting.
+through, invoking rdkit_cli.py's `canon` subcommand. The SMILES travels as an argv element,
+never interpolated into shell/python-c command text: run_in_mol_env shlex-quotes the conda
+path and passes a real argv list on the direct-interpreter path, so stereo markers (forward
+and back slashes) and other shell-meaningful characters in a SMILES cannot corrupt quoting.
 
 Usage: python3 orchestration/canon_smiles.py "<smiles>" [--env radonpy]
 Prints: {"smiles": "<input>", "canonical_smiles": "<output>"}  (exit 0)
@@ -21,30 +22,17 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mol_python import run_in_mol_env  # noqa: E402
-
-_PY_SNIPPET = """\
-import os
-from rdkit import Chem
-smi = os.environ['CANON_SMILES_INPUT']
-isomeric = os.environ.get('CANON_SMILES_ISOMERIC', '1') != '0'
-mol = Chem.MolFromSmiles(smi)
-if mol is None:
-    raise SystemExit('RDKit could not parse SMILES: ' + smi)
-print(Chem.MolToSmiles(mol, canonical=True, isomericSmiles=isomeric))
-"""
+from mol_python import run_in_mol_env, RDKIT_CLI  # noqa: E402
 
 
 def canonicalize(smiles: str, env: str = "radonpy", timeout: int = 30, *,
                   isomeric: bool = True) -> str:
-    r = run_in_mol_env(script=_PY_SNIPPET, env=env, timeout=timeout, extra_env={
-        "CANON_SMILES_INPUT": smiles,
-        "CANON_SMILES_ISOMERIC": "1" if isomeric else "0",
-    })
+    args = ["canon", "--smiles", smiles] + ([] if isomeric else ["--no-isomeric"])
+    r = run_in_mol_env(script_path=RDKIT_CLI, args=args, env=env, timeout=timeout)
     out = r.stdout.strip()
     if r.returncode != 0 or not out:
         raise RuntimeError(r.stderr.strip() or "empty output from RDKit canonicalization")
-    return out.splitlines()[-1]
+    return json.loads(out.splitlines()[-1])["canonical_smiles"]
 
 
 def main():

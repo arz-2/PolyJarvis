@@ -1,10 +1,10 @@
-"""backbone_rigidity.py — reference-polymer classification sanity check.
+"""rdkit_cli.py `rigidity` — reference-polymer classification sanity check.
 
 Real RDKit call (shells into the radonpy conda env, same pattern as
 test_chem_similarity.py's real-RDKit smoke test) -- marked requires_binaries and run
 explicitly (`pytest -m requires_binaries`), not part of the default suite.
 
-The table below is the correctness bar this module was built around: PS's and PMMA's
+The table below is the correctness bar this classifier was built around: PS's and PMMA's
 pendant aromatic/ester groups must NOT make them look stiff (they sit off the backbone
 path), while PEEK's and PSU's in-chain aromatic rings correctly should. PET anchors the
 semi-rigid band between them.
@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SCRIPT = REPO_ROOT / "orchestration" / "scripts" / "backbone_rigidity.py"
+SCRIPT = REPO_ROOT / "orchestration" / "scripts" / "rdkit_cli.py"
 
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 from mol_python import run_in_mol_env  # noqa: E402
@@ -37,7 +37,7 @@ REFERENCE_POLYMERS = [
 
 
 def _run(smiles: str) -> dict:
-    r = run_in_mol_env(script_path=SCRIPT, args=["--smiles", smiles, "--output", "json"],
+    r = run_in_mol_env(script_path=SCRIPT, args=["rigidity", "--smiles", smiles],
                         timeout=30)
     return json.loads(r.stdout.strip())
 

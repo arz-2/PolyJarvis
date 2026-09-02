@@ -6,7 +6,7 @@ PolyJarvis has two agent roles and one deterministic runtime.
 
 The planning agent runs once at campaign start. Rather than authoring its decision file from
 scratch, it starts from a `decision.json` **scaffold** that
-`orchestration/scripts/make_decision_scaffold.py` deterministically pre-populates from the
+`orchestration/scripts/make_deterministic_plan.py decision` deterministically pre-populates from the
 polymer class's current defaults in `guides/polymer_rules.json` — one row per pre-simulation
 policy in `orchestration/decision_policy.json` (`D-01_ff`, `D-02_charges`, `D-03_electrostatics`,
 `D-04_system_size`, `D-08_hardware`), each carrying a `default_choice`, the policy's

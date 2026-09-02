@@ -1,4 +1,4 @@
-"""ingest_protocol_evidence.py — the write-back half of the query-first/search-on-miss
+"""protocol_evidence.py ingest — the write-back half of the query-first/search-on-miss
 loop. Feeds it fixture advisory JSONs shaped exactly like literature-grounding-worker's
 real Part A / Part B output schemas (see its .md file) and checks:
 correct provenance, only verified:true sources persisted, and idempotency (re-ingesting
@@ -9,8 +9,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-import ingest_protocol_evidence as ipe  # noqa: E402
-import protocol_evidence_store as pes  # noqa: E402
+import protocol_evidence as pe  # noqa: E402
 
 FF_ADVISORY = {
     "polymer_name": "PMMA",
@@ -62,13 +61,13 @@ SYSTEM_SIZE_ADVISORY = {
 
 def test_ff_ingest_adds_only_verified_sources(tmp_path):
     store_path = str(tmp_path / "protocol_evidence_ff.json")
-    result = ipe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
+    result = pe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
 
     assert result["records_added"] == 1
     assert result["records_skipped_duplicate"] == 0
     assert result["records_rejected"] == []
 
-    store = pes.load_store(store_path, with_methodology=True)
+    store = pe.load_store(store_path, with_methodology=True)
     assert len(store["records"]) == 1
     record = store["records"][0]
     assert record["field"] == "forcefield"
@@ -80,28 +79,28 @@ def test_ff_ingest_adds_only_verified_sources(tmp_path):
 
 def test_ff_ingest_is_idempotent(tmp_path):
     store_path = str(tmp_path / "protocol_evidence_ff.json")
-    ipe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
-    second = ipe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
+    pe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
+    second = pe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
 
     assert second["records_added"] == 0
     assert second["records_skipped_duplicate"] == 1
-    store = pes.load_store(store_path, with_methodology=True)
+    store = pe.load_store(store_path, with_methodology=True)
     assert len(store["records"]) == 1
 
 
 def test_ff_ingest_dry_run_does_not_write(tmp_path):
     store_path = str(tmp_path / "protocol_evidence_ff.json")
-    result = ipe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path, dry_run=True)
+    result = pe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path, dry_run=True)
     assert result["records_added"] == 1
     assert not Path(store_path).exists()
 
 
 def test_system_size_ingest_populates_system_size_value(tmp_path):
     store_path = str(tmp_path / "protocol_evidence_system_size.json")
-    result = ipe.ingest("system_size", SYSTEM_SIZE_ADVISORY, run_name="PE1", store_path=store_path)
+    result = pe.ingest("system_size", SYSTEM_SIZE_ADVISORY, run_name="PE1", store_path=store_path)
 
     assert result["records_added"] == 1
-    store = pes.load_store(store_path)
+    store = pe.load_store(store_path)
     record = store["records"][0]
     assert record["field"] == "system_size"
     assert record["value"]["dp_typical"] == 60
@@ -114,9 +113,9 @@ def test_system_size_ingest_lifts_kuhn_fields_when_present(tmp_path):
                                "kuhn_length_A": 20.0, "kuhn_molar_mass_gmol": 1500.0,
                                "kuhn_source_note": "test fixture derivation"}}
     store_path = str(tmp_path / "protocol_evidence_system_size.json")
-    ipe.ingest("system_size", advisory, run_name="PE1", store_path=store_path)
+    pe.ingest("system_size", advisory, run_name="PE1", store_path=store_path)
 
-    store = pes.load_store(store_path)
+    store = pe.load_store(store_path)
     value = store["records"][0]["value"]
     assert value["kuhn_length_A"] == 20.0
     assert value["kuhn_molar_mass_gmol"] == 1500.0
@@ -125,9 +124,9 @@ def test_system_size_ingest_lifts_kuhn_fields_when_present(tmp_path):
 
 def test_system_size_ingest_kuhn_fields_default_to_none_when_absent(tmp_path):
     store_path = str(tmp_path / "protocol_evidence_system_size.json")
-    ipe.ingest("system_size", SYSTEM_SIZE_ADVISORY, run_name="PE1", store_path=store_path)
+    pe.ingest("system_size", SYSTEM_SIZE_ADVISORY, run_name="PE1", store_path=store_path)
 
-    store = pes.load_store(store_path)
+    store = pe.load_store(store_path)
     value = store["records"][0]["value"]
     assert value["kuhn_length_A"] is None
     assert value["kuhn_molar_mass_gmol"] is None
@@ -136,11 +135,11 @@ def test_system_size_ingest_kuhn_fields_default_to_none_when_absent(tmp_path):
 def test_ingest_canonicalizes_smiles_at_write_time(tmp_path, monkeypatch):
     # canon_smiles.canonicalize shells into a conda env; stub it so this test exercises
     # ingest's own call-and-store-result logic, not real RDKit.
-    monkeypatch.setattr(ipe, "canonicalize", lambda smi, *a, **k: "CANONICAL_FORM")
+    monkeypatch.setattr(pe, "canonicalize", lambda smi, *a, **k: "CANONICAL_FORM")
     store_path = str(tmp_path / "protocol_evidence_ff.json")
-    ipe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
+    pe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
 
-    store = pes.load_store(store_path, with_methodology=True)
+    store = pe.load_store(store_path, with_methodology=True)
     assert store["records"][0]["smiles"] == ["CANONICAL_FORM"]
 
 
@@ -148,16 +147,16 @@ def test_ingest_falls_back_to_raw_smiles_on_canonicalization_failure(tmp_path, m
     def _boom(smi, *a, **k):
         raise RuntimeError("conda env unavailable")
 
-    monkeypatch.setattr(ipe, "canonicalize", _boom)
+    monkeypatch.setattr(pe, "canonicalize", _boom)
     store_path = str(tmp_path / "protocol_evidence_ff.json")
-    ipe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
+    pe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
 
-    store = pes.load_store(store_path, with_methodology=True)
+    store = pe.load_store(store_path, with_methodology=True)
     assert store["records"][0]["smiles"] == [FF_ADVISORY["smiles"]]
 
 
 def test_ingest_skips_source_folded_from_store_hit(tmp_path):
-    # A source the worker folded in from a query_protocol_evidence.py hit (marked with
+    # A source the worker folded in from a `protocol_evidence.py query` hit (marked with
     # origin_record_id) must never be re-ingested as a new record -- the record already
     # exists under that id. Without this, a paraphrased claim would content-hash to a
     # different record_id and silently duplicate the original finding.
@@ -181,12 +180,12 @@ def test_ingest_skips_source_folded_from_store_hit(tmp_path):
         "dominant_uncertainty": "none", "notes": "test fixture",
     }
     store_path = str(tmp_path / "protocol_evidence_ff.json")
-    result = ipe.ingest("ff", store_hit_advisory, run_name="PE2", store_path=store_path)
+    result = pe.ingest("ff", store_hit_advisory, run_name="PE2", store_path=store_path)
 
     assert result["records_added"] == 0
     assert result["records_skipped_store_origin"] == 1
     assert result["records_skipped_duplicate"] == 0
-    store = pes.load_store(store_path, with_methodology=True)
+    store = pe.load_store(store_path, with_methodology=True)
     assert store["records"] == []  # nothing written -- the finding already lives elsewhere
 
 
@@ -204,11 +203,11 @@ def test_ingest_still_ingests_genuinely_new_sources_alongside_store_hit_sources(
         ],
     }
     store_path = str(tmp_path / "protocol_evidence_ff.json")
-    result = ipe.ingest("ff", mixed_advisory, run_name="PE2", store_path=store_path)
+    result = pe.ingest("ff", mixed_advisory, run_name="PE2", store_path=store_path)
 
     assert result["records_added"] == 1
     assert result["records_skipped_store_origin"] == 1
-    store = pes.load_store(store_path, with_methodology=True)
+    store = pe.load_store(store_path, with_methodology=True)
     assert len(store["records"]) == 1
     assert store["records"][0]["doi"] == "10.1/genuinely-new"
 
@@ -221,6 +220,6 @@ def test_ingest_rejects_record_missing_doi(tmp_path):
                      "claim": "a claim", "verified": True}],
     }
     store_path = str(tmp_path / "protocol_evidence_ff.json")
-    result = ipe.ingest("ff", broken_advisory, run_name="PE1", store_path=store_path)
+    result = pe.ingest("ff", broken_advisory, run_name="PE1", store_path=store_path)
     assert result["records_added"] == 0
     assert len(result["records_rejected"]) == 1

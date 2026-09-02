@@ -201,9 +201,21 @@ def test_materializer_applies_bounded_scientific_overrides():
     assert plan["plan_mode"] == "reasoned"
     assert plan["decided_params"]["stage8_min_steps"] == 8000000
     assert plan["decided_params"]["nchain"] == 12
-    assert plan["uncertainties"] == [{
+    assert plan["uncertainties"][0] == {
         "name": "sampling", "dominant": True, "reduction_probe": "none"
-    }]
+    }
+    # Everything after the dominant entry is a solve_system_size advisory, and every one of
+    # them must be non-dominant -- they disclose, they never take over the plan's headline
+    # uncertainty.
+    assert all(u.get("dominant") is False for u in plan["uncertainties"][1:])
+    # And they must quote the FINAL decided_params, not the pre-override derivation: this plan
+    # overrides nchain to 12, so an advisory about nchain has to say 12. It said 10 (the derived
+    # value) until materialize_plan started re-running solve_system_size against the final
+    # parameters -- a plan that contradicts its own decided_params is worse than one that
+    # discloses nothing.
+    nchain_advisories = [u for u in plan["uncertainties"] if "nchain" in u["name"]]
+    assert nchain_advisories, "expected an nchain advisory: nchain=12 is below the PCFF advisory minimum 20"
+    assert all("nchain=12" in u["detail"] for u in nchain_advisories)
     assert "decision_sha256" in plan["provenance"]
 
 
@@ -530,3 +542,54 @@ def test_planning_context_falls_back_to_raw_smiles_on_canonicalization_failure(t
     )
     context = planning_context(raw_intent)
     assert context["exact_smiles_characterization"] == cache_entry
+
+
+# --- D-04 system size: the plan DISCLOSES solve_system_size()'s advisories ----------------
+
+PEEK_SMILES = "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1"
+
+
+def _tg_plan(polymer_class: str, smiles: str, run_name: str) -> dict:
+    intent = ScientificIntent(run_name=run_name, goal="test", smiles=smiles,
+                              requested_properties=("tg",), polymer_class_hint=polymer_class)
+    decision = PlanDecision(polymer_class=polymer_class, properties=("tg",),
+                            rationale=("test",), dominant_uncertainty="sampling",
+                            confidence="high")
+    return materialize_plan(intent, decision)
+
+
+def test_stiff_backbone_chain_length_bias_reaches_the_plan():
+    """PEEK's aromatic rings are IN the backbone path, so solve_system_size classifies it
+    stiff and raises RIGID_BACKBONE_CHAIN_LENGTH_BIAS.
+
+    That advisory was computed and then dropped until 2026-09-02: materialize_plan read only
+    recommended_params/recommendation_reasons off the solve, so the uncertainty list it built
+    never saw it. The system-size design demoted rigidity from GATING the DP to REPORTING the
+    residual bias ("Reported, not gated" -- select_system_size._rigid_backbone_uncertainty),
+    which only holds up if the report actually lands somewhere a reader sees. This is that
+    wiring: a heavy aromatic repeat unit clears the 50k g/mol system-mass floor at a very
+    short DP, and nothing else in the plan says so."""
+    plan = _tg_plan("PKTN", PEEK_SMILES, "RIGIDITY_DISCLOSURE_TEST")
+    bias = [u for u in plan["uncertainties"] if u["name"] == "RIGID_BACKBONE_CHAIN_LENGTH_BIAS"]
+    assert len(bias) == 1, [u["name"] for u in plan["uncertainties"]]
+    assert bias[0]["class"] == "stiff"
+    assert bias[0]["dominant"] is False, "advisory only -- it must never displace the headline"
+    assert "UNQUANTIFIED" in bias[0]["detail"]
+
+
+def test_flexible_backbone_carries_no_chain_length_bias_advisory():
+    """The counterpart: PE is flexible, so there is no rigid-backbone bias to disclose. A
+    disclosure that fires on every plan tells a reader nothing."""
+    plan = _tg_plan("PHYC", "*CC*", "RIGIDITY_FLEXIBLE_TEST")
+    names = {u["name"] for u in plan["uncertainties"]}
+    assert "RIGID_BACKBONE_CHAIN_LENGTH_BIAS" not in names
+
+
+def test_plan_size_advisories_never_displace_the_dominant_uncertainty():
+    """Every advisory folded in from solve_system_size is non-dominant, and the planner's own
+    dominant uncertainty stays first -- validate_run_plan.py's _uncertainty_findings requires
+    exactly one named dominant entry, so a plumbing mistake here is a structural finding."""
+    plan = _tg_plan("PKTN", PEEK_SMILES, "RIGIDITY_DOMINANCE_TEST")
+    assert plan["uncertainties"][0] == {"name": "sampling", "dominant": True,
+                                        "reduction_probe": "none"}
+    assert sum(1 for u in plan["uncertainties"] if u.get("dominant")) == 1

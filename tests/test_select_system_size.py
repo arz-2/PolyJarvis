@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import canon_smiles  # noqa: E402
-import hw_common  # noqa: E402
+import rules_common  # noqa: E402
 import select_system_size as sss  # noqa: E402
 from select_system_size import (select_system_size, solve_system_size, _fox_flory_floor,
                                 property_floors, MIN_NCHAIN)  # noqa: E402
@@ -51,9 +51,9 @@ def _clear_derive_cell_cache():
 
 @pytest.fixture(autouse=True)
 def _clear_canon_cache():
-    hw_common._canon_for_match.cache_clear()
+    rules_common._canon_for_match.cache_clear()
     yield
-    hw_common._canon_for_match.cache_clear()
+    rules_common._canon_for_match.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -82,7 +82,7 @@ def _patch_class_member_smiles(monkeypatch, polymer_class, member_smiles):
     """Real class entry with member_smiles overridden to the test's own SMILES constants,
     so matching is trivial under the identity-patched canonicalizer without depending on
     guides/polymer_rules.json's real curated (truly canonical) forms."""
-    cls = copy.deepcopy(hw_common.get_class_entry(hw_common.load_rules(), polymer_class))
+    cls = copy.deepcopy(rules_common.get_class_entry(rules_common.load_rules(), polymer_class))
     cls["member_smiles"] = member_smiles
     monkeypatch.setattr(sss, "load_rules", lambda: {"classes": {polymer_class: cls}})
     monkeypatch.setattr(sss, "get_class_entry",
@@ -543,7 +543,7 @@ def test_me_estimated_gmol_computes_dp_at_me_the_same_way_a_documented_table_me_
 #
 # _backbone_rigidity/_monomer_atoms_and_mw default to inert stand-ins for every test in
 # this file (see the autouse fixture above) -- these tests explicitly override them to
-# exercise the new feature. Real backbone_rigidity.py classification correctness (does a
+# exercise the new feature. Real rigidity classification correctness (does a
 # given SMILES actually come out flexible/semi_rigid/stiff) is tested separately in
 # test_backbone_rigidity.py against real RDKit; these tests only cover
 # solve_system_size()'s arithmetic given a rigidity result.
@@ -603,7 +603,7 @@ def test_rigidity_flexible_carries_no_chain_length_bias_uncertainty(monkeypatch)
 
 
 def test_rigidity_estimate_failure_is_advisory_only(monkeypatch):
-    """backbone_rigidity.py subprocess failing (missing rdkit/conda, timeout) must not
+    """The rigidity subprocess failing (missing rdkit/conda, timeout) must not
     crash the solve or silently change the recommendation -- just note it."""
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (2, 100.0))
     monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: None)

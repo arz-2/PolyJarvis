@@ -1,5 +1,5 @@
 {
-  "_description": "Local modifications to the installed EMC field tree (~/emc/field). The stock/ copies are the vendor baseline; the .patch files reproduce the installed state from it. orchestration/scripts/emc_fields.py --verify checks the installed tree against these hashes; --patched-rows feeds ff_provenance.py the set of locally authored parameter rows.",
+  "_description": "Local modifications to the installed EMC field tree (~/emc/field). The stock/ copies are the vendor baseline; the .patch files reproduce the installed state from it. orchestration/scripts/forcefield.py emc-fields --verify checks the installed tree against these hashes; --patched-rows feeds forcefield.py's provenance section the set of locally authored parameter rows.",
   "emc_root_default": "~/emc",
   "fields": {
     "opls/2024/opls-aa": {

@@ -15,12 +15,12 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-from ff_provenance import (  # noqa: E402
+from forcefield import (  # noqa: E402
     FrcField,
     PrmField,
     _match,
     _tok,
-    assess,
+    assess_provenance,
     open_field,
     parse_params,
 )
@@ -124,7 +124,7 @@ def test_no_source_row_is_zero_across_the_archive():
         field = _field_of(cell)
         if not field:
             continue
-        r = assess(str(cell), field)
+        r = assess_provenance(str(cell), field)
         n = r.get("counts", {}).get("NO_SOURCE_ROW", 0)
         if n:
             offenders[cell.parents[1].name] = n
@@ -138,7 +138,7 @@ def test_no_local_patch_under_pcff():
     for cell in _cells():
         if _field_of(cell) != "pcff":
             continue
-        r = assess(str(cell), "pcff")
+        r = assess_provenance(str(cell), "pcff")
         assert not r["counts"].get("LOCAL_PATCH"), cell
 
 
@@ -148,7 +148,7 @@ def test_zero_impropers_are_advisory_not_blocking():
     """A zero out-of-plane term is the norm for sp3 centres and appears in every
     archived cell. Escalating it would make the whole archive unrunnable."""
     cell = next(c for c in _cells() if c.parents[1].name.startswith("PMMA"))
-    r = assess(str(cell), "pcff")
+    r = assess_provenance(str(cell), "pcff")
     zeros = [f for f in r["findings"] if "ZERO_SUBSTITUTED" in f["flags"]]
     assert zeros, "PMMA cells carry zeroed improper rows"
     assert all(f["kind"] == "improper" and f["severity"] == "advisory" for f in zeros)
@@ -162,7 +162,7 @@ def test_check_is_existence_not_value_equality():
     """A wrong-but-present parameter is out of scope, and the note must keep saying so
     -- reproducing EMC's values would trade a reliable check for an unreliable one."""
     cell = next(c for c in _cells() if c.parents[1].name.startswith("PMMA"))
-    r = assess(str(cell), "pcff")
+    r = assess_provenance(str(cell), "pcff")
     assert "Existence check only" in r["note"]
 
 
@@ -170,7 +170,7 @@ def test_no_source_row_never_blocks():
     """A gap in this parser must not demote a field or reject a plan -- that would let
     a lookup bug silently change which force field a run uses. cis-PBD under PCFF was
     the live case: one unmatched out-of-plane permutation demoted the field entirely."""
-    from ff_provenance import _severity
+    from forcefield import _severity
     assert _severity(["NO_SOURCE_ROW"], "improper") == "self_check"
     assert _severity(["NO_SOURCE_ROW"], "torsion") == "self_check"
     assert _severity(["LOCAL_PATCH"], "torsion") == "blocking"
@@ -192,5 +192,5 @@ def test_out_of_plane_matching_permutes_substituents():
 @needs_emc
 def test_cross_terms_are_reported_unchecked_not_dropped():
     cell = next(c for c in _cells() if c.parents[1].name.startswith("PMMA"))
-    r = assess(str(cell), "pcff")
+    r = assess_provenance(str(cell), "pcff")
     assert r["unchecked_cross_terms"], "Class II cross terms must be reported, not hidden"

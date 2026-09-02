@@ -198,7 +198,7 @@ def test_cost_model_now_prices_the_declared_deform_fallback():
     It now reads the declaration. Note it reads the PLAN, not the registry: the registry knows
     deform is murnaghan's fallback slot, but whether that slot attaches is a per-plan regime
     call, so pricing off the registry would charge every rubbery plan for a path it never has."""
-    import cost_model
+    import select_hardware as cost_model
 
     glassy = mdp.build_planned_stages(RULES["classes"]["PACR"], {"bulk_modulus"},
                                       _first_member_smiles("PACR"))

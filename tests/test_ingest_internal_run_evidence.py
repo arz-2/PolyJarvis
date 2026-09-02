@@ -1,4 +1,4 @@
-"""ingest_internal_run_evidence.py — turns a completed, validated PolyJarvis run into
+"""protocol_evidence.py ingest-internal — turns a completed, validated PolyJarvis run into
 protocol evidence for planning OTHER polymers, closing the gap between
 guides/system_characterization_cache.json (same-SMILES-only replay) and
 docs/protocol_evidence_ff.json / protocol_evidence_system_size.json (class/analogue
@@ -14,8 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import canon_smiles  # noqa: E402
-import ingest_internal_run_evidence as iire  # noqa: E402
-import protocol_evidence_store as pes  # noqa: E402
+import protocol_evidence as pe  # noqa: E402
 
 PMMA_SMILES = "*CC(*)(C)C(=O)OC"
 
@@ -61,7 +60,7 @@ def _identity_canonicalize(monkeypatch):
 
 
 def test_evidence_records_cover_only_protocol_choice_fields():
-    records = iire.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
+    records = pe.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
     fields = {r["field"] for r in records}
     assert fields == {"forcefield", "electrostatics", "system_size", "cooling_rate"}
 
@@ -70,7 +69,7 @@ def test_evidence_records_never_emit_measured_value_fields():
     # Gates bind on validity, not accuracy -- a run's acceptance never certifies a
     # measured density/Tg/CTE value is correct, only that the protocol choice it used
     # produced a valid simulation. See the module docstring.
-    records = iire.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
+    records = pe.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
     fields = {r["field"] for r in records}
     assert "density_target" not in fields
     assert "tg_target" not in fields
@@ -78,7 +77,7 @@ def test_evidence_records_never_emit_measured_value_fields():
 
 
 def test_evidence_records_use_internal_trust_tier_and_pseudo_doi():
-    records = iire.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
+    records = pe.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
     for r in records:
         assert r["trust_tier"] == "internal_validated_run"
         assert r["doi"] == "internal-run:PE1"
@@ -90,24 +89,24 @@ def test_evidence_records_use_internal_trust_tier_and_pseudo_doi():
 
 
 def test_forcefield_record_value_matches_decision_choice():
-    records = iire.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
+    records = pe.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
     ff = next(r for r in records if r["field"] == "forcefield")
     assert ff["value"]["recommendation"] == "pcff"
 
 
 def test_charges_decision_never_mapped_no_matching_field_enum():
-    records = iire.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
+    records = pe.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
     assert not any("charges" in r["field"] for r in records)
 
 
 def test_all_records_pass_schema_validation():
-    records = iire.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
+    records = pe.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
     for r in records:
-        assert pes.validate_record(r) == []
+        assert pe.validate_record(r) == []
 
 
 def test_blocked_entry_yields_no_records():
-    assert iire.evidence_records_from_completed_run(BLOCKED_ENTRY, "cisPBD1", "*C=CC=C*") == []
+    assert pe.evidence_records_from_completed_run(BLOCKED_ENTRY, "cisPBD1", "*C=CC=C*") == []
 
 
 def test_missing_decisions_and_measurements_yields_partial_records():
@@ -117,7 +116,7 @@ def test_missing_decisions_and_measurements_yields_partial_records():
         "protocol": {"decided_params": {}, "decisions": [], "planned_stages": []},
         "simulated_properties": {},
     }
-    assert iire.evidence_records_from_completed_run(sparse_entry, "PE2", "*CC*") == []
+    assert pe.evidence_records_from_completed_run(sparse_entry, "PE2", "*CC*") == []
 
 
 def _write_run_fixture(tmp_path, run_name, smiles):
@@ -134,14 +133,14 @@ def test_ingest_from_completed_run_writes_both_stores(tmp_path):
     ff_store = tmp_path / "protocol_evidence_ff.json"
     size_store = tmp_path / "protocol_evidence_system_size.json"
 
-    result = iire.ingest_from_completed_run(
+    result = pe.ingest_from_completed_run(
         "PE1", repo_root=tmp_path, cache_path=cache_path,
         ff_store_path=ff_store, system_size_store_path=size_store)
 
     assert result["status"] == "written"
     assert result["records_added"] == 4
-    ff_data = pes.load_store(str(ff_store), with_methodology=True)
-    size_data = pes.load_store(str(size_store))
+    ff_data = pe.load_store(str(ff_store), with_methodology=True)
+    size_data = pe.load_store(str(size_store))
     assert len(ff_data["records"]) == 3  # forcefield, electrostatics, cooling_rate
     assert len(size_data["records"]) == 1
     assert size_data["records"][0]["field"] == "system_size"
@@ -156,15 +155,15 @@ def test_ingest_from_completed_run_content_is_stable_across_reingest(tmp_path):
     ff_store = tmp_path / "protocol_evidence_ff.json"
     size_store = tmp_path / "protocol_evidence_system_size.json"
 
-    iire.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path,
+    pe.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path,
                                     ff_store_path=ff_store, system_size_store_path=size_store)
-    second = iire.ingest_from_completed_run(
+    second = pe.ingest_from_completed_run(
         "PE1", repo_root=tmp_path, cache_path=cache_path,
         ff_store_path=ff_store, system_size_store_path=size_store)
 
     assert second["records_replaced"] == 4  # prior generation stripped before re-adding
-    ff_data = pes.load_store(str(ff_store), with_methodology=True)
-    size_data = pes.load_store(str(size_store))
+    ff_data = pe.load_store(str(ff_store), with_methodology=True)
+    size_data = pe.load_store(str(size_store))
     assert len(ff_data["records"]) == 3
     assert len(size_data["records"]) == 1
 
@@ -179,16 +178,16 @@ def test_reingest_after_revalidation_replaces_not_accumulates(tmp_path):
     size_store = tmp_path / "protocol_evidence_system_size.json"
 
     cache_path.write_text(json.dumps({PMMA_SMILES: VALIDATED_ENTRY}))
-    iire.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path,
+    pe.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path,
                                     ff_store_path=ff_store, system_size_store_path=size_store)
 
     revalidated_entry = json.loads(json.dumps(VALIDATED_ENTRY))  # deep copy
     revalidated_entry["protocol"]["decisions"][0]["choice"] = "compass"  # FF choice changed
     cache_path.write_text(json.dumps({PMMA_SMILES: revalidated_entry}))
-    iire.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path,
+    pe.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path,
                                     ff_store_path=ff_store, system_size_store_path=size_store)
 
-    ff_data = pes.load_store(str(ff_store), with_methodology=True)
+    ff_data = pe.load_store(str(ff_store), with_methodology=True)
     ff_records = [r for r in ff_data["records"] if r["field"] == "forcefield"]
     assert len(ff_records) == 1  # not two disagreeing generations
     assert ff_records[0]["value"]["recommendation"] == "compass"
@@ -199,7 +198,7 @@ def test_ingest_skips_when_no_cache_entry_for_smiles(tmp_path):
     cache_path = tmp_path / "system_characterization_cache.json"
     cache_path.write_text(json.dumps({}))  # no entry at all
 
-    result = iire.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path)
+    result = pe.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path)
     assert result["status"] == "skipped"
 
 
@@ -208,10 +207,10 @@ def test_ingest_skips_blocked_cache_entry(tmp_path):
     cache_path = tmp_path / "system_characterization_cache.json"
     cache_path.write_text(json.dumps({"*C=CC=C*": BLOCKED_ENTRY}))
 
-    result = iire.ingest_from_completed_run("cisPBD1", repo_root=tmp_path, cache_path=cache_path)
+    result = pe.ingest_from_completed_run("cisPBD1", repo_root=tmp_path, cache_path=cache_path)
     assert result["status"] == "skipped"
 
 
 def test_ingest_skips_when_run_plan_missing(tmp_path):
-    result = iire.ingest_from_completed_run("NoSuchRun", repo_root=tmp_path)
+    result = pe.ingest_from_completed_run("NoSuchRun", repo_root=tmp_path)
     assert result["status"] == "skipped"

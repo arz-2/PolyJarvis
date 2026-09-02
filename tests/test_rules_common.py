@@ -1,4 +1,4 @@
-"""hw_common.resolve_member / resolve_member_value: member-identity resolution via SMILES,
+"""rules_common.resolve_member / resolve_member_value: member-identity resolution via SMILES,
 the shared mechanism every run_name-matching consumer this codebase used to hand-roll now
 goes through. canon_smiles.canonicalize shells into a conda env, so it's monkeypatched here
 rather than actually invoked.
@@ -12,15 +12,15 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 
 import canon_smiles  # noqa: E402
-import hw_common  # noqa: E402
-from hw_common import resolve_member, resolve_member_value  # noqa: E402
+import rules_common  # noqa: E402
+from rules_common import resolve_member, resolve_member_value  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
 def _clear_canon_cache():
-    hw_common._canon_for_match.cache_clear()
+    rules_common._canon_for_match.cache_clear()
     yield
-    hw_common._canon_for_match.cache_clear()
+    rules_common._canon_for_match.cache_clear()
 
 
 CLS = {

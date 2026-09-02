@@ -15,7 +15,7 @@ sweep confirming both plateau before DP reaches entanglement), not DP>=DP@Me.
 Nothing checked either before this script existed: dp_typical/nchain were read straight
 off static per-class literals with no admissibility logic, unlike D-01/D-08 which each
 have a select_*.py that measures rather than transcribes. This is that script for D-04
--- same contract as select_forcefield.py: a checker against already-cited numbers, not a
+-- same contract as forcefield.py: a checker against already-cited numbers, not a
 new formula.
 
 Two literature values already sit in polymer_rules.json's _metadata.global_notes and are
@@ -45,7 +45,7 @@ tuning knob, and this script has no way to know a SMILES's validation status. An
 gap (class default is BELOW its own documented floor) is what D-04's require clause is
 actually about, and IS a decided_params_override candidate (or, if declined, an
 uncertainty that must be acknowledged) -- same acknowledgeable-flag pattern as
-select_forcefield.py's provenance flag.
+forcefield.py's provenance flag.
 
 nchain: no pre-build Rg predictor exists in this repo, and building one (e.g.
 Rg ~ b*sqrt(C_inf*N)) would be exactly the invented-physics shortcut this script avoids
@@ -61,7 +61,7 @@ Usage:
   python3 orchestration/scripts/select_system_size.py <CLASS> "<SMILES>" \\
       [--properties tg,bulk_modulus] [--dp_typical N] [--nchain N]
 Prints JSON, always exits 0 (errors are {"error": ...} in the payload, matching
-select_forcefield.py -- callers parse JSON, never a traceback).
+forcefield.py -- callers parse JSON, never a traceback).
 """
 import argparse
 import json
@@ -71,9 +71,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hw_common import load_rules, get_class_entry, resolve_member  # noqa: E402
+from rules_common import load_rules, get_class_entry, resolve_member  # noqa: E402
 from select_hardware import _monomer_atoms_and_mw               # noqa: E402
-from mol_python import run_in_mol_env                            # noqa: E402
+from mol_python import run_in_mol_env, RDKIT_CLI                 # noqa: E402
 
 # ─── Cell size, derived per SMILES ────────────────────────────────────────────────
 #
@@ -229,14 +229,13 @@ def _entanglement_floor(polymer_class: str, smiles: str, cls: dict):
 
 
 def _backbone_rigidity(smiles: str, timeout: int = 30):
-    """Wrapper for backbone_rigidity.py -- RDKit lives in the radonpy conda env, not
+    """Wrapper for rdkit_cli.py's `rigidity` -- RDKit lives in the radonpy conda env, not
     base, reached via mol_python.run_in_mol_env() (same seam
     stage_params.py's _estimate_tg_group_contribution uses). Returns the parsed result
     dict, or None on any failure (missing rdkit/conda, timeout, unparseable SMILES) --
     advisory only, never worth crashing plan resolution over."""
-    script = Path(__file__).resolve().parent / "backbone_rigidity.py"
     try:
-        r = run_in_mol_env(script_path=script, args=["--smiles", smiles, "--output", "json"],
+        r = run_in_mol_env(script_path=RDKIT_CLI, args=["rigidity", "--smiles", smiles],
                             timeout=timeout)
         result = json.loads(r.stdout.strip())
     except Exception:
@@ -607,7 +606,7 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
             if rigidity is None:
                 uncertainties.append({
                     "name": "backbone_rigidity_estimate_failed", "dominant": False,
-                    "detail": "backbone_rigidity.py subprocess failed or timed out -- "
+                    "detail": "rdkit_cli.py rigidity subprocess failed or timed out -- "
                               "rigidity-based DP recommendation skipped for this SMILES",
                 })
             else:

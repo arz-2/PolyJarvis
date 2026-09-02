@@ -6,7 +6,7 @@ metadata:
 ---
 
 Re-audited PANH class defaults (poly(sebacic anhydride), `*OC(=O)CCCCCCCCC(*)=O`) on 2026-08-26.
-Store query (`query_protocol_evidence.py --store ff`) returned zero exact_smiles/exact_class hits
+Store query (`protocol_evidence.py query --store ff`) returned zero exact_smiles/exact_class hits
 for any field — only `similar_class` PEST (polyester) analogs at similarity 0.667. Fresh search
 (CrossRef + Semantic Scholar APIs, WebSearch budget was exhausted this session) for
 polyanhydride + MD/force-field/amorphous-cell/glass-transition returned only experimental
@@ -23,7 +23,7 @@ attempt).
 fresh search to close this gap — it has now failed twice (original + this audit). Treat PANH FF/
 electrostatics/cooling-rate/density/Tg grounding as permanently `confidence: low` until either (a)
 a genuinely new polyanhydride MD paper is published, or (b) an internal PolyJarvis PANH run is
-ingested via `ingest_internal_run_evidence.py` (which is the only path that can ever produce an
+ingested via `protocol_evidence.py ingest-internal` (which is the only path that can ever produce an
 `internal_validated_run` trust tier for this class). Also: `Afzal2021` (10.1021/acsapm.0c00524,
 the class's `ff_justification_doi`, an OPLS3e 315-polymer Tg screen) could not be independently
 verified to include/exclude polyanhydride coverage this session — ACS publisher page and ChemRxiv

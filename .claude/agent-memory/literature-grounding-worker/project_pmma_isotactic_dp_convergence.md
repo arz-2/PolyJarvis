@@ -34,7 +34,7 @@ orchestration decision_policy.json for how this grounding feeds into the run's s
 
 **Update (2026-08-25, EvidenceStoreVerify1 run)**: `docs/protocol_evidence_system_size.json` was
 found EMPTY at the start of this run — the i-PMMA1 finding above was apparently never ingested via
-`ingest_protocol_evidence.py` in the prior session (this worker only wrote agent-memory, not the
+`protocol_evidence.py ingest` in the prior session (this worker only wrote agent-memory, not the
 persistent store, back then). For plain PMMA (SMILES `*CC(*)(C)C(=O)OC`, no tacticity marker,
 PACR class), re-verified Min 2014 (DOI 10.1002/polb.23437) via WebFetch — still resolves and still
 states DP=200 convergence / DP=252,nchain=12 production. Ingested this as the first record in the

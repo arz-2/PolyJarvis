@@ -222,7 +222,7 @@ def test_tg_window_brackets_the_md_tg_not_just_the_experimental_one(cid):
     members (PEO/PPO/PVME, exp Tg 198-242 -> MD ~362 K) cleared even the old 440 K
     top, so this test passed, while 24 of the 66 POXI entries in RadonPy's PI1070 set
     had an estimated MD Tg above 440 K. Detecting that required scoring the class's
-    actual chemical space with estimate_tg_group_contribution.py, and the real fix is
+    actual chemical space with rdkit_cli.py tg-estimate, and the real fix is
     to resolve the window per-SMILES from that estimator rather than per class.
     """
     entry = CLASSES[cid]

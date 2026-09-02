@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 from stage_params import resolve_stage_params, apply_plan, resolve_hardware, load_plan  # noqa: E402
-from hw_common import load_rules, get_class_entry  # noqa: E402
+from rules_common import load_rules, get_class_entry  # noqa: E402
 import run_campaign as rdr  # noqa: E402
 from run_campaign import (  # noqa: E402
     _base_args, wait_for_analysis, do_equil_and_check, do_summary, do_build, COMPRESSION_RATIO,
@@ -54,7 +54,7 @@ def plan_files(tmp_path_factory):
     paths = {}
     for cls in SCRIPTED_PATH_CLASSES:
         out = d / f"{cls}.json"
-        _run([str(MAKE_PLAN), "--run_name", f"DRT_{cls}", "--polymer_class", cls, "--out", str(out)])
+        _run([str(MAKE_PLAN), "run-plan", "--run_name", f"DRT_{cls}", "--polymer_class", cls, "--out", str(out)])
         paths[cls] = out
     return paths
 
@@ -317,7 +317,7 @@ def equil_check_args_cls():
     import tempfile
     tmp = Path(tempfile.mkdtemp())
     plan_path = tmp / f"{cls}.json"
-    _run([str(MAKE_PLAN), "--run_name", f"DRTU_{cls}", "--polymer_class", cls, "--out", str(plan_path)])
+    _run([str(MAKE_PLAN), "run-plan", "--run_name", f"DRTU_{cls}", "--polymer_class", cls, "--out", str(plan_path)])
     rules = load_rules()
     cls_raw = get_class_entry(rules, cls, warn_on_miss=False)
     plan = load_plan(str(plan_path))
@@ -987,7 +987,7 @@ def test_run_campaign_workflow_writes_cache_on_acceptance(tmp_path, monkeypatch)
     monkeypatch.setattr(wcc, "write_characterization_cache",
                         lambda run_name, **kw: calls.append((run_name, kw)))
 
-    import ingest_internal_run_evidence as iire
+    import protocol_evidence as iire
     ingest_calls = []
     monkeypatch.setattr(iire, "ingest_from_completed_run",
                         lambda run_name, **kw: ingest_calls.append((run_name, kw)))
@@ -1008,7 +1008,7 @@ def test_run_campaign_workflow_skips_cache_write_when_not_accepted(tmp_path, mon
     monkeypatch.setattr(wcc, "write_characterization_cache",
                         lambda run_name, **kw: calls.append((run_name, kw)))
 
-    import ingest_internal_run_evidence as iire
+    import protocol_evidence as iire
     ingest_calls = []
     monkeypatch.setattr(iire, "ingest_from_completed_run",
                         lambda run_name, **kw: ingest_calls.append((run_name, kw)))
@@ -1030,7 +1030,7 @@ def test_run_campaign_workflow_cache_write_failure_does_not_propagate(tmp_path, 
         raise RuntimeError("disk full")
     monkeypatch.setattr(wcc, "write_characterization_cache", _boom)
 
-    import ingest_internal_run_evidence as iire
+    import protocol_evidence as iire
     monkeypatch.setattr(iire, "ingest_from_completed_run", lambda run_name, **kw: {"status": "written"})
 
     result = rdr.run_campaign_workflow(plan_path, repo_root=tmp_path)
@@ -1050,7 +1050,7 @@ def test_run_campaign_workflow_evidence_ingest_failure_does_not_propagate(tmp_pa
     monkeypatch.setattr(wcc, "write_characterization_cache",
                         lambda run_name, **kw: wcc_calls.append((run_name, kw)))
 
-    import ingest_internal_run_evidence as iire
+    import protocol_evidence as iire
 
     def _boom(run_name, **kw):
         raise RuntimeError("evidence store locked")

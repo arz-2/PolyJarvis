@@ -25,7 +25,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 
 import canon_smiles  # noqa: E402
-import hw_common  # noqa: E402
+import rules_common  # noqa: E402
 from stage_params import _exp_density_point, _exp_K_range  # noqa: E402
 
 PHYC = {
@@ -41,9 +41,9 @@ PHYC = {
 
 @pytest.fixture(autouse=True)
 def _clear_canon_cache():
-    hw_common._canon_for_match.cache_clear()
+    rules_common._canon_for_match.cache_clear()
     yield
-    hw_common._canon_for_match.cache_clear()
+    rules_common._canon_for_match.cache_clear()
 
 
 @pytest.fixture(autouse=True)

@@ -16,7 +16,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 
 import canon_smiles  # noqa: E402
-import hw_common  # noqa: E402
+import rules_common  # noqa: E402
 import stage_params  # noqa: E402
 from make_deterministic_plan import build_planned_stages, make_plan  # noqa: E402
 from validate_run_plan import _exp_tg_companion_findings  # noqa: E402
@@ -28,9 +28,9 @@ SINGLE_MEMBER = {"experimental_tg_K": 373}
 
 @pytest.fixture(autouse=True)
 def _clear_canon_cache():
-    hw_common._canon_for_match.cache_clear()
+    rules_common._canon_for_match.cache_clear()
     yield
-    hw_common._canon_for_match.cache_clear()
+    rules_common._canon_for_match.cache_clear()
 
 
 @pytest.fixture(autouse=True)

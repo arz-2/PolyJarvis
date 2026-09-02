@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hw_common import resolve_member_value  # noqa: E402  (still used by other callers of this module)
+from rules_common import resolve_member_value  # noqa: E402  (still used by other callers of this module)
 
 BINDING_GLASSY = {"density_drift", "density_sem", "energy_drift", "energy_sem",
                    "density_homogeneity", "p2", "n_eff_density", "finite_size"}

@@ -29,7 +29,7 @@ not WebSearch -- session's WebSearch budget was exhausted on this task):
   PCFF for bulk amorphous density/Tg use, since it's a different force field for a different regime.
 
 **Net call: kept PCFF/pppm class default** (admissibility already independently confirmed via
-select_forcefield.py; no literature argues against it) but flagged density/Tg/cooling-rate/CTE
+forcefield.py select; no literature argues against it) but flagged density/Tg/cooling-rate/CTE
 targets for linear PEI as still MD-literature-unvalidated defaults.
 
 See also [[feedback_publisher_webfetch_403_arxiv_fallback]] -- ScienceDirect/ResearchGate 403s were

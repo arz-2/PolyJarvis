@@ -37,8 +37,17 @@ import os
 import shlex
 import subprocess
 import tempfile
+from pathlib import Path
 
 MINIFORGE_ROOT = os.environ.get("POLYJARVIS_MINIFORGE_ROOT", os.path.expanduser("~/miniforge3"))
+
+RDKIT_CLI = Path(__file__).resolve().parent / "rdkit_cli.py"
+"""Every RDKit computation in this repo, as one in-env CLI (see rdkit_cli.py's docstring).
+
+It lives next to this module because reaching it and reaching the environment are the same
+problem: `run_in_mol_env(script_path=RDKIT_CLI, args=[subcommand, ...])` is the whole calling
+convention, and no orchestration module should import rdkit_cli directly.
+"""
 
 
 def run_in_mol_env(*, script: str | None = None, script_path=None, args=None,

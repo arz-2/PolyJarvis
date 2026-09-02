@@ -34,7 +34,7 @@ specific "32-chain C128" system-size claim (found only via search-engine summari
 to back dp_typical/nchain — logged as verified:false, context only. arXiv PDF direct-read
 worked fine and was the actual source of the verified claim.
 
-Ingest note: the arXiv source has no DOI, so `ingest_protocol_evidence.py` rejected it
+Ingest note: the arXiv source has no DOI, so `protocol_evidence.py ingest` rejected it
 ("missing 'doi'") even though verified:true — only the DOI-bearing PMC9698502 correction record
 made it into the persistent store (records_added=1). The store currently can't hold DOI-less
 preprint evidence even when it's the stronger/primary finding — future audits on other

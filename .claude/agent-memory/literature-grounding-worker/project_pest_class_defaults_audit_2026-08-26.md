@@ -46,4 +46,4 @@ mirror specifically for ma102084a — resolving it would upgrade this from "not 
 reportable "agreement" outcome (per the calling session's explicit request) without needing to
 invent or inflate a number — see [[project_phyc_class_defaults_audit_2026-08-26]] for the same
 pattern on PHYC. Also a clean example of the store's `verified:false` sources being correctly
-excluded from `ingest_protocol_evidence.py` (2 of 3 sources ingested, 1 skipped).
+excluded from `protocol_evidence.py ingest` (2 of 3 sources ingested, 1 skipped).

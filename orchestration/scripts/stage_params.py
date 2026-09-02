@@ -11,8 +11,9 @@ import json
 import sys
 from functools import lru_cache
 from pathlib import Path
-from hw_common import load_rules, resolve_ff_family, get_class_entry, host_matches, live_host, resolve_member_value
-from mol_python import run_in_mol_env
+from rules_common import load_rules, resolve_ff_family, get_class_entry, resolve_member_value
+from hw_common import host_matches, live_host
+from mol_python import run_in_mol_env, RDKIT_CLI
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 RULES_PATH = REPO_ROOT / 'guides' / 'polymer_rules.json'
 
@@ -107,14 +108,14 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
 
 @lru_cache(maxsize=512)
 def _estimate_tg_group_contribution(smiles: str, timeout: int = 30) -> dict | None:
-    """Run estimate_tg_group_contribution.py in the `radonpy` conda env -- RDKit lives
-    there, not in `base`, reached via mol_python.run_in_mol_env() (same seam
-    canon_smiles.py uses). Returns the parsed result dict, or None on any failure
-    (missing rdkit/conda, timeout, unparseable SMILES, no motif match) -- this is an
-    advisory low-confidence estimate, never worth crashing plan resolution over."""
-    script = REPO_ROOT / 'orchestration' / 'scripts' / 'estimate_tg_group_contribution.py'
+    """Run rdkit_cli.py's `tg-estimate` in the `radonpy` conda env -- RDKit lives there, not
+    in `base`, reached via mol_python.run_in_mol_env() (same seam canon_smiles.py uses).
+    Returns the parsed result dict, or None on any failure (missing rdkit/conda, timeout,
+    unparseable SMILES, no motif match) -- this is an advisory low-confidence estimate,
+    never worth crashing plan resolution over."""
     try:
-        r = run_in_mol_env(script_path=script, args=["--smiles", smiles, "--output", "json"],
+        r = run_in_mol_env(script_path=RDKIT_CLI,
+                            args=["tg-estimate", "--smiles", smiles, "--output", "json"],
                             timeout=timeout)
         result = json.loads(r.stdout.strip())
     except Exception:
@@ -152,7 +153,7 @@ def _exp_tg_point(cls: dict, smiles: str | None=None):
             return est_tg
     return None
 
-TG_ESTIMATE_UNCERTAINTY_K = 80.0  # estimate_tg_group_contribution.py's own stated accuracy
+TG_ESTIMATE_UNCERTAINTY_K = 80.0  # rdkit_cli.py tg-estimate's own stated accuracy
 
 def _regime_exp_tg(cls: dict, smiles: str | None=None):
     """Tg for the glassy-vs-rubbery regime call, not _exp_tg_point's bracket estimate. Curated

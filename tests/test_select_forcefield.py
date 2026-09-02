@@ -16,10 +16,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-import emc_fields  # noqa: E402
-import ff_capability  # noqa: E402
-import select_forcefield as sf  # noqa: E402
-from select_forcefield import LINEAGE  # noqa: E402
+import forcefield as sf  # noqa: E402
+from forcefield import LINEAGE  # noqa: E402
 from validate_run_plan import _forcefield_findings  # noqa: E402
 
 EMC = Path.home() / "emc"
@@ -30,7 +28,7 @@ needs_emc = pytest.mark.skipif(not EMC.exists(), reason="no installed EMC field 
 
 def test_every_registered_field_has_a_lineage():
     """A field with no lineage would silently count as its own, inflating the spread."""
-    missing = sorted(set(ff_capability.FIELDS) - set(LINEAGE))
+    missing = sorted(set(sf.FIELDS) - set(LINEAGE))
     assert not missing, f"fields missing from LINEAGE: {missing}"
 
 
@@ -52,7 +50,7 @@ def _fake_field(candidate=True):
 
 
 def test_class_default_matched_case_insensitively(monkeypatch):
-    """polymer_rules.json's preferred_ff casing need not match ff_capability.FIELDS'
+    """polymer_rules.json's preferred_ff casing need not match sf.FIELDS'
     canonical (lowercase) keys -- e.g. PURA stores "GAFF2_mod" against the registry's
     "gaff2_mod". A class default that IS admissible must never be reported as
     inadmissible, and decided_params_override must never fire, merely because of a
@@ -60,7 +58,7 @@ def test_class_default_matched_case_insensitively(monkeypatch):
     branch and proposed overriding PURA's DOI-justified default to dreiding)."""
     fake_cap = {"fields": {"gaff2_mod": _fake_field(), "gaff": _fake_field(),
                           "gaff2": _fake_field(), "dreiding": _fake_field()}}
-    monkeypatch.setattr(sf.ff_capability, "assess_all", lambda *a, **k: fake_cap)
+    monkeypatch.setattr(sf, "assess_all", lambda *a, **k: fake_cap)
 
     result = sf.select_forcefield("PURA", "*NC(=O)N*")
     assert result["decision"]["choice"] == "gaff2_mod"
@@ -127,7 +125,7 @@ def test_plan_without_a_d01_row_is_unaffected():
 def test_manifest_lists_a_stock_baseline_for_every_patched_file():
     """Diffs alone are not enough: after a reinstall + --apply there is no .bak left to
     diff against, and --patched-rows would lose its reference."""
-    m = emc_fields.load_manifest()
+    m = sf.load_manifest()
     for field, spec in m["fields"].items():
         for basename, f in spec["files"].items():
             assert (REPO_ROOT / f["stock"]).exists(), f"{field}/{basename} has no baseline"
@@ -137,25 +135,25 @@ def test_manifest_lists_a_stock_baseline_for_every_patched_file():
 
 @needs_emc
 def test_verify_matches_the_installed_tree():
-    r = emc_fields.verify(emc_fields.load_manifest())
+    r = sf.verify(sf.load_manifest())
     assert r["ok"], json.dumps(r, indent=2)
 
 
 @needs_emc
 def test_verify_detects_drift(tmp_path):
-    m = emc_fields.load_manifest()
+    m = sf.load_manifest()
     root = tmp_path / "emc" / "field" / "opls" / "2024"
     root.mkdir(parents=True)
     src = EMC / "field" / "opls" / "2024"
     for name in ("opls-aa.define", "opls-aa.top", "opls-aa.prm"):
         (root / name).write_bytes((src / name).read_bytes())
     (root / "opls-aa.prm").write_text((root / "opls-aa.prm").read_text() + "\n")
-    assert not emc_fields.verify(m, str(tmp_path / "emc"))["ok"]
+    assert not sf.verify(m, str(tmp_path / "emc"))["ok"]
 
 
 @needs_emc
 def test_patched_rows_reports_the_locally_authored_parameters():
-    rows = emc_fields.patched_rows(emc_fields.load_manifest(), "opls/2024/opls-aa")
+    rows = sf.patched_rows(sf.load_manifest(), "opls/2024/opls-aa")
     assert rows["n_rows"] > 0
     assert "si4" in rows["typing_rules"]
     # the silanol terminal-cap torsions are the reason this record exists

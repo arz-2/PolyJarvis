@@ -20,11 +20,11 @@ REPO_ROOT = SCRIPT_DIR.parent.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import track_registry  # noqa: E402
 
-from hw_common import get_class_entry, load_rules  # noqa: E402
+from rules_common import get_class_entry, load_rules  # noqa: E402
 from make_deterministic_plan import build_decisions, build_planned_stages, make_plan  # noqa: E402
-from select_system_size import select_system_size, solve_system_size  # noqa: E402
+from select_system_size import solve_system_size  # noqa: E402
 import canon_smiles  # noqa: E402  -- module import so tests can monkeypatch canon_smiles.canonicalize
-import cost_model  # noqa: E402
+import select_hardware as cost_model  # noqa: E402  -- cost model merged into it 2026-09-02
 
 
 # Re-exported from the registry -- imported by name in several modules.
@@ -43,21 +43,8 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "T_equil_K": (100, 1500),
     "annealing_T_high_K": (100, 2000),
     "T_workflow_K": (100, 1500),
-    # A scalar replaces the class's (possibly multi-member-dict, possibly absent)
-    # experimental_tg_K wholesale via apply_plan's {**cls, **decided_params} overlay --
-    # _exp_tg_point already has an isinstance(tg, (int, float)) passthrough for exactly this
-    # shape. Lets the planning agent pin the correct experimental target when
-    # it has reasoned one out (multi-member disambiguation by substituent, a literature value,
-    # or an accepted group-contribution estimate for a genuinely novel SMILES) instead of
-    # relying on run_name-prefix matching against the class dict.
     "experimental_tg_K": (1, 1500),
-    # Same rationale as experimental_tg_K: a scalar replaces the class's (possibly
-    # multi-member-dict, possibly absent) experimental_density_gcm3 wholesale.
     "experimental_density_gcm3": (0.05, 3.0),
-    # exp_K_GPa is a flat {min,max} PER CLASS, not per-member -- e.g. PACR's is scoped to PMMA
-    # specifically even though PACR also covers PMA (see the class's own note). There is no
-    # existing per-member resolution to fix; these let the agent pin the correct range for
-    # whichever member this SMILES actually is.
     "exp_K_min_GPa": (0.001, 200),
     "exp_K_max_GPa": (0.001, 200),
     "P_equil_atm": (0.01, 100000),
@@ -106,9 +93,6 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "velocity_seed": (1, 999_999_999),
     "gpu_per_run": (0, 16),
     "mpi_ranks": (1, 256),
-    # Recovery-only levers the automatic remedy ladder itself writes (workflow_engine.py's
-    # _continue_npt/_murnaghan_resample) -- an agent picking a different value for the same
-    # lever needs the same bounds the ladder is held to.
     "npt_continuation_ns": (0.01, 1000),
     "mechanical_sampling_factor": (1, 10),
 }
@@ -121,8 +105,6 @@ ENUM_OVERRIDES = {
     "engine": frozenset({"gpu", "kokkos", "cpu"}),
     "tg_slope_gate_fallback": frozenset({"highest_rate", "slowest_rate"}),
     "mechanical_method": frozenset({"murnaghan", "deformation"}),
-    # The only values workflow_engine.py's _melt_hold/_cooling/_melt_homogeneity remedies
-    # themselves ever set -- an agent has no sanctioned reason to pick a different one.
     "equilibration_phase": frozenset({"melt_then_cool", "melt_only"}),
     "cooling_resume_source": frozenset({"accepted_melt", "remedied_melt"}),
 }
@@ -140,9 +122,7 @@ INTEGER_OVERRIDES = frozenset({
     "emc_seed", "velocity_seed", "gpu_per_run", "mpi_ranks", "tg_primary_rate_index",
     "mechanical_sampling_factor",
 })
-# Ladder bookkeeping (baseline_*, *_attempt, rerun_homogeneity_gate) is deliberately excluded
-# from every table above: an agent may pick a lever's value, never rewrite the ladder's own
-# accounting of what it already spent.
+
 ALLOWED_OVERRIDES = (frozenset(OVERRIDE_RANGES) | frozenset(ENUM_OVERRIDES) |
                      SEQUENCE_OVERRIDES | BOOLEAN_OVERRIDES)
 
@@ -400,10 +380,6 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     class_entry = dict(get_class_entry(rules, decision.polymer_class, warn_on_miss=False))
     effective_class = {**class_entry, **decision.overrides}
 
-    # D-04 system size: fill in the cost-minimizing recommendation for whichever of
-    # dp_typical/nchain the agent's own overrides didn't already decide. Safe here and only
-    # here -- materialize_plan() (unlike select_system_size.py's own live validator check)
-    # only ever produces plan_mode="reasoned" plans, never a protocol_validated replay.
     size_solve = solve_system_size(
         decision.polymer_class, intent.smiles, properties,
         dp_typical=class_entry.get("dp_typical"), nchain=class_entry.get("nchain"),
@@ -414,10 +390,6 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
         effective_class.update(auto_filled)
 
     _validate_protocol_relationships(effective_class, set(decision.overrides))
-    # Routing consequences of the requested observables (shear/Young's/Poisson only exist on
-    # the deformation path, so they pin mechanical_method). Applied FIRST, so an agent override
-    # still wins -- the plan may contradict the routing deliberately, it just never has to know
-    # the rule. Every key here is asserted to be in PARAMETER_STAGE by the registry lockstep test.
     plan["decided_params"].update(track_registry.forced_params_for(properties))
     plan["decided_params"].update(decision.overrides)
     plan["decided_params"].update(auto_filled)
@@ -444,37 +416,38 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
                         "solve_system_size() -- see D-04_system_size's evidence for why"]
                         if auto_filled else [])
 
-    # Self-acknowledge an over-provisioned final DP (whichever path set it -- literature
-    # grounding, or the agent's own override) so validate_run_plan.py's symmetric
-    # _system_size_over_provisioned_findings never has to guess at WHY a plan exceeds the
-    # mechanized floor; it only ever flags a plan that skipped this step entirely
-    # (hand-edited, or produced outside materialize_plan()).
-    #
-    # The auto-fill can no longer reach this since 2026-09-02: with class defaults removed,
-    # solve_system_size()'s recommendation IS the derived floor, so dp > 1.5 * floor is
-    # unreachable from it. An explicit override still reaches it (overrides are applied over
-    # the auto-fill), which is what keeps this branch worth having -- confirmed by running
-    # materialize_plan with an over-provisioned override, not by reading the code.
     final_dp = plan["decided_params"].get("dp_typical")
     over_provisioned_ack = []
+    final_size_advisories = []
     if final_dp is not None:
-        base_check = select_system_size(decision.polymer_class, intent.smiles,
-                                        properties=properties, dp_typical=final_dp,
-                                        nchain=plan["decided_params"].get("nchain"))
-        if any(u.get("name") == "size_over_provisioned"
-               for u in base_check.get("uncertainties", [])):
+        final_check = solve_system_size(
+            decision.polymer_class, intent.smiles, properties, dp_typical=final_dp,
+            nchain=plan["decided_params"].get("nchain"),
+            literature_grounding=_load_system_size_literature_grounding(intent.run_name))
+        final_size_advisories = list(final_check.get("uncertainties", []))
+        if any(u.get("name") == "size_over_provisioned" for u in final_size_advisories):
             over_provisioned_ack = [{"name": "system_size_over_provisioned", "dominant": False,
                                      "reduction_probe": "none"}]
 
-    # D-06 tg rate ladder is floor-only (tg_min_steps_per_T), never cost-optimized against a
-    # real accuracy-vs-rate curve -- no such curve exists anywhere in this codebase (see
-    # decision_policy.json's tg_protocol; only an aggregate fast-cooling bias is documented,
-    # not a per-rate slope). Surface the gap rather than silently assume the ladder is optimal;
-    # its real GPU-hours cost is already visible via cost_estimate above.
     tg_ladder_ack = ([{"name": "tg_ladder_cost_unoptimized", "dominant": False,
                        "reduction_probe": "none"}]
                       if any(s.get("stage") == "tg" for s in plan.get("planned_stages", []))
                       else [])
+
+    _SIZE_ADVISORIES_COVERED_ELSEWHERE = {"size_over_provisioned",
+                                          "nchain_below_production_minimum"}
+    plan_uncertainties = [{
+        "name": decision.dominant_uncertainty,
+        "dominant": True,
+        "reduction_probe": "none",
+    }] + over_provisioned_ack + tg_ladder_ack
+    seen_uncertainty_names = {u["name"] for u in plan_uncertainties}
+    for advisory in final_size_advisories:
+        name = advisory.get("name")
+        if name in seen_uncertainty_names or name in _SIZE_ADVISORIES_COVERED_ELSEWHERE:
+            continue
+        seen_uncertainty_names.add(name)
+        plan_uncertainties.append(advisory)
 
     plan.update({
         "goal": intent.goal,
@@ -482,11 +455,7 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
         "confidence": decision.confidence,
         "plan_mode": "reasoned",
         "assumptions": list(decision.assumptions) + size_assumptions,
-        "uncertainties": [{
-            "name": decision.dominant_uncertainty,
-            "dominant": True,
-            "reduction_probe": "none",
-        }] + over_provisioned_ack + tg_ladder_ack,
+        "uncertainties": plan_uncertainties,
         "critique": {
             "status": "scientific_agent_decision",
             "rounds": 1,
@@ -502,11 +471,7 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
         ).hexdigest(),
         "agent_rationale": list(decision.rationale),
     }
-    # Mechanizes decision_policy.json's gpu_budget/computational_cost criteria, which named
-    # a cost figure long before cost_model.py existed to compute one. Best-effort: an
-    # unresolvable estimate (e.g. RDKit atom-count failure) must never block plan
-    # materialization, so failures degrade to an explicit {"error": ...} payload rather than
-    # raising.
+
     try:
         plan["cost_estimate"] = cost_model.plan_cost_estimate(plan)
     except Exception as e:  # noqa: BLE001 -- cost estimation is advisory, never blocking

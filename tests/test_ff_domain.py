@@ -13,9 +13,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-from ff_domain import (  # noqa: E402
+from forcefield import (  # noqa: E402
     abundance_from_data,
-    assess,
+    assess_domain,
     build_vocabulary,
     cell_fingerprint,
     types_from_params,
@@ -81,7 +81,7 @@ VOCAB = {"pcff": {"c": ["PMMA"], "hc": ["PMMA"], "o_1": ["PMMA"]}}
 
 def test_all_types_known_is_in_domain():
     fp = {"types": ["c", "hc"], "atom_fraction": {"c": 0.4, "hc": 0.6}, "n_atoms": 10}
-    r = assess(fp, VOCAB, "pcff")
+    r = assess_domain(fp, VOCAB, "pcff")
     assert r["verdict"] == "FF_IN_DOMAIN"
     assert r["type_coverage"] == 1.0
     assert r["extrapolated_types"] == []
@@ -89,7 +89,7 @@ def test_all_types_known_is_in_domain():
 
 def test_new_type_is_extrapolating_and_reports_its_atom_share():
     fp = {"types": ["c", "cl"], "atom_fraction": {"c": 0.8, "cl": 0.2}, "n_atoms": 10}
-    r = assess(fp, VOCAB, "pcff")
+    r = assess_domain(fp, VOCAB, "pcff")
     assert r["verdict"] == "FF_EXTRAPOLATING"
     assert r["extrapolated_types"] == ["cl"]
     assert r["extrapolated_atom_fraction"] == 0.2
@@ -98,7 +98,7 @@ def test_new_type_is_extrapolating_and_reports_its_atom_share():
 def test_unused_field_has_no_domain_at_all():
     """COMPASS has never been run here, so it has no demonstrated domain -- that must
     be said explicitly rather than silently passing."""
-    r = assess({"types": ["c"], "atom_fraction": {}, "n_atoms": 1}, VOCAB, "compass")
+    r = assess_domain({"types": ["c"], "atom_fraction": {}, "n_atoms": 1}, VOCAB, "compass")
     assert r["verdict"] == "FF_UNAVAILABLE"
     assert "pcff" in r["validated_fields"]
 
@@ -109,7 +109,7 @@ def test_verdict_never_claims_to_predict_accuracy():
     extrapolates on 0.2% of atoms with the worst K error (+33%), cis-PBD on 49.8%
     with among the best densities (-0.2%)."""
     fp = {"types": ["c", "cl"], "atom_fraction": {"c": 0.8, "cl": 0.2}, "n_atoms": 10}
-    r = assess(fp, VOCAB, "pcff")
+    r = assess_domain(fp, VOCAB, "pcff")
     assert r["is_accuracy_prediction"] is False
     assert "NOT a prediction" in r["reason"]
     assert "Do not discard this field" in r["reason"]
@@ -122,7 +122,7 @@ def test_every_archived_run_is_in_domain_against_its_own_field():
     """Sanity floor: a run that helped define the vocabulary must be inside it."""
     import glob
     import os
-    from ff_domain import _field_of_run
+    from forcefield import _field_of_run
 
     vocab = build_vocabulary(str(ARCHIVE))
     checked = 0
@@ -132,7 +132,7 @@ def test_every_archived_run_is_in_domain_against_its_own_field():
         fp = cell_fingerprint(cell_dir)
         if not field or not fp:
             continue
-        assert assess(fp, vocab, field)["verdict"] == "FF_IN_DOMAIN", params
+        assert assess_domain(fp, vocab, field)["verdict"] == "FF_IN_DOMAIN", params
         checked += 1
     assert checked >= 30
 

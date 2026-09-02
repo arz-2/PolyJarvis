@@ -27,7 +27,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from select_hardware import select_hardware
 from select_system_size import select_system_size
-from hw_common import load_rules, get_class_entry, hardware_policy, host_matches
+from rules_common import load_rules, get_class_entry, hardware_policy
+from hw_common import host_matches
 
 _ENGINE_SCRIPTS = (Path(__file__).resolve().parents[2]
                    / "mcp-servers" / "mcp-lammps-engine" / "analysis_scripts")
@@ -275,7 +276,7 @@ def _family_has_multi_gpu_benchmark(fam: str) -> bool:
     """True iff some real measured point for this FF family (recommended_by_ff or
     size_points) actually used gpu_per_run>=2 ON A HOST MATCHING THIS ONE
     (hw_common.host_matches -- hardware_policy.host, the same host-match check
-    cost_model.estimate_ns_per_day itself uses). Every point calibrated so far (both fields)
+    select_hardware.estimate_ns_per_day itself uses). Every point calibrated so far (both fields)
     is gpu=1 -- select_hardware.py's cost_model-driven "high" confidence describes how well
     the ns_per_day NUMBER at a given atom count is supported, not whether a >=2-GPU pin is
     benchmarked, which is what this specific check claims to verify -- those are different
@@ -412,7 +413,7 @@ def _unimplemented_param_findings(plan: dict) -> list:
     return findings
 
 
-# NO_SOURCE_ROW is deliberately absent: it reports a gap in ff_provenance.py's own
+# NO_SOURCE_ROW is deliberately absent: it reports a gap in forcefield.py's provenance
 # lookup, not a defect in the field, and must never block a plan or change a field choice
 _PROVENANCE_BLOCKING = ("LOCAL_PATCH", "ZERO_SUBSTITUTED")
 
@@ -422,7 +423,7 @@ def _forcefield_findings(plan: dict) -> list:
 
     Admissibility is the one clause in policies.forcefield.require that a plan can
     silently violate: the class default applies whether or not the field can represent
-    the molecule, and the only previous symptom was the build crashing. select_forcefield.py
+    the molecule, and the only previous symptom was the build crashing. forcefield.py
     records what it measured; this checks the plan agrees with it.
     """
     findings = []
@@ -439,7 +440,7 @@ def _forcefield_findings(plan: dict) -> list:
             "detail": (f"D-01_ff.choice={choice!r} is not in the measured admissible set "
                        f"{admissible} — the field cannot integrate or cannot type this "
                        "SMILES, so the build will fail or the parameters are not this "
-                       "molecule's. Re-run orchestration/scripts/select_forcefield.py.")})
+                       "molecule's. Re-run orchestration/scripts/forcefield.py select.")})
     if isinstance(admissible, list) and not admissible:
         findings.append({
             "check": "ff_no_admissible_field", "severity": "structural",

@@ -21,9 +21,9 @@ No PVDF-specific entanglement Me or packing-length/C-infinity MD study was found
 targeted searches (bulk-modulus DP-convergence angle came up empty for PVDF specifically) — so no
 priority-2 packing-length Me estimate was attempted for this run.
 
-Ingested into `docs/protocol_evidence_system_size.json` via `ingest_protocol_evidence.py`
+Ingested into `docs/protocol_evidence_system_size.json` via `protocol_evidence.py ingest`
 (run_name PVDF_trace, 2026-08-26); future PVDF/PHAL queries should hit this record via
-`query_protocol_evidence.py` before a fresh search.
+`protocol_evidence.py query` before a fresh search.
 
 Related: [[feedback_publisher_domains_block_webfetch]] — electrochemsci.org PDF fetched fine
 (non-major-publisher open-access journal), unlike ACS/RSC/MDPI/ResearchGate.

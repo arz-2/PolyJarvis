@@ -1,7 +1,7 @@
 """
 select_hardware.py -- D-08 hardware selection now prices its one real candidate config
 (by_forcefield[fam], which IS the config recommended_by_ff/size_points measured) via
-cost_model.py's real multi-point interpolation instead of a hand-rolled single-point
+the merged cost model's real multi-point interpolation instead of a hand-rolled single-point
 in-window check. _monomer_atoms_and_mw shells into RDKit/conda -- monkeypatched everywhere
 here, same convention as tests/test_select_system_size.py.
 """
@@ -16,10 +16,11 @@ import select_hardware as sh  # noqa: E402
 
 def test_in_window_cell_gets_high_confidence_and_no_uncertainty(monkeypatch):
     monkeypatch.setattr(sh, "_monomer_atoms_and_mw", lambda smiles, is_ua: (10, 100.0))
-    # "high" confidence requires a host-matched box too (cost_model.estimate_ns_per_day());
-    # this test is about the in-window check, not live GPU fingerprinting, so pin it True --
-    # same convention tests/test_cost_model.py already uses throughout.
-    monkeypatch.setattr(sh.cost_model, "host_matches", lambda rules: True)
+    # "high" confidence requires a host-matched box too (estimate_ns_per_day()); this test is
+    # about the in-window check, not live GPU fingerprinting, so pin it True -- same convention
+    # tests/test_cost_model.py already uses throughout. host_matches is now a name in
+    # select_hardware's own globals (the cost model merged into it), not a nested module.
+    monkeypatch.setattr(sh, "host_matches", lambda rules: True)
     # PACR/pcff has real size_points bracketing [3020, 15040]; dp=50*nchain=15 -> 7500 atoms.
     result = sh.select_hardware("PACR", "*CC(C)(C(=O)OC)*", dp_typical=50, nchain=15)
     assert result["decision"]["confidence"] == "high"

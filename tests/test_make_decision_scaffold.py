@@ -9,9 +9,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-from make_decision_scaffold import make_decision_scaffold  # noqa: E402
+from make_deterministic_plan import make_decision_scaffold  # noqa: E402
 from make_deterministic_plan import build_decisions  # noqa: E402
-from hw_common import get_class_entry, load_rules  # noqa: E402
+from rules_common import get_class_entry, load_rules  # noqa: E402
 from scientific_control import PlanDecision, materialize_plan, ScientificIntent  # noqa: E402
 
 
@@ -90,8 +90,8 @@ def test_cli_refuses_to_overwrite_without_force(tmp_path):
     out_path = tmp_path / "decision.json"
     out_path.write_text("{}")
     result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "orchestration" / "scripts" / "make_decision_scaffold.py"),
-         "--run_name", "X", "--polymer_class", "PSTR", "--out", str(out_path)],
+        [sys.executable, str(REPO_ROOT / "orchestration" / "scripts" / "make_deterministic_plan.py"),
+         "decision", "--run_name", "X", "--polymer_class", "PSTR", "--out", str(out_path)],
         capture_output=True, text=True,
     )
     assert result.returncode != 0
@@ -103,8 +103,8 @@ def test_cli_force_overwrites(tmp_path):
     out_path = tmp_path / "decision.json"
     out_path.write_text("{}")
     result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "orchestration" / "scripts" / "make_decision_scaffold.py"),
-         "--run_name", "X", "--polymer_class", "PSTR", "--out", str(out_path), "--force"],
+        [sys.executable, str(REPO_ROOT / "orchestration" / "scripts" / "make_deterministic_plan.py"),
+         "decision", "--run_name", "X", "--polymer_class", "PSTR", "--out", str(out_path), "--force"],
         capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr

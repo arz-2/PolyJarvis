@@ -18,7 +18,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 
 from stage_params import _lammps_flags  # noqa: E402
-from hw_common import resolve_ff_family  # noqa: E402
+from rules_common import resolve_ff_family  # noqa: E402
 
 
 # ─── style-block selection ─────────────────────────────────────────────────────

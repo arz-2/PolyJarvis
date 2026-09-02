@@ -48,12 +48,12 @@ than expecting it as a separate prompt field. You are only ever invoked in the n
 
 ```bash
 # Part A fields (once per field you're grounding, plus one methodology-only call):
-python3 orchestration/scripts/query_protocol_evidence.py --store ff \
+python3 orchestration/scripts/protocol_evidence.py query --store ff \
   --polymer-class <CLASS> --smiles '<smiles>' --field <forcefield|electrostatics|cooling_rate|density_target|tg_target|cte_glass_melt>
-python3 orchestration/scripts/query_protocol_evidence.py --store ff --methodology-only
+python3 orchestration/scripts/protocol_evidence.py query --store ff --methodology-only
 
 # Part B (one call):
-python3 orchestration/scripts/query_protocol_evidence.py --store system_size \
+python3 orchestration/scripts/protocol_evidence.py query --store system_size \
   --polymer-class <CLASS> --smiles '<smiles>' --field system_size
 ```
 
@@ -65,7 +65,7 @@ exact_smiles|exact_class|similar_class` and the source's `trust_tier`) and, for 
 - An `exact_smiles` or `exact_class` hit at `trust_tier: "peer_reviewed_doi"` OR
   `"internal_validated_run"` for a field is strong enough that you **may skip that field's fresh
   search** — fold the hit directly into that field's `sources` and move to the next field.
-  `internal_validated_run` is a tier only `ingest_internal_run_evidence.py` ever assigns (from a
+  `internal_validated_run` is a tier only `protocol_evidence.py ingest-internal` ever assigns (from a
   completed PolyJarvis run) — you will only ever see it in query results, never assign it
   yourself; your own sources are always `peer_reviewed_doi`/`preprint`/`vendor`/`educational`.
 - A `similar_class` hit, or anything below `peer_reviewed_doi` trust, is a prior to fold in
@@ -172,7 +172,7 @@ threatens the run (e.g. "no class-specific FF validation found").
 **A7. Write verified new findings back to the persistent store** — after writing
 `ff_output_path`:
 ```bash
-python3 orchestration/scripts/ingest_protocol_evidence.py --store ff \
+python3 orchestration/scripts/protocol_evidence.py ingest --store ff \
   --from <ff_output_path> --run-name <run_name>
 ```
 This reads your own `ff_output_path` JSON and ingests every `verified: true` source into
@@ -249,7 +249,7 @@ provenance color. Search in priority order:
    converts a Kuhn value into a DP: `_kuhn_floor` and its ~7-Kuhn-segments-per-chain target were
    removed as unsourced (see the note under this item). Still worth reporting for the record and
    for `RIGID_BACKBONE_CHAIN_LENGTH_BIAS`, which names it as the missing quantity, but it will
-   not change the cell size. `orchestration/scripts/backbone_rigidity.py` still classifies the
+   not change the cell size. `orchestration/scripts/rdkit_cli.py rigidity` still classifies the
    backbone. Report a real Kuhn length (`lK`, Å) and Kuhn segment molar mass (`M_K`, g/mol).
    There is no static per-class Kuhn table in this repo (only PDMS has one, in
    `docs/protocol_evidence_system_size.json`, and only for entanglement Me, not this) — search
@@ -298,7 +298,7 @@ from a related class's entanglement-MW literature value only".
 **B7. Write verified new findings back to the persistent store** — after writing
 `system_size_output_path`:
 ```bash
-python3 orchestration/scripts/ingest_protocol_evidence.py --store system_size \
+python3 orchestration/scripts/protocol_evidence.py ingest --store system_size \
   --from <system_size_output_path> --run-name <run_name>
 ```
 This reads your own `system_size_output_path` JSON and ingests every `verified: true` source into
@@ -355,7 +355,7 @@ Part B: same shape, `"claim"` describes "<the specific convergence fact this sou
 out of scope for MD-protocol grounding), touch `polymer_rules.json` or `run_plan.json`/
 `decision.json`, or write directly to `docs/protocol_evidence_ff.json` or
 `docs/protocol_evidence_system_size.json` — use
-`query_protocol_evidence.py`/`ingest_protocol_evidence.py` for all reads and writes to either
+`protocol_evidence.py query`/`protocol_evidence.py ingest` for all reads and writes to either
 store. `db/query_polydatabase.py` (step 0.5) is explicitly permitted — it's a read-only
 lead-finder over a distinct MD-literature dataset, not the experimental DB. The only files you
 `Write` directly are `ff_output_path` and `system_size_output_path`.

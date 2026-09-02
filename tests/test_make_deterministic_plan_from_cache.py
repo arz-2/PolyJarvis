@@ -19,7 +19,7 @@ import canon_smiles  # noqa: E402
 from make_deterministic_plan import (  # noqa: E402
     _try_cache, make_plan_from_cache, make_plan, _build_hardware_decision, _policy_criteria,
 )
-from hw_common import load_rules, get_class_entry  # noqa: E402
+from rules_common import load_rules, get_class_entry  # noqa: E402
 
 SMILES = "*CC*"
 CLASS = "PHYC"

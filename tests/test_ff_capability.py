@@ -12,7 +12,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-import ff_capability as fc  # noqa: E402
+import forcefield as fc  # noqa: E402
 
 # `lmp -h` puts a blank line directly under each header and ends a section only at
 # the next header. Reproduced verbatim -- this exact shape broke the first parser.
