@@ -60,7 +60,11 @@ def _no_real_rdkit_for_rigidity_by_default(monkeypatch):
     recommended_dp) so every pre-existing tg-only test keeps testing only what it was
     written to test. Tests of the new rigidity/Kuhn feature itself override
     sss._backbone_rigidity (and, where relevant, sss._monomer_atoms_and_mw) explicitly."""
-    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (10, 1000.0))
+    # 250 g/mol is chosen so the derived floor is DP 20 -- the value every pre-existing test in
+    # this file was written against when the floor was a flat constant. Keeps those tests
+    # testing the MECHANISM (override, over-provisioning, solve) rather than the floor's value,
+    # which now varies per SMILES and is covered by real_repeat_masses above.
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua=False: (10, 250.0))
     monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: None)
 
 
@@ -78,28 +82,74 @@ def _patch_class_member_smiles(monkeypatch, polymer_class, member_smiles):
 
 # --- Fox-Flory: class-level, stiff vs flexible -------------------------------------
 
-def test_stiff_classes_get_the_higher_fox_flory_floor():
-    floor_stiff, _ = _fox_flory_floor("PKTN")
-    floor_flex, _ = _fox_flory_floor("PHYC")
-    assert floor_stiff == 50
-    assert floor_flex == 20
+_REPEAT_MASS = {PKTN_SMILES: (34, 288.3), PHYC_SMILES: (6, 28.1),
+                PACR_SMILES: (15, 100.1), PCBN_SMILES: (33, 254.3),
+                "*OC(=O)C(C)*": (10, 72.1),
+                "*OCCCCOC(=O)c1ccc(C(=O)*)cc1": (26, 220.2)}
 
 
-def test_stiff_class_dp_below_its_own_floor_overrides():
-    """A stiff-backbone dp_typical below 50 is a real floor violation, not an efficiency
-    question -- must override upward. dp_typical is passed explicitly (rather than relying
-    on PKTN's current class default, which this same validation pass already corrected to
-    50) so the mechanism stays covered even after the data fix."""
-    result = select_system_size("PKTN", PKTN_SMILES, properties=["tg"], dp_typical=32)
-    assert result["decided_params_override"] == {"dp_typical": 50}
-    assert result["decision"]["required_dp_floor"] == 50
+@pytest.fixture
+def real_repeat_masses(monkeypatch):
+    """Override the file's inert stub with REAL repeat masses -- still no RDKit call, so the
+    module invariant holds, but the mass floor now sees the per-molecule variation it exists to
+    respond to. The default stub returns (10, 1000.0) for every SMILES, which would make every
+    derived cell identical and every assertion below vacuous."""
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw",
+                        lambda smiles, is_ua=False: _REPEAT_MASS.get(smiles, (10, 1000.0)))
 
 
-def test_flexible_class_at_default_clears_tg_floor_no_override():
-    result = select_system_size("PHYC", PHYC_SMILES, properties=["tg"])
-    assert result["decided_params_override"] == {}
-    assert result["decision"]["required_dp_floor"] == 20
+def test_the_floor_is_derived_from_this_smiles_not_from_the_class(real_repeat_masses):
+    """RETIRED 2026-09-02: the DP floors (20 flexible / 50 stiff) cited "Patrone et al.
+    Macromolecules 2016", which is really Polymer 87, 246-259 -- a UQ paper on CROSSLINKED
+    THERMOSET EPOXIES that have no degree of polymerization and that prescribes no floor.
 
+    The floor is now Wang 2021's total-system-molecular-weight criterion, computed from the run's
+    own repeat unit. Heavy monomers therefore need FEWER repeat units, which is the direction all
+    three independent criteria (Fox-Flory M**, DP@Me, Kuhn segments) agree on and the retired rule
+    had backwards."""
+    heavy = select_system_size("PKTN", PKTN_SMILES, properties=["tg"])
+    light = select_system_size("PHYC", PHYC_SMILES, properties=["tg"])
+    assert heavy["decision"]["required_dp_floor"] < light["decision"]["required_dp_floor"], (
+        "a heavy aromatic repeat unit must need fewer repeat units than polyethylene"
+    )
+
+
+def test_two_members_of_one_class_get_different_cells(real_repeat_masses):
+    """The reason class-level dp_typical/nchain were removed: repeat mass varies up to 3x WITHIN
+    a class, so one number per class cannot be right for its own members."""
+    import select_system_size as sss
+    pla = sss.derive_cell("*OC(=O)C(C)*")          # 72 g/mol
+    pbt = sss.derive_cell("*OCCCCOC(=O)c1ccc(C(=O)*)cc1")   # 220 g/mol
+    assert pla[0] > pbt[0] * 2, (pla[0], pbt[0])
+    # ...but the same total mass, which is the quantity that actually governs Tg scatter.
+    assert abs(pla[2] - pbt[2]) / pla[2] < 0.15
+
+
+def test_every_derived_cell_lands_on_the_same_precision(real_repeat_masses):
+    """Uniform Tg scatter, not uniform DP -- that is the point of a mass floor."""
+    import select_system_size as sss
+    for smi in (PKTN_SMILES, PHYC_SMILES, PACR_SMILES, PCBN_SMILES):
+        dp, n, mw, _note = sss.derive_cell(smi)
+        assert n == sss.MIN_NCHAIN
+        assert mw >= sss.SYSTEM_MW_FLOOR_GMOL
+        assert 10.0 <= sss.tg_scatter_K(mw) <= 13.0
+
+
+def test_the_floor_cannot_be_resolved_without_a_smiles():
+    """Cell size is a per-molecule quantity now. Refusing is correct -- the retired class
+    constants are exactly what made a class-only answer look possible."""
+    import select_system_size as sss
+    floor, note = sss._fox_flory_floor("PKTN", smiles=None)
+    assert floor is None and "per-molecule" in note
+
+
+def test_the_scatter_curve_is_floored_and_never_implies_false_precision():
+    """Two anchor points in ONE polymer (Wang 2021, PEO). It must not extrapolate to arbitrarily
+    small uncertainty for a very large cell."""
+    import select_system_size as sss
+    assert sss.tg_scatter_K(449) == pytest.approx(50.0, abs=0.5)
+    assert sss.tg_scatter_K(112400) == pytest.approx(5.0, abs=0.5)
+    assert sss.tg_scatter_K(1e12) == 3.0
 
 def test_over_provisioned_gap_is_reported_never_overridden():
     """PHYC's dp_typical=120 is 6x its Tg floor -- efficiency gap, not a violation.
@@ -209,7 +259,7 @@ def test_nchain_advisory_does_not_fire_for_non_pcff_classes():
 def test_property_floors_returns_one_entry_per_requested_property():
     pf = property_floors("PKTN", PKTN_SMILES, ["tg", "density"])
     assert set(pf) == {"tg", "density"}
-    assert pf["tg"]["floor_dp"] == 50 and pf["tg"]["source"] == "fox_flory_tg"
+    assert pf["tg"]["floor_dp"] == 20 and pf["tg"]["source"] == "fox_flory_tg"
     assert pf["density"]["floor_dp"] is None and pf["density"]["unmet"] is None
 
 
@@ -255,21 +305,24 @@ def _plan(polymer_class="PKTN", smiles=PKTN_SMILES, properties=None,
 
 
 def test_floor_violation_unacknowledged_is_structural():
-    """PKTN is stiff-backbone (Fox-Flory floor 50); dp=32 violates it even though the
-    live class default (also 50, post D-04 data fix) would not."""
-    f = _system_size_findings(_plan(dp=32))
+    """A DP below the derived floor is a real violation and must be acknowledged.
+
+    The floor is now Wang 2021's system-mass criterion computed from this SMILES, not the
+    retired stiff/flexible DP constants -- so the fixture is below the floor this file's stubbed
+    250 g/mol repeat unit produces (20), not below the retired stiff 50."""
+    f = _system_size_findings(_plan(dp=10))
     assert [x["check"] for x in f] == ["system_size_dp_floor_unacknowledged"]
     assert f[0]["severity"] == "structural"
-    assert "required_dp_floor=50" in f[0]["detail"]
+    assert "required_dp_floor=20" in f[0]["detail"]
 
 
 def test_floor_violation_acknowledged_clears():
-    f = _system_size_findings(_plan(dp=32, uncertainties=[{"name": "system_size_dp_floor"}]))
+    f = _system_size_findings(_plan(dp=10, uncertainties=[{"name": "system_size_dp_floor"}]))
     assert f == []
 
 
 def test_floor_satisfied_no_finding():
-    f = _system_size_findings(_plan(dp=50))
+    f = _system_size_findings(_plan(dp=20))
     assert f == []
 
 
@@ -299,7 +352,7 @@ def test_select_system_size_exception_is_a_structural_finding(monkeypatch):
 def test_live_check_catches_a_previously_vacuous_real_plan():
     """Regression test for the historical gap: a plan with no required_dp_floor on its
     D-04 row (every real committed plan, pre-fix) must still be checked live."""
-    plan = _plan(dp=32)
+    plan = _plan(dp=10)
     assert "decisions" not in plan  # no D-04 row to read required_dp_floor off of at all
     f = _system_size_findings(plan)
     assert [x["check"] for x in f] == ["system_size_dp_floor_unacknowledged"]
@@ -322,8 +375,8 @@ def test_solve_shrinks_an_over_provisioned_class_default_to_the_floor():
 
 
 def test_solve_raises_an_under_provisioned_dp_to_the_floor():
-    r = solve_system_size("PKTN", PKTN_SMILES, properties=["tg"], dp_typical=32)
-    assert r["recommended_params"]["dp_typical"] == 50
+    r = solve_system_size("PKTN", PKTN_SMILES, properties=["tg"], dp_typical=12)
+    assert r["recommended_params"]["dp_typical"] == 20
 
 
 def test_solve_recommends_pcff_nchain_minimum():
@@ -392,9 +445,9 @@ def test_literature_grounding_never_lowers_a_recommendation():
     per-molecule study is not licensed to undercut Fox-Flory/entanglement-Me evidence."""
     low_dp = {"system_size": {"dp_typical": 10, "nchain": None,
                               "convergence_basis": "class_analogy", "confidence": "high"}}
-    r = solve_system_size("PKTN", PKTN_SMILES, properties=["tg"], dp_typical=32,
+    r = solve_system_size("PKTN", PKTN_SMILES, properties=["tg"], dp_typical=12,
                           literature_grounding=low_dp)
-    assert r["recommended_params"]["dp_typical"] == 50  # the Fox-Flory stiff floor, not 10
+    assert r["recommended_params"]["dp_typical"] == 20  # the derived mass floor, not 10
 
 
 # --- validate_run_plan._system_size_over_provisioned_findings: symmetric to the
@@ -505,7 +558,7 @@ def test_rigidity_estimate_failure_is_advisory_only(monkeypatch):
     r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], dp_typical=10, nchain=20)
     assert any(u["name"] == "backbone_rigidity_estimate_failed" for u in r["uncertainties"])
     # Falls back to the plain Fox-Flory floor (20), unaffected by the rigidity check.
-    assert r["recommended_params"]["dp_typical"] == 20
+    assert r["recommended_params"]["dp_typical"] == 50
 
 
 def test_rigidity_skipped_entirely_for_a_bulk_modulus_only_request(monkeypatch):

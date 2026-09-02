@@ -375,19 +375,23 @@ def test_materializer_auto_fills_the_floor_clearing_dp_when_unset(monkeypatch):
     left dp_typical unset, so materialize_plan() should fill in the floor-clearing minimum
     via solve_system_size() rather than the bloated class default.
 
-    This tests the Fox-Flory auto-fill specifically, not the separate rigidity/Kuhn DP
-    recommendation (tested in test_select_system_size.py) -- neutralize the latter so it
-    doesn't shell into a real RDKit subprocess here (PE's real DP_MW=179 would otherwise
-    raise the recommendation above 20 and break this test's own assertion)."""
+    UPDATED 2026-09-02: the floor is now Wang 2021's system-mass criterion derived from the
+    run's own repeat unit, not the retired Fox-Flory DP constants. PE's 28.1 g/mol repeat needs
+    DP 179 to reach 50 kg/mol across 10 chains -- so 179 IS the floor here, not a rigidity
+    artifact to be neutralized. The old docstring called it out as something that would "break
+    this test's own assertion"; under the mass floor it is the assertion.
+
+    The rigidity/Kuhn stub stays: that recommendation is a separate, additive source tested in
+    test_select_system_size.py, and this test is about the floor auto-fill."""
     monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: None)
     decision = PlanDecision(
         polymer_class="PHYC", properties=("tg",),
         rationale=("Just need Tg.",), dominant_uncertainty="none", confidence="high",
     )
     plan = materialize_plan(PHYC_INTENT, decision)
-    assert plan["decided_params"]["dp_typical"] == 20
+    assert plan["decided_params"]["dp_typical"] == 179
     d04 = next(d for d in plan["decisions"] if d["id"] == "D-04_system_size")
-    assert d04["choice"] == "DP=20, nchain=20"
+    assert d04["choice"] == "DP=179, nchain=20"
     assert any("floor" in e.get("claim", "") for e in d04["evidence"])
     assert any("D-04_system_size auto-filled" in a for a in plan["assumptions"])
 
@@ -418,7 +422,10 @@ def test_materializer_folds_in_literature_grounding_when_present(tmp_path, monke
     decision = PlanDecision(polymer_class="PHYC", properties=("tg",),
                             rationale=("test",), dominant_uncertainty="none", confidence="high")
     plan = materialize_plan(intent, decision)
-    assert plan["decided_params"]["dp_typical"] == 90  # literature raises above the floor (20)
+    # Literature no longer raises anything here: PE's derived mass floor is DP 179, above the
+    # cited 90, and a literature recommendation may never LOWER a floor. The floor wins, which
+    # is the invariant test_literature_grounding_never_lowers_a_recommendation pins directly.
+    assert plan["decided_params"]["dp_typical"] == 179
 
 
 def test_materializer_attaches_a_populated_cost_estimate():

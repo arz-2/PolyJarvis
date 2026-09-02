@@ -74,11 +74,75 @@ from hw_common import load_rules, get_class_entry, resolve_member  # noqa: E402
 from select_hardware import _monomer_atoms_and_mw               # noqa: E402
 from mol_python import run_in_mol_env                            # noqa: E402
 
-# Fox-Flory plateau (Patrone 2016, polymer_rules.json:_metadata.global_notes). Data, not
-# a classifier: these are the three classes the notes name as stiff backbones.
-STIFF_BACKBONE_CLASSES = {"PIMD", "PKTN", "PSFO"}
-FOX_FLORY_FLEXIBLE_FLOOR_DP = 20
-FOX_FLORY_STIFF_FLOOR_DP = 50
+# ─── Cell size, derived per SMILES ────────────────────────────────────────────────
+#
+# RETIRED 2026-09-02: STIFF_BACKBONE_CLASSES / FOX_FLORY_FLEXIBLE_FLOOR_DP=20 /
+# FOX_FLORY_STIFF_FLOOR_DP=50. They cited "Patrone et al. Macromolecules 2016", which is
+# actually Polymer 87, 246-259 (DOI 10.1016/j.polymer.2016.01.074) -- a UQ-methodology paper on
+# CROSSLINKED THERMOSET EPOXIES, which have no degree of polymerization. It prescribes no DP
+# floor, no chain-length floor and no box rule.
+#
+# DP was also the wrong unit. Tg's chain-length dependence is a chain-END fraction effect, which
+# scales with MOLECULAR WEIGHT; repeat mass spans 28 g/mol (PE) to 442 (PSU), so a DP floor is
+# mass in the wrong currency -- and wrong by that 16x factor. Three independent criteria (Baker
+# PRX 12 021047 Table IV; Fetters ch.25 DP@Me; Kuhn segments per chain) all say heavy aromatic
+# monomers need FEWER repeat units than flexible ones. The retired rule required MORE.
+#
+# WHAT REPLACES THEM. Wang et al., Polym. J. 53, 455-462 (2021), DOI 10.1038/s41428-020-00443-1
+# mapped Tg over molecular weight x chain number for PEO and found the governing variable is the
+# TOTAL system molecular weight, not per-chain MW and not DP: run-to-run Tg scatter falls from
+# +-50 K at 449 g/mol to +-5 K at 112,400 (~18.8 K per decade), and Tg is "molecular weight
+# dependent and chain number independent" outside the finite-size region. Undersized cells did
+# not merely get noisy -- their PEO transformed to a crystal-like phase instead of a rubbery one.
+# They also require nchain >= 10.
+SYSTEM_MW_FLOOR_GMOL = 50_000.0
+"""Total system molecular weight floor. 50 kg/mol buys ~+-12 K of Tg scatter on Wang's curve.
+
+NOT a convergence guarantee, and must never be described as one: the true Fox-Flory plateau is
+20-40 kg/mol PER CHAIN (Baker PRX Table IV: PS 33.3, PMMA 41.2), i.e. ~250k atoms at 10 chains
+for PS. No all-atom cell reaches it. This floor bounds the PRECISION of Tg; the chain-length BIAS
+is reported as an uncertainty instead (see chain_length_bias_uncertainty)."""
+
+MIN_NCHAIN = 10
+"""Wang 2021. Also the RadonPy default, whose 1,077-polymer dataset validates it for density,
+Cp, refractive index and expansion -- though notably NOT for Tg."""
+
+TG_SIZE_SCATTER_K_PER_DECADE = 18.8
+_SCATTER_ANCHOR_MW, _SCATTER_ANCHOR_K = 449.0, 50.0
+"""Wang 2021 Fig. 4b anchors: +-50 K at Mw,s=449 g/mol, +-5 K at 112,400."""
+
+
+def tg_scatter_K(system_mw_gmol: float) -> float:
+    """Implied Tg run-to-run scatter for a cell of this total molecular weight (Wang 2021).
+
+    Reported on every run so the size-induced uncertainty is visible rather than assumed away.
+    Floored at 3 K -- the curve is two anchor points in ONE polymer and must not be extrapolated
+    into implying arbitrary precision.
+    """
+    if not system_mw_gmol or system_mw_gmol <= 0:
+        return None
+    import math as _m
+    return round(max(3.0, _SCATTER_ANCHOR_K - TG_SIZE_SCATTER_K_PER_DECADE
+                     * (_m.log10(system_mw_gmol) - _m.log10(_SCATTER_ANCHOR_MW))), 1)
+
+
+def derive_cell(smiles: str, is_ua: bool = False, nchain: int = MIN_NCHAIN):
+    """(dp, nchain, system_mw_gmol, note) sized from THIS SMILES, not from a class default.
+
+    Class-level dp_typical/nchain were removed 2026-09-02: none of the 21 classes carried any
+    note justifying either, and repeat mass varies up to 3x WITHIN a class (PEST: PLA 72 ->
+    PBT 220 g/mol), so one number per class cannot be right for its own members -- two PSFO
+    members differed 2.2x in atom count for no recorded reason.
+    """
+    _, m_repeat = _monomer_atoms_and_mw(smiles, is_ua)
+    if not m_repeat:
+        return None, nchain, None, "could not resolve a repeat-unit mass from the SMILES"
+    dp = max(1, math.ceil(SYSTEM_MW_FLOOR_GMOL / (nchain * m_repeat)))
+    mw_s = m_repeat * dp * nchain
+    note = (f"DP={dp} x {nchain} chains = {mw_s:,.0f} g/mol total (repeat {m_repeat:.1f} g/mol), "
+            f"clearing the {SYSTEM_MW_FLOOR_GMOL:,.0f} g/mol system-mass floor (Wang 2021); "
+            f"implied Tg scatter +-{tg_scatter_K(mw_s)} K")
+    return dp, nchain, mw_s, note
 
 PCFF_NCHAIN_PRODUCTION_MINIMUM = 20  # Bejagam 2020; nchain=10 is Hayashi2022 throughput compromise
 
@@ -95,12 +159,19 @@ DP_TYPICAL_HARD_CEILING = 1000      # mirrors scientific_control.py's OVERRIDE_R
                                      # a circular import (scientific_control.py imports this module)
 
 
-def _fox_flory_floor(polymer_class: str) -> tuple:
-    stiff = polymer_class.upper() in STIFF_BACKBONE_CLASSES
-    floor = FOX_FLORY_STIFF_FLOOR_DP if stiff else FOX_FLORY_FLEXIBLE_FLOOR_DP
-    note = (f"Fox-Flory plateau (Patrone 2016): DP>={floor} for "
-            f"{'stiff' if stiff else 'flexible'}-backbone classes")
-    return floor, note
+def _fox_flory_floor(polymer_class: str, smiles: str = None, cls: dict = None) -> tuple:
+    """(floor_dp, note) from the system-mass floor, derived from this SMILES.
+
+    Keeps the `fox_flory_tg` source name so downstream consumers (validate_run_plan,
+    plan artifacts, decision rows) need no vocabulary change -- but the number now comes from
+    Wang 2021's total-system-mass criterion, not from the retired DP constants.
+    """
+    if not smiles:
+        return None, ("no SMILES supplied -- cell size is derived per-molecule and cannot be "
+                      "resolved from the class alone")
+    is_ua = (cls or {}).get("preferred_ff", "") == "trappe-ua"
+    dp, _n, mw_s, note = derive_cell(smiles, is_ua)
+    return dp, note
 
 
 def _resolve_me_member(cls: dict, smiles: str):
@@ -229,7 +300,7 @@ def property_floors(polymer_class: str, smiles: str, properties, cls: dict = Non
     for prop in sorted(properties, key=lambda p: _KNOWN_PROPERTY_ORDER.index(p)
                        if p in _KNOWN_PROPERTY_ORDER else len(_KNOWN_PROPERTY_ORDER)):
         if prop == "tg":
-            floor, note = _fox_flory_floor(polymer_class)
+            floor, note = _fox_flory_floor(polymer_class, smiles, cls)
             result[prop] = {"floor_dp": floor, "source": "fox_flory_tg", "note": note,
                             "unmet": None}
         elif prop == "bulk_modulus":
