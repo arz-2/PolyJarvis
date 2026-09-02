@@ -27,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from select_hardware import select_hardware
 from select_system_size import select_system_size
-from hw_common import load_rules, get_class_entry, resolve_member_value, hardware_policy, host_matches
+from hw_common import load_rules, get_class_entry, hardware_policy, host_matches
 
 _ENGINE_SCRIPTS = (Path(__file__).resolve().parents[2]
                    / "mcp-servers" / "mcp-lammps-engine" / "analysis_scripts")
@@ -35,28 +35,6 @@ if str(_ENGINE_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_ENGINE_SCRIPTS))
 from finite_size import predict_equilibrated_L  # noqa: E402
 
-
-def _target_density(cls: dict, smiles: str):
-    """Class experimental density. Multi-member classes key it by member name (PACR
-    {PMMA, PMA}, PHYC {PE, PP, PIB}), resolved via the run's own SMILES against the
-    class's member_smiles table. A bare float applies to the whole class. Returns None
-    when it cannot be resolved -- the caller then skips rather than guessing a density.
-    A dict with exactly one numeric member is not treated as unambiguous: it means only
-    that one member's density happens to be documented, not that the class has one
-    member (e.g. PSTR documents PS but also covers P2VP).
-
-    UNUSED as of 2026-09-02 and untested. It stopped being called by _finite_size_findings
-    (which now always estimates from density_initial_gcm3, never a curated experimental value --
-    see COMPRESSION_RATIO above), and its only remaining exerciser, tests/test_plan_system_size_
-    arms.py, went with the two-arm split. Kept rather than deleted because stage_params.py:179
-    cites it as the precedent for member-keyed resolution, but it is dead code: delete it or give
-    it a test."""
-    ed = cls.get("experimental_density_gcm3")
-    if isinstance(ed, (int, float)):
-        return float(ed)
-    if isinstance(ed, dict) and smiles:
-        return resolve_member_value(cls, "experimental_density_gcm3", smiles)
-    return None
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
@@ -554,6 +532,12 @@ def _system_size_over_provisioned_findings(plan: dict) -> list:
     depth for a hand-edited plan or one produced by a path that skipped that step, matching
     this file's existing practice of re-deriving live rather than trusting the plan's own
     claims.
+
+    Still live after the 2026-09-02 sizing change, though its reachable inputs narrowed: with
+    class defaults gone, the auto-fill can never over-provision (the derived DP is the floor),
+    so what remains is an explicit Planner dp_typical override or a hand-edited plan. Verified
+    by execution before this note was written, not inferred -- an over-provisioned override
+    does still reach both this check and materialize_plan()'s acknowledgment.
     """
     findings = []
     if plan.get("plan_mode") != "reasoned":

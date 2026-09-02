@@ -391,9 +391,17 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
                   f"{sorted(properties) or ['(none requested)']} (e.g. density-only)")
         confidence = "medium"
 
-    # Downward gap: class default is well above the floor. Never an override -- shrinking
-    # DP for an already-protocol_validated SMILES is a protocol change this script cannot
-    # authorize; report it and let the Planner/user opt in.
+    # Downward gap: the dp_typical this run was HANDED is well above the derived floor.
+    # Never an override -- shrinking DP for an already-protocol_validated SMILES is a protocol
+    # change this script cannot authorize; report it and let the Planner/user opt in.
+    #
+    # The trigger changed 2026-09-02 and the old comment ("class default is well above the
+    # floor") no longer describes it: class defaults are gone, so the auto-fill path can never
+    # land here -- the derived DP IS the floor. What remains reachable, and was checked rather
+    # than assumed before this comment was rewritten, is an EXPLICIT dp_typical: a Planner
+    # override (materialize_plan applies overrides over the auto-fill) or a frozen
+    # protocol_validated plan replaying a DP chosen under the retired rules. Both are exactly
+    # the cases worth flagging, so the branch stays.
     if required_floor is not None and not floor_violated and dp > 1.5 * required_floor:
         uncertainties.append({
             "name": "size_over_provisioned", "dominant": False,

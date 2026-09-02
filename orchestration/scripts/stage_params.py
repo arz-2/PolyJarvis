@@ -176,8 +176,8 @@ def _exp_density_point(cls: dict, smiles: str | None=None):
     (single-member class, or a planning agent's overrides.experimental_density_gcm3 pin -- see
     OVERRIDE_RANGES) always wins outright. Otherwise resolves per-member via the run's SMILES.
     No match -> None, NOT another member's measured density (no group-contribution density
-    estimator exists, unlike Tg; matches validate_run_plan.py's _target_density, which already
-    refuses rather than guesses here). Pin overrides.experimental_density_gcm3 if you've
+    estimator exists, unlike Tg -- see hw_common.resolve_member_value, the shared
+    member-keyed resolver, which refuses rather than guesses). Pin overrides.experimental_density_gcm3 if you've
     reasoned out which member this SMILES actually is."""
     exp = cls.get('experimental_density_gcm3')
     if isinstance(exp, (int, float)):

@@ -444,11 +444,17 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
                         "solve_system_size() -- see D-04_system_size's evidence for why"]
                         if auto_filled else [])
 
-    # Self-acknowledge an over-provisioned final DP (whichever path set it -- auto-fill,
-    # literature grounding, or the agent's own override) so validate_run_plan.py's
-    # symmetric _system_size_over_provisioned_findings never has to guess at WHY a plan
-    # exceeds the mechanized floor; it only ever flags a plan that skipped this step
-    # entirely (hand-edited, or produced outside materialize_plan()).
+    # Self-acknowledge an over-provisioned final DP (whichever path set it -- literature
+    # grounding, or the agent's own override) so validate_run_plan.py's symmetric
+    # _system_size_over_provisioned_findings never has to guess at WHY a plan exceeds the
+    # mechanized floor; it only ever flags a plan that skipped this step entirely
+    # (hand-edited, or produced outside materialize_plan()).
+    #
+    # The auto-fill can no longer reach this since 2026-09-02: with class defaults removed,
+    # solve_system_size()'s recommendation IS the derived floor, so dp > 1.5 * floor is
+    # unreachable from it. An explicit override still reaches it (overrides are applied over
+    # the auto-fill), which is what keeps this branch worth having -- confirmed by running
+    # materialize_plan with an over-provisioned override, not by reading the code.
     final_dp = plan["decided_params"].get("dp_typical")
     over_provisioned_ack = []
     if final_dp is not None:

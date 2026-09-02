@@ -260,10 +260,6 @@ def observable(name: str) -> Observable:
     return OBSERVABLES[name]
 
 
-def track_for(stage: str) -> str:
-    return STAGE_TRACK[stage]
-
-
 def _tracks_for(properties) -> tuple[Track, ...]:
     """Union the tracks the requested properties need, plus the always-on ones, in order.
 
