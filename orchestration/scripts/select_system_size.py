@@ -65,6 +65,7 @@ select_forcefield.py -- callers parse JSON, never a traceback).
 """
 import argparse
 import json
+import functools
 import math
 import sys
 from pathlib import Path
@@ -126,6 +127,7 @@ def tg_scatter_K(system_mw_gmol: float) -> float:
                      * (_m.log10(system_mw_gmol) - _m.log10(_SCATTER_ANCHOR_MW))), 1)
 
 
+@functools.lru_cache(maxsize=512)
 def derive_cell(smiles: str, is_ua: bool = False, nchain: int = MIN_NCHAIN):
     """(dp, nchain, system_mw_gmol, note) sized from THIS SMILES, not from a class default.
 
@@ -320,10 +322,17 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
                        dp_typical: int = None, nchain: int = None) -> dict:
     rules = load_rules()
     cls = get_class_entry(rules, polymer_class, warn_on_miss=True)
+    # Class-level dp_typical/nchain were removed 2026-09-02 (none of the 21 classes carried any
+    # note justifying either, and repeat mass varies up to 3x WITHIN a class). An explicit
+    # caller value still wins; otherwise the cell is DERIVED from this run's own SMILES.
     dp = dp_typical if dp_typical is not None else cls.get("dp_typical")
     nchain_v = nchain if nchain is not None else cls.get("nchain")
-    if dp is None:
-        return {"error": f"polymer_rules.json class {polymer_class!r} has no dp_typical"}
+    if dp is None or nchain_v is None:
+        _dp, _n, _mw, _note = derive_cell(smiles, cls.get("preferred_ff", "") == "trappe-ua")
+        dp = dp if dp is not None else _dp
+        nchain_v = nchain_v if nchain_v is not None else _n
+        if dp is None:
+            return {"error": f"could not derive a cell for {polymer_class!r}: {_note}"}
     properties = set(properties or [])
 
     uncertainties = []

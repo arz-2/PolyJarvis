@@ -40,6 +40,16 @@ OTHER_PC_SMILES = "*Oc1ccc(C(C)(C)C)cc1*"  # a different, unmatched hypothetical
 
 
 @pytest.fixture(autouse=True)
+def _clear_derive_cell_cache():
+    """derive_cell is lru_cached (it shells into RDKit), and these tests monkeypatch the mass
+    helper it calls -- without clearing, a result computed under one test's stub leaks into the
+    next. Production is unaffected: the SMILES->mass map is genuinely static there."""
+    sss.derive_cell.cache_clear()
+    yield
+    sss.derive_cell.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _clear_canon_cache():
     hw_common._canon_for_match.cache_clear()
     yield
