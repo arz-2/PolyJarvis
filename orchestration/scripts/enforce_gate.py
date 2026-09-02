@@ -242,6 +242,13 @@ EXTENDABLE_GATES = {"density_drift", "energy_drift", "density_sem", "energy_sem"
 # inherent MD limitation, not a Class A admissibility failure. Still computed, still reported,
 # no longer binding -- see assess_cooling_contraction.assess's alpha-calibration note.
 STRUCTURAL_GATES = {"density_homogeneity", "p2", "finite_size"}
+# finite_size remains structural -- no trajectory length fixes a box dimension. But which
+# finite-size CONDITIONS bind narrowed on 2026-09-02: minimum image (L >= 2*cutoff) always, and
+# chain self-imaging only below L/2Rg = 0.5. Between 0.5 and 1.0 classify_finite_size returns
+# SIZE_CHAIN_SELF_IMAGE_ADVISORY with pass=True, so it never reaches this set. See that
+# function's SELF_IMAGE_BINDING_RATIO note for why a hard gate at 1.0 was wrong: it would fail
+# essentially the entire published atomistic literature, including 17.2% of RadonPy's validated
+# 1,077-polymer dataset.
 
 
 def enforce(run_name, repo_root: Path):

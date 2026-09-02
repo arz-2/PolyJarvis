@@ -50,11 +50,38 @@ def test_min_image_outranks_chain_self_image():
     assert r["pass"] is False
 
 
-def test_chain_self_image_when_min_image_is_fine():
+def test_moderate_self_imaging_is_advisory_not_a_rebuild():
+    """PEEK1's real archived geometry: L/2Rg = 0.737, minimum image fine at 1.515.
+
+    GRADED 2026-09-02. This used to be a hard SIZE_CHAIN_SELF_IMAGE, routing STRUCTURAL_FAIL and
+    a rebuild. `L >= 2*Rg` has no hard standing in the literature -- the founding atomistic paper
+    (Theodorou & Suter 1985) ran at 0.53, and 17.2% of RadonPy's validated 1,077-polymer dataset
+    sits below 1.0. Measured cost at this severity (Anstine 2020, atoms held fixed, 1 chain vs
+    33): density <= 0.6%, modulus inside the force-field spread. Reported, never blocking."""
     r = classify_finite_size(L_A=36.37, cutoff_A=12.0, mean_rg_A=24.69, mean_ree_A=55.89)
-    assert r["verdict"] == "SIZE_CHAIN_SELF_IMAGE"
+    assert r["verdict"] == "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+    assert r["pass"] is True and r["self_image_advisory"] is True
     assert r["L_over_2cutoff"] == 1.515
     assert r["L_over_2Rg"] == 0.737
+
+
+def test_severe_self_imaging_still_binds():
+    """Below SELF_IMAGE_BINDING_RATIO the cell is rebuilt. The boundary is a judgement call
+    (see the constant's own note) -- pinned here so moving it is a deliberate act."""
+    import finite_size as fs
+    r = classify_finite_size(L_A=0.45 * 2 * 24.69, cutoff_A=5.0, mean_rg_A=24.69)
+    assert r["verdict"] == "SIZE_CHAIN_SELF_IMAGE"
+    assert r["pass"] is False
+    assert fs.SELF_IMAGE_BINDING_RATIO == 0.5
+
+
+def test_minimum_image_still_binds_at_any_ratio():
+    """The one criterion with unambiguous standing: below it an atom interacts with its own
+    image and the pair potential itself is wrong. Never graded."""
+    r = classify_finite_size(L_A=20.0, cutoff_A=12.0, mean_rg_A=5.0)
+    assert r["verdict"] == "SIZE_MIN_IMAGE_VIOLATION"
+    assert r["pass"] is False
+    assert r["L_over_2Rg"] >= 1.0          # the Rg half is fine; minimum image is not
 
 
 def test_ree_below_one_alone_still_passes():

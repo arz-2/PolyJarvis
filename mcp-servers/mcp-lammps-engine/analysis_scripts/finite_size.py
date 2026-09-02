@@ -136,11 +136,50 @@ def predict_equilibrated_L(total_mass_g_per_mol, target_density_gcm3):
     return float((volume_cm3 / CM3_PER_A3) ** (1.0 / 3.0))
 
 
+SELF_IMAGE_BINDING_RATIO = 0.5
+"""Below this L/2Rg, chain self-imaging binds and the only remedy is a larger cell. Between it
+and 1.0 the condition is REPORTED and never blocks.
+
+GRADED 2026-09-02, previously a hard fail at any ratio below 1.0. `L >= 2*Rg` has no hard
+standing in the literature: the only two explicit statements are coarse-grained, unsupported by
+measurement, and mutually inconsistent by 4x (2*Rg vs 1.75*R_ee ~ 4.3*Rg). What atomistic work
+actually runs at: Theodorou & Suter's founding paper 0.53; Anstine 2020 single-chain PMMA
+0.25-0.36; RadonPy production ~1.0-1.2, with 17.2% of its validated 1,077-polymer dataset below
+1.0 -- including poly(p-phenylene) at 0.28, which produced a sane density and modulus. A hard
+gate at 1.0 would fail essentially the entire published atomistic amorphous-cell literature.
+
+Measured cost of violating it (Anstine et al., DOI 10.1088/1361-651X/ab615c -- total atoms held
+fixed at ~50k, 1 chain vs 33, bracketing L/2Rg from 0.25 to 1.5): density <= 0.6% across all
+eight matched pairs; modulus -5.7% to +19.5%, inside their own force-field spread (~30%).
+
+THE 0.5 BOUNDARY IS A JUDGEMENT CALL, not a derived quantity, and is recorded as one. Basis: it
+sits below the founding atomistic paper's own 0.53, below RadonPy's 4.9%-under-0.8 tail, and
+inside Anstine's measured bracket where density still moved <= 0.6%. It is NOT derived from a
+measured Tg penalty, because none exists -- no atomistic study varies chain count at fixed chain
+length and reports a Tg shift in kelvin. Revisit if one appears.
+
+Physical reading: in a dense melt or glass, excluded volume is screened and a chain's own
+periodic image is locally indistinguishable from a neighbour, so the self-image is a legitimate
+PACKING partner. What it cannot supply is independent CHAIN-SCALE statistics -- so this bites on
+conformational and rheological observables, not on density or local elasticity.
+
+Minimum image (L >= 2*cutoff) stays hard at any ratio: below it an atom interacts with its own
+image and the pair potential itself is wrong (Allen & Tildesley). That one has unambiguous
+standing; this one does not.
+"""
+
+
 def classify_finite_size(L_A, cutoff_A, mean_rg_A, mean_ree_A=None):
     """Verdict + ratios for one (box, chain-size) pair.
 
-    Returns SIZE_MIN_IMAGE_VIOLATION | SIZE_CHAIN_SELF_IMAGE | SIZE_PASS. `L >= R_ee` is
-    reported via ree_self_image_flag but never decides the verdict.
+    Returns SIZE_MIN_IMAGE_VIOLATION | SIZE_CHAIN_SELF_IMAGE | SIZE_CHAIN_SELF_IMAGE_ADVISORY |
+    SIZE_PASS.
+
+    `L >= R_ee` is emitted as ree_self_image_flag and never decides the verdict -- and is not a
+    criterion at all: it is imposed only in coarse-grained and dilute-solution work (Nikunen
+    2007 at 1.75*R_ee, DPD; Moreno at 2*R_ee, DILUTE solution, where there is no melt screening),
+    never in an atomistic amorphous-cell study. Theodorou & Suter's own R_ee was 2.2x their box
+    edge. Kept for provenance, not as a requirement.
 
     A missing cutoff_A leaves the minimum-image half UNEVALUATED, not passed. The 2*Rg
     half still binds (it is the criterion that discriminates -- realistic amorphous cells
@@ -155,14 +194,20 @@ def classify_finite_size(L_A, cutoff_A, mean_rg_A, mean_ree_A=None):
 
     if r_cut is not None and r_cut < 1.0:
         verdict = "SIZE_MIN_IMAGE_VIOLATION"
-    elif r_rg < 1.0:
+    elif r_rg < SELF_IMAGE_BINDING_RATIO:
         verdict = "SIZE_CHAIN_SELF_IMAGE"
+    elif r_rg < 1.0:
+        verdict = "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
     else:
         verdict = "SIZE_PASS"
 
     out = {
         "available": True,
-        "pass": verdict == "SIZE_PASS",
+        # ADVISORY counts as passing: "reported, never blocks" has to be true of the boolean
+        # that feeds overall_pass and enforce_gate's binding set, not only of the verdict string.
+        # The verdict stays distinct so the condition is still visible in the report.
+        "pass": verdict in ("SIZE_PASS", "SIZE_CHAIN_SELF_IMAGE_ADVISORY"),
+        "self_image_advisory": verdict == "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
         "verdict": verdict,
         "L_min_A": round(L_A, 2),
         "cutoff_A": cutoff_A,
