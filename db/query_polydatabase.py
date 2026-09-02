@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 """
 Query db/polydatabase_md.sqlite for candidate DOIs from the PolyDatabase MD-simulation-
-literature index — a fast local pre-filter for the literature-grounding-worker subagent,
-run *before* its open WebSearch fan-out.
+literature index — the PRIMARY source for the literature-grounding-worker subagent (the
+MD-protocol critic), queried before it falls back to an open WebSearch fan-out.
 
 This is a lead-finder, not a grading source (contrast db/query_best_match.py, which ranks
 and returns real experimental measurements): it returns candidate DOIs plus the force field
 and properties each one reports, grouped so a worker gets a short list, not raw rows. Every
 candidate still requires the worker's own WebFetch-verify-DOI step before being cited —
 a PolyDatabase hit carries no trust_tier of its own.
+
+Two things this function deliberately does NOT do, which every caller must handle:
+  - No system_type/material_morphology filter. Only 623 of 1,095 rows are neat_polymer and
+    1,024 are bulk; the rest are nanocomposites, thin films, confined polymers and blends whose
+    density/Tg are not comparable to a neat bulk cell. (md_records.id=1 is a confined
+    cis-PBD/silica nanocomposite.) Read extra_info before trusting a candidate's numbers.
+  - No DOI normalization. `doi` comes back as a full https://doi.org/... URL, not a bare DOI;
+    the evidence store's dedup key is sha1(doi|field|claim), so a caller that stores the URL
+    form forks the store against every existing record for the same paper.
 
 Matching priority (mirrors db/query_best_match.py, reusing its name-matching helpers):
   1. --polymer_name  → exact/LIKE against polymer_name, abbreviation, common_trade_name,

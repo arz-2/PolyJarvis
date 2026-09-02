@@ -12,12 +12,18 @@ prefer the freshest example, PEG1, over older ones like PE1 when the two disagre
 
 - data/<run>/raw/decision.json: `decision_evaluations` is a dict keyed by decision id
   (currently D-01_ff, D-02_charges, D-03_electrostatics, D-04_system_size, D-08_hardware
-  on this checkout -- confirmed live via make_decision_scaffold.py's PEG1 output; D-05/D-06/D-07
+  on this checkout -- confirmed live via make_deterministic_plan.py decision's PEG1 output; D-05/D-06/D-07
   are NOT keys here, they are mechanized runtime gate verdicts folded into run_summary.json's
   `decisions` dict instead, e.g. "D-05_convergence": "PASS"). Each decision_evaluations row has
   `evidence`: a list of dicts. A row counts as "with evidence" only if at least one entry carries
-  a real citation (`source_doi` or `citation` key) -- a bare `{"claim": ..., "source": "polymer_rules.json:..."}`
-  placeholder (seeded by the scaffold generator, never replaced) does not count.
+  a real citation (`source_doi` or `citation` key) AND is not tagged `origin: "autofill"`.
+  Since 2026-09-02 make_deterministic_plan.py's `decision` subcommand pre-populates every row
+  with genuinely cited evidence resolved from polymer_rules.json's _metadata.primary_sources --
+  that is the deterministic baseline, not LLM reasoning, and it is tagged `origin: "autofill"`
+  so this axis excludes it. Evidence the calling session transcribes from the literature critic
+  is tagged `origin: "critic"` and does count. (A legacy bare
+  `{"claim": ..., "source": "polymer_rules.json:..."}` placeholder still fails the citation test
+  on its own.)
 """
 from __future__ import annotations
 
@@ -30,7 +36,16 @@ MECHANIZED_DECISION_PREFIXES = ("D-05", "D-06", "D-07")
 
 
 def _has_real_citation(evidence_entry: dict) -> bool:
-    return bool(evidence_entry.get("source_doi") or evidence_entry.get("citation"))
+    """True only for a cited entry that live LLM reasoning actually produced.
+
+    `origin: "autofill"` marks an entry the deterministic decision tool wrote from
+    polymer_rules.json's own primary_sources -- well cited, but zero LLM contribution. Counting
+    it would collapse the deterministic baseline into the treatment arm, which is the exact
+    separation this axis exists to measure. Tested with `!= "autofill"` rather than
+    `== "critic"` so historical run dirs, whose entries predate the tag entirely, still count.
+    """
+    return bool((evidence_entry.get("source_doi") or evidence_entry.get("citation"))
+                and evidence_entry.get("origin") != "autofill")
 
 
 def extract_llm_contribution(run_dir: Path) -> LLMContributionBlock:
@@ -66,6 +81,12 @@ def extract_llm_contribution(run_dir: Path) -> LLMContributionBlock:
         1 for row in evaluations.values()
         if any(_has_real_citation(e) for e in row.get("evidence", []))
     )
+    block.autofilled_decisions_with_evidence = sum(
+        1 for row in evaluations.values()
+        if any(e.get("origin") == "autofill"
+               and (e.get("source_doi") or e.get("citation"))
+               for e in row.get("evidence", []))
+    )
 
     run_summary_glob = list((run_dir / "attempts" / "summary").glob("attempt-*/raw/run_summary.json"))
     if run_summary_glob:
@@ -75,7 +96,11 @@ def extract_llm_contribution(run_dir: Path) -> LLMContributionBlock:
             1 for k in decisions if any(k.startswith(p) for p in MECHANIZED_DECISION_PREFIXES)
         )
 
+    # literature_grounding_ff_protocol.json / _system_size.json were merged into one
+    # literature_grounding.json on 2026-09-02; the old names stay listed so historical
+    # benchmark run dirs still score.
     lit_files = [
+        run_dir / "raw" / "literature_grounding.json",
         run_dir / "raw" / "literature_grounding_ff_protocol.json",
         run_dir / "raw" / "literature_grounding_system_size.json",
     ]

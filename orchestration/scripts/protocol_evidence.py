@@ -10,8 +10,10 @@ so answering "what is a record, and who may write one" meant opening four of the
 _now_iso()/STORE_PATHS were each defined more than once.
 
 Subcommands:
-  ingest           fold a literature-grounding advisory JSON into a store (DOI-verified
-                   external sources; the worker writes the advisory, this validates it)
+  ingest           fold the literature critic's advisory JSON into the ff store (DOI-verified
+                   external sources; the critic writes the advisory, this validates it).
+                   --store ff only: the critic stopped emitting a system-size advisory on
+                   2026-09-02, so that store is now written by ingest-internal alone.
   ingest-internal  fold a COMPLETED, gate-passing run of this pipeline into the store as
                    internal_validated_run evidence
   query            tiered retrieval: exact_smiles > exact_class > similar_class
@@ -57,9 +59,14 @@ STORE_PATHS = {
 # ingest_protocol_evidence.py so the three scripts can't drift on record shape. stdlib only.
 #
 # Two store files exist, same record shape, different `field` values populated:
-#   docs/protocol_evidence_ff.json          — forcefield, electrostatics, cooling_rate,
-#                                              density_target, tg_target, cte_glass_melt
-#   docs/protocol_evidence_system_size.json — system_size
+#   docs/protocol_evidence_ff.json          — forcefield, electrostatics, tg_target (plus
+#                                              cooling_rate, density_target, cte_glass_melt on
+#                                              records written before 2026-09-02: those three
+#                                              fields were retired from the critic's schema as
+#                                              non-essential to protocol adjustment, so nothing
+#                                              writes them any more, but stored records stay
+#                                              valid and queryable)
+#   docs/protocol_evidence_system_size.json — system_size (ingest-internal only)
 #
 # Both stores hold ONLY already-verified findings (doi_verified: true) — they are a cache
 # of verified evidence, not a scratchpad of candidates. An unverified source never enters
@@ -264,12 +271,14 @@ def compute_similarities(query_smiles: str, candidate_smiles: list[str],
 # ingest_protocol_evidence.py — write-back a worker's advisory JSON into the persistent
 # protocol evidence store.
 #
-# This is the ONLY writer of docs/protocol_evidence_ff.json / protocol_evidence_system_size.json
-# besides the one-time migrate_ff_selection_literature.py migration. literature-grounding-worker
-# calls this twice (once per store, via Bash) as the last step of each of its two parts, rather
-# than writing to either store directly — code, not the LLM subagent, owns the store's provenance
-# (CLAUDE.md). (Before the 2026-08-29 merge, two separate agents each called this against their
-# own store; a single agent now makes both calls sequentially.)
+# This is the ONLY writer of docs/protocol_evidence_ff.json besides the one-time
+# migrate_ff_selection_literature.py migration. literature-grounding-worker calls it once (via
+# Bash) as its last step, rather than writing to the store directly — code, not the LLM subagent,
+# owns the store's provenance (CLAUDE.md). `--store ff` is the only advisory path: the critic's
+# system-size half was removed 2026-09-02 along with the literature->cell-size fold-in, so
+# docs/protocol_evidence_system_size.json is now written exclusively by ingest-internal, from
+# completed validated runs. Passing --store system_size here raises rather than quietly adding
+# nothing.
 #
 # Only `verified: true` sources are ingested — an unverified candidate in the advisory JSON
 # is silently skipped (it was already excluded from backing any recommendation by the
@@ -288,8 +297,8 @@ def compute_similarities(query_smiles: str, candidate_smiles: list[str],
 #
 # Usage:
 #   python3 orchestration/scripts/ingest_protocol_evidence.py \
-#       --store ff|system_size \
-#       --from data/<run>/raw/literature_grounding_ff_protocol.json \
+#       --store ff \
+#       --from data/<run>/raw/literature_grounding.json \
 #       --run-name <run_name> \
 #       [--dry-run]
 # Prints JSON: {"records_added": N, "records_skipped_duplicate": N,
@@ -298,22 +307,20 @@ def compute_similarities(query_smiles: str, candidate_smiles: list[str],
 #               "store_path": "..."}
 # ===========================================================================
 # advisory-JSON field name -> value keys to lift into the record's `value` dict.
+# Narrowed 2026-09-02: cooling_rate_K_per_ns / density_target_gcm3 / cte_glass_melt were retired
+# from the literature critic's schema as non-essential to protocol adjustment, so nothing emits
+# them any more. They deliberately REMAIN in FIELDS below -- records already in the store stay
+# valid and queryable; this map only governs what a fresh advisory JSON can add.
 _FF_FIELD_VALUE_KEYS = {
     "forcefield": ("recommendation",),
     "electrostatics": ("recommendation",),
-    "cooling_rate_K_per_ns": ("rates",),
-    "density_target_gcm3": ("range", "T_K"),
     "tg_target_K": ("range",),
-    "cte_glass_melt": ("alpha_glass_per_K", "alpha_melt_per_K"),
 }
 # advisory JSON key -> store `field` enum value (differs for a couple of keys).
 _FF_FIELD_NAME_MAP = {
     "forcefield": "forcefield",
     "electrostatics": "electrostatics",
-    "cooling_rate_K_per_ns": "cooling_rate",
-    "density_target_gcm3": "density_target",
     "tg_target_K": "tg_target",
-    "cte_glass_melt": "cte_glass_melt",
 }
 
 
@@ -333,6 +340,38 @@ def _canon_smiles_list(smiles: str | None) -> list[str]:
         return [smiles]
 
 
+def _study_metadata_by_doi(advisory: dict) -> dict[str, dict]:
+    """{bare doi -> md_studies[] entry} for title/url/year backfill.
+
+    The literature critic writes each paper's metadata ONCE, in md_studies[], and its per-field
+    sources[] entries carry only doi/claim/trust_tier/verified -- so the same paper cited for
+    both `forcefield` and `electrostatics` cannot drift between the two. Resolving it back here
+    keeps the store's records complete without asking the agent to retype anything.
+
+    Keys are normalized to the bare 10.xxxx/... form: the PolyDatabase index hands out DOIs as
+    full https://doi.org/... URLs, and a record whose doi carries the prefix content-hashes to a
+    different record_id than the same paper stored bare.
+    """
+    out = {}
+    for study in advisory.get("md_studies") or []:
+        doi = _bare_doi(study.get("doi"))
+        if doi:
+            out[doi] = study
+    return out
+
+
+def _bare_doi(doi):
+    """Strip a doi.org URL prefix. sha1(doi|field|claim) is the store's dedup key, so the URL
+    and bare forms of one DOI would otherwise fork into two records for the same paper."""
+    if not isinstance(doi, str):
+        return doi
+    d = doi.strip()
+    for prefix in ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "doi:"):
+        if d.lower().startswith(prefix):
+            return d[len(prefix):]
+    return d
+
+
 def _records_from_ff_advisory(advisory: dict, run_name: str) -> tuple[list[dict], list[str]]:
     """Returns (records_to_ingest, skipped_store_origin_record_ids)."""
     polymer_class = advisory.get("polymer_class")
@@ -340,6 +379,8 @@ def _records_from_ff_advisory(advisory: dict, run_name: str) -> tuple[list[dict]
         polymer_class = None
     polymer_names = [advisory["polymer_name"]] if advisory.get("polymer_name") else []
     smiles = _canon_smiles_list(advisory.get("smiles"))
+
+    studies = _study_metadata_by_doi(advisory)
 
     records = []
     store_origin_ids = []
@@ -359,6 +400,8 @@ def _records_from_ff_advisory(advisory: dict, run_name: str) -> tuple[list[dict]
                 store_origin_ids.append(source["origin_record_id"])
                 continue
             value = {k: block.get(k) for k in _FF_FIELD_VALUE_KEYS[advisory_key] if k in block}
+            doi = _bare_doi(source.get("doi"))
+            study = studies.get(doi, {})
             record = build_record(
                 field=store_field,
                 polymer_class=polymer_class,
@@ -366,10 +409,10 @@ def _records_from_ff_advisory(advisory: dict, run_name: str) -> tuple[list[dict]
                 smiles=smiles,
                 claim=source.get("claim", ""),
                 value=value,
-                doi=source.get("doi"),
-                url=source.get("url"),
-                title=source.get("title"),
-                year=source.get("year"),
+                doi=doi,
+                url=source.get("url") or study.get("url"),
+                title=source.get("title") or study.get("title"),
+                year=source.get("year") or study.get("year"),
                 doi_verified=True,
                 trust_tier=source.get("trust_tier", "preprint"),
                 relevance=None,
@@ -384,69 +427,17 @@ def _records_from_ff_advisory(advisory: dict, run_name: str) -> tuple[list[dict]
     return records, store_origin_ids
 
 
-def _records_from_system_size_advisory(advisory: dict, run_name: str) -> tuple[list[dict], list[str]]:
-    """Returns (records_to_ingest, skipped_store_origin_record_ids)."""
-    polymer_class = advisory.get("polymer_class")
-    if polymer_class in (None, "UNKNOWN", "offtable"):
-        polymer_class = None
-    polymer_names = [advisory["polymer_name"]] if advisory.get("polymer_name") else []
-    smiles = _canon_smiles_list(advisory.get("smiles"))
-
-    system_size = advisory.get("system_size")
-    if not isinstance(system_size, dict):
-        return [], []
-
-    records = []
-    store_origin_ids = []
-    for source in system_size.get("sources", []):
-        if source.get("verified") is not True:
-            continue
-        if source.get("origin_record_id"):
-            store_origin_ids.append(source["origin_record_id"])
-            continue
-        value = {
-            "dp_typical": system_size.get("dp_typical"),
-            "nchain": system_size.get("nchain"),
-            "convergence_basis": system_size.get("convergence_basis"),
-            "me_estimated_gmol": system_size.get("me_estimated_gmol"),
-            "me_estimation_note": system_size.get("me_estimation_note"),
-            "kuhn_length_A": system_size.get("kuhn_length_A"),
-            "kuhn_molar_mass_gmol": system_size.get("kuhn_molar_mass_gmol"),
-            "kuhn_source_note": system_size.get("kuhn_source_note"),
-        }
-        record = build_record(
-            field="system_size",
-            polymer_class=polymer_class,
-            polymer_names=polymer_names,
-            smiles=smiles,
-            claim=source.get("claim", ""),
-            value=value,
-            doi=source.get("doi"),
-            url=source.get("url"),
-            title=source.get("title"),
-            year=source.get("year"),
-            doi_verified=True,
-            trust_tier=source.get("trust_tier", "preprint"),
-            relevance=None,
-            provenance={
-                "origin": "worker_run",
-                "source_run": run_name,
-                "migrated_from": None,
-                "added_at": _now_iso(),
-            },
-        )
-        records.append(record)
-    return records, store_origin_ids
-
-
 def ingest(store_kind: str, advisory: dict, run_name: str, store_path: str,
            dry_run: bool = False) -> dict:
-    if store_kind == "ff":
-        new_records, store_origin_ids = _records_from_ff_advisory(advisory, run_name)
-        with_methodology = True
-    else:
-        new_records, store_origin_ids = _records_from_system_size_advisory(advisory, run_name)
-        with_methodology = False
+    # `ff` is the only advisory ingest path since 2026-09-02: the literature critic no longer
+    # emits a system-size advisory (the DP/nchain/convergence fields it fed were retired). The
+    # system_size store is still written -- but only by ingest-internal, from completed runs.
+    if store_kind != "ff":
+        raise ValueError(
+            f"no advisory ingest path for --store {store_kind!r}; system_size records come from "
+            "`ingest-internal` (completed validated runs) only")
+    new_records, store_origin_ids = _records_from_ff_advisory(advisory, run_name)
+    with_methodology = True
 
     accepted, rejected = [], []
     for r in new_records:
@@ -922,7 +913,7 @@ def main():
     sub = p.add_subparsers(dest="command", required=True)
 
     c = sub.add_parser("ingest", help="fold a literature-grounding advisory JSON into a store")
-    c.add_argument("--store", choices=["ff", "system_size"], required=True)
+    c.add_argument("--store", choices=["ff"], required=True)
     c.add_argument("--from", dest="from_path", required=True)
     c.add_argument("--run-name", required=True)
     c.add_argument("--dry-run", action="store_true")

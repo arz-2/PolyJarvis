@@ -394,8 +394,9 @@ def _cmd_tg_estimate(args) -> int:
 # result as the RIGID_BACKBONE_CHAIN_LENGTH_BIAS uncertainty. Purely a structural
 # classification (bond counting) -- it estimates NO physical quantity (no Kuhn length, no
 # persistence length, no Rg) and is not the "invented-physics shortcut" that module's
-# docstring warns against; that estimation stays a literature-search responsibility (see
-# .claude/agents/literature-grounding-worker.md's Part B), never a heuristic derived here.
+# docstring warns against; that estimation was a literature-search responsibility until
+# 2026-09-02, when the Kuhn/DP grounding fields were retired -- it is now simply not estimated
+# anywhere, and a stiff backbone is REPORTED as a bias rather than sized around.
 #
 # Classification thresholds -- no repo precedent existed for these numbers before this
 # code; chosen and hand-validated against reference polymers (see

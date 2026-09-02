@@ -422,25 +422,22 @@ def test_materializer_explicit_override_wins_over_the_auto_fill():
     assert not any("dp_typical" in a for a in autofill), autofill
 
 
-def test_materializer_folds_in_literature_grounding_when_present(tmp_path, monkeypatch):
-    """Tests literature-grounding fold-in specifically; neutralize the separate
-    rigidity/Kuhn DP recommendation for the same reason as the auto-fill test above."""
-    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: None)
-    (tmp_path / "data" / "D04_LIT_TEST" / "raw").mkdir(parents=True)
-    (tmp_path / "data" / "D04_LIT_TEST" / "raw" / "literature_grounding_system_size.json").write_text(
-        json.dumps({"system_size": {"dp_typical": 90, "nchain": None,
-                                    "convergence_basis": "class_analogy", "confidence": "high"}}))
-    monkeypatch.setattr(scientific_control, "REPO_ROOT", tmp_path)
+def test_deleting_confidence_does_not_skip_the_gate():
+    """confidence is the ONLY forcing function since 2026-09-02: make_deterministic_plan.py's
+    `decision` subcommand now writes rationale itself, so the old `rationale == []` half of the
+    block never fires on a real file. from_dict used to default a missing key to "medium",
+    which meant deleting it sailed through validation."""
+    base = {"polymer_class": "PHYC", "properties": ["tg"], "rationale": ["r"],
+            "dominant_uncertainty": "none"}
+    for label, value in (("absent", None), ("empty", ""), ("unreviewed", "unreviewed")):
+        d = dict(base)
+        if value is not None:
+            d["confidence"] = value
+        with pytest.raises(ValueError, match="confidence must be one of"):
+            scientific_control._validate_decision(PlanDecision.from_dict(d))
 
-    intent = ScientificIntent(run_name="D04_LIT_TEST", goal="test", smiles="*CC*",
-                              requested_properties=("tg",), polymer_class_hint="PHYC")
-    decision = PlanDecision(polymer_class="PHYC", properties=("tg",),
-                            rationale=("test",), dominant_uncertainty="none", confidence="high")
-    plan = materialize_plan(intent, decision)
-    # Literature no longer raises anything here: PE's derived mass floor is DP 179, above the
-    # cited 90, and a literature recommendation may never LOWER a floor. The floor wins, which
-    # is the invariant test_literature_grounding_never_lowers_a_recommendation pins directly.
-    assert plan["decided_params"]["dp_typical"] == 179
+    ok = dict(base, confidence="medium")
+    scientific_control._validate_decision(PlanDecision.from_dict(ok))  # must not raise
 
 
 def test_materializer_attaches_a_populated_cost_estimate():

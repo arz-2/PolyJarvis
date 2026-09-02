@@ -97,6 +97,9 @@ from mol_python import run_in_mol_env, RDKIT_CLI                 # noqa: E402
 # not merely get noisy -- their PEO transformed to a crystal-like phase instead of a rubbery one.
 # They also require nchain >= 10.
 SYSTEM_MW_FLOOR_GMOL = 50_000.0
+# The floor's source, as a resolvable DOI rather than a bare author-year in a comment --
+# the decision autofill cites it in D-04's finite_size_effects evidence.
+SYSTEM_MW_FLOOR_DOI = "10.1038/s41428-020-00443-1"  # Wang 2021, Polym. J.
 """Total system molecular weight floor. 50 kg/mol buys ~+-12 K of Tg scatter on Wang's curve.
 
 NOT a convergence guarantee, and must never be described as one: the true Fox-Flory plateau is
@@ -154,8 +157,10 @@ stayed put, so the cell landed at 2x SYSTEM_MW_FLOOR_GMOL (PMMA 100k g/mol where
 criterion). Its source, "Bejagam 2020", has no copy in this repo's literature/ and no verified
 DOI anywhere in polymer_rules.json, so the claim could not be checked. What IS verified:
 Wang 2021 requires nchain >= 10, and Hayashi 2022 (RadonPy, PDF in literature/) ran nchain=10
-across 1,077 polymers. A confidence-gated literature nchain from literature-grounding-worker
-still raises nchain bindingly -- that path carries a DOI-verified source, this constant does not.
+across 1,077 polymers. Nothing raises nchain bindingly any more: the confidence-gated
+literature-nchain path was REMOVED 2026-09-02 along with the rest of the literature->cell-size
+fold-in (the grounding fields that fed it were retired as non-essential to protocol adjustment).
+The binding constraint on nchain is the L>=2*Rg finite-size gate, checked elsewhere.
 """
 
 # Per-SMILES rigidity-based DP recommendation (solve_system_size() only -- see that function's
@@ -166,8 +171,9 @@ still raises nchain bindingly -- that path carries a DOI-verified source, this c
 # segments-per-chain target with no source, and it converted a real literature Kuhn mass into an
 # arbitrary DP. A Kuhn-segments-per-chain criterion is also a chain-length-CONVERGENCE claim, and
 # this module's position (Wang 2021) is that chain-length convergence is unreachable at all-atom
-# scale and must be REPORTED as an uncertainty, never gated on. A DOI-verified literature DP still
-# raises the recommendation via _literature_dp_recommendation(); nothing else may invent one.
+# scale and must be REPORTED as an uncertainty, never gated on. As of 2026-09-02 NOTHING raises
+# the recommendation above the derived floor: _literature_dp_recommendation() was removed with the
+# rest of the literature->cell-size path, so the cell is a pure function of this SMILES.
 DP_TYPICAL_HARD_CEILING = 1000      # mirrors scientific_control.py's OVERRIDE_RANGES["dp_typical"]
                                      # upper bound; duplicated here rather than imported to avoid
                                      # a circular import (scientific_control.py imports this module)
@@ -436,7 +442,7 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
                           "doubles cost for no criterion this module can state. Reported, not "
                           "applied -- the L>=2*Rg finite-size gate (a separate, already-"
                           "mechanized check) is the binding constraint on nchain; supply a "
-                          "DOI-verified literature nchain to raise it."),
+                          "nchain is now a pure function of the system-mass floor."),
                 "current_nchain": nchain_v,
             })
 
@@ -465,53 +471,8 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
     }
 
 
-# Literature grounding at any confidence level can resolve an otherwise-unresolvable
-# MW_FLOOR_UNKNOWN (a cited, caveated estimate beats an outright refusal) -- but pushing a
-# recommendation ABOVE an already-established mechanized floor requires the worker's own
-# medium/high confidence bar, so a low-confidence guess never overrides real Fox-Flory/
-# entanglement-Me evidence upward on a whim.
-_GROUNDING_CONFIDENCE_TO_RAISE_AN_EXISTING_FLOOR = {"medium", "high"}
-
-
-def _literature_dp_recommendation(literature_grounding: dict, cls: dict, smiles: str):
-    """(dp, nchain, note, confidence) from a parsed literature_grounding_system_size.json,
-    or (None, None, None, None) if it grounds nothing usable.
-
-    Two distinct sources, both reduced to the same "a per-molecule DP was grounded" shape:
-      - system_size.dp_typical/nchain: a direct convergence-DP citation (worker priority 2).
-      - system_size.me_estimated_gmol: a packing-length-derived Me estimate (worker priority
-        3, see .claude/agents/literature-grounding-worker.md's Part B) -- computed the SAME way a
-        documented table Me is (DP@Me = Me / repeat-unit MW), just literature-sourced rather
-        than curated, so it is never re-derived here from a raw C-infinity value this script
-        would have to trust blindly.
-    """
-    if not literature_grounding:
-        return None, None, None, None
-    ss = literature_grounding.get("system_size") or {}
-    confidence = ss.get("confidence")
-    dp = ss.get("dp_typical")
-    nchain = ss.get("nchain")
-    if isinstance(dp, (int, float)) and dp:
-        return (int(dp), int(nchain) if isinstance(nchain, (int, float)) else None,
-                f"literature-grounded convergence DP ({ss.get('convergence_basis')}, "
-                f"confidence={confidence})", confidence)
-    me = ss.get("me_estimated_gmol")
-    if isinstance(me, (int, float)) and me:
-        try:
-            _, mw_per_monomer = _monomer_atoms_and_mw(smiles, is_ua=False)
-        except Exception as e:  # noqa: BLE001 -- a bad estimate must not crash the solve
-            return None, None, None, None
-        dp_at_me = round(me / mw_per_monomer)
-        return (dp_at_me, None,
-                f"literature-grounded packing-length Me estimate ({me} g/mol) / repeat-unit "
-                f"MW {mw_per_monomer:.1f} g/mol -> DP@Me={dp_at_me} (confidence={confidence})",
-                confidence)
-    return None, None, None, None
-
-
 def solve_system_size(polymer_class: str, smiles: str, properties=None,
-                      dp_typical: int = None, nchain: int = None,
-                      literature_grounding: dict = None) -> dict:
+                      dp_typical: int = None, nchain: int = None) -> dict:
     """Cost-minimizing companion to select_system_size(): the DP/nchain a reasoned/novel
     plan should actually USE, not merely a check of whether the class default clears its
     floor.
@@ -533,19 +494,9 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
     PCFF_NCHAIN_PRODUCTION_MINIMUM for PCFF-family classes; that stopped being true when the
     constant was demoted to advisory (see its own docstring -- binding it silently doubled
     every PCFF cell), and the docstring outlived the behavior. The only thing that raises
-    nchain now is a DOI-verified literature value at medium/high confidence.
+    nchain now is nothing: the DOI-verified-literature path was removed 2026-09-02.
 
-    literature_grounding (parsed literature_grounding_system_size.json, or None) makes the
-    recommendation genuinely vary by molecule rather than only by class-bucket: a real,
-    DOI-verified per-SMILES convergence DP (or packing-length-derived Me) can raise the
-    recommendation above a mechanized floor at medium/high confidence, or provide the
-    recommendation at ANY confidence when no mechanized floor stands (a cited, caveated
-    estimate beats nothing) -- true whether that's because Me is genuinely undocumented
-    (MW_FLOOR_UNKNOWN) or, for bulk_modulus specifically, because entanglement Me is
-    documented but advisory-only (never itself a require -- see _property_floors). It never
-    lowers a recommendation below a floor this script has already mechanically established
-    (Fox-Flory for tg); a single per-molecule study is not licensed to undercut that.
-    """
+"""
     base = select_system_size(polymer_class, smiles, properties=properties,
                               dp_typical=dp_typical, nchain=nchain)
     if "error" in base:
@@ -570,46 +521,14 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
     floor_was_unknown = required_floor is None and any(
         u.get("name") == "MW_FLOOR_UNKNOWN" for u in base.get("uncertainties", []))
 
-    lit_dp, lit_nchain, lit_note, lit_confidence = _literature_dp_recommendation(
-        literature_grounding, cls, smiles)
-
     recommended = {}
     reasons = []
     uncertainties = list(base.get("uncertainties", []))
 
     recommended_dp = required_floor
-    if lit_dp is not None:
-        if recommended_dp is None:
-            # No mechanized DP requirement stands for these properties -- either genuinely
-            # MW_FLOOR_UNKNOWN (Me undocumented) or, for bulk_modulus, entanglement Me was
-            # resolved but is advisory-only (never a require, see _property_floors). Either
-            # way a real per-molecule convergence citation beats nothing at any confidence --
-            # but the two reasons are different facts, say the right one.
-            recommended_dp = lit_dp
-            if floor_was_unknown:
-                reasons.append(f"{lit_note} -- resolves an otherwise-unassessed bulk_modulus "
-                              "chain-length floor (no documented entanglement Me for this "
-                              "class/member)")
-            else:
-                reasons.append(f"{lit_note} -- provides the bulk_modulus chain-length "
-                              "recommendation (entanglement Me is documented but advisory-"
-                              "only, never itself an acceptance criterion for K; this is "
-                              "real per-molecule convergence evidence instead)")
-        elif lit_confidence in _GROUNDING_CONFIDENCE_TO_RAISE_AN_EXISTING_FLOOR:
-            if lit_dp > recommended_dp:
-                recommended_dp = lit_dp
-                reasons.append(f"{lit_note} -- raises the mechanized floor {required_floor} "
-                              "for this specific molecule")
-            else:
-                reasons.append(f"{lit_note} -- does not exceed the mechanized floor "
-                              f"{required_floor}; floor stands")
-        else:
-            reasons.append(f"{lit_note} -- confidence too low to raise an already-"
-                          f"established floor {required_floor}; floor stands")
-
     # Per-SMILES rigidity/Kuhn-based DP recommendation, tg only -- generalizes the
     # class-level Fox-Flory floor above into a real per-molecule computation. Additive:
-    # only ever RAISES recommended_dp, same convention as the literature-DP branch above.
+    # only ever RAISES recommended_dp -- the one remaining path that can.
     if properties and "tg" in set(properties):
         try:
             _, m_repeat = _monomer_atoms_and_mw(smiles, is_ua=False)
@@ -688,14 +607,7 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
     recommended_nchain = None
     # The PCFF-minimum advisory is emitted once, by select_system_size() above, and arrives
     # here in `uncertainties` -- PCFF_NCHAIN_PRODUCTION_MINIMUM is advisory (see its docstring)
-    # and never raises the recommendation. Only a DOI-verified literature nchain does.
-    if (lit_nchain and lit_confidence in _GROUNDING_CONFIDENCE_TO_RAISE_AN_EXISTING_FLOOR
-            and lit_nchain > (recommended_nchain or nchain_v or 0)):
-        # A DOI-verified literature nchain DOES bind. DP is deliberately NOT re-derived
-        # downward to absorb it: shrinking chains to pay for more of them defeats the raise.
-        recommended_nchain = lit_nchain
-        reasons.append(f"literature-grounded nchain={lit_nchain} raises the recommendation "
-                      f"({lit_note})")
+    # and never raises the recommendation. Since 2026-09-02 nothing else does either.
     if recommended_nchain is not None and (nchain_was_derived
                                            or recommended_nchain != nchain_v):
         recommended["nchain"] = recommended_nchain
@@ -714,23 +626,20 @@ def main():
     p.add_argument("--properties", help="comma-separated: tg,bulk_modulus,density")
     p.add_argument("--dp_typical", type=int, default=None)
     p.add_argument("--nchain", type=int, default=None)
-    p.add_argument("--literature_grounding",
-                   help="path to a literature_grounding_system_size.json to fold in via "
-                        "solve_system_size() instead of the plain check")
+    # --literature_grounding was removed 2026-09-02 along with the literature->DP path; it was
+    # also the ONLY way to reach solve_system_size() from the CLI, so --solve replaces it.
+    p.add_argument("--solve", action="store_true",
+                   help="run solve_system_size() -- the cost-minimizing, floor-clearing "
+                        "recommendation the reasoned path actually applies -- instead of the "
+                        "plain admissibility check")
     args = p.parse_args()
 
     try:
-        if args.literature_grounding:
-            lit = json.loads(Path(args.literature_grounding).read_text())
-            result = solve_system_size(
-                args.polymer_class, args.smiles,
-                args.properties.split(",") if args.properties else None,
-                args.dp_typical, args.nchain, literature_grounding=lit)
-        else:
-            result = select_system_size(
-                args.polymer_class, args.smiles,
-                args.properties.split(",") if args.properties else None,
-                args.dp_typical, args.nchain)
+        fn = solve_system_size if args.solve else select_system_size
+        result = fn(
+            args.polymer_class, args.smiles,
+            args.properties.split(",") if args.properties else None,
+            args.dp_typical, args.nchain)
     except Exception as e:  # noqa: BLE001 -- callers parse JSON, never a traceback
         result = {"error": f"{type(e).__name__}: {e}"}
 

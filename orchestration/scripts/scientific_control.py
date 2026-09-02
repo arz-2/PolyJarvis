@@ -175,7 +175,7 @@ class PlanDecision:
             decision_evaluations=dict(value.get("decision_evaluations") or {}),
             assumptions=tuple(value.get("assumptions") or ()),
             dominant_uncertainty=str(value.get("dominant_uncertainty") or "protocol_transferability"),
-            confidence=str(value.get("confidence") or "medium").lower(),
+            confidence=str(value.get("confidence") or "").lower(),
         )
 
 
@@ -356,21 +356,6 @@ def planning_context(intent: ScientificIntent) -> dict[str, Any]:
     }
 
 
-def _load_system_size_literature_grounding(run_name: str) -> Optional[dict]:
-    """data/<run_name>/raw/literature_grounding_system_size.json, if the novel-run-plan
-    skill's step 4 already produced one for this run -- None otherwise (a genuinely novel
-    plan run outside that skill's flow, or a worker failure). Never raises: a malformed or
-    unreadable grounding file must not block materialization, only leave the fallback
-    class-bucket recommendation in place."""
-    path = REPO_ROOT / "data" / run_name / "raw" / "literature_grounding_system_size.json"
-    if not path.exists():
-        return None
-    try:
-        return json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError):
-        return None
-
-
 def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     """Convert a narrow agent decision into a complete executable run plan."""
     _validate_decision(decision)
@@ -382,8 +367,7 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
 
     size_solve = solve_system_size(
         decision.polymer_class, intent.smiles, properties,
-        dp_typical=class_entry.get("dp_typical"), nchain=class_entry.get("nchain"),
-        literature_grounding=_load_system_size_literature_grounding(intent.run_name))
+        dp_typical=class_entry.get("dp_typical"), nchain=class_entry.get("nchain"))
     auto_filled = {k: v for k, v in size_solve.get("recommended_params", {}).items()
                    if k not in decision.overrides}
     if auto_filled:
@@ -397,7 +381,7 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
         plan["decided_params"]["T_workflow_K"] = decision.overrides["T_equil_K"]
         effective_class["T_workflow_K"] = decision.overrides["T_equil_K"]
     plan["planned_stages"] = build_planned_stages(effective_class, properties, intent.smiles)
-    plan["decisions"] = build_decisions(effective_class)
+    plan["decisions"] = build_decisions(effective_class, intent.smiles)
     for row in plan["decisions"]:
         row["confidence"] = decision.confidence
         evaluation = decision.decision_evaluations.get(row["id"])
@@ -422,8 +406,7 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     if final_dp is not None:
         final_check = solve_system_size(
             decision.polymer_class, intent.smiles, properties, dp_typical=final_dp,
-            nchain=plan["decided_params"].get("nchain"),
-            literature_grounding=_load_system_size_literature_grounding(intent.run_name))
+            nchain=plan["decided_params"].get("nchain"))
         final_size_advisories = list(final_check.get("uncertainties", []))
         if any(u.get("name") == "size_over_provisioned" for u in final_size_advisories):
             over_provisioned_ack = [{"name": "system_size_over_provisioned", "dominant": False,
@@ -702,7 +685,12 @@ def _validate_decision(decision: PlanDecision) -> None:
     if not decision.rationale:
         raise ValueError("scientific agent must provide at least one rationale")
     if decision.confidence not in VALID_CONFIDENCE:
-        raise ValueError(f"invalid confidence {decision.confidence!r}")
+        raise ValueError(
+            f"confidence must be one of {sorted(VALID_CONFIDENCE)}; got "
+            f"{decision.confidence!r}"
+            + ("  (key absent or empty -- deleting it does not skip the gate)"
+               if not decision.confidence else "")
+        )
     properties = set(decision.properties)
     if not properties or not properties <= VALID_PROPERTIES:
         raise ValueError(f"properties must be a non-empty subset of {sorted(VALID_PROPERTIES)}")

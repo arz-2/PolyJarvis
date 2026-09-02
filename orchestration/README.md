@@ -10,7 +10,7 @@ guides or generate worker prompts.
 | `run_campaign.py` | Resumable single-stage or end-to-end campaign execution |
 | `stage_params.py` | Plan and class configuration to concrete tool arguments |
 | `protocol_policy.py` | Pressure-ladder selection and bounded recovery |
-| `make_deterministic_plan.py` | Reproducible plan generation for configured classes: `run-plan` (run_plan.json) and `decision` (the agent-facing decision.json scaffold) |
+| `make_deterministic_plan.py` | Reproducible plan generation for configured classes: `run-plan` (run_plan.json) and `decision` (the fully-resolved decision.json the literature critic then critiques) |
 | `validate_run_plan.py` | Structural and policy validation of plan artifacts |
 | `enforce_gate.py` | Deterministic equilibration gate enforcement |
 | `hardware_runtime.py` | What this box has and who currently has it: live host/GPU probes (cores, nvidia-smi, host-fingerprint match) and the atomic GPU claim/release ledger: `status`, `claim`, `release`, `budget` |

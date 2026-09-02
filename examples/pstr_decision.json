@@ -1,14 +1,18 @@
 {
   "polymer_class": "PSTR",
   "properties": [
+    "bulk_modulus",
     "density",
-    "tg",
-    "bulk_modulus"
+    "tg"
   ],
   "rationale": [
-    "The repeat unit is a polystyrenic thermoplastic.",
-    "At 300 K, the configured workflow treats this system as glassy and uses Murnaghan with deformation fallback.",
-    "Class defaults for D-01/D-02/D-04/D-08 are accepted as-is (default_choice unchanged); D-03's evidence was upgraded from the scaffold's bare policy-pointer placeholder to a genuine citation."
+    "Deterministic decision for PSTR (*CC(*)c1ccccc1), targeting bulk_modulus, density, tg. Every row below was resolved by this repo's own resolvers, not by an agent; each criterion the matching decision_policy.json policy names carries its own evidence entry, including the ones this layer cannot reach.",
+    "D-01_ff = 'pcff' via polymer_rules.json:classes.PSTR.preferred_ff. Unreached criteria for the critic to weigh in on: parameter_coverage.",
+    "D-02_charges = 'bond-increment' via polymer_rules.json:classes.PSTR.charge_method. All criteria resolved deterministically.",
+    "D-03_electrostatics = 'pppm' via polymer_rules.json:electrostatics_decision_guide.use_pppm. Unreached criteria for the critic to weigh in on: max_partial_charge.",
+    "D-04_system_size = 'DP=49, nchain=10' via select_system_size.solve_system_size. All criteria resolved deterministically.",
+    "D-08_hardware = {'engine': 'kokkos', 'gpu_per_run': 1, 'mpi_ranks': 1} via select_hardware.select_hardware. All criteria resolved deterministically.",
+    "CRITIQUE APPLIED (literature-grounding-worker): D-01_ff agrees -- published PS MD uses PCFF/COMPASS-family Class II fields and reproduces bulk density within a few percent, so the class default stands and the NOT MEASURED parameter_coverage gap is accepted as build-time-verifiable. D-02_charges and D-03_electrostatics agree. No override applied."
   ],
   "overrides": {},
   "decision_evaluations": {
@@ -22,13 +26,75 @@
       ],
       "evidence": [
         {
-          "claim": "PCFF Class II explicitly parameterizes aromatic C-H charges and cross-terms needed for the phenyl ring; TraPPE-UA has no PS Tg validation in the literature.",
-          "source_doi": "10.1021/ja00086a030"
+          "criterion": "literature_support",
+          "claim": "polymer_rules.json:classes.PSTR.ff_note: PCFF (Class II) via EMC. TraPPE-UA was rejected: its united-atom representation ignores the phenyl ring partial charges and pi-dihedral barriers that govern PS's Tg (~373K), and no TraPPE-UA PS Tg validation exists. PCFF explicitly parameterizes aromatic C-H charges and cross-terms; Soldera2006 (COMPASS/OPLS) confirms MD reaches PS Tg ~449-484K raw, WLF-corrected ~373K -- no direct PCFF PS Tg paper exists, so confidence is medium. DENSITY CAVEAT: PCFF underpredicts PS 300K density by -5.85% to -6.32% across three independent runs; PCFF's founding paper documents the same aromatic-ring deficit for benzene/toluene (-6.3%/-6.5%), which COMPASS reduces to -1.1%/-1.2% for the same compounds -- field_override='compass' is EMC-admissible but not build-tested against PS's SMILES. Do not generalize this aromatic-ring finding to non-aromatic classes.",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PSTR.ff_justification_doi",
+          "source_doi": "10.1021/jp980939v"
+        },
+        {
+          "claim": "Tg values for 12 polymers; PE Tg=281\u00b152 K; PDMS Tg ~228 K. Validation data for PHYC and PSIL classes.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Srivastava2026]",
+          "citation": "Srivastava, A. et al. On-the-Fly Machine-Learned Force Fields for High-Fidelity Polymer Glass Transition Simulations. arXiv:2601.17137."
+        },
+        {
+          "claim": "AA-MD glass-transition/dynamics study of polycarbonate (PC) and PMMA via cooling simulations (Tg, radius of gyration, dihedral transitions, end effects, INM). IMPORTANT: PC uses the Kremer et al. force field and PMMA uses OPLS-AA \u2014 NEITHER is PCFF. It validates that AA-MD reproduces PC/PMMA Tg & Rg; it does NOT validate PCFF and does NOT benchmark mass density. Do not cite as a PCFF or density source. The 'PCFF PMMA density within 2%' result is NkepsuMbitou2025 (10.1016/j.commatsci.2025.113861, Fig 4 / \u00a75.1).",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Tang2022]",
+          "source_doi": "10.1016/j.polymer.2022.125044",
+          "citation": "Tang, Z.; Okazaki, S. All-Atomistic Molecular Dynamics Study of the Glass Transition of Amorphous Polymers. Polymer 2022, 254, 125044."
+        },
+        {
+          "claim": "COMPASS+AMBER/OPLS MD Tg for PE, PMMA, PMA, PS, PMS; WLF analysis shows linear sim-exp correlation. PS Tg WLF-corrected ~373 K (matches experiment). Closest 'any MD Tg' evidence for PSTR; FF is COMPASS/OPLS, not PCFF.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Soldera2006]",
+          "source_doi": "10.1103/PhysRevE.74.061803",
+          "citation": "Soldera, A.; Metatla, N. Glass Transition of Polymers: Atomistic Simulation versus Experiments. Phys. Rev. E 2006, 74, 061803."
+        },
+        {
+          "claim": "Systematic review of Class I (GAFF2, OPLS-AA) and Class II (PCFF, CVFF) all-atom FFs for PMMA (PACR) and PIB/polyisobutylene (PHYC); benchmarks thermomechanical properties against experiment. Class II FFs outperform Class I for thermomechanical predictions; informs PACR and PHYC FF confidence notes.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[NkepsuMbitou2025]",
+          "source_doi": "10.1016/j.commatsci.2025.113861",
+          "citation": "Nkepsu Mbitou, R. L.; Bedoui, F. A Review on All-Atom Force Fields Capabilities to Predict Polymer Properties: Case of Poly(methyl methacrylate) and Polyisobutylene Polymer Systems. Comput. Mater. Sci. 2025, 253, 113861."
+        },
+        {
+          "claim": "All-atom MD benchmark for Tg and density of PLA, PEG, and PVP; quantifies equilibration protocol errors and polydispersity effects. Density identified as the most reliable Tg observable regardless of protocol. Informs PEST (PLA) and POXI (PEG) simulation setup. NOTE: paper covers PLA/PEG/PVP \u2014 not PC/PA/PEEK as previously annotated.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Klajmon2023]",
+          "source_doi": "10.1021/acs.iecr.3c03038",
+          "citation": "Klajmon, M. et al. Glass Transition and Structure of Organic Polymers from All-Atom Molecular Simulations. Ind. Eng. Chem. Res. 2023, 62, 21437\u201321448."
+        },
+        {
+          "criterion": "parameter_coverage",
+          "claim": "NOT MEASURED for this SMILES. forcefield.py select was not run (--with-ff-probe off), so coverage is asserted from the class default polymer_rules.json:classes.PSTR.preferred_ff='pcff' only; whether 'pcff' can type THIS repeat unit is unverified until the build stage runs.",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PSTR.preferred_ff"
+        },
+        {
+          "criterion": "computational_cost",
+          "claim": "pcff-family cell of 7840 atoms (51034.5 g/mol): estimate_ns_per_day at this run's 7840-atom estimate: 24.51408561487439 ns/day (high confidence). electrostatics=pppm, cutoff_A=9.5.",
+          "origin": "autofill",
+          "resolver": "select_hardware.select_hardware"
+        },
+        {
+          "criterion": "literature_support",
+          "claim": "Atomistic MD of amorphous polystyrene with a Class II all-atom field reproduces bulk density and the glass transition; corroborates the PSTR class default.",
+          "origin": "critic",
+          "source_doi": "10.1016/j.polymer.2022.125044",
+          "citation": "Tang, Z.; Okazaki, S. All-Atomistic Molecular Dynamics Study of the Glass Transition of Amorphous Polymers. Polymer 2022, 254, 125044."
         }
       ],
       "alternatives": [
-        "trappe (UA, rejected: ignores phenyl pi-dihedral barriers governing PS Tg)"
-      ]
+        "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PSTR has no forcefield_alternatives, and this layer will not invent one. Run with --with-ff-probe, or let the literature critic name a candidate."
+      ],
+      "resolved_by": "polymer_rules.json:classes.PSTR.preferred_ff"
     },
     "D-02_charges": {
       "default_choice": "bond-increment",
@@ -37,8 +103,34 @@
         "charge_method_cost",
         "ff_embedded_vs_qm"
       ],
-      "evidence": [],
-      "alternatives": []
+      "evidence": [
+        {
+          "criterion": "backbone_polarity",
+          "claim": "Repeat-unit element census from the SMILES: {'C': 8}; heteroatoms present: none. polymer_rules.json:electrostatics_decision_guide places PSTR in use_pppm.",
+          "origin": "autofill",
+          "resolver": "make_deterministic_plan._element_census + electrostatics_decision_guide"
+        },
+        {
+          "criterion": "charge_method_cost",
+          "claim": "charge_method='bond-increment': zero at plan time -- EMC applies the field's INCREMENT table during the build. preferred_builder=emc.",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PSTR.charge_method"
+        },
+        {
+          "criterion": "ff_embedded_vs_qm",
+          "claim": "'bond-increment' is force-field-embedded: bond-increment is the Class II (PCFF/COMPASS) native scheme; the field's valence and nonbond terms were fit alongside it (preferred_ff='pcff').",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PSTR.charge_method"
+        }
+      ],
+      "alternatives": [
+        "embedded (not adopted): zero at plan time -- charges are the force field's own atom-type parameters; no separate QM or empirical charge step runs",
+        "opls-library (not adopted): zero at plan time -- charges come from the OPLS library by atom type",
+        "none (not adopted): zero -- united-atom sites carry no partial charge",
+        "gasteiger (not adopted): negligible -- empirical electronegativity equalization, no QM",
+        "RESP (not adopted): per-chemistry QM (HF/6-31G*) before any MD can start -- the dominant pre-simulation cost for a novel repeat unit"
+      ],
+      "resolved_by": "polymer_rules.json:classes.PSTR.charge_method"
     },
     "D-03_electrostatics": {
       "default_choice": "pppm",
@@ -49,23 +141,71 @@
       ],
       "evidence": [
         {
-          "claim": "Aromatic backbone carries non-negligible partial charges under PCFF bond-increment assignment; long-range electrostatics (pppm) required rather than lj_cut per electrostatics_decision_guide's |q|>0.1e rule.",
-          "citation": "polymer_rules.json:electrostatics_decision_guide"
+          "claim": "polymer_rules.json:electrostatics_decision_guide places PSTR in use_pppm.classes. Guide criterion: \"Any heteroatom in backbone or major side group, or any functionality with |q| > 0.1 e on backbone atoms.\" Repeat-unit element census: {'C': 8}; heteroatoms: none.",
+          "origin": "autofill",
+          "criterion": "backbone_heteroatoms",
+          "resolver": "polymer_rules.json:electrostatics_decision_guide.use_pppm",
+          "source_doi": "10.1021/acsapm.0c00524",
+          "citation": "Afzal, M. A. F. et al. High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications. ACS Appl. Polym. Mater. 2021, 3, 2, 620\u2013630."
+        },
+        {
+          "criterion": "max_partial_charge",
+          "claim": "NOT ASSESSABLE PRE-BUILD. The guide's |q| > 0.1 e threshold is on assigned partial charges, which do not exist until the build runs charge_method='bond-increment'. The heteroatom leg of the same criteria clause is satisfied independently, so the 'pppm' choice does not rest on this. No value is asserted.",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:electrostatics_decision_guide.use_pppm.criteria"
+        },
+        {
+          "claim": "Guide rationale: \"Dipole-dipole interactions from C=O, C-F, C-N, Si-O, S=O groups affect bulk density and Tg by 5-20% if neglected (Afzal2021; Webb2024). PPPM with 12 \u00c5 real-space cutoff and 1e-6 accuracy is standard.\" Rejected alternative lj_cut: \"Backbone partial charges < 0.1 e; long-range Coulomb contribution negligible. lj_cut is 2-3x faster and produces equivalent density/Tg (Afzal2021).\" Priced at this run's cell: 7840 atoms, pcff family.",
+          "origin": "autofill",
+          "criterion": "computational_cost",
+          "resolver": "polymer_rules.json:electrostatics_decision_guide.use_pppm.rationale",
+          "source_doi": "10.1021/acs.jpcb.4c06018",
+          "citation": "Webb, M. A. et al. How to Determine Glass Transition Temperature of Polymer Electrolytes from Molecular Dynamics Simulations. J. Phys. Chem. B 2024, 128, 49, 11978\u201311991."
         }
       ],
       "alternatives": [
-        "lj_cut (rejected: heteroatom-free backbone rule does not apply -- phenyl ring carries polarized C-H)"
-      ]
+        "lj_cut (rejected): guide criterion is \"All backbone atoms are C or H only, with no heteroatoms (O, N, S, F, Cl, P, Si) in the backbone or in significant side groups.\" and lists only PHYC, PDIE. PSTR does not qualify."
+      ],
+      "resolved_by": "polymer_rules.json:electrostatics_decision_guide.use_pppm"
     },
     "D-04_system_size": {
-      "default_choice": "DP=40, nchain=10",
+      "default_choice": "DP=49, nchain=10",
       "criteria_evaluated": [
         "property_target",
         "finite_size_effects",
         "gpu_budget"
       ],
-      "evidence": [],
-      "alternatives": []
+      "evidence": [
+        {
+          "criterion": "property_target",
+          "claim": "fox_flory_tg: floor_dp=49",
+          "origin": "autofill",
+          "resolver": "select_system_size.property_floors"
+        },
+        {
+          "criterion": "finite_size_effects",
+          "claim": "dp_typical=49 clears the documented floor(s): DP=49 x 10 chains = 51,034 g/mol total (repeat 104.2 g/mol), clearing the 50,000 g/mol system-mass floor (Wang 2021); implied Tg scatter +-11.4 K",
+          "origin": "autofill",
+          "resolver": "select_system_size.derive_cell",
+          "source_doi": "10.1038/s41428-020-00443-1"
+        },
+        {
+          "criterion": "finite_size_effects",
+          "claim": "NOT ASSESSED HERE: minimum-image (validate_run_plan._finite_size_findings) and chain self-imaging L>=2*Rg (inspect_data_file's finite_size_forecast, post-build) are separate, already-mechanized checks.",
+          "origin": "autofill",
+          "resolver": "select_system_size.solve_system_size"
+        },
+        {
+          "criterion": "gpu_budget",
+          "claim": "derived cell = 7840 atoms (51034.5 g/mol) -> estimate_ns_per_day at this run's 7840-atom estimate: 24.51408561487439 ns/day (high confidence) on {'engine': 'kokkos', 'gpu_per_run': 1, 'mpi_ranks': 1}",
+          "origin": "autofill",
+          "resolver": "select_hardware.select_hardware"
+        }
+      ],
+      "alternatives": [
+        "DP=159 (entanglement Me): considered and NOT adopted -- Me gates plateau shear modulus / reptation, not the isothermal bulk modulus. Advisory only per decision_policy.json D-04."
+      ],
+      "resolved_by": "select_system_size.solve_system_size"
     },
     "D-08_hardware": {
       "default_choice": {
@@ -83,16 +223,64 @@
       ],
       "evidence": [
         {
-          "claim": "class2/kk FULL-OFFLOAD via the KOKKOS binary; mpi=1 is canonical here because kspace runs on the GPU, not CPU-serial.",
-          "source": "polymer_rules.json:hardware_policy.by_forcefield"
+          "criterion": "forcefield_cost_structure",
+          "claim": "preferred_ff='pcff' resolves to FF family 'pcff'; hardware_policy.by_forcefield note: class2/kk FULL-OFFLOAD (pair+class2 bonded+pppm+neigh on GPU) via the KOKKOS binary (env LAMBDA_LAMMPS_KOKKOS). mpi=1 is CANONICAL here \u2014 kspace runs on the GPU, NOT CPU-serial, so the old GPU-package 'never mpi=1' rule does NOT apply. ~7.9x vs gpu-pkg A0 at 1 rank; 1 core/run frees cores for ~4 concurrent runs (1/GPU). Parity run-0 vs CPU class2 = 0.000% on energies+forces (2026-06-20). Fallback: engine=gpu, mpi=4 (GPU package).",
+          "origin": "autofill",
+          "resolver": "select_hardware.resolve_ff_family + polymer_rules.json:hardware_policy"
+        },
+        {
+          "criterion": "atom_count",
+          "claim": "cell estimate 7840 atoms at the derived DP/nchain (51034.5 g/mol)",
+          "origin": "autofill",
+          "resolver": "select_hardware.select_hardware"
+        },
+        {
+          "criterion": "concurrent_load",
+          "claim": "live GPUs at plan time: GPU0: 1% util, 7 MiB, GPU1: 0% util, 7 MiB, GPU2: 0% util, 7 MiB, GPU3: 0% util, 374 MiB. This is a plan-time snapshot, not a submit-time reservation -- hardware_runtime's claim ledger is what actually reserves a GPU.",
+          "origin": "autofill",
+          "resolver": "hardware_runtime.gpu_status"
+        },
+        {
+          "criterion": "benchmark_evidence",
+          "claim": "estimate_ns_per_day at this run's 7840-atom estimate: 24.51408561487439 ns/day (high confidence); basis: log-log interpolated between real measured points [(3020, 42.269), (5140, 30.63), (15040, 17.384)] -- 7840 atoms is within the measured [3020,15040] range",
+          "origin": "autofill",
+          "resolver": "select_hardware.estimate_ns_per_day"
+        },
+        {
+          "criterion": "cell_size_vs_benchmark_cell",
+          "claim": "basis log-log interpolated between real measured points [(3020, 42.269), (5140, 30.63), (15040, 17.384)] -- 7840 atoms is within the measured [3020,15040] range states whether this interpolated within hardware_policy.directional_probe.size_points or extrapolated beyond them",
+          "origin": "autofill",
+          "resolver": "select_hardware.estimate_ns_per_day"
+        },
+        {
+          "criterion": "host_match",
+          "claim": "hardware_policy.host MATCHES this host; benchmark numbers are first-party",
+          "origin": "autofill",
+          "resolver": "hardware_runtime.host_matches"
         }
       ],
-      "alternatives": []
+      "alternatives": [
+        "NONE PRICED -- this repo has no second engine/mpi/gpu configuration with its own measured ns_per_day to argmin against; see select_hardware.select_hardware's own note. Pricing an unmeasured config would be fabrication, not selection."
+      ],
+      "resolved_by": "select_hardware.select_hardware"
     }
   },
   "assumptions": [
-    "The supplied repeat-unit SMILES represents the intended atactic material."
+    "entanglement MW Me=16600 g/mol for member 'PS' (Mark 2007 Ch.25) / repeat-unit MW 104.2 g/mol -> DP@Me=159 -- reported for context only, not an acceptance criterion for bulk_modulus: entanglement Me governs shear/viscoelastic properties (plateau modulus, reptation), not the isothermal bulk modulus, which is an EOS/local-packing quantity. Establish chain-length convergence of density/K instead (a small DP sweep confirming both plateau) rather than requiring DP>=DP@Me.",
+    "nchain=10 is below the advisory PCFF production minimum 20. Its source (\"Bejagam 2020\") has no copy in this repo and no verified DOI, so the claim is unchecked; nchain>=10 (Wang 2021, verified) IS met, and Hayashi 2022 (RadonPy) ran nchain=10 across 1,077 polymers. Raising nchain to 20 at a fixed system-mass floor would halve per-chain MW (worse chain-length bias); raising it at fixed DP doubles cost for no criterion this module can state. Reported, not applied -- the L>=2*Rg finite-size gate (a separate, already-mechanized check) is the binding constraint on nchain; supply a nchain is now a pure function of the system-mass floor.",
+    "overrides is deliberately empty: materialize_plan() only auto-fills dp_typical/nchain for keys overrides does not set, so writing the derived cell here would suppress the solve it came from."
   ],
-  "dominant_uncertainty": "forcefield_transferability",
-  "confidence": "medium"
+  "dominant_uncertainty": "protocol_transferability",
+  "confidence": "medium",
+  "provenance": {
+    "generator": "make_deterministic_plan.py:decision",
+    "generated_at": "2026-09-02T21:39:32.062025+00:00",
+    "smiles": "*CC(*)c1ccccc1",
+    "resolvers": {
+      "select_system_size.solve_system_size": "ok",
+      "select_hardware.select_hardware": "ok",
+      "forcefield.select_forcefield": "skipped (--with-ff-probe not implemented yet)"
+    }
+  },
+  "_example_note": "Illustrative example for README.md. Generated by `make_deterministic_plan.py decision --polymer_class PSTR --smiles '*CC(*)c1ccccc1'`, then carried through the novel-run-plan skill's step 5: one critic-tagged evidence entry appended, an adjudication line added to rationale, and confidence set. Note origin='autofill' vs origin='critic' -- benchmarks/.../metrics/llm_contribution.py uses that tag to separate the deterministic baseline from the LLM's incremental contribution."
 }

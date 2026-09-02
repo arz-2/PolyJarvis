@@ -415,85 +415,10 @@ def test_the_pcff_nchain_advisory_is_emitted_exactly_once():
     assert "nchain_below_pcff_advisory_minimum" not in names
 
 
-def test_a_doi_verified_literature_nchain_still_binds():
-    """Demoting the unsourced constant must not disarm the sourced path."""
-    lit = {"system_size": {"dp_typical": 200, "nchain": 16,
-                           "convergence_basis": "entanglement_mw", "confidence": "high"}}
-    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], nchain=10,
-                          literature_grounding=lit)
-    assert r["recommended_params"]["nchain"] == 16
-
-
 def test_solve_no_change_when_class_default_already_at_the_floor():
     r = solve_system_size("PHYC", PHYC_SMILES, properties=["tg"], dp_typical=20, nchain=20)
     assert r["recommended_params"] == {}
 
-
-# --- literature grounding: makes the recommendation vary by molecule, not just class -----
-
-_LIT_GROUNDING_SCHEMA = {  # matches .claude/agents/literature-grounding-worker.md's Part B schema
-    "system_size": {"dp_typical": 200, "nchain": 12,
-                    "convergence_basis": "entanglement_mw", "confidence": "medium"},
-}
-
-
-def test_literature_grounding_provides_the_bulk_modulus_recommendation(monkeypatch):
-    """bulk_modulus has no mechanized DP floor (entanglement Me is advisory only, user-
-    directed benchmark criterion 2026-08-25) -- a real per-molecule convergence-DP citation
-    now IS the recommendation outright, not merely something that can raise an existing
-    floor."""
-    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (15, 100.12))
-    _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
-    r = solve_system_size("PACR", PACR_SMILES, properties=["bulk_modulus"],
-                          dp_typical=50, literature_grounding=_LIT_GROUNDING_SCHEMA)
-    assert r["decision"]["required_dp_floor"] is None  # entanglement Me is advisory, not a floor
-    assert r["recommended_params"]["dp_typical"] == 200
-    assert any("entanglement Me is documented but advisory" in reason
-              for reason in r["recommendation_reasons"])
-
-
-def test_literature_grounding_used_even_at_low_confidence_when_no_floor_stands(monkeypatch):
-    """Unlike a genuine mechanized floor (Fox-Flory for tg, which gates literature grounding
-    to medium/high confidence before letting it raise the recommendation), bulk_modulus has
-    no floor to protect against being undercut -- any confidence beats no recommendation."""
-    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (15, 100.12))
-    _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
-    low_conf = {"system_size": {**_LIT_GROUNDING_SCHEMA["system_size"], "confidence": "low"}}
-    r = solve_system_size("PACR", PACR_SMILES, properties=["bulk_modulus"],
-                          dp_typical=50, literature_grounding=low_conf)
-    assert r["recommended_params"]["dp_typical"] == 200
-
-
-def test_literature_grounding_resolves_mw_floor_unknown_at_any_confidence(monkeypatch):
-    """PAA has no documented Me (PACR only documents PMMA) -- MW_FLOOR_UNKNOWN today. Even
-    a low-confidence literature grounding is strictly better than outright refusal."""
-    # Same re-scoping as the unmatched-member guards above: a cell still has to be SIZED, which
-    # needs the repeat mass. The guard is that a direct-DP literature citation is used as-is,
-    # not that no mass lookup happens.
-    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua=False: (10, 250.0))
-    _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
-    low_conf = {"system_size": {"dp_typical": 90, "nchain": None,
-                                "convergence_basis": "class_analogy", "confidence": "low"}}
-    r = solve_system_size("PACR", PAA_SMILES, properties=["bulk_modulus"],
-                          dp_typical=50, literature_grounding=low_conf)
-    assert r["decision"]["required_dp_floor"] is None  # base check still refuses
-    assert r["floor_was_unknown"] is True
-    assert r["recommended_params"]["dp_typical"] == 90
-    assert any("otherwise-unassessed" in reason for reason in r["recommendation_reasons"])
-
-
-def test_literature_grounding_never_lowers_a_recommendation():
-    """A literature dp_typical below the mechanized floor must not undercut it -- a single
-    per-molecule study is not licensed to undercut Fox-Flory/entanglement-Me evidence."""
-    low_dp = {"system_size": {"dp_typical": 10, "nchain": None,
-                              "convergence_basis": "class_analogy", "confidence": "high"}}
-    r = solve_system_size("PKTN", PKTN_SMILES, properties=["tg"], dp_typical=12,
-                          literature_grounding=low_dp)
-    assert r["recommended_params"]["dp_typical"] == 20  # the derived mass floor, not 10
-
-
-# --- validate_run_plan._system_size_over_provisioned_findings: symmetric to the
-# under-provision check, gated on plan_mode -- a replay must never be flagged. -------------
 
 def _reasoned_plan(polymer_class="PHYC", smiles=PHYC_SMILES, properties=None,
                    dp=120, nchain=None, uncertainties=None, plan_mode="reasoned"):
@@ -529,25 +454,6 @@ def test_over_provisioned_check_no_finding_when_dp_already_at_the_floor():
     assert f == []
 
 
-def test_me_estimated_gmol_computes_dp_at_me_the_same_way_a_documented_table_me_does(monkeypatch):
-    """Priority-3 fallback: a packing-length-derived Me estimate, reduced to the same
-    DP@Me = Me/repeat-unit-MW arithmetic a curated table Me already uses -- never a second,
-    invented formula in this script."""
-    monkeypatch.setattr(sss, "_monomer_atoms_and_mw",
-                        lambda smiles, is_ua: (10, 74.15))  # PDMS-scale repeat unit
-    packing_length_grounding = {
-        "system_size": {"dp_typical": None, "nchain": None,
-                        "convergence_basis": "packing_length_estimate",
-                        "confidence": "low", "me_estimated_gmol": 7415.0},
-    }
-    r = solve_system_size("PHYC", PHYC_SMILES, properties=["bulk_modulus"], dp_typical=50,
-                          literature_grounding=packing_length_grounding)
-    # PHYC has no documented entanglement Me at all -> base floor is None (MW_FLOOR_UNKNOWN)
-    assert r["decision"]["required_dp_floor"] is None
-    assert r["recommended_params"]["dp_typical"] == round(7415.0 / 74.15)  # == 100
-    assert any("packing-length Me estimate" in reason for reason in r["recommendation_reasons"])
-
-
 # --- rigidity/Kuhn-based DP recommendation (tg only) -------------------------------
 #
 # _backbone_rigidity/_monomer_atoms_and_mw default to inert stand-ins for every test in
@@ -571,17 +477,16 @@ def test_rigidity_flexible_uses_dp_mw_alone(monkeypatch):
 
 
 def test_rigidity_stiff_does_not_raise_dp_above_the_mass_floor(monkeypatch):
-    """A literature Kuhn value no longer converts into a DP.
+    """A stiff backbone does not buy extra DP.
 
-    It used to: DP_Kuhn = ceil(7 * M_K / M_repeat) would have made this case 210. The 7 was
+    A Kuhn value used to convert into one: DP_Kuhn = ceil(7 * M_K / M_repeat) would have made
+    this case 210. The 7 was
     KUHN_SEGMENTS_PER_CHAIN_TARGET, whose own comment called it a placeholder with no source,
     and a Kuhn-segments-per-chain rule is a chain-length-CONVERGENCE claim -- which this module
     reports as an uncertainty rather than gating on (Wang 2021)."""
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (2, 100.0))
     monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: _STIFF)
-    lit = {"system_size": {"kuhn_molar_mass_gmol": 3000.0, "kuhn_length_A": 25.0}}
-    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], dp_typical=10, nchain=20,
-                          literature_grounding=lit)
+    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], dp_typical=10, nchain=20)
     assert r["recommended_params"]["dp_typical"] == 50
     assert not any("DP_Kuhn" in reason for reason in r["recommendation_reasons"])
 

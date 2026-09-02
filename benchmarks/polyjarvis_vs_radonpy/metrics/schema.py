@@ -36,6 +36,10 @@ class LLMContributionBlock:
     plan_mode: Optional[str] = None  # "reasoned" | "deterministic" | "scaffold"
     llm_authored_decisions_total: int = 0  # out of D-01/D-02/D-03/D-04/D-08
     llm_authored_decisions_with_evidence: int = 0
+    # The deterministic baseline on the other side of the comparison: rows the decision
+    # tool itself cited (origin="autofill"). Measured, not merely excluded, so the
+    # incremental LLM contribution is a difference between two counted quantities.
+    autofilled_decisions_with_evidence: int = 0
     mechanized_gate_decisions_total: int = 0  # D-05/D-06/D-07
     literature_grounding_evidence_count: int = 0
     confidence: Optional[str] = None

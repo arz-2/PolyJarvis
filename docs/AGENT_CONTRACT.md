@@ -4,16 +4,26 @@ PolyJarvis has two agent roles and one deterministic runtime.
 
 ## Scientific Planning Agent
 
-The planning agent runs once at campaign start. Rather than authoring its decision file from
-scratch, it starts from a `decision.json` **scaffold** that
-`orchestration/scripts/make_deterministic_plan.py decision` deterministically pre-populates from the
-polymer class's current defaults in `guides/polymer_rules.json` — one row per pre-simulation
-policy in `orchestration/decision_policy.json` (`D-01_ff`, `D-02_charges`, `D-03_electrostatics`,
-`D-04_system_size`, `D-08_hardware`), each carrying a `default_choice`, the policy's
-`criteria_evaluated`, and any evidence already transcribable from the class entry. The agent's
-job is to annotate that file in place: replace placeholder evidence with real, cited reasoning,
-fill `rationale`/`assumptions`/`dominant_uncertainty`/`confidence`, and set `overrides` only
-where it disagrees with a shown `default_choice`. It returns only scientific decisions:
+The planning agent runs once at campaign start. As of 2026-09-02 it does **not** author the
+decision file at all: `orchestration/scripts/make_deterministic_plan.py decision --smiles ...`
+writes a *complete* `decision.json`, resolving one row per pre-simulation policy in
+`orchestration/decision_policy.json` (`D-01_ff`, `D-02_charges`, `D-03_electrostatics`,
+`D-04_system_size`, `D-08_hardware`) from this repo's own resolvers — `solve_system_size`,
+`select_hardware`, the `electrostatics_decision_guide`, and `polymer_rules.json`'s
+`_metadata.primary_sources` citation records. Every criterion the policy names gets its own
+evidence entry, tagged `origin: "autofill"`, including the criteria that layer cannot reach
+(those say `NOT MEASURED` / `NOT ASSESSABLE` explicitly). `rationale` is written for it.
+
+The agent's job is to **critique** that file, not fill it: the `literature-grounding-worker`
+subagent returns an agree/disagree verdict per decision, and the calling session applies or
+declines each `suggested_override`, transcribes any critic-backed sources with
+`origin: "critic"`, and sets `confidence`. `confidence` comes back `"unreviewed"` (invalid) and
+is the **only** remaining block on materialization — `--baseline` stamps `"low"` instead, for
+the deterministic arm that runs with no LLM in the loop.
+
+`default_choice` stays read-only provenance: `materialize_plan()` reads only
+`criteria_evaluated`/`evidence`/`alternatives` off each row, so disagreement is expressed
+through `overrides`. It returns only scientific decisions:
 
 ```json
 {

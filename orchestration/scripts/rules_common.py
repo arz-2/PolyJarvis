@@ -55,6 +55,46 @@ def get_class_entry(rules: dict, polymer_class: str, warn_on_miss: bool = False)
     return entry
 
 
+def primary_source(rules: dict, source_id: str) -> dict | None:
+    """Resolve a class `citations[]` id to its full record in _metadata.primary_sources.
+
+    The per-class citations arrays hold only opaque ids ("Afzal2021"); the real citation
+    strings and DOIs live in _metadata.primary_sources and, until 2026-09-02, had no reader
+    at all. Joining them is what lets the deterministic decision autofill emit evidence
+    entries carrying a real source_doi/citation -- which is what validate_run_plan.py's
+    evidence_required check actually asks for.
+
+    Returns {'id','citation','doi','relevance', ...} or None for an unknown id.
+    """
+    if not source_id:
+        return None
+    for entry in rules.get("_metadata", {}).get("primary_sources", []) or []:
+        if entry.get("id") == source_id:
+            return entry
+    return None
+
+
+def source_evidence(rules: dict, source_id: str, claim: str, *,
+                    criterion: str | None = None, resolver: str | None = None) -> dict:
+    """One decision-row evidence entry backed by a primary_sources id.
+
+    Emits `source_doi`/`citation` only when the id actually resolves -- never a fabricated
+    or placeholder citation. `origin` is always "autofill": benchmarks/.../llm_contribution.py
+    uses that tag to keep deterministic-baseline reasoning out of the LLM-contribution count.
+    """
+    entry = primary_source(rules, source_id) or {}
+    out = {"claim": claim, "origin": "autofill"}
+    if criterion:
+        out["criterion"] = criterion
+    if resolver:
+        out["resolver"] = resolver
+    if entry.get("doi"):
+        out["source_doi"] = entry["doi"]
+    if entry.get("citation"):
+        out["citation"] = entry["citation"]
+    return out
+
+
 def hardware_policy(rules: dict | None = None) -> dict:
     """The hardware_policy block (loads rules if not supplied). {} if absent."""
     rules = rules if rules is not None else load_rules()

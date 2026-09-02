@@ -1,10 +1,13 @@
 """protocol_evidence.py ingest — the write-back half of the query-first/search-on-miss
 loop. Feeds it fixture advisory JSONs shaped exactly like literature-grounding-worker's
-real Part A / Part B output schemas (see its .md file) and checks:
+real output schema (see its .md file) and checks:
 correct provenance, only verified:true sources persisted, and idempotency (re-ingesting
 the same advisory JSON is a no-op the second time)."""
+import copy
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
@@ -37,27 +40,52 @@ FF_ADVISORY = {
     "notes": "test fixture",
 }
 
-SYSTEM_SIZE_ADVISORY = {
-    "polymer_name": "PMMA",
-    "polymer_class": "PACR",
-    "smiles": "*CC(*)(C)C(=O)OC",
-    "generated_at": "2026-08-24T00:00:00Z",
-    "system_size": {
-        "dp_typical": 60,
-        "nchain": 40,
-        "convergence_basis": "fox_flory_plateau",
-        "confidence": "high",
-        "me_estimated_gmol": None,
-        "me_estimation_note": None,
-        "sources": [
-            {"title": "Verified DP convergence study", "doi": "10.1/verified-dp", "url": "https://doi.org/10.1/verified-dp",
-             "year": 2022, "trust_tier": "peer_reviewed_doi",
-             "claim": "Tg converges above DP=50 for PMMA.", "verified": True},
-        ],
-    },
-    "dominant_uncertainty": "none",
-    "notes": "test fixture",
-}
+def test_url_form_dois_normalize_and_do_not_fork_the_store(tmp_path):
+    """db/query_polydatabase.py hands out DOIs as full https://doi.org/... URLs. The store's
+    dedup key is sha1(doi|field|claim), so storing the URL form would create a second record for
+    a paper already present in bare form."""
+    store_path = str(tmp_path / "protocol_evidence_ff.json")
+    pe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
+    n_bare = len(pe.load_store(store_path)["records"])
+
+    url_form = copy.deepcopy(FF_ADVISORY)
+    for key in ("forcefield", "electrostatics"):
+        for src in url_form.get(key, {}).get("sources", []):
+            src["doi"] = "https://doi.org/" + src["doi"]
+    result = pe.ingest("ff", url_form, run_name="PE1", store_path=store_path)
+
+    assert result["records_added"] == 0
+    assert len(pe.load_store(store_path)["records"]) == n_bare
+    assert all(not r["doi"].startswith("http") for r in pe.load_store(store_path)["records"])
+
+
+def test_ff_ingest_backfills_paper_metadata_from_md_studies(tmp_path):
+    """The critic writes each paper's title/url/year once, in md_studies[]; its per-field
+    sources[] entries carry only doi/claim/trust_tier/verified so the same paper cited for two
+    fields cannot drift between them."""
+    advisory = copy.deepcopy(FF_ADVISORY)
+    doi = advisory["forcefield"]["sources"][0]["doi"]
+    advisory["forcefield"]["sources"][0].pop("title", None)
+    advisory["forcefield"]["sources"][0].pop("year", None)
+    advisory["md_studies"] = [{"doi": doi, "title": "Backfilled Title",
+                               "url": f"https://doi.org/{doi}", "year": 1999}]
+    store_path = str(tmp_path / "protocol_evidence_ff.json")
+    pe.ingest("ff", advisory, run_name="PE1", store_path=store_path)
+
+    rec = next(r for r in pe.load_store(store_path)["records"] if r["doi"] == doi)
+    assert rec["title"] == "Backfilled Title"
+    assert rec["year"] == 1999
+
+
+def test_system_size_advisory_ingest_is_refused_not_silently_empty(tmp_path):
+    """The literature critic stopped emitting a system-size advisory on 2026-09-02 (the
+    dp_typical/nchain/convergence fields it fed were retired). A caller still passing one must
+    hear about it rather than get records_added: 0 and assume the store was updated. The
+    system_size STORE itself is untouched -- ingest-internal still writes it from completed
+    runs, and query --store system_size still reads it."""
+    with pytest.raises(ValueError, match="no advisory ingest path"):
+        pe.ingest("system_size", {"polymer_class": "PACR"}, run_name="PE1",
+                  store_path=str(tmp_path / "s.json"))
 
 
 def test_ff_ingest_adds_only_verified_sources(tmp_path):
@@ -94,43 +122,6 @@ def test_ff_ingest_dry_run_does_not_write(tmp_path):
     result = pe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path, dry_run=True)
     assert result["records_added"] == 1
     assert not Path(store_path).exists()
-
-
-def test_system_size_ingest_populates_system_size_value(tmp_path):
-    store_path = str(tmp_path / "protocol_evidence_system_size.json")
-    result = pe.ingest("system_size", SYSTEM_SIZE_ADVISORY, run_name="PE1", store_path=store_path)
-
-    assert result["records_added"] == 1
-    store = pe.load_store(store_path)
-    record = store["records"][0]
-    assert record["field"] == "system_size"
-    assert record["value"]["dp_typical"] == 60
-    assert record["value"]["nchain"] == 40
-
-
-def test_system_size_ingest_lifts_kuhn_fields_when_present(tmp_path):
-    advisory = {**SYSTEM_SIZE_ADVISORY,
-               "system_size": {**SYSTEM_SIZE_ADVISORY["system_size"],
-                               "kuhn_length_A": 20.0, "kuhn_molar_mass_gmol": 1500.0,
-                               "kuhn_source_note": "test fixture derivation"}}
-    store_path = str(tmp_path / "protocol_evidence_system_size.json")
-    pe.ingest("system_size", advisory, run_name="PE1", store_path=store_path)
-
-    store = pe.load_store(store_path)
-    value = store["records"][0]["value"]
-    assert value["kuhn_length_A"] == 20.0
-    assert value["kuhn_molar_mass_gmol"] == 1500.0
-    assert value["kuhn_source_note"] == "test fixture derivation"
-
-
-def test_system_size_ingest_kuhn_fields_default_to_none_when_absent(tmp_path):
-    store_path = str(tmp_path / "protocol_evidence_system_size.json")
-    pe.ingest("system_size", SYSTEM_SIZE_ADVISORY, run_name="PE1", store_path=store_path)
-
-    store = pe.load_store(store_path)
-    value = store["records"][0]["value"]
-    assert value["kuhn_length_A"] is None
-    assert value["kuhn_molar_mass_gmol"] is None
 
 
 def test_ingest_canonicalizes_smiles_at_write_time(tmp_path, monkeypatch):
