@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-26T17:00:08Z",
+  "generated_at": "2026-08-30T23:08:18Z",
   "records": [
     {
       "schema_version": 1,
@@ -561,6 +561,64 @@
         "source_run": "PPNL_rules_audit",
         "migrated_from": null,
         "added_at": "2026-08-26T15:18:42Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "d5123d044804",
+      "field": "system_size",
+      "polymer_class": "POXI",
+      "polymer_names": [],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "PolyJarvis validated POXI (*CCO*) at dp_typical=50, nchain=20 in run PEG1; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "dp_typical": 50,
+        "nchain": 20,
+        "convergence_basis": "internal_run_validated"
+      },
+      "doi": "internal-run:PEG1",
+      "url": null,
+      "title": "PolyJarvis internal run PEG1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PEG1",
+        "migrated_from": null,
+        "added_at": "2026-08-27T09:15:58Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "4ba08cc32dc4",
+      "field": "system_size",
+      "polymer_class": "POXI",
+      "polymer_names": [],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "PolyJarvis validated POXI (*CCO*) at dp_typical=50, nchain=20 in run PEG1_gate_validation; validated properties: ['density'].",
+      "value": {
+        "dp_typical": 50,
+        "nchain": 20,
+        "convergence_basis": "internal_run_validated"
+      },
+      "doi": "internal-run:PEG1_gate_validation",
+      "url": null,
+      "title": "PolyJarvis internal run PEG1_gate_validation (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PEG1_gate_validation",
+        "migrated_from": null,
+        "added_at": "2026-08-30T23:08:18Z"
       }
     }
   ]

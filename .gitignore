@@ -86,3 +86,12 @@ hardware/HARDWARE_STUDY.md
 hardware/CALIB_*/*
 !hardware/CALIB_*/emc_build.data
 !hardware/CALIB_*/emc_build.params
+
+# ── Benchmark run artifacts (benchmarks/<suite>/data/) ───────────────────────
+# The comparison harness under benchmarks/ is source worth committing; the runs it
+# produces are not -- one PEG1 RadonPy run alone leaves 24 GB (14 files over GitHub's
+# 100 MB hard limit) of dumps, ESP grids, pickles and per-thermo plots.
+benchmarks/*/data/
+
+# Launcher PID files written by background campaign runs
+*.pid
