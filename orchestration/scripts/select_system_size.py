@@ -146,16 +146,28 @@ def derive_cell(smiles: str, is_ua: bool = False, nchain: int = MIN_NCHAIN):
             f"implied Tg scatter +-{tg_scatter_K(mw_s)} K")
     return dp, nchain, mw_s, note
 
-PCFF_NCHAIN_PRODUCTION_MINIMUM = 20  # Bejagam 2020; nchain=10 is Hayashi2022 throughput compromise
+PCFF_NCHAIN_PRODUCTION_MINIMUM = 20
+"""ADVISORY ONLY since 2026-09-02 -- reported as an uncertainty, never a binding recommendation.
 
-# Per-SMILES rigidity/Kuhn-based DP recommendation (solve_system_size() only -- see that
-# function's docstring for why this must never reach select_system_size() itself). This
-# generalizes the class-level STIFF_BACKBONE_CLASSES allowlist above into a real per-
-# molecule computation, but does not replace that allowlist or its Fox-Flory floor: this
-# is a separate, additive recommendation source, same pattern as _literature_dp_recommendation.
-DP_MW_BASELINE_GMOL = 5000          # 5 kg/mol target chain mass, confirmed with user
-KUHN_SEGMENTS_PER_CHAIN_TARGET = 7  # midpoint of a user-specified 5-10 Kuhn-segment target;
-                                     # a placeholder constant pending empirical (deferred) tuning
+It was binding until then, and silently doubled every PCFF cell: nchain went 10 -> 20 while DP
+stayed put, so the cell landed at 2x SYSTEM_MW_FLOOR_GMOL (PMMA 100k g/mol where 50k is the
+criterion). Its source, "Bejagam 2020", has no copy in this repo's literature/ and no verified
+DOI anywhere in polymer_rules.json, so the claim could not be checked. What IS verified:
+Wang 2021 requires nchain >= 10, and Hayashi 2022 (RadonPy, PDF in literature/) ran nchain=10
+across 1,077 polymers. A confidence-gated literature nchain from literature-grounding-worker
+still raises nchain bindingly -- that path carries a DOI-verified source, this constant does not.
+"""
+
+# Per-SMILES rigidity-based DP recommendation (solve_system_size() only -- see that function's
+# docstring for why this must never reach select_system_size() itself).
+#
+# KUHN_SEGMENTS_PER_CHAIN_TARGET = 7 was REMOVED 2026-09-02 along with _dp_from_kuhn/_kuhn_floor.
+# Its own comment called it "a placeholder constant pending empirical (deferred) tuning", i.e. a
+# segments-per-chain target with no source, and it converted a real literature Kuhn mass into an
+# arbitrary DP. A Kuhn-segments-per-chain criterion is also a chain-length-CONVERGENCE claim, and
+# this module's position (Wang 2021) is that chain-length convergence is unreachable at all-atom
+# scale and must be REPORTED as an uncertainty, never gated on. A DOI-verified literature DP still
+# raises the recommendation via _literature_dp_recommendation(); nothing else may invent one.
 DP_TYPICAL_HARD_CEILING = 1000      # mirrors scientific_control.py's OVERRIDE_RANGES["dp_typical"]
                                      # upper bound; duplicated here rather than imported to avoid
                                      # a circular import (scientific_control.py imports this module)
@@ -233,50 +245,44 @@ def _backbone_rigidity(smiles: str, timeout: int = 30):
 
 
 def _dp_from_mw(m_repeat_gmol: float) -> int:
-    """DP_MW = ceil(5000 / M_repeat) -- the flexible-backbone baseline, and the floor
-    every rigidity class starts from (semi-rigid/stiff only ever raise it via Kuhn)."""
-    return math.ceil(DP_MW_BASELINE_GMOL / m_repeat_gmol)
+    """DP that clears the system-mass floor at MIN_NCHAIN chains.
+
+    Identical by construction to derive_cell()'s DP -- both are
+    ceil(SYSTEM_MW_FLOOR_GMOL / (MIN_NCHAIN * M_repeat)). Kept as a separate helper only
+    because this path has an m_repeat in hand and derive_cell() takes a SMILES; it must never
+    grow a second, differently-derived number. The retired DP_MW_BASELINE_GMOL = 5000 g/mol
+    ("confirmed with user") expressed the same quantity as an unsourced per-chain target;
+    SYSTEM_MW_FLOOR_GMOL / MIN_NCHAIN is the same value carrying Wang 2021's actual criterion.
+    """
+    return math.ceil(SYSTEM_MW_FLOOR_GMOL / (MIN_NCHAIN * m_repeat_gmol))
 
 
-def _dp_from_kuhn(kuhn_molar_mass_gmol: float, m_repeat_gmol: float,
-                  n_target: int = KUHN_SEGMENTS_PER_CHAIN_TARGET) -> int:
-    """DP_Kuhn = ceil(n_target * M_K / M_repeat) -- a chain of n_target Kuhn segments has
-    total molar mass n_target*M_K; convert to DP via the SAME repeat-unit MW convention
-    (_monomer_atoms_and_mw) used everywhere else in this file, never a second MW estimate."""
-    return math.ceil(n_target * kuhn_molar_mass_gmol / m_repeat_gmol)
+def _rigid_backbone_uncertainty(rigidity: dict, dp: int, m_repeat_gmol: float) -> dict:
+    """The chain-length-bias uncertainty a stiff/semi-rigid backbone must carry.
 
+    Replaces the retired dp_min fallback. dp_min was the SAME retired Fox-Flory/Patrone floor
+    under a different key -- five classes cited "Patrone 2016" by name for it (PHYC 60, PIMD 50,
+    PKTN 50, PSFO 50, PSIL 40), twelve carried no justification at all, and two (PVNL, PPNL) had
+    notes contradicting their own value. It bound hardest exactly where the mass floor is
+    cheapest: PEEK max(DP_MW=18, dp_min=50) = 50 and PSU max(12, 50) = 50, which is what kept
+    those two unaffordable at 34k/54k atoms.
 
-def _kuhn_floor(rigidity: dict, literature_grounding: dict, m_repeat_gmol: float, cls: dict):
-    """(dp_kuhn, note) or (None, uncertainty_dict). Only ever called for rigidity_class in
-    {"semi_rigid", "stiff"} -- flexible skips this entirely and uses DP_MW alone.
-
-    Mirrors _entanglement_floor's refuse-rather-than-fabricate shape exactly: a real,
-    literature-sourced Kuhn value (from literature_grounding's system_size block, put
-    there by literature-grounding-worker's live per-SMILES search -- there is no static
-    per-class Kuhn table to look up, unlike PDMS's one existing example in
-    docs/protocol_evidence_system_size.json) beats a structural guess; no literature value
-    beats falling back to the class's own dp_min floor, never an invented rotatable-bond-
-    derived numeric estimate -- that is exactly the "invented-physics shortcut" this
-    module's own docstring already rules out for a different quantity (Rg/C_inf)."""
-    ss = (literature_grounding or {}).get("system_size") or {}
-    m_k = ss.get("kuhn_molar_mass_gmol")
-    l_k = ss.get("kuhn_length_A")
-    if not isinstance(m_k, (int, float)) or not m_k:
-        dp_min = cls.get("dp_min")
-        return None, {
-            "name": "KUHN_LENGTH_UNKNOWN", "dominant": False,
-            "class": rigidity.get("rigidity_class"),
-            "detail": (f"backbone classified {rigidity.get('rigidity_class')} "
-                      f"({rigidity.get('classification_note')}) but no literature Kuhn-"
-                      "length/Kuhn-segment-mass value was found for this SMILES -- refusing "
-                      "to estimate Kuhn length from rotatable-bond counting or any other "
-                      f"structural heuristic; falling back to dp_min={dp_min}"),
-        }
-    dp_kuhn = _dp_from_kuhn(m_k, m_repeat_gmol)
-    note = (f"Kuhn segment molar mass M_K={m_k} g/mol (lK={l_k} A) x "
-           f"{KUHN_SEGMENTS_PER_CHAIN_TARGET} target segments/chain / repeat-unit MW "
-           f"{m_repeat_gmol:.1f} g/mol -> DP_Kuhn={dp_kuhn}")
-    return dp_kuhn, note
+    Per the system-size plan, the rigid-aromatic chain-length risk is REPORTED on these runs,
+    "not ignored and not used to block them".
+    """
+    return {
+        "name": "RIGID_BACKBONE_CHAIN_LENGTH_BIAS", "dominant": False,
+        "class": rigidity.get("rigidity_class"),
+        "detail": (f"backbone classified {rigidity.get('rigidity_class')} "
+                  f"({rigidity.get('classification_note')}). The cell is sized by total system "
+                  f"mass (Wang 2021), which for this heavy repeat unit ({m_repeat_gmol:.1f} "
+                  f"g/mol) gives DP={dp} -- short chains. No chain-length-convergence study "
+                  "exists for rigid aromatic backbones, and no Kuhn-length value was supplied "
+                  "for this SMILES, so the residual chain-length bias on Tg is UNQUANTIFIED. "
+                  "Reported, not gated: a DP floor here would be the retired Fox-Flory rule, "
+                  "whose cited source (Patrone 2016) prescribes no floor and studies crosslinked "
+                  "epoxies with no degree of polymerization at all."),
+    }
 
 
 # Canonical order (not the arbitrary iteration order of a set) so evidence text/floors
@@ -594,32 +600,24 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
                 uncertainties.append({
                     "name": "backbone_rigidity_estimate_failed", "dominant": False,
                     "detail": "backbone_rigidity.py subprocess failed or timed out -- "
-                              "rigidity/Kuhn-based DP recommendation skipped for this SMILES",
+                              "rigidity-based DP recommendation skipped for this SMILES",
                 })
             else:
                 dp_mw = _dp_from_mw(m_repeat)
                 rclass = rigidity.get("rigidity_class")
-                if rclass == "flexible":
-                    dp_candidate = dp_mw
-                    rigidity_note = f"{rigidity.get('classification_note')}; DP_MW={dp_mw}"
-                else:  # semi_rigid or stiff -- unified Kuhn path, no separate ad hoc multiplier
-                    dp_kuhn, kuhn_note = _kuhn_floor(rigidity, literature_grounding,
-                                                     m_repeat, cls)
-                    if dp_kuhn is not None:
-                        dp_candidate = max(dp_mw, dp_kuhn)
-                        rigidity_note = (f"{rigidity.get('classification_note')}; {kuhn_note}; "
-                                        f"DP=max(DP_MW={dp_mw}, DP_Kuhn={dp_kuhn})")
-                    else:
-                        uncertainties.append(kuhn_note)
-                        dp_min = cls.get("dp_min") or 0
-                        dp_candidate = max(dp_mw, dp_min)
-                        rigidity_note = (f"{kuhn_note['detail']}; "
-                                        f"DP=max(DP_MW={dp_mw}, dp_min={dp_min})={dp_candidate}")
+                # Rigidity no longer RAISES the DP -- it only decides whether this run has to
+                # carry the chain-length-bias uncertainty. The mass floor sizes every cell; a
+                # stiff backbone changes what is REPORTED about that cell, not how big it is.
+                dp_candidate = dp_mw
+                rigidity_note = f"{rigidity.get('classification_note')}; DP_MW={dp_mw}"
+                if rclass != "flexible":
+                    uncertainties.append(
+                        _rigid_backbone_uncertainty(rigidity, dp_mw, m_repeat))
 
                 if dp_candidate > DP_TYPICAL_HARD_CEILING:
                     uncertainties.append({
                         "name": "rigidity_dp_clamped", "dominant": False,
-                        "detail": (f"rigidity/Kuhn DP recommendation {dp_candidate} exceeds "
+                        "detail": (f"rigidity DP recommendation {dp_candidate} exceeds "
                                   f"the dp_typical override ceiling {DP_TYPICAL_HARD_CEILING} "
                                   "(scientific_control.py's OVERRIDE_RANGES) -- clamped."),
                         "unclamped_dp": dp_candidate,
@@ -628,9 +626,9 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
 
                 if recommended_dp is None or dp_candidate > recommended_dp:
                     recommended_dp = dp_candidate
-                    reasons.append(f"rigidity/Kuhn DP recommendation: {rigidity_note}")
+                    reasons.append(f"rigidity DP recommendation: {rigidity_note}")
                 else:
-                    reasons.append(f"rigidity/Kuhn DP recommendation ({rigidity_note}) does "
+                    reasons.append(f"rigidity DP recommendation ({rigidity_note}) does "
                                   f"not exceed the existing recommendation {recommended_dp}")
 
     # A DERIVED value must always be emitted, not only when it differs from `dp`: with the class
@@ -665,10 +663,26 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
 
     ff = (cls.get("preferred_ff") or "").lower()
     recommended_nchain = None
+    # PCFF_NCHAIN_PRODUCTION_MINIMUM is ADVISORY (see its docstring). It used to be binding
+    # here, which doubled every PCFF cell without re-deriving DP -- so the cell sat at 2x the
+    # system-mass floor rather than at it.
     if "pcff" in ff and nchain_v and nchain_v < PCFF_NCHAIN_PRODUCTION_MINIMUM:
-        recommended_nchain = PCFF_NCHAIN_PRODUCTION_MINIMUM
+        uncertainties.append({
+            "name": "nchain_below_pcff_advisory_minimum", "dominant": False,
+            "detail": (f"nchain={nchain_v} is below the advisory PCFF production minimum "
+                      f"{PCFF_NCHAIN_PRODUCTION_MINIMUM}. Its source (\"Bejagam 2020\") has no "
+                      "copy in this repo and no verified DOI, so the claim is unchecked; "
+                      "nchain>=10 (Wang 2021, verified) IS met, and Hayashi 2022 (RadonPy) ran "
+                      f"nchain=10 across 1,077 polymers. Raising nchain to "
+                      f"{PCFF_NCHAIN_PRODUCTION_MINIMUM} at a fixed system-mass floor would "
+                      "halve per-chain MW (worse chain-length bias); raising it at fixed DP "
+                      "doubles cost for no criterion this module can state. Reported, not "
+                      "applied -- supply a DOI-verified literature nchain to raise it."),
+        })
     if (lit_nchain and lit_confidence in _GROUNDING_CONFIDENCE_TO_RAISE_AN_EXISTING_FLOOR
             and lit_nchain > (recommended_nchain or nchain_v or 0)):
+        # A DOI-verified literature nchain DOES bind. DP is deliberately NOT re-derived
+        # downward to absorb it: shrinking chains to pay for more of them defeats the raise.
         recommended_nchain = lit_nchain
         reasons.append(f"literature-grounded nchain={lit_nchain} raises the recommendation "
                       f"({lit_note})")
@@ -677,12 +691,6 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
         recommended["nchain"] = recommended_nchain
     elif nchain_was_derived:
         recommended["nchain"] = nchain_v
-        if "pcff" in ff and not any("nchain" in r for r in reasons):
-            reasons.append(f"nchain={nchain_v} is below the PCFF production minimum "
-                          f"{PCFF_NCHAIN_PRODUCTION_MINIMUM} (Bejagam 2020); binding this "
-                          "for reasoned/novel plans rather than leaving it advisory-only "
-                          "(no pre-build Rg predictor exists, so this stays a floor, not "
-                          "a continuous cost/accuracy curve)")
 
     return {**base, "uncertainties": uncertainties, "recommended_params": recommended,
             "recommendation_reasons": reasons, "floor_was_unknown": floor_was_unknown}

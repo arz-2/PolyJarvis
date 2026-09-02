@@ -27,7 +27,7 @@ import canon_smiles  # noqa: E402
 import hw_common  # noqa: E402
 import select_system_size as sss  # noqa: E402
 from select_system_size import (select_system_size, solve_system_size, _fox_flory_floor,
-                                property_floors)  # noqa: E402
+                                property_floors, MIN_NCHAIN)  # noqa: E402
 from validate_run_plan import (_system_size_findings,
                                _system_size_over_provisioned_findings)  # noqa: E402
 
@@ -396,9 +396,23 @@ def test_solve_raises_an_under_provisioned_dp_to_the_floor():
     assert r["recommended_params"]["dp_typical"] == 20
 
 
-def test_solve_recommends_pcff_nchain_minimum():
+def test_pcff_nchain_minimum_is_advisory_not_a_recommendation():
+    """It used to bind, and silently doubled every PCFF cell: nchain went 10 -> 20 while DP
+    stayed put, so the cell landed at 2x the system-mass floor rather than at it. Its source
+    ("Bejagam 2020") has no copy in this repo and no verified DOI; nchain>=10 (Wang 2021) and
+    Hayashi 2022's 1,077-polymer nchain=10 are what IS verified."""
     r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], nchain=10)
-    assert r["recommended_params"]["nchain"] == 20
+    assert "nchain" not in r["recommended_params"]
+    assert any(u["name"] == "nchain_below_pcff_advisory_minimum" for u in r["uncertainties"])
+
+
+def test_a_doi_verified_literature_nchain_still_binds():
+    """Demoting the unsourced constant must not disarm the sourced path."""
+    lit = {"system_size": {"dp_typical": 200, "nchain": 16,
+                           "convergence_basis": "entanglement_mw", "confidence": "high"}}
+    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], nchain=10,
+                          literature_grounding=lit)
+    assert r["recommended_params"]["nchain"] == 16
 
 
 def test_solve_no_change_when_class_default_already_at_the_floor():
@@ -547,26 +561,45 @@ def test_rigidity_flexible_uses_dp_mw_alone(monkeypatch):
     assert any("DP_MW=50" in reason for reason in r["recommendation_reasons"])
 
 
-def test_rigidity_stiff_with_literature_kuhn_raises_above_dp_mw(monkeypatch):
+def test_rigidity_stiff_does_not_raise_dp_above_the_mass_floor(monkeypatch):
+    """A literature Kuhn value no longer converts into a DP.
+
+    It used to: DP_Kuhn = ceil(7 * M_K / M_repeat) would have made this case 210. The 7 was
+    KUHN_SEGMENTS_PER_CHAIN_TARGET, whose own comment called it a placeholder with no source,
+    and a Kuhn-segments-per-chain rule is a chain-length-CONVERGENCE claim -- which this module
+    reports as an uncertainty rather than gating on (Wang 2021)."""
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (2, 100.0))
     monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: _STIFF)
     lit = {"system_size": {"kuhn_molar_mass_gmol": 3000.0, "kuhn_length_A": 25.0}}
     r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], dp_typical=10, nchain=20,
                           literature_grounding=lit)
-    # DP_MW = ceil(5000/100) = 50; DP_Kuhn = ceil(7*3000/100) = 210 -- Kuhn dominates.
-    assert r["recommended_params"]["dp_typical"] == 210
-    assert any("DP_Kuhn=210" in reason for reason in r["recommendation_reasons"])
+    assert r["recommended_params"]["dp_typical"] == 50
+    assert not any("DP_Kuhn" in reason for reason in r["recommendation_reasons"])
 
 
-def test_rigidity_stiff_without_literature_kuhn_falls_back_to_dp_min(monkeypatch):
-    """Refuse-rather-than-fabricate: no literature Kuhn value -> KUHN_LENGTH_UNKNOWN,
-    fall back to max(DP_MW, dp_min), never an invented structural estimate."""
+def test_rigidity_stiff_reports_chain_length_bias_instead_of_raising_dp(monkeypatch):
+    """A stiff backbone changes what is REPORTED about the cell, not how big it is.
+
+    The retired behaviour fell back to max(DP_MW, cls["dp_min"]) -- the same Fox-Flory floor
+    the code had already deleted, surviving as a data field. It bound hardest exactly where the
+    mass floor is cheapest (PEEK max(18, 50), PSU max(12, 50)), which is what kept those two
+    unaffordable."""
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (2, 100.0))
     monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: _STIFF)
     r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], dp_typical=10, nchain=20)
-    # DP_MW=50, PACR dp_min=30 -> max(50,30)=50; PACR's own Fox-Flory floor (20) is lower.
-    assert r["recommended_params"]["dp_typical"] == 50
-    assert any(u["name"] == "KUHN_LENGTH_UNKNOWN" for u in r["uncertainties"])
+    assert r["recommended_params"]["dp_typical"] == 50  # the mass floor, nothing added
+    bias = [u for u in r["uncertainties"] if u["name"] == "RIGID_BACKBONE_CHAIN_LENGTH_BIAS"]
+    assert len(bias) == 1
+    assert "not ignored" not in bias[0]["detail"]  # it is reported, not editorialised
+    assert "UNQUANTIFIED" in bias[0]["detail"]
+
+
+def test_rigidity_flexible_carries_no_chain_length_bias_uncertainty(monkeypatch):
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (2, 100.0))
+    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: _FLEXIBLE)
+    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], dp_typical=10, nchain=20)
+    assert not any(u["name"] == "RIGID_BACKBONE_CHAIN_LENGTH_BIAS"
+                   for u in r["uncertainties"])
 
 
 def test_rigidity_estimate_failure_is_advisory_only(monkeypatch):
@@ -589,27 +622,106 @@ def test_rigidity_skipped_entirely_for_a_bulk_modulus_only_request(monkeypatch):
     assert calls == []
 
 
-def test_dp_from_mw_baseline_is_5000_gmol():
-    assert sss._dp_from_mw(100.0) == 50  # ceil(5000/100)
+def test_dp_from_mw_is_the_system_mass_floor_at_min_nchain():
+    assert sss._dp_from_mw(100.0) == 50   # ceil(50000 / (10 * 100))
     assert sss._dp_from_mw(28.05) == 179  # PE's real repeat-unit MW
 
 
-def test_dp_from_kuhn_uses_the_named_target_constant():
-    assert sss.KUHN_SEGMENTS_PER_CHAIN_TARGET == 7
-    assert sss._dp_from_kuhn(kuhn_molar_mass_gmol=1500.0, m_repeat_gmol=288.3) == 37
+def test_dp_from_mw_agrees_with_derive_cell(monkeypatch):
+    """One number, two call sites. The retired DP_MW_BASELINE_GMOL=5000 was a second,
+    independently-stated constant that happened to equal SYSTEM_MW_FLOOR_GMOL/MIN_NCHAIN --
+    if they ever drift, the cell size depends on which path a caller took."""
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (34, 288.3))
+    dp_derived, _n, _mw, _note = sss.derive_cell("*stub*")
+    assert sss._dp_from_mw(288.3) == dp_derived
 
 
-def test_kuhn_floor_refuses_without_fabricating_when_no_literature_value(monkeypatch):
-    cls = {"dp_min": 42}
-    dp, uncertainty = sss._kuhn_floor(_STIFF, literature_grounding=None,
-                                      m_repeat_gmol=100.0, cls=cls)
-    assert dp is None
-    assert uncertainty["name"] == "KUHN_LENGTH_UNKNOWN"
-    assert "42" in uncertainty["detail"]  # names the dp_min it will fall back to
+def test_no_kuhn_to_dp_conversion_survives():
+    """The whole Kuhn->DP path is gone, constant included."""
+    for gone in ("KUHN_SEGMENTS_PER_CHAIN_TARGET", "_dp_from_kuhn", "_kuhn_floor",
+                 "DP_MW_BASELINE_GMOL"):
+        assert not hasattr(sss, gone), f"{gone} is back"
 
 
-def test_kuhn_floor_computes_dp_kuhn_from_a_grounded_value():
-    lit = {"system_size": {"kuhn_molar_mass_gmol": 1500.0, "kuhn_length_A": 20.0}}
-    dp, note = sss._kuhn_floor(_STIFF, lit, m_repeat_gmol=288.3, cls={"dp_min": 50})
-    assert dp == 37
-    assert "DP_Kuhn=37" in note
+# --- end-to-end: the LIVE path, not derive_cell -------------------------------------
+#
+# The regression this guards against actually shipped. derive_cell() was correct and its unit
+# tests passed, but solve_system_size() -- the function scientific_control.materialize_plan()
+# calls, whose recommended_params go straight into decided_params -- still routed through two
+# older recommendation layers (a class dp_min floor, and a binding PCFF nchain minimum). PEEK
+# planned at 50 x 20 = 34,000 atoms while derive_cell said 18 x 10 = 6,120, and 1,371 tests
+# passed. Assert on the solve output, never on derive_cell, or the two can drift again.
+
+# Real repeat-unit masses and backbone classes, so these exercise the whole solve WITHOUT
+# shelling into RDKit (this file's standing invariant). Masses cross-checked against
+# select_hardware._monomer_atoms_and_mw on the real SMILES -- exact, not rounded: DP is a
+# ceil(), so 28.1 vs 28.054 is the difference between DP 178 and 179.
+_LIVE_REPEAT = {
+    "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1": (34, 288.302, "stiff"),
+    "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1": (54, 442.536, "stiff"),
+    "*CC(*)(C)C(=O)OC": (15, 100.117, "flexible"),
+    "*CC(*)c1ccccc1": (16, 104.152, "flexible"),
+    "*OC(C)C(*)=O": (9, 72.063, "flexible"),
+    "*CC(*)Cl": (6, 62.499, "flexible"),
+    "*CC*": (2, 28.054, "flexible"),
+}
+
+
+@pytest.fixture
+def live_path_masses(monkeypatch):
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw",
+                        lambda smiles, is_ua=False: _LIVE_REPEAT[smiles][:2])
+    monkeypatch.setattr(sss, "_backbone_rigidity", lambda smiles: {
+        "rigidity_class": _LIVE_REPEAT[smiles][2],
+        "classification_note": f"{_LIVE_REPEAT[smiles][2]} (real classification, stubbed call)",
+    })
+
+
+_LIVE_PATH_CELLS = [
+    # (polymer, class, smiles, dp, nchain, atoms_per_repeat)
+    ("PEEK", "PKTN", "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1", 18, 10, 34),
+    ("PSU", "PSFO",
+     "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1", 12, 10, 54),
+    ("PMMA", "PACR", "*CC(*)(C)C(=O)OC", 50, 10, 15),
+    ("PS", "PSTR", "*CC(*)c1ccccc1", 49, 10, 16),
+    ("PLA", "PEST", "*OC(C)C(*)=O", 70, 10, 9),
+    ("PVC", "PVNL", "*CC(*)Cl", 81, 10, 6),
+    ("PE", "PHYC", "*CC*", 179, 10, 2),  # TraPPE-UA: 2 united-atom sites per repeat
+]
+
+
+@pytest.mark.parametrize("name,cls,smiles,dp,nchain,atoms_per_repeat", _LIVE_PATH_CELLS)
+def test_live_solve_path_sizes_the_cell_from_the_mass_floor(
+        name, cls, smiles, dp, nchain, atoms_per_repeat, live_path_masses):
+    """What a real plan gets, for the default property set."""
+    r = solve_system_size(cls, smiles, properties=["tg", "density", "bulk_modulus"])
+    rec = r["recommended_params"]
+    assert rec["dp_typical"] == dp, f"{name}: {rec['dp_typical']} != {dp}"
+    assert rec.get("nchain", MIN_NCHAIN) == nchain, name
+    assert rec["dp_typical"] * nchain * atoms_per_repeat < 16_000, f"{name} cell too large"
+
+
+@pytest.mark.parametrize("name,cls,smiles,dp,nchain,atoms_per_repeat", _LIVE_PATH_CELLS)
+def test_live_solve_path_clears_the_system_mass_floor(
+        name, cls, smiles, dp, nchain, atoms_per_repeat, live_path_masses):
+    """...and clears the floor without overshooting it by a whole factor.
+
+    The 2x ceiling is the specific bug: raising nchain without re-deriving DP doubled the mass
+    of every PCFF cell. A cell may exceed the floor because DP rounds up, never because two
+    independent layers each sized it."""
+    r = solve_system_size(cls, smiles, properties=["tg", "density", "bulk_modulus"])
+    rec = r["recommended_params"]
+    is_ua = cls in ("PHYC", "PDIE")
+    _atoms, m_repeat = sss._monomer_atoms_and_mw(smiles, is_ua)
+    mw_system = m_repeat * rec["dp_typical"] * rec.get("nchain", MIN_NCHAIN)
+    assert mw_system >= sss.SYSTEM_MW_FLOOR_GMOL, f"{name}: {mw_system:.0f} below the floor"
+    assert mw_system < 2 * sss.SYSTEM_MW_FLOOR_GMOL, (
+        f"{name}: {mw_system:.0f} is 2x+ the floor -- two layers sized this cell")
+
+
+def test_no_class_dp_floor_reaches_the_live_path():
+    """A reinstated dp_min would be invisible to every test above except on PEEK/PSU, where it
+    is the difference between 6,120 and 34,000 atoms. Assert the consult itself is gone."""
+    src = (Path(sss.__file__)).read_text()
+    assert 'cls.get("dp_min")' not in src
+    assert 'get("dp_min")' not in src

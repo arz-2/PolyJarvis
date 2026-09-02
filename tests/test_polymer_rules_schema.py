@@ -28,12 +28,13 @@ REQUIRED_KEYS = [
     "preferred_ff",
     "forcefield",
     "charge_method",
-    # dp_typical / nchain REMOVED 2026-09-02: cell size is derived per-SMILES from
-    # select_system_size's system-mass floor, not stored per class. None of the 21 classes ever
-    # carried a note justifying either, and repeat mass varies up to 3x WITHIN a class, so one
-    # number per class cannot be right for its own members. dp_min stays -- it is a documented
-    # per-class minimum, not a sizing default.
-    "dp_min",
+    # dp_typical / nchain / dp_min ALL REMOVED 2026-09-02: cell size is derived per-SMILES
+    # from select_system_size's system-mass floor, not stored per class. None of the 21 classes
+    # ever carried a note justifying dp_typical/nchain, and repeat mass varies up to 3x WITHIN a
+    # class, so one number per class cannot be right for its own members. dp_min was removed in
+    # the same pass once it turned out to be the SAME retired Fox-Flory/Patrone floor under a
+    # different key -- and the binding one: it forced PEEK to DP=50 and PSU to DP=50 long after
+    # the constants it duplicated were deleted from the code.
     "density_initial_gcm3",
     "electrostatics",
     "cutoff_A",
@@ -59,8 +60,17 @@ def test_no_class_stores_a_cell_size():
     """Cell size is derived per-SMILES (select_system_size.derive_cell), never stored per class.
     A reinstated dp_typical/nchain would silently take precedence over the derivation and
     reintroduce the one-number-per-class error the mass floor exists to fix."""
-    offenders = {cid: [k for k in ("dp_typical", "nchain") if k in e]
-                 for cid, e in CLASSES.items() if any(k in e for k in ("dp_typical", "nchain"))}
+    size_keys = ("dp_typical", "nchain", "dp_min")
+    offenders = {cid: [k for k in size_keys if k in e]
+                 for cid, e in CLASSES.items() if any(k in e for k in size_keys)}
+    assert not offenders, offenders
+
+
+def test_global_defaults_stores_no_cell_size():
+    """global_defaults carried dp_min=20 as a catch-all floor. Same retired rule, same removal:
+    an unmatched class must fall through to the per-SMILES derivation, not to a stored number."""
+    gd = RULES.get("global_defaults", {})
+    offenders = [k for k in ("dp_typical", "nchain", "dp_min") if k in gd]
     assert not offenders, offenders
 
 
@@ -68,7 +78,6 @@ def test_no_class_stores_a_cell_size():
 def test_numeric_fields_in_range(cid):
     e = CLASSES[cid]
     assert 0.1 <= e["density_initial_gcm3"] <= 2.5, "initial density out of plausible range"
-    assert e["dp_min"] >= 1
     assert e["T_equil_K"] > 0
     assert e["dt_fs"] > 0
     assert e["cutoff_A"] > 0
@@ -158,22 +167,14 @@ def test_electrostatics_matches_its_own_decision_guide():
         )
 
 
-# D-04_system_size's Fox-Flory require clause (mechanized by select_system_size.py):
-# DP>=20 for flexible backbones, DP>=50 for the three classes global_notes names as
-# stiff. dp_min is each class's own claimed floor -- this locks it to actually clear
-# the plateau its class cites, the same self-consistency shape as
-# test_electrostatics_matches_its_own_decision_guide above.
-STIFF_BACKBONE_CLASSES = {"PIMD", "PKTN", "PSFO"}
-
-
-@pytest.mark.parametrize("cid", sorted(CLASSES))
-def test_dp_min_clears_its_own_fox_flory_floor(cid):
-    floor = 50 if cid in STIFF_BACKBONE_CLASSES else 20
-    assert CLASSES[cid]["dp_min"] >= floor, (
-        f"{cid}: dp_min={CLASSES[cid]['dp_min']} is below the Fox-Flory floor {floor} "
-        f"its own class ({'stiff' if cid in STIFF_BACKBONE_CLASSES else 'flexible'} "
-        "backbone) claims to clear"
-    )
+# The retired test here was test_dp_min_clears_its_own_fox_flory_floor: it asserted every
+# class's dp_min cleared DP>=20, or DP>=50 for a hardcoded {PIMD, PKTN, PSFO} stiff allowlist.
+# Both the allowlist and the 20/50 constants were deleted from select_system_size.py when the
+# Fox-Flory rule was retired (its cited source, Patrone 2016, studies crosslinked epoxies that
+# have no degree of polymerization and prescribes no floor) -- but the test kept asserting them
+# against a data field that also survived, so the rule went on binding. Replaced by
+# test_no_class_stores_a_cell_size / test_global_defaults_stores_no_cell_size above: the
+# invariant is now that NO per-class DP floor exists to clear.
 
 
 def test_tg_slope_gate_fallback_valid():

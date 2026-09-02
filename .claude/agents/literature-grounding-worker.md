@@ -245,10 +245,12 @@ provenance color. Search in priority order:
    and that scatter is a property of the method, not of how well you cited it.
 
 1.5. **A Kuhn length / Kuhn segment molar mass, for `tg` requests on a semi-rigid or stiff
-   backbone** — `solve_system_size()`'s rigidity/Kuhn DP recommendation (see
-   `orchestration/scripts/backbone_rigidity.py` and `select_system_size.py`'s `_kuhn_floor`)
-   needs a real Kuhn length (`lK`, Å) and Kuhn segment molar mass (`M_K`, g/mol) for any
-   backbone its RDKit classifier calls semi-rigid/stiff, to require ~7 Kuhn segments per chain.
+   backbone** — RECORDED AS EVIDENCE ONLY since 2026-09-02. `solve_system_size()` no longer
+   converts a Kuhn value into a DP: `_kuhn_floor` and its ~7-Kuhn-segments-per-chain target were
+   removed as unsourced (see the note under this item). Still worth reporting for the record and
+   for `RIGID_BACKBONE_CHAIN_LENGTH_BIAS`, which names it as the missing quantity, but it will
+   not change the cell size. `orchestration/scripts/backbone_rigidity.py` still classifies the
+   backbone. Report a real Kuhn length (`lK`, Å) and Kuhn segment molar mass (`M_K`, g/mol).
    There is no static per-class Kuhn table in this repo (only PDMS has one, in
    `docs/protocol_evidence_system_size.json`, and only for entanglement Me, not this) — search
    fresh, per SMILES, every time, same as priorities 1-2 above. Fan out
@@ -262,9 +264,14 @@ provenance color. Search in priority order:
    Rg/end-to-end-distance) for THIS repeat unit specifically — not a structurally similar
    polymer, not a soluble analog with a different backbone substituent — **refuse**: leave
    `kuhn_length_A`/`kuhn_molar_mass_gmol` `null` and say so in `dominant_uncertainty`. A
-   fabricated-sounding Kuhn length is worse than none: `select_system_size.py`'s `_kuhn_floor`
-   falls back cleanly to the class's `dp_min` floor when this is null, exactly the same
-   refuse-rather-than-fabricate contract as priority-1/2's `null` handling.
+   fabricated-sounding Kuhn length is worse than none. NOTE (2026-09-02): `_kuhn_floor` and the
+   class `dp_min` floor it fell back to were both REMOVED — a Kuhn-segments-per-chain target had
+   no source, and every class `dp_min` was the retired Fox-Flory/Patrone floor. A Kuhn value you
+   report is still recorded as evidence but is no longer converted into a DP; the cell is sized
+   from the system-mass floor, and a stiff backbone carries a reported
+   `RIGID_BACKBONE_CHAIN_LENGTH_BIAS` uncertainty instead. A DOI-verified `dp_typical`/`nchain`
+   you report DOES still raise the recommendation — that path is unchanged, and is now the only
+   one that can.
 
 Only ground this when `properties_requested` includes `tg` and/or `bulk_modulus` (density alone
 doesn't have a strong DP-dependence worth searching for — if `properties_requested` is exactly

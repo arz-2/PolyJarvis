@@ -36,7 +36,7 @@
     "description": "Optional cheap experiments a reasoned plan may schedule BEFORE the full pipeline to reduce the dominant uncertainty. Each maps to an existing or planned ROADMAP capability.",
     "fast_density_screen": {
       "reduces": "ff_transferability, system_size finite-size error",
-      "mechanism": "small-cell short NPT; compare density to experimental within +/-10%; max 2 FF retries (ROADMAP E3, currently BLOCKED on A1/A2 \u2014 record as planned, not executed, until unblocked).",
+      "mechanism": "small-cell short NPT; compare density to experimental within +/-10%; max 2 FF retries (ROADMAP E3, currently BLOCKED on A1/A2 — record as planned, not executed, until unblocked).",
       "cost": "minutes"
     },
     "literature_anchor": {
@@ -45,7 +45,7 @@
       "cost": "no simulation"
     },
     "hardware_benchmark": {
-      "reduces": "hardware_optimum \u2014 the mpi/gpu config uncertainty for an off-table FF, an unusually sized cell, or a host whose hardware_policy is not cleanly benchmarked (values_are_benchmarked=false or host mismatch)",
+      "reduces": "hardware_optimum — the mpi/gpu config uncertainty for an off-table FF, an unusually sized cell, or a host whose hardware_policy is not cleanly benchmarked (values_are_benchmarked=false or host mismatch)",
       "mechanism": "hardware/calibrate_hardware.py (wrapping hardware/benchmark_hardware.py) sweeps the mpi/gpu matrix on the built .data per template cost class, reports ns/day + Pair/Kspace/Neigh/Comm breakdown, names the winner, and writes directional_probe + by_forcefield (the latter only on a clean uncontended sweep). Runs politely around live runs (idle GPU + spare cores only, niced, sequential).",
       "cost": "minutes"
     }
@@ -62,7 +62,7 @@
         "cell_size_vs_benchmark_cell",
         "host_match"
       ],
-      "default_source": "polymer_rules.json:hardware_policy.by_forcefield.<FF_FAMILY> (the only priced config per family today \u2014 recommended_by_ff/size_points describe its own measured throughput, not an alternative to switch to)"
+      "default_source": "polymer_rules.json:hardware_policy.by_forcefield.<FF_FAMILY> (the only priced config per family today — recommended_by_ff/size_points describe its own measured throughput, not an alternative to switch to)"
     },
     "forcefield": {
       "decision_id": "D-01_ff",
@@ -103,7 +103,7 @@
         "finite_size_effects",
         "gpu_budget"
       ],
-      "default_source": "polymer_rules.json:classes.<CLASS>.{dp_typical,nchain,density_initial_gcm3}"
+      "default_source": "DERIVED per-SMILES by select_system_size.derive_cell -- polymer_rules.json:classes.<CLASS>.{dp_typical,nchain,dp_min} were all REMOVED 2026-09-02. Only density_initial_gcm3 still comes from the class. DP = ceil(SYSTEM_MW_FLOOR_GMOL / (MIN_NCHAIN * M_repeat)), i.e. 50,000 g/mol of total system mass at nchain=10 (Wang 2021, DOI 10.1038/s41428-020-00443-1)."
     },
     "equilibration": {
       "decision_id": "D-05_convergence",
