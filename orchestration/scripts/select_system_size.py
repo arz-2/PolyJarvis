@@ -524,8 +524,19 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
 
     rules = load_rules()
     cls = get_class_entry(rules, polymer_class, warn_on_miss=True)
+    # Same precedence as select_system_size: explicit > class > derived. The class values were
+    # removed 2026-09-02, so in practice this is the derivation -- and it MUST resolve, because
+    # materialize_plan writes these into decided_params and cost_model needs them there.
     dp = dp_typical if dp_typical is not None else cls.get("dp_typical")
     nchain_v = nchain if nchain is not None else cls.get("nchain")
+    dp_was_derived = dp is None
+    nchain_was_derived = nchain_v is None
+    if dp is None or nchain_v is None:
+        _dp, _n, _mw, _note = derive_cell(smiles, cls.get("preferred_ff", "") == "trappe-ua")
+        dp = dp if dp is not None else _dp
+        nchain_v = nchain_v if nchain_v is not None else _n
+        if dp is None:
+            return {"error": f"could not derive a cell for {polymer_class!r}: {_note}"}
     required_floor = base["decision"].get("required_dp_floor")
     floor_was_unknown = required_floor is None and any(
         u.get("name") == "MW_FLOOR_UNKNOWN" for u in base.get("uncertainties", []))
@@ -622,15 +633,35 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
                     reasons.append(f"rigidity/Kuhn DP recommendation ({rigidity_note}) does "
                                   f"not exceed the existing recommendation {recommended_dp}")
 
-    if recommended_dp is not None and dp != recommended_dp:
-        recommended["dp_typical"] = recommended_dp
-        if not reasons:  # pure floor-clearing, no literature involved
+    # A DERIVED value must always be emitted, not only when it differs from `dp`: with the class
+    # defaults removed there is no other source, and materialize_plan writes recommended_params
+    # straight into decided_params -- which cost_model and the builder both require.
+    if recommended_dp is not None:
+        # dp_was_derived: emit even when it equals `dp`, because with the class defaults removed
+        # there is no other source and materialize_plan writes recommended_params straight into
+        # decided_params -- which cost_model and the builder both require.
+        if dp_was_derived or dp != recommended_dp:
+            recommended["dp_typical"] = recommended_dp
+        if dp_was_derived and not reasons:
+            # The cell was derived rather than pinned, so nothing else explains it. Without this
+            # the D-04 decision row carries no evidence for the size it chose.
+            _, _, _mw, _note = derive_cell(smiles, cls.get("preferred_ff", "") == "trappe-ua")
+            reasons.append(f"dp_typical={recommended_dp} derived from this SMILES' own repeat "
+                          f"unit to clear the {SYSTEM_MW_FLOOR_GMOL:,.0f} g/mol system-mass "
+                          f"floor (Wang 2021): {_note}")
+        if not reasons and dp != recommended_dp:  # pure floor-clearing, no literature involved
             direction = "below" if dp < recommended_dp else "above"
             reasons.append(f"dp_typical={dp} is {direction} the documented floor "
                           f"{recommended_dp} for {sorted(set(properties or []))}; the "
-                          "cost-minimizing choice is exactly the floor -- Fox-Flory's "
-                          "plateau means there is no accuracy gain above it, and no "
-                          "trajectory-length remedy exists below it")
+                          "cost-minimizing choice is exactly the floor -- there is no accuracy "
+                          "gain above it, and no trajectory-length remedy exists below it")
+    elif dp_was_derived:
+        # No property floor applies (density-only), but the cell still has to be sized: the
+        # system-mass derivation is the answer and nothing else will supply it.
+        recommended["dp_typical"] = dp
+        reasons.append(f"dp_typical={dp} derived from this SMILES' own repeat unit to clear the "
+                      f"{SYSTEM_MW_FLOOR_GMOL:,.0f} g/mol system-mass floor; no property-specific "
+                      "chain-length floor applies to the requested properties")
 
     ff = (cls.get("preferred_ff") or "").lower()
     recommended_nchain = None
@@ -641,8 +672,11 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
         recommended_nchain = lit_nchain
         reasons.append(f"literature-grounded nchain={lit_nchain} raises the recommendation "
                       f"({lit_note})")
-    if recommended_nchain is not None and recommended_nchain != nchain_v:
+    if recommended_nchain is not None and (nchain_was_derived
+                                           or recommended_nchain != nchain_v):
         recommended["nchain"] = recommended_nchain
+    elif nchain_was_derived:
+        recommended["nchain"] = nchain_v
         if "pcff" in ff and not any("nchain" in r for r in reasons):
             reasons.append(f"nchain={nchain_v} is below the PCFF production minimum "
                           f"{PCFF_NCHAIN_PRODUCTION_MINIMUM} (Bejagam 2020); binding this "

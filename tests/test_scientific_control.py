@@ -391,7 +391,7 @@ def test_materializer_auto_fills_the_floor_clearing_dp_when_unset(monkeypatch):
     plan = materialize_plan(PHYC_INTENT, decision)
     assert plan["decided_params"]["dp_typical"] == 179
     d04 = next(d for d in plan["decisions"] if d["id"] == "D-04_system_size")
-    assert d04["choice"] == "DP=179, nchain=20"
+    assert d04["choice"] == "DP=179, nchain=10"
     assert any("floor" in e.get("claim", "") for e in d04["evidence"])
     assert any("D-04_system_size auto-filled" in a for a in plan["assumptions"])
 
@@ -403,8 +403,11 @@ def test_materializer_explicit_override_wins_over_the_auto_fill():
         overrides={"dp_typical": 40}, dominant_uncertainty="none", confidence="high",
     )
     plan = materialize_plan(PHYC_INTENT, decision)
-    assert plan["decided_params"]["dp_typical"] == 40  # the agent's pin, not the floor (20)
-    assert not any("D-04_system_size auto-filled" in a for a in plan["assumptions"])
+    assert plan["decided_params"]["dp_typical"] == 40  # the agent's pin, not the derived floor
+    # nchain is still auto-filled (it is derived now, and the agent pinned only dp_typical), so
+    # an auto-fill assumption legitimately fires -- it must just not claim dp_typical.
+    autofill = [a for a in plan["assumptions"] if "D-04_system_size auto-filled" in a]
+    assert not any("dp_typical" in a for a in autofill), autofill
 
 
 def test_materializer_folds_in_literature_grounding_when_present(tmp_path, monkeypatch):

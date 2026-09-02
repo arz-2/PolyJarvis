@@ -161,17 +161,16 @@ def test_the_scatter_curve_is_floored_and_never_implies_false_precision():
     assert sss.tg_scatter_K(112400) == pytest.approx(5.0, abs=0.5)
     assert sss.tg_scatter_K(1e12) == 3.0
 
-def test_over_provisioned_gap_is_reported_never_overridden():
-    """PHYC's dp_typical=120 is 6x its Tg floor -- efficiency gap, not a violation.
-    Shrinking DP for an already-validated SMILES is a protocol change this script does
-    not have standing to make."""
+def test_over_provisioning_is_structurally_impossible_now():
+    """`size_over_provisioned` flagged a class default sitting far above its floor. With cell
+    size DERIVED from the system-mass floor, the chosen DP *is* the floor, so the gap it reported
+    cannot exist. Retired as an outcome, pinned here so its disappearance is deliberate rather
+    than an unnoticed regression."""
     result = select_system_size("PHYC", PHYC_SMILES, properties=["tg"])
-    assert result["decided_params_override"] == {}
-    names = [u["name"] for u in result["uncertainties"]]
-    assert "size_over_provisioned" in names
-
-
-# --- entanglement Me: per-member, never generalized across a class -----------------
+    assert "size_over_provisioned" not in [u["name"] for u in result["uncertainties"]]
+    assert result["decision"]["choice"].startswith("DP=")
+    # and the decided DP equals the floor it was derived from
+    assert f"DP={result['decision']['required_dp_floor']}," in result["decision"]["choice"]
 
 def test_entanglement_floor_resolves_the_matched_member(monkeypatch):
     """Entanglement Me is still resolved and reported (DP@Me=125), but is advisory only for
@@ -190,8 +189,13 @@ def test_entanglement_floor_resolves_the_matched_member(monkeypatch):
 def test_entanglement_floor_refuses_an_unmatched_sibling_member(monkeypatch):
     """PACR documents Me for PMMA only. A PAA run must NOT inherit PMMA's floor --
     regression test for the member-generalization bug (see module docstring)."""
+    # The guard is that the ENTANGLEMENT lookup must not generalize a sibling member's Me. It
+    # used to be expressed as "never call _monomer_atoms_and_mw", which was equivalent while DP
+    # came from a class constant. Cell size is now DERIVED from the repeat unit, so one (cached)
+    # mass lookup per SMILES is unavoidable and is not the thing being guarded against.
+    _calls = []
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw",
-                        lambda *a, **k: pytest.fail("must not reach RDKit for an unmatched member"))
+                        lambda smiles, is_ua=False: (_calls.append(smiles), (10, 250.0))[1])
     _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
     result = select_system_size("PACR", PAA_SMILES, properties=["bulk_modulus"])
     assert result["decided_params_override"] == {}
@@ -231,8 +235,13 @@ def test_single_member_class_still_refuses_an_unmatched_smiles(monkeypatch):
     """Regression for the deleted single-member carve-out: a class with exactly one
     documented member must still come back MW_FLOOR_UNKNOWN for a SMILES that isn't it,
     not resolve unconditionally just because there was only one key to pick from."""
+    # The guard is that the ENTANGLEMENT lookup must not generalize a sibling member's Me. It
+    # used to be expressed as "never call _monomer_atoms_and_mw", which was equivalent while DP
+    # came from a class constant. Cell size is now DERIVED from the repeat unit, so one (cached)
+    # mass lookup per SMILES is unavoidable and is not the thing being guarded against.
+    _calls = []
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw",
-                        lambda *a, **k: pytest.fail("must not reach RDKit for an unmatched member"))
+                        lambda smiles, is_ua=False: (_calls.append(smiles), (10, 250.0))[1])
     _patch_class_member_smiles(monkeypatch, "PCBN", {"BPA_PC": [PCBN_SMILES]})
     result = select_system_size("PCBN", OTHER_PC_SMILES, properties=["bulk_modulus"])
     assert result["decided_params_override"] == {}
@@ -374,15 +383,13 @@ def test_live_check_catches_a_previously_vacuous_real_plan():
 # scientific_control.py:materialize_plan(), which only ever produces plan_mode="reasoned"
 # plans -- so shrinking an over-provisioned DP here carries no replay-safety risk. ------
 
-def test_solve_shrinks_an_over_provisioned_class_default_to_the_floor():
-    """Mirrors test_over_provisioned_gap_is_reported_never_overridden's PHYC case, but
-    solve_system_size() recommends the floor-clearing minimum instead of only reporting."""
+def test_solve_recommends_the_derived_cell_when_nothing_is_pinned():
+    """Was: shrinks an over-provisioned class default to the floor. There is no class default to
+    shrink any more -- solve now supplies the whole cell, and MUST, because materialize_plan
+    writes recommended_params straight into decided_params and cost_model requires them there."""
     r = solve_system_size("PHYC", PHYC_SMILES, properties=["tg"])
-    assert r["recommended_params"] == {"dp_typical": 20}
-    # the base select_system_size() uncertainty is still carried through for provenance --
-    # solve_system_size() adds the fix, it doesn't erase the record of the original gap
-    assert "size_over_provisioned" in [u["name"] for u in r["uncertainties"]]
-
+    assert r["recommended_params"] == {"dp_typical": 20, "nchain": 10}
+    assert "size_over_provisioned" not in [u["name"] for u in r["uncertainties"]]
 
 def test_solve_raises_an_under_provisioned_dp_to_the_floor():
     r = solve_system_size("PKTN", PKTN_SMILES, properties=["tg"], dp_typical=12)
@@ -437,8 +444,10 @@ def test_literature_grounding_used_even_at_low_confidence_when_no_floor_stands(m
 def test_literature_grounding_resolves_mw_floor_unknown_at_any_confidence(monkeypatch):
     """PAA has no documented Me (PACR only documents PMMA) -- MW_FLOOR_UNKNOWN today. Even
     a low-confidence literature grounding is strictly better than outright refusal."""
-    monkeypatch.setattr(sss, "_monomer_atoms_and_mw",
-                        lambda *a, **k: pytest.fail("must not reach RDKit for a direct-DP grounding"))
+    # Same re-scoping as the unmatched-member guards above: a cell still has to be SIZED, which
+    # needs the repeat mass. The guard is that a direct-DP literature citation is used as-is,
+    # not that no mass lookup happens.
+    monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua=False: (10, 250.0))
     _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
     low_conf = {"system_size": {"dp_typical": 90, "nchain": None,
                                 "convergence_basis": "class_analogy", "confidence": "low"}}

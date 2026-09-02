@@ -28,9 +28,12 @@ REQUIRED_KEYS = [
     "preferred_ff",
     "forcefield",
     "charge_method",
-    "dp_typical",
+    # dp_typical / nchain REMOVED 2026-09-02: cell size is derived per-SMILES from
+    # select_system_size's system-mass floor, not stored per class. None of the 21 classes ever
+    # carried a note justifying either, and repeat mass varies up to 3x WITHIN a class, so one
+    # number per class cannot be right for its own members. dp_min stays -- it is a documented
+    # per-class minimum, not a sizing default.
     "dp_min",
-    "nchain",
     "density_initial_gcm3",
     "electrostatics",
     "cutoff_A",
@@ -52,12 +55,20 @@ def test_required_keys_present(cid):
     assert not missing, f"{cid} missing required keys: {missing}"
 
 
+def test_no_class_stores_a_cell_size():
+    """Cell size is derived per-SMILES (select_system_size.derive_cell), never stored per class.
+    A reinstated dp_typical/nchain would silently take precedence over the derivation and
+    reintroduce the one-number-per-class error the mass floor exists to fix."""
+    offenders = {cid: [k for k in ("dp_typical", "nchain") if k in e]
+                 for cid, e in CLASSES.items() if any(k in e for k in ("dp_typical", "nchain"))}
+    assert not offenders, offenders
+
+
 @pytest.mark.parametrize("cid", sorted(CLASSES))
 def test_numeric_fields_in_range(cid):
     e = CLASSES[cid]
     assert 0.1 <= e["density_initial_gcm3"] <= 2.5, "initial density out of plausible range"
-    assert e["dp_min"] <= e["dp_typical"], "dp_min must not exceed dp_typical"
-    assert e["nchain"] >= 1
+    assert e["dp_min"] >= 1
     assert e["T_equil_K"] > 0
     assert e["dt_fs"] > 0
     assert e["cutoff_A"] > 0
