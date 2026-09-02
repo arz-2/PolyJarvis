@@ -10,7 +10,7 @@ Two things easy to quietly regress:
     found and fixed once for experimental density (stage_params.py:217-223, PE1 vs PP).
 
 Member resolution matches on the run's own SMILES (canonicalized, stereo-stripped)
-against the class's member_smiles table, not run_name. canon_smiles.canonicalize shells
+against the class's member_smiles table, not run_name. rules_common.canonicalize shells
 into a conda env, so it's monkeypatched to identity here and member_smiles fixtures are
 built from the test's own SMILES constants -- no real RDKit call in this file.
 """
@@ -23,11 +23,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-import canon_smiles  # noqa: E402
 import rules_common  # noqa: E402
 import select_system_size as sss  # noqa: E402
 from select_system_size import (select_system_size, solve_system_size, _fox_flory_floor,
-                                property_floors, MIN_NCHAIN)  # noqa: E402
+                                _property_floors, MIN_NCHAIN)  # noqa: E402
 from validate_run_plan import (_system_size_findings,
                                _system_size_over_provisioned_findings)  # noqa: E402
 
@@ -58,7 +57,7 @@ def _clear_canon_cache():
 
 @pytest.fixture(autouse=True)
 def _identity_canonicalize(monkeypatch):
-    monkeypatch.setattr(canon_smiles, "canonicalize", lambda smi, *a, **k: smi)
+    monkeypatch.setattr(rules_common, "canonicalize", lambda smi, *a, **k: smi)
 
 
 @pytest.fixture(autouse=True)
@@ -270,13 +269,13 @@ def test_nchain_advisory_does_not_fire_for_non_pcff_classes():
     assert "nchain_below_production_minimum" not in names
 
 
-# --- property_floors: the per-property piece select_system_size() collapses via max() --
+# --- _property_floors: the per-property piece select_system_size() collapses via max() --
 # select_system_size()'s own tests above already exercise these mechanisms end-to-end
 # through the collapsed max(); these confirm the standalone per-property dict shape a
 # multi-arm planner needs (one arm sized off "tg" alone, another off "bulk_modulus" alone).
 
 def test_property_floors_returns_one_entry_per_requested_property():
-    pf = property_floors("PKTN", PKTN_SMILES, ["tg", "density"])
+    pf = _property_floors("PKTN", PKTN_SMILES, ["tg", "density"])
     assert set(pf) == {"tg", "density"}
     assert pf["tg"]["floor_dp"] == 20 and pf["tg"]["source"] == "fox_flory_tg"
     assert pf["density"]["floor_dp"] is None and pf["density"]["unmet"] is None
@@ -285,14 +284,14 @@ def test_property_floors_returns_one_entry_per_requested_property():
 def test_property_floors_entanglement_matches_select_system_size(monkeypatch):
     monkeypatch.setattr(sss, "_monomer_atoms_and_mw", lambda smiles, is_ua: (15, 100.12))
     cls = _patch_class_member_smiles(monkeypatch, "PACR", {"PMMA": [PACR_SMILES]})
-    pf = property_floors("PACR", PACR_SMILES, ["bulk_modulus"], cls=cls)
+    pf = _property_floors("PACR", PACR_SMILES, ["bulk_modulus"], cls=cls)
     assert pf["bulk_modulus"]["floor_dp"] == 125
     assert pf["bulk_modulus"]["source"] == "entanglement_bm"
     assert pf["bulk_modulus"]["unmet"] is None
 
 
 def test_property_floors_unmet_carries_the_mw_floor_unknown_reason():
-    pf = property_floors("PHYC", PHYC_SMILES, ["bulk_modulus"])
+    pf = _property_floors("PHYC", PHYC_SMILES, ["bulk_modulus"])
     assert pf["bulk_modulus"]["floor_dp"] is None
     assert pf["bulk_modulus"]["unmet"]["name"] == "MW_FLOOR_UNKNOWN"
 
@@ -300,7 +299,7 @@ def test_property_floors_unmet_carries_the_mw_floor_unknown_reason():
 def test_property_floors_order_is_canonical_not_set_iteration_order():
     """dict key order must be tg, bulk_modulus, density regardless of input order --
     select_system_size()'s reason text joins floors in this order for reproducibility."""
-    pf = property_floors("PKTN", PKTN_SMILES, {"density", "bulk_modulus", "tg"})
+    pf = _property_floors("PKTN", PKTN_SMILES, {"density", "bulk_modulus", "tg"})
     assert list(pf) == ["tg", "bulk_modulus", "density"]
 
 
@@ -403,7 +402,17 @@ def test_pcff_nchain_minimum_is_advisory_not_a_recommendation():
     Hayashi 2022's 1,077-polymer nchain=10 are what IS verified."""
     r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], nchain=10)
     assert "nchain" not in r["recommended_params"]
-    assert any(u["name"] == "nchain_below_pcff_advisory_minimum" for u in r["uncertainties"])
+    assert any(u["name"] == "nchain_below_production_minimum" for u in r["uncertainties"])
+
+
+def test_the_pcff_nchain_advisory_is_emitted_exactly_once():
+    """It was emitted twice under two names until 2026-09-02 -- once by select_system_size()
+    and once by solve_system_size() -- on identical triggers, so a reasoned plan carried the
+    same fact twice and scientific_control.py filtered one of them by hand."""
+    r = solve_system_size("PACR", PACR_SMILES, properties=["tg"], nchain=10)
+    names = [u["name"] for u in r["uncertainties"]]
+    assert names.count("nchain_below_production_minimum") == 1
+    assert "nchain_below_pcff_advisory_minimum" not in names
 
 
 def test_a_doi_verified_literature_nchain_still_binds():

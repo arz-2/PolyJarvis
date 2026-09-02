@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from select_hardware import select_hardware
 from select_system_size import select_system_size
 from rules_common import load_rules, get_class_entry, hardware_policy
-from hw_common import host_matches
+from hardware_runtime import host_matches
 
 _ENGINE_SCRIPTS = (Path(__file__).resolve().parents[2]
                    / "mcp-servers" / "mcp-lammps-engine" / "analysis_scripts")
@@ -275,7 +275,7 @@ def _finite_size_findings(plan: dict) -> list:
 def _family_has_multi_gpu_benchmark(fam: str) -> bool:
     """True iff some real measured point for this FF family (recommended_by_ff or
     size_points) actually used gpu_per_run>=2 ON A HOST MATCHING THIS ONE
-    (hw_common.host_matches -- hardware_policy.host, the same host-match check
+    (hardware_runtime.host_matches -- hardware_policy.host, the same host-match check
     select_hardware.estimate_ns_per_day itself uses). Every point calibrated so far (both fields)
     is gpu=1 -- select_hardware.py's cost_model-driven "high" confidence describes how well
     the ns_per_day NUMBER at a given atom count is supported, not whether a >=2-GPU pin is

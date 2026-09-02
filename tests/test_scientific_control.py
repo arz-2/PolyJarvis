@@ -9,7 +9,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-import canon_smiles  # noqa: E402
+import rules_common
 import select_system_size as sss  # noqa: E402
 import scientific_control  # noqa: E402
 from scientific_control import (  # noqa: E402
@@ -364,7 +364,7 @@ def test_planning_context_looks_up_cache_by_canonical_smiles(tmp_path, monkeypat
         json.dumps({canonical: cache_entry}))
 
     monkeypatch.setattr(scientific_control, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(canon_smiles, "canonicalize", lambda smi, *a, **k: canonical)
+    monkeypatch.setattr(rules_common, "canonicalize", lambda smi, *a, **k: canonical)
 
     raw_intent = ScientificIntent(
         run_name="CANON_TEST", goal="test", smiles="not-yet-canonical-form",
@@ -534,7 +534,7 @@ def test_planning_context_falls_back_to_raw_smiles_on_canonicalization_failure(t
 
     def _boom(smi, *a, **k):
         raise RuntimeError("RDKit unavailable")
-    monkeypatch.setattr(canon_smiles, "canonicalize", _boom)
+    monkeypatch.setattr(rules_common, "canonicalize", _boom)
 
     raw_intent = ScientificIntent(
         run_name="CANON_TEST2", goal="test", smiles=raw_smiles,

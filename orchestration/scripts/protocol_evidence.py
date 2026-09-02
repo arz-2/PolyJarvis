@@ -36,8 +36,7 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import canon_smiles  # noqa: E402  -- module import so tests can monkeypatch canon_smiles.canonicalize
-from canon_smiles import canonicalize  # noqa: E402
+import rules_common  # noqa: E402  -- module import so tests can monkeypatch rules_common.canonicalize
 from rules_common import load_rules  # noqa: E402
 from mol_python import run_in_mol_env, RDKIT_CLI  # noqa: E402
 
@@ -221,7 +220,7 @@ def build_record(*, field: str, polymer_class, polymer_names, smiles, claim, val
 # chem_similarity.py — SMILES structural similarity via RDKit Morgan/Tanimoto.
 #
 # RDKit lives in the `radonpy`/`mol-builder` conda envs, not `base` — same constraint
-# canon_smiles.py documents. This reaches it via mol_python.run_in_mol_env(), invoking
+# rules_common.canonicalize documents. This reaches it via mol_python.run_in_mol_env(), invoking
 # rdkit_cli.py's `similarity` subcommand and passing the candidate list through a temp JSON
 # file (not argv) so a large batch (e.g. every class's member_smiles at once) never hits
 # argv-length limits, and so SMILES stereo markers (forward and back slashes) stay out of
@@ -229,7 +228,7 @@ def build_record(*, field: str, polymer_class, polymer_names, smiles, claim, val
 #
 # This module's compute_similarities() is the one seam every caller (query_protocol_evidence.py)
 # goes through and the one seam tests monkeypatch — same convention already used for
-# canon_smiles.canonicalize (see tests/test_make_deterministic_plan_from_cache.py etc.).
+# rules_common.canonicalize (see tests/test_make_deterministic_plan_from_cache.py etc.).
 #
 # Usage (CLI, for manual/real-env verification):
 #   python3 orchestration/scripts/chem_similarity.py --smoke '<smiles1>' '<smiles2>' [...]
@@ -319,7 +318,7 @@ _FF_FIELD_NAME_MAP = {
 
 
 def _canon_smiles_list(smiles: str | None) -> list[str]:
-    """Canonicalize once at ingest time (isomeric=False, matching hw_common's existing
+    """Canonicalize once at ingest time (isomeric=False, matching rules_common's existing
     member_smiles convention) so query_protocol_evidence.py's exact_smiles tier can do a
     plain string comparison instead of re-canonicalizing every stored record's smiles on
     every query — the store is written far less often than it's read. Falls back to the
@@ -329,7 +328,7 @@ def _canon_smiles_list(smiles: str | None) -> list[str]:
     if not smiles:
         return []
     try:
-        return [canonicalize(smiles, isomeric=False)]
+        return [rules_common.canonicalize(smiles, isomeric=False)]
     except (RuntimeError, subprocess.TimeoutExpired):
         return [smiles]
 
@@ -545,7 +544,7 @@ _DECISION_ID_TO_FIELD = {
 
 def _canonicalize_or_none(smiles: str, *, isomeric: bool) -> Optional[str]:
     try:
-        return canon_smiles.canonicalize(smiles, isomeric=isomeric)
+        return rules_common.canonicalize(smiles, isomeric=isomeric)
     except (RuntimeError, subprocess.TimeoutExpired):
         return None
 
@@ -750,7 +749,7 @@ def _canon(smiles: str | None):
     if not smiles:
         return None
     try:
-        return canonicalize(smiles, isomeric=False)
+        return rules_common.canonicalize(smiles, isomeric=False)
     except (RuntimeError, subprocess.TimeoutExpired):
         return None
 
@@ -794,7 +793,7 @@ def query(store: dict, *, polymer_class: str | None, smiles: str | None, field: 
 
     if canon_query:
         # Stored smiles[] are canonicalized once at write time (ingest_protocol_evidence.py /
-        # migrate_ff_selection_literature.py, both isomeric=False, matching hw_common's
+        # migrate_ff_selection_literature.py, both isomeric=False, matching rules_common's
         # member_smiles convention) — a plain string comparison here, not a re-canonicalize
         # per record, is what keeps this query fast as the store grows.
         for r in records:

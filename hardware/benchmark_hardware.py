@@ -54,9 +54,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 ENGINE = REPO / "mcp-servers" / "mcp-lammps-engine"
 sys.path.insert(0, str(ENGINE))
-sys.path.insert(0, str(REPO / "orchestration" / "scripts"))  # hw_common lives in orchestration/scripts/
+sys.path.insert(0, str(REPO / "orchestration" / "scripts"))  # hardware_runtime lives in orchestration/scripts/
 # shared host/GPU probes (re-exported here so calibrate_hardware.py keeps using bh.detect_phys_cores / bh.gpu_status)
-from hw_common import detect_phys_cores, gpu_status
+from hardware_runtime import detect_phys_cores, gpu_status
 
 LMP_DEFAULT = "/home/arz2/lammps-install/bin/lmp"
 LMP_KOKKOS_DEFAULT = "/home/arz2/lammps-install-kokkos/bin/lmp"

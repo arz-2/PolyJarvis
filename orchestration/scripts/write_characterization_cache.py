@@ -30,7 +30,7 @@ from typing import Any, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import track_registry  # noqa: E402
-import canon_smiles  # noqa: E402  -- module import (not `from ... import canonicalize`) so tests can monkeypatch canon_smiles.canonicalize
+import rules_common  # noqa: E402  -- module import (not `from ... import canonicalize`) so tests can monkeypatch rules_common.canonicalize
 from make_deterministic_plan import SNAPSHOT_KEYS  # noqa: E402  -- single source of truth, don't duplicate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -54,7 +54,7 @@ STAGE_FOR_PROPERTY = {p: track_registry.stage_for_property(p)
 
 def _canonicalize_or_none(smiles: str) -> Optional[str]:
     try:
-        return canon_smiles.canonicalize(smiles, isomeric=True)
+        return rules_common.canonicalize(smiles, isomeric=True)
     except (RuntimeError, subprocess.TimeoutExpired):
         return None
 

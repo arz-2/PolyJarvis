@@ -12,7 +12,7 @@ State which of the three were parsed from $ARGUMENTS and which are missing, then
 
 ## 1. Determine novelty
 
-- Canonicalize: `python3 orchestration/scripts/canon_smiles.py '<smiles>'` (radonpy env by default; `--env <env>` if renamed).
+- Canonicalize: `python3 orchestration/scripts/rules_common.py canon '<smiles>'` (radonpy env by default; `--env <env>` if renamed).
 - Look up the canonical SMILES in `guides/system_characterization_cache.json`.
   - `protocol_validated: true` AND `validated_properties` covers every requested property → **not novel**: stop, use `python3 orchestration/scripts/make_deterministic_plan.py run-plan --run_name <name> --polymer_class <CLASS> --smiles '<smiles>' --properties <props>` instead.
   - Otherwise → `decision_policy.json`'s `confidence_gate.novel_or_partially_validated`: `plan_mode = reasoned`. Every decision below needs real reasoning and evidence, not a fast-path guess.

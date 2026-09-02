@@ -32,7 +32,7 @@ made mechanically checkable here, not re-derived:
   real Me number for exactly six classes -- but for ONE MEMBER of each, not the class as
   a whole (e.g. PACR covers PMMA/PMA/PAA; only PMMA's Me=12,500 is documented). Me is
   resolved per-member via the run's own SMILES against the class's member_smiles table
-  (hw_common.resolve_member), and refuses -- MW_FLOOR_UNKNOWN, never a class-level number
+  (rules_common.resolve_member), and refuses -- MW_FLOOR_UNKNOWN, never a class-level number
   -- when the SMILES matches no documented member. DP@Me = Me / repeat-unit molar mass is
   computed here with the SAME RDKit residue-mass convention select_hardware.py already
   uses (dummy '*' atoms carry zero mass) -- this reproduces the notes' own cited
@@ -139,7 +139,7 @@ def derive_cell(smiles: str, is_ua: bool = False, nchain: int = MIN_NCHAIN):
     _, m_repeat = _monomer_atoms_and_mw(smiles, is_ua)
     if not m_repeat:
         return None, nchain, None, "could not resolve a repeat-unit mass from the SMILES"
-    dp = max(1, math.ceil(SYSTEM_MW_FLOOR_GMOL / (nchain * m_repeat)))
+    dp = _dp_from_mw(m_repeat, nchain)
     mw_s = m_repeat * dp * nchain
     note = (f"DP={dp} x {nchain} chains = {mw_s:,.0f} g/mol total (repeat {m_repeat:.1f} g/mol), "
             f"clearing the {SYSTEM_MW_FLOOR_GMOL:,.0f} g/mol system-mass floor (Wang 2021); "
@@ -243,17 +243,19 @@ def _backbone_rigidity(smiles: str, timeout: int = 30):
     return result if isinstance(result, dict) and "error" not in result else None
 
 
-def _dp_from_mw(m_repeat_gmol: float) -> int:
-    """DP that clears the system-mass floor at MIN_NCHAIN chains.
+def _dp_from_mw(m_repeat_gmol: float, nchain: int = MIN_NCHAIN) -> int:
+    """DP that clears the system-mass floor: ceil(SYSTEM_MW_FLOOR_GMOL / (nchain * M_repeat)).
 
-    Identical by construction to derive_cell()'s DP -- both are
-    ceil(SYSTEM_MW_FLOOR_GMOL / (MIN_NCHAIN * M_repeat)). Kept as a separate helper only
-    because this path has an m_repeat in hand and derive_cell() takes a SMILES; it must never
-    grow a second, differently-derived number. The retired DP_MW_BASELINE_GMOL = 5000 g/mol
-    ("confirmed with user") expressed the same quantity as an unsourced per-chain target;
-    SYSTEM_MW_FLOOR_GMOL / MIN_NCHAIN is the same value carrying Wang 2021's actual criterion.
+    THE one place this number is computed. derive_cell() calls it too -- until 2026-09-02 the
+    two carried the same arithmetic written out twice, kept in sync only by a comment saying
+    they were "identical by construction", because one path holds an m_repeat and the other
+    takes a SMILES. That difference is an argument, not a second formula.
+
+    The retired DP_MW_BASELINE_GMOL = 5000 g/mol ("confirmed with user") expressed the same
+    quantity as an unsourced per-chain target; SYSTEM_MW_FLOOR_GMOL / MIN_NCHAIN is the same
+    value carrying Wang 2021's actual criterion.
     """
-    return math.ceil(SYSTEM_MW_FLOOR_GMOL / (MIN_NCHAIN * m_repeat_gmol))
+    return max(1, math.ceil(SYSTEM_MW_FLOOR_GMOL / (nchain * m_repeat_gmol)))
 
 
 def _rigid_backbone_uncertainty(rigidity: dict, dp: int, m_repeat_gmol: float) -> dict:
@@ -289,16 +291,18 @@ def _rigid_backbone_uncertainty(rigidity: dict, dp: int, m_repeat_gmol: float) -
 _KNOWN_PROPERTY_ORDER = ("tg", "bulk_modulus", "density")
 
 
-def property_floors(polymer_class: str, smiles: str, properties, cls: dict = None) -> dict:
+def _property_floors(polymer_class: str, smiles: str, properties, cls: dict = None) -> dict:
     """Per-property DP floor -- the piece select_system_size() collapses via max().
 
     One entry per element of `properties`, keyed by property name:
       {"floor_dp": int|None, "source": str|None, "note": str|None, "unmet": dict|None}
     `floor_dp` is None both when no floor mechanism applies at all (e.g. density) and
     when one applies but could not resolve (MW_FLOOR_UNKNOWN) -- `unmet` then carries
-    the reason (the same uncertainty dict select_system_size() would report). Exposed
-    standalone so a multi-arm planner can size each arm from its own property subset
-    instead of the single run-wide max().
+    the reason (the same uncertainty dict select_system_size() would report).
+
+    Private since 2026-09-02. It was public for "a multi-arm planner [that] can size each arm
+    from its own property subset", but the two-arm split was retired (see the track registry)
+    and nothing outside this file ever called it. Its one caller is select_system_size() below.
     """
     if cls is None:
         cls = get_class_entry(load_rules(), polymer_class, warn_on_miss=True)
@@ -343,7 +347,7 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
     uncertainties = []
     floors = []  # (source, floor_dp, note)
 
-    for prop, info in property_floors(polymer_class, smiles, properties, cls=cls).items():
+    for prop, info in _property_floors(polymer_class, smiles, properties, cls=cls).items():
         if info["floor_dp"] is not None and info["source"] == "entanglement_bm":
             # User-directed benchmark acceptance criterion, 2026-08-25 (see decision_policy.json
             # D-04_system_size): entanglement Me gates the plateau shear modulus / viscoelastic
@@ -353,7 +357,7 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
             # change chain-end fraction, hence density, hence K), but it is advisory context,
             # never a require -- unlike Fox-Flory's floor_dp below, it must not feed
             # required_dp_floor/decided_params_override. The right acceptance criterion for K is
-            # chain-length CONVERGENCE of density/K (see property_floors' bulk_modulus branch and
+            # chain-length CONVERGENCE of density/K (see _property_floors' bulk_modulus branch and
             # this module's docstring) -- run a small DP sweep and confirm both plateau, never
             # just "DP exceeds DP@Me".
             uncertainties.append({
@@ -412,17 +416,27 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
             "current_dp_typical": dp, "documented_floor_dp": required_floor,
         })
 
+    # ONE advisory for this condition. Until 2026-09-02 select_system_size() and
+    # solve_system_size() each emitted their own -- nchain_below_production_minimum and
+    # nchain_below_pcff_advisory_minimum -- on identical triggers, so a reasoned plan computed
+    # the same fact twice under two names and scientific_control.py carried a hand-maintained
+    # filter to drop one of them. The text below is the survivor (the more current of the two).
     if nchain_v and nchain_v < PCFF_NCHAIN_PRODUCTION_MINIMUM:
         ff = (cls.get("preferred_ff") or "").lower()
         if "pcff" in ff:
             uncertainties.append({
                 "name": "nchain_below_production_minimum", "dominant": False,
-                "detail": (f"nchain={nchain_v} is below {PCFF_NCHAIN_PRODUCTION_MINIMUM}, the "
-                          "literature-recommended production minimum for PCFF classes "
-                          "(Bejagam 2020); nchain=10 is documented as a throughput compromise "
-                          "(Hayashi 2022), not a production target. Advisory only -- the "
-                          "L>=2*Rg finite-size gate (a separate, already-mechanized check) is "
-                          "the binding constraint on nchain."),
+                "detail": (f"nchain={nchain_v} is below the advisory PCFF production minimum "
+                          f"{PCFF_NCHAIN_PRODUCTION_MINIMUM}. Its source (\"Bejagam 2020\") has "
+                          "no copy in this repo and no verified DOI, so the claim is unchecked; "
+                          "nchain>=10 (Wang 2021, verified) IS met, and Hayashi 2022 (RadonPy) "
+                          f"ran nchain=10 across 1,077 polymers. Raising nchain to "
+                          f"{PCFF_NCHAIN_PRODUCTION_MINIMUM} at a fixed system-mass floor would "
+                          "halve per-chain MW (worse chain-length bias); raising it at fixed DP "
+                          "doubles cost for no criterion this module can state. Reported, not "
+                          "applied -- the L>=2*Rg finite-size gate (a separate, already-"
+                          "mechanized check) is the binding constraint on nchain; supply a "
+                          "DOI-verified literature nchain to raise it."),
                 "current_nchain": nchain_v,
             })
 
@@ -513,11 +527,13 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
     below it (that is what "plateau" means) -- so once a floor is known, there is no
     accuracy left to buy by exceeding it, and the cost-minimizing choice is exactly the
     floor, in both directions. This collapses to a closed-form set (not a search): DP is
-    set to required_floor when one applies; nchain is set to the PCFF production minimum
-    (Bejagam 2020) for PCFF-family classes, since no pre-build Rg predictor exists to give
-    nchain a continuous cost/accuracy curve (select_system_size.py's own docstring rules
-    that out as invented physics) -- this only moves the ALREADY-KNOWN floor from
-    advisory to binding, it does not add new physics.
+    set to required_floor when one applies.
+
+    nchain is NOT set here. This docstring claimed until 2026-09-02 that nchain was raised to
+    PCFF_NCHAIN_PRODUCTION_MINIMUM for PCFF-family classes; that stopped being true when the
+    constant was demoted to advisory (see its own docstring -- binding it silently doubled
+    every PCFF cell), and the docstring outlived the behavior. The only thing that raises
+    nchain now is a DOI-verified literature value at medium/high confidence.
 
     literature_grounding (parsed literature_grounding_system_size.json, or None) makes the
     recommendation genuinely vary by molecule rather than only by class-bucket: a real,
@@ -526,7 +542,7 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
     recommendation at ANY confidence when no mechanized floor stands (a cited, caveated
     estimate beats nothing) -- true whether that's because Me is genuinely undocumented
     (MW_FLOOR_UNKNOWN) or, for bulk_modulus specifically, because entanglement Me is
-    documented but advisory-only (never itself a require -- see property_floors). It never
+    documented but advisory-only (never itself a require -- see _property_floors). It never
     lowers a recommendation below a floor this script has already mechanically established
     (Fox-Flory for tg); a single per-molecule study is not licensed to undercut that.
     """
@@ -566,7 +582,7 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
         if recommended_dp is None:
             # No mechanized DP requirement stands for these properties -- either genuinely
             # MW_FLOOR_UNKNOWN (Me undocumented) or, for bulk_modulus, entanglement Me was
-            # resolved but is advisory-only (never a require, see property_floors). Either
+            # resolved but is advisory-only (never a require, see _property_floors). Either
             # way a real per-molecule convergence citation beats nothing at any confidence --
             # but the two reasons are different facts, say the right one.
             recommended_dp = lit_dp
@@ -670,22 +686,9 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
 
     ff = (cls.get("preferred_ff") or "").lower()
     recommended_nchain = None
-    # PCFF_NCHAIN_PRODUCTION_MINIMUM is ADVISORY (see its docstring). It used to be binding
-    # here, which doubled every PCFF cell without re-deriving DP -- so the cell sat at 2x the
-    # system-mass floor rather than at it.
-    if "pcff" in ff and nchain_v and nchain_v < PCFF_NCHAIN_PRODUCTION_MINIMUM:
-        uncertainties.append({
-            "name": "nchain_below_pcff_advisory_minimum", "dominant": False,
-            "detail": (f"nchain={nchain_v} is below the advisory PCFF production minimum "
-                      f"{PCFF_NCHAIN_PRODUCTION_MINIMUM}. Its source (\"Bejagam 2020\") has no "
-                      "copy in this repo and no verified DOI, so the claim is unchecked; "
-                      "nchain>=10 (Wang 2021, verified) IS met, and Hayashi 2022 (RadonPy) ran "
-                      f"nchain=10 across 1,077 polymers. Raising nchain to "
-                      f"{PCFF_NCHAIN_PRODUCTION_MINIMUM} at a fixed system-mass floor would "
-                      "halve per-chain MW (worse chain-length bias); raising it at fixed DP "
-                      "doubles cost for no criterion this module can state. Reported, not "
-                      "applied -- supply a DOI-verified literature nchain to raise it."),
-        })
+    # The PCFF-minimum advisory is emitted once, by select_system_size() above, and arrives
+    # here in `uncertainties` -- PCFF_NCHAIN_PRODUCTION_MINIMUM is advisory (see its docstring)
+    # and never raises the recommendation. Only a DOI-verified literature nchain does.
     if (lit_nchain and lit_confidence in _GROUNDING_CONFIDENCE_TO_RAISE_AN_EXISTING_FLOOR
             and lit_nchain > (recommended_nchain or nchain_v or 0)):
         # A DOI-verified literature nchain DOES bind. DP is deliberately NOT re-derived

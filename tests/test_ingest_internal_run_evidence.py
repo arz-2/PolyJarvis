@@ -2,7 +2,7 @@
 protocol evidence for planning OTHER polymers, closing the gap between
 guides/system_characterization_cache.json (same-SMILES-only replay) and
 docs/protocol_evidence_ff.json / protocol_evidence_system_size.json (class/analogue
-evidence). canon_smiles.canonicalize shells into a conda env, so it's monkeypatched to
+evidence). rules_common.canonicalize shells into a conda env, so it's monkeypatched to
 identity here (same convention as write_characterization_cache.py's own tests)."""
 import json
 import sys
@@ -13,7 +13,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-import canon_smiles  # noqa: E402
+import rules_common
 import protocol_evidence as pe  # noqa: E402
 
 PMMA_SMILES = "*CC(*)(C)C(=O)OC"
@@ -56,7 +56,7 @@ BLOCKED_ENTRY = {
 
 @pytest.fixture(autouse=True)
 def _identity_canonicalize(monkeypatch):
-    monkeypatch.setattr(canon_smiles, "canonicalize", lambda smi, *a, **k: smi)
+    monkeypatch.setattr(rules_common, "canonicalize", lambda smi, *a, **k: smi)
 
 
 def test_evidence_records_cover_only_protocol_choice_fields():

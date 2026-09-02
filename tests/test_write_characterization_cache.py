@@ -2,7 +2,7 @@
 into guides/system_characterization_cache.json, keyed by canonical SMILES. These tests never
 touch the real cache file -- every case passes an explicit cache_path under tmp_path.
 
-canon_smiles.canonicalize shells into a conda env, so it's monkeypatched to identity here,
+rules_common.canonicalize shells into a conda env, so it's monkeypatched to identity here,
 matching the pattern established in tests/test_select_system_size.py.
 """
 import json
@@ -14,13 +14,13 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-import canon_smiles  # noqa: E402
+import rules_common
 import write_characterization_cache as wcc  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
 def _identity_canonicalize(monkeypatch):
-    monkeypatch.setattr(canon_smiles, "canonicalize", lambda smi, *a, **k: smi)
+    monkeypatch.setattr(rules_common, "canonicalize", lambda smi, *a, **k: smi)
 
 
 def _write(path: Path, obj):
@@ -159,7 +159,7 @@ def test_missing_smiles_writes_nothing(tmp_path):
 def test_canonicalization_failure_writes_nothing(tmp_path, monkeypatch):
     def _boom(smi, *a, **k):
         raise RuntimeError("RDKit could not parse SMILES")
-    monkeypatch.setattr(canon_smiles, "canonicalize", _boom)
+    monkeypatch.setattr(rules_common, "canonicalize", _boom)
     _make_run(tmp_path, "RUN9")
     cache_path = tmp_path / "cache.json"
     entry = wcc.write_characterization_cache("RUN9", repo_root=tmp_path, cache_path=cache_path)

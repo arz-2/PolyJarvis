@@ -12,7 +12,7 @@ consuming any curated experimental density -- see run_campaign.py's COMPRESSION_
 its coverage above (member-vs-class-vs-override resolution) is still exercised via
 _exp_density_point, which is now the only surviving density-member resolver.
 
-canon_smiles.canonicalize shells into a conda env, so it's monkeypatched to identity here;
+rules_common.canonicalize shells into a conda env, so it's monkeypatched to identity here;
 PHYC's member_smiles carries placeholder tokens (not real chemistry) so matching stays
 deterministic without real RDKit.
 """
@@ -24,7 +24,6 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 
-import canon_smiles  # noqa: E402
 import rules_common  # noqa: E402
 from stage_params import _exp_density_point, _exp_K_range  # noqa: E402
 
@@ -48,7 +47,7 @@ def _clear_canon_cache():
 
 @pytest.fixture(autouse=True)
 def _identity_canonicalize(monkeypatch):
-    monkeypatch.setattr(canon_smiles, "canonicalize", lambda smi, *a, **k: smi)
+    monkeypatch.setattr(rules_common, "canonicalize", lambda smi, *a, **k: smi)
 
 
 def test_exp_density_point_unmatched_smiles_returns_none_not_a_sibling_members_value():

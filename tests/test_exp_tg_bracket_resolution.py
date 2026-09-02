@@ -3,7 +3,7 @@ SMILES, and validate_run_plan's Check C must actually be reachable.
 
 Member resolution (which class member a SMILES is) matches on the run's own SMILES
 (canonicalized, stereo-stripped) against the class's member_smiles table, never run_name.
-canon_smiles.canonicalize shells into a conda env, so it's monkeypatched to identity here;
+rules_common.canonicalize shells into a conda env, so it's monkeypatched to identity here;
 local fixture classes carry placeholder member_smiles tokens (not real chemistry) so
 matching stays deterministic without real RDKit.
 """
@@ -15,7 +15,6 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 
-import canon_smiles  # noqa: E402
 import rules_common  # noqa: E402
 import stage_params  # noqa: E402
 from make_deterministic_plan import build_planned_stages, make_plan  # noqa: E402
@@ -35,7 +34,7 @@ def _clear_canon_cache():
 
 @pytest.fixture(autouse=True)
 def _identity_canonicalize(monkeypatch):
-    monkeypatch.setattr(canon_smiles, "canonicalize", lambda smi, *a, **k: smi)
+    monkeypatch.setattr(rules_common, "canonicalize", lambda smi, *a, **k: smi)
 
 
 def _tg_stage(stages):

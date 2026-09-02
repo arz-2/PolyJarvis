@@ -21,7 +21,7 @@ LAMMPS_EXEC = Path("/home/arz2/lammps-install/bin/lmp")
 
 
 def _load_physical_cores() -> int:
-    """Same source of truth pick_gpu.py uses, kept in sync by calibrate_hardware.py."""
+    """Same source of truth hardware_runtime.py uses, kept in sync by calibrate_hardware.py."""
     try:
         rules = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
         return int(rules["hardware_policy"]["host"]["phys_cores"])

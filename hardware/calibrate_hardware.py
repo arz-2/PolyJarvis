@@ -44,9 +44,9 @@ HERE = Path(__file__).resolve().parent
 ORCH = REPO / "orchestration" / "scripts"
 RULES = REPO / "guides" / "polymer_rules.json"
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(ORCH))            # hw_common lives in orchestration/scripts/
+sys.path.insert(0, str(ORCH))            # hardware_runtime lives in orchestration/scripts/
 import benchmark_hardware as bh          # reuse politeness probes + detection + matrix
-import hw_common                         # live_host() for the host fingerprint
+import hardware_runtime                  # live_host() for the host fingerprint
 
 HEADROOM_FRAC = 0.25                     # leave >=25% of physical cores for other users
 
@@ -72,8 +72,8 @@ REVALIDATE_TIMEOUT_S = 1800             # generous per-run cap (timed run + two 
 # --------------------------------------------------------------------------
 def detect_host() -> dict:
     # Single fingerprint definition (GPU count+model + a DIRECT core probe) shared with
-    # hw_common.host_matches, so what we write here is exactly what the nudge compares against.
-    return hw_common.live_host()
+    # hardware_runtime.host_matches, so what we write here is exactly what the nudge compares against.
+    return hardware_runtime.live_host()
 
 
 def polite_state(phys: int, allow_busy: bool) -> dict:

@@ -114,7 +114,7 @@ def run_radonpy_arm(polymer_name: str, smiles: str, harness_root: Path | None = 
     # overhead, not a meaningful accuracy/throughput tradeoff RadonPy chose on purpose. Pinning
     # to the physical-core count here (see PHYSICAL_CORES in config.py) makes the wall-time
     # comparison apples-to-apples against PolyJarvis's own hardware policy, which already caps
-    # Σmpi_ranks at physical cores (orchestration/scripts/pick_gpu.py).
+    # Σmpi_ranks at physical cores (orchestration/scripts/hardware_runtime.py).
     env["RadonPy_MPI"] = str(PHYSICAL_CORES)
 
     phases = []

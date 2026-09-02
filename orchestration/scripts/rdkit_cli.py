@@ -20,7 +20,7 @@ is what every wrapper listed below already does. Do not `import rdkit_cli` from
 orchestration code.
 
 Subcommands, and the wrapper each one exists for:
-  canon         -> canon_smiles.canonicalize()            (novelty-gate/evidence-store keys)
+  canon         -> rules_common.canonicalize()            (novelty-gate/evidence-store keys)
   similarity    -> chem_similarity.compute_similarities() (protocol-evidence retrieval)
   monomer-info  -> select_hardware._monomer_atoms_and_mw() (cell sizing + D-08 hardware)
   tg-estimate   -> stage_params._estimate_tg_group_contribution() (exp-Tg fallback/bracket)

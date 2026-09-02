@@ -2,7 +2,7 @@
 phase — it is what lets a worker skip a fresh web search safely. These tests cover the
 tier order (exact_smiles > exact_class > similar_class), the trust-tier/year/doi
 tie-break within a tier, --methodology-only, and a missing store file degrading to empty
-hits rather than crashing. canon_smiles.canonicalize and protocol_evidence.compute_similarities
+hits rather than crashing. rules_common.canonicalize and protocol_evidence.compute_similarities
 both shell into a conda env, so both are monkeypatched here — no real RDKit call."""
 import sys
 from pathlib import Path
@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import protocol_evidence as pe  # noqa: E402
+import rules_common  # noqa: E402  -- pe calls through rules_common.canonicalize
 
 PMMA_SMILES = "*CC(*)(C)C(=O)OC"
 PAA_SMILES = "*CC(*)C(=O)O"
@@ -40,12 +41,11 @@ def _record(**overrides):
 
 @pytest.fixture(autouse=True)
 def _identity_canonicalize(monkeypatch):
-    # canon_smiles.canonicalize shells into a conda env; identity is sufficient here
+    # rules_common.canonicalize shells into a conda env; identity is sufficient here
     # since these fixtures never rely on real canonicalization behavior. protocol_evidence
-    # imports canonicalize by name (`from canon_smiles import canonicalize`), so the patch
-    # target is the reference inside protocol_evidence's own module, not
-    # canon_smiles.canonicalize itself.
-    monkeypatch.setattr(pe, "canonicalize", lambda smi, *a, **k: smi)
+    # protocol_evidence calls rules_common.canonicalize through the module object, so
+    # patching it on rules_common is what the call site actually resolves.
+    monkeypatch.setattr(rules_common, "canonicalize", lambda smi, *a, **k: smi)
 
 
 def test_exact_smiles_beats_exact_class_beats_similar_class(monkeypatch):

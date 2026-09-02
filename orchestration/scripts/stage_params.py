@@ -12,7 +12,7 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 from rules_common import load_rules, resolve_ff_family, get_class_entry, resolve_member_value
-from hw_common import host_matches, live_host
+from hardware_runtime import host_matches, live_host
 from mol_python import run_in_mol_env, RDKIT_CLI
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 RULES_PATH = REPO_ROOT / 'guides' / 'polymer_rules.json'
@@ -66,7 +66,7 @@ def resolve_hardware(args, cls: dict, rules: dict) -> None:
     them, so a run can never default to the mpi=1 anti-pattern. Explicit CLI values
     always win (keeps deterministic-plan output byte-identical — runtime wiring stays
     CLI-authoritative per apply_plan's contract). Specific gpu_ids remain runtime;
-    use orchestration/pick_gpu.py to claim a non-colliding GPU at submit time."""
+    use orchestration/scripts/hardware_runtime.py to claim a non-colliding GPU at submit time."""
     hp = rules.get('hardware_policy')
     if not hp:
         return
@@ -92,7 +92,7 @@ def resolve_hardware(args, cls: dict, rules: dict) -> None:
         else:
             n = max(1, int(pol.get('gpu_per_run', 1) or 1))
             args.gpu_ids = ','.join((str(i) for i in range(n)))
-        print(f'INFO: gpu_ids not given — derived "{args.gpu_ids}" from hardware_policy[{fam}]; claim free GPU(s) with orchestration/pick_gpu.py', file=sys.stderr)
+        print(f'INFO: gpu_ids not given — derived "{args.gpu_ids}" from hardware_policy[{fam}]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py', file=sys.stderr)
 
 def _pick(arg_val, cls: dict, key: str, default):
     """CLI flag takes precedence over polymer_rules.json; rules over hard default."""
@@ -109,7 +109,7 @@ def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
 @lru_cache(maxsize=512)
 def _estimate_tg_group_contribution(smiles: str, timeout: int = 30) -> dict | None:
     """Run rdkit_cli.py's `tg-estimate` in the `radonpy` conda env -- RDKit lives there, not
-    in `base`, reached via mol_python.run_in_mol_env() (same seam canon_smiles.py uses).
+    in `base`, reached via mol_python.run_in_mol_env() (same seam rules_common.canonicalize uses).
     Returns the parsed result dict, or None on any failure (missing rdkit/conda, timeout,
     unparseable SMILES, no motif match) -- this is an advisory low-confidence estimate,
     never worth crashing plan resolution over."""
@@ -177,7 +177,7 @@ def _exp_density_point(cls: dict, smiles: str | None=None):
     (single-member class, or a planning agent's overrides.experimental_density_gcm3 pin -- see
     OVERRIDE_RANGES) always wins outright. Otherwise resolves per-member via the run's SMILES.
     No match -> None, NOT another member's measured density (no group-contribution density
-    estimator exists, unlike Tg -- see hw_common.resolve_member_value, the shared
+    estimator exists, unlike Tg -- see rules_common.resolve_member_value, the shared
     member-keyed resolver, which refuses rather than guesses). Pin overrides.experimental_density_gcm3 if you've
     reasoned out which member this SMILES actually is."""
     exp = cls.get('experimental_density_gcm3')

@@ -115,7 +115,7 @@ class StageHalt(SystemExit):
 # ─── GPU claim (A.6 — cross-track rules as code, not convention) ──────────────
 
 def _pick_gpu(action: str, run_name: str, need: int = None) -> dict:
-    cmd = [sys.executable, str(REPO_ROOT / "orchestration" / "scripts" / "pick_gpu.py"),
+    cmd = [sys.executable, str(REPO_ROOT / "orchestration" / "scripts" / "hardware_runtime.py"),
            "--json", action, "--run", run_name]
     if need is not None:
         cmd += ["--need", str(need)]
@@ -123,7 +123,7 @@ def _pick_gpu(action: str, run_name: str, need: int = None) -> dict:
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError:
-        return {"error": f"pick_gpu.py {action} produced no JSON: {r.stdout!r} {r.stderr!r}"}
+        return {"error": f"hardware_runtime.py {action} produced no JSON: {r.stdout!r} {r.stderr!r}"}
 
 
 class gpu_claim:
@@ -132,7 +132,7 @@ class gpu_claim:
     label, verify release) enforced structurally rather than by convention.
 
     A bare `kill`/SIGTERM skips __exit__ entirely (Python does not unwind `with` blocks on
-    SIGTERM by default), leaving a stale claim in pick_gpu.py's ledger — observed directly:
+    SIGTERM by default), leaving a stale claim in hardware_runtime.py's ledger — observed directly:
     killing a test run left GPU 0 permanently marked busy under its run_name until released
     by hand. A SIGTERM handler released for the claim's lifetime closes that gap.
     """

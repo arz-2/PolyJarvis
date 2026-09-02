@@ -3,7 +3,7 @@ cache entry keyed by exact canonical SMILES), not just the polymer CLASS, whenev
 and covers the requested properties. This is the fix for the "plan is class-keyed, not
 system-keyed" gap: previously --smiles was accepted but silently ignored.
 
-canon_smiles.canonicalize shells into a conda env, so it's monkeypatched to identity here,
+rules_common.canonicalize shells into a conda env, so it's monkeypatched to identity here,
 matching the pattern established in tests/test_select_system_size.py.
 """
 import json
@@ -15,7 +15,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-import canon_smiles  # noqa: E402
+import rules_common
 from make_deterministic_plan import (  # noqa: E402
     _try_cache, make_plan_from_cache, make_plan, _build_hardware_decision, _policy_criteria,
 )
@@ -28,7 +28,7 @@ PROPERTIES = {"density", "tg"}
 
 @pytest.fixture(autouse=True)
 def _identity_canonicalize(monkeypatch):
-    monkeypatch.setattr(canon_smiles, "canonicalize", lambda smi, *a, **k: smi)
+    monkeypatch.setattr(rules_common, "canonicalize", lambda smi, *a, **k: smi)
 
 
 def _write_cache(tmp_path, entry, smiles=SMILES):

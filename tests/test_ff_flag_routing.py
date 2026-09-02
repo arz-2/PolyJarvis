@@ -1,6 +1,6 @@
 """Force-field flag routing for the Class II comparison fields.
 
-`stage_params._lammps_flags` and `hw_common.resolve_ff_family` both classify a field by
+`stage_params._lammps_flags` and `rules_common.resolve_ff_family` both classify a field by
 substring. That works for the routed defaults by accident of naming -- "pcff_ore" contains
 "pcff" -- but **compass** shares no token with any family. It silently returned
 all-False flags (so the deck fell back to GAFF2 styles: lj/charmm/coul/long with

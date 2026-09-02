@@ -23,7 +23,7 @@ import track_registry  # noqa: E402
 from rules_common import get_class_entry, load_rules  # noqa: E402
 from make_deterministic_plan import build_decisions, build_planned_stages, make_plan  # noqa: E402
 from select_system_size import solve_system_size  # noqa: E402
-import canon_smiles  # noqa: E402  -- module import so tests can monkeypatch canon_smiles.canonicalize
+import rules_common  # noqa: E402  -- module import so tests can monkeypatch rules_common.canonicalize
 import select_hardware as cost_model  # noqa: E402  -- cost model merged into it 2026-09-02
 
 
@@ -329,7 +329,7 @@ def planning_context(intent: ScientificIntent) -> dict[str, Any]:
     canonical_smiles = None
     if intent.smiles:
         try:
-            canonical_smiles = canon_smiles.canonicalize(intent.smiles, isomeric=True)
+            canonical_smiles = rules_common.canonicalize(intent.smiles, isomeric=True)
         except (RuntimeError, subprocess.TimeoutExpired):
             pass
     characterization = characterization_cache.get(canonical_smiles or intent.smiles)
@@ -434,8 +434,13 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
                       if any(s.get("stage") == "tg" for s in plan.get("planned_stages", []))
                       else [])
 
-    _SIZE_ADVISORIES_COVERED_ELSEWHERE = {"size_over_provisioned",
-                                          "nchain_below_production_minimum"}
+    # size_over_provisioned is re-stated as system_size_over_provisioned in
+    # over_provisioned_ack above, so passing the raw advisory through too would double it.
+    # nchain_below_production_minimum used to be listed here as well, back when
+    # select_system_size() and solve_system_size() each emitted their own name for the same
+    # PCFF-minimum fact; select_system_size() is now the single emitter (2026-09-02), so the
+    # advisory reaches the plan directly and must not be filtered.
+    _SIZE_ADVISORIES_COVERED_ELSEWHERE = {"size_over_provisioned"}
     plan_uncertainties = [{
         "name": decision.dominant_uncertainty,
         "dominant": True,

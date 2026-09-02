@@ -1,6 +1,6 @@
 """pe.py — compute_similarities() shells into a conda env for RDKit, so
 these are pure-logic tests of its subprocess-wrapping contract via monkeypatching
-subprocess.run (same convention as canon_smiles.canonicalize's tests), plus one real
+subprocess.run (same convention as rules_common.canonicalize's tests), plus one real
 @requires_binaries smoke test of the actual RDKit call for a configured host."""
 import json
 import sys

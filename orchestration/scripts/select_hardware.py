@@ -10,7 +10,7 @@ hardware -- so they are now one file and the cycle is gone.
 
 D-08 selection: `decision_policy.json:policies.hardware` remains the source of truth for the
 numbers; the validator and runtime use this shared implementation instead of re-deriving
-hardware thresholds. Runtime GPU allocation stays separate (pick_gpu.py).
+hardware thresholds. Runtime GPU allocation stays separate (hardware_runtime.py).
 
 The cost model prices every planning-stage decision that trades accuracy against compute
 cost (D-04 system size, D-08 hardware, and plan-level budget reporting):
@@ -45,7 +45,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rules_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family
-from hw_common import host_matches
+from hardware_runtime import host_matches
 from mol_python import run_in_mol_env, RDKIT_CLI
 
 
@@ -348,7 +348,7 @@ def _monomer_atoms_and_mw(smiles: str, is_ua: bool, env: str = "radonpy",
     (e.g. TraPPE) or all-atom with H for all-atom FFs (PCFF/OPLS/GAFF); the mass is always
     all-atom. `*` connection-point atoms are discounted -- RDKit would otherwise count them
     as real (wildcard) atoms. Reaches RDKit via mol_python.run_in_mol_env(), the same seam
-    canon_smiles.py's canonicalize() uses, invoking rdkit_cli.py's `monomer-info`."""
+    rules_common.canonicalize() uses, invoking rdkit_cli.py's `monomer-info`."""
     args = ["monomer-info", "--smiles", smiles] + (["--ua"] if is_ua else [])
     r = run_in_mol_env(script_path=RDKIT_CLI, args=args, env=env, timeout=timeout)
     out = r.stdout.strip()

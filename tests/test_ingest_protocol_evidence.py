@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import protocol_evidence as pe  # noqa: E402
+import rules_common  # noqa: E402  -- pe calls through rules_common.canonicalize
 
 FF_ADVISORY = {
     "polymer_name": "PMMA",
@@ -133,9 +134,9 @@ def test_system_size_ingest_kuhn_fields_default_to_none_when_absent(tmp_path):
 
 
 def test_ingest_canonicalizes_smiles_at_write_time(tmp_path, monkeypatch):
-    # canon_smiles.canonicalize shells into a conda env; stub it so this test exercises
+    # rules_common.canonicalize shells into a conda env; stub it so this test exercises
     # ingest's own call-and-store-result logic, not real RDKit.
-    monkeypatch.setattr(pe, "canonicalize", lambda smi, *a, **k: "CANONICAL_FORM")
+    monkeypatch.setattr(rules_common, "canonicalize", lambda smi, *a, **k: "CANONICAL_FORM")
     store_path = str(tmp_path / "protocol_evidence_ff.json")
     pe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
 
@@ -147,7 +148,7 @@ def test_ingest_falls_back_to_raw_smiles_on_canonicalization_failure(tmp_path, m
     def _boom(smi, *a, **k):
         raise RuntimeError("conda env unavailable")
 
-    monkeypatch.setattr(pe, "canonicalize", _boom)
+    monkeypatch.setattr(rules_common, "canonicalize", _boom)
     store_path = str(tmp_path / "protocol_evidence_ff.json")
     pe.ingest("ff", FF_ADVISORY, run_name="PE1", store_path=store_path)
 

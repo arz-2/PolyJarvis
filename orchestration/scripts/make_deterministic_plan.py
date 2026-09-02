@@ -45,11 +45,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import rules_common  # noqa: E402  -- module import so tests can monkeypatch rules_common.canonicalize
 from rules_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family  # shared rules access (single source of truth)
 import track_registry  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from stage_params import _exp_tg_point, _regime_exp_tg  # reuse the proven resolvers, don't duplicate them
-import canon_smiles  # noqa: E402  -- module import so tests can monkeypatch canon_smiles.canonicalize
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DECISION_POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
@@ -314,7 +314,7 @@ def _try_cache(run_name: str, polymer_class: str, smiles, properties: set,
     if not path.exists():
         return None
     try:
-        canonical = canon_smiles.canonicalize(smiles, isomeric=True)
+        canonical = rules_common.canonicalize(smiles, isomeric=True)
     except (RuntimeError, subprocess.TimeoutExpired):
         return None
     try:

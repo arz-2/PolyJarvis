@@ -3,26 +3,36 @@
 rules_common.py — guides/polymer_rules.json access and class/member resolution.
 
 The single source of truth for reading the rules file and answering "what does this class
-say" and "which member of it is this SMILES". This is the most-imported module in the
+say", "which member of it is this SMILES", and -- since 2026-09-02 -- "what is this SMILES'
+canonical form", the question the other two rest on. This is the most-imported module in the
 orchestration layer, and until 2026-09-02 it lived inside hw_common.py -- a file named for
 hardware, two thirds of whose call sites (load_rules, get_class_entry, resolve_member*,
 resolve_ff_family) had nothing to do with hardware at all. Nobody looking for the rules
 loader would have opened a file called hw_common.
 
-hw_common.py keeps what its name actually describes: live host and GPU probing. It imports
-hardware_policy() from here, one way, no cycle.
+hardware_runtime.py keeps what that name actually describes: live host/GPU probing and the
+GPU claim ledger. It imports hardware_policy() from here, one way, no cycle.
+
+canonicalize() arrived from canon_smiles.py, a 53-line module that existed only to wrap one
+subprocess call. Four modules imported it, and this one already lazy-imported it from inside
+_canon_for_match() -- member resolution cannot answer "is this the same molecule" without
+it, so the canonical form and the tables it is matched against now live together.
 
 stdlib only -- importable by any orchestration/scripts/<x>.py (orchestration/scripts/ is on
 sys.path[0] when run as a CLI; benchmark_hardware.py / calibrate_hardware.py also insert
-orchestration/scripts/ explicitly).
+orchestration/scripts/ explicitly). mol_python is stdlib-only too, and does not import back.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import sys
 from functools import lru_cache
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mol_python import run_in_mol_env, RDKIT_CLI  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 RULES_PATH = REPO / "guides" / "polymer_rules.json"
@@ -51,6 +61,31 @@ def hardware_policy(rules: dict | None = None) -> dict:
     return rules.get("hardware_policy", {})
 
 
+def canonicalize(smiles: str, env: str = "radonpy", timeout: int = 30, *,
+                  isomeric: bool = True) -> str:
+    """Canonical SMILES via RDKit. Raises RuntimeError on any RDKit-side failure.
+
+    Two callers need this for different reasons. The system-probe novelty gate
+    (guides/system_characterization_cache.json) is keyed by ISOMERIC canonical SMILES so two
+    atom-orderings of the same monomer collapse to one cache entry while a different stereo
+    variant stays its own entry; _canon_for_match() below strips stereo instead, because
+    tacticity must not change which class member a SMILES resolves to.
+
+    RDKit lives in the `radonpy`/`mol-builder` conda envs, not in this interpreter, so this
+    shells through mol_python.run_in_mol_env() -- the one seam every RDKit caller uses -- to
+    rdkit_cli.py's `canon` subcommand. The SMILES travels as an argv element and is never
+    interpolated into shell/python -c command text: run_in_mol_env passes a real argv list on
+    the direct-interpreter path and shlex-quotes on the conda path, so stereo markers (forward
+    and back slashes) and other shell-meaningful characters cannot corrupt quoting.
+    """
+    args = ["canon", "--smiles", smiles] + ([] if isomeric else ["--no-isomeric"])
+    r = run_in_mol_env(script_path=RDKIT_CLI, args=args, env=env, timeout=timeout)
+    out = r.stdout.strip()
+    if r.returncode != 0 or not out:
+        raise RuntimeError(r.stderr.strip() or "empty output from RDKit canonicalization")
+    return json.loads(out.splitlines()[-1])["canonical_smiles"]
+
+
 @lru_cache(maxsize=256)
 def _canon_for_match(smiles: str) -> str | None:
     """Stereo-stripped canonical SMILES for member-identity matching. Distinct from
@@ -63,7 +98,6 @@ def _canon_for_match(smiles: str) -> str | None:
     (unparseable SMILES, RDKit/conda unavailable, timeout) -- never raises."""
     if not smiles:
         return None
-    from canon_smiles import canonicalize
     try:
         return canonicalize(smiles, isomeric=False)
     except (RuntimeError, subprocess.TimeoutExpired):
@@ -114,3 +148,36 @@ def resolve_ff_family(ff_raw: str, hp: dict) -> str:
         fam = ("pcff" if ("pcff" in fl or fl == "compass") else "opls" if "opls" in fl
                else "trappe" if "trappe" in fl else "gaff")
     return fam
+
+
+def main() -> int:
+    """`canon` CLI, inherited from canon_smiles.py.
+
+    The novel-run-plan skill canonicalizes a SMILES from a shell before writing decision.json,
+    and does it from the base env -- so the entry point has to be a module that runs HERE and
+    shells inward, not rdkit_cli.py, which only runs inside the RDKit env. Output contract is
+    canon_smiles.py's, unchanged:
+      {"smiles": ..., "canonical_smiles": ...}  exit 0
+      {"error": ..., "smiles": ...}             exit 1
+    """
+    ap = argparse.ArgumentParser(description="polymer_rules access; canonicalize a SMILES.")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    c = sub.add_parser("canon", help="canonicalize a SMILES via RDKit")
+    c.add_argument("smiles")
+    c.add_argument("--env", default="radonpy",
+                   help="conda env with RDKit installed (default: radonpy)")
+    c.add_argument("--no-isomeric", action="store_true",
+                   help="strip stereo (the member-matching form, not the cache-key form)")
+    a = ap.parse_args()
+
+    try:
+        canon = canonicalize(a.smiles, a.env, isomeric=not a.no_isomeric)
+    except (RuntimeError, subprocess.TimeoutExpired) as e:
+        print(json.dumps({"error": str(e), "smiles": a.smiles}))
+        return 1
+    print(json.dumps({"smiles": a.smiles, "canonical_smiles": canon}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
