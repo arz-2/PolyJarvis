@@ -45,10 +45,12 @@ def _target_density(cls: dict, smiles: str):
     that one member's density happens to be documented, not that the class has one
     member (e.g. PSTR documents PS but also covers P2VP).
 
-    No longer called by _finite_size_findings (which now always estimates from
-    density_initial_gcm3, never a curated experimental value -- see COMPRESSION_RATIO
-    above). Kept as a standalone resolver utility; tests/test_plan_system_size_arms.py
-    exercises it directly."""
+    UNUSED as of 2026-09-02 and untested. It stopped being called by _finite_size_findings
+    (which now always estimates from density_initial_gcm3, never a curated experimental value --
+    see COMPRESSION_RATIO above), and its only remaining exerciser, tests/test_plan_system_size_
+    arms.py, went with the two-arm split. Kept rather than deleted because stage_params.py:179
+    cites it as the precedent for member-keyed resolution, but it is dead code: delete it or give
+    it a test."""
     ed = cls.get("experimental_density_gcm3")
     if isinstance(ed, (int, float)):
         return float(ed)

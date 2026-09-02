@@ -456,7 +456,7 @@ def main():
         # already in the extractor JSONs; only the surfacing is new.
         #
         # A SIBLING of results, deliberately not a key inside it: aggregate_replicates,
-        # merge_arm_summaries and the polyjarvis_vs_radonpy scorer all read results by field path
+        # and the polyjarvis_vs_radonpy scorer read results by field path
         # and would break on an unexpected sub-dict. results keeps its exact three-key shape.
         #
         # Each entry carries its own gate verdict. A failing byproduct ANNOTATES -- it is never
