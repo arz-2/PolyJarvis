@@ -610,3 +610,33 @@ def test_an_untrustworthy_tg_fits_the_whole_descent():
     """No trustworthy Tg means nothing to size a window around, so the bound is None and the
     fit sees every bin -- the pre-existing behaviour, not a silent narrowing."""
     assert _sched("PKTN")["tg_fit_top_K"] is None
+
+
+# ─── the melt holds carry a real, per-class convergence budget ────────────────────
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_both_melt_holds_are_sized_per_class(cid):
+    """The melt hold carries every binding structural gate (Rg, MSID, torsion, P2,
+    homogeneity) and the NVT window carries the binding C(t) gate. The generator's own tier
+    default is 0.5 ns -- inherited from npt_final, a stage that never had to satisfy any of
+    them. Each class must state its own budget instead.
+
+    The values are the retired stage7_min_steps (nvt_kinetic_stability), which were hand-tuned
+    per class for exactly this convergence question at 300 K, where it is hardest.
+    """
+    e = RULES["classes"][cid]
+    for key in ("melt_hold_min_steps", "nvt_melt_min_steps"):
+        v = e.get(key)
+        assert isinstance(v, int) and v > 0, f"{cid}: {key} missing or not a positive int"
+        # 0.5 ns is the generator fallback this exists to override; anything at or below it
+        # means the class silently kept the npt_final-shaped default.
+        assert v * e.get("dt_fs", 1.0) / 1e6 > 0.5, (
+            f"{cid}: {key} is {v * e.get('dt_fs', 1.0) / 1e6} ns -- at or below the generator "
+            "fallback, so the class is not actually sizing its own melt budget")
+
+
+def test_the_two_melt_holds_are_sized_together():
+    """C(t) decorrelation (NVT window) is the longest timescale either hold has to resolve, so
+    the fixed-volume window is never the shorter of the two."""
+    for cid, e in RULES["classes"].items():
+        assert e["nvt_melt_min_steps"] >= e["melt_hold_min_steps"], cid
