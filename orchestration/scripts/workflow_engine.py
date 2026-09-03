@@ -71,6 +71,8 @@ PARAMETER_STAGE: dict[str, str] = {
     # The descent, and the two stages at the assessment temperature -- all COOLING now.
     "cool_block_dT_K": "cooling",
     "cool_block_hold_steps": "cooling", "cool_block_hold_cap_steps": "cooling",
+    # stage7_* sized nvt_kinetic_stability, cut 2026-09-02 (every gate it fed was advisory at
+    # the assessment temperature). Mapping kept so a stale on-disk value cannot hash to "build".
     "stage7_min_steps": "cooling", "stage7_cap_steps": "cooling",
     "stage8_min_steps": "cooling", "stage8_cap_steps": "cooling",
     "equilibration_extend_base_stage": "equilibration",
@@ -493,6 +495,12 @@ def default_remedies() -> tuple[Remedy, ...]:
                _rate_sensitivity, "mechanical"),
         Remedy("agent_only", frozenset({
             "PLAN_AGENT_CONTRACT_ERROR", "PLAN_VALIDATION_FAILED", "UNSUPPORTED_BUILDER",
+            # Both are build-stage verdicts with no mechanical remedy: rebuilding at the same
+            # decided_params reproduces the same cell (the EMC seed is pinned), so a retry is
+            # guaranteed to fail identically. FF_PROVENANCE_ZERO_SUBSTITUTED needs a re-cut
+            # repeat unit, a different field, or an emc_fields/ patch; BUILD_CELL_INVALID
+            # needs someone to read which pre-simulation check failed and why.
+            "FF_PROVENANCE_ZERO_SUBSTITUTED", "BUILD_CELL_INVALID",
             "DETERMINISTIC_BUILD_FAILED", "FORCE_FIELD_TYPING_AMBIGUOUS",
             "BACKBONE_TYPES_UNRESOLVED", "STRUCTURAL_FAIL", "AMBIGUOUS_ORDERING",
             "BM_INADMISSIBLE_UNSUPPORTED_REGIME", "DEFORM_ANISOTROPIC",

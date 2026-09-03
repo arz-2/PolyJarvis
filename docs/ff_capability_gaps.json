@@ -127,7 +127,17 @@
         "Author the missing TraPPE-UA torsion rows via emc_fields/, the same tracked-patch route used for PSIL's siloxane types.",
         "Mark PI unsupported in member_smiles so it stops presenting as available."
       ],
-      "last_updated": "2026-08-31"
+      "last_updated": "2026-09-02",
+      "mechanized_recheck_2026-09-02": {
+        "what": "orchestration/scripts/forcefield.py capability '*CC=C(C)C*' --fields pcff,trappe-ua -- a real EMC trial build per field, not a file inspection.",
+        "result": {
+          "pcff": "types_smiles=true, typing_evidence='built_cell' -- PCFF builds polyisoprene to a runnable cell.",
+          "trappe-ua": "types_smiles=false, 'Missing force field parameters' -- reproduces the class default's failure."
+        },
+        "why_trappe_cannot_be_patched_cleanly": "Checked against the installed trappe/2014/trappe-ua.prm. The torsion across a DIsubstituted C=C exists (ITEM TORSION 'c* c3h c3h c*'), which is why PBD builds; there is no row with c3h/c3 as the central pair, and ITEM EQUIVALENCE_AUTO maps c3 to itself in the torsion column, so no fallback reaches one. Copying the disubstituted values onto the trisubstituted case would assert the two have the same torsional barrier -- a physical claim about chain stiffness, not a transcription. That is invention, and is exactly the kind of row this file's PEST/PURT entries already refuse to write.",
+        "bearing_on_options": "Option 1 (route substituted dienes to PCFF) is now evidence-backed rather than a hypothesis needing admissibility testing -- the test has been run. Option 2 (author the TraPPE torsion rows) is ruled out on the no-invented-numbers standard. Option 3 (mark PI unsupported) remains the smallest honest step while option 1 is unimplemented: preferred_ff is class-level today, so splitting PDIE's field by member needs a per-member routing mechanism that does not exist yet.",
+        "not_done": "No routing change made. Recorded as evidence only, so the probe does not have to be re-run to make the decision."
+      }
     },
     {
       "polymer_class": "PIMD",

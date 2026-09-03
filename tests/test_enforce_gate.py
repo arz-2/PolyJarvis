@@ -466,3 +466,59 @@ def test_live_and_retrospective_regimes_agree():
             tg = sp._regime_exp_tg(entry, args.smiles)
             retro = enforce_gate.resolve_regime(entry.get("final_T_K", 300.0), tg)
             assert live == retro, f"{cid}/{_name}: live {live} vs retrospective {retro}"
+
+
+# ─── the melt clause binds chain structure; the assessment clauses cannot ──────────
+
+_ALL_GATES = ["density_drift", "density_sem", "energy_drift", "energy_sem", "n_eff_density",
+              "density_homogeneity", "p2", "finite_size", "rg", "ct", "torsion",
+              "msid_gaussian", "msd_not_trapped", "residual_stress"]
+
+
+def _binding(regime, ct_reliable=True, dp=50):
+    _, binding, _ = enforce_gate.classify({k: True for k in _ALL_GATES}, regime, dp, ct_reliable)
+    return set(binding)
+
+
+def test_the_melt_clause_binds_every_chain_structure_check():
+    """The point of gating a melt rather than a glass. MSID (ideal-chain statistics) and torsion
+    (Jensen-Shannon convergence of the backbone-dihedral distribution) are the melt-equilibration
+    criteria; rg and ct are the relaxation ones. All four bind here and nowhere else."""
+    melt = _binding("melt")
+    assert {"rg", "ct", "msid_gaussian", "torsion"} <= melt
+    for regime in ("glassy", "rubbery"):
+        assert not ({"rg", "ct", "msid_gaussian", "torsion"} & _binding(regime)), regime
+
+
+def test_always_advisory_does_not_silently_unbind_the_melt_clause():
+    """ALWAYS_ADVISORY is subtracted from the assessment clauses only. It contains
+    msid_gaussian, so subtracting it unconditionally would un-bind MSID at the melt the moment
+    it was added -- silently, since classify() would just drop it from both dicts."""
+    assert "msid_gaussian" in enforce_gate.ALWAYS_ADVISORY
+    assert "msid_gaussian" in _binding("melt")
+
+
+def test_msd_and_residual_stress_stay_advisory_even_at_the_melt():
+    """Both are deliberate. msd_not_trapped asks for displacement beyond the chain's own Rg,
+    which decision_policy records as unattainable within MD timescales for DP>=30 and aromatic
+    backbones -- binding it would make overall_pass unsatisfiable for the classes that most need
+    a melt gate. residual_stress is uncalibrated: melts are expected stress-isotropic, but the
+    magnitude bound has never been set."""
+    melt = _binding("melt")
+    assert "msd_not_trapped" not in melt
+    assert "residual_stress" not in melt
+
+
+def test_torsion_gate_reads_the_stable_verdict_and_is_none_when_unavailable():
+    """check_equilibration_comprehensive has computed this verdict since it was written and
+    enforce_gate never collected it -- a melt whose torsional population was still visibly
+    evolving passed the gate."""
+    assert enforce_gate.torsion_gate({"torsion": {"available": True, "stable": True}}) is True
+    assert enforce_gate.torsion_gate({"torsion": {"available": True, "stable": False}}) is False
+    assert enforce_gate.torsion_gate({"torsion": {"available": False}}) is None
+    assert enforce_gate.torsion_gate({}) is None
+
+
+def test_collect_gates_surfaces_torsion():
+    gates = enforce_gate.collect_gates({"chain": {"torsion": {"available": True, "stable": False}}})
+    assert gates["torsion"] is False

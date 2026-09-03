@@ -45,6 +45,11 @@ VENV_PY = REPO_ROOT / "mcp-servers" / ".venv" / "bin" / "python"
 MCP_JSON = REPO_ROOT / ".mcp.json"
 
 POLL_SECONDS = 30
+# Ceiling on the EMC cell build. The poll loop below had none, so a wedged emc_setup.pl or
+# EMC binary hung the whole campaign silently and indefinitely -- there is no progress output
+# to notice it by. Two hours is far beyond any observed build (the largest archived cells
+# pack in minutes), so this only ever fires on a genuinely stuck process.
+BUILD_TIMEOUT_S = 2 * 60 * 60
 EXTEND_MAX_ATTEMPTS = 2
 # Finite-size forecast target density: density_initial_gcm3 is a build parameter we choose
 # (how loosely to pack the initial cell before EMC/LAMMPS compress it), never experimental
@@ -236,6 +241,50 @@ def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNames
 
 # ─── Stage: build ───────────────────────────────────────────────────────────
 
+def _ff_provenance(cell_dir: Path, field: str, params_path) -> dict:
+    """Classify every coefficient this build actually emitted against the installed field.
+
+    EMC exits 0 whether a coefficient came from the published field, a wildcard fallback, a
+    local patch, or a zero substituted for a row that does not exist -- the per-pair
+    "increment pair {X, Y} not found" line is a warning, not an abort. That is not a rare
+    edge: docs/ff_capability_gaps.json's stratified PI1070 survey built 71 of 109 (65%)
+    through each polymer's own class-preferred field, and several classes are far worse
+    (PDIE 0/8, PIMD 1/8). Until now nothing looked -- forcefield.assess_provenance ran only
+    inside select_forcefield, which the planning layer records as skipped -- so a cell whose
+    torsions or charge increments were silently zeroed was accepted and equilibrated.
+
+    Advisory flags (LOCAL_PATCH, AUTO_FALLBACK, NO_SOURCE_ROW) are recorded, never blocking:
+    LOCAL_PATCH is the expected state for PSIL/PDMS, whose siloxane rows live in
+    emc_fields/, and NO_SOURCE_ROW is a statement about this repo's own .frc reader rather
+    than about the field.
+    """
+    if params_path is None:
+        return {"available": False,
+                "reason": "no .params emitted -- coefficients are inline in the .data"}
+    try:
+        from forcefield import assess_provenance
+        result = assess_provenance(str(cell_dir), field)
+    except Exception as exc:  # noqa: BLE001 -- a missing field tree must not kill a build
+        return {"available": False, "reason": f"assess_provenance failed: {exc}"}
+    if "error" in result:
+        return {"available": False, "reason": result["error"]}
+    # Only a genuinely substituted zero blocks. A zero out-of-plane term is the norm for an
+    # sp3 centre and appears in every archived cell, which is why _severity already demotes
+    # improper to advisory -- read that severity rather than re-deriving the exception here.
+    substituted = [f for f in result["findings"]
+                   if "ZERO_SUBSTITUTED" in f["flags"] and f["severity"] == "blocking"]
+    return {
+        "available": True,
+        "field": result["field"],
+        "field_file": result["field_file"],
+        "rows_checked": result["rows_checked"],
+        "counts": result["counts"],
+        "local_patch_increments": result["local_patch_increments"],
+        "unchecked_cross_terms": result["unchecked_cross_terms"],
+        "zero_substituted": substituted,
+    }
+
+
 def do_build(args, cls: dict, emc, lammps) -> dict:
     preferred_builder = cls.get("preferred_builder", "emc")
     if preferred_builder != "emc":
@@ -251,67 +300,118 @@ def do_build(args, cls: dict, emc, lammps) -> dict:
     job = emc.submit_emc_cell_job(
         smiles=p["smiles"], polymer_class=args.polymer_class.upper(),
         dp=p["dp"], nchains=p["nchain"], density_initial=p["density_initial_gcm3"],
-        temperature=p["build_temperature_K"], seed=emc_seed, output_name="polymer",
+        temperature=p["build_temperature_K"], seed=emc_seed,
         field_override=p["preferred_ff"],
     )
     if job.get("error"):
         raise SystemExit(f"submit_emc_cell_job failed: {job['error']}")
     job_id = job["job_id"]
 
-    status = {}
+    started = time.time()
     while True:
         status = emc.get_emc_job_status(job_id)
         if status.get("status") in ("completed", "failed"):
             break
+        if time.time() - started > BUILD_TIMEOUT_S:
+            raise SystemExit(
+                f"EMC build job {job_id} did not finish within {BUILD_TIMEOUT_S}s "
+                f"(last status {status.get('status')!r}). Its working files are under "
+                f"{job.get('output_dir')}.")
         time.sleep(POLL_SECONDS)
+    # get_emc_job_status carries only has_error; EMC's own stderr is on output(). Reading the
+    # status dict alone produced PROCESS_FAILED findings that never named the cause.
+    job_output = emc.get_emc_job_output(job_id)
     if status["status"] != "completed":
-        raise SystemExit(f"EMC build job {job_id} failed: {status}")
+        raise SystemExit(
+            f"EMC build job {job_id} failed: "
+            f"{job_output.get('error') or status}. Working files: {job.get('output_dir')}")
+    out = job_output["result"]
 
-    out = emc.get_emc_job_output(job_id)["result"]
     cell_dir = work_dir / "cell"
     cell_dir.mkdir(parents=True, exist_ok=True)
     dest_data = cell_dir / "cell.data"
     shutil.copy(out["data_path"], dest_data)
     # get_emc_job_output's result has no "params_path" key (only "output_dir") -- EMC always
-    # writes the coefficients file as "emc_build.params" (fixed filename, independent of
-    # output_name -- see smiles_to_emc.py's "'emc_build' never collides with the cluster name"
-    # comment) inside output_dir. PCFF/OPLS-AA builds store all Pair/Bond/Angle/... Coeffs
-    # here, not inline in .data.
+    # writes the coefficients file as "emc_build.params" (fixed filename -- see
+    # smiles_to_emc.py's "'emc_build' never collides with the cluster name" comment) inside
+    # output_dir. PCFF/OPLS-AA builds store all Pair/Bond/Angle/... Coeffs here, not inline
+    # in .data. assess_provenance below looks for exactly that name under cell_dir.
     dest_params = None
     src_params_matches = sorted(Path(out["output_dir"]).glob("*.params"))
     if src_params_matches:
         dest_params = cell_dir / "emc_build.params"
         shutil.copy(src_params_matches[0], dest_params)
 
+    base_outputs = {
+        "data_path": str(dest_data),
+        "emc_params_path": str(dest_params) if dest_params else None,
+        "emc_seed": emc_seed,
+        "lammps_flags": out["lammps_flags"],
+    }
+
+    # Force-field provenance, before the cell is worth spending MD on. Uses the field EMC
+    # reports it actually used, not the one the plan asked for.
+    provenance = _ff_provenance(cell_dir, out["field"], dest_params)
+    base_outputs["ff_provenance"] = provenance
+    if provenance.get("zero_substituted"):
+        rows = provenance["zero_substituted"]
+        return {**base_outputs, "halted": True,
+                "reason": "FF_PROVENANCE_ZERO_SUBSTITUTED",
+                "detail": {
+                    "error": (
+                        f"{len(rows)} coefficient(s) in this cell were written as zero because "
+                        f"{provenance['field']!r} has no source row for them -- EMC substituted "
+                        f"a zero and exited 0. Equilibrating this cell would measure a force "
+                        f"field that does not exist. Either re-cut the repeat unit so the "
+                        f"offending atoms type correctly, route this class to a field that "
+                        f"covers the chemistry, or author the missing rows through "
+                        f"emc_fields/ -- see docs/ff_capability_gaps.json."),
+                    "field": provenance["field"],
+                    "field_file": provenance["field_file"],
+                    "n_zero_substituted": len(rows),
+                    "coefficients": rows[:20],
+                }}
+
     # Size gate at the cheapest point: the built cell, before any MD. A too-small cell would
     # otherwise burn the whole equilibration chain before the equil-check gate said the same.
     # target_density_gcm3 is always the density_initial_gcm3-derived estimate (COMPRESSION_RATIO,
     # module-level above) -- never a curated experimental value, so this forecast runs
     # unconditionally for every system, known or novel.
+    #
+    # params_file is what makes the non-SIZE_ errors trustworthy: without it every EMC
+    # PCFF/TraPPE cell reports "'Pair Coeffs' section missing" (the coefficients are in the
+    # .params, not the .data), which is why this call used to keep SIZE_-prefixed errors and
+    # throw the rest away -- discarding the charge-neutrality, coefficient-completeness and
+    # density-plausibility checks along with the false positive.
     ep = resolve_stage_params("equil", args, cls)
     info = lammps.inspect_data_file(
         data_file=str(dest_data), lj_cutoff=ep.get("cutoff_A") or 12.0,
         target_density_gcm3=COMPRESSION_RATIO * p["density_initial_gcm3"], nchain=ep.get("nchain"),
+        params_file=str(dest_params) if dest_params else "",
     )
-    size_errors = [e for e in (info.get("validation", {}).get("errors") or [])
-                   if e.startswith("SIZE_")]
+    errors = list(info.get("validation", {}).get("errors") or [])
+    size_errors = [e for e in errors if e.startswith("SIZE_")]
+    other_errors = [e for e in errors if not e.startswith("SIZE_")]
     if size_errors:
+        # Raised first: this is the one build failure with a deterministic remedy
+        # (finite_size_rebuild), so it must reach that route rather than being folded into a
+        # generic invalid-cell escalation.
         raise StageHalt(
             "Halting before equilibration — the built cell would self-image once compressed: "
             + " ".join(size_errors)
-            + " A deterministic replicate must not silently rebuild at a different nchain; "
-              "that is a decided_params change and needs human review.",
+            + " A deterministic replicate must not rebuild at a different nchain without "
+              "saying so; the finite_size_rebuild remedy does exactly that, explicitly and "
+              "counted, and anything beyond its cap needs human review.",
             details={"finite_size_forecast": info.get("finite_size_forecast")},
         )
+    if other_errors:
+        return {**base_outputs, "halted": True, "reason": "BUILD_CELL_INVALID",
+                "detail": {"error": ("The built cell failed pre-simulation validation: "
+                                     + " ".join(other_errors)),
+                           "errors": other_errors,
+                           "stats": info.get("validation", {}).get("stats")}}
 
-    result = {
-        "data_path": str(dest_data),
-        "emc_params_path": str(dest_params) if dest_params else None,
-        "emc_seed": emc_seed,
-        "lammps_flags": out["lammps_flags"],
-        "n_atoms": info.get("info", {}).get("n_atoms"),
-    }
-    return result
+    return {**base_outputs, "n_atoms": info.get("info", {}).get("n_atoms")}
 
 
 # ─── Stage: equilibration + gate (EXTEND loop, STRUCTURAL_FAIL halt) ──────────
@@ -442,7 +542,6 @@ def _submit_cool_chain(args, cls: dict, lammps, extend_from_data: str = None,
         T_melt_hold_K=p["T_melt_hold_K"], final_T_K=p["final_T_K"],
         cool_block_dT_K=p["cool_block_dT_K"],
         cool_block_hold_cap_steps=p["cool_block_hold_cap_steps"],
-        stage7_cap_steps=p["stage7_cap_steps"],
         stage8_cap_steps=p["stage8_cap_steps"],
         polymer_name=args.run_name, press=p["P_equil_atm"],
         use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
@@ -455,14 +554,12 @@ def _submit_cool_chain(args, cls: dict, lammps, extend_from_data: str = None,
         extend_steps_val = int(extend_ns * 1e6 / dt)
         base = extend_base_stage or "npt_final"
         override = {
-            "nvt_kinetic_stability": {"stage7_min_steps": extend_steps_val},
             "npt_final": {"stage8_min_steps": extend_steps_val},
         }.get(base, {"cool_block_hold_steps": extend_steps_val})
         workflow = lammps.generate_cooling_workflow(
             data_file=p["data_path"],
             cool_block_hold_steps=override.get("cool_block_hold_steps",
                                                p["cool_block_hold_steps"]),
-            stage7_min_steps=override.get("stage7_min_steps", p["stage7_min_steps"]),
             stage8_min_steps=override.get("stage8_min_steps", p["stage8_min_steps"]),
             extend_only=True, restart_file=extend_from_data, base_stage_name=base,
             extend_ensemble=extend_ensemble, extend_temp_K=extend_temp_K,
@@ -472,7 +569,6 @@ def _submit_cool_chain(args, cls: dict, lammps, extend_from_data: str = None,
         workflow = lammps.generate_cooling_workflow(
             data_file=resume_data_path or p["data_path"],
             cool_block_hold_steps=p["cool_block_hold_steps"],
-            stage7_min_steps=p["stage7_min_steps"],
             stage8_min_steps=p["stage8_min_steps"],
             resume_from=resume_from,
             **common,
@@ -930,10 +1026,9 @@ def do_cool_and_check(args, cls: dict, lammps) -> dict:
     npt_prod_data_path = workflow["stages"][-1]["output_data"]
     npt_prod_dump_path = _stage_dump_path(workflow["stages"][-1])
     npt_prod_restart_path = workflow["stages"][-1].get("output_restart")
-    _kinetic = next((s for s in workflow["stages"]
-                     if s.get("name") == "nvt_kinetic_stability"), None)
-    if _kinetic:
-        args.npt_prod_dump = _stage_dump_path(_kinetic)
+    # No fixed-volume window at the assessment temperature: every gate reads npt_final's own
+    # trajectory. args.npt_prod_dump stays unset so the resolver's own default applies.
+    args.npt_prod_dump = None
 
     attempts = 0
     while True:

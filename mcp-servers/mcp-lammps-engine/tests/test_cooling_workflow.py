@@ -1,8 +1,12 @@
 """Deck-generation contract for generate_cooling_workflow.
 
 The cooling chain is the second half of what used to be one 10-substep equilibration chain:
-the blockwise descent from the gated melt cell to final_T_K, then nvt_kinetic_stability and
-npt_final. It runs only when a property needs a cell at the assessment temperature.
+the blockwise descent from the gated melt cell to final_T_K, then npt_final. It runs only when
+a property needs a cell at the assessment temperature.
+
+There is no fixed-volume NVT window here: nvt_kinetic_stability was cut because every gate it
+fed (MSD/kinetic-trap, C(t)) is advisory in both regimes at the assessment temperature, so it
+cost 3-20 ns per run and could not fail one. Chain relaxation binds at the melt gate instead.
 """
 import importlib.util
 import sys
@@ -29,7 +33,6 @@ def _base_kwargs(tmp_path, **overrides):
         work_dir_base=str(tmp_path), velocity_seed=4242,
         T_melt_hold_K=700.0, final_T_K=300.0,
         cool_block_dT_K=100.0, cool_block_hold_steps=6666, cool_block_hold_cap_steps=99999,
-        stage7_min_steps=7777, stage7_cap_steps=99999,
         stage8_min_steps=8888, stage8_cap_steps=99999,
         use_long_range=False, press=2.0,
         use_pcff=True, use_trappe=False, use_opls=False,
@@ -40,17 +43,16 @@ def _base_kwargs(tmp_path, **overrides):
 
 
 def test_full_descent_order_and_step_counts(tmp_path):
-    """700 -> 300 K at dT=100 -> exactly 4 cool blocks, then the two assessment stages."""
+    """700 -> 300 K at dT=100 -> exactly 4 cool blocks, then the assessment cell."""
     result = server.generate_cooling_workflow(**_base_kwargs(tmp_path))
     assert result["status"] == "success", result
     assert result["run_order"] == ["cool_block_01", "cool_block_02", "cool_block_03",
-                                   "cool_block_04", "nvt_kinetic_stability", "npt_final"]
+                                   "cool_block_04", "npt_final"]
     by_name = {s["name"]: s for s in result["stages"]}
     for i in range(1, 5):
         assert by_name[f"cool_block_{i:02d}"]["params"]["N_STEPS"] == 6666
     assert by_name["cool_block_01"]["params"]["T_START"] == 700.0
     assert by_name["cool_block_04"]["params"]["T_FINAL"] == 300.0
-    assert by_name["nvt_kinetic_stability"]["params"]["N_STEPS"] == 7777
     assert by_name["npt_final"]["params"]["N_STEPS"] == 8888
     assert result["n_cool_blocks"] == 4
     assert result["assessment_data_path"] == by_name["npt_final"]["output_data"]
@@ -89,11 +91,11 @@ def test_an_uneven_span_still_lands_exactly_on_final_T(tmp_path):
 
 def test_melt_hold_equal_to_final_T_emits_no_cool_blocks(tmp_path):
     """The rubbery-shaped case: the melt IS the assessment cell. Legal, and it still produces
-    the two stages the gate needs."""
+    the assessment stage the gate needs."""
     result = server.generate_cooling_workflow(
         **_base_kwargs(tmp_path, T_melt_hold_K=300.0, final_T_K=300.0))
     assert result["status"] == "success", result
-    assert result["run_order"] == ["nvt_kinetic_stability", "npt_final"]
+    assert result["run_order"] == ["npt_final"]
     assert result["n_cool_blocks"] == 0
 
 
@@ -107,8 +109,8 @@ def test_final_T_above_the_melt_hold_is_rejected(tmp_path):
 def test_null_step_counts_select_defaults(tmp_path):
     result = server.generate_cooling_workflow(
         **_base_kwargs(tmp_path, cool_block_dT_K=None, cool_block_hold_steps=None,
-                       cool_block_hold_cap_steps=None, stage7_min_steps=None,
-                       stage7_cap_steps=None, stage8_min_steps=None, stage8_cap_steps=None))
+                       cool_block_hold_cap_steps=None, stage8_min_steps=None,
+                       stage8_cap_steps=None))
     assert result["status"] == "success", result
     assert all(s["params"]["N_STEPS"] > 0 for s in result["stages"])
 
@@ -129,23 +131,24 @@ def test_no_stage_recreates_velocities(tmp_path):
 
 # ── resume_from ───────────────────────────────────────────────────────────────
 
-def test_resume_from_cool_block_starts_at_the_assessment_stages(tmp_path):
+def test_resume_from_cool_block_starts_at_the_assessment_cell(tmp_path):
     result = server.generate_cooling_workflow(
         **_base_kwargs(tmp_path, resume_from="cool_block"))
     assert result["status"] == "success", result
-    assert result["run_order"] == ["nvt_kinetic_stability", "npt_final"]
+    assert result["run_order"] == ["npt_final"]
     assert result["stages"][0]["input_data"] == MELT_CELL
 
 
-def test_resume_from_nvt_kinetic_stability_starts_at_npt_final(tmp_path):
-    result = server.generate_cooling_workflow(
-        **_base_kwargs(tmp_path, resume_from="nvt_kinetic_stability"))
-    assert result["status"] == "success", result
-    assert result["run_order"] == ["npt_final"]
+def test_the_chain_has_no_fixed_volume_window(tmp_path):
+    """Regression pin for the cut: nvt_kinetic_stability fed only advisory gates at the
+    assessment temperature and is gone. Every stage here is NPT."""
+    result = server.generate_cooling_workflow(**_base_kwargs(tmp_path))
+    assert "nvt_kinetic_stability" not in result["run_order"]
+    assert all(st["template"] == "npt" for st in result["stages"])
 
 
 def test_resume_from_rejects_an_equilibration_checkpoint(tmp_path):
-    for name in ("anneal_hold", "npt_melt_hold", "npt_final"):
+    for name in ("anneal_hold", "npt_melt_hold", "npt_final", "nvt_kinetic_stability"):
         result = server.generate_cooling_workflow(
             **_base_kwargs(tmp_path, resume_from=name))
         assert result["status"] == "error", name
@@ -188,10 +191,11 @@ def test_extend_only_npt_final_holds_at_final_T(tmp_path):
 
 
 def test_extend_only_rejects_ensemble_mismatch(tmp_path):
+    """npt_final is NPT -- extending it as nvt would silently drop the barostat."""
     result = server.generate_cooling_workflow(
-        **_base_kwargs(tmp_path, extend_only=True, base_stage_name="nvt_kinetic_stability",
-                       extend_ensemble="npt",
-                       restart_file=str(tmp_path / "nvt_kinetic_stability_out.restart")))
+        **_base_kwargs(tmp_path, extend_only=True, base_stage_name="npt_final",
+                       extend_ensemble="nvt",
+                       restart_file=str(tmp_path / "npt_final_out.restart")))
     assert result["status"] == "error"
     assert "extend_ensemble" in result["error"]
 

@@ -78,7 +78,7 @@ SNAPSHOT_KEYS = [
     "warmup_steps", "densify_ramp_steps", "densify_check_every_steps", "densify_steps_cap",
     "ff_activate_npt_steps", "anneal_heat_steps", "anneal_check_every_steps",
     "anneal_cap_steps", "cool_block_dT_K", "cool_block_hold_steps", "cool_block_hold_cap_steps",
-    "stage7_min_steps", "stage7_cap_steps", "stage8_min_steps", "stage8_cap_steps",
+    "stage8_min_steps", "stage8_cap_steps",
     "melt_ramp_steps", "melt_hold_min_steps", "melt_hold_cap_steps",
     "nvt_melt_min_steps", "nvt_melt_cap_steps",
     "md_tg_ceiling_K", "tg_t_low_K", "tg_t_step_K", "tg_steps_per_t", "tg_rates_K_per_ns",
@@ -258,13 +258,55 @@ def _assert_tg_rates_feasible(cls: dict, polymer_class: str) -> None:
         )
 
 
-def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dict:
+def size_the_cell(polymer_class: str, smiles, properties: set,
+                  size_solve: dict | None = None) -> tuple[dict, list]:
+    """(dp_typical/nchain for decided_params, assumptions) -- the cell, resolved per-SMILES.
+
+    SNAPSHOT_KEYS can only copy keys the class entry HAS, and per-class dp_typical/nchain
+    were removed 2026-09-02, so without this a scaffold run_plan.json carried no cell size
+    at all. That was not inert: stage_params fell through to hardcoded 50/10 and
+    validate_run_plan's D-04 floor check returns clean on `dp is None`, so an unsized plan
+    built a wrong cell and reported no finding. Resolve it here, from the same
+    solve_system_size() materialize_plan() uses, so every plan artifact carries a real cell
+    whatever mode produced it.
+
+    `size_solve` lets a caller that has already run the solve hand it in rather than pay for
+    a second RDKit round-trip; materialize_plan() does exactly that.
+    """
+    if size_solve is None:
+        if not smiles:
+            return {}, ["D-04_system_size UNRESOLVED: no SMILES was supplied, so the cell "
+                        "could not be sized from the repeat unit. run_campaign will refuse "
+                        "to build this plan rather than default the cell."]
+        try:
+            size_solve = solve_system_size(polymer_class, smiles, properties,
+                                           dp_typical=None, nchain=None)
+        except Exception as e:  # noqa: BLE001 -- an unsized plan must say so, not crash here
+            return {}, [f"D-04_system_size UNRESOLVED: solve_system_size raised {e!r}. "
+                        "run_campaign will refuse to build this plan rather than default "
+                        "the cell."]
+    recommended = size_solve.get("recommended_params") or {}
+    sized = {k: v for k, v in recommended.items() if k in ("dp_typical", "nchain")}
+    if not sized:
+        return {}, ["D-04_system_size UNRESOLVED: solve_system_size returned no "
+                    "dp_typical/nchain. run_campaign will refuse to build this plan "
+                    "rather than default the cell."]
+    reasons = size_solve.get("recommendation_reasons") or []
+    return sized, [f"D-04_system_size resolved to {sized} by "
+                   f"select_system_size.solve_system_size()"
+                   + (f" -- {'; '.join(reasons)}" if reasons else ".")]
+
+
+def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
+              size_solve: dict | None = None) -> dict:
     rules = load_rules()
     if polymer_class.upper() not in rules.get("classes", {}):
         raise ValueError(f"unknown polymer class {polymer_class!r}")
     cls = get_class_entry(rules, polymer_class)
     _assert_tg_rates_feasible(cls, polymer_class.upper())
     decided_params = {k: cls[k] for k in SNAPSHOT_KEYS if k in cls}
+    sized, size_assumptions = size_the_cell(polymer_class, smiles, properties, size_solve)
+    decided_params.update(sized)
     # Regime call (see _regime_exp_tg): a novel polymer's Tg estimate now drives this instead of
     # defaulting glassy by omission, padded toward glassy for an uncertain estimate.
     exp_tg = _regime_exp_tg(cls, smiles)
@@ -297,7 +339,7 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
         "properties": sorted(properties),
         "confidence": "unreviewed",
         "plan_mode": "scaffold",
-        "assumptions": [
+        "assumptions": size_assumptions + [
             "polymer_rules.json class defaults are a starting hypothesis pending "
             "scientific-agent review.",
         ],

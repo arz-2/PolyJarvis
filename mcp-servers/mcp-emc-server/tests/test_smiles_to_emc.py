@@ -154,10 +154,15 @@ class TestMakeEshStructure:
         s = sections(esh)
         assert "1.200000" in s["OPTIONS"]
 
-    def test_ntotal_in_options(self):
-        esh = make_esh("*CC*", ntotal=5000)
-        s = sections(esh)
-        assert "5000" in s["OPTIONS"]
+    def test_ntotal_is_emitted_but_inert(self):
+        """ntotal stopped being a parameter 2026-09-02 -- "number true" is now always on, so
+        EMC reads the ITEM CLUSTERS fraction as a literal chain count and ignores ntotal. The
+        key is still emitted so the OPTIONS block stays well-formed, at a fixed value that
+        cannot vary per call."""
+        from smiles_to_emc import _ESH_NTOTAL_INERT
+        assert str(_ESH_NTOTAL_INERT) in sections(make_esh("*CC*"))["OPTIONS"]
+        assert sections(make_esh("*CC*", nchains=7))["OPTIONS"] == \
+            sections(make_esh("*CC*", nchains=7))["OPTIONS"]
 
     def test_output_name_as_esh_filename(self):
         # output name is derived from the .esh filename passed to emc_setup.pl,
@@ -181,20 +186,20 @@ class TestMakeEshStructure:
 
 
 class TestMakeEshChainCount:
-    """nchains>0 selects EMC 'number' mode (exact chain count); otherwise the
-    ntotal-driven default sizing is used."""
+    """The chain count is always exact: EMC 'number' mode is unconditional. The
+    ntotal-driven sizing path was removed 2026-09-02 so that D-04_system_size is the only
+    thing that decides how big a cell is -- a second, implicit sizing route is exactly the
+    kind of thing that silently decides a run."""
 
-    def test_default_no_number_mode(self):
-        # nchains defaults to 0 → no 'number' option, cluster fraction stays 1
-        esh = make_esh("*CC*")
-        s = sections(esh)
-        assert "number" not in s["OPTIONS"].lower().split()
-        assert "poly    alternate    1" in s["CLUSTERS"]
+    def test_number_mode_is_unconditional(self):
+        s = sections(make_esh("*CC*"))
+        opts = s["OPTIONS"].split()
+        assert "number" in opts and opts[opts.index("number") + 1] == "true"
 
-    def test_nchains_zero_no_number_mode(self):
-        esh = make_esh("*CC*", nchains=0)
-        s = sections(esh)
-        assert "number" not in s["OPTIONS"].lower().split()
+    def test_nchains_below_one_is_refused(self):
+        for bad in (0, -1):
+            with pytest.raises(ValueError, match="nchains must be >= 1"):
+                make_esh("*CC*", nchains=bad)
 
     def test_nchains_enables_number_mode(self):
         esh = make_esh("*CC*", nchains=20)

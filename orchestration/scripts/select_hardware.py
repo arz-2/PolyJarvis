@@ -212,11 +212,10 @@ def _cool_total_steps(effective_class: dict) -> tuple:
             return None, "primary tg rate is zero -- cannot rate-match the cooldown"
         hold = int(round(dT / (rate * dt * 1e-06)))
 
-    stage7 = int(effective_class.get("stage7_min_steps") or (5.0e5 / dt))
     stage8 = int(effective_class.get("stage8_min_steps") or (5.0e5 / dt))
-    total = n_blocks * int(hold) + stage7 + stage8
+    total = n_blocks * int(hold) + stage8
     return total, (f"{n_blocks} cool blocks x {int(hold)} steps ({t_high:.0f}->{t_low:.0f} K "
-                   f"at dT={dT:.0f} K) + nvt_kinetic_stability {stage7} + npt_final {stage8}; "
+                   f"at dT={dT:.0f} K) + npt_final {stage8}; "
                    "first blocks only -- adaptive extensions are not priced")
 
 

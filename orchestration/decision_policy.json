@@ -133,11 +133,14 @@
           "energy_sem",
           "n_eff_density",
           "density_homogeneity",
+          "p2",
           "finite_size",
           "rg",
-          "ct"
+          "ct",
+          "msid_gaussian",
+          "torsion"
         ],
-        "require_melt_rationale": "A melt is the one state in which chain relaxation is physically attainable on MD timescales, so rg (chain-dimension equilibration) and ct (end-to-end decorrelation) BIND here -- they are advisory at the assessment temperature only because a glass cannot satisfy them, not because they do not matter. ct is skipped where the class carries ct_gate_reliable=false, the same carve-out require_glassy already applies. msd_not_trapped, msid_gaussian and residual_stress stay advisory everywhere (enforce_gate.ALWAYS_ADVISORY)."
+        "require_melt_rationale": "A melt is the one state in which chain relaxation and ideal-chain statistics are physically attainable on MD timescales, so the chain-structure gates BIND here and only here: rg (chain-dimension spread), ct (end-to-end decorrelation), msid_gaussian (MSID(n) ~ n, the textbook equilibrated-melt criterion) and torsion (Jensen-Shannon convergence of the backbone-dihedral distribution). They are advisory at the assessment temperature because a glass cannot satisfy them, not because they do not matter. ct is skipped where the class carries ct_gate_reliable=false, the same carve-out require_glassy applies. msd_not_trapped stays advisory everywhere -- its criterion is displacement beyond the chain's own Rg, which rationale_glassy/rationale_rubbery already record as unattainable for DP>=30 and aromatic backbones. residual_stress stays advisory by calibration status: melts are expected to be stress-isotropic, but the magnitude bound has never been set."
       }
     },
     "tg_protocol": {

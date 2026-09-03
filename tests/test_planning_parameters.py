@@ -77,9 +77,10 @@ def test_equilibration_controls_resolve_to_executable_steps():
     cooled = resolve_stage_params("cool", _args(), cls)
     assert cooled["cool_block_hold_steps"] == 250000
     assert cooled["cool_block_hold_cap_steps"] == 750000
-    assert cooled["stage7_min_steps"] == 600000
     assert cooled["stage8_min_steps"] == 700000
     assert cooled["thermostat_damp_fs"] == 150.0
+    # nvt_kinetic_stability is cut, so its knobs reach no resolver at all.
+    assert "stage7_min_steps" not in cooled
 
 
 def test_thermal_and_mechanical_controls_resolve_without_hardcoded_replacement():

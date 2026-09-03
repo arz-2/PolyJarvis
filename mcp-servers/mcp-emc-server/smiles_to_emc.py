@@ -45,13 +45,22 @@ def _check_emc():
 # .esh generation
 # ---------------------------------------------------------------------------
 
+# EMC's OPTIONS block wants an ntotal key, but "number true" (always emitted below) makes
+# it inert: EMC then reads the ITEM CLUSTERS fraction as a literal molecule count rather
+# than sizing the cell from a target atom count. It was a real knob until the nchains<=0
+# sizing path was removed 2026-09-02 -- the campaign always passes an explicit chain count
+# from D-04_system_size, and a second, implicit way to size a cell is exactly the kind of
+# thing that silently decides a run. Kept as a constant only so the emitted .esh stays a
+# well-formed OPTIONS block; changing it changes nothing.
+_ESH_NTOTAL_INERT = 3000
+
+
 def make_esh(
     smiles: str,
     field: str = "pcff",
     density: float = 0.9,
-    ntotal: int = 3000,
     dp: int = 20,
-    nchains: int = 0,
+    nchains: int = 10,
 ) -> str:
     """
     Generate EMC .esh file content from a repeat-unit SMILES.
@@ -60,11 +69,8 @@ def make_esh(
       - First * = left chain-end connection point
       - Second * = right chain-end connection point
 
-    Chain count:
-      - nchains > 0  → exact chain count via EMC "number" mode: emit
-        `number true` in ITEM OPTIONS and use nchains as the ITEM CLUSTERS
-        fraction. EMC then builds exactly nchains chains and ignores ntotal.
-      - nchains <= 0 → ntotal-driven sizing (chains ≈ ntotal / sites_per_chain).
+    Chain count is always exact, via EMC "number" mode: `number true` in ITEM OPTIONS with
+    nchains as the ITEM CLUSTERS fraction, so EMC builds exactly nchains chains.
 
     seed and temperature are passed as emc_setup.pl CLI flags (not .esh options).
     Returns the .esh file as a string (does not write to disk).
@@ -73,6 +79,11 @@ def make_esh(
     if n_stars != 2:
         raise ValueError(
             f"SMILES must have exactly 2 * connection points, found {n_stars}: {smiles!r}"
+        )
+    if nchains < 1:
+        raise ValueError(
+            f"nchains must be >= 1, got {nchains}: the cell's chain count is decided by "
+            f"D-04_system_size and is never inferred from a target atom count."
         )
 
     # Connection spec for PCFF / OPLS-AA (all-atom fields):
@@ -96,20 +107,17 @@ def make_esh(
         repeat_connect = f"{smiles},1,repeat:2"
         cap_line = "*[H],1,repeat:1,1,repeat:2"
 
-    # Chain count: with nchains>0, EMC "number" mode reads the cluster fraction
-    # as a literal molecule count (n_poly = f_poly); otherwise EMC sizes the cell
-    # from ntotal (n_poly = int(f_poly*ntotal/l_poly+0.5)).
-    use_number = nchains > 0
-    number_opt = "number          true\n" if use_number else ""
-    cluster_fraction = nchains if use_number else 1
+    # EMC "number" mode reads the cluster fraction as a literal molecule count
+    # (n_poly = f_poly) rather than deriving it (n_poly = int(f_poly*ntotal/l_poly+0.5)).
     return f"""\
 ITEM OPTIONS
 
 replace         true
 field           {field}
 density         {density:.6f}
-ntotal          {ntotal}
-{number_opt}
+ntotal          {_ESH_NTOTAL_INERT}
+number          true
+
 ITEM END
 
 ITEM GROUPS
@@ -121,7 +129,7 @@ ITEM END
 
 ITEM CLUSTERS
 
-poly    alternate    {cluster_fraction}
+poly    alternate    {nchains}
 
 ITEM END
 
@@ -246,10 +254,8 @@ def run_emc_build(build_emc: Path) -> Path:
 def build_cell(
     smiles: str,
     output_dir: str | Path,
-    output_name: str = "polymer",
     field: str = "pcff",
     density: float = 0.9,
-    ntotal: int = 3000,
     dp: int = 20,
     nchains: int = 10,
     temperature: float = 300.0,
@@ -258,31 +264,29 @@ def build_cell(
     """
     Full pipeline: SMILES → .esh → emc_setup.pl → EMC binary → LAMMPS .data
 
+    Every product is named emc_build.* (see the fixed .esh filename below), so there is no
+    output-prefix parameter; one was accepted and silently ignored until 2026-09-02.
+
     Parameters
     ----------
     smiles : str
         Repeat-unit SMILES with exactly two * connection points.
     output_dir : path-like
         Directory where all intermediate and output files are written.
-    output_name : str
-        Prefix for all generated files (default: "polymer").
     field : str
         EMC force field name (default: "pcff").
     density : float
         Target packing density in g/cm³. Use ~0.5× experimental for initial
         build to avoid overlaps; EMC scales to this density.
-    ntotal : int
-        Fallback target total atom count — used only when nchains <= 0. EMC then
-        chooses the number of chains to approximate this count given dp.
     dp : int
         Degree of polymerization — repeat units per chain.
     nchains : int
-        Number of polymer chains. When > 0, builds exactly this many chains via
-        EMC "number" mode (ntotal is then ignored). Pass 0 (or negative) to let
-        EMC determine chain count from ntotal instead.
+        Exact number of polymer chains (EMC "number" mode). Must be >= 1.
     temperature : float
-        Build temperature in K (used for velocity assignments in the
-        generated LAMMPS run script).
+        Build temperature in K. Feeds EMC's `build.system.temperature`, which its
+        `grow -> {method -> energetic}` chain growth accepts moves against — so this
+        shapes the packed configuration, not only the velocities of the run script EMC
+        generates (that script is unused; PolyJarvis generates its own decks).
     seed : int
         Random seed for EMC. -1 selects a random seed each run.
 
@@ -300,8 +304,7 @@ def build_cell(
     # ("emc_build") never collides with the cluster name ("poly") in the .esh.
     esh_path = output_dir / "emc_build.esh"
     esh_path.write_text(
-        make_esh(smiles, field=field, density=density, ntotal=ntotal, dp=dp,
-                 nchains=nchains)
+        make_esh(smiles, field=field, density=density, dp=dp, nchains=nchains)
     )
 
     build_emc = run_emc_setup(esh_path, field=field, seed=seed, temperature=temperature)
@@ -319,18 +322,13 @@ def main():
     )
     parser.add_argument("smiles", help="Repeat-unit SMILES with two * connection points")
     parser.add_argument("output_dir", help="Directory to write all output files")
-    parser.add_argument("--name", default="polymer", help="Output file prefix [polymer]")
     parser.add_argument("--field", default="pcff", help="EMC force field [pcff]")
     parser.add_argument("--density", type=float, default=0.9,
                         help="Target packing density in g/cm³ [0.9]")
-    parser.add_argument("--ntotal", type=int, default=3000,
-                        help="Target total atom count; fallback sizing when "
-                             "--nchains<=0 [3000]")
     parser.add_argument("--dp", type=int, default=20,
                         help="Repeat units per chain [20]")
     parser.add_argument("--nchains", type=int, default=10,
-                        help="Exact number of chains (EMC number mode); "
-                             "0 = size from ntotal [10]")
+                        help="Exact number of chains (EMC number mode), >= 1 [10]")
     parser.add_argument("--temperature", type=float, default=300.0,
                         help="Build temperature in K [300.0]")
     parser.add_argument("--seed", type=int, default=-1,
@@ -343,13 +341,12 @@ def main():
 
     if args.esh_only:
         output_dir.mkdir(parents=True, exist_ok=True)
-        esh_path = output_dir / f"{args.name}.esh"
+        esh_path = output_dir / "emc_build.esh"
         esh_path.write_text(
             make_esh(
                 args.smiles,
                 field=args.field,
                 density=args.density,
-                ntotal=args.ntotal,
                 dp=args.dp,
                 nchains=args.nchains,
             )
@@ -360,10 +357,8 @@ def main():
     data_path = build_cell(
         smiles=args.smiles,
         output_dir=output_dir,
-        output_name=args.name,
         field=args.field,
         density=args.density,
-        ntotal=args.ntotal,
         dp=args.dp,
         nchains=args.nchains,
         temperature=args.temperature,

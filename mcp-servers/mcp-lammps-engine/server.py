@@ -1583,7 +1583,7 @@ def generate_equilibration_workflow(
                                is the cell every downstream track starts from.
 
     This chain does NOT cool. The descent to the assessment temperature — cool_block_NN,
-    nvt_kinetic_stability, npt_final — is generate_cooling_workflow's, and runs only when a
+    cool_block_NN and npt_final — is generate_cooling_workflow's, and runs only when a
     property needs a cell at that temperature. A melt-only run stops here.
 
     Required args — no defaults. Every step count and the velocity seed must be passed on
@@ -1633,8 +1633,8 @@ def generate_equilibration_workflow(
         nvt_melt_min_steps: REQUIRED. Step count for nvt_melt_hold's first block. Null
                         selects int(5.0e5/dt_prod) (~0.5 ns). NOTE this window is
                         uncalibrated: MSD/C(t) decorrelate far faster at melt temperatures
-                        than at 300 K, so the 0.5 ns inherited from the old
-                        nvt_kinetic_stability is a placeholder, not a measured floor.
+                        than at 300 K, so the 0.5 ns default is a placeholder, not a measured
+                        floor. This is now the ONLY fixed-volume window in the whole protocol.
         nvt_melt_cap_steps: REQUIRED. Ceiling on cumulative nvt_melt_hold steps. Null selects
                         int(2.0e6/dt_prod) (~2 ns).
         warmup_steps:   REQUIRED. Step count for the fixed nvt_warmup stage. Null selects
@@ -1885,8 +1885,8 @@ def generate_equilibration_workflow(
                         "error": f"base_stage_name={base_stage_name!r} is not a recognized "
                                  "adaptive stage of the CORE chain — must be one of "
                                  "npt_densify_hold, anneal_hold, npt_melt_hold, nvt_melt_hold. "
-                                 "The cooldown's stages (cool_block_NN, nvt_kinetic_stability, "
-                                 "npt_final) belong to generate_cooling_workflow."}
+                                 "The cooldown's stages (cool_block_NN, npt_final) belong to "
+                                 "generate_cooling_workflow."}
             ext_steps = int(ext_steps) if ext_steps else int(1.0e6 / dt_prod)
             template = "nvt" if extend_ensemble == "nvt" else "npt"
             # Each adaptive stage holds at its OWN fixed condition; a continuation must hold
@@ -2153,8 +2153,6 @@ def generate_cooling_workflow(
     cool_block_dT_K: Optional[float],
     cool_block_hold_steps: Optional[int],
     cool_block_hold_cap_steps: Optional[int],
-    stage7_min_steps: Optional[int],
-    stage7_cap_steps: Optional[int],
     stage8_min_steps: Optional[int],
     stage8_cap_steps: Optional[int],
     use_long_range: bool,
@@ -2189,12 +2187,15 @@ def generate_cooling_workflow(
                                block is generated with its FIRST hold only; further holds are
                                extend_only=True continuations of that SPECIFIC block, capped
                                at cool_block_hold_cap_steps.
-      nvt_kinetic_stability  - ADAPTIVE: NVT at final_T_K, FIXED volume (the last cool_block's
-                               endpoint) -- MSD/kinetic-trap diagnostics need an
-                               uncontaminated (non-barostat-rescaled) window.
       npt_final              - ADAPTIVE: NPT at final_T_K/press -- the assessment cell.
-                               Rg/Ree/RDF/dihedrals/MSID/K_T are computed from its own
-                               trajectory, not a separate production stage.
+                               Density, Rg/Ree/RDF/dihedrals/MSID/P2/homogeneity/finite-size
+                               and K_T are all computed from its own trajectory.
+
+    There is deliberately NO fixed-volume NVT window here. One existed (nvt_kinetic_stability,
+    3-20 ns depending on class) to give MSD/kinetic-trap and C(t) an uncontaminated trajectory
+    -- but at the assessment temperature both are ADVISORY in every regime (a glass cannot
+    satisfy them), so it fed nothing that could fail a run. Chain relaxation is adjudicated
+    where it is physically attainable: the melt gate, on nvt_melt_hold. Removed 2026-09-02.
 
     The descent rate is the caller's business, not this tool's: cool_block_hold_steps is
     resolved upstream (stage_params.rate_matched_cool_block_hold_steps) so the cooldown runs at
@@ -2202,7 +2203,7 @@ def generate_cooling_workflow(
     would mean a run's density and its Tg describe glasses with different thermal histories.
 
     T_melt_hold_K == final_T_K is legal and emits ZERO cool blocks -- the melt IS the
-    assessment cell, and only nvt_kinetic_stability + npt_final are generated.
+    assessment cell, and only npt_final is generated.
 
     Args:
         data_file:      The melt-start cell: nvt_melt_hold's own output_data from
@@ -2213,27 +2214,24 @@ def generate_cooling_workflow(
                         it rather than silently drawing its own.
         T_melt_hold_K:  Where the melt was held; the top of the descent. Must be >= final_T_K.
         final_T_K:      The assessment temperature (300 K by default). cool_block's last block,
-                        nvt_kinetic_stability and npt_final all run here.
+                        and npt_final both run here.
         cool_block_dT_K: REQUIRED. Nominal temperature decrement per cool_block. Null selects
                         25.0 K.
         cool_block_hold_steps: REQUIRED. Step count for each cool_block's first (base) hold.
                         Null selects int(2.0e5/dt_prod) (~200 ps at dt=1fs).
         cool_block_hold_cap_steps: REQUIRED. Ceiling on cumulative steps for any ONE
                         cool_block's restart-continuation extensions. Null selects 3x the base.
-        stage7_min_steps / stage7_cap_steps: REQUIRED. First block and cumulative ceiling for
-                        nvt_kinetic_stability. Null selects int(5.0e5/dt_prod) / int(2.0e6/dt_prod).
         stage8_min_steps / stage8_cap_steps: REQUIRED. First block and cumulative ceiling for
                         npt_final. Null selects int(5.0e5/dt_prod) / int(5.0e6/dt_prod).
         resume_from:    None (default, the whole descent) or "cool_block" (the entire blockwise
-                        cooldown already ran -- start at nvt_kinetic_stability, reading
-                        data_file as the last block's own output) or "nvt_kinetic_stability".
+                        cooldown already ran -- start at npt_final, reading data_file as the
+                        last block's own output).
                         To regenerate the cooldown itself with a different rate, invalidate this
                         stage rather than resuming: its input is the gated melt cell, so a fresh
                         call rebuilds the whole descent without touching the core chain.
         extend_temp_K:  REQUIRED when extend_only=True AND base_stage_name is a cool_block_NN
                         name -- that block's own hold temperature, which cannot be inferred
-                        from the name alone. Ignored for nvt_kinetic_stability/npt_final, which
-                        both hold at final_T_K.
+                        from the name alone. Ignored for npt_final, which holds at final_T_K.
         (Force-field, engine and damping args behave exactly as in
         generate_equilibration_workflow; the two chains share _ff_base_for so they cannot
         emit different styles for the same cell.)
@@ -2247,7 +2245,7 @@ def generate_cooling_workflow(
             return {"status": "error",
                     "error": "velocity_seed is required and must not be null — pass the same "
                              "seed the equilibration chain used for this run."}
-        _CHECKPOINTS = ["cool_block", "nvt_kinetic_stability"]
+        _CHECKPOINTS = ["cool_block"]
         if resume_from not in (None, *_CHECKPOINTS):
             return {"status": "error",
                     "error": f"resume_from={resume_from!r} is not supported — must be one of "
@@ -2262,7 +2260,7 @@ def generate_cooling_workflow(
             return {"status": "error",
                     "error": "extend_only=True requires both restart_file (the base stage's own "
                              ".restart output) and base_stage_name (the stage being continued)."}
-        _STAGE_ENSEMBLE = {"nvt_kinetic_stability": "nvt", "npt_final": "npt"}
+        _STAGE_ENSEMBLE = {"npt_final": "npt"}
         if extend_only and base_stage_name:
             _required = ("npt" if base_stage_name.startswith("cool_block_")
                          else _STAGE_ENSEMBLE.get(base_stage_name))
@@ -2312,15 +2310,13 @@ def generate_cooling_workflow(
                                      "extend_temp_K (that block's own hold temperature) — it "
                                      "cannot be inferred from base_stage_name alone."}
                 ext_T = extend_temp_K
-            elif base_stage_name == "nvt_kinetic_stability":
-                ext_steps, ext_T = stage7_min_steps, final_T_K
             elif base_stage_name == "npt_final":
                 ext_steps, ext_T = stage8_min_steps, final_T_K
             else:
                 return {"status": "error",
                         "error": f"base_stage_name={base_stage_name!r} is not a recognized "
                                  "adaptive stage of the cooling chain — must be a cool_block_NN "
-                                 "name, nvt_kinetic_stability, or npt_final."}
+                                 "name or npt_final."}
             ext_steps = int(ext_steps) if ext_steps else int(1.0e6 / dt_prod)
             template = "nvt" if extend_ensemble == "nvt" else "npt"
             params = {"T_START": ext_T, "T_FINAL": ext_T, "T_DAMP": thermostat_damp_fs,
@@ -2376,19 +2372,7 @@ def generate_cooling_workflow(
                 stages.append(s)
                 prev_output = s["output_data"]
 
-        # 2. nvt_kinetic_stability — ADAPTIVE, fixed volume at final_T_K.
-        if _resume_idx < 1:
-            s = _stage("nvt_kinetic_stability", "nvt", {
-                "T_START": final_T_K, "T_FINAL": final_T_K, "T_DAMP": thermostat_damp_fs,
-                "TIMESTEP": dt_prod,
-                "N_STEPS": int(stage7_min_steps) if stage7_min_steps else int(5.0e5 / dt_prod),
-                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
-                "write_restart": True,
-            }, prev_output)
-            stages.append(s)
-            prev_output = s["output_data"]
-
-        # 3. npt_final — ADAPTIVE, the assessment cell at final_T_K/press.
+        # 2. npt_final — ADAPTIVE, the assessment cell at final_T_K/press.
         s = _stage("npt_final", "npt", {
             "T_START": final_T_K, "T_FINAL": final_T_K, "T_DAMP": thermostat_damp_fs,
             "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
@@ -2413,11 +2397,11 @@ def generate_cooling_workflow(
             "instructions": (
                 f"Generated {len(stages)} staged scripts for {polymer_name} (engine={engine}): "
                 f"{n_blocks} cool blocks from {T_melt_hold_K} K to {final_T_K} K, then "
-                "nvt_kinetic_stability and npt_final.\n"
+                "npt_final.\n"
                 f"Pass engine='{engine}' to run_lammps_chain() so the launch flags match.\n"
                 "npt_final is the assessment cell — compute density/Rg/Ree/RDF/dihedrals/MSID/"
                 "K_T from its own trajectory.\n"
-                "Adaptive stages (each cool_block_NN, nvt_kinetic_stability, npt_final) are "
+                "Adaptive stages (each cool_block_NN and npt_final) are "
                 "generated with only their FIRST block — further steps come from "
                 "extend_only=True restart-continuation calls, never from re-generating with a "
                 "larger N_STEPS.\n"
@@ -3158,7 +3142,7 @@ def check_equilibration_comprehensive(
         log_file:            LAMMPS log file (thermo output, e.g. 06_nvt_production.log).
         dump_file:           LAMMPS dump trajectory carrying the ensemble-sensitive checks
                              (MSD/kinetic-trap, C(t)) — must be a fixed-volume NVT window
-                             (e.g. nvt_kinetic_stability.dump); a barostatted trajectory
+                             (e.g. nvt_melt_hold.dump); a barostatted trajectory
                              affine-scales coordinates every step and contaminates cumulative
                              CoM displacement.
         data_file:           LAMMPS .data topology file paired with dump_file.

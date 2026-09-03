@@ -35,6 +35,42 @@ EXECUTOR = REPO_ROOT / "orchestration" / "scripts" / "run_campaign.py"
 MAKE_PLAN = REPO_ROOT / "orchestration" / "scripts" / "make_deterministic_plan.py"
 
 
+# Classes whose member_smiles carries no discrete repeat unit. PURT's own entry says why:
+# "soft_segment/hard_segment are generic polyol-/diisocyanate-derived structural roles, not
+# one discrete repeat-unit molecule each". This is the aliphatic-TPU proxy
+# docs/ff_capability_gaps.json already uses for the same reason.
+_PROXY_SMILES = {"PURT": "*OCCOC(=O)NCCCCCCNC(*)=O"}
+
+
+def _member_smiles(cls: str):
+    """A curated repeat-unit SMILES for this class, or None when the class has none.
+
+    Returns None rather than raising: two EMC classes deliberately carry no discrete repeat
+    unit, and their own member_smiles notes say why. PIMD's is a standing instruction not to
+    hand-curate one ("a first attempt produced an invalid 3-open-valence PMDA_ODA structure
+    ... needs verification against a primary source"), so this fixture must not quietly
+    supply one -- PLANNABLE_CLASSES below excludes it instead.
+    """
+    """A curated repeat-unit SMILES for this class, for the plan fixtures below.
+
+    Plans are sized per-SMILES now (make_deterministic_plan.size_the_cell -> D-04), and
+    stage_params refuses to default dp_typical/nchain, so a `run-plan` with no --smiles
+    produces a deliberately unbuildable plan. These fixtures stand in for real runs, so they
+    have to carry a real molecule.
+    """
+    proxy = _PROXY_SMILES.get(cls)
+    if proxy:
+        return proxy
+    members = RULES["classes"][cls].get("member_smiles") or {}
+    # Values are lists of SMILES, but the block also carries prose keys ("note"); a bare
+    # string is truthy and indexable, so `smiles_list[0]` on one silently yields a single
+    # character -- which is how PURT first reached the plan generator as "s".
+    for _name, smiles_list in sorted(members.items()):
+        if isinstance(smiles_list, list) and smiles_list:
+            return smiles_list[0]
+    return None
+
+
 def _run(cmd):
     r = subprocess.run([sys.executable, *cmd], capture_output=True, text=True)
     assert r.returncode == 0, f"command failed: {cmd}\n{r.stderr}"
@@ -47,14 +83,30 @@ def _normalize(d):
     return json.loads(json.dumps(d, default=str))
 
 
+# Classes a run_plan.json can actually be built for. A plan is sized from its SMILES now
+# (make_deterministic_plan.size_the_cell), so a class with no curated repeat unit cannot
+# produce an executable plan and is not a meaningful dry-run subject.
+PLANNABLE_CLASSES = [c for c in SCRIPTED_PATH_CLASSES if _member_smiles(c)]
+UNPLANNABLE_CLASSES = [c for c in SCRIPTED_PATH_CLASSES if not _member_smiles(c)]
+
+
+def test_unplannable_classes_are_exactly_the_documented_ones():
+    """PIMD carries no curated repeat unit and its member_smiles note explicitly defers that
+    to primary-source verification. Pin the exclusion so a class cannot silently drop out of
+    the dry-run matrix by losing its member_smiles."""
+    assert UNPLANNABLE_CLASSES == ["PIMD"], (
+        f"unexpected classes without a plannable SMILES: {UNPLANNABLE_CLASSES}")
+
+
 @pytest.fixture(scope="module")
 def plan_files(tmp_path_factory):
     """One deterministic run_plan.json per EMC-build (scripted-path-eligible) class."""
     d = tmp_path_factory.mktemp("plans")
     paths = {}
-    for cls in SCRIPTED_PATH_CLASSES:
+    for cls in PLANNABLE_CLASSES:
         out = d / f"{cls}.json"
-        _run([str(MAKE_PLAN), "run-plan", "--run_name", f"DRT_{cls}", "--polymer_class", cls, "--out", str(out)])
+        _run([str(MAKE_PLAN), "run-plan", "--run_name", f"DRT_{cls}", "--polymer_class", cls,
+              "--smiles", _member_smiles(cls), "--out", str(out)])
         paths[cls] = out
     return paths
 
@@ -65,7 +117,7 @@ def test_scripted_path_classes_nonempty():
     assert SCRIPTED_PATH_CLASSES, "no EMC-build classes found in guides/polymer_rules.json"
 
 
-@pytest.mark.parametrize("cls", SCRIPTED_PATH_CLASSES)
+@pytest.mark.parametrize("cls", PLANNABLE_CLASSES)
 def test_dry_run_matches_resolve_stage_params(cls, plan_files):
     plan_path = plan_files[cls]
     r = subprocess.run(
@@ -93,7 +145,7 @@ def test_dry_run_matches_resolve_stage_params(cls, plan_files):
             f"{cls}/{stage}: --dry-run output diverges from a direct resolve_stage_params() call")
 
 
-@pytest.mark.parametrize("cls", SCRIPTED_PATH_CLASSES)
+@pytest.mark.parametrize("cls", PLANNABLE_CLASSES)
 def test_dry_run_covers_expected_stages(cls, plan_files):
     """Every deterministic-plan class dry-runs at least the always-on stages, plus tg/mechanical
     stages iff the plan's properties include them -- catches a stage silently dropped from the
@@ -181,17 +233,24 @@ class _FakeEmc:
         return {"status": "completed"}
 
     def get_emc_job_output(self, job_id):
+        # Mirrors _build_emc_cell's real return keys. "field" is what do_build runs the
+        # force-field provenance check against -- a fake that omits a key the real server
+        # always returns turns a contract change into a KeyError in the test rather than a
+        # caught regression in the code.
         return {"result": {"data_path": str(self.tmp_path / "cell.data"),
-                           "output_dir": str(self.tmp_path), "lammps_flags": ""}}
+                           "output_dir": str(self.tmp_path), "lammps_flags": "",
+                           "field": "pcff", "resolved_seed": 1, "natoms": 0}}
 
 
 class _FakeBuildLammps:
-    def __init__(self):
+    def __init__(self, errors=None):
         self.inspect_data_file_calls = []
+        self.errors = list(errors or [])
 
     def inspect_data_file(self, **kwargs):
         self.inspect_data_file_calls.append(kwargs)
-        return {"info": {}, "validation": {"errors": [], "warnings": []},
+        return {"info": {"n_atoms": 7040},
+                "validation": {"errors": list(self.errors), "warnings": []},
                 "finite_size_forecast": {"available": True}}
 
 
@@ -215,6 +274,183 @@ def test_do_build_target_density_ignores_resolvable_experimental_density(
     call = lammps.inspect_data_file_calls[0]
     expected = COMPRESSION_RATIO * cls["density_initial_gcm3"]
     assert call["target_density_gcm3"] == pytest.approx(expected)
+
+
+# ─── do_build(): the gates that stand between a built cell and the equilibration chain ──
+
+def _provenance_finding(kind, flags, severity):
+    return {"flags": list(flags), "kind": kind, "types": ["na", "c_1"],
+            "coeff": "pair_coeff 3", "params": [0.0, 0.0], "source": None,
+            "severity": severity}
+
+
+def _fake_assess(findings, **extra):
+    def _assess(cell_dir, field, emc_root=None):
+        return {"cell_dir": cell_dir, "field": field, "field_file": "/fake/pcff.frc",
+                "rows_checked": 100, "unchecked_cross_terms": {},
+                "local_patch_increments": [], "findings": list(findings),
+                "counts": {}, **extra}
+    return _assess
+
+
+def _clean_provenance(monkeypatch):
+    monkeypatch.setattr("forcefield.assess_provenance", _fake_assess([]))
+
+
+def test_do_build_hands_inspect_data_file_the_params_file(tmp_path, equil_check_args_cls,
+                                                          monkeypatch):
+    """Without params_file every EMC PCFF/TraPPE cell reports "'Pair Coeffs' section missing"
+    -- the coefficients live in the .params, not the .data. That false positive is why this
+    call used to keep only SIZE_-prefixed errors and discard the rest, taking the charge
+    neutrality, coefficient-completeness and density-plausibility checks with it."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+    _clean_provenance(monkeypatch)
+    (tmp_path / "emc_build.params").write_text("pair_coeff 1 1 0.1 3.0\n")
+
+    lammps = _FakeBuildLammps()
+    do_build(args, cls, _FakeEmc(tmp_path), lammps)
+
+    call = lammps.inspect_data_file_calls[0]
+    assert call["params_file"].endswith("emc_build.params")
+
+
+def test_do_build_halts_on_a_non_size_validation_error(tmp_path, equil_check_args_cls,
+                                                       monkeypatch):
+    """A charge-non-neutral or coefficient-incomplete cell used to sail through: do_build
+    filtered inspect_data_file's errors to SIZE_-prefixed ones and threw the rest away."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+    _clean_provenance(monkeypatch)
+
+    lammps = _FakeBuildLammps()
+    lammps.errors = ["Net charge = +0.4200 e (tolerance ±0.01 e). PPPM requires a "
+                     "charge-neutral cell."]
+    result = do_build(args, cls, _FakeEmc(tmp_path), lammps)
+
+    assert result["halted"] is True
+    assert result["reason"] == "BUILD_CELL_INVALID"
+    assert "Net charge" in result["detail"]["error"]
+
+
+def test_do_build_still_raises_a_size_halt_so_the_rebuild_remedy_can_route_it(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """SIZE_ errors must keep reaching finite_size_rebuild rather than being folded into the
+    generic invalid-cell escalation -- it is the one build failure with a real remedy."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+    _clean_provenance(monkeypatch)
+
+    lammps = _FakeBuildLammps()
+    lammps.errors = ["SIZE_CHAIN_SELF_IMAGE: compressed cell would have L=21.0 A",
+                     "Net charge = +0.4200 e"]
+    with pytest.raises(SystemExit) as exc:
+        do_build(args, cls, _FakeEmc(tmp_path), lammps)
+    assert "SIZE_CHAIN_SELF_IMAGE" in str(exc.value)
+
+
+def test_do_build_halts_when_a_coefficient_was_zero_substituted(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """EMC exits 0 whether a coefficient came from the field or from a zero substituted for a
+    row that does not exist. Nothing looked until now, and the typing survey in
+    docs/ff_capability_gaps.json says the substituted case is common, not rare."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+    monkeypatch.setattr("forcefield.assess_provenance", _fake_assess(
+        [_provenance_finding("bond_increment", ["ZERO_SUBSTITUTED"], "blocking")]))
+    (tmp_path / "emc_build.params").write_text("pair_coeff 1 1 0.0 0.0\n")
+
+    lammps = _FakeBuildLammps()
+    result = do_build(args, cls, _FakeEmc(tmp_path), lammps)
+
+    assert result["halted"] is True
+    assert result["reason"] == "FF_PROVENANCE_ZERO_SUBSTITUTED"
+    assert result["detail"]["n_zero_substituted"] == 1
+    assert not lammps.inspect_data_file_calls, (
+        "the provenance gate must run before the size forecast -- there is no point "
+        "forecasting a cell built on a force field that does not exist")
+
+
+def test_do_build_does_not_halt_on_an_advisory_zero_improper(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """A zero out-of-plane term is the norm for an sp3 centre and appears in every archived
+    cell, which is why forcefield._severity demotes improper to advisory. do_build must read
+    that severity rather than blocking on the ZERO_SUBSTITUTED flag alone."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+    monkeypatch.setattr("forcefield.assess_provenance", _fake_assess(
+        [_provenance_finding("improper", ["ZERO_SUBSTITUTED"], "advisory")]))
+    (tmp_path / "emc_build.params").write_text("improper_coeff 1 0.0\n")
+
+    result = do_build(args, cls, _FakeEmc(tmp_path), _FakeBuildLammps())
+    assert "halted" not in result
+    assert result["ff_provenance"]["available"] is True
+
+
+def test_do_build_records_provenance_even_on_a_clean_cell(tmp_path, equil_check_args_cls,
+                                                          monkeypatch):
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+    _clean_provenance(monkeypatch)
+    (tmp_path / "emc_build.params").write_text("pair_coeff 1 1 0.1 3.0\n")
+
+    result = do_build(args, cls, _FakeEmc(tmp_path), _FakeBuildLammps())
+    assert result["ff_provenance"]["rows_checked"] == 100
+    assert result["ff_provenance"]["zero_substituted"] == []
+
+
+def test_do_build_survives_a_missing_field_tree(tmp_path, equil_check_args_cls, monkeypatch):
+    """assess_provenance reads the installed EMC field files. A host without them must get a
+    recorded reason, not a crashed build -- the check is new and must not become a new way
+    for a working run to die."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+
+    def _boom(cell_dir, field, emc_root=None):
+        raise FileNotFoundError("no .prm or .frc for field 'pcff'")
+    monkeypatch.setattr("forcefield.assess_provenance", _boom)
+    (tmp_path / "emc_build.params").write_text("pair_coeff 1 1 0.1 3.0\n")
+
+    result = do_build(args, cls, _FakeEmc(tmp_path), _FakeBuildLammps())
+    assert "halted" not in result
+    assert result["ff_provenance"]["available"] is False
+    assert "no .prm or .frc" in result["ff_provenance"]["reason"]
+
+
+def test_do_build_times_out_instead_of_polling_forever(tmp_path, equil_check_args_cls,
+                                                       monkeypatch):
+    """The poll loop had no deadline, so a wedged emc_setup.pl or EMC binary hung the whole
+    campaign silently -- there is no progress output to notice it by."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+
+    class _NeverFinishes(_FakeEmc):
+        def get_emc_job_status(self, job_id):
+            return {"status": "running"}
+
+    monkeypatch.setattr(rdr, "BUILD_TIMEOUT_S", 0)
+    monkeypatch.setattr(rdr.time, "sleep", lambda _s: None)
+    with pytest.raises(SystemExit, match="did not finish within"):
+        do_build(args, cls, _NeverFinishes(tmp_path), _FakeBuildLammps())
+
+
+def test_do_build_reports_emcs_own_error_text_not_just_has_error(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """get_emc_job_status carries only has_error; EMC's stderr is on output(). Reading the
+    status dict alone produced PROCESS_FAILED findings that never named the cause."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+
+    class _Fails(_FakeEmc):
+        def get_emc_job_status(self, job_id):
+            return {"status": "failed", "has_error": True}
+
+        def get_emc_job_output(self, job_id):
+            return {"status": "failed",
+                    "error": "EMC build failed (segfault (signal 11)): Missing rules."}
+
+    with pytest.raises(SystemExit, match="Missing rules"):
+        do_build(args, cls, _Fails(tmp_path), _FakeBuildLammps())
 
 
 # ─── do_equil_and_check(): backbone_types halt + EXTEND sizing (Findings 2/3) ─────────
@@ -320,11 +556,12 @@ def equil_check_args_cls():
     """Real args/cls for one EMC-build class, resolved via the same
     make_deterministic_plan.py -> apply_plan/resolve_hardware path main() uses -- so
     resolve_stage_params("equil"/"equil-check", ...) sees realistic values."""
-    cls = SCRIPTED_PATH_CLASSES[0]
+    cls = PLANNABLE_CLASSES[0]
     import tempfile
     tmp = Path(tempfile.mkdtemp())
     plan_path = tmp / f"{cls}.json"
-    _run([str(MAKE_PLAN), "run-plan", "--run_name", f"DRTU_{cls}", "--polymer_class", cls, "--out", str(plan_path)])
+    _run([str(MAKE_PLAN), "run-plan", "--run_name", f"DRTU_{cls}", "--polymer_class", cls,
+          "--smiles", _member_smiles(cls), "--out", str(plan_path)])
     rules = load_rules()
     cls_raw = get_class_entry(rules, cls, warn_on_miss=False)
     plan = load_plan(str(plan_path))

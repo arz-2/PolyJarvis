@@ -24,12 +24,13 @@ from rules_common import resolve_member_value  # noqa: E402  (still used by othe
 
 BINDING_GLASSY = {"density_drift", "density_sem", "energy_drift", "energy_sem",
                    "density_homogeneity", "p2", "n_eff_density", "finite_size"}
-ADVISORY_GLASSY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "residual_stress"}
+ADVISORY_GLASSY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "residual_stress",
+                   "torsion"}
 
 BINDING_RUBBERY = {"density_sem", "density_homogeneity", "energy_drift", "energy_sem",
                    "n_eff_density", "finite_size"}
 ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_drift",
-                    "residual_stress"}
+                    "residual_stress", "torsion"}
 # density_drift isn't in require_rubbery's binding text (density_sem is); treated advisory here.
 
 # The MELT clause (decision_policy.json's require_melt), for the cell the equilibration stage
@@ -50,8 +51,30 @@ ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_dri
 # Gaussian-chain band is a shape check rather than a convergence one, and residual_stress is
 # uncalibrated (see its note below).
 BINDING_MELT = {"density_drift", "density_sem", "energy_drift", "energy_sem", "n_eff_density",
-                "density_homogeneity", "p2", "finite_size", "rg", "ct"}
-ADVISORY_MELT = {"msid_gaussian", "msd_not_trapped", "residual_stress"}
+                "density_homogeneity", "p2", "finite_size", "rg", "ct",
+                # Chain-structure convergence, binding ONLY here. A melt is where these are
+                # both attainable and meaningful:
+                #   msid_gaussian  ideal-chain statistics -- MSID(n) ~ n over the backbone.
+                #                  THE textbook criterion for an equilibrated polymer melt, and
+                #                  the same quantity the opt-in anneal_hold probe already gates
+                #                  on mid-chain. It was in ALWAYS_ADVISORY, bundled with MSD on
+                #                  the reasoning that melt self-diffusion is unattainable -- but
+                #                  that argument is about MSD, not about chain shape.
+                #   torsion        Jensen-Shannon divergence between consecutive blocks of the
+                #                  backbone-dihedral distribution: has the torsional population
+                #                  stopped changing. A pure convergence test, computed since
+                #                  the comprehensive check was written and never collected.
+                "msid_gaussian", "torsion"}
+ADVISORY_MELT = {"msd_not_trapped", "residual_stress"}
+"""msd_not_trapped stays advisory even here, deliberately. Its criterion is displacement beyond
+the chain's own Rg, and decision_policy's rationale_glassy/rationale_rubbery record that melt
+self-diffusion is unattainable within MD timescales for DP>=30 and aromatic backbones -- binding
+it would make overall_pass unsatisfiable for exactly the classes that most need a melt gate.
+
+residual_stress stays advisory by calibration status, not physics: this module's own note says
+melts ARE stress-isotropic while glasses carry 100-290 atm, so a melt should pass it -- but the
+magnitude bound has never been set, and binding an uncalibrated gate on the strength of an
+expectation is how a whole track halts. Promote once the bound exists."""
 
 # MSD diffusivity metrics are advisory everywhere, unconditionally -- decision_policy.json's
 # rationale_glassy/rationale_rubbery (2026-06-20, user-authorized, PVC1 route-back) documents
@@ -173,8 +196,13 @@ def classify(gates: dict, regime: str, dp_typical, ct_gate_reliable):
         clause = "require (plain, no carve-out)"
         binding_set, advisory_set = set(gates.keys()), set()
 
-    binding_set = binding_set - ALWAYS_ADVISORY
-    advisory_set = advisory_set | ALWAYS_ADVISORY
+    # ALWAYS_ADVISORY is "always" for the ASSESSMENT clauses. The melt clause states its own
+    # split explicitly (BINDING_MELT/ADVISORY_MELT above), because the reasons those three are
+    # advisory elsewhere are reasons about a glass, not about every cell -- subtracting them
+    # here unconditionally would silently un-bind msid_gaussian the moment it was added.
+    if clause != "require_melt":
+        binding_set = binding_set - ALWAYS_ADVISORY
+        advisory_set = advisory_set | ALWAYS_ADVISORY
 
     binding_results = {k: v for k, v in gates.items() if k in binding_set and v is not None}
     advisory_results = {k: v for k, v in gates.items() if k in advisory_set and v is not None}
@@ -202,8 +230,25 @@ def collect_gates(comp: dict) -> dict:
         "p2": spatial.get("p2", {}).get("pass"),
         "density_homogeneity": spatial.get("density_homogeneity", {}).get("pass"),
         "finite_size": finite_size_gate(spatial),
+        "torsion": torsion_gate(chain),
         **msd_msid_gates(chain),
     }
+
+
+def torsion_gate(chain: dict):
+    """Pass-polarity entry for backbone-dihedral convergence.
+
+    check_equilibration_comprehensive blocks the trajectory, histograms the pooled backbone
+    dihedrals in each block, and reports the Jensen-Shannon divergence between consecutive
+    blocks plus a `stable` verdict against js_threshold. That verdict was computed on every run
+    since the check was written and never read by this module -- so a melt whose torsional
+    population was still visibly evolving could pass the gate. None when the trajectory was too
+    short to block (fewer than 2x block_count frames) or carried no backbone dihedrals.
+    """
+    t = chain.get("torsion") or {}
+    if not t.get("available"):
+        return None
+    return t.get("stable")
 
 
 def residual_stress_gate(thermo: dict):

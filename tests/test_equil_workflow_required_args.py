@@ -50,8 +50,6 @@ COOLING_REQUIRED = [
     "cool_block_dT_K",
     "cool_block_hold_steps",
     "cool_block_hold_cap_steps",
-    "stage7_min_steps",
-    "stage7_cap_steps",
     "stage8_min_steps",
     "stage8_cap_steps",
     "use_long_range",

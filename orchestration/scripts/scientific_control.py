@@ -62,8 +62,6 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "cool_block_dT_K": (1, 500),
     "cool_block_hold_steps": (1, 2_000_000_000),
     "cool_block_hold_cap_steps": (1, 2_000_000_000),
-    "stage7_min_steps": (1, 2_000_000_000),
-    "stage7_cap_steps": (1, 2_000_000_000),
     "stage8_min_steps": (1, 2_000_000_000),
     "stage8_cap_steps": (1, 2_000_000_000),
     # The melt tail of the core equilibration chain.
@@ -123,7 +121,7 @@ INTEGER_OVERRIDES = frozenset({
     "warmup_steps", "densify_ramp_steps", "densify_check_every_steps", "densify_steps_cap",
     "ff_activate_npt_steps", "anneal_heat_steps", "anneal_check_every_steps",
     "anneal_cap_steps", "cool_block_hold_steps", "cool_block_hold_cap_steps",
-    "stage7_min_steps", "stage7_cap_steps", "stage8_min_steps", "stage8_cap_steps",
+    "stage8_min_steps", "stage8_cap_steps",
     "melt_ramp_steps", "melt_hold_min_steps", "melt_hold_cap_steps",
     "nvt_melt_min_steps", "nvt_melt_cap_steps",
     "tg_min_steps_per_T", "tg_steps_per_t",
@@ -369,14 +367,18 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     """Convert a narrow agent decision into a complete executable run plan."""
     _validate_decision(decision)
     properties = set(decision.properties or intent.requested_properties)
-    plan = make_plan(intent.run_name, decision.polymer_class, intent.smiles, properties)
     rules = load_rules()
     class_entry = dict(get_class_entry(rules, decision.polymer_class, warn_on_miss=False))
     effective_class = {**class_entry, **decision.overrides}
 
+    # Solved BEFORE make_plan and handed to it: make_plan sizes the cell itself now (a
+    # scaffold plan used to carry none at all), and the solve shells into the RDKit env, so
+    # passing this in is what keeps a reasoned plan to one round-trip instead of two.
     size_solve = solve_system_size(
         decision.polymer_class, intent.smiles, properties,
         dp_typical=class_entry.get("dp_typical"), nchain=class_entry.get("nchain"))
+    plan = make_plan(intent.run_name, decision.polymer_class, intent.smiles, properties,
+                     size_solve=size_solve)
     auto_filled = {k: v for k, v in size_solve.get("recommended_params", {}).items()
                    if k not in decision.overrides}
     if auto_filled:
