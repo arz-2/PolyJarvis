@@ -22,7 +22,7 @@ from rules_common import load_rules, get_class_entry  # noqa: E402
 import run_campaign as rdr  # noqa: E402
 from run_campaign import (  # noqa: E402
     _base_args, wait_for_analysis, do_equil_and_check, do_summary, do_build, COMPRESSION_RATIO,
-    _bracket_tg_start_temp, _run_tg_sweep_adaptive, _bm_point_adaptive_extend,
+    _run_tg_sweep_adaptive, _bm_point_adaptive_extend, do_cool_and_check, _submit_cool_chain,
     _anneal_hold_adaptive_extend, _record_anneal_hold_convergence, _submit_equil_chain,
 )
 
@@ -243,9 +243,8 @@ class _FakeEquilLammps:
         self._atom_type_names = atom_type_names or {}
         # None -> derivation fails (genuine last resort); a list -> derivation succeeds with it.
         self._derived_backbone_types = derived_backbone_types
-        # None -> the default single anonymous stage below; a list of named stage dicts (e.g.
-        # nvt_production/npt_production) -> returned verbatim, for tests of the name-based
-        # melt_dump_path/melt_data_path stage lookup.
+        # None -> the default melt pair below; a list of named stage dicts -> returned
+        # verbatim, for tests of the name-based melt_dump_path/melt_data_path stage lookup.
         self._workflow_stages = workflow_stages
         self._workflow_extra = workflow_extra or {}
         # A list of full workflow dicts, one popped per generate_equilibration_workflow() call --
@@ -266,11 +265,19 @@ class _FakeEquilLammps:
             return self._workflow_queue.pop(0)
         if self._workflow_stages is not None:
             return {"stages": self._workflow_stages, **self._workflow_extra}
-        stage = {"name": "npt_final",
-                 "output_data": f"{self.tmp_path}/npt_prod_{self._chain_n}_out.data",
-                 "output_restart": f"{self.tmp_path}/npt_prod_{self._chain_n}_out.restart",
-                 "work_dir": str(self.tmp_path), "params": {"DUMP_FILE": "npt_prod.dump"}}
-        return {"stages": [stage]}
+        # The core chain's real tail: the GATED cell (npt_melt_hold) followed by the HANDOFF
+        # cell (nvt_melt_hold). Both are needed -- do_equil_and_check gates the first and
+        # publishes the second, and a fake with only one of them would hide that distinction.
+        n = self._chain_n
+        hold = {"name": "npt_melt_hold",
+                "output_data": f"{self.tmp_path}/melt_hold_{n}_out.data",
+                "output_restart": f"{self.tmp_path}/melt_hold_{n}_out.restart",
+                "work_dir": str(self.tmp_path), "params": {"DUMP_FILE": "npt_melt_hold.dump"}}
+        nvt = {"name": "nvt_melt_hold",
+               "output_data": f"{self.tmp_path}/nvt_melt_{n}_out.data",
+               "output_restart": f"{self.tmp_path}/nvt_melt_{n}_out.restart",
+               "work_dir": str(self.tmp_path), "params": {"DUMP_FILE": "nvt_melt_hold.dump"}}
+        return {"stages": [hold, nvt]}
 
     def run_lammps_chain(self, **kwargs):
         return {"chain_id": f"pending-{self._chain_n + 1}"}
@@ -428,17 +435,23 @@ def test_do_equil_and_check_sizes_extend_off_measured_tau_relax(tmp_path, equil_
     assert result["equil_verdict"] == "PASS"
     assert len(result["extend_history"]) == 1
     assert result["extend_history"][0]["attempt"] == 1
-    # Two generate_equilibration_workflow calls: the initial submission, then the EXTEND.
-    assert len(fake.generate_equilibration_workflow_calls) == 2
+    # THREE calls, and the third is the point: the initial submission, the restart-continuation
+    # of npt_melt_hold (where every extendable gate is measured), and then the REGENERATION of
+    # nvt_melt_hold -- which was built from the pre-extension endpoint and is stale both as the
+    # MSD/C(t) window and as the cell every downstream track starts from.
+    assert len(fake.generate_equilibration_workflow_calls) == 3
     extend_call = fake.generate_equilibration_workflow_calls[1]
     assert extend_call["extend_only"] is True
-    assert extend_call["base_stage_name"] == "npt_final"
-    assert extend_call["restart_file"] == f"{tmp_path}/npt_prod_0_out.restart"
+    assert extend_call["base_stage_name"] == "npt_melt_hold"
+    assert extend_call["restart_file"] == f"{tmp_path}/melt_hold_0_out.restart"
+    regen_call = fake.generate_equilibration_workflow_calls[2]
+    assert regen_call["resume_from"] == "npt_melt_hold"
+    assert result["melt_start_data_path"] != f"{tmp_path}/nvt_melt_0_out.data"
     dt_fs = resolve_stage_params("equil", args, cls)["dt_fs"]
-    # npt_final's continuation length comes through stage8_min_steps (the same knob
-    # generate_equilibration_workflow reads for base_stage_name="npt_final"), not a generic
+    # npt_melt_hold's continuation length comes through melt_hold_min_steps (the same knob
+    # generate_equilibration_workflow reads for base_stage_name="npt_melt_hold"), not a generic
     # "extend_steps" param.
-    extend_ns_used = extend_call["stage8_min_steps"] * dt_fs / 1e6
+    extend_ns_used = extend_call["melt_hold_min_steps"] * dt_fs / 1e6
     expected_extend_ns = max(1.5, round(1.5 * tau_relax_ps / 1000, 2))
     assert extend_ns_used == pytest.approx(expected_extend_ns, rel=1e-6)
     # sanity: the measured signal actually moved the knob away from the old flat 1.5 ns default
@@ -500,168 +513,64 @@ def test_do_summary_waits_for_generate_run_summary_completion(tmp_path):
 
 # ─── do_equil_and_check(): melt_dump_path/melt_data_path stage lookup ──────────────
 
-def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_check_args_cls, monkeypatch):
-    """melt_dump_path (nvt_kinetic_stability's dump) must come from the real workflow's own
-    named stage, not the flat-convention guess -- same bug class as npt_prod_log_path, fixed
-    the same way analyze-tg's per_t_dump_file was: look up the real path instead of re-deriving
-    one independently. melt_data_path (the assess_cooling_contraction melt reference) comes
-    directly from the generator's own top-level melt_data_path field -- the cool_block tagged
-    at `temp`/t_equil_K, which stage-name lookup can't find since its name varies (cool_block_NN
-    for whichever N is tagged)."""
+def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_check_args_cls,
+                                                             monkeypatch):
+    """Every path the melt gate reads comes from the real workflow's own named stages, not a
+    flat-convention guess -- the bug class that once silently disabled this binding gate on
+    every run.
+
+    The split it encodes: npt_melt_hold is GATED (its log, its trajectory, its .data), while
+    nvt_melt_hold supplies only the fixed-volume dump MSD/kinetic-trap/C(t) require. A
+    barostatted trajectory affine-scales coordinates every step, which is why the MSD window
+    cannot be the hold's own.
+    """
     args, cls = equil_check_args_cls
     args.backbone_types = [1, 2]  # skip the halt path
     monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
         {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
 
-    kinetic_dir = tmp_path / "work" / "nvt_kinetic_stability"
-    final_dir = tmp_path / "work" / "npt_final"
-    cool_block_dir = tmp_path / "work" / "cool_block_02"
-    kinetic_dir.mkdir(parents=True)
-    final_dir.mkdir(parents=True)
-    cool_block_dir.mkdir(parents=True)
+    hold_dir = tmp_path / "work" / "npt_melt_hold"
+    nvt_dir = tmp_path / "work" / "nvt_melt_hold"
+    hold_dir.mkdir(parents=True)
+    nvt_dir.mkdir(parents=True)
     workflow_stages = [
-        {"name": "nvt_kinetic_stability", "work_dir": str(kinetic_dir),
-         "params": {"DUMP_FILE": "nvt_kinetic_stability.dump"},
-         "output_data": str(kinetic_dir / "nvt_kinetic_stability_out.data"),
-         "output_restart": str(kinetic_dir / "nvt_kinetic_stability_out.restart")},
-        {"name": "npt_final", "work_dir": str(final_dir),
-         "params": {"DUMP_FILE": "npt_final.dump"},
-         "output_data": str(final_dir / "npt_final_out.data"),
-         "output_restart": str(final_dir / "npt_final_out.restart")},
+        {"name": "npt_melt_hold", "work_dir": str(hold_dir),
+         "params": {"DUMP_FILE": "npt_melt_hold.dump"},
+         "output_data": str(hold_dir / "npt_melt_hold_out.data"),
+         "output_restart": str(hold_dir / "npt_melt_hold_out.restart")},
+        {"name": "nvt_melt_hold", "work_dir": str(nvt_dir),
+         "params": {"DUMP_FILE": "nvt_melt_hold.dump"},
+         "output_data": str(nvt_dir / "nvt_melt_hold_out.data"),
+         "output_restart": str(nvt_dir / "nvt_melt_hold_out.restart")},
     ]
-    melt_data_path = str(cool_block_dir / "cool_block_02_out.data")
     fake = _FakeEquilLammps(
         tmp_path,
         comp_results=[{"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}}],
         gate_verdicts=[{"verdict": "PASS"}],
         workflow_stages=workflow_stages,
-        workflow_extra={"melt_data_path": melt_data_path},
     )
 
     result = do_equil_and_check(args, cls, fake)
 
     assert result["equil_verdict"] == "PASS"
     comp_call = fake.check_equilibration_comprehensive_calls[0]
-    assert comp_call["dump_file"] == str(kinetic_dir / "nvt_kinetic_stability.dump")
-    # Rg/MSID/R_ee/torsion/P2/density_homogeneity/finite_size must read from npt_final's OWN
-    # trajectory (struct_dump_file/struct_data_file), not nvt_kinetic_stability's fixed-volume
-    # window -- only MSD/kinetic-trap/C(t) stay on dump_file/data_file above.
-    assert comp_call["struct_dump_file"] == str(final_dir / "npt_final.dump")
-    assert comp_call["struct_data_file"] == str(final_dir / "npt_final_out.data")
-    assert comp_call["data_file"] == str(final_dir / "npt_final_out.data")
+    # MSD/kinetic-trap/C(t): the NVT window.
+    assert comp_call["dump_file"] == str(nvt_dir / "nvt_melt_hold.dump")
+    # Everything thermo- and geometry-derived: the gated NPT hold's own log/trajectory/.data.
+    assert comp_call["struct_dump_file"] == str(hold_dir / "npt_melt_hold.dump")
+    assert comp_call["struct_data_file"] == str(hold_dir / "npt_melt_hold_out.data")
+    assert comp_call["data_file"] == str(hold_dir / "npt_melt_hold_out.data")
+
     gate_call = fake.enforce_equilibration_gate_calls[0]
-    assert gate_call["melt_data"] == melt_data_path
+    # No cooling-contraction probe at the melt: that check compares a melt against a glass and
+    # there is no glass yet. enforce_live skips it on a falsy melt_data regardless of regime.
+    assert gate_call["melt_data"] is None
+    assert gate_call["regime"] == "melt"
 
+    # The two cells this stage publishes are distinct and correctly assigned.
+    assert result["melt_data_path"] == str(hold_dir / "npt_melt_hold_out.data")
+    assert result["melt_start_data_path"] == str(nvt_dir / "nvt_melt_hold_out.data")
 
-def test_do_equil_and_check_persists_the_tg_start_tag_for_the_thermal_stage(
-        tmp_path, equil_check_args_cls, monkeypatch):
-    """The tg-start tag names a specific cool_block_NN, and which one it is varies per run --
-    unlike melt_data_path it has NO formula fallback in the resolver (stage_params.py's
-    npt_final path). So it only reaches the thermal stage of a RESUMED run by being written
-    into this stage's outputs dict and read back by CampaignStageExecutor.execute. In-process
-    capture onto args alone would work for a single-process run and die on resume."""
-    args, cls = equil_check_args_cls
-    args.backbone_types = [1, 2]
-    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
-        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
-
-    final_dir = tmp_path / "work" / "npt_final"
-    cool_block_dir = tmp_path / "work" / "cool_block_04"
-    final_dir.mkdir(parents=True)
-    cool_block_dir.mkdir(parents=True)
-    tg_start_data_path = str(cool_block_dir / "cool_block_04_out.data")
-    fake = _FakeEquilLammps(
-        tmp_path,
-        comp_results=[{"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}}],
-        gate_verdicts=[{"verdict": "PASS"}],
-        workflow_stages=[{"name": "npt_final", "work_dir": str(final_dir),
-                          "params": {"DUMP_FILE": "npt_final.dump"},
-                          "output_data": str(final_dir / "npt_final_out.data"),
-                          "output_restart": str(final_dir / "npt_final_out.restart")}],
-        workflow_extra={"tg_start_data_path": tg_start_data_path, "tg_start_T_K": 770.0},
-    )
-
-    result = do_equil_and_check(args, cls, fake)
-
-    assert result["equil_verdict"] == "PASS"
-    assert result["tg_start_data_path"] == tg_start_data_path
-    assert result["tg_start_T_K"] == 770.0
-
-
-# ─── do_thermal(): where the Tg staircase starts ──────────────────────────────────
-#
-# The sweep measures where a COOLING liquid stiffens, so it has to start from a liquid.
-# The equilibration cooldown already wrote one at every waypoint on its way down; the
-# alternative is reheating the finished final_T_K cell, which is not a ramp at all --
-# _bracket_tg_start_temp's deck sets T_START and T_FINAL both to the candidate, a thermostat
-# step change applied to a cell packed at its final_T_K density.
-
-
-def _tg_start_params(tmp_path, **over):
-    p = {"T_start_K": 600.0, "final_T_K": 300.0, "cool_block_dT_K": 25.0,
-         "tg_start_data_path": None, "tg_start_T_K": None,
-         "equil_data_path": str(tmp_path / "npt_final_out.data")}
-    p.update(over)
-    return p
-
-
-def test_tg_sweep_starts_from_the_tagged_melt_cooled_cell(tmp_path):
-    tagged = tmp_path / "cool_block_03_out.data"
-    tagged.write_text("")
-    p = _tg_start_params(tmp_path, tg_start_data_path=str(tagged), tg_start_T_K=610.0)
-
-    result = rdr._select_tg_start_cell(None, {}, None, p)
-    assert result["outcome"] == "MELT_COOLED_START"
-    assert result["start_data_path"] == str(tagged)
-    assert result["start_T_K"] == 610.0
-
-
-def test_a_stale_tag_falls_back_to_reheating_rather_than_the_wrong_temperature(
-        tmp_path, monkeypatch):
-    """tg_t_high_K can be edited between the equilibration and thermal stages, or replayed from
-    a frozen plan. The tagged file still exists, but at the OLD sweep top -- starting there
-    would silently run the staircase from a different temperature than the deck declares."""
-    tagged = tmp_path / "cool_block_09_out.data"
-    tagged.write_text("")
-    # Tagged at 480 K for a sweep that now starts at 600 K: more than one block adrift.
-    p = _tg_start_params(tmp_path, tg_start_data_path=str(tagged), tg_start_T_K=480.0)
-    monkeypatch.setattr(rdr, "_bracket_tg_start_temp",
-                        lambda *a, **k: {"outcome": "PASS", "start_data_path": "probe.data"})
-
-    result = rdr._select_tg_start_cell(None, {}, None, p)
-    assert result["outcome"] == "PASS"
-    assert result["stale_tg_start_tag_T_K"] == 480.0
-
-
-def test_a_run_assessed_above_its_sweep_top_needs_no_probe(tmp_path):
-    """A rubbery run whose final_T_K already sits at or above the staircase's first point: its
-    npt_final IS an equilibrated cell there, so there is nothing to reheat and nothing tagged."""
-    p = _tg_start_params(tmp_path, T_start_K=350.0, final_T_K=400.0)
-    result = rdr._select_tg_start_cell(None, {}, None, p)
-    assert result["outcome"] == "ASSESSED_ABOVE_SWEEP_TOP"
-    assert result["start_data_path"] == p["equil_data_path"]
-
-
-def test_no_tag_reheats(tmp_path, monkeypatch):
-    """What a SMILES with an untrustworthy Tg estimate, or a legacy plan, lands on. The probe
-    path is retained rather than deleted precisely for this case."""
-    p = _tg_start_params(tmp_path)
-    monkeypatch.setattr(rdr, "_bracket_tg_start_temp",
-                        lambda *a, **k: {"outcome": "EXHAUSTED", "start_data_path": "probe.data"})
-    result = rdr._select_tg_start_cell(None, {}, None, p)
-    assert result["outcome"] == "EXHAUSTED"
-    assert "stale_tg_start_tag_T_K" not in result
-
-
-def test_a_tag_pointing_at_a_missing_file_reheats(tmp_path, monkeypatch):
-    p = _tg_start_params(tmp_path, tg_start_data_path=str(tmp_path / "gone.data"),
-                         tg_start_T_K=600.0)
-    monkeypatch.setattr(rdr, "_bracket_tg_start_temp",
-                        lambda *a, **k: {"outcome": "PASS", "start_data_path": "probe.data"})
-    assert rdr._select_tg_start_cell(None, {}, None, p)["outcome"] == "PASS"
-
-
-# ─── CampaignStageExecutor.execute(): STRUCTURAL_FAIL finding-code routing ─────────
 
 def test_structural_fail_prefers_the_real_cause_over_a_passing_finite_size_string(
         tmp_path, monkeypatch):
@@ -700,117 +609,6 @@ def test_structural_fail_prefers_the_real_cause_over_a_passing_finite_size_strin
 
     assert result.status == "remedy_required"
     assert result.findings[0].code == "DENSITY_HETEROGENEITY"
-
-
-def _tg_tag_executor(tmp_path, monkeypatch, prior_outputs_list, seed_args=None):
-    """Run the equilibration stage with a chain that produces NO tg-start tag of its own (what
-    a resume at or past the "cool_block" checkpoint generates), and report what the executor
-    left on args for the thermal stage."""
-    from run_campaign import CampaignStageExecutor
-    import run_campaign as rc
-
-    seen = {}
-
-    def _fake_equil(args, cls, lammps):
-        seen["tg_start_data"] = getattr(args, "tg_start_data", "ABSENT")
-        seen["tg_start_T_K"] = getattr(args, "tg_start_T_K", "ABSENT")
-        return {"equil_verdict": "PASS", "npt_prod_data_path": "x.data"}
-
-    monkeypatch.setattr(rc, "do_equil_and_check", _fake_equil)
-
-    priors = []
-    for i, outputs in enumerate(prior_outputs_list):
-        mp = tmp_path / f"prior-{i}.json"
-        mp.write_text(json.dumps({"parameters": {}, "outputs": outputs}))
-        priors.append({"manifest": str(mp)})
-
-    attempt_dir = tmp_path / "attempt"
-    attempt_dir.mkdir(exist_ok=True)
-    args = SimpleNamespace(engine_owned_recovery=False, **(seed_args or {}))
-    executor = CampaignStageExecutor(args, {}, emc=None, lammps=None, plan_path="unused")
-    executor.execute("equilibration", {"attempt_dir": str(attempt_dir), "parameters": {},
-                                       "dependencies": {}, "prior_attempts": priors})
-    return seen
-
-
-def test_a_resumed_attempt_inherits_the_tg_start_tag_from_the_attempt_that_cooled(
-        tmp_path, monkeypatch):
-    """The tag is emitted only by the code path that BUILDS cool_blocks. An attempt resuming at
-    or past the "cool_block" checkpoint builds none, so the generator returns no tag -- and the
-    thermal stage would reheat npt_final even though the tagged cell is on disk.
-
-    Inheriting is not reaching back for something stale: resuming from "cool_block" means the
-    cooldown already ran and is not being redone, and the resumed chain's own first stage reads
-    that prior attempt's cool_block output as its input file. There is ONE cooldown in the run;
-    it lives in the earlier attempt's directory. A remedy that genuinely re-cools resumes from
-    "anneal_hold" instead, rebuilds the blocks, and emits a fresh tag that wins over this."""
-    seen = _tg_tag_executor(tmp_path, monkeypatch, [
-        {"tg_start_data_path": "/runs/attempt-0001/cool_block_04_out.data",
-         "tg_start_T_K": 770.0},
-    ])
-    assert seen["tg_start_data"] == "/runs/attempt-0001/cool_block_04_out.data"
-    assert seen["tg_start_T_K"] == 770.0
-
-
-def test_the_most_recent_prior_tag_wins(tmp_path, monkeypatch):
-    """Walk newest-first: a later attempt that DID rebuild the cooldown supersedes an earlier
-    one, so its tag must be the one inherited."""
-    seen = _tg_tag_executor(tmp_path, monkeypatch, [
-        {"tg_start_data_path": "/runs/attempt-0001/cool_block_04_out.data",
-         "tg_start_T_K": 770.0},
-        {"tg_start_data_path": "/runs/attempt-0002/cool_block_06_out.data",
-         "tg_start_T_K": 745.0},
-    ])
-    assert seen["tg_start_data"] == "/runs/attempt-0002/cool_block_06_out.data"
-    assert seen["tg_start_T_K"] == 745.0
-
-
-def test_a_rebuilt_ramps_own_tag_beats_an_inherited_one(tmp_path, monkeypatch):
-    """The executor seeds args from the prior attempt BEFORE do_equil_and_check runs, and
-    do_equil_and_check overwrites from the generator whenever the chain produced a tag of its
-    own. So a slower_cooling retry -- which resumes from "anneal_hold" and rebuilds the ramp --
-    uses its OWN slower cooldown, never the one it was fired to replace."""
-    from run_campaign import CampaignStageExecutor
-    import run_campaign as rc
-
-    seen = {}
-
-    def _fake_equil(args, cls, lammps):
-        seen["inherited"] = getattr(args, "tg_start_data", None)
-        # What do_equil_and_check does with a chain that DID rebuild the ramp.
-        args.tg_start_data = "/runs/attempt-0002/cool_block_02_out.data"
-        args.tg_start_T_K = 500.0
-        return {"equil_verdict": "PASS", "npt_prod_data_path": "x.data",
-                "tg_start_data_path": args.tg_start_data,
-                "tg_start_T_K": args.tg_start_T_K}
-
-    monkeypatch.setattr(rc, "do_equil_and_check", _fake_equil)
-    mp = tmp_path / "prior.json"
-    mp.write_text(json.dumps({"parameters": {}, "outputs": {
-        "tg_start_data_path": "/runs/attempt-0001/cool_block_04_out.data",
-        "tg_start_T_K": 770.0}}))
-    attempt_dir = tmp_path / "attempt"
-    attempt_dir.mkdir()
-    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
-                                     {}, emc=None, lammps=None, plan_path="unused")
-    result = executor.execute("equilibration", {
-        "attempt_dir": str(attempt_dir), "parameters": {}, "dependencies": {},
-        "prior_attempts": [{"manifest": str(mp)}]})
-
-    assert seen["inherited"] == "/runs/attempt-0001/cool_block_04_out.data"
-    assert result.outputs["tg_start_data_path"] == "/runs/attempt-0002/cool_block_02_out.data"
-    assert result.outputs["tg_start_T_K"] == 500.0
-
-
-def test_a_stale_tag_is_cleared_when_no_prior_attempt_has_one(tmp_path, monkeypatch):
-    """args is a long-lived object reused across stage executions, so a value left by an earlier
-    stage must never be mistaken for this equilibration's own tag."""
-    seen = _tg_tag_executor(
-        tmp_path, monkeypatch, [{"npt_prod_data_path": "no-tag-here.data"}],
-        seed_args={"tg_start_data": "/stale/from-a-previous-stage.data",
-                   "tg_start_T_K": 999.0})
-    assert seen["tg_start_data"] is None
-    assert seen["tg_start_T_K"] is None
 
 
 def _write_prior_manifest(tmp_path, name, parameters, stage_checkpoints):
@@ -1064,9 +862,11 @@ def test_run_campaign_workflow_evidence_ingest_failure_does_not_propagate(tmp_pa
 
 
 # ─── Tg-sweep adaptive per-temperature sampling ───────────────────────────────
-# _bracket_tg_start_temp (Phase 1: is T_start_K high enough?) and
-# _run_tg_sweep_adaptive (Phase 2: is each temperature adequately sampled?) --
-# see the plan file for the design this implements.
+# _run_tg_sweep_adaptive: is each temperature adequately sampled?
+#
+# There is no longer a Phase 1. _bracket_tg_start_temp asked "is T_start_K high enough?" of a
+# reheated 300 K glass; the staircase now starts from the cell the melt gate certified, at the
+# temperature that gate ran at, so the question is answered by construction.
 
 def _write_lammps_log(path, densities, append=False):
     """A minimal real LAMMPS-log-shaped thermo table -- parse_lammps_log (unmocked in these
@@ -1081,8 +881,7 @@ def _write_lammps_log(path, densities, append=False):
 
 
 class _FakeTgLammps:
-    """Minimal in-process stand-in covering only what _bracket_tg_start_temp/
-    _run_tg_sweep_adaptive call. Each generate_script call is remembered; the matching
+    """Minimal in-process stand-in covering only what _run_tg_sweep_adaptive calls. Each generate_script call is remembered; the matching
     run_lammps_script call writes a real LAMMPS-log-shaped density trace (popped from a
     scripted per-job queue) to the log/data paths the real deck would have produced."""
 
@@ -1125,13 +924,16 @@ def tg_args_cls(tmp_path):
     args.engine = "gpu"
     args.velocity_seed = 12345
     cls = {
-        "dt_fs": 1.0, "tg_rates_K_per_ns": [], "tg_t_step_K": 20, "tg_t_high_K": 440.0,
+        # The staircase starts at the MELT HOLD, so pinning a 3-point sweep means pinning the
+        # melt: T_equil_K and md_tg_ceiling_K are the two terms T_melt_hold_K maxes over, and
+        # this fixture has no trustworthy Tg, so the second one is the live branch.
+        "dt_fs": 1.0, "tg_rates_K_per_ns": [], "tg_t_step_K": 20,
+        "T_equil_K": 440.0, "md_tg_ceiling_K": 440.0,
         "tg_t_low_K": 400.0, "tg_steps_per_t": 1000, "tg_min_steps_per_T": 1000,
         "electrostatics": "pppm", "P_equil_atm": 1.0, "thermostat_damp_fs": 100.0,
         "barostat_damp_fs": 1000.0, "cutoff_A": 12.0, "annealing_T_high_K": 700.0,
         "T_workflow_K": 300.0, "preferred_ff": "pcff",
-        "tg_bracket_max_iters": 3, "tg_bracket_probe_steps": 1000,
-        "tg_bracket_drift_threshold_pct": 0.5, "tg_per_t_max_extensions": 2,
+        "tg_per_t_max_extensions": 2,
         "tg_per_t_stability_pct": 1.0, "tg_per_t_min_n_eff": 5.0,
     }
     return args, cls
@@ -1154,8 +956,6 @@ def _rising_densities(n=30, start=0.90, end=0.95):
     return _falling_densities(n=n, start=start, end=end)
 
 
-# ── Phase 1: _bracket_tg_start_temp ────────────────────────────────────────────
-
 def _patch_wait_for_run(monkeypatch):
     """wait_for_run() polls lammps.watch_run(), which _FakeTgLammps doesn't implement --
     patch it to read status straight off the fake's own bookkeeping instead."""
@@ -1163,62 +963,6 @@ def _patch_wait_for_run(monkeypatch):
         {"status": "failed"} if run_id == f"run-{lammps._fail_on_call}" else {"status": "completed"}
     ))
 
-
-def test_bracket_first_candidate_melt_like_passes_unchanged(tg_args_cls, monkeypatch):
-    _patch_wait_for_run(monkeypatch)
-    args, cls = tg_args_cls
-    p = resolve_stage_params("tg", args, cls)
-    lammps = _FakeTgLammps(density_queue=[_falling_densities()])
-
-    result = _bracket_tg_start_temp(args, cls, lammps, p)
-
-    assert result["outcome"] == "PASS"
-    assert result["T_start_K"] == p["T_start_K"]
-    assert len(result["iterations"]) == 1
-
-
-def test_bracket_fail_then_pass_raises_candidate(tg_args_cls, monkeypatch):
-    _patch_wait_for_run(monkeypatch)
-    args, cls = tg_args_cls
-    p = resolve_stage_params("tg", args, cls)
-    lammps = _FakeTgLammps(density_queue=[_rising_densities(), _falling_densities()])
-
-    result = _bracket_tg_start_temp(args, cls, lammps, p)
-
-    assert result["outcome"] == "PASS"
-    assert result["T_start_K"] == p["T_start_K"] + 2 * p["T_step_K"]
-    assert len(result["iterations"]) == 2
-    assert result["iterations"][0]["melt_like"] is False
-    assert result["iterations"][1]["melt_like"] is True
-
-
-def test_bracket_exhausts_and_clamps_at_ceiling(tg_args_cls, monkeypatch):
-    _patch_wait_for_run(monkeypatch)
-    args, cls = tg_args_cls
-    cls["annealing_T_high_K"] = p_ceiling = cls["tg_t_high_K"] + 2 * cls["tg_t_step_K"]
-    p = resolve_stage_params("tg", args, cls)
-    lammps = _FakeTgLammps(density_queue=[_rising_densities()] * 5)  # always fails
-
-    result = _bracket_tg_start_temp(args, cls, lammps, p)
-
-    assert result["outcome"] == "EXHAUSTED"
-    assert result["T_start_K"] <= p_ceiling
-    assert len(result["iterations"]) == p["tg_bracket_max_iters"]
-
-
-def test_bracket_run_failure_is_advisory_not_raising(tg_args_cls, monkeypatch):
-    _patch_wait_for_run(monkeypatch)
-    args, cls = tg_args_cls
-    p = resolve_stage_params("tg", args, cls)
-    lammps = _FakeTgLammps(density_queue=[_falling_densities()], fail_on_call=1)
-
-    result = _bracket_tg_start_temp(args, cls, lammps, p)
-
-    assert result["outcome"] == "PROBE_FAILED"
-    assert result["T_start_K"] == p["T_start_K"]
-
-
-# ── Phase 2: _run_tg_sweep_adaptive ────────────────────────────────────────────
 
 def test_sweep_all_points_stable_no_extensions(tg_args_cls, monkeypatch):
     _patch_wait_for_run(monkeypatch)
@@ -1289,21 +1033,24 @@ def test_sweep_job_failure_is_advisory_and_continues(tg_args_cls, monkeypatch):
 
 # ── Executor wiring ─────────────────────────────────────────────────────────
 
-def test_thermal_dispatch_passes_equil_density_when_present(tmp_path, monkeypatch):
+def test_thermal_dispatch_passes_the_melt_density_when_present(tmp_path, monkeypatch):
+    """The staircase's first point sits AT the melt hold, so what do_thermal cross-checks it
+    against is the MELT density the melt gate measured -- not the 300 K glass density, which
+    the thermal stage no longer has (and no longer waits for)."""
     from run_campaign import CampaignStageExecutor
     import run_campaign as rc
 
     calls = []
     monkeypatch.setattr(rc, "do_thermal",
-                        lambda args, cls, lammps, equil_density_gcm3=None:
-                        calls.append(equil_density_gcm3) or {"per_rate": []})
+                        lambda args, cls, lammps, melt_density_gcm3=None:
+                        calls.append(melt_density_gcm3) or {"per_rate": []})
 
     attempt_dir = tmp_path / "attempt-0001"
     attempt_dir.mkdir()
     executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
                                      {}, emc=None, lammps=None, plan_path="unused")
     context = {"attempt_dir": str(attempt_dir), "parameters": {},
-              "dependencies": {"equilibration": {"outputs": {"density_gcm3": 1.05}}},
+              "dependencies": {"equilibration": {"outputs": {"melt_density_gcm3": 1.05}}},
               "prior_attempts": []}
 
     executor.execute("thermal", context)
@@ -1311,14 +1058,14 @@ def test_thermal_dispatch_passes_equil_density_when_present(tmp_path, monkeypatc
     assert calls == [1.05]
 
 
-def test_thermal_dispatch_passes_none_when_equil_density_absent(tmp_path, monkeypatch):
+def test_thermal_dispatch_passes_none_when_the_melt_density_is_absent(tmp_path, monkeypatch):
     from run_campaign import CampaignStageExecutor
     import run_campaign as rc
 
     calls = []
     monkeypatch.setattr(rc, "do_thermal",
-                        lambda args, cls, lammps, equil_density_gcm3=None:
-                        calls.append(equil_density_gcm3) or {"per_rate": []})
+                        lambda args, cls, lammps, melt_density_gcm3=None:
+                        calls.append(melt_density_gcm3) or {"per_rate": []})
 
     attempt_dir = tmp_path / "attempt-0001"
     attempt_dir.mkdir()
@@ -1504,20 +1251,24 @@ def test_bm_point_extension_run_failure_is_advisory(bm_args_cls, tmp_path, monke
 # ── Summary dispatch: cross-attempt-directory paths (PEG1 run_summary bug fix) ─────────────
 
 def test_summary_dispatch_threads_equilibration_and_mechanical_json_paths(tmp_path, monkeypatch):
-    """generate_run_summary.py can only find equilibration.json/mechanical.json when the caller
-    passes their real (cross-attempt-directory) paths explicitly -- do_equil_and_check/
-    do_mechanical surface those paths as equilibration_json_path/mechanical_json_path in their
-    own outputs dicts; CampaignStageExecutor.execute("summary", ...) must thread both through to
-    do_summary, which must thread them into generate_run_summary's call. Locks in the fix without
-    submitting any real simulation."""
+    """generate_run_summary.py can only find the gate/mechanical JSONs when the caller passes
+    their real (cross-attempt-directory) paths explicitly -- each stage surfaces its own path in
+    its outputs dict; CampaignStageExecutor.execute("summary", ...) must thread all of them
+    through to do_summary. Locks in the fix without submitting any real simulation.
+
+    Three now, not two: the melt gate writes equilibration.json and the assessment gate writes
+    cooling.json, and they are not interchangeable -- one holds the melt density at
+    T_melt_hold_K, the other the density at final_T_K. D-05 reports the cooling verdict when
+    the cooldown ran."""
     from run_campaign import CampaignStageExecutor
     import run_campaign as rc
 
     calls = []
     monkeypatch.setattr(rc, "do_summary",
                         lambda args, cls, lammps, is_glassy, thermal, equil_verdict, raw_dir,
-                               equil_result=None, mechanical_result=None:
-                        calls.append((equil_result, mechanical_result)) or {})
+                               equil_result=None, mechanical_result=None, cool_result=None:
+                        calls.append((equil_result, mechanical_result, cool_result,
+                                      equil_verdict)) or {})
 
     attempt_dir = tmp_path / "attempt-0001"
     attempt_dir.mkdir()
@@ -1527,6 +1278,8 @@ def test_summary_dispatch_threads_equilibration_and_mechanical_json_paths(tmp_pa
               "dependencies": {
                   "equilibration": {"outputs": {"equil_verdict": "PASS",
                                                 "equilibration_json_path": "/eq/attempt/raw/equilibration.json"}},
+                  "cooling": {"outputs": {"cool_verdict": "PASS",
+                                          "cooling_json_path": "/cool/attempt/raw/cooling.json"}},
                   "thermal": {"outputs": {"is_glassy": False}},
                   "mechanical": {"outputs": {"mechanical_json_path": "/mech/attempt/raw/mechanical.json"}},
               },
@@ -1535,9 +1288,39 @@ def test_summary_dispatch_threads_equilibration_and_mechanical_json_paths(tmp_pa
     executor.execute("summary", context)
 
     assert len(calls) == 1
-    equil_result, mechanical_result = calls[0]
+    equil_result, mechanical_result, cool_result, d05 = calls[0]
     assert equil_result["equilibration_json_path"] == "/eq/attempt/raw/equilibration.json"
+    assert cool_result["cooling_json_path"] == "/cool/attempt/raw/cooling.json"
     assert mechanical_result["mechanical_json_path"] == "/mech/attempt/raw/mechanical.json"
+    assert d05 == "PASS"
+
+
+def test_summary_dispatch_falls_back_to_the_melt_verdict_without_a_cooldown(tmp_path,
+                                                                           monkeypatch):
+    """A melt-only run has no cooling stage, so D-05 reports the gate that actually ran."""
+    from run_campaign import CampaignStageExecutor
+    import run_campaign as rc
+
+    calls = []
+    monkeypatch.setattr(rc, "do_summary",
+                        lambda args, cls, lammps, is_glassy, thermal, equil_verdict, raw_dir,
+                               equil_result=None, mechanical_result=None, cool_result=None:
+                        calls.append((equil_verdict, cool_result)) or {})
+
+    attempt_dir = tmp_path / "attempt-0001"
+    attempt_dir.mkdir()
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    context = {"attempt_dir": str(attempt_dir), "parameters": {},
+              "dependencies": {
+                  "equilibration": {"outputs": {"equil_verdict": "PASS"}},
+                  "thermal": {"outputs": {"is_glassy": False}},
+              },
+              "prior_attempts": []}
+
+    executor.execute("summary", context)
+
+    assert calls == [("PASS", None)]
 
 
 class _FakeBmSeriesLammps(_FakeBmExtLammps):
@@ -1713,9 +1496,10 @@ def test_anneal_hold_gate_stabilizes_via_slope_diff_after_extension(anneal_gate_
     # equilibration_workflow's own unconditional `max_temp >= temp + anneal_margin_K` gate runs
     # BEFORE its extend_only branch (which hardcodes T_START=T_FINAL=max_temp for
     # base_stage_name="anneal_hold" regardless of the `temp` argument anyway) -- passing
-    # T_anneal_high_K as `temp` sets temp==max_temp, which can never clear a positive margin
-    # over itself. `temp` must stay strictly below `max_temp` here.
-    assert ext_call["temp"] < ext_call["max_temp"]
+    # T_anneal_high_K as the hold temperature would set melt_hold_T == max_temp, which the
+    # generator warns about (the melt ramp becomes a no-op). The melt hold must stay at or
+    # below the ceiling, and here strictly below it.
+    assert ext_call["melt_hold_T"] < ext_call["max_temp"]
 
 
 def test_anneal_hold_gate_exhausts_cap_without_stabilizing(anneal_gate_args_cls, monkeypatch):
@@ -1933,11 +1717,14 @@ def test_do_equil_and_check_gated_path_merges_chain1_and_chain2_stages(
                          "work_dir": str(tmp_path),
                          "params": {"LOG_FILE": "anneal_hold.log", "DUMP_FILE": "anneal_hold.dump",
                                     "DUMP_FREQ": 1000, "N_STEPS": 1000000}}
-    cool_block_stage = {"name": "cool_block_01", "output_data": f"{tmp_path}/cool_out.data",
-                        "work_dir": str(tmp_path), "params": {"DUMP_FILE": "cool.dump"}}
-    npt_final_stage = {"name": "npt_final", "output_data": f"{tmp_path}/npt_final_out.data",
-                       "output_restart": f"{tmp_path}/npt_final_out.restart",
-                       "work_dir": str(tmp_path), "params": {"DUMP_FILE": "npt_final.dump"}}
+    melt_ramp_stage = {"name": "npt_melt_ramp", "output_data": f"{tmp_path}/melt_ramp_out.data",
+                       "work_dir": str(tmp_path), "params": {"DUMP_FILE": "npt_melt_ramp.dump"}}
+    melt_hold_stage = {"name": "npt_melt_hold", "output_data": f"{tmp_path}/melt_hold_out.data",
+                       "output_restart": f"{tmp_path}/melt_hold_out.restart",
+                       "work_dir": str(tmp_path), "params": {"DUMP_FILE": "npt_melt_hold.dump"}}
+    nvt_melt_stage = {"name": "nvt_melt_hold", "output_data": f"{tmp_path}/nvt_melt_out.data",
+                      "output_restart": f"{tmp_path}/nvt_melt_out.restart",
+                      "work_dir": str(tmp_path), "params": {"DUMP_FILE": "nvt_melt_hold.dump"}}
 
     fake = _FakeEquilLammps(
         tmp_path,
@@ -1946,15 +1733,16 @@ def test_do_equil_and_check_gated_path_merges_chain1_and_chain2_stages(
             # first probe, zero extensions.
             {"status": "success",
              "chain": {"msid": {"large_s": {"slope": 0.95, "gaussian_pass": True}}}},
-            # 2nd call: the normal post-chain-2 equil-check comprehensive call, on npt_final.
+            # 2nd call: the normal post-chain-2 melt-gate comprehensive call, on npt_melt_hold.
             {"chain": {"ct": {"tau_relax_ps": 100.0, "decay_fraction_at_end": 0.9}}},
         ],
         gate_verdicts=[{"verdict": "PASS"}],
         workflow_queue=[
             {"status": "success", "stages": [minimize_stage, anneal_hold_stage],
              "run_order": ["minimize", "anneal_hold"]},
-            {"status": "success", "stages": [cool_block_stage, npt_final_stage],
-             "run_order": ["cool_block_01", "npt_final"]},
+            {"status": "success",
+             "stages": [melt_ramp_stage, melt_hold_stage, nvt_melt_stage],
+             "run_order": ["npt_melt_ramp", "npt_melt_hold", "nvt_melt_hold"]},
         ],
     )
 
@@ -1966,10 +1754,13 @@ def test_do_equil_and_check_gated_path_merges_chain1_and_chain2_stages(
     # merged stage_checkpoints carries BOTH chain 1's and chain 2's stages -- a later remedy
     # resuming from an earlier checkpoint (e.g. minimize) can still find it, even though chain 2
     # (resume_from="anneal_hold") never generated it itself.
-    assert set(result["stage_checkpoints"]) == {"minimize", "anneal_hold", "cool_block_01", "npt_final"}
+    assert set(result["stage_checkpoints"]) == {
+        "minimize", "anneal_hold", "npt_melt_ramp", "npt_melt_hold", "nvt_melt_hold"}
     assert result["stage_checkpoints"]["anneal_hold"] == f"{tmp_path}/anneal_hold_out.data"
-    assert result["stage_checkpoints"]["npt_final"] == f"{tmp_path}/npt_final_out.data"
-    assert result["npt_prod_data_path"] == f"{tmp_path}/npt_final_out.data"
+    assert result["stage_checkpoints"]["npt_melt_hold"] == f"{tmp_path}/melt_hold_out.data"
+    # The gated cell and the handoff cell come out of the merged list correctly assigned.
+    assert result["melt_data_path"] == f"{tmp_path}/melt_hold_out.data"
+    assert result["melt_start_data_path"] == f"{tmp_path}/nvt_melt_out.data"
     # exactly 2 generate_equilibration_workflow calls: chain 1 (sliced to stop at anneal_hold by
     # _submit_equil_chain itself -- see test_submit_equil_chain_stop_after_stage_slices_the_workflow
     # for that mechanism in isolation), chain 2 (resume_from="anneal_hold") -- no extension, since

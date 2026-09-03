@@ -11,7 +11,7 @@ To request a subset, pass `--properties density,tg` to `run_campaign.py`. Omitti
 | Field | Value |
 |-------|-------|
 | Units | g/cm³ at 300 K |
-| Source log | Rubbery: `npt_production.log` (melt NPT production); Glassy: `npt_prod300.log` (NPT 300 K production) |
+| Source log | `cool/npt_final/npt_final.log` (the assessment cell at `final_T_K`, default 300 K). The melt density at `T_melt_hold_K` is a separate observable, read from `equil/npt_melt_hold/npt_melt_hold.log` — the two are reported under different names and are not interchangeable. |
 | Tool | `extract_equilibrated_density` |
 | Method | Discard first 50 % of log as burn-in; mean ± SEM over production window; linear drift check |
 | Validation | `experimental_density_gcm3` from polymer_rules.json; OK if within ±5 % |
@@ -29,8 +29,9 @@ degenerate/inverted — runs `tg_rates_K_per_ns[0]` instead).
 No class carries that fallback as of 2026-09-01. PKTN and PSFO did: their staircase reheated
 the finished 300 K cell, so the top plateaus under-equilibrated and a faster sweep, spending
 less time contaminated there, read a *lower* Tg — an inverted rate dependence. The sweep now
-starts from the cool_block the equilibration cooldown already wrote at the sweep's top
-temperature, so both returned to the highest rate.
+starts from the gated melt hold and runs the whole descent to `tg_t_low_K`, so both returned to
+the highest rate. There is no reheat probe and no mid-ramp waypoint to select between: the
+staircase's first point is the cell the melt gate certified.
 
 ### Sweep
 
@@ -67,7 +68,7 @@ Fit parameters: B0 (GPa) = K_T, B0' (pressure derivative), V0 (reference volume 
 
 | Field | Value |
 |-------|-------|
-| Worker | murnaghan-worker: `run_bulk_modulus_series` submits N NPT runs at each pressure from `npt_prod300_out.data` (the 300 K cell), then fits |
+| Worker | murnaghan-worker: `run_bulk_modulus_series` submits N NPT runs at each pressure from `cool/npt_final/npt_final_out.data` (the assessment cell), then fits |
 | Tool | `extract_bulk_modulus_murnaghan` |
 | Acceptance | `fit_converged=True`; otherwise fall back to Path C (deformation). `B0_prime` outside [4, 20] is a WARNING annotation only, not a fallback trigger |
 | Cross-check | Volume-fluctuation K, computed inside the same `extract_bulk_modulus_murnaghan` call via its `npt_prod_log` argument — a diagnostic, not the reported value |
@@ -84,7 +85,7 @@ Same Murnaghan EOS fit as Path A, run at T>Tg from the melt production cell over
 
 | Field | Value |
 |-------|-------|
-| Worker | murnaghan-worker: `run_bulk_modulus_series` over `bm_pressures_atm` (e.g. [1, 100, 300, 600, 1000] atm) from `npt_production_out.data` |
+| Worker | murnaghan-worker: `run_bulk_modulus_series` over `bm_pressures_atm` (e.g. [1, 100, 300, 600, 1000] atm) from `cool/npt_final/npt_final_out.data` |
 | Tool | `extract_bulk_modulus_murnaghan` |
 | Advantage over fluctuation | Barostat-independent (uses mean V per pressure, not variance); captures EOS nonlinearity |
 | Convergence fallback | If curve_fit fails → linear regression of P vs ln V (method label: `linear_fallback`) |
@@ -97,7 +98,7 @@ Same Murnaghan EOS fit as Path A, run at T>Tg from the melt production cell over
 
 Invoked when a Murnaghan fit fails acceptance (`fit_converged=False`).
 
-`extract_bulk_modulus_deform` reads three uniaxial-deformation logs (DEFORM_DIR x/y/z, run sequentially by deform-worker from `npt_prod300_out.data`) and derives the bulk modulus from the stress–strain response.
+`extract_bulk_modulus_deform` reads three uniaxial-deformation logs (DEFORM_DIR x/y/z, run sequentially from `cool/npt_final/npt_final_out.data`) and derives the bulk modulus from the stress–strain response.
 
 | Field | Value |
 |-------|-------|
@@ -120,7 +121,7 @@ K_T = kB·T·<V> / Var(V)
 
 | Field | Value |
 |-------|-------|
-| Source log | `npt_production.log` (no new simulations needed) |
+| Source log | `cool/npt_final/npt_final.log` (no new simulations needed) |
 | Tool | `extract_bulk_modulus` |
 | Caveat | Sensitive to barostat P_DAMP. Cross-checked against `B_def = −dP/d(ln V)` from P vs ln V regression; disagreement >20 % emits a warning |
 | Method label | `fluctuation` |

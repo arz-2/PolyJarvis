@@ -211,6 +211,11 @@ def main():
                    help="Explicit path to the canonical thermal.json (e.g. the slowest-rate "
                         "folder). When supplied, skips rglob discovery and uses this file directly. "
                         "Prevents alphabetical-order bugs when multiple rate folders coexist.")
+    p.add_argument("--melt_equilibration_path", default=None,
+                   help="The MELT gate's own equilibration.json (the equilibration attempt's "
+                        "raw/). Distinct from --equilibration_path, which is the ASSESSMENT "
+                        "gate's file (cooling.json) whenever a cooldown ran: the two carry the "
+                        "same keys about two different cells, at T_melt_hold_K and final_T_K.")
     p.add_argument("--equilibration_path", default=None,
                    help="Explicit path to the accepted equilibration attempt's equilibration.json. "
                         "Under the attempt-based run layout this file lives under a DIFFERENT "
@@ -281,6 +286,13 @@ def main():
     eq_comp      = _load_cross_attempt("equilibration.json", args.equilibration_path, "equilibration_path")
     eq_dens      = eq_comp.get("density") or {}
     eq_gate      = eq_comp.get("gate") or {}
+    # The melt gate's own file. For a melt-only run this IS eq_comp (no cooldown ran, so
+    # --equilibration_path fell back to it); reading it separately keeps the melt density
+    # labelled as a melt rather than reported as the density at final_T_K.
+    melt_comp = (_load_cross_attempt("equilibration.json", args.melt_equilibration_path,
+                                     "melt_equilibration_path")
+                 if args.melt_equilibration_path else {})
+    melt_dens = melt_comp.get("density") or {}
     bulk_deform  = _load_cross_attempt("bulk_modulus_deform.json", args.bulk_modulus_deform_path,
                                         "bulk_modulus_deform_path")
     bulk_murnaghan = _load_cross_attempt("mechanical.json", args.mechanical_path, "mechanical_path")
@@ -444,6 +456,16 @@ def main():
             },
             "density": {
                 "value_g_cm3":    rho_val,
+            },
+            # The melt at T_melt_hold_K, from the equilibration stage's own gate file. A
+            # DIFFERENT measurement from "density" above, which is the assessment cell at
+            # final_T_K -- reported separately because they are not comparable and because a
+            # melt-only run has no assessment cell at all. Sparse: null when no melt gate file
+            # was passed.
+            "melt_density": {
+                "value_g_cm3":    (melt_dens.get("plateau_density_mean")
+                                   or melt_dens.get("density_mean")),
+                "temperature_K":  melt_dens.get("target_temp"),
             },
             "bulk_modulus": {
                 "value_GPa":      K_val,

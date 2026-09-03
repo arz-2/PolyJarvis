@@ -28,16 +28,27 @@ def test_anneal_cap_steps_is_snapshotted_and_agent_adjustable():
 
 
 def test_executor_forwards_resolved_anneal_hold_controls():
+    """Every resolved anneal control reaches the generator from _submit_equil_chain.
+
+    The three call sites (fresh / resume_from / extend_only) share a `common` kwargs dict now,
+    so the controls appear as dict KEYS rather than as keyword args on each call -- assert
+    against the function body as a whole rather than against one call's keywords, which is what
+    this checked before the shared dict existed."""
     tree = ast.parse((REPO_ROOT / "orchestration" / "scripts" / "run_campaign.py").read_text())
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
              and isinstance(node.func, ast.Attribute)
              and node.func.attr == "generate_equilibration_workflow"]
     assert len(calls) == 3
-    full = next(call for call in calls
-                if any(kw.arg == "anneal_cap_steps" and isinstance(kw.value, ast.Subscript)
-                       for kw in call.keywords))
-    passed = {kw.arg for kw in full.keywords}
-    assert {"anneal_heat_steps", "anneal_check_every_steps", "anneal_cap_steps"} <= passed
+
+    submit = next(node for node in ast.walk(tree)
+                  if isinstance(node, ast.FunctionDef) and node.name == "_submit_equil_chain")
+    forwarded = {kw.arg for call in ast.walk(submit) if isinstance(call, ast.Call)
+                 for kw in call.keywords if kw.arg}
+    forwarded |= {k.value for d in ast.walk(submit) if isinstance(d, ast.Dict)
+                  for k in d.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+    assert {"anneal_heat_steps", "anneal_check_every_steps", "anneal_cap_steps"} <= forwarded
+    # The melt tail must be forwarded on the same footing -- it is the half that is new.
+    assert {"melt_ramp_steps", "melt_hold_min_steps", "nvt_melt_min_steps"} <= forwarded
 
 
 def test_server_materializes_anneal_heat_then_a_single_extendable_hold():

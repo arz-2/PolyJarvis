@@ -180,6 +180,46 @@ def gpu_hours(atoms: int, steps: int, dt_fs: float, ff_family: str, gpu_per_run:
             "ns_per_day_used": round(est["ns_per_day"], 4), "simulated_ns": round(simulated_ns, 6)}
 
 
+def _cool_total_steps(effective_class: dict) -> tuple:
+    """Total GPU steps for the cooling stage: the blockwise descent plus the two stages at the
+    assessment temperature.
+
+    Resolvable, unlike the core equilibration chain, because none of its three terms depends on
+    an atom-count tier the planner cannot see: the block count is
+    ceil((T_melt_hold - final_T)/cool_block_dT_K), each block's hold is rate-matched to this
+    class's own primary Tg rate (stage_params.rate_matched_cool_block_hold_steps -- the same
+    arithmetic, not a second copy), and stage7/stage8 carry explicit class defaults.
+    """
+    dt = effective_class.get("dt_fs", 1.0)
+    t_high = effective_class.get("T_melt_hold_K") or effective_class.get("T_equil_K")
+    t_low = effective_class.get("final_T_K", 300.0)
+    dT = effective_class.get("cool_block_dT_K") or 25.0
+    if not t_high or t_high <= t_low:
+        return None, "T_melt_hold_K is not above final_T_K -- no descent to price"
+    n_blocks = math.ceil((t_high - t_low) / dT)
+
+    hold = effective_class.get("cool_block_hold_steps")
+    if not hold:
+        rates = effective_class.get("tg_rates_K_per_ns") or []
+        if not rates:
+            return None, ("no cool_block_hold_steps and no tg_rates_K_per_ns to rate-match "
+                          "against -- the generator's atom-count tier default applies")
+        idx = (0 if effective_class.get("tg_slope_gate_fallback") == "slowest_rate"
+               else len(rates) - 1)
+        idx = int(effective_class.get("tg_primary_rate_index", idx))
+        rate = rates[idx] if 0 <= idx < len(rates) else rates[-1]
+        if not rate:
+            return None, "primary tg rate is zero -- cannot rate-match the cooldown"
+        hold = int(round(dT / (rate * dt * 1e-06)))
+
+    stage7 = int(effective_class.get("stage7_min_steps") or (5.0e5 / dt))
+    stage8 = int(effective_class.get("stage8_min_steps") or (5.0e5 / dt))
+    total = n_blocks * int(hold) + stage7 + stage8
+    return total, (f"{n_blocks} cool blocks x {int(hold)} steps ({t_high:.0f}->{t_low:.0f} K "
+                   f"at dT={dT:.0f} K) + nvt_kinetic_stability {stage7} + npt_final {stage8}; "
+                   "first blocks only -- adaptive extensions are not priced")
+
+
 def _tg_sweep_total_steps(effective_class: dict) -> tuple:
     """(total_steps, note) summed over every configured tg_rates_K_per_ns entry -- the
     documented multi-rate protocol (decision_policy.json D-06's primary/alternative-rate
@@ -188,7 +228,11 @@ def _tg_sweep_total_steps(effective_class: dict) -> tuple:
     already computes, rather than a second, driftable copy."""
     dt = effective_class.get("dt_fs", 1.0)
     t_step = effective_class.get("tg_t_step_K", 20)
-    t_high = effective_class.get("tg_t_high_K", 600)
+    # The sweep's top is the melt hold: the staircase starts from the gated melt cell and runs
+    # the whole descent. (It was tg_t_high_K until the equilibration/cooling split retired that
+    # key -- pricing from the retired constant would undercount every sweep whose melt sits
+    # above it, which is most of them.)
+    t_high = effective_class.get("T_melt_hold_K") or effective_class.get("T_equil_K", 600)
     t_low = effective_class.get("tg_t_low_K", 200)
     rates = effective_class.get("tg_rates_K_per_ns") or []
     floor = effective_class.get("tg_min_steps_per_T", 200000)
@@ -282,6 +326,21 @@ def plan_cost_estimate(plan: dict, hp: dict = None, rules: dict = None) -> dict:
             "stage-length knobs default to None, deferred to generate_equilibration_"
             "workflow's own atom-count-tiered default inside the MCP LAMMPS engine -- "
             "not resolvable from decided_params alone; not priced here to avoid guessing"})
+
+    if "cool" in planned_stage_names:
+        # The blockwise descent is the single largest block of GPU time in the protocol and it
+        # IS resolvable: the block count is a pure function of the temperature span and
+        # cool_block_dT_K, and each block's hold is rate-matched to the class's own sweep rate.
+        # Leaving it unpriced (as the bare "cool stage matches nothing" fallthrough would) hides
+        # most of a density or modulus run's cost.
+        total_steps, note = _cool_total_steps(effective_class)
+        if total_steps:
+            stages["cool"] = gpu_hours(cell_atoms, total_steps, dt_fs, fam, gpu_per_run, hp,
+                                       rules)
+            stages["cool"]["steps"] = total_steps
+            stages["cool"]["note"] = note
+        else:
+            unpriced.append({"stage": "cool", "reason": note})
 
     if "tg" in planned_stage_names or "analyze-tg" in planned_stage_names:
         total_steps, note = _tg_sweep_total_steps(effective_class)

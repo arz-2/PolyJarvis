@@ -44,7 +44,11 @@ CACHE_PATH_DEFAULT = REPO_ROOT / "guides" / "system_characterization_cache.json"
 # contract than "the protocol actually executed." If SNAPSHOT_KEYS gains a future key with a
 # similar computed-after-the-fact sibling, FREEZE_KEYS needs the same treatment -- check both
 # definitions together.
-FREEZE_KEYS = SNAPSHOT_KEYS + ["T_workflow_K"]
+FREEZE_KEYS = SNAPSHOT_KEYS + ["T_workflow_K", "T_melt_hold_K"]
+"""T_melt_hold_K joins T_workflow_K for the same reason: it is resolved by
+temperature_schedule AFTER the SNAPSHOT_KEYS comprehension runs, and it is the
+protocol-defining melt temperature -- a replayed protocol that did not carry it
+would re-derive the melt from whatever the class says today."""
 
 # property -> the workflow_engine.py stage whose acceptance already proves that property's
 # binding gate (equil_verdict / tg_gate_verdict / bm_gate_verdict|deform_gate_verdict) passed.

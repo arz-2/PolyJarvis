@@ -31,7 +31,7 @@ SIGNATURES = [
         "name": "sweep-below-Tg",
         "pattern": "extract_tg: too few temperature bins / glassy slope missing",
         "root_cause": "Tg sweep ceiling below MD Tg",
-        "action": "raise tg_t_high_K / T_START toward ~2× expected Tg",
+        "action": "raise md_tg_ceiling_K (the melt-hold floor) toward ~2x expected Tg",
         "match": lambda t: ("below md tg" in t) or ("glassy slope" in t)
         or ("bins" in t and "tg" in t) or ("t_start" in t),
     },

@@ -130,6 +130,16 @@ def _stage_properties_findings(plan: dict) -> list:
         findings.append({"check": "stage_properties", "severity": "structural",
                          "detail": "bulk_modulus requested but no murnaghan/deform/analyze-bm "
                                    "stage present"})
+    # The cooling stage is genuinely optional (a melt-only or Tg-only run never runs it), so it
+    # is not in the always-required list -- but anything measured at the assessment temperature
+    # depends on the cell it produces. track_registry._MECHANICAL.requires routes it in
+    # automatically; this catches a hand-written or replayed plan that omitted it.
+    needs_cooling = props & {"density", "bulk_modulus", "shear_modulus", "youngs_modulus",
+                             "poisson_ratio"}
+    if needs_cooling and not (stages_present & {"cool", "cool-check"}):
+        findings.append({"check": "stage_properties", "severity": "structural",
+                         "detail": f"{sorted(needs_cooling)} require a cell at final_T_K but no "
+                                   "cool/cool-check stage is present"})
     return findings
 
 
@@ -169,46 +179,6 @@ def _exp_tg_companion_findings(plan: dict) -> list:
                              "detail": "t_range_brackets_exp_tg is unresolved (None) -- no "
                                        "pinned experimental Tg target for this run's member"})
     return findings
-
-
-def _tg_window_ceiling_findings(plan: dict) -> list:
-    """A hand-set Tg sweep window must be accompanied by an anneal ceiling that clears it.
-
-    The thermal stage starts its staircase from a cell the equilibration cooldown already
-    wrote -- cool_block saves a .data file at every waypoint between the anneal ceiling and
-    final_T_K -- so one of those waypoints has to sit at or above tg_t_high_K. One cool block
-    of headroom is needed, not zero: the ceiling itself is only reached by anneal_hold, which
-    runs NVT and therefore still carries the densified 300 K volume rather than a melt density.
-
-    temperature_schedule raises the ceiling automatically for a DERIVED window, which is a pure
-    function of the SMILES and hence already build-hashed. It deliberately does NOT do so for an
-    EXPLICIT tg_t_high_K override: that key hashes to the THERMAL stage
-    (workflow_engine.PARAMETER_STAGE), so propagating it into the ceiling would rewrite the
-    equilibration chain under an unchanged equilibration _input_hash -- a store would then serve
-    one run's equilibrated cell for another's. The override is honoured for the sweep and
-    flagged here instead, so the plan raises annealing_T_high_K (equilibration-hashed, and
-    therefore an honest invalidation) in the same edit.
-
-    Advisory, not structural: the run still executes. It just reheats the finished final_T_K
-    cell to reach the sweep top instead of starting from a melt-cooled one, which biases the
-    rubbery branch of the fit and hence the breakpoint.
-    """
-    decided = plan.get("decided_params") or {}
-    if "tg_t_high_K" not in decided:
-        return []
-    tg_high = decided.get("tg_t_high_K")
-    ceiling = decided.get("annealing_T_high_K")
-    if not isinstance(tg_high, (int, float)) or not isinstance(ceiling, (int, float)):
-        return []
-    headroom = decided.get("cool_block_dT_K") or 25.0
-    if tg_high + headroom <= ceiling:
-        return []
-    return [{"check": "tg_window_ceiling", "stage": "tg", "severity": "advisory",
-             "detail": (f"explicit tg_t_high_K={tg_high} K needs annealing_T_high_K of at least "
-                        f"{tg_high + headroom} K (sweep top + one cool block of "
-                        f"{headroom} K), have {ceiling} K -- the cooldown never writes a cell "
-                        f"at the sweep's start, so the thermal stage will reheat the "
-                        f"final_T_K cell instead of starting from a melt-cooled one")}]
 
 
 def _finite_size_findings(plan: dict) -> list:
@@ -581,7 +551,6 @@ def validate_plan(plan: dict, policy: dict) -> list:
     findings += _stage_properties_findings(plan)
     findings += _uncertainty_findings(plan, policy)
     findings += _exp_tg_companion_findings(plan)
-    findings += _tg_window_ceiling_findings(plan)
     findings += _hardware_findings(plan)
     findings += _forcefield_findings(plan)
     findings += _system_size_findings(plan)

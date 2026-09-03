@@ -32,6 +32,27 @@ ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_dri
                     "residual_stress"}
 # density_drift isn't in require_rubbery's binding text (density_sem is); treated advisory here.
 
+# The MELT clause (decision_policy.json's require_melt), for the cell the equilibration stage
+# now ends on. It is the glassy binding set PLUS the two chain-relaxation gates, and that
+# addition is the whole point of gating a melt rather than a glass.
+#
+# rg and ct are advisory in every other clause for a physical reason, not a permissive one: at
+# the assessment temperature a glassy chain cannot diffuse or decorrelate its end-to-end vector
+# on MD timescales, so binding on them would make overall_pass unsatisfiable by construction
+# (the same argument decision_policy.json's rationale_glassy/rationale_rubbery makes for MSD).
+# A melt is the one state where both ARE attainable, so "advisory" there would be inherited
+# permissiveness rather than a judgement. ct still drops out for a class carrying
+# ct_gate_reliable=false -- classify() applies that carve-out to this clause exactly as it does
+# to require_glassy.
+#
+# msd_not_trapped/msid_gaussian/residual_stress stay advisory via ALWAYS_ADVISORY: MSD's melt
+# self-diffusion target is unattainable within MD timescales even here for DP>=30, MSID's
+# Gaussian-chain band is a shape check rather than a convergence one, and residual_stress is
+# uncalibrated (see its note below).
+BINDING_MELT = {"density_drift", "density_sem", "energy_drift", "energy_sem", "n_eff_density",
+                "density_homogeneity", "p2", "finite_size", "rg", "ct"}
+ADVISORY_MELT = {"msid_gaussian", "msd_not_trapped", "residual_stress"}
+
 # MSD diffusivity metrics are advisory everywhere, unconditionally -- decision_policy.json's
 # rationale_glassy/rationale_rubbery (2026-06-20, user-authorized, PVC1 route-back) documents
 # that melt self-diffusion is physically unattainable within MD timescales for glassy DP>=30 /
@@ -69,7 +90,12 @@ def resolve_regime(final_t_k, tg_k=None):
 
     An unresolvable Tg or assessment temperature falls to 'glassy' -- the STRICTER gate set
     (density_drift binds there and is advisory in rubbery), so an unknown must not buy the
-    more permissive clause. Callers with no resolvable Tg at all want resolve_regime_legacy."""
+    more permissive clause. Callers with no resolvable Tg at all want resolve_regime_legacy.
+
+    This function is for the ASSESSMENT cell only. The melt gate does not call it: its cell is
+    a melt by construction (T_melt_hold_K clears the MD transition by 80 K), and this function
+    would answer 'glassy' for it whenever Tg is unresolvable -- the common case for a novel
+    SMILES. stage_params._resolve_equil_check_params passes regime='melt' outright."""
     if not isinstance(final_t_k, (int, float)) or not isinstance(tg_k, (int, float)):
         return "glassy"
     return "rubbery" if final_t_k > tg_k else "glassy"
@@ -127,7 +153,15 @@ def _stage_log_for(data_path):
 def classify(gates: dict, regime: str, dp_typical, ct_gate_reliable):
     """Shared clause-selection + binding/advisory split, used by both the retrospective
     (enforce) and live (enforce_live) paths."""
-    if regime == "glassy" and (
+    if regime == "melt":
+        clause = "require_melt"
+        binding_set, advisory_set = set(BINDING_MELT), set(ADVISORY_MELT)
+        if ct_gate_reliable is False:
+            # Same carve-out require_glassy already makes, applied explicitly rather than left
+            # to dict membership: 6 of 21 classes cannot resolve a trustworthy C(t) decay.
+            binding_set.discard("ct")
+            advisory_set.add("ct")
+    elif regime == "glassy" and (
         (dp_typical is not None and dp_typical >= 30) or ct_gate_reliable is False
     ):
         clause = "require_glassy"

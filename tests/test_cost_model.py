@@ -159,12 +159,15 @@ def test_tg_sweep_total_steps_sums_across_configured_rates():
 
 
 def test_tg_sweep_n_bins_matches_real_generator_on_a_non_exact_range():
-    """Regression: PE1's real committed plan (tg_t_high_K=450, tg_t_low_K=100,
+    """Regression: PE1's real committed plan (sweep top 450 K, tg_t_low_K=100,
     tg_t_step_K=20 -- range 350 is not an exact multiple of 20) confirmed against its
     actual LAMMPS logs that script_generator.py's temp list has 19 points, not
     round(350/20)=18. cost_model must match the real generator exactly, not a
-    closed-form approximation of it."""
-    cls = {"dt_fs": 2.0, "tg_t_step_K": 20, "tg_t_high_K": 450, "tg_t_low_K": 100,
+    closed-form approximation of it.
+
+    The top is T_melt_hold_K now (the staircase starts at the gated melt cell), not the
+    retired tg_t_high_K -- the arithmetic under test is unchanged."""
+    cls = {"dt_fs": 2.0, "tg_t_step_K": 20, "T_melt_hold_K": 450, "tg_t_low_K": 100,
            "tg_rates_K_per_ns": [40], "tg_min_steps_per_T": 250000}
     total, note = cm._tg_sweep_total_steps(cls)
     assert "19 T-bin(s)" in note

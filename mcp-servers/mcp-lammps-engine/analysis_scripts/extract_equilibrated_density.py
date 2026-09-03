@@ -15,7 +15,9 @@ the density time series rather than a fixed burn-in fraction:
 
 Output contract:
   - Prints a JSON summary to stdout as the last line.
-  - Merges its result under the "density" key of equilibration.json in --output_dir.
+  - Merges its result under the "density" key of --output_name (default equilibration.json)
+    in --output_dir. The melt gate and the assessment gate write different files for the same
+    keys, because they describe different cells.
   - Exit 0 on success, non-zero on failure (errors to stderr).
 
 Usage:
@@ -52,6 +54,10 @@ def main():
                         help="Path to the LAMMPS log file.")
     parser.add_argument("--output_dir", required=True,
                         help="Output directory for results.")
+    parser.add_argument("--output_name", default="equilibration.json",
+                        help="Filename for the merged gate JSON inside --output_dir. "
+                             "equilibration.json = the melt hold; cooling.json = the "
+                             "assessment cell at final_T_K.")
     parser.add_argument("--eq_fraction", type=float, default=0.5,
                         help="Fraction of rows used as production window.")
     parser.add_argument("--target_temp", type=float, default=None,
@@ -225,7 +231,8 @@ def main():
     # Shared with check_equilibration_comprehensive.py (top-level thermo/chain/spatial keys)
     # and enforce_equilibration_gate's _save_gate_verdict ("gate" key) -- read-merge-write so
     # this producer's own section replaces wholesale without clobbering the others.
-    equilibration_json = output_dir / "equilibration.json"
+    equilibration_json = output_dir / (getattr(args, "output_name", None)
+                                       or "equilibration.json")
     merged = {}
     if equilibration_json.exists():
         try:

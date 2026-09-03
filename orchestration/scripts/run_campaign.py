@@ -217,17 +217,15 @@ def wait_for_analysis(lammps, submit_result: dict, label: str, poll_seconds: flo
 def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNamespace:
     return SimpleNamespace(
         run_name=run_name, polymer_class=polymer_class, plan=str(plan_path),
-        smiles=None, data_path=None, tg_start_data=None, work_dir=None,
+        smiles=None, data_path=None, melt_start_data_path=None, work_dir=None,
         gpu_ids=None, mpi_ranks=None, engine=None, emc_seed=None, velocity_seed=None,
         dp=None, nchain=None, n_atoms=None, charge_method=None, date_start=None, date_end=None,
         d01=None, d02=None, d03=None, d04=None, lammps_flags=None, is_glassy=None,
         tg_k=None, tg_fit_quality=None, deform_log=None, deform_log_slow=None,
         deform_rate_mode="primary", murnaghan_logs=None, d05=None, npt_prod_log=None,
         npt_prod_dump=None, melt_data_path=None, ff=None, backbone_types=None, enthalpy_col="Enthalpy",
-        output_dir=None, equil_data_path=None, npt_prod_ns=None, add_melt_npt=False,
-        melt_hold_ns=None, melt_only_continuation_ns=None, phase="full",
-        pending_cooldown_path=None,
-        T_equil_K=None, T_anneal_high_K=None, tg_t_high_K=None, tg_t_low_K=None,
+        output_dir=None, equil_data_path=None, npt_prod_ns=None,
+        T_equil_K=None, T_anneal_high_K=None, md_tg_ceiling_K=None, tg_t_low_K=None,
         tg_t_step_K=None, tg_steps_per_t=None, tg_rate_index=None,
         n_replicates=1, K_strain_max=None, K_deform_rate_inv_s=None,
         dt_fs=None, density_initial=None, properties="all", exp_K_min=None, exp_K_max=None,
@@ -324,124 +322,87 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
                          extend_temp_K: float = None,
                          resume_from: str = None, resume_data_path: str = None,
                          stop_after_stage: str = None) -> dict:
-    """resume_from is one of generate_equilibration_workflow's 8 checkpoint names (see
-    server.py) -- e.g. "anneal_hold" to regenerate cooling+tail with different parameters
-    after a remedy adjusts them, or "cool_block"/"nvt_kinetic_stability" to redo only the
-    tail. extend_from_data (paired with extend_base_stage/extend_ensemble) is a genuine
+    """Submit the CORE equilibration chain: minimize -> ... -> anneal_hold -> the melt tail.
+
+    resume_from is one of generate_equilibration_workflow's checkpoint names (see server.py) --
+    e.g. "anneal_hold" to regenerate the melt tail with different parameters after a remedy
+    adjusts them. extend_from_data (paired with extend_base_stage/extend_ensemble) is a genuine
     restart-continuation of one already-run adaptive stage, not a resubmission.
 
     stop_after_stage (fresh-chain submissions only, i.e. extend_from_data and resume_from both
-    None): submit only the leading slice of the 8-stage protocol through and including this
-    stage name, e.g. "anneal_hold" for the anneal_hold_msid_gate's chain 1. A plain client-side
-    slice of workflow["stages"]/["run_order"] before run_lammps_chain -- generate_
-    equilibration_workflow itself is untouched, it always plans the full chain; only the
-    submitted subset changes."""
+    None): submit only the leading slice of the chain through and including this stage name,
+    e.g. "anneal_hold" for the anneal_hold_msid_gate's chain 1. A plain client-side slice of
+    workflow["stages"]/["run_order"] before run_lammps_chain -- generate_equilibration_workflow
+    itself is untouched, it always plans the full chain; only the submitted subset changes."""
     p = resolve_stage_params("equil", args, cls)
     flags = p["lammps_flags"]
     velocity_seed = p["velocity_seed"]
+    common = dict(
+        work_dir_base=p["work_dir"],
+        melt_hold_T=p["T_melt_hold_K"], max_temp=p["T_anneal_high_K"],
+        anneal_margin_K=p["anneal_margin_K"],
+        max_press=p["compression_max_pressure_atm"],
+        warmup_steps=p["warmup_steps"],
+        densify_ramp_steps=p["densify_ramp_steps"],
+        densify_steps_cap=p["densify_steps_cap"],
+        ff_activate_npt_steps=p["ff_activate_npt_steps"],
+        anneal_heat_steps=p["anneal_heat_steps"],
+        anneal_cap_steps=p["anneal_cap_steps"],
+        melt_ramp_steps=p["melt_ramp_steps"],
+        melt_hold_cap_steps=p["melt_hold_cap_steps"],
+        nvt_melt_cap_steps=p["nvt_melt_cap_steps"],
+        polymer_name=args.run_name, press=p["P_equil_atm"],
+        use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
+        engine=p["engine"], velocity_seed=velocity_seed,
+        thermostat_damp_fs=p["thermostat_damp_fs"], barostat_damp_fs=p["barostat_damp_fs"],
+        use_long_range=p["use_long_range_electrostatics"],
+    )
     if resume_from is not None:
         workflow = lammps.generate_equilibration_workflow(
-            data_file=resume_data_path, work_dir_base=p["work_dir"],
-            temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
-            anneal_margin_K=p["anneal_margin_K"], final_T_K=p["final_T_K"],
-            max_press=p["compression_max_pressure_atm"],
-            warmup_steps=p["warmup_steps"],
-            densify_ramp_steps=p["densify_ramp_steps"],
+            data_file=resume_data_path,
             densify_check_every_steps=p["densify_check_every_steps"],
-            densify_steps_cap=p["densify_steps_cap"],
-            ff_activate_npt_steps=p["ff_activate_npt_steps"],
-            anneal_heat_steps=p["anneal_heat_steps"],
             anneal_check_every_steps=p["anneal_check_every_steps"],
-            anneal_cap_steps=p["anneal_cap_steps"],
-            cool_block_dT_K=p["cool_block_dT_K"],
-            cool_block_hold_steps=p["cool_block_hold_steps"],
-            cool_block_hold_cap_steps=p["cool_block_hold_cap_steps"],
-            stage7_min_steps=p["stage7_min_steps"], stage7_cap_steps=p["stage7_cap_steps"],
-            stage8_min_steps=p["stage8_min_steps"], stage8_cap_steps=p["stage8_cap_steps"],
-            t_equil_K=p["t_equil_K"], tg_start_T_K=p["tg_start_T_K"],
-            melt_hold_extra_steps=p["melt_hold_extra_steps"],
-            params_file="",
-            resume_from=resume_from,
-            polymer_name=args.run_name, press=p["P_equil_atm"],
-            use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
-            engine=p["engine"], velocity_seed=velocity_seed,
-            thermostat_damp_fs=p["thermostat_damp_fs"], barostat_damp_fs=p["barostat_damp_fs"],
-            use_long_range=p["use_long_range_electrostatics"],
+            melt_hold_min_steps=p["melt_hold_min_steps"],
+            nvt_melt_min_steps=p["nvt_melt_min_steps"],
+            params_file="", resume_from=resume_from, **common,
         )
     elif extend_from_data is None:
         workflow = lammps.generate_equilibration_workflow(
-            data_file=p["data_path"], work_dir_base=p["work_dir"],
-            temp=p["T_workflow_K"], max_temp=p["T_anneal_high_K"],
-            anneal_margin_K=p["anneal_margin_K"], final_T_K=p["final_T_K"],
-            max_press=p["compression_max_pressure_atm"],
-            warmup_steps=p["warmup_steps"],
-            densify_ramp_steps=p["densify_ramp_steps"],
+            data_file=p["data_path"],
             densify_check_every_steps=p["densify_check_every_steps"],
-            densify_steps_cap=p["densify_steps_cap"],
-            ff_activate_npt_steps=p["ff_activate_npt_steps"],
-            anneal_heat_steps=p["anneal_heat_steps"],
             anneal_check_every_steps=p["anneal_check_every_steps"],
-            anneal_cap_steps=p["anneal_cap_steps"],
-            cool_block_dT_K=p["cool_block_dT_K"],
-            cool_block_hold_steps=p["cool_block_hold_steps"],
-            cool_block_hold_cap_steps=p["cool_block_hold_cap_steps"],
-            stage7_min_steps=p["stage7_min_steps"], stage7_cap_steps=p["stage7_cap_steps"],
-            stage8_min_steps=p["stage8_min_steps"], stage8_cap_steps=p["stage8_cap_steps"],
-            t_equil_K=p["t_equil_K"], tg_start_T_K=p["tg_start_T_K"],
-            melt_hold_extra_steps=p["melt_hold_extra_steps"],
+            melt_hold_min_steps=p["melt_hold_min_steps"],
+            nvt_melt_min_steps=p["nvt_melt_min_steps"],
             params_file=p.get("emc_params_path") or "",
             minimize_etol=p["minimize_etol"], minimize_ftol=p["minimize_ftol"],
             minimize_maxiter=p["minimize_maxiter"], minimize_maxeval=p["minimize_maxeval"],
-            polymer_name=args.run_name, press=p["P_equil_atm"],
-            use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
-            engine=p["engine"], velocity_seed=velocity_seed,
-            thermostat_damp_fs=p["thermostat_damp_fs"], barostat_damp_fs=p["barostat_damp_fs"],
-            use_long_range=p["use_long_range_electrostatics"],
+            **common,
         )
     else:
         # Genuine restart-continuation of extend_base_stage's own trajectory (read_restart,
         # appended log/dump) -- NOT a fresh stage. extend_from_data is that stage's own
-        # .restart file (not a .data file); extend_temp_K is required for a cool_block_NN
-        # (its hold temperature can't be inferred from the name alone).
+        # .restart file (not a .data file).
         dt = p["dt_fs"]
         extend_steps_val = int(extend_ns * 1e6 / dt)
-        base = extend_base_stage or "npt_final"
+        base = extend_base_stage or "npt_melt_hold"
         override = {
             "npt_densify_hold": {"densify_check_every_steps": extend_steps_val},
             "anneal_hold": {"anneal_check_every_steps": extend_steps_val},
-            "nvt_kinetic_stability": {"stage7_min_steps": extend_steps_val},
-            "npt_final": {"stage8_min_steps": extend_steps_val},
-        }.get(base, {"cool_block_hold_steps": extend_steps_val})
+            "npt_melt_hold": {"melt_hold_min_steps": extend_steps_val},
+            "nvt_melt_hold": {"nvt_melt_min_steps": extend_steps_val},
+        }.get(base, {"melt_hold_min_steps": extend_steps_val})
         workflow = lammps.generate_equilibration_workflow(
-            data_file=p["data_path"], work_dir_base=p["work_dir"],
-            temp=extend_temp if extend_temp is not None else p["T_workflow_K"],
-            max_temp=p["T_anneal_high_K"], anneal_margin_K=p["anneal_margin_K"],
-            final_T_K=p["final_T_K"], max_press=p["compression_max_pressure_atm"],
-            warmup_steps=p["warmup_steps"], densify_ramp_steps=p["densify_ramp_steps"],
+            data_file=p["data_path"],
             densify_check_every_steps=override.get("densify_check_every_steps",
-                                                    p["densify_check_every_steps"]),
-            densify_steps_cap=p["densify_steps_cap"],
-            ff_activate_npt_steps=p["ff_activate_npt_steps"],
-            anneal_heat_steps=p["anneal_heat_steps"],
+                                                   p["densify_check_every_steps"]),
             anneal_check_every_steps=override.get("anneal_check_every_steps",
                                                   p["anneal_check_every_steps"]),
-            anneal_cap_steps=p["anneal_cap_steps"], cool_block_dT_K=p["cool_block_dT_K"],
-            cool_block_hold_steps=override.get("cool_block_hold_steps",
-                                               p["cool_block_hold_steps"]),
-            cool_block_hold_cap_steps=p["cool_block_hold_cap_steps"],
-            stage7_min_steps=override.get("stage7_min_steps", p["stage7_min_steps"]),
-            stage7_cap_steps=p["stage7_cap_steps"],
-            stage8_min_steps=override.get("stage8_min_steps", p["stage8_min_steps"]),
-            stage8_cap_steps=p["stage8_cap_steps"],
-            t_equil_K=p["t_equil_K"], tg_start_T_K=p["tg_start_T_K"],
-            melt_hold_extra_steps=p["melt_hold_extra_steps"],
+            melt_hold_min_steps=override.get("melt_hold_min_steps", p["melt_hold_min_steps"]),
+            nvt_melt_min_steps=override.get("nvt_melt_min_steps", p["nvt_melt_min_steps"]),
+            params_file="",
             extend_only=True, restart_file=extend_from_data, base_stage_name=base,
             extend_ensemble=extend_ensemble, extend_temp_K=extend_temp_K,
-            polymer_name=args.run_name, press=p["P_equil_atm"],
-            use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
-            engine=p["engine"], velocity_seed=velocity_seed,
-            thermostat_damp_fs=p["thermostat_damp_fs"], barostat_damp_fs=p["barostat_damp_fs"],
-            use_long_range=p["use_long_range_electrostatics"],
+            **common,
         )
     if workflow.get("status") == "error":
         raise SystemExit(f"generate_equilibration_workflow failed: {workflow}")
@@ -457,6 +418,71 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
         data_file=resume_data_path or extend_from_data or p["data_path"], engine=p["engine"],
         params_file=(p.get("emc_params_path") or "")
                     if (extend_from_data is None and resume_from is None) else "",
+    )
+    if chain.get("status") == "error":
+        raise SystemExit(f"run_lammps_chain failed: {chain}")
+    return {"chain_id": chain["chain_id"], "workflow": workflow}
+
+
+def _submit_cool_chain(args, cls: dict, lammps, extend_from_data: str = None,
+                       extend_ns: float = 1.5, extend_base_stage: str = None,
+                       extend_ensemble: str = "npt", extend_temp_K: float = None,
+                       resume_from: str = None, resume_data_path: str = None) -> dict:
+    """Submit the COOLING chain: the melt cell -> blockwise descent -> npt_final at final_T_K.
+
+    Mirrors _submit_equil_chain's three branches (fresh / resume_from / extend_only) against
+    generate_cooling_workflow. Its input is always the equilibration stage's own melt cell, so
+    a remedy that needs the whole descent regenerated invalidates this stage rather than
+    resuming from a checkpoint inside the core chain.
+    """
+    p = resolve_stage_params("cool", args, cls)
+    flags = p["lammps_flags"]
+    common = dict(
+        work_dir_base=p["work_dir"],
+        T_melt_hold_K=p["T_melt_hold_K"], final_T_K=p["final_T_K"],
+        cool_block_dT_K=p["cool_block_dT_K"],
+        cool_block_hold_cap_steps=p["cool_block_hold_cap_steps"],
+        stage7_cap_steps=p["stage7_cap_steps"],
+        stage8_cap_steps=p["stage8_cap_steps"],
+        polymer_name=args.run_name, press=p["P_equil_atm"],
+        use_pcff=flags["use_pcff"], use_trappe=flags["use_trappe"], use_opls=flags["use_opls"],
+        engine=p["engine"], velocity_seed=p["velocity_seed"],
+        thermostat_damp_fs=p["thermostat_damp_fs"], barostat_damp_fs=p["barostat_damp_fs"],
+        use_long_range=p["use_long_range_electrostatics"],
+    )
+    if extend_from_data is not None:
+        dt = p["dt_fs"]
+        extend_steps_val = int(extend_ns * 1e6 / dt)
+        base = extend_base_stage or "npt_final"
+        override = {
+            "nvt_kinetic_stability": {"stage7_min_steps": extend_steps_val},
+            "npt_final": {"stage8_min_steps": extend_steps_val},
+        }.get(base, {"cool_block_hold_steps": extend_steps_val})
+        workflow = lammps.generate_cooling_workflow(
+            data_file=p["data_path"],
+            cool_block_hold_steps=override.get("cool_block_hold_steps",
+                                               p["cool_block_hold_steps"]),
+            stage7_min_steps=override.get("stage7_min_steps", p["stage7_min_steps"]),
+            stage8_min_steps=override.get("stage8_min_steps", p["stage8_min_steps"]),
+            extend_only=True, restart_file=extend_from_data, base_stage_name=base,
+            extend_ensemble=extend_ensemble, extend_temp_K=extend_temp_K,
+            **common,
+        )
+    else:
+        workflow = lammps.generate_cooling_workflow(
+            data_file=resume_data_path or p["data_path"],
+            cool_block_hold_steps=p["cool_block_hold_steps"],
+            stage7_min_steps=p["stage7_min_steps"],
+            stage8_min_steps=p["stage8_min_steps"],
+            resume_from=resume_from,
+            **common,
+        )
+    if workflow.get("status") == "error":
+        raise SystemExit(f"generate_cooling_workflow failed: {workflow}")
+    chain = lammps.run_lammps_chain(
+        stages=workflow["stages"], gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"],
+        data_file=resume_data_path or extend_from_data or p["data_path"], engine=p["engine"],
+        params_file="",
     )
     if chain.get("status") == "error":
         raise SystemExit(f"run_lammps_chain failed: {chain}")
@@ -555,7 +581,7 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
 
     if gate_enabled:
         # Two-chain path: chain 1 (minimize..anneal_hold) -> adaptive MSID gate on anneal_hold's
-        # own trajectory -> chain 2 (cool_block_01..npt_final, via resume_from="anneal_hold").
+        # own trajectory -> chain 2 (the melt tail, via resume_from="anneal_hold").
         # Opt-in (anneal_hold_msid_gate_enabled, default off) -- see _anneal_hold_adaptive_extend
         # for the validated remedy this implements and why. EXTEND/resume_from continuations of an
         # EARLIER attempt never take this branch -- gate_enabled is False for those -- so a
@@ -640,7 +666,7 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                 atomic_write_json(pending_path,
                                   {"chain_id": submission["chain_id"], "workflow": workflow})
             result = wait_for_run(lammps, submission["chain_id"],
-                                  "equilibration chain 2 (cool_block_01..npt_final)")
+                                  "equilibration chain 2 (melt tail)")
         if result.get("status") != "completed":
             raise SystemExit(f"Equilibration chain 2 did not complete: {result}")
         if pending_path is not None:
@@ -687,49 +713,37 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
             pending_path.unlink(missing_ok=True)
         workflow = submission["workflow"]
     # Every stage THIS call actually built, by name -> its own write_data output. A later
-    # attempt's remedy (melt_hold's anneal-cycle extension, a future npt_cool300 remedy) needs a
-    # real checkpoint path to resume from — CampaignStageExecutor.execute locates it by walking
-    # this attempt's outputs (via prior_attempts), the same pattern npt_continuation_ns already
-    # uses for npt_prod_data_path. Surfaced on every return below, halted or not: a resumed chain
-    # (resume_from set) only contains ITS OWN tail stages here, not the ones it skipped -- a
+    # attempt's remedy needs a real checkpoint path to resume from — CampaignStageExecutor.execute
+    # locates it by walking this attempt's outputs (via prior_attempts), the same pattern
+    # npt_continuation_ns already uses. Surfaced on every return below, halted or not: a resumed
+    # chain (resume_from set) only contains ITS OWN tail stages here, not the ones it skipped -- a
     # remedy resuming from one of those earlier stages must walk further back through
     # prior_attempts to find them, same as any other stage_checkpoints lookup.
     stage_checkpoints = {s["name"]: s["output_data"] for s in workflow["stages"] if s.get("name")}
-    # npt_final is unconditionally the terminal stage in the 8-stage adaptive protocol -- there
-    # is no separate glassy-vs-rubbery terminal stage name anymore (cool_block always ramps
-    # down to final_T_K regardless of regime).
-    npt_prod_data_path = workflow["stages"][-1]["output_data"]
-    npt_prod_dump_path = _stage_dump_path(workflow["stages"][-1])
-    npt_prod_restart_path = workflow["stages"][-1].get("output_restart")
 
-    # melt_dump_path (nvt_kinetic_stability's fixed-volume window) carries the ensemble-
-    # sensitive checks -- rg/msd/ct/msid used to all read from here too (a known simplification,
-    # now retired); Rg/MSID/R_ee/torsion/P2/density_homogeneity/finite_size now read from
-    # struct_dump_path (npt_final's own trajectory) instead, set just below alongside
-    # npt_prod_data_path each loop iteration. melt_data_path (the assess_cooling_contraction
-    # melt reference) comes directly from the generator's own melt_data_path field -- the
-    # cool_block tagged at `temp`/t_equil_K -- not a stage-name lookup, since which specific
-    # cool_block_NN it is varies per run.
     def _find_stage(name):
         return next((s for s in workflow["stages"] if s.get("name") == name), None)
-    _kinetic_stage = _find_stage("nvt_kinetic_stability")
-    if _kinetic_stage:
-        args.npt_prod_dump = _stage_dump_path(_kinetic_stage)
-    if workflow.get("melt_data_path"):
-        args.melt_data_path = workflow["melt_data_path"]
-    # tg_start_data_path: the cool_block the Tg sweep should start its staircase from -- a
-    # melt-cooled cell at (or at most one block above) the sweep's top, instead of reheating
-    # the finished final_T_K one. Unlike melt_data_path this has NO formula fallback in the
-    # resolver: which cool_block_NN it is varies per run, so it only survives a resume by being
-    # persisted in this stage's outputs dict and re-read by CampaignStageExecutor.execute.
-    if workflow.get("tg_start_data_path"):
-        args.tg_start_data = workflow["tg_start_data_path"]
-        args.tg_start_T_K = workflow.get("tg_start_T_K")
+
+    # The core chain ends on nvt_melt_hold, but the cell it GATES is npt_melt_hold: the melt
+    # density and every thermo-derived gate come from the barostatted hold, while nvt_melt_hold
+    # supplies only the fixed-volume trajectory MSD/kinetic-trap/C(t) require (a barostatted
+    # trajectory affine-scales coordinates every step and contaminates cumulative CoM
+    # displacement). nvt_melt_hold's ENDPOINT is what every downstream track starts from -- its
+    # box is npt_melt_hold's, unchanged, because NVT cannot move it.
+    melt_start_data_path = workflow["stages"][-1]["output_data"]
+    melt_start_restart_path = workflow["stages"][-1].get("output_restart")
+    _hold_stage = _find_stage("npt_melt_hold")
+    melt_hold_data_path = _hold_stage["output_data"] if _hold_stage else melt_start_data_path
+    melt_hold_dump_path = _stage_dump_path(_hold_stage) if _hold_stage else None
+    melt_hold_restart_path = _hold_stage.get("output_restart") if _hold_stage else None
+    _nvt_stage = _find_stage("nvt_melt_hold")
+    if _nvt_stage:
+        args.npt_prod_dump = _stage_dump_path(_nvt_stage)
 
     attempts = 0
     while True:
-        args.data_path = npt_prod_data_path
-        args.struct_dump_path = npt_prod_dump_path
+        args.data_path = melt_hold_data_path
+        args.struct_dump_path = melt_hold_dump_path
         p = resolve_stage_params("equil-check", args, cls)
         # The resolver's value, not the raw CLI arg: the halt below says the list comes from
         # decided_params, and only the resolver reads it from there (via the plan-overlaid cls).
@@ -743,47 +757,205 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
         if derivation is not None:
             backbone_derivation = derivation
 
-        comp = wait_for_analysis(lammps, lammps.check_equilibration_comprehensive(
-            log_file=p["npt_prod_log_path"], dump_file=p["melt_dump_path"],
-            data_file=p["npt_prod_data_path"], backbone_types=backbone_types,
-            ct_min_decay=p["ct_min_decay_melt"], output_dir=p["output_dir"], graphs_dir=p["graphs_dir"],
-            cutoff_A=p["cutoff_A"], timestep_fs=p["dt_fs"],
-            struct_dump_file=p["struct_dump_path"], struct_data_file=p["npt_prod_data_path"],
-        ), "equil-check comprehensive")
-        density = wait_for_analysis(lammps, lammps.extract_equilibrated_density(
-            log_file=p["npt_prod_log_path"], target_temp=p["npt_prod_temp_K"], output_dir=p["output_dir"],
-        ), "equil-check density")
-        comprehensive_json = str(Path(p["output_dir"]) / "equilibration.json")
-        verdict = lammps.enforce_equilibration_gate(
-            comprehensive_json=comprehensive_json, regime=p["regime"], dp=p["dp"],
-            ct_gate_reliable=p["ct_gate_reliable"],
-            tg_K=p["exp_tg_point_K"], t_equil_K=p["T_workflow_K"], glass_data=p["npt_prod_data_path"],
-            final_T_K=p["npt_prod_temp_K"],
-            melt_data=p["melt_data_path"], out_dir=p["output_dir"],
-        )
+        comp, density, verdict, comprehensive_json = _run_equilibration_gate(
+            lammps, p, backbone_types, "equilibration.json", "melt gate")
         equil_verdict = verdict.get("verdict")
 
         if equil_verdict == "PASS":
-            result = {"equil_verdict": "PASS", "npt_prod_data_path": p["npt_prod_data_path"],
-                      "npt_prod_log_path": p["npt_prod_log_path"], "npt_prod_dump_path": npt_prod_dump_path,
-                      "npt_prod_restart_path": npt_prod_restart_path,
-                      "density_gcm3": density.get("plateau_density_mean"),
-                      "velocity_seed": velocity_seed, "extend_history": extend_history,
-                      "backbone_derivation": backbone_derivation,
-                      "anneal_hold_convergence": ({k: v for k, v in anneal_hold_gate_result.items()
-                                                   if k != "anneal_hold_stage"}
-                                                  if anneal_hold_gate_result else None),
-                      "stage_checkpoints": stage_checkpoints,
-                      # equilibration.json's own on-disk path -- see do_mechanical's
-                      # mechanical_json_path for why this needs to be explicit rather than
-                      # searched (it lives under THIS equilibration attempt's raw dir, not the
-                      # summary attempt's own output_dir).
-                      "equilibration_json_path": comprehensive_json,
-                      "tg_start_data_path": getattr(args, "tg_start_data", None),
-                      "tg_start_T_K": getattr(args, "tg_start_T_K", None)}
-            return result
+            return {"equil_verdict": "PASS",
+                    # The gated melt cell (npt_melt_hold): the cooling stage's contraction
+                    # reference, and what melt density was measured on.
+                    "melt_data_path": melt_hold_data_path,
+                    "melt_log_path": p["npt_prod_log_path"],
+                    "melt_dump_path": melt_hold_dump_path,
+                    "melt_restart_path": melt_hold_restart_path,
+                    # The handoff cell (nvt_melt_hold): what cooling, thermal and any other
+                    # downstream track reads.
+                    "melt_start_data_path": melt_start_data_path,
+                    "melt_start_restart_path": melt_start_restart_path,
+                    "T_melt_hold_K": p["T_melt_hold_K"],
+                    "melt_density_gcm3": density.get("plateau_density_mean"),
+                    "velocity_seed": velocity_seed, "extend_history": extend_history,
+                    "backbone_derivation": backbone_derivation,
+                    "anneal_hold_convergence": ({k: v for k, v in anneal_hold_gate_result.items()
+                                                 if k != "anneal_hold_stage"}
+                                                if anneal_hold_gate_result else None),
+                    "stage_checkpoints": stage_checkpoints,
+                    # equilibration.json's own on-disk path -- see do_mechanical's
+                    # mechanical_json_path for why this needs to be explicit rather than
+                    # searched (it lives under THIS equilibration attempt's raw dir, not the
+                    # summary attempt's own output_dir).
+                    "equilibration_json_path": comprehensive_json}
 
         if equil_verdict == "EXTEND":
+            tau_relax_ps = (((comp or {}).get("chain") or {}).get("ct") or {}).get("tau_relax_ps")
+            if getattr(args, "engine_owned_recovery", False):
+                detail = dict(verdict)
+                if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
+                    detail["relaxation_time_ns"] = tau_relax_ps / 1000.0
+                return {"halted": True, "reason": "EXTEND", "detail": detail,
+                        "melt_data_path": melt_hold_data_path,
+                        "melt_dump_path": melt_hold_dump_path,
+                        "melt_restart_path": melt_hold_restart_path,
+                        "melt_start_data_path": melt_start_data_path,
+                        "stage_checkpoints": stage_checkpoints}
+            attempts += 1
+            if attempts > EXTEND_MAX_ATTEMPTS:
+                return {"halted": True, "reason": "EXTEND_EXHAUSTED",
+                        "detail": {"attempts": attempts}, "stage_checkpoints": stage_checkpoints}
+            # A measured relaxation signal from this run's own data beats a blind flat guess —
+            # tau_relax_ps comes from the comprehensive check's KWW fit.
+            extend_ns = 1.5
+            if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
+                extend_ns = max(1.5, round(1.5 * tau_relax_ps / 1000, 2))
+            extend_history.append({"attempt": attempts, "trigger": "equil_verdict=EXTEND",
+                                   "extend_ns": extend_ns, "tau_relax_ps": tau_relax_ps,
+                                   "melt_hold_temp_K": p["npt_prod_temp_K"]})
+            with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
+                args.gpu_ids = gpu_ids
+                # TWO steps, and the second is not optional. Every extendable gate is measured on
+                # npt_melt_hold, so step 1 restart-continues that stage's own trajectory (its
+                # .restart, read via read_restart with log/dump appended, so the result is one
+                # continuous trajectory). But nvt_melt_hold -- the handoff cell AND the MSD/C(t)
+                # window -- was built from the PRE-extension endpoint, so it is now stale in both
+                # roles. Step 2 regenerates it from the extended hold. Skipping it would hand
+                # thermal and cooling a cell that is not the one this gate passed.
+                submission = _submit_equil_chain(
+                    args, cls, lammps, extend_from_data=melt_hold_restart_path,
+                    extend_temp=p["npt_prod_temp_K"], extend_ns=extend_ns,
+                    extend_base_stage="npt_melt_hold", extend_ensemble="npt")
+                ext_result = wait_for_run(lammps, submission["chain_id"],
+                                          "melt hold EXTEND (npt_melt_hold)")
+                if ext_result.get("status") != "completed":
+                    raise SystemExit(f"EXTEND chain did not complete: {ext_result}")
+                extended_hold = submission["workflow"]["stages"][0]
+                melt_hold_data_path = extended_hold["output_data"]
+                melt_hold_dump_path = _stage_dump_path(extended_hold)
+                melt_hold_restart_path = extended_hold.get("output_restart")
+
+                regen = _submit_equil_chain(args, cls, lammps, resume_from="npt_melt_hold",
+                                            resume_data_path=melt_hold_data_path)
+                regen_result = wait_for_run(lammps, regen["chain_id"],
+                                            "melt hold EXTEND (nvt_melt_hold regeneration)")
+            if regen_result.get("status") != "completed":
+                raise SystemExit(f"nvt_melt_hold regeneration did not complete: {regen_result}")
+            regen_tail = regen["workflow"]["stages"][-1]
+            melt_start_data_path = regen_tail["output_data"]
+            melt_start_restart_path = regen_tail.get("output_restart")
+            args.npt_prod_dump = _stage_dump_path(regen_tail)
+            stage_checkpoints.update({s["name"]: s["output_data"]
+                                      for s in regen["workflow"]["stages"] if s.get("name")})
+            continue
+
+        # Structural or protocol failures never trigger an implicit protocol change. Halt with
+        # structured evidence for the recovery-agent boundary.
+        return {"halted": True, "reason": equil_verdict, "detail": verdict,
+                "stage_checkpoints": stage_checkpoints}
+
+
+def _run_equilibration_gate(lammps, p: dict, backbone_types, json_name: str, label: str):
+    """The gate itself: comprehensive check -> density -> verdict, on whatever cell `p` names.
+
+    Shared verbatim by the melt gate (equilibration stage, on npt_melt_hold) and the assessment
+    gate (cooling stage, on npt_final). The two differ only in the cell they point at, the
+    regime they declare, and the file they write -- never in what is computed or how it is
+    adjudicated, which is what keeps one D-05 policy honest across both.
+    """
+    comp = wait_for_analysis(lammps, lammps.check_equilibration_comprehensive(
+        log_file=p["npt_prod_log_path"], dump_file=p["melt_dump_path"],
+        data_file=p["npt_prod_data_path"], backbone_types=backbone_types,
+        ct_min_decay=p["ct_min_decay_melt"], output_dir=p["output_dir"],
+        graphs_dir=p["graphs_dir"], cutoff_A=p["cutoff_A"], timestep_fs=p["dt_fs"],
+        struct_dump_file=p["struct_dump_path"], struct_data_file=p["npt_prod_data_path"],
+        output_name=json_name,
+    ), f"{label} comprehensive")
+    density = wait_for_analysis(lammps, lammps.extract_equilibrated_density(
+        log_file=p["npt_prod_log_path"], target_temp=p["npt_prod_temp_K"],
+        output_dir=p["output_dir"], output_name=json_name,
+    ), f"{label} density")
+    comprehensive_json = str(Path(p["output_dir"]) / json_name)
+    verdict = lammps.enforce_equilibration_gate(
+        comprehensive_json=comprehensive_json, regime=p["regime"], dp=p["dp"],
+        ct_gate_reliable=p["ct_gate_reliable"],
+        tg_K=p["exp_tg_point_K"],
+        # The hot endpoint of assess_cooling_contraction's span is where the melt was actually
+        # held. Passing T_workflow_K here understated it for every rubbery class (T_workflow is
+        # 300 K there), and the melt gate passes no melt_data at all, so the probe never runs.
+        t_equil_K=p["T_melt_hold_K"], glass_data=p["npt_prod_data_path"],
+        final_T_K=p["npt_prod_temp_K"],
+        melt_data=p["melt_data_path"], out_dir=p["output_dir"],
+        output_name=json_name,
+    )
+    return comp, density, verdict, comprehensive_json
+
+
+def do_cool_and_check(args, cls: dict, lammps) -> dict:
+    """Cool the gated melt to final_T_K and adjudicate the assessment cell.
+
+    Runs only when a property needs a cell at the assessment temperature: a density at
+    final_T_K, or any mechanical property (track_registry._MECHANICAL.requires). A melt-only or
+    Tg-only run never reaches here.
+    """
+    gpu_per_run = cls.get("gpu_per_run") or 1
+    continuation_path = getattr(args, "pending_continuation_path", None)
+    extend_history = []
+
+    pending_path = (Path(args.work_dir).parent / "pending_cool_submission.json"
+                    if args.work_dir else None)
+    reattaching = pending_path is not None and pending_path.is_file()
+
+    with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
+        args.gpu_ids = gpu_ids
+        if reattaching:
+            submission = json.loads(pending_path.read_text())
+        else:
+            if continuation_path:
+                submission = _submit_cool_chain(
+                    args, cls, lammps, extend_from_data=continuation_path,
+                    extend_ns=float(getattr(args, "cooling_continuation_ns", 1.5)),
+                    extend_base_stage=getattr(args, "cooling_extend_base_stage", "npt_final"),
+                    extend_ensemble=getattr(args, "cooling_extend_ensemble", "npt"))
+            else:
+                submission = _submit_cool_chain(args, cls, lammps)
+            if pending_path is not None:
+                atomic_write_json(pending_path, submission)
+        result = wait_for_run(lammps, submission["chain_id"], "cooling chain")
+    if result.get("status") != "completed":
+        raise SystemExit(f"Cooling chain did not complete: {result}")
+    if pending_path is not None:
+        pending_path.unlink(missing_ok=True)
+    workflow = submission["workflow"]
+
+    stage_checkpoints = {s["name"]: s["output_data"] for s in workflow["stages"] if s.get("name")}
+    npt_prod_data_path = workflow["stages"][-1]["output_data"]
+    npt_prod_dump_path = _stage_dump_path(workflow["stages"][-1])
+    npt_prod_restart_path = workflow["stages"][-1].get("output_restart")
+    _kinetic = next((s for s in workflow["stages"]
+                     if s.get("name") == "nvt_kinetic_stability"), None)
+    if _kinetic:
+        args.npt_prod_dump = _stage_dump_path(_kinetic)
+
+    attempts = 0
+    while True:
+        args.data_path = npt_prod_data_path
+        args.struct_dump_path = npt_prod_dump_path
+        p = resolve_stage_params("cool-check", args, cls)
+        backbone_types = args.backbone_types or cls.get("backbone_types")
+        comp, density, verdict, cooling_json = _run_equilibration_gate(
+            lammps, p, backbone_types, "cooling.json", "cool-check")
+        cool_verdict = verdict.get("verdict")
+
+        if cool_verdict == "PASS":
+            return {"cool_verdict": "PASS", "npt_prod_data_path": p["npt_prod_data_path"],
+                    "npt_prod_log_path": p["npt_prod_log_path"],
+                    "npt_prod_dump_path": npt_prod_dump_path,
+                    "npt_prod_restart_path": npt_prod_restart_path,
+                    "density_gcm3": density.get("plateau_density_mean"),
+                    "extend_history": extend_history,
+                    "stage_checkpoints": stage_checkpoints,
+                    "cooling_json_path": cooling_json}
+
+        if cool_verdict == "EXTEND":
             tau_relax_ps = (((comp or {}).get("chain") or {}).get("ct") or {}).get("tau_relax_ps")
             if getattr(args, "engine_owned_recovery", False):
                 detail = dict(verdict)
@@ -798,24 +970,22 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
             if attempts > EXTEND_MAX_ATTEMPTS:
                 return {"halted": True, "reason": "EXTEND_EXHAUSTED",
                         "detail": {"attempts": attempts}, "stage_checkpoints": stage_checkpoints}
-            # A measured relaxation signal from this run's own data beats a blind flat guess —
-            # tau_relax_ps comes from the comprehensive check's KWW fit.
             extend_ns = 1.5
             if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
                 extend_ns = max(1.5, round(1.5 * tau_relax_ps / 1000, 2))
-            extend_history.append({"attempt": attempts, "trigger": "equil_verdict=EXTEND",
+            extend_history.append({"attempt": attempts, "trigger": "cool_verdict=EXTEND",
                                    "extend_ns": extend_ns, "tau_relax_ps": tau_relax_ps,
                                    "npt_prod_temp_K": p["npt_prod_temp_K"]})
             with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
                 args.gpu_ids = gpu_ids
-                # Restart-continuation of npt_final's own trajectory -- extend_from_data is its
-                # .restart output (not .data), read via read_restart with the log/dump appended
-                # onto npt_final's own files, so the result is one continuous trajectory.
-                submission = _submit_equil_chain(
+                # npt_final is terminal here, so unlike the melt gate a single restart-
+                # continuation is enough: nothing downstream of it was built from the old
+                # endpoint.
+                submission = _submit_cool_chain(
                     args, cls, lammps, extend_from_data=npt_prod_restart_path,
-                    extend_temp=p["npt_prod_temp_K"], extend_ns=extend_ns,
-                    extend_base_stage="npt_final", extend_ensemble="npt")
-                ext_result = wait_for_run(lammps, submission["chain_id"], "equilibration EXTEND")
+                    extend_ns=extend_ns, extend_base_stage="npt_final",
+                    extend_ensemble="npt", extend_temp_K=p["npt_prod_temp_K"])
+                ext_result = wait_for_run(lammps, submission["chain_id"], "cooling EXTEND")
             if ext_result.get("status") != "completed":
                 raise SystemExit(f"EXTEND chain did not complete: {ext_result}")
             npt_prod_data_path = submission["workflow"]["stages"][0]["output_data"]
@@ -823,9 +993,7 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
             npt_prod_restart_path = submission["workflow"]["stages"][0].get("output_restart")
             continue
 
-        # Structural or protocol failures never trigger an implicit protocol change. Halt with
-        # structured evidence for the recovery-agent boundary.
-        return {"halted": True, "reason": equil_verdict, "detail": verdict,
+        return {"halted": True, "reason": cool_verdict, "detail": verdict,
                 "stage_checkpoints": stage_checkpoints}
 
 
@@ -840,140 +1008,6 @@ def _tg_lammps_common_params(p: dict) -> dict:
         "use_pppm": p["use_long_range_electrostatics"] and not p["lammps_flags"]["use_trappe"],
         **{f"use_{k.split('_')[1]}": v for k, v in p["lammps_flags"].items()},
     }
-
-
-def _bracket_tg_start_temp(args, cls: dict, lammps, p: dict) -> dict:
-    """RadonPy-inspired pre-sweep probe: verify T_start_K sits unambiguously in the melt
-    branch before committing to the (multi-ns) per-temperature sweep, using this run's own
-    measured density-vs-T trend rather than the class's static tg_t_high_K constant alone.
-
-    A short NPT ramp from the cold T_workflow_K structure up to the candidate T_start_K is
-    checked for a statistically significant, monotonically NEGATIVE density trend near its top
-    (monotonic_trend alone is sign-agnostic -- an explicit slope<0 check is required). Density
-    is a state function, not path-dependent: a bare ramp-and-read conflates "still relaxing
-    from the jump" with "hasn't melted," so this bracket only decides WHETHER to raise the
-    candidate -- genuine equilibration at the accepted candidate happens in Phase 2
-    (_run_tg_sweep_adaptive), which holds every point (including the first) until stable.
-
-    Necessary but not sufficient: the glassy branch also has negative dRho/dT (~half the melt
-    branch's expansivity), so this cannot alone distinguish "comfortably melt" from "comfortably
-    glass but still cooling normally." Advisory only -- never raises, never blocks do_thermal;
-    an exhausted or failed bracket just proceeds with its best candidate. extract_thermal.py's
-    own downstream fit-quality gates remain the real correctness backstop.
-    """
-    from check_block_gate import monotonic_trend
-    from analysis_utils import parse_lammps_log
-
-    T_workflow_K = p["T_workflow_K"]
-    T_step_K = p["T_step_K"]
-    ceiling_K = cls.get("annealing_T_high_K", 700.0)
-    max_iters = p["tg_bracket_max_iters"]
-    probe_steps = p["tg_bracket_probe_steps"]
-    drift_threshold_pct = p["tg_bracket_drift_threshold_pct"]
-    common = _tg_lammps_common_params(p)
-
-    candidate = p["T_start_K"]
-    from_data = p["equil_data_path"]
-    from_T = T_workflow_K
-    iterations: list[dict] = []
-
-    for i in range(1, max_iters + 1):
-        probe_dir = f"{p['work_dir']}/tg_bracket/probe_{i:02d}"
-        script = lammps.generate_script(
-            template_name="npt", data_file=from_data,
-            output_script=f"{probe_dir}/probe.in", velocity_seed=p["velocity_seed"],
-            params={**common, "LOG_FILE": "probe.log", "T_START": from_T, "T_FINAL": candidate,
-                    "N_STEPS": probe_steps, "THERMO_FREQ": 500, "use_restart": False,
-                    "P_START": p["pressure_atm"], "P_FINAL": p["pressure_atm"]},
-        )
-        run = lammps.run_lammps_script(
-            script=script["output_script"], work_dir=probe_dir, log_file="probe_run.log",
-            gpu_ids=p["gpu_ids"], mpi=p["mpi_ranks"], engine=p["engine"],
-            data_file=from_data, lj_cutoff=p["cutoff_A"],
-        )
-        result = wait_for_run(lammps, run["run_id"], f"tg bracket probe {i}")
-        if result.get("status") != "completed":
-            iterations.append({"iteration": i, "candidate_T_K": candidate, "outcome": "run_failed"})
-            return {"T_start_K": candidate, "start_data_path": from_data,
-                    "iterations": iterations, "outcome": "PROBE_FAILED"}
-
-        try:
-            df = parse_lammps_log(f"{probe_dir}/probe.log")
-        except Exception:
-            df = None
-        if df is None or "Density" not in df.columns or len(df) < 4:
-            iterations.append({"iteration": i, "candidate_T_K": candidate, "outcome": "unparseable_log"})
-            return {"T_start_K": candidate, "start_data_path": from_data,
-                    "iterations": iterations, "outcome": "PROBE_FAILED"}
-
-        window_frac = (1.0 / 3.0) if i == 1 else 0.8
-        window = df["Density"].values[-max(int(len(df) * window_frac), 4):]
-        trend = monotonic_trend(window, drift_threshold_pct=drift_threshold_pct)
-        melt_like = bool(trend.get("available") and trend.get("monotonic_trend")
-                          and trend.get("slope", 0.0) < 0)
-        iterations.append({"iteration": i, "candidate_T_K": candidate, "trend": trend,
-                            "melt_like": melt_like})
-        from_data = f"{probe_dir}/npt_out.data"
-
-        if melt_like:
-            return {"T_start_K": candidate, "start_data_path": from_data,
-                    "iterations": iterations, "outcome": "PASS"}
-
-        from_T = candidate
-        candidate = min(candidate + 2 * T_step_K, ceiling_K)
-
-    return {"T_start_K": candidate, "start_data_path": from_data,
-            "iterations": iterations, "outcome": "EXHAUSTED"}
-
-
-def _select_tg_start_cell(args, cls: dict, lammps, p: dict) -> dict:
-    """Which structure the Tg staircase starts from, in bracket-result shape.
-
-    The sweep measures where a COOLING liquid stiffens, so it has to start from a liquid. The
-    equilibration chain already made one and wrote it to disk: cool_block ramps the annealed
-    melt down to final_T_K and saves a .data file at every waypoint, and the anneal ceiling now
-    carries one block of headroom above the sweep top precisely so one of those waypoints sits
-    there (see temperature_schedule's sweep_start_headroom term). Using it costs nothing -- the
-    trajectory has already been run -- and it replaces a 150 ps reheat of the finished cell.
-
-    Why the reheat was wrong, not merely slower: the fallback probe hands npt_final (a cell
-    equilibrated at final_T_K) to a deck whose T_START and T_FINAL are BOTH the candidate
-    temperature -- a thermostat step change, not a ramp. Worse, that cell is packed at its
-    final_T_K density; a real melt is several percent less dense, and 150 ps is nowhere near
-    enough for the barostat to expand the box. The top plateaus of the staircase are then read
-    off a cell still relaxing from the jump, which biases the rubbery branch and hence the
-    breakpoint. PKTN/PSFO's inverted rate dependence (Tg FALLING as cooling gets faster, i.e. as
-    less time is spent contaminated at the top) is the signature of exactly this.
-
-    Three cases; the fallback is retained rather than deleted because it is what a run with an
-    untrustworthy Tg estimate legitimately lands on -- the ceiling carries no sweep headroom
-    there, so no tagged cell is guaranteed to exist.
-    """
-    T_start = p["T_start_K"]
-    tagged_path, tagged_T = p["tg_start_data_path"], p["tg_start_T_K"]
-    dT = p["cool_block_dT_K"]
-
-    # (a) The equilibration cooldown tagged a cell at or just above the sweep top. The
-    # temperature match is not decoration: tg_t_high_K can be edited between the equilibration
-    # and thermal stages (or replayed from a frozen plan), and a stale tag would silently start
-    # the staircase from the wrong temperature. Reject it and reheat rather than guess.
-    if tagged_path and isinstance(tagged_T, (int, float)) and Path(tagged_path).exists():
-        if -1e-6 <= tagged_T - T_start <= dT + 1e-6:
-            return {"T_start_K": T_start, "start_data_path": tagged_path,
-                    "start_T_K": tagged_T, "iterations": [], "outcome": "MELT_COOLED_START"}
-        fallback = _bracket_tg_start_temp(args, cls, lammps, p)
-        return {**fallback, "stale_tg_start_tag_T_K": tagged_T}
-
-    # (b) A rubbery run assessed at or above the sweep top: npt_final IS an equilibrated cell
-    # at/above the staircase's first point, so there is nothing to reheat and nothing to tag.
-    if p["final_T_K"] >= T_start - 1e-6:
-        return {"T_start_K": T_start, "start_data_path": p["equil_data_path"],
-                "start_T_K": p["final_T_K"], "iterations": [],
-                "outcome": "ASSESSED_ABOVE_SWEEP_TOP"}
-
-    # (c) No tagged cell -- an untrustworthy Tg estimate (class-default window, no headroom), a
-    # legacy plan, or a chain generated before tagging existed.
-    return _bracket_tg_start_temp(args, cls, lammps, p)
 
 
 def _run_tg_sweep_adaptive(args, cls: dict, lammps, p: dict, start_data_path: str) -> dict:
@@ -1072,21 +1106,22 @@ def _run_tg_sweep_adaptive(args, cls: dict, lammps, p: dict, start_data_path: st
     return {"per_t": per_t, "outcome": "COMPLETE"}
 
 
-def do_thermal(args, cls: dict, lammps, equil_density_gcm3=None) -> dict:
+def do_thermal(args, cls: dict, lammps, melt_density_gcm3=None) -> dict:
     """Single-rate-primary: run one sweep at the class's primary configured rate (highest by
     default; a tg_slope_gate_fallback="slowest_rate" class runs rates[0] instead, its
     highest-rate fit being documented as degenerate/inverted).
 
     No class carries that fallback as of 2026-09-01: PKTN and PSFO did, and their inversion was
-    the cold-start artifact the melt-start sweep fixes (see _select_tg_start_cell). The branch
-    stays because the fallback remains a valid, validated diagnosis for a class that genuinely
-    cannot resolve its highest rate."""
+    a cold-start artifact -- the staircase used to reheat a finished 300 K glass. It now starts
+    from the gated melt hold, so there is neither a reheat probe nor a mid-ramp waypoint to
+    select between. The branch stays because the fallback remains a valid, validated diagnosis
+    for a class that genuinely cannot resolve its highest rate."""
     tg_rates = cls.get("tg_rates_K_per_ns", [])
     gpu_per_run = cls.get("gpu_per_run") or 1
     per_rate = []
     if tg_rates:
-        # Shared with _resolve_equil_params' cool_block rate matching -- the cooldown and the
-        # staircase are one continuous descent and must not drift apart on which rate that is.
+        # Shared with _resolve_cool_params' cool_block rate matching -- the cooldown and the
+        # staircase descend from the same melt cell and must not drift apart on which rate.
         idx = select_primary_tg_rate_index(cls)
         if not 0 <= idx < len(tg_rates):
             return {"halted": True, "reason": "TG_PRIMARY_RATE_INDEX_INVALID",
@@ -1096,37 +1131,39 @@ def do_thermal(args, cls: dict, lammps, equil_density_gcm3=None) -> dict:
         p = resolve_stage_params("tg", args, cls)
         with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
             args.gpu_ids = gpu_ids
-            bracket = _select_tg_start_cell(args, cls, lammps, p)
-            sweep = _run_tg_sweep_adaptive(args, cls, lammps, p, bracket["start_data_path"])
+            # No bracketing, no reheat probe, no waypoint selection: the staircase starts from
+            # the cell the melt gate passed, at the temperature that gate certified.
+            start_cell = {"outcome": "MELT_HOLD_START",
+                          "T_start_K": p["T_start_K"],
+                          "start_data_path": p["equil_data_path"]}
+            sweep = _run_tg_sweep_adaptive(args, cls, lammps, p, start_cell["start_data_path"])
 
-        # bracket["outcome"] may be PROBE_FAILED (the very first probe couldn't even run/parse,
-        # almost certainly a real deck/hardware problem rather than a "wasn't melt enough" case)
-        # or EXHAUSTED (candidate raised to its ceiling without ever confirming a melt-like
-        # trend) -- both are advisory: _run_tg_sweep_adaptive still ran from bracket's best
-        # candidate/structure either way, and any genuinely bad outcome is caught by
-        # extract_thermal's own fit-quality gates below, not here.
-
-        equil_sanity = None
-        if equil_density_gcm3 is not None and sweep.get("per_t"):
-            first_point = sweep["per_t"][0]
-            probe_density = first_point.get("mean_density_gcm3")
+        # The staircase's first point sits AT the melt hold, so its density should reproduce the
+        # density the melt gate measured on that same cell. A mismatch means the sweep started
+        # from something other than the gated melt -- a wiring fault, not a physics result.
+        # (This used to assert probe_density < equil_density, which was correct only while
+        # equil_density was the 300 K GLASS; against a melt reference it inverts.)
+        melt_start_consistent = None
+        if melt_density_gcm3 and sweep.get("per_t"):
+            probe_density = sweep["per_t"][0].get("mean_density_gcm3")
             if probe_density is not None:
-                equil_sanity = bool(probe_density < equil_density_gcm3)
+                melt_start_consistent = bool(
+                    abs(probe_density - melt_density_gcm3) / melt_density_gcm3 <= 0.02)
 
         ap = resolve_stage_params("analyze-tg", args, cls)
         thermal = wait_for_analysis(lammps, lammps.extract_thermal(
             log_file=ap["tg_log_path"], tg_data_file=ap["tg_data_file"],
             per_t_dump_file=ap["per_t_dump_file"], backbone_types=ap["backbone_types"],
             enthalpy_col=ap["enthalpy_col"], output_dir=ap["output_dir"], graphs_dir=ap["graphs_dir"],
-            method_gap_exempt=ap["method_gap_exempt"],
+            method_gap_exempt=ap["method_gap_exempt"], fit_t_max_K=ap["fit_t_max_K"],
         ), f"tg analysis rate={rate}")
         per_rate.append({"rate": rate, "Tg_K": thermal.get("Tg_K"),
                          "fit_quality": thermal.get("fit_quality"), "r_squared": thermal.get("r_squared"),
                          "output_dir": ap["output_dir"], "used_highest_rate": idx == len(tg_rates) - 1,
                          "tg_gate_verdict": thermal.get("tg_gate_verdict"),
                          "velocity_seed": p["velocity_seed"],
-                         "tg_bracket": bracket, "tg_per_t_sampling": sweep.get("per_t"),
-                         "tg_bracket_equil_density_sanity": equil_sanity})
+                         "tg_start_cell": start_cell, "tg_per_t_sampling": sweep.get("per_t"),
+                         "tg_melt_start_density_consistent": melt_start_consistent})
 
     highest = per_rate[-1] if per_rate else None
 
@@ -1635,7 +1672,8 @@ def do_deformation(args, cls: dict, lammps) -> dict:
 # ─── Stage: summary ─────────────────────────────────────────────────────────
 
 def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_verdict: str,
-               raw_dir: Path, equil_result: dict = None, mechanical_result: dict = None) -> dict:
+               raw_dir: Path, equil_result: dict = None, mechanical_result: dict = None,
+               cool_result: dict = None) -> dict:
     exp_lookup_path = raw_dir / "exp_lookup.json"
     properties = (set(track_registry.DEFAULT_PROPERTIES) if args.properties in (None, "all")
                   else {x.strip().lower() for x in args.properties.split(",") if x.strip()})
@@ -1672,7 +1710,13 @@ def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_v
     # lookup can never find them there, so these explicit cross-attempt-directory paths (already
     # known from each stage's own returned outputs) are required, mirroring tg_path's existing
     # precedent for exactly this reason.
-    equilibration_path = (equil_result or {}).get("equilibration_json_path")
+    # TWO gate files now, and they are not interchangeable. equilibration.json holds the MELT
+    # gate and the melt density at T_melt_hold_K; cooling.json holds the assessment gate and the
+    # density at final_T_K. Anything that means "the 300 K density" reads cooling.json -- see
+    # track_registry's density vs melt_density observables, which name the file each comes from.
+    melt_equilibration_path = (equil_result or {}).get("equilibration_json_path")
+    cooling_path = (cool_result or {}).get("cooling_json_path")
+    equilibration_path = cooling_path or melt_equilibration_path
     mechanical_path = (mechanical_result or {}).get("mechanical_json_path")
     bulk_modulus_deform_path = (mechanical_result or {}).get("bulk_modulus_deform_json_path")
 
@@ -1699,7 +1743,9 @@ def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_v
         d01=sp["d01_ff"], d02=sp["d02_charges"], d03=sp["d03_electrostatics"], d04=sp["d04_system_size"],
         d05=args.d05, d06=args.tg_fit_quality or "N/A (not requested)",
         n_replicates=args.n_replicates, tg_path=tg_path,
-        equilibration_path=equilibration_path, mechanical_path=mechanical_path,
+        equilibration_path=equilibration_path,
+        melt_equilibration_path=melt_equilibration_path,
+        mechanical_path=mechanical_path,
         bulk_modulus_deform_path=bulk_modulus_deform_path,
         byproducts_spec=byproducts_spec_path,
     ), "run-summary generation")
@@ -1758,38 +1804,6 @@ class CampaignStageExecutor:
                 if prior_outputs.get("murnaghan_result"):
                     cls["_prior_murnaghan_result"] = prior_outputs["murnaghan_result"]
                     break
-        if stage == "equilibration":
-            # The tg-start tag is produced ONLY by the code path that builds cool_blocks. An
-            # attempt that resumes at or past the "cool_block" checkpoint -- or an extend-only
-            # continuation -- generates none, so generate_equilibration_workflow returns no tag
-            # and the thermal stage would fall back to reheating npt_final even though the
-            # tagged cell is still on disk from an earlier attempt.
-            #
-            # Reaching back is safe here for a structural reason, not a hopeful one. The
-            # generator's checkpoint order is [... anneal_hold, cool_block, ...]: resuming from
-            # "anneal_hold" or earlier REBUILDS the cooldown and emits a fresh tag, so this walk
-            # never fires for it. The tag is missing only from "cool_block" onward -- which is
-            # exactly the resume point whose meaning is "the cooldown already ran, do not redo
-            # it", i.e. the prior attempt's blocks ARE the live cooldown this attempt stands on.
-            # A remedy that genuinely changes the cooling (a slower cool_block_hold_steps)
-            # resumes from "anneal_hold" and regenerates, so it can never inherit a cell from a
-            # cooldown it replaced.
-            #
-            # do_thermal validates the recovered tag exactly as it validates a fresh one -- the
-            # file must exist and its temperature must sit within one cool block of the sweep
-            # top -- so a window edit between attempts falls back to reheating rather than
-            # silently starting from the wrong temperature.
-            args.tg_start_data = None       # never inherit across stage executions
-            args.tg_start_T_K = None
-            for prior in reversed(context.get("prior_attempts") or ()):
-                manifest_path = prior.get("manifest")
-                if not manifest_path or not Path(manifest_path).is_file():
-                    continue
-                prior_outputs = json.loads(Path(manifest_path).read_text()).get("outputs") or {}
-                if prior_outputs.get("tg_start_data_path"):
-                    args.tg_start_data = prior_outputs["tg_start_data_path"]
-                    args.tg_start_T_K = prior_outputs.get("tg_start_T_K")
-                    break
         for key, value in context["parameters"].items():
             if hasattr(args, key):
                 setattr(args, key, value)
@@ -1797,6 +1811,7 @@ class CampaignStageExecutor:
         args.output_dir = str(attempt_dir / "raw")
         build = self._outputs(context, "build")
         equil = self._outputs(context, "equilibration")
+        cool = self._outputs(context, "cooling")
         thermal = self._outputs(context, "thermal") or None
         mechanical = self._outputs(context, "mechanical") or None
         if build:
@@ -1804,13 +1819,18 @@ class CampaignStageExecutor:
             args.build_data_path = build.get("data_path")
             args.emc_params_path = build.get("emc_params_path")
             args.n_atoms = build.get("n_atoms")
+        # args.data_path is now PER-STAGE, because two different cells are handed downstream:
+        # the melt hold (what cooling and thermal descend from) and the assessment cell at
+        # final_T_K (what mechanical measures and what summary reports). A single unconditional
+        # assignment would hand mechanical a melt.
         if equil:
-            args.data_path = equil.get("npt_prod_data_path")
-            # The thermal stage's sweep starts here, not from npt_final -- see do_thermal.
-            # Read back from the persisted manifest so a resumed run picks the same cool_block
-            # the original chain tagged (there is no formula that recovers it).
-            args.tg_start_data = equil.get("tg_start_data_path")
-            args.tg_start_T_K = equil.get("tg_start_T_K")
+            args.melt_start_data_path = equil.get("melt_start_data_path")
+            args.melt_data_path = equil.get("melt_data_path")
+            if stage in ("cooling", "thermal"):
+                args.data_path = equil.get("melt_start_data_path")
+        if cool:
+            if stage in ("mechanical", "summary"):
+                args.data_path = cool.get("npt_prod_data_path")
         if stage == "equilibration" and context["parameters"].get("npt_continuation_ns"):
             for prior in reversed(context.get("prior_attempts") or ()):
                 manifest_path = prior.get("manifest")
@@ -1819,13 +1839,29 @@ class CampaignStageExecutor:
                 prior_outputs = json.loads(Path(manifest_path).read_text()).get("outputs") or {}
                 # The .restart output (read_restart, appended log/dump), NOT .data -- a genuine
                 # continuation of the prior attempt's own trajectory, not a fresh stage.
-                if prior_outputs.get("npt_prod_restart_path"):
-                    args.pending_continuation_path = prior_outputs["npt_prod_restart_path"]
+                if prior_outputs.get("melt_restart_path"):
+                    args.pending_continuation_path = prior_outputs["melt_restart_path"]
                     args.npt_continuation_ns = context["parameters"]["npt_continuation_ns"]
                     args.equilibration_extend_base_stage = context["parameters"].get(
-                        "equilibration_extend_base_stage", "npt_final")
+                        "equilibration_extend_base_stage", "npt_melt_hold")
                     args.equilibration_extend_ensemble = context["parameters"].get(
                         "equilibration_extend_ensemble", "npt")
+                    break
+        if stage == "cooling" and context["parameters"].get("cooling_continuation_ns"):
+            # The cooling twin of the walk above. Separate keys, separate stage hash: a cooling
+            # drift must not write equilibration-scoped parameters and re-melt on resume.
+            for prior in reversed(context.get("prior_attempts") or ()):
+                manifest_path = prior.get("manifest")
+                if not manifest_path or not Path(manifest_path).is_file():
+                    continue
+                prior_outputs = json.loads(Path(manifest_path).read_text()).get("outputs") or {}
+                if prior_outputs.get("npt_prod_restart_path"):
+                    args.pending_continuation_path = prior_outputs["npt_prod_restart_path"]
+                    args.cooling_continuation_ns = context["parameters"]["cooling_continuation_ns"]
+                    args.cooling_extend_base_stage = context["parameters"].get(
+                        "cooling_extend_base_stage", "npt_final")
+                    args.cooling_extend_ensemble = context["parameters"].get(
+                        "cooling_extend_ensemble", "npt")
                     break
         # equilibration_resume_from: set by a remedy (_cooling -> "anneal_hold", regenerating
         # the blockwise cooldown with a slower cool_block_hold_steps) to signal
@@ -1884,8 +1920,30 @@ class CampaignStageExecutor:
                                        (Finding(code, stage, confidence=confidence,
                                                 details=detail),),
                                        self._artifacts(attempt_dir), outputs)
+            elif stage == "cooling":
+                outputs = do_cool_and_check(args, cls, self.lammps)
+                if outputs.get("halted"):
+                    code = outputs.get("reason") or "STRUCTURAL_FAIL"
+                    detail = outputs.get("detail") or {}
+                    if code == "STRUCTURAL_FAIL":
+                        # Same routing as the melt gate's, and the same reason it cannot be an
+                        # `or` chain on truthiness. A homogeneity failure raised HERE still
+                        # routes to melt_homogeneity, which invalidates the equilibration stage:
+                        # a heterogeneous glass is a melt-mixing defect that the cooldown only
+                        # made visible.
+                        finite_size_code = detail.get("finite_size_verdict")
+                        code = (finite_size_code
+                                if finite_size_code not in (None, "SIZE_PASS") else
+                                ("DENSITY_HETEROGENEITY"
+                                 if detail.get("homogeneity_verdict") == "HOMOG_HETEROGENEOUS"
+                                 else code))
+                    confidence = detail.get("remedy_confidence") or "high"
+                    return StageResult("remedy_required",
+                                       (Finding(code, stage, confidence=confidence,
+                                                details=detail),),
+                                       self._artifacts(attempt_dir), outputs)
             elif stage == "thermal":
-                outputs = do_thermal(args, cls, self.lammps, equil.get("density_gcm3"))
+                outputs = do_thermal(args, cls, self.lammps, equil.get("melt_density_gcm3"))
             elif stage == "mechanical":
                 is_glassy = (thermal.get("is_glassy") if thermal else
                               resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0)
@@ -1897,9 +1955,14 @@ class CampaignStageExecutor:
             elif stage == "summary":
                 is_glassy = (thermal.get("is_glassy") if thermal else
                               resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0)
+                # D-05 has two verdicts now. Report the one for the cell the run actually
+                # reports on: the assessment cell when the cooldown ran, the melt otherwise.
+                d05_verdict = (cool.get("cool_verdict") if cool
+                               else equil.get("equil_verdict"))
                 outputs = do_summary(args, cls, self.lammps, is_glassy, thermal,
-                                     equil.get("equil_verdict"), attempt_dir / "raw",
-                                     equil_result=equil, mechanical_result=mechanical)
+                                     d05_verdict, attempt_dir / "raw",
+                                     equil_result=equil, mechanical_result=mechanical,
+                                     cool_result=cool or None)
             else:
                 raise ValueError(f"unknown workflow stage {stage!r}")
         except SystemExit as exc:

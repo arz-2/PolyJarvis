@@ -23,8 +23,8 @@ same way regardless of what (if anything) is known about it.
 
 Usage:
     python assess_cooling_contraction.py \
-        --melt_data  /path/npt_production_out.data \
-        --glass_data /path/npt_prod300_out.data \
+        --melt_data  /path/equil/npt_melt_hold/npt_melt_hold_out.data \
+        --glass_data /path/cool/npt_final/npt_final_out.data \
         --tg_K 378 --t_equil_K 550 \
         [--alpha_glass 2.5e-4] [--alpha_melt 6e-4]
 
@@ -215,7 +215,7 @@ def make_markdown(a):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--melt_data', help='npt_production_out.data at T_equil (melt). Optional but needed for the split.')
+    ap.add_argument('--melt_data', help='npt_melt_hold_out.data at T_melt_hold_K (the gated melt). Optional but needed for the split.')
     ap.add_argument('--glass_data', required=True,
                     help='npt_final_out.data at final_T_K (the assessed/glass state).')
     ap.add_argument('--final_T_K', type=float, default=300.0,
@@ -223,7 +223,7 @@ def main():
                          'Default 300 is the default assessment T, not its definition.')
     ap.add_argument('--rho_melt', type=float, help='Override: melt density g/cm^3 (skip --melt_data parse).')
     ap.add_argument('--rho_glass', type=float, help='Override: glass density g/cm^3 (skip --glass_data parse).')
-    ap.add_argument('--melt_log', help='npt_production.log — plateau-averaged melt density. '
+    ap.add_argument('--melt_log', help='npt_melt_hold.log — plateau-averaged melt density. '
                                        'Preferred over --melt_data (single fluctuating frame).')
     ap.add_argument('--glass_log', help='npt_final.log — plateau-averaged glass density. '
                                         'Preferred over --glass_data (single fluctuating frame).')

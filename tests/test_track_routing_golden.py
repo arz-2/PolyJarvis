@@ -48,23 +48,34 @@ def _first_member_smiles(cid):
 # properties -> the exact ordered stage names build_planned_stages emits. Note NO "deform":
 # it is attached as {"fallback": "deform"} on the murnaghan entry, never emitted as its own
 # stage. Both dry-run sites disagree with this today -- see the dry-run test below.
+# Every entry gained cool/cool-check EXCEPT {tg}, and that exception is the point of the
+# equilibration/cooling split. `density` means the density at final_T_K, so it needs the
+# cooldown; `bulk_modulus` needs a cell at bm_temperature_K, which only the cooldown reaches
+# (track_registry._MECHANICAL.requires) -- it pulls cooling in even though no mechanical
+# observable maps onto the cooling track. `tg` needs neither: the staircase descends from the
+# same gated melt cell on its own, sampling as it goes, so a Tg-only run never pays for a
+# second descent. (A melt_density-only run is narrower still -- see the melt-only test below --
+# but melt_density is not in SUBSETS, which pins the pre-existing three-property matrix.)
 GOLDEN_PLANNED_STAGES = {
     frozenset({"density"}):
-        ["build", "equil", "equil-check", "run-summary"],
+        ["build", "equil", "equil-check", "cool", "cool-check", "run-summary"],
     frozenset({"tg"}):
         ["build", "equil", "equil-check", "tg", "analyze-tg", "run-summary"],
     frozenset({"bulk_modulus"}):
-        ["build", "equil", "equil-check", "murnaghan", "analyze-bm", "run-summary"],
+        ["build", "equil", "equil-check", "cool", "cool-check", "murnaghan", "analyze-bm",
+         "run-summary"],
     frozenset({"density", "tg"}):
-        ["build", "equil", "equil-check", "tg", "analyze-tg", "run-summary"],
+        ["build", "equil", "equil-check", "cool", "cool-check", "tg", "analyze-tg",
+         "run-summary"],
     frozenset({"density", "bulk_modulus"}):
-        ["build", "equil", "equil-check", "murnaghan", "analyze-bm", "run-summary"],
+        ["build", "equil", "equil-check", "cool", "cool-check", "murnaghan", "analyze-bm",
+         "run-summary"],
     frozenset({"tg", "bulk_modulus"}):
-        ["build", "equil", "equil-check", "tg", "analyze-tg", "murnaghan", "analyze-bm",
-         "run-summary"],
+        ["build", "equil", "equil-check", "cool", "cool-check", "tg", "analyze-tg",
+         "murnaghan", "analyze-bm", "run-summary"],
     frozenset({"density", "tg", "bulk_modulus"}):
-        ["build", "equil", "equil-check", "tg", "analyze-tg", "murnaghan", "analyze-bm",
-         "run-summary"],
+        ["build", "equil", "equil-check", "cool", "cool-check", "tg", "analyze-tg",
+         "murnaghan", "analyze-bm", "run-summary"],
 }
 
 
@@ -93,6 +104,7 @@ def test_stage_tracks_are_stable(cid):
                                       _first_member_smiles(cid))
     assert {s["stage"]: s["track"] for s in stages} == {
         "build": "foundation", "equil": "foundation", "equil-check": "foundation",
+        "cool": "cooling", "cool-check": "cooling",
         "tg": "thermal", "analyze-tg": "thermal",
         "murnaghan": "mechanical", "analyze-bm": "mechanical",
         "run-summary": "summary",
@@ -114,16 +126,20 @@ def test_the_deform_fallback_attaches_only_for_a_glassy_class():
 # ─── enabled_stages: what the engine actually runs ────────────────────────────────
 
 GOLDEN_MACRO_STAGES = {
-    frozenset({"density"}):        ("build", "equilibration", "summary"),
+    frozenset({"density"}):        ("build", "equilibration", "cooling", "summary"),
     frozenset({"tg"}):             ("build", "equilibration", "thermal", "summary"),
-    frozenset({"bulk_modulus"}):   ("build", "equilibration", "mechanical", "summary"),
-    frozenset({"density", "tg"}):  ("build", "equilibration", "thermal", "summary"),
+    frozenset({"bulk_modulus"}):   ("build", "equilibration", "cooling", "mechanical",
+                                    "summary"),
+    frozenset({"density", "tg"}):  ("build", "equilibration", "cooling", "thermal", "summary"),
     frozenset({"density", "bulk_modulus"}):
-                                   ("build", "equilibration", "mechanical", "summary"),
+                                   ("build", "equilibration", "cooling", "mechanical",
+                                    "summary"),
     frozenset({"tg", "bulk_modulus"}):
-                                   ("build", "equilibration", "thermal", "mechanical", "summary"),
+                                   ("build", "equilibration", "cooling", "thermal",
+                                    "mechanical", "summary"),
     frozenset({"density", "tg", "bulk_modulus"}):
-                                   ("build", "equilibration", "thermal", "mechanical", "summary"),
+                                   ("build", "equilibration", "cooling", "thermal",
+                                    "mechanical", "summary"),
 }
 
 

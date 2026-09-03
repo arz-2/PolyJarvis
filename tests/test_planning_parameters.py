@@ -65,12 +65,21 @@ def test_equilibration_controls_resolve_to_executable_steps():
     assert resolved["anneal_heat_steps"] == 400000
     assert resolved["anneal_check_every_steps"] == 500000
     assert resolved["densify_ramp_steps"] == 200000
-    assert resolved["stage7_min_steps"] == 600000
-    assert resolved["stage8_min_steps"] == 700000
     assert resolved["compression_max_pressure_atm"] == 75000.0
     assert resolved["use_long_range_electrostatics"] is False
     assert resolved["thermostat_damp_fs"] == 150.0
     assert resolved["barostat_damp_fs"] == 1500.0
+    # The descent's knobs belong to the COOLING stage now and are deliberately absent here --
+    # passing them to the core chain would be passing arguments its generator does not take.
+    for descent_knob in ("cool_block_hold_steps", "stage7_min_steps", "stage8_min_steps"):
+        assert descent_knob not in resolved
+
+    cooled = resolve_stage_params("cool", _args(), cls)
+    assert cooled["cool_block_hold_steps"] == 250000
+    assert cooled["cool_block_hold_cap_steps"] == 750000
+    assert cooled["stage7_min_steps"] == 600000
+    assert cooled["stage8_min_steps"] == 700000
+    assert cooled["thermostat_damp_fs"] == 150.0
 
 
 def test_thermal_and_mechanical_controls_resolve_without_hardcoded_replacement():
@@ -125,7 +134,7 @@ def test_integer_protocol_controls_reject_fractional_values():
 
 
 @pytest.mark.parametrize(("overrides", "message"), [
-    ({"tg_t_low_K": 700, "tg_t_high_K": 600}, "tg_t_low_K"),
+    ({"tg_t_low_K": 700, "T_melt_hold_K": 600}, "tg_t_low_K"),
     ({"deform_strain_start": 0.04, "K_strain_max": 0.03}, "deform_strain_start"),
     ({"tg_rates_K_per_ns": [10.0], "tg_primary_rate_index": 2},
      "tg_primary_rate_index"),

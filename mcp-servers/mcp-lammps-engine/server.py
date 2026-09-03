@@ -1405,6 +1405,102 @@ def watch_run(run_id: str) -> dict:
 
 
 
+def _ff_base_for(use_pcff: bool, use_trappe: bool, use_opls: bool,
+                 params_file: str, engine: str) -> dict:
+    """The force-field/engine keys every stage deck in a chain must carry.
+
+    Shared by generate_equilibration_workflow and generate_cooling_workflow so the two halves
+    of one run cannot drift onto different styles -- the cooling chain reads the equilibration
+    chain's own .data file, and a mismatch there is the "deck emits CHARMM regardless" class of
+    bug this repo has hit more than once.
+
+    PCFF class2 cells from EMC start at ~0.5x experimental density -- no separate soft-heat or
+    cutoff-only compression phase needed. SHAKE is off: PCFF runs stably at 1 fs all-atom
+    without constraints. TraPPE-UA is united-atom (no H), pure lj/cut, no kspace; SHAKE is
+    disabled there too -- UA removes the fast C-H stretch modes, so 2 fs is stable WITHOUT bond
+    constraints, and fix shake on a continuous backbone would fail in LAMMPS anyway (interior
+    atoms have 2 bonds; cluster-build requires terminal atoms). The 2 fs speedup comes from the
+    timestep alone (see _dt_prod_for).
+    """
+    if use_pcff:
+        ff_base = {"use_pcff": True, "use_shake": False}
+    elif use_trappe:
+        ff_base = {"use_trappe": True, "use_shake": False, "use_pppm": False,
+                   "LJ_CUTOFF": 14.0}
+    elif use_opls:
+        ff_base = {"use_opls": True, "use_shake": False}
+    else:
+        ff_base = {}
+    if params_file:
+        ff_base["params_file"] = params_file
+    # Carry the execution engine into every stage deck. GPU-enabled stages render the matching
+    # accelerator package (gpu -> `package gpu`; kokkos -> none, -sf kk handles it); use_gpu=False
+    # stages ignore it and stay CPU. Submit the chain with the SAME engine (run_lammps_chain).
+    ff_base["engine"] = engine
+    return ff_base
+
+
+def _make_stage_builders(gen, work_dir_base: str, ff_base: dict, velocity_seed: int):
+    """Return (_stage, _continue_stage) bound to one chain's generator and output directory.
+
+    Both build the same {name, template, script, work_dir, input_data, output_data,
+    output_restart, params} shape, and both put ff_base LAST so use_shake/use_pcff/params_file
+    always win over a stage's own params.
+    """
+
+    def _stage(name, template, p, prev_data):
+        stage_dir = f"{work_dir_base}/{name}"
+        script = f"{stage_dir}/{name}.in"
+        out_data = f"{stage_dir}/{name}_out.data"
+        out_restart = f"{stage_dir}/{name}_out.restart"
+        p = {
+            "LOG_FILE":           f"{name}.log",
+            "DUMP_FILE":          f"{name}.dump",
+            "LAST_DUMP_FILE":     f"{name}_last.dump",
+            "WRITE_DATA_FILE":    out_data,
+            "WRITE_RESTART_FILE": out_restart,
+            **p,        # stage params first (lower priority for FF keys)
+            **ff_base,  # ff_base last -- ensures use_shake/use_pcff/params_file always win
+        }
+        Path(stage_dir).mkdir(parents=True, exist_ok=True)
+        gen.generate(template_name=template, output_path=script, params=p,
+                     data_file_override=prev_data, velocity_seed=velocity_seed)
+        return {"name": name, "template": template, "script": script, "work_dir": stage_dir,
+                "input_data": prev_data, "output_data": out_data,
+                "output_restart": out_restart, "params": p}
+
+    def _continue_stage(base_name, template, p, restart_path):
+        """Genuinely CONTINUE base_name's own trajectory: read_restart (not read_data),
+        log/dump appended onto base_name's own files, no velocity re-initialization.
+        Returns the same shape as _stage(), keyed by the SAME name so callers can't
+        mistake this for a new, independently-numbered stage."""
+        stage_dir = f"{work_dir_base}/{base_name}"
+        script = f"{stage_dir}/{base_name}.in"
+        out_data = f"{stage_dir}/{base_name}_out.data"
+        out_restart = f"{stage_dir}/{base_name}_out.restart"
+        p = {
+            "LOG_FILE":           f"{base_name}.log",
+            "DUMP_FILE":          f"{base_name}.dump",
+            "LAST_DUMP_FILE":     f"{base_name}_last.dump",
+            "WRITE_DATA_FILE":    out_data,
+            "WRITE_RESTART_FILE": out_restart,
+            "use_restart":        True,
+            "LOG_APPEND":         True,
+            "dump_append":        True,
+            "init_velocity":      None,
+            **p,
+            **ff_base,
+        }
+        Path(stage_dir).mkdir(parents=True, exist_ok=True)
+        gen.generate(template_name=template, output_path=script, params=p,
+                     data_file_override=restart_path, velocity_seed=velocity_seed)
+        return {"name": base_name, "template": template, "script": script,
+                "work_dir": stage_dir, "input_data": restart_path, "output_data": out_data,
+                "output_restart": out_restart, "params": p}
+
+    return _stage, _continue_stage
+
+
 @mcp.tool()
 def generate_equilibration_workflow(
     data_file: str,
@@ -1417,16 +1513,14 @@ def generate_equilibration_workflow(
     anneal_heat_steps: Optional[int],
     anneal_check_every_steps: Optional[int],
     anneal_cap_steps: Optional[int],
-    cool_block_dT_K: Optional[float],
-    cool_block_hold_steps: Optional[int],
-    cool_block_hold_cap_steps: Optional[int],
-    stage7_min_steps: Optional[int],
-    stage7_cap_steps: Optional[int],
-    stage8_min_steps: Optional[int],
-    stage8_cap_steps: Optional[int],
+    melt_ramp_steps: Optional[int],
+    melt_hold_min_steps: Optional[int],
+    melt_hold_cap_steps: Optional[int],
+    nvt_melt_min_steps: Optional[int],
+    nvt_melt_cap_steps: Optional[int],
     warmup_steps: Optional[int],
     use_long_range: bool,
-    temp: float,
+    melt_hold_T: float,
     use_pcff: bool,
     use_trappe: bool,
     use_opls: bool,
@@ -1438,10 +1532,6 @@ def generate_equilibration_workflow(
     n_chains: int = 6,
     n_atoms: Optional[int] = None,
     params_file: str = "",
-    t_equil_K: Optional[float] = None,
-    tg_start_T_K: Optional[float] = None,
-    melt_hold_extra_steps: Optional[int] = None,
-    final_T_K: float = 300.0,
     anneal_margin_K: float = 100.0,
     extend_only: bool = False,
     restart_file: Optional[str] = None,
@@ -1479,19 +1569,22 @@ def generate_equilibration_workflow(
       anneal_heat            - fixed, short NVT ramp 300 K -> max_temp (one-shot, same reason)
       anneal_hold            - ADAPTIVE: NVT hold AT max_temp (accessible conformational
                                relaxation — NOT a claim of reptation/terminal relaxation)
-      cool_block_NN          - ADAPTIVE (one segment per block): NPT blockwise cooldown,
-                               max_temp -> final_T_K in cool_block_dT_K decrements. If temp
-                               (the melt/production reference T) sits strictly between
-                               final_T_K and max_temp, the block that reaches it is tagged
-                               as the melt-property reference (K_T, melt structure) —
-                               see melt_data_path in the return dict — and the ramp
-                               continues past it down to final_T_K.
-      nvt_kinetic_stability  - ADAPTIVE: NVT at final_T_K, FIXED volume (from the last
-                               cool_block's endpoint) — MSD/kinetic-trap diagnostics need
-                               an uncontaminated (non-barostat-rescaled) window.
-      npt_final              - ADAPTIVE: NPT at final_T_K/press — the equilibrated parent
-                               state. Rg/Ree/RDF/dihedrals/MSID/K_T are all computed from
-                               this stage's own trajectory, not a separate production stage.
+      npt_melt_ramp          - fixed, one-shot NPT ramp max_temp -> melt_hold_T. The first
+                               barostatted stage after an NVT anneal_hold, so the box is
+                               still the densified 300 K one and the barostat expands it to
+                               melt density here.
+      npt_melt_hold          - ADAPTIVE: NPT at melt_hold_T/press. THE GATED CELL — melt
+                               density, the thermo drift/SEM gates and the per-frame
+                               geometry checks (Rg/MSID/R_ee/torsion/P2/homogeneity/
+                               finite_size) all come from this stage's own log/trajectory.
+      nvt_melt_hold          - ADAPTIVE: NVT at melt_hold_T, FIXED volume (npt_melt_hold's
+                               own endpoint). Supplies the uncontaminated (non-barostat-
+                               rescaled) window MSD/kinetic-trap/C(t) need, and its endpoint
+                               is the cell every downstream track starts from.
+
+    This chain does NOT cool. The descent to the assessment temperature — cool_block_NN,
+    nvt_kinetic_stability, npt_final — is generate_cooling_workflow's, and runs only when a
+    property needs a cell at that temperature. A melt-only run stops here.
 
     Required args — no defaults. Every step count and the velocity seed must be passed on
     every call, including as an explicit null where the value does not apply to this path.
@@ -1529,29 +1622,27 @@ def generate_equilibration_workflow(
                         restart-continuation extensions. Null selects 3x the tier default.
                         This is a TIME cap, not a cycle count — the retired eq_annealing_cycles
                         knob no longer exists; annealing is one continuously-extendable hold.
-        cool_block_dT_K: REQUIRED. Nominal temperature decrement per cool_block. Null
-                        selects 25.0 K.
-        cool_block_hold_steps: REQUIRED. Step count for each cool_block's first (base) hold.
-                        Null selects int(2.0e5/dt_prod) (~200 ps at dt=1fs) — matches this
-                        codebase's own validated tg_min_steps_per_T floor for the adjacent
-                        (but distinct) Tg multi-rate sweep track.
-        cool_block_hold_cap_steps: REQUIRED. Ceiling on cumulative steps for any ONE
-                        cool_block's restart-continuation extensions. Null selects 3x the
-                        base hold.
-        stage7_min_steps: REQUIRED. Step count for nvt_kinetic_stability's first block. Null
+        melt_ramp_steps: REQUIRED. Step count for the fixed max_temp -> melt_hold_T
+                        npt_melt_ramp. Null selects the atom-count tier default (steps_heat).
+                        Size it generously: this is where the densified 300 K box expands to
+                        melt density, and a ramp is one-shot.
+        melt_hold_min_steps: REQUIRED. Step count for npt_melt_hold's first block. Null
                         selects int(5.0e5/dt_prod) (~0.5 ns).
-        stage7_cap_steps: REQUIRED. Ceiling on cumulative nvt_kinetic_stability steps. Null
-                        selects int(2.0e6/dt_prod) (~2 ns).
-        stage8_min_steps: REQUIRED. Step count for npt_final's first block. Null selects
-                        int(5.0e5/dt_prod) (~0.5 ns).
-        stage8_cap_steps: REQUIRED. Ceiling on cumulative npt_final steps. Null selects
-                        int(5.0e6/dt_prod) (~5 ns).
+        melt_hold_cap_steps: REQUIRED. Ceiling on cumulative npt_melt_hold steps across all
+                        restart-continuation extensions. Null selects int(5.0e6/dt_prod).
+        nvt_melt_min_steps: REQUIRED. Step count for nvt_melt_hold's first block. Null
+                        selects int(5.0e5/dt_prod) (~0.5 ns). NOTE this window is
+                        uncalibrated: MSD/C(t) decorrelate far faster at melt temperatures
+                        than at 300 K, so the 0.5 ns inherited from the old
+                        nvt_kinetic_stability is a placeholder, not a measured floor.
+        nvt_melt_cap_steps: REQUIRED. Ceiling on cumulative nvt_melt_hold steps. Null selects
+                        int(2.0e6/dt_prod) (~2 ns).
         warmup_steps:   REQUIRED. Step count for the fixed nvt_warmup stage. Null selects
                         int(1.0e5/dt_prod) (~100 ps).
         extend_ensemble: "npt" (default) or "nvt" — which ensemble extend_only continues.
                         Must match base_stage_name's own ensemble (e.g. "nvt" for
-                        anneal_hold/nvt_kinetic_stability, "npt" for npt_densify/cool_block_*/
-                        npt_final) — mismatches would silently add or remove a barostat
+                        anneal_hold/nvt_melt_hold, "npt" for npt_densify_hold/npt_melt_hold)
+                        — mismatches would silently add or remove a barostat
                         mid-trajectory. Ignored unless extend_only=True.
         minimize_etol:  Energy-tolerance stopping criterion for the minimize stage (default
                         1e-6, matches script_generator.py's own default). Escalated (looser,
@@ -1563,21 +1654,21 @@ def generate_equilibration_workflow(
                         same remedy.
         minimize_maxeval: Max force evaluations (default 100000). Same remedy/scope.
         polymer_name:   Label used in filenames and log comments.
-        temp:           REQUIRED. Melt/production reference temperature (K) — where K_T and
-                        melt-state chain structure are measured. Not necessarily this chain's
-                        final state: cool_block always ramps down to final_T_K (default
-                        300 K); temp is a MID-RAMP tag when it differs from final_T_K
-                        (the glassy case — temp is the melt-equilibration T, above Tg). For a
-                        rubbery chain temp == final_T_K and no separate tag is needed.
-        max_temp:       Peak annealing temperature (K). Typically 2x Tg. Must exceed
-                        temp + anneal_margin_K (enforced below) — the blockwise cooldown
-                        needs a well-defined positive span to ramp down through.
-        anneal_margin_K: Minimum required margin between max_temp and temp (default 100 K).
-                        Enforced as a hard validation error, not silently auto-corrected —
-                        this is a planning-layer decision (see stage_params.py's own floor on
-                        this same invariant), not one the generator should second-guess.
-        final_T_K:      True final temperature (K) this chain equilibrates to (default 300).
-                        cool_block/nvt_kinetic_stability/npt_final all run here.
+        melt_hold_T:    REQUIRED. The melt hold temperature (K) — where this chain ENDS and
+                        every downstream track begins. Melt density and the binding melt gate
+                        are measured here. Resolved per-SMILES by the planning layer as
+                        max(class T_equil_K, Tg + 200) so it clears the MD glass transition
+                        (which sits ~120 K above the experimental Tg at accessible cooling
+                        rates); the Tg staircase starts from this cell and cools, so a melt
+                        hold below the MD transition would begin the sweep inside the glass.
+        max_temp:       Peak annealing temperature (K). Must be at or above melt_hold_T
+                        (enforced below) — npt_melt_ramp descends from it to the melt hold.
+                        A margin of anneal_margin_K is expected but only warned about, since
+                        the soak's value is a planning-layer judgement, not a correctness one.
+        anneal_margin_K: Expected margin between max_temp and melt_hold_T (default 100 K).
+                        Below it the ramp is near a no-op and the soak does no de-knotting;
+                        logged as a warning rather than rejected. See stage_params.py's own
+                        floor on this same invariant, which is where it is actually decided.
         press:          Target pressure (atm), typically 1.
         max_press:      Compression pressure (atm), typically 50000.
         n_chains:       NO-OP — accepted for backward compatibility but never read. Chain
@@ -1609,48 +1700,21 @@ def generate_equilibration_workflow(
                         When provided, Coeffs validation is skipped on the .data
                         file (EMC stores coefficients separately) and each script
                         includes the file via `include {params_file}`.
-        t_equil_K:      Optional melt-tag temperature for a RUBBERY chain (temp == final_T_K)
-                        that still wants an explicit melt-property reference block somewhere
-                        between final_T_K and max_temp — the direct successor to the retired
-                        add_melt_npt flag. Ignored if temp > final_T_K (the glassy case
-                        already tags at temp; the two tags are mutually exclusive).
-        tg_start_T_K:   Optional Tg-sweep start temperature. Read-only METADATA: the cooldown
-                        grid is NOT altered to land on it (that would make the equilibration
-                        chain a function of a thermal-stage parameter). The COLDEST cool_block
-                        whose endpoint is still at or above it is reported as
-                        tg_start_data_path, so the thermal stage can start its staircase from a
-                        melt-cooled cell instead of reheating the finished final_T_K one. Both
-                        the path and its temperature are None when tg_start_T_K falls outside
-                        (final_T_K, max_temp - cool_block_dT_K] -- there is no NPT cell at or
-                        above it then. Deliberately NOT anneal_hold's output even when that sits
-                        exactly at tg_start_T_K: anneal_hold is NVT, so its cell still carries
-                        the densified 300 K volume rather than a melt density.
-        melt_hold_extra_steps: Optional extra steps added to whichever cool_block is tagged
-                        as the melt reference (temp, or t_equil_K) — the direct successor to
-                        the retired melt_npt_steps isothermal-hold stage, folded into the
-                        blockwise schedule instead of its own stage. Null -> 0 (no extra hold;
-                        the tagged block's structural results still come from its own
-                        cool_block_hold_steps window either way).
         resume_from:    None (default, full chain from minimize) or one of "nvt_warmup" |
                         "npt_densify" | "npt_ff_activate" | "npt_densify_hold" | "anneal_hold" |
-                        "cool_block" | "nvt_kinetic_stability" | "npt_final" — skip every stage
-                        up to and including the named checkpoint and start the returned chain
-                        AFTER it, reading data_file as that checkpoint's own write_data output.
+                        "npt_melt_ramp" | "npt_melt_hold" — skip every stage up to and
+                        including the named checkpoint and start the returned chain AFTER it,
+                        reading data_file as that checkpoint's own write_data output.
                         Every resumable stage runs with init_velocity=None (no `velocity all
                         create`), so it always inherits velocities from whatever .data file
                         it's given — resuming is not a special case, it's how every stage
                         boundary in the full chain already works. "anneal_hold" means both
-                        anneal_heat and anneal_hold already ran — starts at cool_block_01 using
-                        data_file as anneal_hold's own already-converged output (skips
-                        regenerating either stage; see the `_resume_idx < 4` guard below).
-                        "cool_block" means the entire blockwise
-                        cooldown already ran — starts at nvt_kinetic_stability using data_file
-                        as the last cool_block's own output. To regenerate the cooldown itself
-                        (e.g. a different cool_block_dT_K), use resume_from="anneal_hold"
-                        instead — there is no finer-grained "redo cooling, keep annealing"
-                        checkpoint. To continue a single already-run block (of any adaptive
-                        stage) rather than redo it, use extend_only. "npt_final" is invalid —
-                        see the validation error above.
+                        anneal_heat and anneal_hold already ran — starts at npt_melt_ramp.
+                        "npt_melt_hold" generates nvt_melt_hold alone, which is exactly what
+                        the melt gate's two-step EXTEND needs after lengthening npt_melt_hold:
+                        the NVT window and the handoff cell were both built from the
+                        pre-extension endpoint and are stale until regenerated. To continue a
+                        single already-run block rather than redo it, use extend_only.
         extend_only:    If True, generate ONE restart-continuation stage (not a fresh chain) —
                         see restart_file/base_stage_name below. This is the ONLY way any
                         adaptive stage gets more steps; it is never done by re-generating that
@@ -1659,30 +1723,26 @@ def generate_equilibration_workflow(
                         <name>_out.restart file (NOT a .data file) — the continuation reads
                         this via `read_restart`, preserving thermostat/barostat extended-system
                         state and step count, and issues no `velocity create`.
-        extend_temp_K:  REQUIRED when extend_only=True AND base_stage_name is a cool_block_NN
-                        name — that block's own hold temperature (its position in the ramp
-                        can't be inferred from the name alone). Ignored for every other
-                        base_stage_name, which each hold at a fixed, known condition
-                        (npt_densify_hold: 300 K; anneal_hold: max_temp;
-                        nvt_kinetic_stability/npt_final: final_T_K).
-        base_stage_name: REQUIRED when extend_only=True. The stage being continued (e.g.
-                        "npt_densify_hold", "anneal_hold", "cool_block_03",
-                        "nvt_kinetic_stability", "npt_final") — the continuation's log/dump
-                        are opened in APPEND mode
-                        onto that stage's own LOG_FILE/DUMP_FILE, so the result is one
-                        continuous trajectory split across runs, not a new one.
+        extend_temp_K:  Unused by this tool — every adaptive stage of the core chain holds at
+                        a fixed, known condition (npt_densify_hold: 300 K; anneal_hold:
+                        max_temp; npt_melt_hold/nvt_melt_hold: melt_hold_T). Accepted for
+                        signature symmetry with generate_cooling_workflow, where a cool_block_NN
+                        genuinely does need it.
+        base_stage_name: REQUIRED when extend_only=True. The stage being continued — one of
+                        "npt_densify_hold", "anneal_hold", "npt_melt_hold", "nvt_melt_hold".
+                        The continuation's log/dump are opened in APPEND mode onto that stage's
+                        own LOG_FILE/DUMP_FILE, so the result is one continuous trajectory
+                        split across runs, not a new one.
 
     Returns:
         dict with:
             stages          - list of stage dicts (script_path, work_dir, params)
             run_order       - ordered list of stage names
-            melt_data_path  - output_data of the cool_block tagged as the melt/production
-                              reference (temp, or t_equil_K), or None if temp == final_T_K
-                              and no t_equil_K tag was requested
-            tg_start_data_path - output_data of the coldest cool_block whose endpoint is still
-                              at or above tg_start_T_K, or None (see tg_start_T_K above)
-            tg_start_T_K    - that block's own endpoint temperature (>= the requested
-                              tg_start_T_K by at most cool_block_dT_K), or None
+            melt_data_path  - npt_melt_hold's output_data: the GATED melt cell. What the melt
+                              gate adjudicates, and the cooling stage's contraction reference.
+            melt_start_data_path - nvt_melt_hold's output_data: the HANDOFF cell. What the
+                              cooling stage and the Tg staircase both start from. Its box is
+                              npt_melt_hold's own, since NVT cannot move it.
             instructions    - how to execute this workflow
     """
     try:
@@ -1695,7 +1755,7 @@ def generate_equilibration_workflow(
                          "record it in run_log.md.",
             }
         _CHECKPOINTS = ["nvt_warmup", "npt_densify", "npt_ff_activate", "npt_densify_hold",
-                       "anneal_hold", "cool_block", "nvt_kinetic_stability", "npt_final"]
+                       "anneal_hold", "npt_melt_ramp", "npt_melt_hold"]
         if resume_from not in (None, *_CHECKPOINTS):
             return {"status": "error",
                     "error": f"resume_from={resume_from!r} is not supported — must be one of "
@@ -1712,12 +1772,9 @@ def generate_equilibration_workflow(
                              "a continuation reads restart state onto that stage's own log/dump, "
                              "it does not start a new stage from a plain .data file."}
         _STAGE_ENSEMBLE = {"npt_densify_hold": "npt", "anneal_hold": "nvt",
-                          "nvt_kinetic_stability": "nvt", "npt_final": "npt"}
+                          "npt_melt_hold": "npt", "nvt_melt_hold": "nvt"}
         if extend_only and base_stage_name:
-            _required_ensemble = (
-                "npt" if base_stage_name.startswith("cool_block_")
-                else _STAGE_ENSEMBLE.get(base_stage_name)
-            )
+            _required_ensemble = _STAGE_ENSEMBLE.get(base_stage_name)
             if _required_ensemble is not None and extend_ensemble != _required_ensemble:
                 return {"status": "error",
                         "error": f"extend_ensemble={extend_ensemble!r} does not match "
@@ -1725,23 +1782,29 @@ def generate_equilibration_workflow(
                                  f"({_required_ensemble!r}) — continuing an {_required_ensemble} "
                                  f"stage as {extend_ensemble} would silently add or remove a "
                                  "barostat mid-trajectory."}
-        if max_temp < temp + anneal_margin_K:
+        temp = melt_hold_T
+        if max_temp < melt_hold_T:
             return {"status": "error",
-                    "error": f"max_temp={max_temp} does not meet temp={temp} plus the required "
-                             f"anneal_margin_K={anneal_margin_K} — the blockwise cooldown "
-                             "(cool_block) needs a well-defined positive span from max_temp down "
-                             "to final_T_K to ramp through. Raise max_temp (or the class's "
-                             "annealing_T_high_K), don't lower temp to fit."}
-        if final_T_K > temp:
-            return {"status": "error",
-                    "error": f"final_T_K={final_T_K} must not exceed temp={temp} — temp is a "
-                             "mid-ramp melt-reference tag on the way down to final_T_K, not a "
-                             "temperature below it."}
-        if resume_from == "npt_final":
-            return {"status": "error",
-                    "error": "resume_from='npt_final' has nothing left to generate — npt_final "
-                             "is the last stage in this workflow. Use extend_only=True with "
-                             "base_stage_name='npt_final' to lengthen it instead."}
+                    "error": f"max_temp={max_temp} is below melt_hold_T={melt_hold_T} — "
+                             "npt_melt_ramp descends from the anneal ceiling to the melt hold, "
+                             "so the ceiling must be at or above it. Raise max_temp (or the "
+                             "class's annealing_T_high_K)."}
+        if max_temp == melt_hold_T:
+            # Only the degenerate case is worth saying anything about. anneal_margin_K is a
+            # margin over T_equil_K -- the melt-EQUILIBRATION temperature -- and that is where
+            # stage_params enforces it; this generator never sees T_equil_K, so comparing the
+            # margin against melt_hold_T here would fire on every perfectly-correct run whose
+            # per-SMILES melt sits above T_equil (PS: melt 573 K, ceiling 650 K, a 77 K gap
+            # that is exactly the intended 100 K over T_equil=550).
+            logger.warning(
+                "max_temp == melt_hold_T == %s — npt_melt_ramp is a no-op and the anneal soak "
+                "runs at the melt temperature, so it does no de-knotting above it. Legal, but "
+                "probably not what was intended.", melt_hold_T)
+        if resume_from == "npt_melt_hold":
+            # Legal and meaningful, unlike the old npt_final case: it regenerates nvt_melt_hold
+            # from an already-extended npt_melt_hold, which is exactly what the melt gate's
+            # two-step EXTEND needs. Left explicit so the asymmetry is visible.
+            pass
         if thermostat_damp_fs <= 0 or barostat_damp_fs <= 0:
             return {"status": "error", "error": "thermostat/barostat damping must be positive"}
 
@@ -1788,161 +1851,52 @@ def generate_equilibration_workflow(
             steps_npt   = 3000000
             steps_nvt   = 3000000
 
-        # PCFF class2 cells from EMC start at ~0.5× experimental density — no
-        # separate soft-heat or cutoff-only compression phase needed.
-        # SHAKE is off: PCFF runs stably at 1 fs all-atom without constraints.
-        # TraPPE-UA: united-atom (no H), pure lj/cut, no kspace.
-        # SHAKE is disabled — UA removes fast C-H stretch modes, so 2 fs is stable
-        # WITHOUT bond constraints. fix shake on a continuous backbone would fail in
-        # LAMMPS anyway (interior atoms have 2 bonds; cluster-build requires terminal atoms).
-        # The 2 fs speedup comes from timestep increase alone (dt_prod below).
-        if use_pcff:
-            ff_base = {"use_pcff": True, "use_shake": False}
-        elif use_trappe:
-            ff_base = {
-                "use_trappe": True,
-                "use_shake":  False,
-                "use_pppm":   False,
-                "LJ_CUTOFF":  14.0,
-            }
-        elif use_opls:
-            ff_base = {"use_opls": True, "use_shake": False}
-        else:
-            ff_base = {}
-        if params_file:
-            ff_base["params_file"] = params_file
-        # Carry the execution engine into every stage deck. GPU-enabled stages render the matching
-        # accelerator package (gpu → `package gpu`; kokkos → none, -sf kk handles it); use_gpu=False
-        # stages ignore it and stay CPU. Submit the chain with the SAME engine (run_lammps_chain).
-        ff_base["engine"] = engine
-
-        # TraPPE-UA with SHAKE enables 2 fs timestep for npt_pppm through npt_production.
-        # Stages 02-03 keep 0.5 fs (chain overlap risk at startup is too high for large dt).
+        ff_base = _ff_base_for(use_pcff, use_trappe, use_opls, params_file, engine)
+        # TraPPE-UA's united-atom sites permit 2 fs; the early ramps still pin 0.5 fs inline.
         dt_prod = 2.0 if use_trappe else 1.0
 
         stages = []
 
-        def _stage(name, template, p, prev_data):
-            stage_dir = f"{work_dir_base}/{name}"
-            script    = f"{stage_dir}/{name}.in"
-            out_data  = f"{stage_dir}/{name}_out.data"
-            out_restart = f"{stage_dir}/{name}_out.restart"
-            p = {
-                "LOG_FILE":          f"{name}.log",
-                "DUMP_FILE":         f"{name}.dump",
-                "LAST_DUMP_FILE":    f"{name}_last.dump",
-                "WRITE_DATA_FILE":   out_data,
-                "WRITE_RESTART_FILE": out_restart,
-                **p,        # stage params first (lower priority for FF keys)
-                **ff_base,  # ff_base last — ensures use_shake/use_pcff/params_file always win
-            }
-            Path(stage_dir).mkdir(parents=True, exist_ok=True)
-            gen.generate(
-                template_name=template,
-                output_path=script,
-                params=p,
-                data_file_override=prev_data,
-                velocity_seed=velocity_seed,
-            )
-            return {
-                "name":            name,
-                "template":        template,
-                "script":   script,
-                "work_dir": stage_dir,
-                "input_data":      prev_data,
-                "output_data":     out_data,
-                "output_restart":  out_restart,
-                "params":          p,
-            }
-
-        def _continue_stage(base_name, template, p, restart_path):
-            """Genuinely CONTINUE base_name's own trajectory: read_restart (not read_data),
-            log/dump appended onto base_name's own files, no velocity re-initialization.
-            Returns the same shape as _stage(), keyed by the SAME name so callers can't
-            mistake this for a new, independently-numbered stage."""
-            stage_dir = f"{work_dir_base}/{base_name}"
-            script    = f"{stage_dir}/{base_name}.in"
-            out_data  = f"{stage_dir}/{base_name}_out.data"
-            out_restart = f"{stage_dir}/{base_name}_out.restart"
-            p = {
-                "LOG_FILE":          f"{base_name}.log",
-                "DUMP_FILE":         f"{base_name}.dump",
-                "LAST_DUMP_FILE":    f"{base_name}_last.dump",
-                "WRITE_DATA_FILE":   out_data,
-                "WRITE_RESTART_FILE": out_restart,
-                "use_restart":       True,
-                "LOG_APPEND":        True,
-                "dump_append":       True,
-                "init_velocity":     None,
-                **p,
-                **ff_base,
-            }
-            Path(stage_dir).mkdir(parents=True, exist_ok=True)
-            gen.generate(
-                template_name=template,
-                output_path=script,
-                params=p,
-                data_file_override=restart_path,
-                velocity_seed=velocity_seed,
-            )
-            return {
-                "name":            base_name,
-                "template":        template,
-                "script":   script,
-                "work_dir": stage_dir,
-                "input_data":      restart_path,
-                "output_data":     out_data,
-                "output_restart":  out_restart,
-                "params":          p,
-            }
+        _stage, _continue_stage = _make_stage_builders(
+            gen, work_dir_base, ff_base, velocity_seed)
 
         # --- Extend-only mode: restart-based continuation of an already-submitted adaptive
         # stage. This is the ONLY way any adaptive stage (npt_densify, anneal_hold, any
-        # cool_block_NN, nvt_kinetic_stability, npt_final) gets more steps — never by
+        # npt_melt_hold, nvt_melt_hold) gets more steps — never by
         # re-generating that stage with a larger N_STEPS. read_restart preserves
         # thermostat/barostat extended-system state and step count; log/dump are opened in
         # append mode onto base_stage_name's OWN files, so the result is one continuous
         # trajectory, not a new independently-numbered stage.
         if extend_only:
             # The continuation's own block length comes from whichever *_check_every_steps /
-            # *_min_steps / cool_block_hold_steps arg governs base_stage_name — the SAME knob
+            # *_min_steps arg governs base_stage_name — the SAME knob
             # the orchestration layer passed (possibly escalated by a remedy) when it first
             # submitted that stage, not a separate generic "how long to extend" parameter.
             if base_stage_name == "npt_densify_hold":
                 ext_steps = densify_check_every_steps
             elif base_stage_name == "anneal_hold":
                 ext_steps = anneal_check_every_steps
-            elif base_stage_name and base_stage_name.startswith("cool_block_"):
-                ext_steps = cool_block_hold_steps
-            elif base_stage_name == "nvt_kinetic_stability":
-                ext_steps = stage7_min_steps
-            elif base_stage_name == "npt_final":
-                ext_steps = stage8_min_steps
+            elif base_stage_name == "npt_melt_hold":
+                ext_steps = melt_hold_min_steps
+            elif base_stage_name == "nvt_melt_hold":
+                ext_steps = nvt_melt_min_steps
             else:
                 return {"status": "error",
                         "error": f"base_stage_name={base_stage_name!r} is not a recognized "
-                                 "adaptive stage — must be one of npt_densify_hold, "
-                                 "anneal_hold, a cool_block_NN name, nvt_kinetic_stability, "
-                                 "npt_final."}
+                                 "adaptive stage of the CORE chain — must be one of "
+                                 "npt_densify_hold, anneal_hold, npt_melt_hold, nvt_melt_hold. "
+                                 "The cooldown's stages (cool_block_NN, nvt_kinetic_stability, "
+                                 "npt_final) belong to generate_cooling_workflow."}
             ext_steps = int(ext_steps) if ext_steps else int(1.0e6 / dt_prod)
             template = "nvt" if extend_ensemble == "nvt" else "npt"
             # Each adaptive stage holds at its OWN fixed condition; a continuation must hold
-            # at the SAME one, not silently default to the workflow's temp/press. cool_block_NN
-            # has no fixed default (its T depends on which block in the ramp it is) — the
-            # caller MUST pass extend_temp_K for that one.
+            # at the SAME one, not silently default to the workflow's temp/press.
             if base_stage_name == "npt_densify_hold":
                 ext_T = 300.0
             elif base_stage_name == "anneal_hold":
                 ext_T = max_temp
-            elif base_stage_name in ("nvt_kinetic_stability", "npt_final"):
-                ext_T = final_T_K
-            elif base_stage_name.startswith("cool_block_"):
-                if extend_temp_K is None:
-                    return {"status": "error",
-                            "error": "extend_only for a cool_block_NN stage requires "
-                                     "extend_temp_K (that block's own hold temperature) — it "
-                                     "cannot be inferred from base_stage_name alone."}
-                ext_T = extend_temp_K
+            elif base_stage_name in ("npt_melt_hold", "nvt_melt_hold"):
+                ext_T = melt_hold_T
             else:
                 ext_T = temp  # unreachable: base_stage_name already validated above
             params = {
@@ -1959,7 +1913,7 @@ def generate_equilibration_workflow(
                 "status":             "success",
                 "polymer":            polymer_name,
                 "n_atoms":            n_atoms,
-                "temp":               temp,
+                "melt_hold_T":        melt_hold_T,
                 "max_temp":           max_temp,
                 "n_stages":           1,
                 "engine":             engine,
@@ -1967,9 +1921,12 @@ def generate_equilibration_workflow(
                 "extend_ensemble":    extend_ensemble,
                 "stages":             stages,
                 "run_order":          [sx["name"]],
-                "melt_data_path":     None,
-                "tg_start_data_path": None,
-                "tg_start_T_K":       None,
+                # An extend-only call generates ONE continuation stage and nothing else, so it
+                # names no melt cells. The caller keeps the paths it already had -- and, when it
+                # extended npt_melt_hold, must regenerate nvt_melt_hold (resume_from=
+                # "npt_melt_hold") before those paths are valid again.
+                "melt_data_path":       None,
+                "melt_start_data_path": None,
                 "preflight_warnings":  vr["warnings"],
                 "preflight_stats":     vr["stats"],
                 "instructions": (
@@ -1998,10 +1955,6 @@ def generate_equilibration_workflow(
             prev_output = data_file  # stand-in for whatever checkpoint resume_from names
 
         _resume_idx = _CHECKPOINTS.index(resume_from) if resume_from is not None else -1
-        melt_tag_T = None
-        melt_data_path = None
-        tg_start_data_path = None
-        tg_start_T_actual = None
 
         # 1. nvt_warmup — fixed, short 300 K settle (removes build artifacts)
         if _resume_idx < 0:
@@ -2092,65 +2045,339 @@ def generate_equilibration_workflow(
         # resume_from == "anneal_hold": prev_output already = data_file, standing in
         # correctly for anneal_hold's own (already-run) output.
 
-        # 7. cool_block_NN — ADAPTIVE per block: blockwise cooldown max_temp -> final_T_K in
-        # cool_block_dT_K decrements, first block of each only (further blocks are
-        # extend_only=True continuations of that SPECIFIC block, capped at
-        # cool_block_hold_cap_steps). The block reaching `temp` (glassy: temp > final_T_K) or
-        # t_equil_K (rubbery: the direct successor to the retired add_melt_npt flag) is tagged
-        # as the melt/production reference for K_T and melt-state chain structure, and gets
-        # melt_hold_extra_steps of additional hold — the successor to the retired dedicated
-        # npt_melt isothermal-hold stage, folded into the blockwise schedule instead.
+        # 7. npt_melt_ramp — fixed one-shot NPT ramp from the anneal ceiling down to the melt
+        # hold. This is the FIRST barostatted stage after an NVT anneal_hold, so the cell still
+        # carries the densified 300 K box and the barostat has to expand it to melt density
+        # here. That expansion used to happen inside cool_block_01, ungated; now the adaptive
+        # hold that follows gates it.
         if _resume_idx < 5:
+            s = _stage("npt_melt_ramp", "npt", {
+                "T_START": max_temp, "T_FINAL": melt_hold_T, "T_DAMP": thermostat_damp_fs,
+                "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
+                "TIMESTEP": dt_prod,
+                "N_STEPS": int(melt_ramp_steps) if melt_ramp_steps else steps_heat,
+                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+                "write_restart": True,
+            }, prev_output)
+            stages.append(s)
+            prev_output = s["output_data"]
+
+        # 8. npt_melt_hold — ADAPTIVE: NPT at melt_hold_T/press. THE GATED CELL. Melt density,
+        # the thermo drift/SEM gates, and the per-frame geometry checks (Rg/MSID/R_ee/torsion/
+        # P2/homogeneity/finite_size) are all computed from this stage's own log and trajectory.
+        if _resume_idx < 6:
+            s = _stage("npt_melt_hold", "npt", {
+                "T_START": melt_hold_T, "T_FINAL": melt_hold_T, "T_DAMP": thermostat_damp_fs,
+                "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
+                "TIMESTEP": dt_prod,
+                "N_STEPS": int(melt_hold_min_steps) if melt_hold_min_steps
+                           else int(5.0e5 / dt_prod),
+                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+                "write_restart": True,
+            }, prev_output)
+            stages.append(s)
+            prev_output = s["output_data"]
+
+        # 9. nvt_melt_hold — ADAPTIVE: NVT at melt_hold_T, FIXED volume (npt_melt_hold's own
+        # endpoint). Two jobs, and both need the barostat off: it supplies the uncontaminated
+        # window MSD/kinetic-trap/C(t) require (a barostatted trajectory affine-scales
+        # coordinates every step, which contaminates cumulative CoM displacement), and its
+        # endpoint is the cell every downstream track starts from. Because NVT cannot move the
+        # box, that cell carries npt_melt_hold's own equilibrated volume unchanged.
+        s = _stage("nvt_melt_hold", "nvt", {
+            "T_START": melt_hold_T, "T_FINAL": melt_hold_T, "T_DAMP": thermostat_damp_fs,
+            "TIMESTEP": dt_prod,
+            "N_STEPS": int(nvt_melt_min_steps) if nvt_melt_min_steps else int(5.0e5 / dt_prod),
+            "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+            "write_restart": True,
+        }, prev_output)
+        stages.append(s)
+        prev_output = s["output_data"]
+
+        final_stage = stages[-1]
+        melt_hold_stage = next((st for st in stages if st["name"] == "npt_melt_hold"), None)
+
+        ret = {
+            "status":     "success",
+            "polymer":    polymer_name,
+            "n_atoms":    n_atoms,
+            "melt_hold_T": melt_hold_T,
+            "max_temp":   max_temp,
+            "n_stages":   len(stages),
+            "engine":     engine,
+            "stages":     stages,
+            "run_order":  [s["name"] for s in stages],
+            "npt_production_log": f"{final_stage['work_dir']}/{final_stage['params']['LOG_FILE']}",
+            "npt_production_dir": final_stage["work_dir"],
+            # The two cells this chain hands on, named explicitly rather than looked up by
+            # position: the gated melt (what the melt gate adjudicates and what the cooling
+            # stage's contraction reference is) and the melt-start cell (what cooling, thermal
+            # and anything else downstream reads).
+            "melt_data_path":       melt_hold_stage["output_data"] if melt_hold_stage else None,
+            "melt_start_data_path": final_stage["output_data"],
+            "preflight_warnings": vr["warnings"],
+            "preflight_stats":    vr["stats"],
+            "instructions": (
+                f"Generated {len(stages)} staged scripts for {polymer_name} (engine={engine}).\n"
+                "Execute in order using run_lammps_script().\n"
+                "GPU is ON for all stages.\n"
+                f"Pass engine='{engine}' to run_lammps_chain() so the launch flags match the decks.\n"
+                f"npt_melt_hold is the GATED melt cell at {melt_hold_T} K — melt density and "
+                "every thermo/geometry gate come from its own log and trajectory.\n"
+                "nvt_melt_hold is the handoff cell: the cooling stage and the Tg staircase both "
+                "start from its endpoint, whose box is npt_melt_hold's own.\n"
+                "This chain does NOT cool. Call generate_cooling_workflow() with "
+                "melt_start_data_path to descend to the assessment temperature.\n"
+                "Adaptive stages (npt_densify_hold, anneal_hold, npt_melt_hold, nvt_melt_hold) "
+                "are generated here with only their FIRST block — further steps come from "
+                "extend_only=True restart-continuation calls (read_restart, appended log/dump), "
+                "never from re-generating that stage with a larger N_STEPS.\n"
+                "Submit stages as a chain using run_lammps_chain()."
+            ),
+        }
+        if resume_from is not None:
+            ret["resumed_from"] = resume_from
+        return ret
+
+    except Exception as e:
+        logger.error(f"generate_equilibration_workflow failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+@mcp.tool()
+def generate_cooling_workflow(
+    data_file: str,
+    work_dir_base: str,
+    velocity_seed: int,
+    T_melt_hold_K: float,
+    final_T_K: float,
+    cool_block_dT_K: Optional[float],
+    cool_block_hold_steps: Optional[int],
+    cool_block_hold_cap_steps: Optional[int],
+    stage7_min_steps: Optional[int],
+    stage7_cap_steps: Optional[int],
+    stage8_min_steps: Optional[int],
+    stage8_cap_steps: Optional[int],
+    use_long_range: bool,
+    use_pcff: bool,
+    use_trappe: bool,
+    use_opls: bool,
+    engine: str,
+    polymer_name: str = "polymer",
+    press: float = 1.0,
+    n_atoms: Optional[int] = None,
+    params_file: str = "",
+    thermostat_damp_fs: float = 100.0,
+    barostat_damp_fs: float = 1000.0,
+    extend_only: bool = False,
+    restart_file: Optional[str] = None,
+    base_stage_name: Optional[str] = None,
+    extend_temp_K: Optional[float] = None,
+    extend_ensemble: str = "npt",
+    resume_from: Optional[str] = None,
+) -> dict:
+    """
+    Cool an already-equilibrated melt to the assessment temperature and produce the gated
+    assessment cell.
+
+    Runs only when a property needs a cell at final_T_K -- a density there, or any mechanical
+    property. A melt-only or Tg-only run never calls this: the Tg staircase descends from the
+    same melt cell on its own, sampling as it goes.
+
+    Protocol (fixed stage names, adaptive stages EXTEND via restart-continuation):
+      cool_block_NN          - ADAPTIVE (one segment per block): NPT blockwise cooldown,
+                               T_melt_hold_K -> final_T_K in cool_block_dT_K decrements. Each
+                               block is generated with its FIRST hold only; further holds are
+                               extend_only=True continuations of that SPECIFIC block, capped
+                               at cool_block_hold_cap_steps.
+      nvt_kinetic_stability  - ADAPTIVE: NVT at final_T_K, FIXED volume (the last cool_block's
+                               endpoint) -- MSD/kinetic-trap diagnostics need an
+                               uncontaminated (non-barostat-rescaled) window.
+      npt_final              - ADAPTIVE: NPT at final_T_K/press -- the assessment cell.
+                               Rg/Ree/RDF/dihedrals/MSID/K_T are computed from its own
+                               trajectory, not a separate production stage.
+
+    The descent rate is the caller's business, not this tool's: cool_block_hold_steps is
+    resolved upstream (stage_params.rate_matched_cool_block_hold_steps) so the cooldown runs at
+    the same K/ns the Tg staircase uses. Two descents from one melt cell at two different rates
+    would mean a run's density and its Tg describe glasses with different thermal histories.
+
+    T_melt_hold_K == final_T_K is legal and emits ZERO cool blocks -- the melt IS the
+    assessment cell, and only nvt_kinetic_stability + npt_final are generated.
+
+    Args:
+        data_file:      The melt-start cell: nvt_melt_hold's own output_data from
+                        generate_equilibration_workflow (its melt_start_data_path).
+        velocity_seed:  REQUIRED, non-null. Same value as the equilibration chain's -- one seed
+                        per run. No stage here issues `velocity all create` (every one inherits
+                        velocities from the incoming .data), but the generator still requires
+                        it rather than silently drawing its own.
+        T_melt_hold_K:  Where the melt was held; the top of the descent. Must be >= final_T_K.
+        final_T_K:      The assessment temperature (300 K by default). cool_block's last block,
+                        nvt_kinetic_stability and npt_final all run here.
+        cool_block_dT_K: REQUIRED. Nominal temperature decrement per cool_block. Null selects
+                        25.0 K.
+        cool_block_hold_steps: REQUIRED. Step count for each cool_block's first (base) hold.
+                        Null selects int(2.0e5/dt_prod) (~200 ps at dt=1fs).
+        cool_block_hold_cap_steps: REQUIRED. Ceiling on cumulative steps for any ONE
+                        cool_block's restart-continuation extensions. Null selects 3x the base.
+        stage7_min_steps / stage7_cap_steps: REQUIRED. First block and cumulative ceiling for
+                        nvt_kinetic_stability. Null selects int(5.0e5/dt_prod) / int(2.0e6/dt_prod).
+        stage8_min_steps / stage8_cap_steps: REQUIRED. First block and cumulative ceiling for
+                        npt_final. Null selects int(5.0e5/dt_prod) / int(5.0e6/dt_prod).
+        resume_from:    None (default, the whole descent) or "cool_block" (the entire blockwise
+                        cooldown already ran -- start at nvt_kinetic_stability, reading
+                        data_file as the last block's own output) or "nvt_kinetic_stability".
+                        To regenerate the cooldown itself with a different rate, invalidate this
+                        stage rather than resuming: its input is the gated melt cell, so a fresh
+                        call rebuilds the whole descent without touching the core chain.
+        extend_temp_K:  REQUIRED when extend_only=True AND base_stage_name is a cool_block_NN
+                        name -- that block's own hold temperature, which cannot be inferred
+                        from the name alone. Ignored for nvt_kinetic_stability/npt_final, which
+                        both hold at final_T_K.
+        (Force-field, engine and damping args behave exactly as in
+        generate_equilibration_workflow; the two chains share _ff_base_for so they cannot
+        emit different styles for the same cell.)
+
+    Returns:
+        dict with stages / run_order / npt_production_log / npt_production_dir /
+        assessment_data_path (npt_final's output_data) / instructions.
+    """
+    try:
+        if not velocity_seed:
+            return {"status": "error",
+                    "error": "velocity_seed is required and must not be null — pass the same "
+                             "seed the equilibration chain used for this run."}
+        _CHECKPOINTS = ["cool_block", "nvt_kinetic_stability"]
+        if resume_from not in (None, *_CHECKPOINTS):
+            return {"status": "error",
+                    "error": f"resume_from={resume_from!r} is not supported — must be one of "
+                             f"None, {', '.join(repr(c) for c in _CHECKPOINTS)}."}
+        if resume_from is not None and extend_only:
+            return {"status": "error",
+                    "error": "resume_from and extend_only are mutually exclusive"}
+        if extend_ensemble not in ("npt", "nvt"):
+            return {"status": "error",
+                    "error": f"extend_ensemble={extend_ensemble!r} must be 'npt' or 'nvt'"}
+        if extend_only and (not restart_file or not base_stage_name):
+            return {"status": "error",
+                    "error": "extend_only=True requires both restart_file (the base stage's own "
+                             ".restart output) and base_stage_name (the stage being continued)."}
+        _STAGE_ENSEMBLE = {"nvt_kinetic_stability": "nvt", "npt_final": "npt"}
+        if extend_only and base_stage_name:
+            _required = ("npt" if base_stage_name.startswith("cool_block_")
+                         else _STAGE_ENSEMBLE.get(base_stage_name))
+            if _required is not None and extend_ensemble != _required:
+                return {"status": "error",
+                        "error": f"extend_ensemble={extend_ensemble!r} does not match "
+                                 f"base_stage_name={base_stage_name!r}'s own ensemble "
+                                 f"({_required!r}) — continuing an {_required} stage as "
+                                 f"{extend_ensemble} would silently add or remove a barostat "
+                                 "mid-trajectory."}
+        if final_T_K > T_melt_hold_K:
+            return {"status": "error",
+                    "error": f"final_T_K={final_T_K} exceeds T_melt_hold_K={T_melt_hold_K} — "
+                             "this chain only cools. A run that needs an assessment temperature "
+                             "above the melt hold needs a higher melt hold, not a heating ramp "
+                             "from an equilibrated melt."}
+        if thermostat_damp_fs <= 0 or barostat_damp_fs <= 0:
+            return {"status": "error", "error": "thermostat/barostat damping must be positive"}
+
+        content = Path(data_file).read_text(encoding="utf-8")
+        gen = ScriptGenerator(data_file=data_file)
+        info = gen.parse_data_file(content=content)
+        vr = gen.validate_data_file(content=content, h_type_ids=info.get("h_type_ids"))
+        errors = vr["errors"]
+        if params_file:
+            errors = [e for e in errors if "Coeffs' section missing" not in e]
+        if errors:
+            return {"status": "error",
+                    "error": "Pre-flight validation failed — workflow not generated",
+                    "validation_errors": errors, "validation_warnings": vr["warnings"],
+                    "validation_stats": vr["stats"]}
+
+        n_atoms = n_atoms or info.get("n_atoms", 0)
+        ff_base = _ff_base_for(use_pcff, use_trappe, use_opls, params_file, engine)
+        dt_prod = 2.0 if use_trappe else 1.0
+        _stage, _continue_stage = _make_stage_builders(
+            gen, work_dir_base, ff_base, velocity_seed)
+
+        stages = []
+
+        if extend_only:
+            if base_stage_name and base_stage_name.startswith("cool_block_"):
+                ext_steps = cool_block_hold_steps
+                if extend_temp_K is None:
+                    return {"status": "error",
+                            "error": "extend_only for a cool_block_NN stage requires "
+                                     "extend_temp_K (that block's own hold temperature) — it "
+                                     "cannot be inferred from base_stage_name alone."}
+                ext_T = extend_temp_K
+            elif base_stage_name == "nvt_kinetic_stability":
+                ext_steps, ext_T = stage7_min_steps, final_T_K
+            elif base_stage_name == "npt_final":
+                ext_steps, ext_T = stage8_min_steps, final_T_K
+            else:
+                return {"status": "error",
+                        "error": f"base_stage_name={base_stage_name!r} is not a recognized "
+                                 "adaptive stage of the cooling chain — must be a cool_block_NN "
+                                 "name, nvt_kinetic_stability, or npt_final."}
+            ext_steps = int(ext_steps) if ext_steps else int(1.0e6 / dt_prod)
+            template = "nvt" if extend_ensemble == "nvt" else "npt"
+            params = {"T_START": ext_T, "T_FINAL": ext_T, "T_DAMP": thermostat_damp_fs,
+                      "TIMESTEP": dt_prod, "N_STEPS": ext_steps,
+                      "use_pppm": use_long_range and not use_trappe, "use_gpu": True}
+            if extend_ensemble == "npt":
+                params.update({"P_START": press, "P_FINAL": press,
+                               "P_DAMP": barostat_damp_fs})
+            sx = _continue_stage(base_stage_name, template, params, restart_file)
+            stages.append(sx)
+            return {
+                "status": "success", "polymer": polymer_name, "n_atoms": n_atoms,
+                "T_melt_hold_K": T_melt_hold_K, "final_T_K": final_T_K, "n_stages": 1,
+                "engine": engine, "extend_only": True, "extend_ensemble": extend_ensemble,
+                "stages": stages, "run_order": [sx["name"]],
+                "assessment_data_path": None,
+                "npt_production_log": f"{sx['work_dir']}/{sx['params']['LOG_FILE']}",
+                "npt_production_dir": sx["work_dir"],
+                "preflight_warnings": vr["warnings"], "preflight_stats": vr["stats"],
+                "instructions": (
+                    f"Extend-only: continued {base_stage_name} ({extend_ensemble.upper()}, "
+                    f"{ext_steps} more steps) via read_restart from {restart_file}, appending "
+                    f"onto {sx['work_dir']}/{sx['params']['LOG_FILE']} (engine={engine}). "
+                    f"Submit with run_lammps_chain(engine='{engine}'); then re-run the gate on "
+                    f"{sx['output_data']}."
+                ),
+            }
+
+        _resume_idx = _CHECKPOINTS.index(resume_from) if resume_from is not None else -1
+        prev_output = data_file
+
+        # 1. cool_block_NN — the blockwise descent. Walking down from the melt hold in dT
+        # decrements; the final block lands exactly on final_T_K however short it is.
+        if _resume_idx < 0:
             dT = float(cool_block_dT_K) if cool_block_dT_K else 25.0
-            base_hold = int(cool_block_hold_steps) if cool_block_hold_steps else int(2.0e5 / dt_prod)
-            extra_hold = int(melt_hold_extra_steps) if melt_hold_extra_steps else 0
-
-            melt_tag_T = temp if temp > final_T_K else (
-                t_equil_K if (t_equil_K is not None and final_T_K < t_equil_K < max_temp) else None
-            )
-
+            base_hold = (int(cool_block_hold_steps) if cool_block_hold_steps
+                         else int(2.0e5 / dt_prod))
             waypoints = []
-            t = max_temp
+            t = T_melt_hold_K
             while t > final_T_K + 1e-6:
                 waypoints.append(t)
                 t -= dT
             waypoints.append(final_T_K)
-            if melt_tag_T is not None and not any(abs(melt_tag_T - w) < 1e-6 for w in waypoints):
-                waypoints.append(melt_tag_T)
-                waypoints.sort(reverse=True)
-
-            block_idx = 0
-            for w_start, w_end in zip(waypoints[:-1], waypoints[1:]):
-                block_idx += 1
-                is_melt_block = melt_tag_T is not None and abs(w_end - melt_tag_T) < 1e-6
+            for block_idx, (w_start, w_end) in enumerate(
+                    zip(waypoints[:-1], waypoints[1:]), start=1):
                 s = _stage(f"cool_block_{block_idx:02d}", "npt", {
                     "T_START": w_start, "T_FINAL": w_end, "T_DAMP": thermostat_damp_fs,
                     "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
-                    "TIMESTEP": dt_prod,
-                    "N_STEPS": base_hold + (extra_hold if is_melt_block else 0),
+                    "TIMESTEP": dt_prod, "N_STEPS": base_hold,
                     "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
                     "write_restart": True,
                 }, prev_output)
                 stages.append(s)
                 prev_output = s["output_data"]
-                if is_melt_block:
-                    melt_data_path = s["output_data"]
-                # Walking downward, every endpoint reached so far is >= the next one, so the
-                # LAST block satisfying this is the coldest cell still at or above the sweep
-                # top -- overwrite rather than break.
-                if tg_start_T_K is not None and w_end >= tg_start_T_K - 1e-6:
-                    tg_start_data_path, tg_start_T_actual = s["output_data"], w_end
-        # resume_from == "cool_block": the entire cooldown is already done; prev_output stands
-        # in for its last block's output. To regenerate the cooldown itself (e.g. a different
-        # cool_block_dT_K), resume_from="anneal_hold" instead — there is no "redo cooling but
-        # keep annealing" checkpoint at finer grain than that.
 
-        # 8. nvt_kinetic_stability — ADAPTIVE, fixed volume (from cool_block's own endpoint),
-        # at final_T_K. MSD/kinetic-trap diagnostics need this uncontaminated-by-barostat
-        # window; everything else (Rg/Ree/RDF/dihedrals/MSID) is computed from npt_final
-        # instead, since those are per-frame relative-geometry quantities with no ensemble
-        # dependence.
-        if _resume_idx < 6:
+        # 2. nvt_kinetic_stability — ADAPTIVE, fixed volume at final_T_K.
+        if _resume_idx < 1:
             s = _stage("nvt_kinetic_stability", "nvt", {
                 "T_START": final_T_K, "T_FINAL": final_T_K, "T_DAMP": thermostat_damp_fs,
                 "TIMESTEP": dt_prod,
@@ -2161,54 +2388,40 @@ def generate_equilibration_workflow(
             stages.append(s)
             prev_output = s["output_data"]
 
-        # 9. npt_final — ADAPTIVE, the equilibrated parent state at final_T_K/press.
-        if _resume_idx < 7:
-            s = _stage("npt_final", "npt", {
-                "T_START": final_T_K, "T_FINAL": final_T_K, "T_DAMP": thermostat_damp_fs,
-                "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
-                "TIMESTEP": dt_prod,
-                "N_STEPS": int(stage8_min_steps) if stage8_min_steps else int(5.0e5 / dt_prod),
-                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
-                "write_restart": True,
-            }, prev_output)
-            stages.append(s)
-            prev_output = s["output_data"]
+        # 3. npt_final — ADAPTIVE, the assessment cell at final_T_K/press.
+        s = _stage("npt_final", "npt", {
+            "T_START": final_T_K, "T_FINAL": final_T_K, "T_DAMP": thermostat_damp_fs,
+            "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
+            "TIMESTEP": dt_prod,
+            "N_STEPS": int(stage8_min_steps) if stage8_min_steps else int(5.0e5 / dt_prod),
+            "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+            "write_restart": True,
+        }, prev_output)
+        stages.append(s)
 
         final_stage = stages[-1]
-
+        n_blocks = sum(1 for st in stages if st["name"].startswith("cool_block_"))
         ret = {
-            "status":     "success",
-            "polymer":    polymer_name,
-            "n_atoms":    n_atoms,
-            "temp":       temp,
-            "max_temp":   max_temp,
-            "final_T_K":  final_T_K,
-            "n_stages":   len(stages),
-            "engine":     engine,
-            "stages":     stages,
-            "run_order":  [s["name"] for s in stages],
+            "status": "success", "polymer": polymer_name, "n_atoms": n_atoms,
+            "T_melt_hold_K": T_melt_hold_K, "final_T_K": final_T_K,
+            "n_cool_blocks": n_blocks, "n_stages": len(stages), "engine": engine,
+            "stages": stages, "run_order": [st["name"] for st in stages],
             "npt_production_log": f"{final_stage['work_dir']}/{final_stage['params']['LOG_FILE']}",
             "npt_production_dir": final_stage["work_dir"],
-            "melt_data_path":     melt_data_path,
-            "tg_start_data_path": tg_start_data_path,
-            "tg_start_T_K":       tg_start_T_actual,
-            "preflight_warnings": vr["warnings"],
-            "preflight_stats":    vr["stats"],
+            "assessment_data_path": final_stage["output_data"],
+            "preflight_warnings": vr["warnings"], "preflight_stats": vr["stats"],
             "instructions": (
-                f"Generated {len(stages)} staged scripts for {polymer_name} (engine={engine}).\n"
-                "Execute in order using run_lammps_script().\n"
-                "GPU is ON for all stages.\n"
-                f"Pass engine='{engine}' to run_lammps_chain() so the launch flags match the decks.\n"
-                "npt_final is the equilibrated parent state at final_T_K/press — compute "
-                "Rg/Ree/RDF/dihedrals/MSID/K_T from its own trajectory.\n"
-                + (f"melt_data_path points to the cool_block reference at {melt_tag_T} K for "
-                   "K_T/melt-structure extraction.\n" if melt_data_path else "")
-                + "Adaptive stages (npt_densify_hold, anneal_hold, any cool_block_NN, "
-                "nvt_kinetic_stability, npt_final) are generated here with only their FIRST "
-                "block — further steps come from extend_only=True restart-continuation calls "
-                "(read_restart, appended log/dump), never from re-generating that stage with a "
+                f"Generated {len(stages)} staged scripts for {polymer_name} (engine={engine}): "
+                f"{n_blocks} cool blocks from {T_melt_hold_K} K to {final_T_K} K, then "
+                "nvt_kinetic_stability and npt_final.\n"
+                f"Pass engine='{engine}' to run_lammps_chain() so the launch flags match.\n"
+                "npt_final is the assessment cell — compute density/Rg/Ree/RDF/dihedrals/MSID/"
+                "K_T from its own trajectory.\n"
+                "Adaptive stages (each cool_block_NN, nvt_kinetic_stability, npt_final) are "
+                "generated with only their FIRST block — further steps come from "
+                "extend_only=True restart-continuation calls, never from re-generating with a "
                 "larger N_STEPS.\n"
-                + "Submit stages as a chain using run_lammps_chain()."
+                "Submit stages as a chain using run_lammps_chain()."
             ),
         }
         if resume_from is not None:
@@ -2216,8 +2429,9 @@ def generate_equilibration_workflow(
         return ret
 
     except Exception as e:
-        logger.error(f"generate_equilibration_workflow failed: {e}")
+        logger.error(f"generate_cooling_workflow failed: {e}")
         return {"status": "error", "error": str(e)}
+
 
 
 # ─── Analysis tools (Tg, density, convergence, bulk modulus) ─────────────────
@@ -2264,20 +2478,24 @@ def _require_output_dir(output_dir, tool: str, legacy: str):
         )
 
 
-def _save_gate_verdict(out_dir, result: dict) -> dict:
-    """Persist the equilibration-gate verdict under the "gate" key of <out_dir>/equilibration.json.
+def _save_gate_verdict(out_dir, result: dict, output_name: str = "equilibration.json") -> dict:
+    """Persist the gate verdict under the "gate" key of <out_dir>/<output_name>.
 
     The decision that authorises (or blocks) every downstream property extraction used to exist
     only in the calling worker's reply, leaving nothing to audit — unlike every other stage,
     which leaves a JSON in raw/. Failures are written too: a probe that blew up is the case most
-    worth having a record of. equilibration.json is shared with check_equilibration_comprehensive
+    worth having a record of. The file is shared with check_equilibration_comprehensive
     (top-level thermo/chain/spatial keys) and extract_equilibrated_density ("density" key) —
     read-merge-write so this producer's own section replaces wholesale without clobbering theirs.
+
+    output_name selects which cell's file this is: equilibration.json for the melt gate,
+    cooling.json for the assessment gate. All three producers must be given the SAME name for
+    one cell, or the gate verdict lands in a different file from the measurements it adjudicates.
     """
     if not out_dir:
         return result
     try:
-        verdict_path = Path(out_dir) / "equilibration.json"
+        verdict_path = Path(out_dir) / (output_name or "equilibration.json")
         verdict_path.parent.mkdir(parents=True, exist_ok=True)
         merged = {}
         if verdict_path.exists():
@@ -2626,6 +2844,7 @@ def _run_extract_thermal(
     tg_data_file: Optional[str] = None,
     backbone_types: Optional[List[str]] = None,
     method_gap_exempt: bool = False,
+    fit_t_max_K: Optional[float] = None,
 ) -> dict:
     """Background worker — runs extract_thermal.py via CLI."""
 
@@ -2648,6 +2867,8 @@ def _run_extract_thermal(
         parts.append(f"--backbone_types {' '.join(str(t) for t in backbone_types)}")
     if method_gap_exempt:
         parts.append("--method_gap_exempt")
+    if fit_t_max_K is not None:
+        parts.append(f"--fit_t_max_K {fit_t_max_K}")
 
     command = " ".join(parts)
     logger.info(f"Running thermal extraction via CLI: {command}")
@@ -2662,7 +2883,7 @@ def _run_extract_thermal(
     if n_bins < 4 or r2 < 0.80:
         result["recovery_hint"] = (
             "ABORT: R² < 0.80 or < 4 temperature bins — "
-            "re-spawn tg-sweep-worker with --tg_t_high_K +50 and --tg_t_low_K −50."
+            "the sweep starts at the melt hold, so widen it by raising T_melt_hold_K (via md_tg_ceiling_K) or lowering tg_t_low_K."
         )
     elif r2 < 0.90:
         result["recovery_hint"] = (
@@ -2690,6 +2911,7 @@ def extract_thermal(
     temp_col: str = "Temp",
     density_col: str = "Density",
     enthalpy_col: str = "Enthalpy",
+    fit_t_max_K: Optional[float] = None,
 ) -> dict:
     """
     Extract thermal properties (Tg, CTE, ΔCp) from a LAMMPS MD temperature-sweep log.
@@ -2774,6 +2996,7 @@ def extract_thermal(
             tg_data_file           = tg_data_file,
             backbone_types         = backbone_types,
                     method_gap_exempt   = method_gap_exempt,
+            fit_t_max_K            = fit_t_max_K,
 )),
         daemon=True,
     )
@@ -2815,6 +3038,7 @@ def _run_check_equilibration_comprehensive(
     cutoff_A: Optional[float] = None,
     struct_dump_file: Optional[str] = None,
     struct_data_file: Optional[str] = None,
+    output_name: str = "equilibration.json",
 ) -> dict:
     """Background worker — runs check_equilibration_comprehensive.py via CLI."""
     bt_str = " ".join(str(t) for t in backbone_types)
@@ -2838,6 +3062,7 @@ def _run_check_equilibration_comprehensive(
         f"--energy_col {energy_col}",
         f'--atom_style "{atom_style}"',
         f"--cv_signal_max {cv_signal_max}",
+        f"--output_name {output_name}",
     ]
     if cutoff_A is not None:
         parts.append(f"--cutoff_A {cutoff_A}")
@@ -2898,6 +3123,7 @@ def check_equilibration_comprehensive(
     cv_signal_max: float = 0.11,
     struct_dump_file: Optional[str] = None,
     struct_data_file: Optional[str] = None,
+    output_name: str = "equilibration.json",
 ) -> dict:
     """
     Comprehensive polymer equilibration validator — thermo + structural checks in
@@ -3020,6 +3246,7 @@ def check_equilibration_comprehensive(
             cutoff_A            = cutoff_A,
             struct_dump_file    = struct_dump_file,
             struct_data_file    = struct_data_file,
+            output_name         = output_name,
         )),
         daemon=True,
     )
@@ -3059,6 +3286,7 @@ def _run_extract_equilibrated_density(
     parts.append(f"--plateau_shift_sigma {plateau_shift_sigma}")
     parts.append(f"--density_col {density_col}")
     parts.append(f"--temp_col {temp_col}")
+    parts.append(f"--output_name {output_name}")
 
     command = " ".join(parts)
     logger.info(f"Running equilibrated density extraction via CLI: {command}")
@@ -3195,6 +3423,7 @@ def enforce_equilibration_gate(
     melt_data: Optional[str],
     out_dir: Optional[str],
     final_T_K: float = 300.0,
+    output_name: str = "equilibration.json",
 ) -> dict:
     """
     Mechanized equilibration gate verdict — replaces prose PASS/EXTEND/FAIL judgment with a
@@ -3218,7 +3447,10 @@ def enforce_equilibration_gate(
 
     Args:
         comprehensive_json: Path to check_equilibration_comprehensive's saved JSON output.
-        regime:             "glassy" or "rubbery" (T_workflow_K > 300 → glassy).
+        regime:             "melt" (the melt hold -- rg and ct BIND there, see
+                            enforce_gate.BINDING_MELT), "glassy", or "rubbery". The melt gate
+                            passes "melt" outright rather than resolving it, because
+                            resolve_regime answers "glassy" whenever Tg is unresolvable.
         dp:                 Degree of polymerization (drives the require_glassy DP≥30 carve-out).
         ct_gate_reliable:   False for aromatic-backbone classes (PSFO/PKTN) — C(t) is
                             structurally undefined there regardless of DP.
@@ -3284,13 +3516,13 @@ def enforce_equilibration_gate(
             failure = {"status": "failed",
                        "error": "assess_cooling_contraction probe failed inside enforce_equilibration_gate",
                        "detail": cooling_result}
-            return _save_gate_verdict(out_dir, failure)
+            return _save_gate_verdict(out_dir, failure, output_name)
         save_path = Path(result["save_result_to"])
         save_path.parent.mkdir(parents=True, exist_ok=True)
         save_path.write_text(json.dumps(cooling_result, indent=2))
         result = enforce_gate.enforce_live(live_args)  # re-run now that the cache exists
 
-    return _save_gate_verdict(out_dir, result)
+    return _save_gate_verdict(out_dir, result, output_name)
 
 
 @mcp.tool()
@@ -3303,6 +3535,7 @@ def extract_equilibrated_density(
     plateau_shift_sigma: float = 1.0,
     density_col: str = "Density",
     temp_col: str = "Temp",
+    output_name: str = "equilibration.json",
 ) -> dict:
     """
     Extract the equilibrated (plateau) density from a single LAMMPS log.
@@ -3373,6 +3606,7 @@ def extract_equilibrated_density(
             plateau_shift_sigma = plateau_shift_sigma,
             density_col         = density_col,
             temp_col            = temp_col,
+            output_name         = output_name,
         )),
         daemon=True,
     )
@@ -4118,6 +4352,7 @@ def _run_generate_run_summary(
     n_replicates: Optional[int] = None,
     tg_path: Optional[str] = None,
     equilibration_path: Optional[str] = None,
+    melt_equilibration_path: Optional[str] = None,
     mechanical_path: Optional[str] = None,
     bulk_modulus_deform_path: Optional[str] = None,
     byproducts_spec: Optional[str] = None,
@@ -4146,6 +4381,7 @@ def _run_generate_run_summary(
     if n_replicates is not None:    parts.append(f"--n_replicates {n_replicates}")
     if tg_path:                     parts.append(f"--tg_path {tg_path}")
     if equilibration_path:          parts.append(f"--equilibration_path {equilibration_path}")
+    if melt_equilibration_path:     parts.append(f"--melt_equilibration_path {melt_equilibration_path}")
     if mechanical_path:             parts.append(f"--mechanical_path {mechanical_path}")
     if bulk_modulus_deform_path:    parts.append(f"--bulk_modulus_deform_path {bulk_modulus_deform_path}")
     if byproducts_spec:             parts.append(f"--byproducts_spec {byproducts_spec}")
@@ -4183,6 +4419,7 @@ def generate_run_summary(
     n_replicates: Optional[int] = None,
     tg_path: Optional[str] = None,
     equilibration_path: Optional[str] = None,
+    melt_equilibration_path: Optional[str] = None,
     mechanical_path: Optional[str] = None,
     bulk_modulus_deform_path: Optional[str] = None,
     byproducts_spec: Optional[str] = None,
@@ -4259,6 +4496,7 @@ def generate_run_summary(
             d01=d01, d02=d02, d03=d03, d04=d04, d05=d05, d06=d06,
             graphs_dir=graphs_dir, n_replicates=n_replicates,
             tg_path=tg_path, equilibration_path=equilibration_path,
+            melt_equilibration_path=melt_equilibration_path,
             mechanical_path=mechanical_path, bulk_modulus_deform_path=bulk_modulus_deform_path,
             byproducts_spec=byproducts_spec,
         )),

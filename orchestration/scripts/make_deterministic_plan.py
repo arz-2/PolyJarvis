@@ -47,6 +47,7 @@ Usage:
 
 import argparse
 import json
+from types import SimpleNamespace
 import re
 import subprocess
 import sys
@@ -78,7 +79,9 @@ SNAPSHOT_KEYS = [
     "ff_activate_npt_steps", "anneal_heat_steps", "anneal_check_every_steps",
     "anneal_cap_steps", "cool_block_dT_K", "cool_block_hold_steps", "cool_block_hold_cap_steps",
     "stage7_min_steps", "stage7_cap_steps", "stage8_min_steps", "stage8_cap_steps",
-    "tg_t_high_K", "tg_t_low_K", "tg_t_step_K", "tg_steps_per_t", "tg_rates_K_per_ns",
+    "melt_ramp_steps", "melt_hold_min_steps", "melt_hold_cap_steps",
+    "nvt_melt_min_steps", "nvt_melt_cap_steps",
+    "md_tg_ceiling_K", "tg_t_low_K", "tg_t_step_K", "tg_steps_per_t", "tg_rates_K_per_ns",
     "tg_min_steps_per_T", "tg_slope_gate_fallback",
     "K_deform_rate_inv_s", "K_deform_rate_slow_inv_s", "K_strain_max",
     "bm_pressures_atm", "ct_min_decay_melt",
@@ -199,6 +202,10 @@ def build_planned_stages(cls: dict, properties: set, smiles: str | None = None) 
         "build":       {"data_file_written": True},
         "equil":       {"check_equilibration_comprehensive.overall_pass": True},
         "equil-check": {"equil_verdict": "PASS"},
+        # The cooling stage: the blockwise descent from the gated melt to final_T_K, then the
+        # assessment cell. Present only when a property needs a cell at that temperature.
+        "cool":        {"chain_submitted": True},
+        "cool-check":  {"cool_verdict": "PASS"},
         # Single-rate-primary: one sweep at the class's primary configured rate (see
         # stage_params.select_primary_tg_rate_index, shared with do_thermal and the cooldown).
         "tg":          {"bilinear_fit_r_squared_min": 0.80,
@@ -263,6 +270,18 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set) -> dic
     exp_tg = _regime_exp_tg(cls, smiles)
     T_equil = decided_params.get("T_equil_K", 600.0)
     decided_params["T_workflow_K"] = 300.0 if (exp_tg is not None and exp_tg < 300) else T_equil
+    # T_melt_hold_K is resolved by stage_params.temperature_schedule at execution time from this
+    # same class entry plus the SMILES; recording it here makes it visible in the plan artifact,
+    # freezable (write_characterization_cache.FREEZE_KEYS), and readable by the cost model, which
+    # needs the sweep's top and must not re-derive it from a retired key.
+    try:
+        import stage_params as _sp
+        _sched = _sp.temperature_schedule(
+            SimpleNamespace(smiles=smiles, exp_tg_K=None, final_T_K=None,
+                            T_equil_K=None, T_anneal_high_K=None), cls)
+        decided_params["T_melt_hold_K"] = _sched["T_melt_hold_K"]
+    except Exception:  # noqa: BLE001 -- a planning-time convenience, never a hard dependency
+        pass
     uncertainties = [{
         "name": "scientific_review_pending",
         "dominant": True,
@@ -364,6 +383,16 @@ def _try_cache(run_name: str, polymer_class: str, smiles, properties: set,
     if str(entry.get("polymer_class", "")).upper() != polymer_class.upper():
         # Don't trust a cache entry recorded under a different class label -- fall back
         # rather than silently apply a different class's frozen protocol.
+        return None
+    # A frozen protocol names the stages that ran when it was validated. If the stage vocabulary
+    # has since changed (the equilibration/cooling split renamed and added stages), replaying it
+    # verbatim produces a plan validate_run_plan rejects as STRUCTURAL -- and because _try_cache
+    # has already committed the run to plan_mode="deterministic" by then, the failure surfaces as
+    # PLAN_VALIDATION_FAILED rather than as a graceful fall-through to make_plan(). A locked
+    # SMILES would become permanently unrunnable. Treat an unknown stage name as a cache MISS.
+    frozen_stages = {st.get("stage") for st in
+                     ((entry.get("protocol") or {}).get("planned_stages") or [])}
+    if not frozen_stages <= set(track_registry.STAGE_TRACK):
         return None
     return make_plan_from_cache(run_name, polymer_class, smiles, canonical, properties, entry)
 

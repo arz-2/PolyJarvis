@@ -26,11 +26,16 @@ from protocol_policy import ATM_PER_GPA  # noqa: E402
 import track_registry  # noqa: E402  (stdlib-only, no repo-local imports)
 
 
-ENGINE_VERSION = "workflow-engine-v1"
+ENGINE_VERSION = "workflow-engine-v2"
+"""v2 (2026-09-02): the equilibration stage was split into an `equilibration` core that
+ends at a gated melt hold and a separate `cooling` stage that descends to final_T_K.
+Bumped deliberately -- implementation_version is inside every stage's _input_hash, so
+this is what makes the invalidation of every resumable run on disk explicit rather than
+an accident of the decision_policy.json hash changing underneath them."""
 MAX_AUTOMATIC_REMEDIES = 12
 MAX_AGENT_DECISIONS = 2
 TRANSIENT_RETRIES = 2
-STAGE_ORDER = ("build", "equilibration", "thermal", "mechanical", "summary")
+STAGE_ORDER = ("build", "equilibration", "cooling", "thermal", "mechanical", "summary")
 STAGE_RESULTS = frozenset({"accepted", "remedy_required", "escalation_required", "failed"})
 BLOCKING_SEVERITIES = frozenset({"blocking", "structural", "error", "fatal"})
 
@@ -45,21 +50,33 @@ PARAMETER_STAGE: dict[str, str] = {
     "gpu_per_run": "build", "mpi_ranks": "build", "engine": "build",
     "dt_fs": "equilibration", "T_equil_K": "equilibration",
     "annealing_T_high_K": "equilibration", "T_workflow_K": "equilibration",
-    "P_equil_atm": "equilibration", "final_T_K": "equilibration",
-    "anneal_margin_K": "equilibration", "add_melt_npt": "equilibration",
+    "P_equil_atm": "equilibration", "final_T_K": "cooling",
+    "anneal_margin_K": "equilibration",
     "compression_max_pressure_atm": "equilibration",
     "thermostat_damp_fs": "equilibration", "barostat_damp_fs": "equilibration",
     "warmup_steps": "equilibration",
     "densify_ramp_steps": "equilibration", "densify_check_every_steps": "equilibration",
     "densify_steps_cap": "equilibration", "ff_activate_npt_steps": "equilibration",
     "anneal_heat_steps": "equilibration", "anneal_check_every_steps": "equilibration",
-    "anneal_cap_steps": "equilibration", "cool_block_dT_K": "equilibration",
-    "cool_block_hold_steps": "equilibration", "cool_block_hold_cap_steps": "equilibration",
-    "stage7_min_steps": "equilibration", "stage7_cap_steps": "equilibration",
-    "stage8_min_steps": "equilibration", "stage8_cap_steps": "equilibration",
-    "t_equil_K": "equilibration", "melt_hold_extra_steps": "equilibration",
+    "anneal_cap_steps": "equilibration",
+    # The melt tail of the core chain.
+    "T_melt_hold_K": "equilibration", "melt_ramp_steps": "equilibration",
+    "melt_hold_min_steps": "equilibration", "melt_hold_cap_steps": "equilibration",
+    "nvt_melt_min_steps": "equilibration", "nvt_melt_cap_steps": "equilibration",
+    # md_tg_ceiling_K (formerly tg_t_high_K, formerly THERMAL-hashed) sets the melt hold for a
+    # SMILES whose Tg cannot be trusted to size a protocol, so it shapes the equilibration chain
+    # and must invalidate it. Hashing it to "thermal" while it moved the melt would rewrite the
+    # equilibration chain under an unchanged equilibration _input_hash.
+    "md_tg_ceiling_K": "equilibration",
+    # The descent, and the two stages at the assessment temperature -- all COOLING now.
+    "cool_block_dT_K": "cooling",
+    "cool_block_hold_steps": "cooling", "cool_block_hold_cap_steps": "cooling",
+    "stage7_min_steps": "cooling", "stage7_cap_steps": "cooling",
+    "stage8_min_steps": "cooling", "stage8_cap_steps": "cooling",
     "equilibration_extend_base_stage": "equilibration",
     "equilibration_extend_ensemble": "equilibration",
+    "cooling_continuation_ns": "cooling", "cooling_continuation_attempt": "cooling",
+    "cooling_extend_base_stage": "cooling", "cooling_extend_ensemble": "cooling",
     # alpha_glass_per_K/alpha_melt_per_K are now fully inert: assess_cooling_contraction.py's
     # self-consistency check always uses its own generic literature-typical constants and
     # never reads a class-curated value, so these two keys have no consumer anymore. Left
@@ -77,8 +94,21 @@ PARAMETER_STAGE: dict[str, str] = {
     "experimental_density_gcm3": "equilibration",
     "velocity_seed": "equilibration",
     "npt_continuation_ns": "equilibration",
+    "equilibration_phase": "equilibration",
+    # RETIRED by the equilibration/cooling split (2026-09-02), mapping deliberately KEPT -- the
+    # alpha_glass_per_K precedent above. An effective_parameters dict already on disk may still
+    # carry these; an unmapped key falls through PARAMETER_STAGE.get(key, "build") and
+    # invalidates the entire pipeline back to build on the next resume.
+    #   add_melt_npt / t_equil_K / melt_hold_extra_steps / melt_hold_ns /
+    #   melt_only_continuation_ns  -- the melt cell is a named stage now, not a tagged cool_block
+    #   tg_t_high_K                -- renamed md_tg_ceiling_K and re-homed above
+    #   tg_start_T_K               -- the sweep starts at the melt hold; no waypoint to tag
+    #   cooling_resume_source      -- vestigial even before the split; never had a consumer
+    "add_melt_npt": "equilibration", "t_equil_K": "equilibration",
+    "melt_hold_extra_steps": "equilibration",
     "melt_hold_ns": "equilibration", "melt_only_continuation_ns": "equilibration",
-    "equilibration_phase": "equilibration", "cooling_resume_source": "equilibration",
+    "tg_t_high_K": "equilibration", "tg_start_T_K": "equilibration",
+    "cooling_resume_source": "equilibration",
     # Ladder bookkeeping the equilibration remedies (_continue_npt, _cooling,
     # _melt_homogeneity) write into effective_parameters alongside their real scientific
     # knob -- these carry no scientific weight of their own, but MUST still be mapped to their
@@ -90,7 +120,7 @@ PARAMETER_STAGE: dict[str, str] = {
     # already-verified PASS back to "stale" on repair-script reconstruction.
     "npt_continuation_attempt": "equilibration",
     "rerun_homogeneity_gate": "equilibration",
-    "baseline_cool_block_hold_steps": "equilibration",
+    "baseline_cool_block_hold_steps": "cooling",
     "equilibration_resume_from": "equilibration",
     # minimize.in's ETOL/FTOL/MAXITER/MAXEVAL, threaded from decided_params -- _raise_minimize_
     # tolerance's ladder bookkeeping (baseline_minimize_*) follows the same pattern as the
@@ -99,10 +129,12 @@ PARAMETER_STAGE: dict[str, str] = {
     "minimize_maxiter": "equilibration", "minimize_maxeval": "equilibration",
     "baseline_minimize_etol": "equilibration", "baseline_minimize_ftol": "equilibration",
     "baseline_minimize_maxiter": "equilibration", "baseline_minimize_maxeval": "equilibration",
-    "tg_t_high_K": "thermal", "tg_t_low_K": "thermal", "tg_t_step_K": "thermal",
+    "tg_t_low_K": "thermal", "tg_t_step_K": "thermal",
     "tg_primary_rate_index": "thermal", "tg_rates_K_per_ns": "thermal",
     "tg_slope_gate_fallback": "thermal",
     "tg_steps_per_t": "thermal", "tg_min_steps_per_T": "thermal",
+    # RETIRED with the reheat probe (_bracket_tg_start_temp): the sweep starts from the gated
+    # melt hold, so there is nothing to bracket. Mapping kept, as above.
     "tg_bracket_max_iters": "thermal", "tg_bracket_probe_steps": "thermal",
     "tg_bracket_drift_threshold_pct": "thermal", "tg_per_t_max_extensions": "thermal",
     "tg_per_t_stability_pct": "thermal", "tg_per_t_min_n_eff": "thermal",
@@ -275,11 +307,19 @@ def _forcefield(params: dict[str, Any], finding: Finding, _: int) -> dict[str, A
 
 
 def _continue_npt(params: dict[str, Any], finding: Finding, attempt: int) -> dict[str, Any]:
-    """EQUIL_DRIFT/EQUIL_SEM/EQUIL_N_EFF/EXTEND: extend npt_final's own trajectory via
-    restart-continuation (read_restart, appended log/dump) -- see
-    equilibration_extend_base_stage/equilibration_extend_ensemble, consumed by
-    CampaignStageExecutor.execute to set args.pending_continuation_path from the prior
-    attempt's npt_prod_restart_path (its .restart output, not its .data output)."""
+    """EQUIL_DRIFT/EQUIL_SEM/EQUIL_N_EFF/EXTEND: extend the gated stage's own trajectory via
+    restart-continuation (read_restart, appended log/dump) -- see the *_extend_base_stage /
+    *_extend_ensemble keys, consumed by CampaignStageExecutor.execute to set
+    args.pending_continuation_path from the prior attempt's restart output (its .restart, not
+    its .data).
+
+    Two gates raise these codes now, on two different cells, so the keys this writes are
+    STAGE-SCOPED. Writing the equilibration-hashed keys from a cooling-stage finding would
+    invalidate the melt on the next resume -- the PE1 2026-08-17 trap, one layer up.
+
+      equilibration -> extends npt_melt_hold, the gated melt cell
+      cooling       -> extends npt_final, the gated assessment cell
+    """
     details = finding.details
     ns = details.get("extension_ns") or details.get("required_extension_ns")
     if ns is None:
@@ -287,8 +327,13 @@ def _continue_npt(params: dict[str, Any], finding: Finding, attempt: int) -> dic
         n_eff = max(float(details.get("n_eff") or 0), 1.0)
         target = max(float(details.get("target_n_eff") or 20), n_eff)
         ns = tau * target
+    if finding.stage == "cooling":
+        return _merge(params, cooling_continuation_ns=float(ns),
+                      cooling_continuation_attempt=attempt,
+                      cooling_extend_base_stage="npt_final",
+                      cooling_extend_ensemble="npt")
     return _merge(params, npt_continuation_ns=float(ns), npt_continuation_attempt=attempt,
-                  equilibration_extend_base_stage="npt_final",
+                  equilibration_extend_base_stage="npt_melt_hold",
                   equilibration_extend_ensemble="npt")
 
 
@@ -296,14 +341,13 @@ def _cooling(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[st
     """UNDER_ANNEALED_COOLING: melt density is fine, but the glass under-contracted relative to
     the system's own thermal-expansion prediction -- free volume frozen in during cooling
     (assess_cooling_contraction.py's definition). cool_block (max_temp -> final_T_K, blockwise)
-    is the sole stage sequence that crosses Tg in the 8-stage adaptive protocol -- slow the
-    whole ramp by doubling each block's hold. equilibration_resume_from="anneal_hold" lets
-    do_equil_and_check regenerate the entire blockwise cooldown fresh from the prior attempt's
-    own real anneal_hold checkpoint, instead of re-running minimize through annealing too."""
+    is the sole stage sequence that crosses Tg -- slow the whole ramp by doubling each block's
+    hold. No resume_from override any more: the cooling stage's own input IS the gated melt
+    cell, so invalidating `cooling` regenerates the entire blockwise descent from it without
+    touching minimize, annealing or the melt hold."""
     baseline = int(params.get("baseline_cool_block_hold_steps") or params.get("cool_block_hold_steps") or 1)
     return _merge(params, cool_block_hold_steps=baseline * (2 ** attempt),
-                  baseline_cool_block_hold_steps=baseline,
-                  equilibration_resume_from="anneal_hold")
+                  baseline_cool_block_hold_steps=baseline)
 
 
 def _raise_minimize_tolerance(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[str, Any]:
@@ -419,8 +463,10 @@ def default_remedies() -> tuple[Remedy, ...]:
                1, _remove_noop, "build"),
         Remedy("unique_forcefield", frozenset({"FORCE_FIELD_TYPING_FAILED"}), 1,
                _forcefield, "build"),
+        # "same", not "equilibration": these codes come from whichever gate raised them, and a
+        # cooling-stage drift must not re-melt an already-accepted equilibration stage.
         Remedy("continue_npt", frozenset({"EQUIL_DRIFT", "EQUIL_SEM", "EQUIL_N_EFF", "EXTEND"}),
-               2, _continue_npt, "equilibration"),
+               2, _continue_npt, "same"),
         # slower_cooling (UNDER_ANNEALED_COOLING) RETIRED 2026-09-01. Its gate is now advisory
         # (enforce_gate.STRUCTURAL_GATES) because the remedy cannot clear it: glass density moves
         # ~1.1% per DECADE of cooling rate (21 archived multi-rate sweeps), so x2 then x4 recovers
@@ -643,11 +689,15 @@ class WorkflowEngine:
             return ()
         if stage == "equilibration":
             return ("build",)
-        if stage == "thermal":
+        # Both cooling and thermal descend from the SAME gated melt cell, independently: the
+        # staircase does not wait for the cooldown and does not consume its output.
+        if stage in ("cooling", "thermal"):
             return ("equilibration",)
         if stage == "mechanical":
-            return (("equilibration", "thermal") if "thermal" in self.enabled_stages()
-                    else ("equilibration",))
+            # cooling is guaranteed present whenever mechanical is (track_registry's
+            # _MECHANICAL.requires), but filter anyway -- an unenabled dependency KeyErrors in
+            # run() and _input_hash rather than degrading.
+            return tuple(name for name in ("cooling", "thermal") if name in enabled)
         return tuple(name for name in enabled if name != "summary")
 
     def _accepted_manifest(self, stage: str) -> dict[str, Any]:

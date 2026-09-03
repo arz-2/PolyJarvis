@@ -40,7 +40,7 @@ REQUIRED_KEYS = [
     "cutoff_A",
     "dt_fs",
     "T_equil_K",
-    "tg_t_high_K",
+    "md_tg_ceiling_K",
     "tg_t_low_K",
     "tg_t_step_K",
 ]
@@ -85,10 +85,14 @@ def test_numeric_fields_in_range(cid):
 
 @pytest.mark.parametrize("cid", sorted(CLASSES))
 def test_tg_sweep_window_is_valid(cid):
+    """The sweep runs from the MELT HOLD down to tg_t_low_K -- there is no separate class top
+    any more, so the span is checked against the resolved schedule rather than a pair of class
+    constants."""
     e = CLASSES[cid]
-    assert e["tg_t_low_K"] < e["tg_t_high_K"], "Tg sweep low bound must be below high bound"
+    sched = _sched(cid)
+    assert e["tg_t_low_K"] < sched["T_melt_hold_K"], "sweep low bound must be below the melt hold"
     assert e["tg_t_step_K"] > 0
-    span = e["tg_t_high_K"] - e["tg_t_low_K"]
+    span = sched["T_melt_hold_K"] - e["tg_t_low_K"]
     assert e["tg_t_step_K"] <= span, "step size larger than the whole sweep window"
 
 
@@ -230,11 +234,12 @@ def test_tg_window_brackets_the_md_tg_not_just_the_experimental_one(cid):
     if not tgs:
         pytest.skip(f"{cid} has no numeric member Tg to bracket")
     md_upper = max(tgs) + MD_TG_OFFSET_K
-    assert entry["tg_t_high_K"] > md_upper, (
-        f"{cid}: sweep top {entry['tg_t_high_K']} K does not clear the MD Tg upper "
+    assert entry["md_tg_ceiling_K"] > md_upper, (
+        f"{cid}: md_tg_ceiling_K {entry['md_tg_ceiling_K']} K does not clear the MD Tg upper "
         f"estimate {md_upper:.0f} K (max member exp Tg {max(tgs):.0f} + "
-        f"{MD_TG_OFFSET_K:.0f} K rate offset) -- the staircase would start below the "
-        "transition and the bilinear fit would find no breakpoint"
+        f"{MD_TG_OFFSET_K:.0f} K rate offset). This constant is the MELT HOLD floor for a "
+        "SMILES whose Tg cannot be trusted to size a protocol; below the MD transition it "
+        "would put the melt inside the glass and the staircase would find no breakpoint"
     )
     assert entry["tg_t_low_K"] < min(tgs), (
         f"{cid}: sweep bottom {entry['tg_t_low_K']} K is not below the lowest member "
@@ -368,17 +373,22 @@ def test_curated_member_window_derives_from_its_own_measured_tg(cid):
             f"got {sched['window_source']}"
         )
         md_tg = tg + sp.MD_TG_OFFSET_K
-        assert sched["tg_t_low_K"] < md_tg < sched["tg_t_high_K"], (
-            f"{cid}/{name}: window {sched['tg_t_low_K']}-{sched['tg_t_high_K']} "
+        assert sched["tg_t_low_K"] < md_tg < sched["T_melt_hold_K"], (
+            f"{cid}/{name}: window {sched['tg_t_low_K']}-{sched['T_melt_hold_K']} "
             f"misses the MD Tg {md_tg:.0f}"
         )
         assert sched["tg_t_low_K"] < tg, "no glassy branch below the transition to fit"
 
 
 def test_an_explicit_window_override_is_never_second_guessed(cid="POXI"):
-    """A plan that pins tg_t_high_K/tg_t_low_K means it; the derivation must stand down."""
-    sched = _sched(cid, smiles="*CCO*", tg_t_high_K=777, tg_t_low_K=111)
-    assert (sched["tg_t_low_K"], sched["tg_t_high_K"]) == (111, 777)
+    """A plan that pins tg_t_low_K means it; the derivation must stand down.
+
+    Only the COLD bound is a knob now. The sweep's top is T_melt_hold_K by construction -- the
+    staircase starts at the gated melt cell -- so there is no tg_t_high_K to pin, and with it
+    goes the invalidation trap that key carried (it hashed to the thermal stage while shaping
+    the equilibration chain)."""
+    sched = _sched(cid, smiles="*CCO*", tg_t_low_K=111)
+    assert sched["tg_t_low_K"] == 111
     assert sched["window_source"] == "class_default"
 
 
@@ -392,12 +402,12 @@ def test_novel_smiles_window_brackets_the_md_tg():
     for tg in (150.0, 250.0, 350.0, 500.0):
         args = SimpleNamespace(smiles="*CC(c1ccccc1)(c1ccccc1)O*", exp_tg_K=tg,
                                final_T_K=None, T_equil_K=None, T_anneal_high_K=None,
-                               tg_t_high_K=None, tg_t_low_K=None)
+                               tg_t_low_K=None)
         sched = sp.temperature_schedule(args, entry)
         assert sched["window_source"] == "estimated_tg"
         md_tg = tg + sp.MD_TG_OFFSET_K
-        assert sched["tg_t_low_K"] < md_tg < sched["tg_t_high_K"], (
-            f"Tg={tg}: window {sched['tg_t_low_K']}-{sched['tg_t_high_K']} misses MD Tg {md_tg}"
+        assert sched["tg_t_low_K"] < md_tg < sched["T_melt_hold_K"], (
+            f"Tg={tg}: window {sched['tg_t_low_K']}-{sched['T_melt_hold_K']} misses MD Tg {md_tg}"
         )
         assert sched["tg_t_low_K"] < tg, "no glassy branch below the transition to fit"
 
@@ -419,8 +429,10 @@ def test_a_low_confidence_estimate_never_sizes_the_protocol(monkeypatch):
     assert sched["schedule_source"] == "class_default"
     assert sched["window_source"] == "class_default"
     assert sched["T_equil_K"] == entry["T_equil_K"]
-    assert (sched["tg_t_low_K"], sched["tg_t_high_K"]) == \
-        (entry["tg_t_low_K"], entry["tg_t_high_K"])
+    assert sched["tg_t_low_K"] == entry["tg_t_low_K"]
+    # An untrustworthy Tg cannot size the melt either -- it falls back to the class's own
+    # md_tg_ceiling_K, which is what that constant exists for now.
+    assert sched["T_melt_hold_K"] == max(entry["T_equil_K"], entry["md_tg_ceiling_K"])
 
     monkeypatch.setattr(sp, "_estimate_tg_group_contribution",
                         lambda smi, timeout=30: {"tg_estimated_K": 250,
@@ -443,32 +455,29 @@ def test_regime_still_uses_a_low_confidence_estimate(monkeypatch):
     assert sp._regime(args, RULES["classes"]["PKTN"]) == "rubbery"
 
 
-# ─── The anneal ceiling must clear the Tg sweep's own top ──────────────────────────
+# ─── The anneal ceiling must clear the melt hold ───────────────────────────────────
 #
-# The thermal stage starts its staircase from a cell the equilibration cooldown already
-# wrote: cool_block saves a .data file at every waypoint between the anneal ceiling and
-# final_T_K, and one of those has to sit at or above tg_t_high_K or there is nothing to
-# start from and the sweep falls back to reheating the finished final_T_K cell.
+# The core equilibration chain ends at the melt hold, and npt_melt_ramp descends to it from
+# the anneal ceiling. So the ceiling has to sit at or above T_melt_hold_K or the "ramp" is an
+# ascent -- an incoherent chain rather than a merely suboptimal one.
 #
-# The headroom is one cool block, not zero: anneal_hold runs NVT, so the cell AT the
-# ceiling still carries the densified 300 K volume rather than a melt density. The first
-# genuinely melt-density cell is cool_block_01's endpoint, one cool_block_dT_K down.
+# No headroom term is required beyond that. The soak's job is to sit above the MELT-
+# EQUILIBRATION temperature, and the ceiling already clears T_equil_K by ANNEAL_MARGIN_K.
+# The old one-cool-block headroom existed only to guarantee the cooldown tagged a waypoint the
+# sweep could start from; the sweep starts from a named, gated stage now, so that term is gone.
 
 
 @pytest.mark.parametrize("cid", sorted(RULES["classes"]))
-def test_class_ceiling_clears_its_own_class_sweep_top(cid):
+def test_class_ceiling_clears_its_own_class_melt_hold(cid):
     """The class-constant path -- what a SMILES with an untrustworthy Tg estimate takes, which
-    is 59% of RadonPy's PI1070 set. Each class's tg_t_high_K and annealing_T_high_K were sized
-    independently (window from the class's highest-Tg member + the MD offset; ceiling from
-    T_equil), and were never compared: PCBN/PIMD/PIMN/POXI/PPHS were all short until 2026-09-01.
-    """
-    entry = RULES["classes"][cid]
+    is 59% of RadonPy's PI1070 set. There the melt hold falls back to md_tg_ceiling_K, which
+    for 14 of the 21 classes sits ABOVE T_equil_K, so this is not automatically satisfied by
+    the T_equil + ANNEAL_MARGIN term."""
     sched = _sched(cid)
     assert sched["window_source"] == "class_default", "no SMILES -> no Tg -> class window"
-    dT = float(entry.get("cool_block_dT_K") or 25.0)
-    assert sched["tg_t_high_K"] + dT <= sched["T_anneal_high_K"], (
-        f"{cid}: sweep top {sched['tg_t_high_K']} K needs a ceiling of at least "
-        f"{sched['tg_t_high_K'] + dT} K, have {sched['T_anneal_high_K']} K"
+    assert sched["T_melt_hold_K"] <= sched["T_anneal_high_K"], (
+        f"{cid}: melt hold {sched['T_melt_hold_K']} K is above the ceiling "
+        f"{sched['T_anneal_high_K']} K -- npt_melt_ramp would have to heat"
     )
 
 
@@ -479,45 +488,42 @@ def test_class_ceilings_are_self_consistent_without_being_auto_raised(cid):
     widened without its ceiling following; if it BINDS today it means the shipped constants are
     still internally inconsistent and something is being silently patched at runtime."""
     sched = _sched(cid)
-    assert sched["ceiling_source"] != "sweep_start_headroom", (
+    assert sched["ceiling_source"] != "melt_hold_floor", (
         f"{cid}: the class ceiling is being auto-raised to "
         f"{sched['T_anneal_high_K']} K at runtime -- fix annealing_T_high_K in the data file"
     )
 
 
 @pytest.mark.parametrize("cid", sorted(RULES["classes"]))
-def test_curated_member_ceiling_clears_its_derived_sweep_top(cid):
-    """The per-SMILES path. A curated member's window is derived from its OWN measured Tg
-    (Tg+270) while its ceiling comes from the class T_equil (+100), so the two coincide only
-    when Tg < T_equil-195. Eight of the 43 members failed that -- PMMA, PAA, PS, P2VP, PVC,
-    BPA-PC, PPO/PPE, PMHS -- each short by 3-25 K."""
+def test_curated_member_ceiling_clears_its_derived_melt_hold(cid):
+    """The per-SMILES path. A curated member's melt hold is max(class T_equil_K, Tg+200), so a
+    member whose Tg runs hot for its class lifts it above the class value -- 11 of the 51
+    curated members do (PMMA, PAA, PS, P2VP, PVC, BPA-PC, PPO/PPE, PMHS, Ultem, both PIMD
+    members). The ceiling must still clear it, and does: none of them binds melt_hold_floor."""
     entry = RULES["classes"][cid]
-    dT = float(entry.get("cool_block_dT_K") or 25.0)
     for name, smis in (entry.get("member_smiles") or {}).items():
         if not smis:
             continue
         sched = _sched(cid, smiles=smis[0])
-        assert sched["tg_t_high_K"] + dT <= sched["T_anneal_high_K"], (
-            f"{cid}/{name}: derived sweep top {sched['tg_t_high_K']} K exceeds ceiling "
+        assert sched["T_melt_hold_K"] <= sched["T_anneal_high_K"], (
+            f"{cid}/{name}: melt hold {sched['T_melt_hold_K']} K exceeds ceiling "
             f"{sched['T_anneal_high_K']} K"
         )
-        assert sched["tg_start_T_K"] == sched["tg_t_high_K"]
 
 
-def test_an_explicit_window_override_never_moves_the_ceiling():
-    """tg_t_high_K is hashed to the THERMAL stage (workflow_engine.PARAMETER_STAGE); the anneal
-    ceiling shapes the EQUILIBRATION chain. Letting an explicit override feed the ceiling would
-    rewrite the equilibration chain under an unchanged equilibration _input_hash -- the
-    over-dedupe trap where a store serves one run's cell for another's. A DERIVED window is
-    safe because it is a pure function of the SMILES, which is already build-hashed."""
-    baseline = _sched("PIMN", smiles="*CCN*")
-    override = _sched("PIMN", smiles="*CCN*", tg_t_high_K=900)
-    assert override["tg_t_high_K"] == 900
-    assert override["T_anneal_high_K"] == baseline["T_anneal_high_K"]
-    assert override["ceiling_source"] != "sweep_start_headroom"
-    # No guaranteed waypoint at 900 K, so no tag -- the thermal stage reheats instead of
-    # starting from a cell that may not exist.
-    assert override["tg_start_T_K"] is None
+def test_the_sweep_top_is_the_melt_hold_and_has_no_override():
+    """The trap this replaces: tg_t_high_K was hashed to the THERMAL stage while feeding the
+    anneal ceiling, so an explicit override would rewrite the EQUILIBRATION chain under an
+    unchanged equilibration _input_hash -- a store serving one run's cell for another's. The
+    fix is structural rather than a carve-out: the sweep's top is not a knob at all any more,
+    it is wherever the melt gate certified the cell. md_tg_ceiling_K, which inherited the old
+    key's value, is equilibration-hashed precisely because it CAN move the melt."""
+    import workflow_engine as we
+    sched = _sched("PIMN", smiles="*CCN*")
+    assert "tg_t_high_K" not in sched
+    assert sched["T_melt_hold_K"] > sched["tg_t_low_K"]
+    assert we.PARAMETER_STAGE["md_tg_ceiling_K"] == "equilibration"
+    assert we.PARAMETER_STAGE["tg_t_low_K"] == "thermal"
 
 
 # ─── the cooldown runs at this class's own Tg-sweep rate ──────────────────────────
@@ -568,3 +574,39 @@ def test_the_primary_rate_index_is_shared_with_do_thermal():
     import stage_params as sp
     import run_campaign as rc
     assert rc.select_primary_tg_rate_index is sp.select_primary_tg_rate_index
+
+
+# ─── the Tg FIT window is an analysis bound, not a start temperature ──────────────
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_the_fit_window_brackets_the_md_tg_and_sits_below_the_melt_hold(cid):
+    """The sweep descends from the melt hold and every bin is simulated and reported; the fit
+    sees only bins at or below tg_fit_top_K.
+
+    That bound exists because extract_thermal's curve_fit is UNWEIGHTED. On synthetic bilinear
+    curves with a realistic melt-branch quadratic, fitting the whole 100-700 K descent biases Tg
+    by -15 to -36 K, against -1 to -3 K over the sized window -- the melt branch simply
+    out-numbers the transition. It must still contain the MD transition, or the fit has nothing
+    to find.
+    """
+    import stage_params as sp
+    entry = RULES["classes"][cid]
+    for name, smis in (entry.get("member_smiles") or {}).items():
+        if not smis:
+            continue
+        sched = _sched(cid, smiles=smis[0])
+        tg, top = sched["tg_K"], sched["tg_fit_top_K"]
+        if not isinstance(tg, (int, float)) or top is None:
+            continue
+        md_tg = tg + sp.MD_TG_OFFSET_K
+        assert sched["tg_t_low_K"] < md_tg < top, (
+            f"{cid}/{name}: fit window {sched['tg_t_low_K']}-{top} misses MD Tg {md_tg:.0f}")
+        assert top <= sched["T_melt_hold_K"] + 1e-9, (
+            f"{cid}/{name}: fit top {top} is above the melt hold {sched['T_melt_hold_K']} — "
+            "there are no bins up there to fit")
+
+
+def test_an_untrustworthy_tg_fits_the_whole_descent():
+    """No trustworthy Tg means nothing to size a window around, so the bound is None and the
+    fit sees every bin -- the pre-existing behaviour, not a silent narrowing."""
+    assert _sched("PKTN")["tg_fit_top_K"] is None

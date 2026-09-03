@@ -44,8 +44,10 @@ def _make_run(tmp_path, run_name="RUN1", *, properties=("density", "tg", "bulk_m
     }
     _write(run_dir / "raw" / "run_plan.json", plan)
 
-    default_status = {"equilibration": "accepted", "thermal": "accepted",
-                      "mechanical": "accepted", "summary": "accepted"}
+    # "cooling", not "equilibration", is what proves `density` now: it is the stage whose gate
+    # adjudicates the cell at final_T_K (track_registry's density observable).
+    default_status = {"equilibration": "accepted", "cooling": "accepted",
+                      "thermal": "accepted", "mechanical": "accepted", "summary": "accepted"}
     if stage_status:
         default_status.update(stage_status)
     stages = {name: {"status": status} for name, status in default_status.items()}
@@ -174,13 +176,18 @@ def test_missing_run_plan_writes_nothing(tmp_path):
 
 
 def test_real_cache_file_was_actually_invalidated_by_the_equilibration_redesign():
-    """Eager bulk invalidation (the 8-stage adaptive equilibration protocol replaced
-    generate_equilibration_workflow in place -- every pre-redesign cache entry references
-    stage names, decided_params shapes, and gate keys that no longer exist). A smoke test
-    that this was actually executed, not just planned: the real repo cache file at
-    guides/system_characterization_cache.json must have zero entries; the pre-redesign
-    content is preserved for reference at system_characterization_cache.pre_redesign.json."""
+    """Eager bulk invalidation. Every equilibration redesign so far has renamed stages and
+    reshaped decided_params, so a pre-redesign cache entry references a protocol that no longer
+    exists -- the 8-stage adaptive protocol did it in 2026-08, and the equilibration/cooling
+    split did it again in 2026-09. A smoke test that the clearing was actually executed, not
+    just planned: the real repo cache file must have zero entries.
+
+    The .pre_redesign.json reference copy this used to also assert on was deleted in d44696e
+    ("committed as found"), which is why this test has been red since; the assertion is dropped
+    rather than the file restored. _try_cache now returns a MISS for any frozen protocol naming
+    a stage the registry does not know, so a stale entry degrades to re-planning instead of a
+    hard PLAN_VALIDATION_FAILED -- which is the real protection, and it is tested directly in
+    test_make_deterministic_plan_from_cache.py."""
     repo_root = Path(__file__).resolve().parent.parent
     live_cache = json.loads((repo_root / "guides" / "system_characterization_cache.json").read_text())
     assert live_cache == {}
-    assert (repo_root / "guides" / "system_characterization_cache.pre_redesign.json").is_file()

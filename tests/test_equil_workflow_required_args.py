@@ -22,6 +22,8 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 SERVER_PY = REPO_ROOT / "mcp-servers" / "mcp-lammps-engine" / "server.py"
 
+# The CORE chain's required args. The descent's knobs (cool_block_*, stage7_*, stage8_*) moved
+# to generate_cooling_workflow with the stages they size -- COOLING_REQUIRED below.
 REQUIRED = [
     "velocity_seed",
     "densify_ramp_steps",
@@ -31,6 +33,20 @@ REQUIRED = [
     "anneal_heat_steps",
     "anneal_check_every_steps",
     "anneal_cap_steps",
+    "melt_ramp_steps",
+    "melt_hold_min_steps",
+    "melt_hold_cap_steps",
+    "nvt_melt_min_steps",
+    "nvt_melt_cap_steps",
+    "warmup_steps",
+    "use_long_range",
+]
+REQUIRED_INTEGER = {"velocity_seed"}
+REQUIRED_BOOLEAN = {"use_long_range"}
+REQUIRED_FLOAT = set()
+
+COOLING_REQUIRED = [
+    "velocity_seed",
     "cool_block_dT_K",
     "cool_block_hold_steps",
     "cool_block_hold_cap_steps",
@@ -38,21 +54,17 @@ REQUIRED = [
     "stage7_cap_steps",
     "stage8_min_steps",
     "stage8_cap_steps",
-    "warmup_steps",
     "use_long_range",
 ]
-REQUIRED_INTEGER = {"velocity_seed"}
-REQUIRED_BOOLEAN = {"use_long_range"}
-REQUIRED_FLOAT = {"cool_block_dT_K"}
 
 
-def _workflow_signature():
+def _workflow_signature(name="generate_equilibration_workflow"):
     """The tool's parameters as {name: has_default}. Parsed rather than imported --
     server.py needs the `mcp` package, which the test interpreter does not have."""
     tree = ast.parse(SERVER_PY.read_text())
     fn = next(n for n in ast.walk(tree)
               if isinstance(n, ast.FunctionDef)
-              and n.name == "generate_equilibration_workflow")
+              and n.name == name)
     args = fn.args.args + fn.args.kwonlyargs
     defaults = ([None] * (len(fn.args.args) - len(fn.args.defaults)) + list(fn.args.defaults)
                 + list(fn.args.kw_defaults))
@@ -64,6 +76,26 @@ def test_every_step_count_and_the_seed_are_required():
     for name in REQUIRED:
         assert name in sig, f"{name} vanished from generate_equilibration_workflow"
         assert not sig[name], f"{name} has a default -- omitting it silently changes the deck"
+
+
+def test_the_cooling_tool_requires_its_own_step_counts():
+    """The same hazard, moved with the stages: a silently-defaulted cool_block_hold_steps is
+    how two runs of the same system would cool at different rates."""
+    sig, _ = _workflow_signature("generate_cooling_workflow")
+    for name in COOLING_REQUIRED:
+        assert name in sig, f"{name} vanished from generate_cooling_workflow"
+        assert not sig[name], f"{name} has a default -- omitting it silently changes the deck"
+    assert not sig["T_melt_hold_K"] and not sig["final_T_K"], (
+        "the descent's endpoints must be passed explicitly, not defaulted")
+
+
+def test_the_core_chain_no_longer_accepts_the_descents_knobs():
+    """Pin the split itself: passing a cool_block knob to the core chain must be a TypeError,
+    not a silently-ignored argument."""
+    sig, _ = _workflow_signature()
+    for name in ("cool_block_dT_K", "cool_block_hold_steps", "stage7_min_steps",
+                 "stage8_min_steps", "final_T_K", "t_equil_K", "tg_start_T_K"):
+        assert name not in sig, f"{name} is still accepted by the core chain"
 
 
 def test_data_file_and_work_dir_stay_required():
@@ -81,7 +113,7 @@ def test_the_optional_knobs_keep_their_defaults():
     What stays optional here is what stays harmless."""
     sig, _ = _workflow_signature()
     for name in ("polymer_name", "max_temp", "press", "max_press", "n_chains",
-                 "extend_only", "final_T_K", "anneal_margin_K"):
+                 "extend_only", "anneal_margin_K"):
         assert sig[name], f"{name} lost its default"
 
 
@@ -114,9 +146,10 @@ def test_mcp_schema_marks_them_required():
     for name in set(REQUIRED) - REQUIRED_INTEGER - REQUIRED_BOOLEAN - REQUIRED_FLOAT:
         types = {b["type"] for b in schema["properties"][name]["anyOf"]}
         assert types == {"integer", "null"}, name
-    for name in REQUIRED_FLOAT:
-        types = {b["type"] for b in schema["properties"][name]["anyOf"]}
-        assert types == {"number", "null"}, name
+
+    cooling = next(t for t in tools if t.name == "generate_cooling_workflow").inputSchema
+    assert set(COOLING_REQUIRED) <= set(cooling["required"])
+    assert {"T_melt_hold_K", "final_T_K"} <= set(cooling["required"])
 
 
 def test_the_other_seed_drawing_tools_require_one_too():
@@ -144,20 +177,31 @@ def test_no_seed_is_drawn_at_random_once_one_is_given():
             assert "_velocity_seed" in line or "else random.randint" in line, line
 
 
+def _kwargs_reaching(fn_name: str, tool_name: str) -> set:
+    """Every argument name a submitter can put on a tool call: explicit keywords plus the keys
+    of the shared `common` dict it splats. The three call sites (fresh / resume_from /
+    extend_only) share that dict, which is exactly why the args cannot be read off one call."""
+    tree = ast.parse((REPO_ROOT / "orchestration" / "scripts" / "run_campaign.py").read_text())
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef) and n.name == fn_name)
+    calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Attribute) and n.func.attr == tool_name]
+    assert calls, f"{fn_name} makes no {tool_name} call"
+    names = {kw.arg for call in calls for kw in call.keywords if kw.arg}
+    names |= {k.value for d in ast.walk(fn) if isinstance(d, ast.Dict)
+              for k in d.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+    names |= {kw.arg for c in ast.walk(fn) if isinstance(c, ast.Call)
+              for kw in c.keywords if kw.arg}
+    return names
+
+
 def test_deterministic_executor_passes_every_required_arg():
-    """run_campaign has three call sites -- the full chain, the EXTEND continuation, and the
-    resume_from continuation (melt_hold/slower_cooling's checkpoint-based resubmission) -- and
-    each must name all six, including the ones it passes as None."""
-    src = (REPO_ROOT / "orchestration" / "scripts" / "run_campaign.py").read_text()
-    tree = ast.parse(src)
-    calls = [n for n in ast.walk(tree)
-             if isinstance(n, ast.Call)
-             and isinstance(n.func, ast.Attribute)
-             and n.func.attr == "generate_equilibration_workflow"]
-    assert len(calls) == 3
-    for call in calls:
-        passed = {kw.arg for kw in call.keywords}
-        assert set(REQUIRED) <= passed, f"missing {set(REQUIRED) - passed}"
+    """Each submitter must name every required arg of its own tool, including the ones it
+    passes as None."""
+    equil = _kwargs_reaching("_submit_equil_chain", "generate_equilibration_workflow")
+    assert set(REQUIRED) <= equil, f"missing {set(REQUIRED) - equil}"
+    cool = _kwargs_reaching("_submit_cool_chain", "generate_cooling_workflow")
+    assert set(COOLING_REQUIRED) <= cool, f"missing {set(COOLING_REQUIRED) - cool}"
 
 
 def test_stage_seed_is_stable_across_resolutions_and_distinct_per_run():
@@ -175,3 +219,49 @@ def test_stage_seed_is_stable_across_resolutions_and_distinct_per_run():
     assert seed("PEG1") != seed("PEG2")
     assert 10000 <= seed("PEG1") <= 999_999
     assert seed("PEG1", pinned=4242) == 4242
+
+
+# ── every kwarg the orchestrator passes must actually exist on the tool ────────
+
+def _server_tool_params() -> dict:
+    """{tool name: set of accepted parameter names} for every top-level def in server.py."""
+    tree = ast.parse(SERVER_PY.read_text())
+    out = {}
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef):
+            a = node.args
+            out[node.name] = {p.arg for p in a.posonlyargs + a.args + a.kwonlyargs}
+            if a.kwarg:
+                out[node.name] = None  # accepts **kwargs -- cannot be checked
+    return out
+
+
+def test_no_orchestrator_call_passes_an_argument_the_tool_does_not_accept():
+    """The gap every in-process fake leaves open.
+
+    tests/test_run_campaign.py's fakes take **kwargs, so a call passing a parameter the real
+    MCP tool has never heard of type-checks green all the way through the suite and fails only
+    on the first real run. That is exactly what happened when the equilibration/cooling split
+    introduced `output_name=` (so the melt gate writes equilibration.json and the assessment
+    gate writes cooling.json) without adding it to check_equilibration_comprehensive,
+    extract_equilibrated_density or enforce_equilibration_gate.
+
+    Only calls with purely explicit keywords are checked -- a `**common` splat is opaque here
+    and is covered by test_deterministic_executor_passes_every_required_arg instead.
+    """
+    tools = _server_tool_params()
+    tree = ast.parse((REPO_ROOT / "orchestration" / "scripts" / "run_campaign.py").read_text())
+    problems = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            continue
+        name = node.func.attr
+        accepted = tools.get(name)
+        if accepted is None or name not in tools:
+            continue                      # not a server tool, or it takes **kwargs
+        if any(kw.arg is None for kw in node.keywords):
+            continue                      # has a ** splat -- opaque
+        for kw in node.keywords:
+            if kw.arg not in accepted:
+                problems.append(f"{name}(...) passed {kw.arg!r}, which it does not accept")
+    assert not problems, "\n".join(sorted(set(problems)))

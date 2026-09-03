@@ -62,6 +62,14 @@ class Track:
     stages: tuple[ResolverStage, ...]
     macro_stages: tuple[str, ...]
     always: bool = False
+    requires: tuple[str, ...] = ()
+    """Tracks that must run for THIS track to be able to run, even though no observable of
+    theirs was requested. Exists for exactly one relation: mechanical needs a cell at
+    bm_temperature_K, which only the cooling track produces, and no mechanical observable maps
+    onto the cooling track. Closed over transitively by _tracks_for.
+
+    Every named track must have a STRICTLY LOWER order, so macro_stages_for stays a
+    STAGE_ORDER subsequence -- _dependencies and invalidate_from depend on that."""
     note: str = ""
 
 
@@ -99,38 +107,62 @@ _FOUNDATION = Track(
             ResolverStage("equil", "foundation", "equilibration"),
             ResolverStage("equil-check", "foundation", "equilibration")),
     macro_stages=("build", "equilibration"),
-    note="Ends at npt_final, the cell at final_T_K that carries the full binding gate set.",
+    note="Ends at the MELT HOLD: npt_melt_hold (the gated cell, where melt density is measured) "
+         "followed by nvt_melt_hold (the fixed-volume window MSD/C(t) need, and the cell every "
+         "downstream track starts from). The descent to final_T_K is the cooling track's job.",
+)
+
+_COOLING = Track(
+    name="cooling", order=1,
+    stages=(ResolverStage("cool", "cooling", "cooling"),
+            ResolverStage("cool-check", "cooling", "cooling")),
+    macro_stages=("cooling",),
+    note="The blockwise descent from the melt hold to final_T_K, then nvt_kinetic_stability and "
+         "npt_final -- the assessment cell, carrying the gate set that used to be the only one. "
+         "Runs only when something needs a cell at the assessment temperature: a density at "
+         "final_T_K, or any mechanical property (see _MECHANICAL.requires).",
 )
 
 _THERMAL = Track(
-    name="thermal", order=1,
+    name="thermal", order=2,
     stages=(ResolverStage("tg", "thermal", "thermal"),
             ResolverStage("analyze-tg", "thermal", "thermal")),
     macro_stages=("thermal",),
-    note="The staircase is a continuous cooling run: it starts from the cool_block cell the "
-         "foundation track tagged at tg_t_high_K and cools to tg_t_low_K at the same rate the "
-         "cooldown used (see stage_params.rate_matched_cool_block_hold_steps).",
+    note="The staircase is a continuous cooling run from the MELT HOLD down to tg_t_low_K, at "
+         "the same rate the cooling track descends at (see "
+         "stage_params.rate_matched_cool_block_hold_steps). It starts from a named, gated stage "
+         "rather than a mid-ramp waypoint, so it needs neither a tagged cool_block nor a reheat "
+         "probe, and it does NOT depend on the cooling track.",
 )
 
 _MECHANICAL = Track(
-    name="mechanical", order=2,
+    name="mechanical", order=3,
     stages=(ResolverStage("murnaghan", "mechanical", "mechanical"),
             ResolverStage("deform", "mechanical", "mechanical", role="fallback"),
             ResolverStage("analyze-bm", "mechanical", "mechanical")),
     macro_stages=("mechanical",),
-    note="Starts from the foundation track's npt_final cell, NEVER a thermal staircase "
-         "waypoint: npt_final is the gated cell, a waypoint is an ungated mid-sweep transient, "
-         "and for a high-Tg class the sweep floor sits above bm_temperature_K so no such "
-         "waypoint exists. Costs nothing to keep -- run_campaign already wires it this way.",
+    requires=("cooling",),
+    note="Starts from the COOLING track's npt_final cell, NEVER a thermal staircase waypoint: "
+         "npt_final is the gated cell at the assessment temperature, a waypoint is an ungated "
+         "mid-sweep transient, and for a high-Tg class the sweep floor sits above "
+         "bm_temperature_K so no such waypoint exists. The modulus is measured at "
+         "bm_temperature_K, which only the cooldown reaches -- hence `requires`.",
 )
 
 _SUMMARY = Track(
-    name="summary", order=3, always=True,
+    name="summary", order=4, always=True,
     stages=(ResolverStage("run-summary", "summary", "summary"),),
     macro_stages=("summary",),
 )
 
-TRACKS: dict[str, Track] = {t.name: t for t in (_FOUNDATION, _THERMAL, _MECHANICAL, _SUMMARY)}
+TRACKS: dict[str, Track] = {t.name: t for t in
+                            (_FOUNDATION, _COOLING, _THERMAL, _MECHANICAL, _SUMMARY)}
+
+for _t in TRACKS.values():
+    for _r in _t.requires:
+        assert _r in TRACKS, f"{_t.name} requires unknown track {_r!r}"
+        assert TRACKS[_r].order < _t.order, (
+            f"{_t.name} requires {_r}, which must sort before it")
 
 
 # ─── observables ──────────────────────────────────────────────────────────────────
@@ -147,13 +179,28 @@ _OBS: tuple[Observable, ...] = (
              "because plan['properties'] has no name for it.",
     ),
     Observable(
-        "density", "foundation", "requestable",
+        "melt_density", "foundation", "requestable",
         extractor_json="equilibration.json", extractor_field="density_gcm3", unit="g/cm^3",
         gate_macro_stage="equilibration", gate_field="equil_verdict",
+        legacy_property="melt_density",
+        summary_path=("results", "melt_density", "value_g_cm3"),
+        note="The density of the gated melt at T_melt_hold_K -- what the core equilibration "
+             "chain now produces on its own. Requesting it alone is the cheapest real run there "
+             "is: build + equilibration + summary, no cooldown. Reported WITH its temperature, "
+             "which is per-SMILES (max(T_equil_K, Tg+200)) and so is not comparable between "
+             "polymers the way the final_T_K density is.",
+    ),
+    # ---- cooling ----------------------------------------------------------------
+    Observable(
+        "density", "cooling", "requestable",
+        extractor_json="cooling.json", extractor_field="density_gcm3", unit="g/cm^3",
+        gate_macro_stage="cooling", gate_field="cool_verdict",
         legacy_property="density", summary_path=("results", "density", "value_g_cm3"),
-        note="Comparable across every run because no property-conditional cooling path exists: "
-             "every run rides the same cool_block cooldown, which since 2026-09-01 runs at the "
-             "class's own Tg-sweep rate. Guarded by test_property_independence.",
+        note="The density at final_T_K (300 K by default). Comparable across every run because "
+             "no property-conditional path reaches it: every run holds its melt at the same "
+             "property-independent T_melt_hold_K and descends at the class's own Tg-sweep rate. "
+             "Guarded by test_property_independence. Reads cooling.json, NOT equilibration.json "
+             "-- the two gates write the same keys about two different cells.",
     ),
     # ---- thermal ----------------------------------------------------------------
     Observable(
@@ -250,7 +297,7 @@ STAGE_TRACK: dict[str, str] = {
 }
 
 MACRO_TO_RESOLVER: dict[str, str] = {
-    "build": "build", "equilibration": "equil", "thermal": "tg",
+    "build": "build", "equilibration": "equil", "cooling": "cool", "thermal": "tg",
     "mechanical": "murnaghan", "summary": "run-summary",
 }
 """Macro stage -> the resolver stage that represents it, for recovery_agent_cli's prompt text."""
@@ -269,6 +316,16 @@ def _tracks_for(properties) -> tuple[Track, ...]:
     wanted = {o.track for o in _OBS
               if o.legacy_property in set(properties or ()) and o.kind == "requestable"}
     wanted |= {t.name for t in TRACKS.values() if t.always}
+    # Close over `requires`: a track can need another track's cell without any observable of
+    # that track's having been asked for (mechanical needs the cooldown's npt_final). The
+    # order assertion at TRACKS construction makes this terminate and keeps the result a
+    # STAGE_ORDER subsequence.
+    pending = list(wanted)
+    while pending:
+        for required in TRACKS[pending.pop()].requires:
+            if required not in wanted:
+                wanted.add(required)
+                pending.append(required)
     return tuple(sorted((TRACKS[n] for n in wanted), key=lambda t: t.order))
 
 

@@ -66,14 +66,29 @@ After planning, PolyJarvis launches these commands in order:
 
 ```text
 validate_run_plan.py
-run_campaign.py --stage build
-run_campaign.py --stage equilibration
-run_campaign.py --stage thermal       # only when Tg is requested
-run_campaign.py --stage mechanical    # only when modulus is requested
-run_campaign.py --stage summary
+run_campaign.py --plan <run_plan.json>
+```
+
+`run_campaign.py` takes a plan, never an individual stage: which stages run is derived from
+`plan["properties"]` by `track_registry`, and the engine walks them in order.
+
+```text
+build
+equilibration   # ends at the gated melt hold
+cooling         # only when a cell at final_T_K is needed (density, any modulus)
+thermal         # only when Tg is requested
+mechanical      # only when a modulus is requested
+summary
 ```
 
 Each stage reads and writes structured state. A completed stage is skipped when the chain resumes.
+
+`equilibration` ends at a melt hold at `T_melt_hold_K` (per-SMILES:
+`max(class T_equil_K, Tg + 200)`), gated there on the `require_melt` clause — the one place
+chain relaxation is physically attainable, so `rg` and `ct` bind. `cooling` descends from that
+same cell to `final_T_K` and carries the assessment gate. Both `thermal` and `cooling` start
+from the melt hold independently; `mechanical` needs the assessment cell and so requires
+`cooling`. A run asking only for `melt_density` stops after `equilibration`.
 
 ## Recovery Agent
 

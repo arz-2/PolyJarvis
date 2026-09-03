@@ -34,7 +34,7 @@ Method (vacuum single-chain reference):
 
 Usage:
     python extract_solubility_parameter.py \\
-        --bulk_log /path/to/npt_production.log \\
+        --bulk_log /path/to/cool/npt_final/npt_final.log \\
         --vacuum_log /path/to/nvt_vacuum_chain.log \\
         --n_chains 20 \\
         --output_dir /path/to/raw/ \\
@@ -160,7 +160,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--bulk_log", required=True,
-                   help="Bulk NPT hold log (npt_production.log / npt_prod300.log).")
+                   help="Bulk NPT hold log (npt_final.log, or npt_melt_hold.log for a melt).")
     p.add_argument("--vacuum_log", required=True,
                    help="Single-chain, low-density NVT hold log (same FF/T).")
     p.add_argument("--n_chains", type=int, required=True,

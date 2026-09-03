@@ -592,6 +592,17 @@ def main():
                              "Required for ΔCp mass normalisation and MDAnalysis structural analysis.")
     parser.add_argument("--backbone_types", nargs="*", type=int, default=None,
                         help="Backbone atom type IDs for P2 nematic order computation.")
+    parser.add_argument("--fit_t_max_K", type=float, default=None,
+                        help="Upper temperature bound for the BILINEAR FIT only (K). The sweep "
+                             "itself descends from the melt hold and every bin is still "
+                             "simulated, dumped and reported per-T; bins above this are simply "
+                             "not fed to the fit. Sized around the MD transition "
+                             "(Tg + 120 + 150 K), which is where the rubbery branch is still "
+                             "straight. Without it a low-Tg member of a hot class (PTFE, Tg 160, "
+                             "melt hold 700 K) puts ~45%% of its bins in a featureless melt, and "
+                             "curve_fit is UNWEIGHTED -- measured on synthetic curves, realistic "
+                             "melt-branch curvature then biases Tg by -15 to -36 K, against "
+                             "-1 to -3 K over the sized window.")
     parser.add_argument("--method_gap_max_K", type=float, default=20.0,
                         help="Max allowed |Tg_primary - Tg_alternative|. Above it the transition "
                              "region is noisy or the sweep too narrow -> tg_gate_verdict=REVIEW.")
@@ -783,6 +794,22 @@ def main():
 
     temps = df_bins["temperature"].values
     densities = df_bins["mean_density"].values
+
+    # Fit window: every bin is reported, but only bins at or below fit_t_max_K are FITTED.
+    # See --fit_t_max_K. Applied here, after per-T reporting is assembled, so the melt bins
+    # remain in per_t output and in the plotted trace -- they are excluded from the fit, not
+    # from the run.
+    fit_t_max = getattr(args, "fit_t_max_K", None)
+    n_bins_total, fit_excluded_bins = len(temps), 0
+    if fit_t_max is not None:
+        keep = temps <= float(fit_t_max)
+        if keep.sum() >= 4:
+            fit_excluded_bins = int((~keep).sum())
+            temps, densities = temps[keep], densities[keep]
+        else:
+            warnings.warn(
+                f"fit_t_max_K={fit_t_max} would leave only {int(keep.sum())} bins (need 4) — "
+                "fitting the whole sweep instead.")
 
     # -------------------------------------------------------------------
     # 3. PRIMARY: hyperbola (smoothed-bilinear) fit, seeded from and falling back
@@ -1146,6 +1173,12 @@ def main():
         "tg_alt_uncertainty_K": (round(cf_result["tg_alt_uncertainty_K"], 1)
                                  if cf_result.get("tg_alt_uncertainty_K") is not None else None),
         "binning_method":      binning_method,
+        # Provenance for the fit window: how many bins the sweep produced vs how many were
+        # actually fitted. A reader can tell "fitted the whole descent" from "fitted the sized
+        # window" without re-deriving it.
+        "fit_t_max_K":          fit_t_max,
+        "n_bins_total":         n_bins_total,
+        "n_bins_excluded_from_fit": fit_excluded_bins,
         "fit_params": {
             "a_glassy":  cf_result["a_glassy"],
             "b_glassy":  cf_result["b_glassy"],

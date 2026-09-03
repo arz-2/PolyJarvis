@@ -16,6 +16,7 @@
     ],
     "valid_tracks": [
       "foundation",
+      "cooling",
       "thermal",
       "mechanical",
       "summary"
@@ -24,6 +25,8 @@
       "build": "foundation",
       "equil": "foundation",
       "equil-check": "foundation",
+      "cool": "cooling",
+      "cool-check": "cooling",
       "tg": "thermal",
       "analyze-tg": "thermal",
       "murnaghan": "mechanical",
@@ -113,13 +116,28 @@
         "energy_convergence",
         "chain_statistic_convergence"
       ],
-      "default_source": "tool:check_equilibration_comprehensive + tool:assess_cooling_contraction (density-value routing)",
+      "default_source": "tool:check_equilibration_comprehensive (twice: once on the melt hold, once on the assessment cell) + tool:assess_cooling_contraction (density-value routing, cooling stage only)",
       "remedy_economics": {
         "thresholds": {
           "variance_limited_sigma": 3.0,
           "min_margin_factor": 2.0,
           "converged_cost_ceiling_hours": 200.0
         }
+      },
+      "gates": {
+        "description": "D-05 adjudicates two cells now. The melt gate runs at the end of the equilibration stage on npt_melt_hold; the assessment gate runs at the end of the cooling stage on npt_final. One decision id, two verdicts (equil_verdict, cool_verdict); the run summary reports the cooling verdict when the cooling stage ran, else the melt verdict.",
+        "require_melt": [
+          "density_drift",
+          "density_sem",
+          "energy_drift",
+          "energy_sem",
+          "n_eff_density",
+          "density_homogeneity",
+          "finite_size",
+          "rg",
+          "ct"
+        ],
+        "require_melt_rationale": "A melt is the one state in which chain relaxation is physically attainable on MD timescales, so rg (chain-dimension equilibration) and ct (end-to-end decorrelation) BIND here -- they are advisory at the assessment temperature only because a glass cannot satisfy them, not because they do not matter. ct is skipped where the class carries ct_gate_reliable=false, the same carve-out require_glassy already applies. msd_not_trapped, msid_gaussian and residual_stress stay advisory everywhere (enforce_gate.ALWAYS_ADVISORY)."
       }
     },
     "tg_protocol": {

@@ -1127,6 +1127,10 @@ def main():
                              "--struct_dump_file is given.")
     parser.add_argument("--backbone_types",    type=int, nargs="+", required=True)
     parser.add_argument("--output_dir",        default=None)
+    parser.add_argument("--output_name",       default="equilibration.json",
+                        help="Filename for the merged gate JSON inside --output_dir. "
+                             "equilibration.json = the melt hold; cooling.json = the "
+                             "assessment cell at final_T_K.")
     parser.add_argument("--graphs_dir",        default=None,
                         help="Directory for PNG figures (accepted for interface parity; currently unused).")
     parser.add_argument("--skip_frames",       type=int,   default=50)
@@ -1330,11 +1334,17 @@ def main():
         "timestamp": timestamp,
     })
 
-    # equilibration.json is shared with extract_equilibrated_density.py ("density" key) and
+    # The gate file is shared with extract_equilibrated_density.py ("density" key) and
+    # enforce_gate ("gate" key) -- read-merge-write, so each producer replaces only its own
+    # section. --output_name selects WHICH cell's file this is: the melt gate writes
+    # equilibration.json (the melt hold at T_melt_hold_K), the assessment gate writes
+    # cooling.json (npt_final at final_T_K). Same keys, two different cells; a single filename
+    # would have one silently overwrite the other's meaning.
     # enforce_equilibration_gate's _save_gate_verdict ("gate" key) -- read-merge-write so this
     # producer's own top-level keys (below) replace wholesale on each EXTEND re-check without
     # clobbering whichever of those two sibling sections already landed from a prior pass.
-    equilibration_json = output_dir / "equilibration.json"
+    equilibration_json = output_dir / (getattr(args, "output_name", None)
+                                       or "equilibration.json")
     merged = {}
     if equilibration_json.exists():
         try:

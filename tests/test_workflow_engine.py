@@ -228,7 +228,7 @@ def test_changed_accepted_artifact_invalidates_producer_and_descendants(tmp_path
     resumed = WorkflowEngine(tmp_path, plan(), resumed_fake)
     assert resumed.run()["status"] == "accepted"
     assert [stage for stage, _ in resumed_fake.calls] == [
-        "build", "equilibration", "thermal", "mechanical", "summary"
+        "build", "equilibration", "cooling", "thermal", "mechanical", "summary"
     ]
 
 

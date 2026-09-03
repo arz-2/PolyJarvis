@@ -66,14 +66,22 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "stage7_cap_steps": (1, 2_000_000_000),
     "stage8_min_steps": (1, 2_000_000_000),
     "stage8_cap_steps": (1, 2_000_000_000),
-    "melt_hold_ns": (0.01, 1000),
-    "melt_only_continuation_ns": (0.01, 1000),
+    # The melt tail of the core equilibration chain.
+    "T_melt_hold_K": (100, 1500),
+    "melt_ramp_steps": (1, 2_000_000_000),
+    "melt_hold_min_steps": (1, 2_000_000_000),
+    "melt_hold_cap_steps": (1, 2_000_000_000),
+    "nvt_melt_min_steps": (1, 2_000_000_000),
+    "nvt_melt_cap_steps": (1, 2_000_000_000),
+    # The cooling stage's own extend ladder, kept separate from npt_continuation_ns so a
+    # cooling-stage drift never writes an equilibration-hashed key.
+    "cooling_continuation_ns": (0.01, 1000),
     "thermostat_damp_fs": (1, 100000),
     "barostat_damp_fs": (1, 1_000_000),
     "alpha_glass_per_K": (0.0, 0.1),
     "alpha_melt_per_K": (0.0, 0.1),
     "ct_min_decay_melt": (0.0, 1.0),
-    "tg_t_high_K": (100, 2000),
+    "md_tg_ceiling_K": (100, 2000),
     "tg_t_low_K": (1, 1500),
     "tg_t_step_K": (1, 200),
     "tg_min_steps_per_T": (1, 2_000_000_000),
@@ -106,17 +114,18 @@ ENUM_OVERRIDES = {
     "tg_slope_gate_fallback": frozenset({"highest_rate", "slowest_rate"}),
     "mechanical_method": frozenset({"murnaghan", "deformation"}),
     "equilibration_phase": frozenset({"melt_then_cool", "melt_only"}),
-    "cooling_resume_source": frozenset({"accepted_melt", "remedied_melt"}),
 }
 SEQUENCE_OVERRIDES = frozenset({"tg_rates_K_per_ns", "bm_pressures_atm", "backbone_types",
                                 "mechanical_resample_points"})
-BOOLEAN_OVERRIDES = frozenset({"add_melt_npt", "ct_gate_reliable"})
+BOOLEAN_OVERRIDES = frozenset({"ct_gate_reliable"})
 INTEGER_OVERRIDES = frozenset({
     "dp_typical", "nchain",
     "warmup_steps", "densify_ramp_steps", "densify_check_every_steps", "densify_steps_cap",
     "ff_activate_npt_steps", "anneal_heat_steps", "anneal_check_every_steps",
     "anneal_cap_steps", "cool_block_hold_steps", "cool_block_hold_cap_steps",
     "stage7_min_steps", "stage7_cap_steps", "stage8_min_steps", "stage8_cap_steps",
+    "melt_ramp_steps", "melt_hold_min_steps", "melt_hold_cap_steps",
+    "nvt_melt_min_steps", "nvt_melt_cap_steps",
     "tg_min_steps_per_T", "tg_steps_per_t",
     "deform_eq_steps", "deform_avg_window", "bm_npt_steps", "bm_thermo_freq",
     "emc_seed", "velocity_seed", "gpu_per_run", "mpi_ranks", "tg_primary_rate_index",
@@ -735,10 +744,10 @@ def validate_overrides(overrides: dict[str, Any]) -> None:
 def _validate_protocol_relationships(parameters: dict[str, Any], changed: set[str]) -> None:
     """Reject internally inconsistent plans before any files or jobs are created."""
     t_low = parameters.get("tg_t_low_K")
-    t_high = parameters.get("tg_t_high_K")
-    if ({"tg_t_low_K", "tg_t_high_K"} & changed and
+    t_high = parameters.get("T_melt_hold_K")
+    if ({"tg_t_low_K", "T_melt_hold_K"} & changed and
             t_low is not None and t_high is not None and t_low >= t_high):
-        raise ValueError("tg_t_low_K must be lower than tg_t_high_K")
+        raise ValueError("tg_t_low_K must be lower than T_melt_hold_K")
 
     strain_start = parameters.get("deform_strain_start")
     strain_max = parameters.get("K_strain_max")

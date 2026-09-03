@@ -207,8 +207,9 @@ def _resolve_build_params(args, cls: dict) -> dict:
 def _resolve_t_workflow(args, cls: dict) -> float:
     """Equilibration workflow temperature (K). Plan's T_workflow_K wins; otherwise 300 K for
     rubbery (exp_Tg < 300) and T_equil_K for glassy. Mirrors generate_equilibration_workflow,
-    whose chain ends at npt_production when T ≤ 300 (rubbery, 7-run) and appends npt_prod300
-    when T > 300 (glassy, 9-run)."""
+    Retained as the melt/production REFERENCE temperature: it still feeds the anneal ceiling and
+    the regime-adjacent bookkeeping, but it no longer selects a chain shape -- the core chain
+    always ends at the melt hold and the cooling chain always ends at npt_final."""
     exp_tg = _regime_tg(args, cls)
     if 'T_workflow_K' in cls:
         return cls['T_workflow_K']
@@ -349,23 +350,28 @@ def _is_curated_member(cls: dict, smiles: str | None) -> bool:
 def temperature_schedule(args, cls: dict) -> dict:
     """The run's whole temperature schedule, adapted to this SMILES and the requested state.
 
-    Single place that decides the four temperatures the equilibration chain is built from, so
-    they cannot drift out of coherence with each other:
+    Single place that decides the temperatures the equilibration and cooling chains are built
+    from, so they cannot drift out of coherence with each other:
 
-      final_T_K   the ASSESSMENT temperature -- what the cell is gated at (npt_final, which
-                  cool_block always ramps to). 300 K is its default, not its definition.
-      T_equil_K   the melt-equilibration temperature. Must clear this polymer's melting point,
-                  which group contribution cannot see; the class constant therefore always acts
-                  as a FLOOR and is used unchanged for a curated member. For a novel SMILES it
-                  can only be RAISED, never lowered: max(Tg+200, 1.5*Tg) -- the additive term
-                  governs low-Tg polymers, Boyer's Tm/Tg ~ 1.5 ratio governs high-Tg ones,
-                  where a fixed +200 K undershoots (PEEK: Tg 418 -> +200 = 618 vs Tm 616).
-      T_anneal    the anneal ceiling, ANNEAL_MARGIN_K above whichever of T_equil/final_T_K is
-                  higher. Raising it is cheap and lowering it is not the saving it looks like:
-                  25 K of ceiling costs one cool block (~200k steps) while ONE avoided
-                  anneal_hold extension saves 1-2.5M, so break-even sits 125-312 K out. The
-                  ceiling is therefore bounded by physical validity (thermal degradation,
-                  Class II quartic bond instability, timestep validity), never by compute.
+      final_T_K      the ASSESSMENT temperature -- what the cooling stage ramps to and gates at
+                     (npt_final). 300 K is its default, not its definition.
+      T_equil_K      the melt-equilibration temperature. Must clear this polymer's melting point,
+                     which group contribution cannot see; the class constant therefore always
+                     acts as a FLOOR and is used unchanged for a curated member. For a novel
+                     SMILES it can only be RAISED, never lowered: max(Tg+200, 1.5*Tg) -- the
+                     additive term governs low-Tg polymers, Boyer's Tm/Tg ~ 1.5 ratio governs
+                     high-Tg ones, where a fixed +200 K undershoots (PEEK: Tg 418 -> +200 = 618
+                     vs Tm 616).
+      T_melt_hold_K  where the core equilibration chain ENDS and everything downstream starts:
+                     the gated melt cell, the Tg staircase's first point, and the cooling stage's
+                     input. See the derivation note below.
+      T_anneal_high  the anneal ceiling, ANNEAL_MARGIN_K above whichever of T_equil/final_T_K is
+                     higher, and never below T_melt_hold_K (npt_melt_ramp descends to it).
+                     Raising it is cheap and lowering it is not the saving it looks like:
+                     25 K of ceiling costs one cool block (~200k steps) while ONE avoided
+                     anneal_hold extension saves 1-2.5M, so break-even sits 125-312 K out. The
+                     ceiling is therefore bounded by physical validity (thermal degradation,
+                     Class II quartic bond instability, timestep validity), never by compute.
 
     Returns the resolved values plus `schedule_source`, so a plan records whether a temperature
     came from the class constant or was raised for a novel SMILES.
@@ -385,73 +391,64 @@ def temperature_schedule(args, cls: dict) -> dict:
         if needed > class_equil:
             T_equil, source = needed, 'raised_for_novel_smiles'
 
-    # Tg sweep window. Same curated-vs-novel split, for the same reason: a class window was
-    # sized for the members the class curated. POXI is the worked example -- its window topped
-    # out at 440 K for PEO/PPO/PVME, while 24 of the 66 POXI entries in RadonPy's PI1070 set
-    # have an estimated MD Tg above that, so their staircase would have started below the
-    # transition. Scoring 1006 PI1070 polymers, per-SMILES windows are 24% narrower (18.1 vs
-    # 23.9 T-bins) AND bracket the MD Tg for all 1006, against 27 misses with class windows.
+    # T_melt_hold_K -- the melt the whole run hangs off. It must clear the MD glass transition,
+    # not merely the melting point, because the Tg staircase now STARTS here and runs the entire
+    # descent: a melt hold below the MD transition would begin the sweep inside the glass and the
+    # bilinear fit would find no breakpoint (TG_NOT_REPORTABLE -- loud, but a wasted run).
     #
-    # The window must bracket the MD Tg, not the experimental one: at accessible cooling rates
-    # the transition is frozen in 80-120 K high. Unlike T_equil, narrowing here is safe --
-    # a window that misses fails LOUDLY (no breakpoint -> TG_NOT_REPORTABLE), where a
-    # too-cold T_equil fails silently as an under-melted cell.
-    tg_high = _pick(getattr(args, 'tg_t_high_K', None), cls, 'tg_t_high_K', 600)
+    # Two sources, in order of how far each can be trusted:
+    #   trustworthy per-SMILES Tg -> Tg + 200 K. The MD transition sits MD_TG_OFFSET_K (120 K)
+    #     above the experimental Tg at accessible cooling rates, so this clears it by 80 K.
+    #   otherwise -> md_tg_ceiling_K, this class's own bound on how hot its chemistry's MD Tg
+    #     gets (formerly tg_t_high_K, back when it was the sweep's top). An untrustworthy
+    #     estimate is 59% of RadonPy's PI1070 set, and for 14 of the 21 classes this constant
+    #     sits ABOVE T_equil_K -- POXI is the worked example: T_equil 500 K against a class
+    #     bound of 600 K, with 24 of 66 scored POXI polymers having an MD Tg above 500 K.
+    #
+    # T_equil_K floors both: it carries melting-point knowledge Tg cannot see (PE's Tg is 195 K
+    # and it melts near 410 K), and for a novel trustworthy SMILES it has already absorbed the
+    # Tg+200 term above -- so this only ever LIFTS a CURATED member whose own Tg runs hot for its
+    # class (11 of the 51 curated members; PEI/Ultem is the load-bearing case, whose 550 K class
+    # melt left only 62 K of rubbery branch above a Tg of 488 K).
+    if trustworthy and isinstance(tg, (int, float)):
+        melt_clearance = tg + 200.0
+    else:
+        melt_clearance = _pick(getattr(args, 'md_tg_ceiling_K', None), cls,
+                               'md_tg_ceiling_K', 600.0)
+    T_melt_hold = max(T_equil, float(melt_clearance))
+
+    # Only the sweep's COLD bound is a knob now. Its hot bound is T_melt_hold_K by construction:
+    # the staircase starts at the melt hold and cools, so there is no separate top to size.
+    # (tg_t_high_K used to live here. It was the sweep's top AND, via a ceiling headroom term,
+    # the thing that guaranteed the cooldown tagged a waypoint the sweep could start from. Both
+    # jobs are gone: the sweep owns its own descent from a named, gated stage.)
     tg_low = _pick(getattr(args, 'tg_t_low_K', None), cls, 'tg_t_low_K', 200)
+    # The FIT window's top -- an analysis bound, never a start temperature. The sweep descends
+    # from the melt hold and every bin is simulated and reported; only bins above this are kept
+    # out of the bilinear fit. It exists because curve_fit is unweighted: for a low-Tg member of
+    # a hot class the melt branch would otherwise dominate the point count, and on synthetic
+    # curves with realistic melt curvature that biases Tg by -15 to -36 K, against -1 to -3 K
+    # over the sized window. Sized around the MD transition (Tg + MD_TG_OFFSET_K), which is
+    # where the rubbery branch is still straight; None when no trustworthy Tg sizes it, in
+    # which case the whole descent is fitted as before.
+    tg_fit_top = None
     window_source = 'class_default'
-    explicit_window = (getattr(args, 'tg_t_high_K', None) is not None
-                       or getattr(args, 'tg_t_low_K', None) is not None)
+    explicit_window = getattr(args, 'tg_t_low_K', None) is not None
     if not explicit_window and trustworthy and isinstance(tg, (int, float)):
-        # ALWAYS derive from a Tg, never from the class constant -- and from the best Tg
-        # available: a curated member's exact experimental value when it has one, the
-        # group-contribution estimate otherwise. A class window is sized for whichever member
-        # is most extreme, so every other member of that class pays for chemistry it does not
-        # have, and any member outside the curated spread is not covered at all.
-        # Size the window around the MD transition, not around T_equil. The bilinear fit needs
-        # a straight run of points on EACH side of the breakpoint, so what matters is how much
-        # branch sits above and below it -- not how hot the melt was. Tying the top to T_equil
-        # (as the estimator's own tg_t_high does) puts the sweep 460 K above the transition for
-        # a low-Tg member of a hot class: PTFE (Tg 160) in PHAL (T_equil 700) would sweep to
-        # 720 K, spending two thirds of its bins in a featureless melt.
-        md_tg = tg + MD_TG_OFFSET_K
-        est_high = round(md_tg + TG_BRANCH_K)
-        est_low = round(max(100.0, md_tg - 1.5 * TG_BRANCH_K))
-        if est_low < tg - 20 and est_low < est_high:
-            tg_high, tg_low = est_high, est_low
+        # Sized around the MD transition, not around the melt: the bilinear fit needs a straight
+        # run of points BELOW the breakpoint, and 1.5x TG_BRANCH_K is the glassy-side lever arm.
+        est_low = round(max(100.0, tg + MD_TG_OFFSET_K - 1.5 * TG_BRANCH_K))
+        if est_low < tg - 20:
+            tg_low = est_low
+            # Clamped to the melt hold: there are no bins above it to fit. For most curated
+            # members the clamp binds (the melt clears the MD transition by 80 K, the unclamped
+            # window wanted 150 K), so they fit their whole descent -- correctly, because a
+            # descent that short has no featureless melt branch to be dominated by. The bound
+            # only bites for a low-Tg member of a hot class, which is exactly the shape it
+            # exists for: PTFE fits 100-430 K of a 100-700 K sweep.
+            tg_fit_top = min(round(tg + MD_TG_OFFSET_K + TG_BRANCH_K), T_melt_hold)
             window_source = 'curated_tg' if curated else 'estimated_tg'
 
-    # The ceiling must clear the melt, the assessment temperature, AND the sweep window --
-    # computed here, after the window, because the last term depends on it.
-    #
-    # The sweep term is what lets the thermal stage start from a melt-cooled cell instead of
-    # reheating the finished 300 K one. cool_block writes a .data file at every waypoint on the
-    # way down, so the cell the sweep needs already exists -- but only if the cooldown actually
-    # reaches the sweep's top. One cool block of headroom is required, not zero: anneal_hold
-    # runs NVT, so the cell AT the ceiling still carries the densified 300 K volume; the first
-    # genuinely melt-density cell is cool_block_01's endpoint, one dT below. Without this term
-    # the two temperatures coincide only by accident (window = Tg+270, ceiling = T_equil+100),
-    # which breaks for every member whose Tg exceeds T_equil-195 -- 8 of the 43 curated members,
-    # PMMA/PS/PVC/BPA-PC among them, each short by 3-25 K.
-    #
-    # ONLY the derived window feeds this. A derived window is a pure function of the SMILES,
-    # which is already build-hashed, so a window change invalidates the equilibration chain
-    # honestly. An EXPLICIT tg_t_high_K override is thermal-hashed, and propagating it here
-    # would rewrite the equilibration chain under an unchanged equilibration _input_hash --
-    # validate_run_plan raises a finding for that case instead (see _tg_window_ceiling_findings),
-    # telling the plan to raise annealing_T_high_K, which is equilibration-hashed.
-    #
-    # A CLASS-DEFAULT window is included, deliberately. It was excluded while the class ceilings
-    # had not been checked against the class windows -- feeding one in would have auto-raised a
-    # ceiling on a thermal-stability judgement nobody had made. All 21 class ceilings were
-    # reviewed on 2026-09-01 (PCBN/PIMD/PIMN/POXI/PPHS raised; see their
-    # _annealing_T_high_K_note entries), so the term can no longer bind on an unvetted number,
-    # and this is what puts the melt-cooled start on the path a run with an UNTRUSTWORTHY Tg
-    # estimate actually takes -- 59% of RadonPy's PI1070 set, which would otherwise all reheat.
-    #
-    # NOTE: because the derived window comes from the group-contribution estimator, changing the
-    # estimator now reshapes the equilibration chain. That is covered by the implementation_version
-    # bump discipline, but it is a real new coupling rather than an inherited one.
-    sweep_headroom = float(cls.get('cool_block_dT_K') or 25.0)
     ceiling_terms = {
         'class_default': _pick(getattr(args, 'T_anneal_high_K', None), cls,
                                'annealing_T_high_K', 700.0),
@@ -461,21 +458,22 @@ def temperature_schedule(args, cls: dict) -> dict:
         # is already covered -- but it is independently overridable, and dropping it would
         # silently lower the ceiling for a plan that pins T_workflow above both.
         'workflow_margin': _resolve_t_workflow(args, cls) + ANNEAL_MARGIN_K,
+        # No ANNEAL_MARGIN on this one, deliberately. The anneal soak's job is to sit above the
+        # MELT-EQUILIBRATION temperature, and melt_margin already puts it there. This term only
+        # guarantees npt_melt_ramp is a DESCENT (ceiling >= melt hold) for a class whose
+        # md_tg_ceiling_K or per-SMILES Tg pushes the melt hold above T_equil + 100. It does not
+        # bind for any of the 21 classes or 51 curated members today -- which is why this whole
+        # redesign moves no class ceiling at all -- and it exists so that a future edit to
+        # md_tg_ceiling_K or T_equil_K cannot silently invert the ramp.
+        'melt_hold_floor': T_melt_hold,
     }
-    if not explicit_window:
-        ceiling_terms['sweep_start_headroom'] = tg_high + sweep_headroom
     ceiling_source = max(ceiling_terms, key=lambda k: ceiling_terms[k])
     T_anneal = ceiling_terms[ceiling_source]
 
-    # tg_start_T_K is the sweep's own top, restated as the temperature the equilibration
-    # cooldown must tag a .data file at. None only for an EXPLICIT window override, which is
-    # excluded from the ceiling above and therefore has no guaranteed waypoint at or above it;
-    # the thermal stage then falls back to reheating rather than starting from a cell that may
-    # not exist.
-    return {'final_T_K': final_T, 'T_equil_K': T_equil, 'T_anneal_high_K': T_anneal,
-            'tg_t_high_K': tg_high, 'tg_t_low_K': tg_low,
-            'tg_start_T_K': None if explicit_window else tg_high,
-            'cool_block_dT_K': sweep_headroom,
+    return {'final_T_K': final_T, 'T_equil_K': T_equil, 'T_melt_hold_K': T_melt_hold,
+            'T_anneal_high_K': T_anneal, 'tg_t_low_K': tg_low,
+            'tg_fit_top_K': tg_fit_top,
+            'cool_block_dT_K': float(cls.get('cool_block_dT_K') or 25.0),
             'tg_K': tg, 'tg_is_curated': curated, 'tg_trustworthy': trustworthy,
             'schedule_source': source, 'window_source': window_source,
             'ceiling_source': ceiling_source}
@@ -502,16 +500,15 @@ def select_primary_tg_rate_index(cls: dict) -> int:
 def rate_matched_cool_block_hold_steps(cls: dict, dt_fs: float, dT_K: float):
     """Steps per cool_block so the cooldown runs at this class's own Tg-sweep rate.
 
-    The equilibration cooldown and the Tg staircase are one continuous descent now: cool_block
-    ramps the annealed melt down to tg_t_high_K, where it writes the cell the staircase starts
-    from (see _select_tg_start_cell), and the staircase continues to tg_t_low_K. Running the two
-    halves at DIFFERENT rates makes that one trajectory with a rate discontinuity in the middle,
-    and glass density is rate-dependent (~1.1% per decade, measured over 21 archived multi-rate
-    sweeps across 8 chemistries) -- so the discontinuity is not cosmetic.
+    The cooling stage's descent and the Tg staircase are two descents from the SAME melt cell,
+    at the same temperatures, differing only in what is sampled along the way. Running them at
+    different rates would mean a run's density and its Tg describe glasses with two different
+    thermal histories, and glass density is rate-dependent (~1.1% per decade, measured over 21
+    archived multi-rate sweeps across 8 chemistries) -- so the match is not cosmetic.
 
-    Matching them also makes density comparable ACROSS runs: a density-only run has no staircase,
-    but its cooldown now runs at the same rate the staircase would have used, so its glass has the
-    same thermal history as a Tg run's.
+    It also makes density comparable ACROSS runs: a density-only run has no staircase, but its
+    cooldown runs at the rate the staircase would have used, so its glass has the same thermal
+    history as a Tg run's.
 
     Returns None when the class configures no rates (nothing to match); the caller then falls
     through to generate_equilibration_workflow's own atom-count tier default.
@@ -526,54 +523,32 @@ def rate_matched_cool_block_hold_steps(cls: dict, dt_fs: float, dT_K: float):
 
 
 def _resolve_equil_params(args, cls: dict) -> dict:
-    """Resolve deterministic equilibration-chain arguments (8-stage adaptive protocol)."""
+    """Resolve the CORE equilibration chain's arguments.
+
+    The core chain ends at the melt hold. Everything about the descent to final_T_K -- the
+    cool blocks, nvt_kinetic_stability, npt_final -- belongs to the `cool` resolver now, and
+    those keys are deliberately absent here rather than passed and ignored.
+    """
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
     sched = temperature_schedule(args, cls)
-    T_equil = sched['T_equil_K']
-    T_workflow = _resolve_t_workflow(args, cls)
-    T_anneal_high = sched['T_anneal_high_K']
-
-    # t_equil_K: an explicit melt/production-reference tag for a RUBBERY chain (T_workflow ==
-    # final_T_K) -- the direct successor to the retired add_melt_npt flag. A glassy chain
-    # (T_workflow > final_T_K) already gets its tag at T_workflow itself; the two are mutually
-    # exclusive by construction in generate_equilibration_workflow.
-    want_melt_tag = (getattr(args, 'add_melt_npt', False) or bool(cls.get('add_melt_npt', False)))
-    t_equil_K = T_equil if (want_melt_tag and T_workflow <= 300.0) else None
-
-    # tg_start_T_K: read-only metadata for generate_equilibration_workflow, so the cooldown
-    # reports which cool_block the Tg sweep should start from instead of the thermal stage
-    # reheating npt_final. None when the window came from a class constant -- the ceiling then
-    # carries no sweep headroom, so no cool_block is guaranteed to sit at or above the top.
-    tg_start_T_K = sched['tg_start_T_K']
-    remedy_melt_ns = (getattr(args, 'melt_hold_ns', None) or cls.get('melt_hold_ns') or
-                      getattr(args, 'melt_only_continuation_ns', None) or
-                      cls.get('melt_only_continuation_ns'))
-    melt_hold_extra_steps = (int(remedy_melt_ns * 1000000.0 / dt)
-                             if remedy_melt_ns is not None else None)
-
-    phase = getattr(args, 'phase', 'full') or 'full'
-    if T_workflow <= 300.0:
-        phase = 'full'
 
     def _step_pick(name):
-        """Direct step-count override (like npt_cool_steps historically) -- None selects
-        generate_equilibration_workflow's own atom-count tier default."""
+        """Direct step-count override -- None selects generate_equilibration_workflow's own
+        atom-count tier default."""
         return _pick(getattr(args, name, None), cls, name, None)
 
     return {
         'data_path': args.data_path,
         'emc_params_path': getattr(args, 'emc_params_path', None),
-        'phase': phase,
-        'pending_cooldown_path': getattr(args, 'pending_cooldown_path', None),
         'lammps_flags': _lammps_flags(args.lammps_flags, cls),
         'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm',
         'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/equil',
         'dt_fs': dt,
-        'T_equil_K': T_equil,
-        'T_anneal_high_K': T_anneal_high,
+        'T_equil_K': sched['T_equil_K'],
+        'T_melt_hold_K': sched['T_melt_hold_K'],
+        'T_anneal_high_K': sched['T_anneal_high_K'],
         'anneal_margin_K': ANNEAL_MARGIN_K,
-        'T_workflow_K': T_workflow,
-        'final_T_K': sched['final_T_K'],
+        'T_workflow_K': _resolve_t_workflow(args, cls),
         'P_equil_atm': cls.get('P_equil_atm', 1.0),
         'compression_max_pressure_atm': cls.get('compression_max_pressure_atm', 50000.0),
         'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0),
@@ -586,20 +561,13 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         'anneal_heat_steps': _step_pick('anneal_heat_steps'),
         'anneal_check_every_steps': _step_pick('anneal_check_every_steps'),
         'anneal_cap_steps': _step_pick('anneal_cap_steps'),
-        'cool_block_dT_K': _pick(getattr(args, 'cool_block_dT_K', None), cls,
-                                 'cool_block_dT_K', None),
-        # An explicit plan/class value still wins; otherwise derive it from this class's own
-        # sweep rate rather than falling to the generator's flat 2e5/dt tier default.
-        'cool_block_hold_steps': (_step_pick('cool_block_hold_steps')
-                                  or rate_matched_cool_block_hold_steps(
-                                      cls, dt, cls.get('cool_block_dT_K') or 25.0)),
-        'cool_block_hold_cap_steps': _step_pick('cool_block_hold_cap_steps'),
-        'stage7_min_steps': _step_pick('stage7_min_steps'),
-        'stage7_cap_steps': _step_pick('stage7_cap_steps'),
-        'stage8_min_steps': _step_pick('stage8_min_steps'),
-        'stage8_cap_steps': _step_pick('stage8_cap_steps'),
-        't_equil_K': t_equil_K, 'tg_start_T_K': tg_start_T_K,
-        'melt_hold_extra_steps': melt_hold_extra_steps,
+        # The melt tail. npt_melt_ramp is one-shot (ceiling -> melt hold); the two holds are
+        # adaptive, first-block/cap pairs like every other adaptive stage.
+        'melt_ramp_steps': _step_pick('melt_ramp_steps'),
+        'melt_hold_min_steps': _step_pick('melt_hold_min_steps'),
+        'melt_hold_cap_steps': _step_pick('melt_hold_cap_steps'),
+        'nvt_melt_min_steps': _step_pick('nvt_melt_min_steps'),
+        'nvt_melt_cap_steps': _step_pick('nvt_melt_cap_steps'),
         'gpu_ids': args.gpu_ids,
         'mpi_ranks': args.mpi_ranks,
         'engine': args.engine,
@@ -641,6 +609,56 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         'anneal_hold_rg_veto_pct': cls.get('anneal_hold_rg_veto_pct', 10.0),
     }
 
+
+def _resolve_cool_params(args, cls: dict) -> dict:
+    """Resolve the COOLING chain's arguments: melt hold -> final_T_K, then the assessment cell.
+
+    Runs only when something downstream needs a cell at the assessment temperature (a density
+    at final_T_K, or any mechanical property). A melt-only run never reaches this resolver.
+    """
+    dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
+    sched = temperature_schedule(args, cls)
+    dT = _pick(getattr(args, 'cool_block_dT_K', None), cls, 'cool_block_dT_K', None)
+
+    def _step_pick(name):
+        return _pick(getattr(args, name, None), cls, name, None)
+
+    return {
+        # The melt-start cell the equilibration stage published (nvt_melt_hold_out.data). The
+        # flat-convention fallback is --dry-run only; in real execution CampaignStageExecutor
+        # sets args.data_path from the accepted equilibration manifest.
+        'data_path': (getattr(args, 'melt_start_data_path', None) or args.data_path
+                      or f'{REPO_ROOT}/data/{args.run_name}/lammps/equil/nvt_melt_hold/'
+                         'nvt_melt_hold_out.data'),
+        'lammps_flags': _lammps_flags(args.lammps_flags, cls),
+        'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm',
+        'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/cool',
+        'dt_fs': dt,
+        'T_melt_hold_K': sched['T_melt_hold_K'],
+        'final_T_K': sched['final_T_K'],
+        'P_equil_atm': cls.get('P_equil_atm', 1.0),
+        'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0),
+        'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0),
+        'cool_block_dT_K': dT,
+        # An explicit plan/class value still wins; otherwise derive it from this class's own
+        # sweep rate rather than falling to the generator's flat 2e5/dt tier default.
+        'cool_block_hold_steps': (_step_pick('cool_block_hold_steps')
+                                  or rate_matched_cool_block_hold_steps(
+                                      cls, dt, cls.get('cool_block_dT_K') or 25.0)),
+        'cool_block_hold_cap_steps': _step_pick('cool_block_hold_cap_steps'),
+        'stage7_min_steps': _step_pick('stage7_min_steps'),
+        'stage7_cap_steps': _step_pick('stage7_cap_steps'),
+        'stage8_min_steps': _step_pick('stage8_min_steps'),
+        'stage8_cap_steps': _step_pick('stage8_cap_steps'),
+        'gpu_ids': args.gpu_ids,
+        'mpi_ranks': args.mpi_ranks,
+        'engine': args.engine,
+        'velocity_seed': _velocity_seed(args),
+        'cutoff_A': cls.get('cutoff_A', 12.0),
+        'nchain': args.nchain or cls.get('nchain', 10),
+        'exp_density_gcm3': _exp_density_point(cls, args.smiles),
+    }
+
 def _resolve_tg_rate(args, cls: dict):
     """Resolve the selected cooling rate + a per-rate output-dir suffix for multi-rate
     Tg sweeps. Returns (selected_rate | None, rate_suffix). When --tg_rate_index is unset,
@@ -652,6 +670,17 @@ def _resolve_tg_rate(args, cls: dict):
         return (selected_rate, f'_r{int(selected_rate)}')
     return (None, '')
 
+def _melt_start_data_path(args) -> str:
+    """The cell the core equilibration chain ends on: nvt_melt_hold_out.data.
+
+    Real execution gets this from the accepted equilibration manifest (CampaignStageExecutor
+    sets args.melt_start_data_path); args.data_path is the same file by then. The flat-convention
+    fallback is --dry-run only, where no attempt directory exists yet.
+    """
+    return (getattr(args, 'melt_start_data_path', None) or getattr(args, 'data_path', None)
+            or f'{REPO_ROOT}/data/{args.run_name}/lammps/equil/nvt_melt_hold/nvt_melt_hold_out.data')
+
+
 def _resolve_tg_params(args, cls: dict) -> dict:
     """Resolve deterministic single-rate Tg sweep arguments."""
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
@@ -660,24 +689,19 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     (selected_rate, rate_suffix) = _resolve_tg_rate(args, cls)
     t_step = _pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)
     floor = cls.get('tg_min_steps_per_T', 200000)
-    # Sweep bounds come from the shared temperature schedule (class window for a curated
-    # member, Tg-derived for a novel SMILES) so the thermal stage and the equilibration
-    # stage cannot disagree about this polymer's Tg.
+    # The staircase starts AT the melt hold and cools to tg_t_low_K -- one continuous descent
+    # from the cell the equilibration stage gated, with no reheat and no mid-ramp waypoint. Both
+    # bounds come from the shared temperature schedule so the thermal and equilibration stages
+    # cannot disagree about this polymer's melt.
     _sched = temperature_schedule(args, cls)
     if selected_rate is not None:
         n_steps_per_t = int(t_step / (selected_rate * dt * 1e-06))
     else:
         n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
     work_dir = args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/thermal'
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _sched['tg_t_high_K'], 'T_end_K': _sched['tg_t_low_K'], 'tg_window_source': _sched['window_source'], 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': getattr(args, 'tg_start_data', None) or args.data_path, 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0),
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _sched['T_melt_hold_K'], 'T_end_K': _sched['tg_t_low_K'], 'tg_window_source': _sched['window_source'], 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': _melt_start_data_path(args), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0),
             'T_workflow_K': _resolve_t_workflow(args, cls),
-            'tg_start_data_path': getattr(args, 'tg_start_data', None),
-            'tg_start_T_K': getattr(args, 'tg_start_T_K', None),
-            'cool_block_dT_K': float(cls.get('cool_block_dT_K') or 25.0),
             'final_T_K': _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0),
-            'tg_bracket_max_iters': int(cls.get('tg_bracket_max_iters', 3)),
-            'tg_bracket_probe_steps': int(cls.get('tg_bracket_probe_steps', 150000)),
-            'tg_bracket_drift_threshold_pct': cls.get('tg_bracket_drift_threshold_pct', 0.5),
             'tg_per_t_max_extensions': int(cls.get('tg_per_t_max_extensions', 2)),
             'tg_per_t_stability_pct': cls.get('tg_per_t_stability_pct', 1.0),
             'tg_per_t_min_n_eff': cls.get('tg_per_t_min_n_eff', 5.0)}
@@ -711,14 +735,13 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     tg_work_dir = args.work_dir or f'{lammps_base}/thermal'
     tg_sweep_dir = f'{tg_work_dir}/tg_sweep{rate_suffix}'
     tg_log = f'{tg_sweep_dir}/tg_sweep.log'
-    # npt_final is unconditionally the terminal equilibration stage now (regardless of regime).
-    default_equil_data = f'{lammps_base}/equil/npt_final/npt_final_out.data'
-    # args.data_path holds the equilibration attempt's real accepted output during execution
-    # (CampaignStageExecutor sets it from the equilibration manifest); the flat-convention guess
-    # is a --dry-run-only fallback, since no real attempt path exists yet at preview time.
-    equil_data = args.equil_data_path or args.data_path or default_equil_data
+    # The structure file extract_thermal reads is the cell the SWEEP started from -- the melt
+    # hold -- not the assessment cell. args.equil_data_path holds the real accepted output
+    # during execution; the flat-convention guess is a --dry-run-only fallback.
+    equil_data = args.equil_data_path or _melt_start_data_path(args)
     per_t_dump = f'{tg_sweep_dir}/per_t_structs.dump'
-    return {'selected_rate_K_per_ns': selected_rate, 'tg_rate_index': args.tg_rate_index, 'tg_log_path': tg_log, 'tg_data_file': equil_data, 'per_t_dump_file': per_t_dump, 'enthalpy_col': getattr(args, 'enthalpy_col', None) or 'Enthalpy', 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'output_dir': output_dir, 'graphs_dir': graphs_dir, 'method_gap_exempt': bool(cls.get('tg_slope_gate_fallback') == 'slowest_rate')}
+    return {'selected_rate_K_per_ns': selected_rate, 'tg_rate_index': args.tg_rate_index, 'tg_log_path': tg_log, 'tg_data_file': equil_data, 'per_t_dump_file': per_t_dump, 'enthalpy_col': getattr(args, 'enthalpy_col', None) or 'Enthalpy', 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'output_dir': output_dir, 'graphs_dir': graphs_dir, 'method_gap_exempt': bool(cls.get('tg_slope_gate_fallback') == 'slowest_rate'),
+            'fit_t_max_K': temperature_schedule(args, cls)['tg_fit_top_K']}
 
 def _derive_npt_prod_log_path(args, effective_data_path, lammps_base: str) -> str:
     """Shared by _resolve_equil_check_params/_resolve_murnaghan_params/
@@ -732,51 +755,109 @@ def _derive_npt_prod_log_path(args, effective_data_path, lammps_base: str) -> st
         return args.npt_prod_log
     if effective_data_path and effective_data_path.endswith('_out.data'):
         return effective_data_path[:-len('_out.data')] + '.log'
-    return f'{lammps_base}/equil/npt_final/npt_final.log'
+    return f'{lammps_base}/cool/npt_final/npt_final.log'
 
 
 def _resolve_equil_check_params(args, cls: dict) -> dict:
-    """Resolve deterministic equilibration validation arguments.
+    """Resolve the MELT gate's arguments.
 
-    The terminal stage is always npt_final (at final_T_K/press) in the 8-stage protocol --
-    there is no separate glassy-vs-rubbery terminal stage name anymore, since cool_block
-    always ramps down to final_T_K regardless of regime. check_equilibration_comprehensive
-    reads two trajectories: melt_dump_path (nvt_kinetic_stability's fixed-volume window) for
-    the ensemble-sensitive checks (MSD/kinetic-trap, C(t)), and struct_dump_path (npt_final's
-    own trajectory) for the ensemble-insensitive per-frame geometry checks (Rg/MSID/R_ee/
-    torsion/P2/density_homogeneity/finite_size) -- a barostatted trajectory affine-scales
-    coordinates every step and would contaminate cumulative CoM displacement."""
+    The core equilibration chain ends at the melt hold, and this is what adjudicates it. The
+    cell is a melt by construction (T_melt_hold_K clears the MD transition), so `regime` is
+    'melt' unconditionally -- NOT resolve_regime/_regime, which fall to 'glassy' whenever Tg is
+    unresolvable, and that is the common case for a novel SMILES. The melt clause is the one
+    place chain relaxation is physically attainable, so rg and ct bind there (see
+    enforce_gate.BINDING_MELT); at the assessment temperature they cannot and do not.
+
+    check_equilibration_comprehensive reads two trajectories, and the split is the same one it
+    has always used, just moved up the chain: melt_dump_path is nvt_melt_hold's fixed-volume
+    window, for the ensemble-sensitive checks (MSD/kinetic-trap, C(t)); struct_dump_path is
+    npt_melt_hold's own trajectory, for the ensemble-insensitive per-frame geometry checks
+    (Rg/MSID/R_ee/torsion/P2/density_homogeneity/finite_size). A barostatted trajectory
+    affine-scales coordinates every step and would contaminate cumulative CoM displacement,
+    which is why the MSD window has to be the NVT one.
+
+    No melt_data_path: the cooling-contraction probe compares a melt against a glass, and there
+    is no glass yet. enforce_live skips it on a falsy melt_data regardless of regime.
+    """
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
     graphs_dir = _run_graphs_dir(args)
     ct_decay = cls.get('ct_min_decay_melt', 0.1) if cls.get('ct_gate_reliable', True) else None
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
-    T_workflow = _resolve_t_workflow(args, cls)
-    final_T = _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0)
-    phase = getattr(args, 'phase', 'full') or 'full'
-    if T_workflow <= 300:
-        phase = 'full'
-    prod = 'npt_final'
-    npt_prod_data_path = args.data_path or f'{lammps_base}/equil/{prod}/{prod}_out.data'
-    # npt_prod_log_path used to fall to a flat data/<run>/lammps/... convention whenever
-    # args.npt_prod_log was unset -- which is always, in real execution (nothing ever sets it).
-    # That path doesn't exist under the attempt-based layout (data/<run>/attempts/equilibration/
-    # attempt-N/work/...), so check_equilibration_comprehensive's log_file (the BINDING density/
-    # energy drift and block-SEM gate, not an advisory check) would fail to parse any thermo rows
-    # on every real run -- args.data_path IS the correct, real npt_prod_data_path at this point
-    # (do_equil_and_check sets it just before calling this resolver), so derive the sibling .log
-    # in the same directory instead of re-deriving a path independently.
+    sched = temperature_schedule(args, cls)
+    hold = 'npt_melt_hold'
+    npt_prod_data_path = args.data_path or f'{lammps_base}/equil/{hold}/{hold}_out.data'
     npt_prod_log_path = _derive_npt_prod_log_path(args, npt_prod_data_path, lammps_base)
-    return {'output_dir': output_dir, 'phase': phase, 'graphs_dir': graphs_dir, 'ct_min_decay_melt': ct_decay, 'cutoff_A': cls.get('cutoff_A'), 'npt_prod_log_path': npt_prod_log_path, 'npt_prod_data_path': npt_prod_data_path, 'melt_dump_path': args.npt_prod_dump or f'{lammps_base}/equil/nvt_kinetic_stability/nvt_kinetic_stability.dump', 'melt_data_path': getattr(args, 'melt_data_path', None) or f'{lammps_base}/equil/npt_final/npt_final_out.data',
-            # struct_dump_path: npt_final's OWN trajectory -- the ensemble-insensitive per-frame
-            # geometry checks (Rg/MSID/R_ee/torsion/P2/density_homogeneity/finite_size) read from
-            # here, not from melt_dump_path (nvt_kinetic_stability's fixed-volume window, which
-            # stays reserved for MSD/kinetic-trap/C(t)). Paired with npt_prod_data_path, which is
-            # already npt_final's own .data.
-            'struct_dump_path': getattr(args, 'struct_dump_path', None) or f'{lammps_base}/equil/npt_final/npt_final.dump',
+    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'ct_min_decay_melt': ct_decay,
+            'cutoff_A': cls.get('cutoff_A'),
+            'npt_prod_log_path': npt_prod_log_path,
+            'npt_prod_data_path': npt_prod_data_path,
+            'melt_dump_path': (args.npt_prod_dump
+                               or f'{lammps_base}/equil/nvt_melt_hold/nvt_melt_hold.dump'),
+            'struct_dump_path': (getattr(args, 'struct_dump_path', None)
+                                 or f'{lammps_base}/equil/{hold}/{hold}.dump'),
+            'melt_data_path': None,
+            'npt_prod_temp_K': sched['T_melt_hold_K'],
+            'T_melt_hold_K': sched['T_melt_hold_K'],
+            'T_workflow_K': _resolve_t_workflow(args, cls),
+            'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)),
+            'regime': 'melt',
+            'dp': getattr(args, 'dp', None) or cls.get('dp_typical'),
+            'ct_gate_reliable': cls.get('ct_gate_reliable', True),
+            'backbone_types': args.backbone_types or cls.get('backbone_types'),
+            'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+
+
+def _resolve_cool_check_params(args, cls: dict) -> dict:
+    """Resolve the ASSESSMENT gate's arguments -- the cell at final_T_K, after the cooldown.
+
+    This is the gate that used to be the only one. npt_final is unconditionally the cooling
+    chain's terminal stage (cool_block always ramps to final_T_K regardless of regime), so
+    there is no glassy-vs-rubbery terminal stage name; `regime` is resolved against final_T_K
+    by the shared oracle, exactly as before.
+    """
+    output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
+    graphs_dir = _run_graphs_dir(args)
+    ct_decay = cls.get('ct_min_decay_melt', 0.1) if cls.get('ct_gate_reliable', True) else None
+    lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
+    sched = temperature_schedule(args, cls)
+    final_T = sched['final_T_K']
+    prod = 'npt_final'
+    npt_prod_data_path = args.data_path or f'{lammps_base}/cool/{prod}/{prod}_out.data'
+    # args.npt_prod_log is never set in real execution; derive the sibling .log of the REAL
+    # data path rather than re-deriving a flat convention path that does not exist under the
+    # attempt layout (the bug that silently disabled this binding gate on every run once).
+    npt_prod_log_path = _derive_npt_prod_log_path(args, npt_prod_data_path, lammps_base)
+    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'ct_min_decay_melt': ct_decay,
+            'cutoff_A': cls.get('cutoff_A'),
+            'npt_prod_log_path': npt_prod_log_path,
+            'npt_prod_data_path': npt_prod_data_path,
+            'melt_dump_path': (args.npt_prod_dump
+                               or f'{lammps_base}/cool/nvt_kinetic_stability/'
+                                  'nvt_kinetic_stability.dump'),
+            'struct_dump_path': (getattr(args, 'struct_dump_path', None)
+                                 or f'{lammps_base}/cool/{prod}/{prod}.dump'),
+            # The melt reference for assess_cooling_contraction's melt->glass span. Previously
+            # this fell back to npt_final_out.data -- the SAME file as glass_data -- so a run
+            # whose generator emitted no melt tag silently compared the glass against itself.
+            # It is a named stage now, so the fallback is a real and different cell.
+            'melt_data_path': (getattr(args, 'melt_data_path', None)
+                               or f'{lammps_base}/equil/npt_melt_hold/npt_melt_hold_out.data'),
+            # The hot endpoint of the contraction span is where the melt was actually held,
+            # not T_workflow_K (which is 300 K for a rubbery class and would misstate the span).
+            'T_melt_hold_K': sched['T_melt_hold_K'],
+            'npt_prod_temp_K': final_T,
+            'T_workflow_K': _resolve_t_workflow(args, cls),
+            'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)),
             # is_glassy derives from the regime oracle rather than re-testing T_workflow > 300:
             # that proxy and _regime would disagree the moment final_T_K is not 300, and this
             # dict feeds both the gate set (regime) and the mechanical routing (is_glassy).
-            'npt_prod_temp_K': final_T, 'T_workflow_K': T_workflow, 'exp_tg_point_K': _exp_tg_point(cls, getattr(args, 'smiles', None)), 'is_glassy': _regime(args, cls) == 'glassy', 'regime': _regime(args, cls), 'dp': getattr(args, 'dp', None) or cls.get('dp_typical'), 'ct_gate_reliable': cls.get('ct_gate_reliable', True), 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+            'is_glassy': _regime(args, cls) == 'glassy',
+            'regime': _regime(args, cls),
+            'dp': getattr(args, 'dp', None) or cls.get('dp_typical'),
+            'ct_gate_reliable': cls.get('ct_gate_reliable', True),
+            'backbone_types': args.backbone_types or cls.get('backbone_types'),
+            'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0)}
+
 
 def _resolve_murnaghan_params(args, cls: dict) -> dict:
     """Resolve deterministic Murnaghan bulk-modulus arguments."""
@@ -788,7 +869,7 @@ def _resolve_murnaghan_params(args, cls: dict) -> dict:
     # runs); the fallback below is a --dry-run-only preview default. npt_final is unconditionally
     # the terminal stage in the 8-stage adaptive protocol (regardless of regime -- cool_block
     # always ramps down to final_T_K), so no glassy/rubbery branch is needed anymore.
-    default_equil_data = f'{lammps_base}/equil/npt_final/npt_final_out.data'
+    default_equil_data = f'{lammps_base}/cool/npt_final/npt_final_out.data'
     equil_data_path = args.data_path or default_equil_data
     npt_prod_log_path = _derive_npt_prod_log_path(args, equil_data_path, lammps_base)
     return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': is_glassy, 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'cutoff_A': cls.get('cutoff_A'), 'use_long_range': cls.get('electrostatics', 'pppm') == 'pppm', 'equil_data_path': equil_data_path, 'npt_prod_log_path': npt_prod_log_path, 'temp_K': cls.get('bm_temperature_K', 300.0), 'npt_steps': int(cls.get('bm_npt_steps', 500000)) * sampling_factor, 'thermo_freq': int(cls.get('bm_thermo_freq', 100)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'mechanical_sampling_factor': sampling_factor, 'bm_per_point_max_extensions': int(cls.get('bm_per_point_max_extensions', 2)), 'bm_per_point_stability_pct': cls.get('bm_per_point_stability_pct', 1.0), 'bm_per_point_min_n_eff': cls.get('bm_per_point_min_n_eff', 5.0), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
@@ -834,7 +915,7 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
     d03 = args.d03 or cls.get('electrostatics')
     d04 = args.d04 or (f'DP={dp}, {nchain} chains' if dp and nchain else None)
     return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'run_plan': run_plan, 'dp': dp, 'nchain': nchain, 'charge_method': charge_method, 'ff': ff, 'd01_ff': d01, 'd02_charges': d02, 'd03_electrostatics': d03, 'd04_system_size': d04}
-_STAGE_RESOLVERS = {'build': _resolve_build_params, 'equil': _resolve_equil_params, 'tg': _resolve_tg_params, 'deform': _resolve_deform_params, 'analyze-tg': _resolve_analyze_tg_params, 'equil-check': _resolve_equil_check_params, 'murnaghan': _resolve_murnaghan_params, 'analyze-bm': _resolve_analyze_bm_params, 'run-summary': _resolve_run_summary_params}
+_STAGE_RESOLVERS = {'build': _resolve_build_params, 'equil': _resolve_equil_params, 'cool': _resolve_cool_params, 'cool-check': _resolve_cool_check_params, 'tg': _resolve_tg_params, 'deform': _resolve_deform_params, 'analyze-tg': _resolve_analyze_tg_params, 'equil-check': _resolve_equil_check_params, 'murnaghan': _resolve_murnaghan_params, 'analyze-bm': _resolve_analyze_bm_params, 'run-summary': _resolve_run_summary_params}
 
 def resolve_stage_params(stage: str, args, cls: dict) -> dict:
     """Resolve routing and physics decisions into concrete tool arguments."""
