@@ -501,19 +501,18 @@ class _FakeEquilLammps:
             return self._workflow_queue.pop(0)
         if self._workflow_stages is not None:
             return {"stages": self._workflow_stages, **self._workflow_extra}
-        # The core chain's real tail: the GATED cell (npt_melt_hold) followed by the HANDOFF
-        # cell (nvt_melt_hold). Both are needed -- do_equil_and_check gates the first and
-        # publishes the second, and a fake with only one of them would hide that distinction.
+        # The core chain's real tail, in order: the NVT hold where the structure relaxes,
+        # then the TERMINAL npt_melt_hold, which is both the gated cell and the handoff cell.
         n = self._chain_n
-        hold = {"name": "npt_melt_hold",
-                "output_data": f"{self.tmp_path}/melt_hold_{n}_out.data",
-                "output_restart": f"{self.tmp_path}/melt_hold_{n}_out.restart",
-                "work_dir": str(self.tmp_path), "params": {"DUMP_FILE": "npt_melt_hold.dump"}}
         nvt = {"name": "nvt_melt_hold",
                "output_data": f"{self.tmp_path}/nvt_melt_{n}_out.data",
                "output_restart": f"{self.tmp_path}/nvt_melt_{n}_out.restart",
                "work_dir": str(self.tmp_path), "params": {"DUMP_FILE": "nvt_melt_hold.dump"}}
-        return {"stages": [hold, nvt]}
+        hold = {"name": "npt_melt_hold",
+                "output_data": f"{self.tmp_path}/melt_hold_{n}_out.data",
+                "output_restart": f"{self.tmp_path}/melt_hold_{n}_out.restart",
+                "work_dir": str(self.tmp_path), "params": {"DUMP_FILE": "npt_melt_hold.dump"}}
+        return {"stages": [nvt, hold]}
 
     def run_lammps_chain(self, **kwargs):
         return {"chain_id": f"pending-{self._chain_n + 1}"}
@@ -652,47 +651,102 @@ def test_do_equil_and_check_auto_derives_backbone_types(tmp_path, equil_check_ar
     assert persisted["decided_params"]["backbone_types"] == [1, 2]
 
 
-def test_do_equil_and_check_sizes_extend_off_measured_tau_relax(tmp_path, equil_check_args_cls, monkeypatch):
+def test_do_equil_and_check_extends_the_nvt_hold_on_a_structural_gate(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """A chain-convergence failure is fixed by more structural relaxation, so it lengthens the
+    NVT hold -- and then the TERMINAL npt_melt_hold must be regenerated, because it was built
+    from a structure that no longer exists. Skipping that would gate a density taken from the
+    pre-extension cell and hand that same cell downstream."""
     args, cls = equil_check_args_cls
-    args.backbone_types = [1, 2]  # explicit -- skip the halt path, exercise EXTEND sizing instead
+    args.backbone_types = [1, 2]
     monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
         {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
     tau_relax_ps = 6209.0
     fake = _FakeEquilLammps(
         tmp_path,
         comp_results=[
-            {"chain": {"ct": {"tau_relax_ps": tau_relax_ps, "decay_fraction_at_end": 0.08}}},
-            {"chain": {"ct": {"tau_relax_ps": tau_relax_ps, "decay_fraction_at_end": 0.3}}},
+            {"chain": {"ct": {"tau_relax_ps": tau_relax_ps, "decay_fraction_at_end": 0.30}}},
+            {"chain": {"ct": {"tau_relax_ps": tau_relax_ps, "decay_fraction_at_end": 0.40}}},
         ],
-        gate_verdicts=[{"verdict": "EXTEND"}, {"verdict": "PASS"}],
+        gate_verdicts=[{"verdict": "EXTEND", "failing_binding_gates": ["msid_gaussian"]},
+                       {"verdict": "PASS"}],
     )
 
     result = do_equil_and_check(args, cls, fake)
 
     assert result["equil_verdict"] == "PASS"
     assert len(result["extend_history"]) == 1
-    assert result["extend_history"][0]["attempt"] == 1
-    # THREE calls, and the third is the point: the initial submission, the restart-continuation
-    # of npt_melt_hold (where every extendable gate is measured), and then the REGENERATION of
-    # nvt_melt_hold -- which was built from the pre-extension endpoint and is stale both as the
-    # MSD/C(t) window and as the cell every downstream track starts from.
+    hist = result["extend_history"][0]
+    assert hist["stage"] == "nvt_melt_hold"
+    assert hist["failing_gates"] == ["msid_gaussian"]
+    # 3 calls: initial submission, the NVT continuation, the terminal-NPT regeneration.
     assert len(fake.generate_equilibration_workflow_calls) == 3
-    extend_call = fake.generate_equilibration_workflow_calls[1]
-    assert extend_call["extend_only"] is True
-    assert extend_call["base_stage_name"] == "npt_melt_hold"
-    assert extend_call["restart_file"] == f"{tmp_path}/melt_hold_0_out.restart"
-    regen_call = fake.generate_equilibration_workflow_calls[2]
-    assert regen_call["resume_from"] == "npt_melt_hold"
-    assert result["melt_start_data_path"] != f"{tmp_path}/nvt_melt_0_out.data"
+    ext = fake.generate_equilibration_workflow_calls[1]
+    assert ext["extend_only"] is True
+    assert ext["base_stage_name"] == "nvt_melt_hold"
+    assert ext["extend_ensemble"] == "nvt"
+    assert fake.generate_equilibration_workflow_calls[2]["resume_from"] == "nvt_melt_hold"
+
     dt_fs = resolve_stage_params("equil", args, cls)["dt_fs"]
-    # npt_melt_hold's continuation length comes through melt_hold_min_steps (the same knob
-    # generate_equilibration_workflow reads for base_stage_name="npt_melt_hold"), not a generic
-    # "extend_steps" param.
-    extend_ns_used = extend_call["melt_hold_min_steps"] * dt_fs / 1e6
-    expected_extend_ns = max(1.5, round(1.5 * tau_relax_ps / 1000, 2))
-    assert extend_ns_used == pytest.approx(expected_extend_ns, rel=1e-6)
-    # sanity: the measured signal actually moved the knob away from the old flat 1.5 ns default
-    assert extend_ns_used > 1.5
+    used_ns = ext["nvt_melt_min_steps"] * dt_fs / 1e6
+    assert used_ns == pytest.approx(max(1.5, round(1.5 * tau_relax_ps / 1000, 2)), rel=1e-6)
+    assert used_ns > 1.5, "the measured signal must move the knob off the flat default"
+
+
+def test_do_equil_and_check_extends_the_npt_hold_alone_on_a_thermo_gate(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """A density/energy sampling failure needs more of the plateau, not more relaxation. The
+    NPT hold is terminal, so nothing downstream was built from its old endpoint and one step
+    is enough -- no regeneration."""
+    args, cls = equil_check_args_cls
+    args.backbone_types = [1, 2]
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
+    fake = _FakeEquilLammps(
+        tmp_path,
+        comp_results=[
+            {"chain": {"ct": {"tau_relax_ps": 6209.0, "decay_fraction_at_end": 0.30}}},
+            {"chain": {"ct": {"tau_relax_ps": 6209.0, "decay_fraction_at_end": 0.30}}},
+        ],
+        gate_verdicts=[{"verdict": "EXTEND", "failing_binding_gates": ["density_sem"]},
+                       {"verdict": "PASS"}],
+    )
+
+    result = do_equil_and_check(args, cls, fake)
+
+    assert result["equil_verdict"] == "PASS"
+    assert result["extend_history"][0]["stage"] == "npt_melt_hold"
+    # 2 calls, not 3: no regeneration needed behind a terminal stage.
+    assert len(fake.generate_equilibration_workflow_calls) == 2
+    ext = fake.generate_equilibration_workflow_calls[1]
+    assert ext["base_stage_name"] == "npt_melt_hold"
+    assert ext["extend_ensemble"] == "npt"
+
+
+def test_an_unidentifiable_tau_does_not_produce_a_microsecond_extension(
+        tmp_path, equil_check_args_cls, monkeypatch):
+    """End-to-end guard for the archived PEG1 shape: tau = 6.18 us fitted to a 2.1% decay. The
+    old sizing rule would have requested 9269 ns here."""
+    args, cls = equil_check_args_cls
+    args.backbone_types = [1, 2]
+    monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
+        {"claimed": [0], "run": run_name} if action == "claim" else {"released": True}))
+    fake = _FakeEquilLammps(
+        tmp_path,
+        comp_results=[
+            {"chain": {"ct": {"tau_relax_ps": 6179405.0, "decay_fraction_at_end": 0.021}}},
+            {"chain": {"ct": {"tau_relax_ps": 6179405.0, "decay_fraction_at_end": 0.30}}},
+        ],
+        gate_verdicts=[{"verdict": "EXTEND", "failing_binding_gates": ["ct"]},
+                       {"verdict": "PASS"}],
+    )
+
+    result = do_equil_and_check(args, cls, fake)
+
+    hist = result["extend_history"][0]
+    assert hist["extend_ns"] == 1.5
+    assert "not identifiable" in hist["sizing"]
+
 
 
 # ─── do_summary(): generate_run_summary must be waited on, not read as a submission stub ──
@@ -756,10 +810,10 @@ def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_ch
     flat-convention guess -- the bug class that once silently disabled this binding gate on
     every run.
 
-    The split it encodes: npt_melt_hold is GATED (its log, its trajectory, its .data), while
-    nvt_melt_hold supplies only the fixed-volume dump MSD/kinetic-trap/C(t) require. A
-    barostatted trajectory affine-scales coordinates every step, which is why the MSD window
-    cannot be the hold's own.
+    The split it encodes: the TERMINAL npt_melt_hold is GATED (its log, its trajectory, its
+    .data) and is also the handoff cell, while nvt_melt_hold supplies only the fixed-volume
+    dump MSD/kinetic-trap/C(t) require. A barostatted trajectory affine-scales coordinates
+    every step, which is why the MSD window cannot be the hold's own.
     """
     args, cls = equil_check_args_cls
     args.backbone_types = [1, 2]  # skip the halt path
@@ -771,14 +825,14 @@ def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_ch
     hold_dir.mkdir(parents=True)
     nvt_dir.mkdir(parents=True)
     workflow_stages = [
-        {"name": "npt_melt_hold", "work_dir": str(hold_dir),
-         "params": {"DUMP_FILE": "npt_melt_hold.dump"},
-         "output_data": str(hold_dir / "npt_melt_hold_out.data"),
-         "output_restart": str(hold_dir / "npt_melt_hold_out.restart")},
         {"name": "nvt_melt_hold", "work_dir": str(nvt_dir),
          "params": {"DUMP_FILE": "nvt_melt_hold.dump"},
          "output_data": str(nvt_dir / "nvt_melt_hold_out.data"),
          "output_restart": str(nvt_dir / "nvt_melt_hold_out.restart")},
+        {"name": "npt_melt_hold", "work_dir": str(hold_dir),
+         "params": {"DUMP_FILE": "npt_melt_hold.dump"},
+         "output_data": str(hold_dir / "npt_melt_hold_out.data"),
+         "output_restart": str(hold_dir / "npt_melt_hold_out.restart")},
     ]
     fake = _FakeEquilLammps(
         tmp_path,
@@ -804,9 +858,9 @@ def test_do_equil_and_check_resolves_melt_paths_by_stage_name(tmp_path, equil_ch
     assert gate_call["melt_data"] is None
     assert gate_call["regime"] == "melt"
 
-    # The two cells this stage publishes are distinct and correctly assigned.
+    # npt_melt_hold is terminal, so the gated cell and the handoff cell are one file.
     assert result["melt_data_path"] == str(hold_dir / "npt_melt_hold_out.data")
-    assert result["melt_start_data_path"] == str(nvt_dir / "nvt_melt_hold_out.data")
+    assert result["melt_start_data_path"] == str(hold_dir / "npt_melt_hold_out.data")
 
 
 def test_structural_fail_prefers_the_real_cause_over_a_passing_finite_size_string(
@@ -1956,12 +2010,12 @@ def test_do_equil_and_check_gated_path_merges_chain1_and_chain2_stages(
                                     "DUMP_FREQ": 1000, "N_STEPS": 1000000}}
     melt_ramp_stage = {"name": "npt_melt_ramp", "output_data": f"{tmp_path}/melt_ramp_out.data",
                        "work_dir": str(tmp_path), "params": {"DUMP_FILE": "npt_melt_ramp.dump"}}
-    melt_hold_stage = {"name": "npt_melt_hold", "output_data": f"{tmp_path}/melt_hold_out.data",
-                       "output_restart": f"{tmp_path}/melt_hold_out.restart",
-                       "work_dir": str(tmp_path), "params": {"DUMP_FILE": "npt_melt_hold.dump"}}
     nvt_melt_stage = {"name": "nvt_melt_hold", "output_data": f"{tmp_path}/nvt_melt_out.data",
                       "output_restart": f"{tmp_path}/nvt_melt_out.restart",
                       "work_dir": str(tmp_path), "params": {"DUMP_FILE": "nvt_melt_hold.dump"}}
+    melt_hold_stage = {"name": "npt_melt_hold", "output_data": f"{tmp_path}/melt_hold_out.data",
+                       "output_restart": f"{tmp_path}/melt_hold_out.restart",
+                       "work_dir": str(tmp_path), "params": {"DUMP_FILE": "npt_melt_hold.dump"}}
 
     fake = _FakeEquilLammps(
         tmp_path,
@@ -1978,8 +2032,8 @@ def test_do_equil_and_check_gated_path_merges_chain1_and_chain2_stages(
             {"status": "success", "stages": [minimize_stage, anneal_hold_stage],
              "run_order": ["minimize", "anneal_hold"]},
             {"status": "success",
-             "stages": [melt_ramp_stage, melt_hold_stage, nvt_melt_stage],
-             "run_order": ["npt_melt_ramp", "npt_melt_hold", "nvt_melt_hold"]},
+             "stages": [melt_ramp_stage, nvt_melt_stage, melt_hold_stage],
+             "run_order": ["npt_melt_ramp", "nvt_melt_hold", "npt_melt_hold"]},
         ],
     )
 
@@ -1995,9 +2049,9 @@ def test_do_equil_and_check_gated_path_merges_chain1_and_chain2_stages(
         "minimize", "anneal_hold", "npt_melt_ramp", "npt_melt_hold", "nvt_melt_hold"}
     assert result["stage_checkpoints"]["anneal_hold"] == f"{tmp_path}/anneal_hold_out.data"
     assert result["stage_checkpoints"]["npt_melt_hold"] == f"{tmp_path}/melt_hold_out.data"
-    # The gated cell and the handoff cell come out of the merged list correctly assigned.
+    # The terminal npt_melt_hold is both the gated cell and the handoff cell.
     assert result["melt_data_path"] == f"{tmp_path}/melt_hold_out.data"
-    assert result["melt_start_data_path"] == f"{tmp_path}/nvt_melt_out.data"
+    assert result["melt_start_data_path"] == f"{tmp_path}/melt_hold_out.data"
     # exactly 2 generate_equilibration_workflow calls: chain 1 (sliced to stop at anneal_hold by
     # _submit_equil_chain itself -- see test_submit_equil_chain_stop_after_stage_slices_the_workflow
     # for that mechanism in isolation), chain 2 (resume_from="anneal_hold") -- no extension, since
@@ -2116,3 +2170,63 @@ def test_do_equil_and_check_gated_reattach_chain1_mid_wait_reuses_chain_id(
     # zero generate_equilibration_workflow calls for chain 1 -- only chain 2's own call
     assert len(fake.generate_equilibration_workflow_calls) == 1
     assert fake.generate_equilibration_workflow_calls[0]["resume_from"] == "anneal_hold"
+
+
+# ── EXTEND sizing: the two guards the unbounded form lacked ───────────────────
+
+def test_an_unidentifiable_tau_is_refused():
+    """The archived PEG1 run decayed 2.1% and its KWW fit returned tau = 6.18 us. The previous
+    sizing rule (1.5 x tau, no clamp, no identifiability test) would have turned that into a
+    9.3 MICROSECOND continuation request -- and EXTEND_MAX_ATTEMPTS=2 would have allowed two of
+    them, because it bounds the attempt COUNT, not the time."""
+    assert rdr._tau_is_identifiable(6179405.0, 0.021) is False
+    assert rdr._tau_is_identifiable(170625.6, 0.031) is False
+    assert rdr._tau_is_identifiable(6209.0, 0.30) is True
+    assert rdr._tau_is_identifiable(None, 0.30) is False
+    assert rdr._tau_is_identifiable(6209.0, None) is False
+
+    ns, note = rdr._size_extension(6179405.0, 0.021, cumulative=0, cap_steps=None, dt_fs=1.0)
+    assert ns == 1.5, "a 2% decay must fall back to the flat extension, not 9269 ns"
+    assert "not identifiable" in note
+
+
+def test_a_trustworthy_tau_sizes_the_extension():
+    ns, note = rdr._size_extension(6209.0, 0.30, cumulative=0, cap_steps=None, dt_fs=1.0)
+    assert ns == pytest.approx(9.31, abs=0.01)   # 1.5 x 6.209 ns
+    assert "measured tau_relax" in note
+
+
+def test_the_cap_clamps_the_extension_and_then_stops_it():
+    """*_cap_steps was declared, snapshotted and agent-overridable but read by no code -- the
+    only bound on an adaptive stage was the attempt count. These two assertions are what make
+    it a real ceiling."""
+    # 8 ns already run against a 10 ns cap: a 9.31 ns request is clamped to the 2 ns left.
+    ns, note = rdr._size_extension(6209.0, 0.30, cumulative=8_000_000,
+                                   cap_steps=10_000_000, dt_fs=1.0)
+    assert ns == pytest.approx(2.0, abs=0.01)
+    assert "clamped" in note
+    # At the cap there is nothing left to give, and the caller must halt rather than resubmit.
+    ns, note = rdr._size_extension(6209.0, 0.30, cumulative=10_000_000,
+                                   cap_steps=10_000_000, dt_fs=1.0)
+    assert ns is None
+    assert "cap already reached" in note
+
+
+def test_extension_routing_splits_structural_from_thermo_gates():
+    """A density-SEM failure is not fixed by more structural relaxation, and an unconverged
+    MSID is not fixed by more barostatted sampling."""
+    assert {"ct", "rg", "msid_gaussian", "torsion"} <= rdr.CHAIN_CONVERGENCE_GATES
+    for thermo in ("density_drift", "density_sem", "energy_drift", "energy_sem",
+                   "n_eff_density"):
+        assert thermo not in rdr.CHAIN_CONVERGENCE_GATES
+
+
+def test_every_melt_chain_gate_can_actually_be_extended():
+    """enforce_gate maps a failing binding gate that is in neither EXTENDABLE_GATES nor
+    STRUCTURAL_GATES to a hard FAIL. So every chain-convergence gate that BINDS at the melt
+    must also be extendable, or an under-relaxed melt -- the exact condition the gate exists to
+    catch -- halts the run instead of buying more time."""
+    import enforce_gate as eg
+    bindable = eg.BINDING_MELT & rdr.CHAIN_CONVERGENCE_GATES
+    assert bindable, "no chain gate binds at the melt -- the melt clause lost its point"
+    assert bindable <= eg.EXTENDABLE_GATES, sorted(bindable - eg.EXTENDABLE_GATES)

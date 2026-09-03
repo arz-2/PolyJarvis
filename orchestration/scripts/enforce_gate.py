@@ -303,7 +303,16 @@ def msd_msid_gates(chain: dict) -> dict:
 # n_eff_density belongs here: too few independent samples is undersampling of a valid
 # state, and more NPT at the same temperature is exactly the remedy.
 EXTENDABLE_GATES = {"density_drift", "energy_drift", "density_sem", "energy_sem",
-                    "n_eff_density"}
+                    "n_eff_density",
+                    # The melt clause's chain-convergence gates. Without these the melt gate
+                    # cannot work at all: they bind only under require_melt, and a failing
+                    # binding gate that is in neither EXTENDABLE_GATES nor STRUCTURAL_GATES
+                    # falls through to a hard FAIL -- so an under-relaxed melt, the exact
+                    # condition the gate exists to catch, would halt the run instead of buying
+                    # more time. They are advisory in every other clause, so they can never
+                    # appear in failing_binding there and this addition cannot loosen the
+                    # assessment gate.
+                    "ct", "rg", "msid_gaussian", "torsion"}
 # Gates whose failure means the cell is WRONG, not merely unconverged -- extending at the
 # assessment temperature cannot fix these (policy: "a glass cannot densify below Tg").
 #

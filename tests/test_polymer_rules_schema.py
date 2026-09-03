@@ -612,31 +612,43 @@ def test_an_untrustworthy_tg_fits_the_whole_descent():
     assert _sched("PKTN")["tg_fit_top_K"] is None
 
 
-# ─── the melt holds carry a real, per-class convergence budget ────────────────────
+# ─── melt-hold durations are uniform + adaptive, never per class ──────────────────
 
 @pytest.mark.parametrize("cid", sorted(RULES["classes"]))
-def test_both_melt_holds_are_sized_per_class(cid):
-    """The melt hold carries every binding structural gate (Rg, MSID, torsion, P2,
-    homogeneity) and the NVT window carries the binding C(t) gate. The generator's own tier
-    default is 0.5 ns -- inherited from npt_final, a stage that never had to satisfy any of
-    them. Each class must state its own budget instead.
-
-    The values are the retired stage7_min_steps (nvt_kinetic_stability), which were hand-tuned
-    per class for exactly this convergence question at 300 K, where it is hardest.
-    """
+def test_no_class_pins_a_melt_hold_duration(cid):
+    """The 21 values that used to sit here were a 1:1 rename of t_equil_ns (commit 6bd7f58):
+    hand-set constants correlating with raw Tg (r=0.79) but not at all with T_melt_hold_K - Tg
+    (r=0.03), which is what actually governs melt dynamics -- PIMN and PSFO differed 8 vs 20 ns
+    at Tg 488 vs 493. They are replaced by one uniform default plus the adaptive extend loop,
+    which measures each run's own relaxation time. Re-pin per class ONLY on measured melt data,
+    and prefer a DP-scaling form over constants."""
     e = RULES["classes"][cid]
-    for key in ("melt_hold_min_steps", "nvt_melt_min_steps"):
-        v = e.get(key)
-        assert isinstance(v, int) and v > 0, f"{cid}: {key} missing or not a positive int"
-        # 0.5 ns is the generator fallback this exists to override; anything at or below it
-        # means the class silently kept the npt_final-shaped default.
-        assert v * e.get("dt_fs", 1.0) / 1e6 > 0.5, (
-            f"{cid}: {key} is {v * e.get('dt_fs', 1.0) / 1e6} ns -- at or below the generator "
-            "fallback, so the class is not actually sizing its own melt budget")
+    for key in ("melt_hold_min_steps", "nvt_melt_min_steps",
+                "melt_hold_cap_steps", "nvt_melt_cap_steps"):
+        assert key not in e, (
+            f"{cid} pins {key} -- melt-hold duration is uniform + adaptive; see "
+            "_melt_hold_durations_note in polymer_rules.json")
 
 
-def test_the_two_melt_holds_are_sized_together():
-    """C(t) decorrelation (NVT window) is the longest timescale either hold has to resolve, so
-    the fixed-volume window is never the shorter of the two."""
-    for cid, e in RULES["classes"].items():
-        assert e["nvt_melt_min_steps"] >= e["melt_hold_min_steps"], cid
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_the_melt_holds_resolve_to_the_uniform_defaults(cid):
+    """5 ns of structural relaxation, 2 ns of density sampling, and a ceiling at 3x each.
+
+    The NVT hold gets the larger share because that is where chain relaxation happens and C(t)
+    decorrelation is the slowest quantity the melt gate resolves; the terminal NPT only samples
+    a plateau on an already-relaxed structure. Resolved concretely (not deferred to the
+    generator) precisely so the ceiling can be derived from the first block."""
+    import stage_params as sp
+    e = RULES["classes"][cid]
+    dt = e.get("dt_fs", 1.0)
+    args = SimpleNamespace(smiles=None, exp_tg_K=None, final_T_K=None, T_equil_K=None,
+                           T_anneal_high_K=None, dt_fs=None, data_path=None, work_dir=None,
+                           run_name="X", lammps_flags=None, gpu_ids=None, mpi_ranks=None,
+                           engine=None, velocity_seed=None, nchain=None, emc_params_path=None)
+    p = sp.resolve_stage_params("equil", args, e)
+    assert p["nvt_melt_min_steps"] * dt / 1e6 == pytest.approx(5.0)
+    assert p["melt_hold_min_steps"] * dt / 1e6 == pytest.approx(2.0)
+    assert p["nvt_melt_cap_steps"] == 3 * p["nvt_melt_min_steps"]
+    assert p["melt_hold_cap_steps"] == 3 * p["melt_hold_min_steps"]
+    # The structural hold is never the shorter of the two.
+    assert p["nvt_melt_min_steps"] >= p["melt_hold_min_steps"]

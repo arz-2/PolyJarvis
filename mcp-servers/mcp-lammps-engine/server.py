@@ -1755,7 +1755,7 @@ def generate_equilibration_workflow(
                          "record it in run_log.md.",
             }
         _CHECKPOINTS = ["nvt_warmup", "npt_densify", "npt_ff_activate", "npt_densify_hold",
-                       "anneal_hold", "npt_melt_ramp", "npt_melt_hold"]
+                       "anneal_hold", "npt_melt_ramp", "nvt_melt_hold"]
         if resume_from not in (None, *_CHECKPOINTS):
             return {"status": "error",
                     "error": f"resume_from={resume_from!r} is not supported — must be one of "
@@ -1800,10 +1800,10 @@ def generate_equilibration_workflow(
                 "max_temp == melt_hold_T == %s — npt_melt_ramp is a no-op and the anneal soak "
                 "runs at the melt temperature, so it does no de-knotting above it. Legal, but "
                 "probably not what was intended.", melt_hold_T)
-        if resume_from == "npt_melt_hold":
-            # Legal and meaningful, unlike the old npt_final case: it regenerates nvt_melt_hold
-            # from an already-extended npt_melt_hold, which is exactly what the melt gate's
-            # two-step EXTEND needs. Left explicit so the asymmetry is visible.
+        if resume_from == "nvt_melt_hold":
+            # Legal and meaningful: it regenerates the closing npt_melt_hold from an
+            # already-extended nvt_melt_hold, which is exactly what the melt gate's two-step
+            # structural EXTEND needs. Left explicit so the asymmetry is visible.
             pass
         if thermostat_damp_fs <= 0 or barostat_damp_fs <= 0:
             return {"status": "error", "error": "thermostat/barostat damping must be positive"}
@@ -2062,32 +2062,38 @@ def generate_equilibration_workflow(
             stages.append(s)
             prev_output = s["output_data"]
 
-        # 8. npt_melt_hold — ADAPTIVE: NPT at melt_hold_T/press. THE GATED CELL. Melt density,
-        # the thermo drift/SEM gates, and the per-frame geometry checks (Rg/MSID/R_ee/torsion/
-        # P2/homogeneity/finite_size) are all computed from this stage's own log and trajectory.
+        # 8. nvt_melt_hold — ADAPTIVE: NVT at melt_hold_T, FIXED volume (npt_melt_ramp's own
+        # endpoint, which is a barostatted melt). This is where the expensive work happens:
+        # chain relaxation, and the ideal-chain / decorrelation statistics that decide whether
+        # this melt is equilibrated at all (MSID, C(t), Rg, torsion, MSD). It runs at fixed
+        # volume because MSD and C(t) require it -- a barostatted trajectory affine-rescales
+        # coordinates every step, contaminating cumulative displacement -- and because the
+        # structural work is the long part, doing it here means the expensive stage is also the
+        # clean one. Extending THIS is how an under-relaxed melt is fixed.
         if _resume_idx < 6:
-            s = _stage("npt_melt_hold", "npt", {
+            s = _stage("nvt_melt_hold", "nvt", {
                 "T_START": melt_hold_T, "T_FINAL": melt_hold_T, "T_DAMP": thermostat_damp_fs,
-                "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
                 "TIMESTEP": dt_prod,
-                "N_STEPS": int(melt_hold_min_steps) if melt_hold_min_steps
-                           else int(5.0e5 / dt_prod),
+                "N_STEPS": int(nvt_melt_min_steps) if nvt_melt_min_steps
+                           else int(5.0e6 / dt_prod),
                 "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
                 "write_restart": True,
             }, prev_output)
             stages.append(s)
             prev_output = s["output_data"]
 
-        # 9. nvt_melt_hold — ADAPTIVE: NVT at melt_hold_T, FIXED volume (npt_melt_hold's own
-        # endpoint). Two jobs, and both need the barostat off: it supplies the uncontaminated
-        # window MSD/kinetic-trap/C(t) require (a barostatted trajectory affine-scales
-        # coordinates every step, which contaminates cumulative CoM displacement), and its
-        # endpoint is the cell every downstream track starts from. Because NVT cannot move the
-        # box, that cell carries npt_melt_hold's own equilibrated volume unchanged.
-        s = _stage("nvt_melt_hold", "nvt", {
+        # 9. npt_melt_hold — ADAPTIVE: NPT at melt_hold_T/press. TERMINAL, and THE GATED CELL.
+        # Melt density is measured here, on a structure the NVT hold has already relaxed --
+        # the ordering matters: measuring it before convergence would gate a density whose
+        # chains had not yet moved. npt_melt_ramp set the box near melt density, the NVT hold
+        # pinned it while the structure relaxed, and this stage lets the barostat correct the
+        # residual. Its endpoint is the cell every downstream track starts from.
+        s = _stage("npt_melt_hold", "npt", {
             "T_START": melt_hold_T, "T_FINAL": melt_hold_T, "T_DAMP": thermostat_damp_fs,
+            "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
             "TIMESTEP": dt_prod,
-            "N_STEPS": int(nvt_melt_min_steps) if nvt_melt_min_steps else int(5.0e5 / dt_prod),
+            "N_STEPS": int(melt_hold_min_steps) if melt_hold_min_steps
+                       else int(2.0e6 / dt_prod),
             "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
             "write_restart": True,
         }, prev_output)
@@ -2095,7 +2101,6 @@ def generate_equilibration_workflow(
         prev_output = s["output_data"]
 
         final_stage = stages[-1]
-        melt_hold_stage = next((st for st in stages if st["name"] == "npt_melt_hold"), None)
 
         ret = {
             "status":     "success",
@@ -2109,11 +2114,11 @@ def generate_equilibration_workflow(
             "run_order":  [s["name"] for s in stages],
             "npt_production_log": f"{final_stage['work_dir']}/{final_stage['params']['LOG_FILE']}",
             "npt_production_dir": final_stage["work_dir"],
-            # The two cells this chain hands on, named explicitly rather than looked up by
-            # position: the gated melt (what the melt gate adjudicates and what the cooling
-            # stage's contraction reference is) and the melt-start cell (what cooling, thermal
-            # and anything else downstream reads).
-            "melt_data_path":       melt_hold_stage["output_data"] if melt_hold_stage else None,
+            # ONE terminal cell now, named under both keys it is read by: npt_melt_hold is
+            # both the gated melt (what the gate adjudicates, and the cooling stage's
+            # contraction reference) and the handoff cell (what cooling and thermal start
+            # from). Before the NVT/NPT reorder these were two different stages.
+            "melt_data_path":       final_stage["output_data"],
             "melt_start_data_path": final_stage["output_data"],
             "preflight_warnings": vr["warnings"],
             "preflight_stats":    vr["stats"],

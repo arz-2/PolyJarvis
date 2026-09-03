@@ -416,6 +416,69 @@ def do_build(args, cls: dict, emc, lammps) -> dict:
 
 # ─── Stage: equilibration + gate (EXTEND loop, STRUCTURAL_FAIL halt) ──────────
 
+CHAIN_CONVERGENCE_GATES = frozenset({"ct", "rg", "msid_gaussian", "torsion", "msd_not_trapped"})
+"""The melt gates that more STRUCTURAL RELAXATION can fix, as opposed to more sampling.
+
+Binding only under require_melt (enforce_gate.BINDING_MELT). A failure here means the chains
+have not equilibrated, which is the NVT hold's job; a thermo failure (drift/SEM/n_eff) means the
+plateau is undersampled, which is the terminal NPT hold's. Extending the wrong one burns time
+without touching the defect."""
+
+TAU_MIN_DECAY_FRACTION = 0.05
+"""How far C(t) must have decayed before its KWW tau is worth believing.
+
+A stretched exponential fitted to a barely-decayed curve is not merely imprecise, it is
+unidentifiable: the archived PEG1 run decayed 2.1% and the fit returned tau = 6.18 us, which
+this module's own sizing rule would have turned into a 9.3 MICROSECOND continuation request.
+Below this threshold the measured tau is discarded and the flat 1.5 ns fallback is used."""
+
+
+def _tau_is_identifiable(tau_relax_ps, decay_fraction) -> bool:
+    """Whether a measured relaxation time carries information -- see TAU_MIN_DECAY_FRACTION."""
+    if not isinstance(tau_relax_ps, (int, float)) or tau_relax_ps <= 0:
+        return False
+    return (isinstance(decay_fraction, (int, float))
+            and decay_fraction >= TAU_MIN_DECAY_FRACTION)
+
+
+def _first_block_steps(resolved_steps, dt_fs: float, structural: bool) -> int:
+    """The first block's own step count, for cumulative-vs-cap bookkeeping. The resolver always
+    hands a concrete number now; the fallback mirrors the generator's for a direct call."""
+    if resolved_steps:
+        return int(resolved_steps)
+    return int((5.0e6 if structural else 2.0e6) / dt_fs)
+
+
+def _size_extension(tau_relax_ps, decay_fraction, cumulative: int, cap_steps, dt_fs: float):
+    """How long the next restart-continuation should run, in ns, or None when the ceiling is hit.
+
+    Two guards the previous unbounded form lacked. The tau is used only when C(t) has decayed
+    far enough to constrain the fit, and the result is clamped so cumulative steps never exceed
+    cap_steps -- which is what makes *_cap_steps a real ceiling for the first time rather than a
+    recorded-but-unread number. Returns (extend_ns, note); note is kept in extend_history so a
+    reader can tell a measured extension from a fallback one.
+    """
+    if _tau_is_identifiable(tau_relax_ps, decay_fraction):
+        extend_ns = max(1.5, round(1.5 * tau_relax_ps / 1000, 2))
+        note = (f"1.5 x measured tau_relax {tau_relax_ps / 1000:.2f} ns "
+                f"(C(t) decayed {decay_fraction:.1%})")
+    else:
+        extend_ns = 1.5
+        shown = (f"{decay_fraction:.1%}" if isinstance(decay_fraction, (int, float))
+                 else "unavailable")
+        note = (f"flat 1.5 ns -- tau not identifiable (C(t) decayed {shown}, "
+                f"below the {TAU_MIN_DECAY_FRACTION:.0%} floor)")
+    if cap_steps:
+        remaining = int(cap_steps) - int(cumulative)
+        if remaining <= 0:
+            return None, note + "; cap already reached"
+        max_ns = remaining * dt_fs / 1e6
+        if extend_ns > max_ns:
+            extend_ns = round(max_ns, 2)
+            note += f"; clamped to the {max_ns:.2f} ns of cap headroom left"
+    return extend_ns, note
+
+
 def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
                          extend_temp: float = None, extend_ns: float = 1.5,
                          extend_base_stage: str = None, extend_ensemble: str = "npt",
@@ -820,23 +883,26 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
     def _find_stage(name):
         return next((s for s in workflow["stages"] if s.get("name") == name), None)
 
-    # The core chain ends on nvt_melt_hold, but the cell it GATES is npt_melt_hold: the melt
-    # density and every thermo-derived gate come from the barostatted hold, while nvt_melt_hold
-    # supplies only the fixed-volume trajectory MSD/kinetic-trap/C(t) require (a barostatted
-    # trajectory affine-scales coordinates every step and contaminates cumulative CoM
-    # displacement). nvt_melt_hold's ENDPOINT is what every downstream track starts from -- its
-    # box is npt_melt_hold's, unchanged, because NVT cannot move it.
-    melt_start_data_path = workflow["stages"][-1]["output_data"]
-    melt_start_restart_path = workflow["stages"][-1].get("output_restart")
-    _hold_stage = _find_stage("npt_melt_hold")
-    melt_hold_data_path = _hold_stage["output_data"] if _hold_stage else melt_start_data_path
-    melt_hold_dump_path = _stage_dump_path(_hold_stage) if _hold_stage else None
-    melt_hold_restart_path = _hold_stage.get("output_restart") if _hold_stage else None
+    # npt_melt_hold is TERMINAL and is the gated cell: melt density and every thermo-derived
+    # gate come from it, measured on a structure nvt_melt_hold has already relaxed. Its
+    # endpoint is also what every downstream track starts from, so the two roles collapse onto
+    # one file. nvt_melt_hold supplies only the fixed-volume trajectory MSD/kinetic-trap/C(t)
+    # require -- a barostatted trajectory affine-scales coordinates every step and contaminates
+    # cumulative CoM displacement.
+    melt_hold_data_path = workflow["stages"][-1]["output_data"]
+    melt_hold_dump_path = _stage_dump_path(workflow["stages"][-1])
+    melt_hold_restart_path = workflow["stages"][-1].get("output_restart")
+    melt_start_data_path = melt_hold_data_path
+    melt_start_restart_path = melt_hold_restart_path
     _nvt_stage = _find_stage("nvt_melt_hold")
+    nvt_restart_path = _nvt_stage.get("output_restart") if _nvt_stage else None
     if _nvt_stage:
         args.npt_prod_dump = _stage_dump_path(_nvt_stage)
 
     attempts = 0
+    p_equil = resolve_stage_params("equil", args, cls)
+    dt_fs = p_equil["dt_fs"]
+    cumulative_steps: dict = {}
     while True:
         args.data_path = melt_hold_data_path
         args.struct_dump_path = melt_hold_dump_path
@@ -885,9 +951,12 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
 
         if equil_verdict == "EXTEND":
             tau_relax_ps = (((comp or {}).get("chain") or {}).get("ct") or {}).get("tau_relax_ps")
+            ct_decay = (((comp or {}).get("chain") or {}).get("ct") or {}).get(
+                "decay_fraction_at_end")
+            failing = set(verdict.get("failing_binding_gates") or ())
             if getattr(args, "engine_owned_recovery", False):
                 detail = dict(verdict)
-                if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
+                if _tau_is_identifiable(tau_relax_ps, ct_decay):
                     detail["relaxation_time_ns"] = tau_relax_ps / 1000.0
                 return {"halted": True, "reason": "EXTEND", "detail": detail,
                         "melt_data_path": melt_hold_data_path,
@@ -899,48 +968,82 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
             if attempts > EXTEND_MAX_ATTEMPTS:
                 return {"halted": True, "reason": "EXTEND_EXHAUSTED",
                         "detail": {"attempts": attempts}, "stage_checkpoints": stage_checkpoints}
-            # A measured relaxation signal from this run's own data beats a blind flat guess —
-            # tau_relax_ps comes from the comprehensive check's KWW fit.
-            extend_ns = 1.5
-            if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
-                extend_ns = max(1.5, round(1.5 * tau_relax_ps / 1000, 2))
+
+            # WHICH stage to lengthen is decided by WHICH gate failed. A density-SEM failure is
+            # not fixed by more structural relaxation, and an unconverged MSID is not fixed by
+            # more barostatted sampling. Chain-convergence failures extend the NVT hold (and
+            # then regenerate the terminal NPT, which was built from the pre-extension
+            # endpoint); thermo failures extend the terminal NPT alone, with nothing downstream
+            # to restale.
+            structural = failing & CHAIN_CONVERGENCE_GATES
+            target = "nvt_melt_hold" if structural else "npt_melt_hold"
+            base_steps = (p_equil["nvt_melt_min_steps"] if structural
+                          else p_equil["melt_hold_min_steps"])
+            cap_steps = (p_equil["nvt_melt_cap_steps"] if structural
+                         else p_equil["melt_hold_cap_steps"])
+            cumulative = cumulative_steps.get(target) or _first_block_steps(base_steps, dt_fs,
+                                                                           structural)
+            extend_ns, extend_note = _size_extension(tau_relax_ps, ct_decay, cumulative,
+                                                     cap_steps, dt_fs)
+            if extend_ns is None:
+                return {"halted": True, "reason": "EXTEND_EXHAUSTED",
+                        "detail": {"attempts": attempts, "stage": target,
+                                   "cumulative_steps": cumulative, "cap_steps": cap_steps,
+                                   "reason": "cap reached"},
+                        "stage_checkpoints": stage_checkpoints}
+            cumulative_steps[target] = cumulative + int(extend_ns * 1e6 / dt_fs)
             extend_history.append({"attempt": attempts, "trigger": "equil_verdict=EXTEND",
+                                   "failing_gates": sorted(failing), "stage": target,
                                    "extend_ns": extend_ns, "tau_relax_ps": tau_relax_ps,
+                                   "ct_decay_fraction": ct_decay, "sizing": extend_note,
+                                   "cumulative_steps": cumulative_steps[target],
+                                   "cap_steps": cap_steps,
                                    "melt_hold_temp_K": p["npt_prod_temp_K"]})
             with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
                 args.gpu_ids = gpu_ids
-                # TWO steps, and the second is not optional. Every extendable gate is measured on
-                # npt_melt_hold, so step 1 restart-continues that stage's own trajectory (its
-                # .restart, read via read_restart with log/dump appended, so the result is one
-                # continuous trajectory). But nvt_melt_hold -- the handoff cell AND the MSD/C(t)
-                # window -- was built from the PRE-extension endpoint, so it is now stale in both
-                # roles. Step 2 regenerates it from the extended hold. Skipping it would hand
-                # thermal and cooling a cell that is not the one this gate passed.
+                restart = nvt_restart_path if structural else melt_hold_restart_path
                 submission = _submit_equil_chain(
-                    args, cls, lammps, extend_from_data=melt_hold_restart_path,
+                    args, cls, lammps, extend_from_data=restart,
                     extend_temp=p["npt_prod_temp_K"], extend_ns=extend_ns,
-                    extend_base_stage="npt_melt_hold", extend_ensemble="npt")
+                    extend_base_stage=target,
+                    extend_ensemble=("nvt" if structural else "npt"))
                 ext_result = wait_for_run(lammps, submission["chain_id"],
-                                          "melt hold EXTEND (npt_melt_hold)")
+                                          f"melt EXTEND ({target})")
                 if ext_result.get("status") != "completed":
                     raise SystemExit(f"EXTEND chain did not complete: {ext_result}")
-                extended_hold = submission["workflow"]["stages"][0]
-                melt_hold_data_path = extended_hold["output_data"]
-                melt_hold_dump_path = _stage_dump_path(extended_hold)
-                melt_hold_restart_path = extended_hold.get("output_restart")
+                extended = submission["workflow"]["stages"][0]
 
-                regen = _submit_equil_chain(args, cls, lammps, resume_from="npt_melt_hold",
-                                            resume_data_path=melt_hold_data_path)
-                regen_result = wait_for_run(lammps, regen["chain_id"],
-                                            "melt hold EXTEND (nvt_melt_hold regeneration)")
+                if not structural:
+                    # npt_melt_hold is terminal: nothing downstream was built from its old
+                    # endpoint, so one step is enough.
+                    melt_hold_data_path = extended["output_data"]
+                    melt_hold_dump_path = _stage_dump_path(extended)
+                    melt_hold_restart_path = extended.get("output_restart")
+                    melt_start_data_path = melt_hold_data_path
+                    melt_start_restart_path = melt_hold_restart_path
+                    regen_result = {"status": "completed"}
+                else:
+                    # The NVT hold grew, so the terminal NPT was built from a structure that no
+                    # longer exists. Regenerate it -- skipping this would gate a density taken
+                    # from the pre-extension cell and hand that same cell downstream.
+                    nvt_restart_path = extended.get("output_restart")
+                    args.npt_prod_dump = _stage_dump_path(extended)
+                    regen = _submit_equil_chain(args, cls, lammps,
+                                                resume_from="nvt_melt_hold",
+                                                resume_data_path=extended["output_data"])
+                    regen_result = wait_for_run(lammps, regen["chain_id"],
+                                                "melt EXTEND (npt_melt_hold regeneration)")
             if regen_result.get("status") != "completed":
-                raise SystemExit(f"nvt_melt_hold regeneration did not complete: {regen_result}")
-            regen_tail = regen["workflow"]["stages"][-1]
-            melt_start_data_path = regen_tail["output_data"]
-            melt_start_restart_path = regen_tail.get("output_restart")
-            args.npt_prod_dump = _stage_dump_path(regen_tail)
-            stage_checkpoints.update({s["name"]: s["output_data"]
-                                      for s in regen["workflow"]["stages"] if s.get("name")})
+                raise SystemExit(f"npt_melt_hold regeneration did not complete: {regen_result}")
+            if structural:
+                regen_tail = regen["workflow"]["stages"][-1]
+                melt_hold_data_path = regen_tail["output_data"]
+                melt_hold_dump_path = _stage_dump_path(regen_tail)
+                melt_hold_restart_path = regen_tail.get("output_restart")
+                melt_start_data_path = melt_hold_data_path
+                melt_start_restart_path = melt_hold_restart_path
+                stage_checkpoints.update({s["name"]: s["output_data"]
+                                          for s in regen["workflow"]["stages"] if s.get("name")})
             continue
 
         # Structural or protocol failures never trigger an implicit protocol change. Halt with

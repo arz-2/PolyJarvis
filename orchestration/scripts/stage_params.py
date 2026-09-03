@@ -591,6 +591,16 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         atom-count tier default."""
         return _pick(getattr(args, name, None), cls, name, None)
 
+    # The melt holds resolve to CONCRETE step counts here rather than deferring to the
+    # generator, because their ceilings are derived from them (3x the first block) and a
+    # ceiling cannot be computed from None. Unlike the other stages these defaults are not
+    # atom-count tiered -- they are a flat 5 ns of structural relaxation and 2 ns of density
+    # sampling, uniform across every class on purpose. See polymer_rules.json's
+    # _melt_hold_durations_note for why the 21 per-class constants that used to sit here were
+    # removed rather than retuned.
+    melt_hold_min = _step_pick('melt_hold_min_steps') or int(2.0e6 / dt)
+    nvt_melt_min = _step_pick('nvt_melt_min_steps') or int(5.0e6 / dt)
+
     return {
         'data_path': args.data_path,
         'emc_params_path': getattr(args, 'emc_params_path', None),
@@ -618,10 +628,10 @@ def _resolve_equil_params(args, cls: dict) -> dict:
         # The melt tail. npt_melt_ramp is one-shot (ceiling -> melt hold); the two holds are
         # adaptive, first-block/cap pairs like every other adaptive stage.
         'melt_ramp_steps': _step_pick('melt_ramp_steps'),
-        'melt_hold_min_steps': _step_pick('melt_hold_min_steps'),
-        'melt_hold_cap_steps': _step_pick('melt_hold_cap_steps'),
-        'nvt_melt_min_steps': _step_pick('nvt_melt_min_steps'),
-        'nvt_melt_cap_steps': _step_pick('nvt_melt_cap_steps'),
+        'melt_hold_min_steps': melt_hold_min,
+        'melt_hold_cap_steps': _step_pick('melt_hold_cap_steps') or 3 * melt_hold_min,
+        'nvt_melt_min_steps': nvt_melt_min,
+        'nvt_melt_cap_steps': _step_pick('nvt_melt_cap_steps') or 3 * nvt_melt_min,
         'gpu_ids': args.gpu_ids,
         'mpi_ranks': args.mpi_ranks,
         'engine': args.engine,

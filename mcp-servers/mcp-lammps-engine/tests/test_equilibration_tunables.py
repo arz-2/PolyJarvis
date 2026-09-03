@@ -23,7 +23,7 @@ finally:
 FULL_CHAIN_ORDER = [
     "minimize", "nvt_warmup", "npt_densify", "npt_ff_activate", "npt_densify_hold",
     "anneal_heat", "anneal_hold",
-    "npt_melt_ramp", "npt_melt_hold", "nvt_melt_hold",
+    "npt_melt_ramp", "nvt_melt_hold", "npt_melt_hold",
 ]
 
 
@@ -73,11 +73,11 @@ def test_full_chain_order_and_step_counts_forward_correctly(tmp_path):
     assert by_name["npt_melt_ramp"]["params"]["N_STEPS"] == 6666
     assert by_name["npt_melt_ramp"]["params"]["T_START"] == 700.0
     assert by_name["npt_melt_ramp"]["params"]["T_FINAL"] == 550.0
+    assert by_name["nvt_melt_hold"]["params"]["N_STEPS"] == 8888
+    assert by_name["nvt_melt_hold"]["params"]["T_START"] == 550.0
     assert by_name["npt_melt_hold"]["params"]["N_STEPS"] == 7777
     assert by_name["npt_melt_hold"]["params"]["T_START"] == 550.0
     assert by_name["npt_melt_hold"]["params"]["T_FINAL"] == 550.0
-    assert by_name["nvt_melt_hold"]["params"]["N_STEPS"] == 8888
-    assert by_name["nvt_melt_hold"]["params"]["T_START"] == 550.0
     assert all(not stage["params"].get("use_pppm", False) for stage in result["stages"])
 
 
@@ -93,16 +93,17 @@ def test_the_melt_hold_is_npt_and_the_window_after_it_is_nvt(tmp_path):
     assert "P_START" not in by_name["nvt_melt_hold"]["params"]
 
 
-def test_the_two_melt_cells_are_named_explicitly_in_the_return(tmp_path):
-    """Downstream must never have to guess which stage is which by position: the gate reads
-    melt_data_path (npt_melt_hold), everything else reads melt_start_data_path
-    (nvt_melt_hold)."""
+def test_the_melt_cell_is_named_explicitly_in_the_return(tmp_path):
+    """Downstream must never have to guess which stage is which by position. npt_melt_hold is
+    terminal, so the gated cell and the handoff cell are one file, named under both keys."""
     result = server.generate_equilibration_workflow(**_base_kwargs(tmp_path))
     by_name = {stage["name"]: stage for stage in result["stages"]}
     assert result["melt_data_path"] == by_name["npt_melt_hold"]["output_data"]
-    assert result["melt_start_data_path"] == by_name["nvt_melt_hold"]["output_data"]
-    # The handoff cell's box IS the gated cell's, because NVT cannot move it.
-    assert by_name["nvt_melt_hold"]["input_data"] == by_name["npt_melt_hold"]["output_data"]
+    assert result["melt_start_data_path"] == by_name["npt_melt_hold"]["output_data"]
+    # The ordering: the ramp sets the box, the NVT hold relaxes the structure at fixed volume,
+    # the closing NPT corrects the residual and measures the density on a relaxed cell.
+    assert by_name["nvt_melt_hold"]["input_data"] == by_name["npt_melt_ramp"]["output_data"]
+    assert by_name["npt_melt_hold"]["input_data"] == by_name["nvt_melt_hold"]["output_data"]
 
 
 def test_this_chain_never_cools(tmp_path):
@@ -160,22 +161,23 @@ def test_resume_from_a_cooling_stage_is_rejected(tmp_path):
         assert result["status"] == "error", name
 
 
-def test_resume_from_npt_melt_hold_regenerates_only_the_nvt_window(tmp_path):
-    """The melt gate's two-step EXTEND depends on exactly this: after lengthening
-    npt_melt_hold, nvt_melt_hold was built from the PRE-extension endpoint and is stale both
-    as the MSD/C(t) window and as the handoff cell."""
+def test_resume_from_nvt_melt_hold_regenerates_only_the_terminal_npt(tmp_path):
+    """The melt gate's two-step structural EXTEND depends on exactly this: after lengthening
+    nvt_melt_hold, the terminal npt_melt_hold was built from a structure that no longer exists
+    and is stale both as the gated cell and as the handoff cell."""
     checkpoint = str(REPO_ROOT / "hardware" / "CALIB_PCFF" / "emc_build.data")
     result = server.generate_equilibration_workflow(
-        **_base_kwargs(tmp_path, data_file=checkpoint, resume_from="npt_melt_hold")
+        **_base_kwargs(tmp_path, data_file=checkpoint, resume_from="nvt_melt_hold")
     )
     assert result["status"] == "success", result
-    assert result["run_order"] == ["nvt_melt_hold"]
+    assert result["run_order"] == ["npt_melt_hold"]
     assert result["stages"][0]["input_data"] == checkpoint
+    assert result["melt_data_path"] == result["stages"][0]["output_data"]
     assert result["melt_start_data_path"] == result["stages"][0]["output_data"]
 
 
 _CHECKPOINTS = ["nvt_warmup", "npt_densify", "npt_ff_activate", "npt_densify_hold",
-                "anneal_hold", "npt_melt_ramp", "npt_melt_hold"]
+                "anneal_hold", "npt_melt_ramp", "nvt_melt_hold"]
 
 # Maps each resume_from checkpoint name to the LAST concrete stage name it bundles (the point
 # after which generation resumes) -- e.g. "anneal_hold" bundles anneal_heat+anneal_hold, so
