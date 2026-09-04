@@ -176,9 +176,12 @@ def resolve_member_value(cls: dict, value_field: str, smiles: str):
 
 
 def resolve_ff_family(ff_raw: str, hp: dict) -> str:
-    """Map a force-field name to a by_forcefield family key
-    (pcff | opls | trappe | gaff) via hardware_policy.ff_aliases, with a substring
-    fallback. Used by stage_params.resolve_hardware and any consumer keying on FF family."""
+    """Map a force-field name to a by_forcefield family key (pcff | opls | trappe | gaff).
+
+    hardware_policy.ff_aliases names every field forcefield.RUNNABLE_FIELDS can select, pinned
+    by test_every_runnable_field_has_an_explicit_hardware_family. The substring chain below is
+    the last resort for a name from outside that set -- it is not the routing table, and it
+    once masked an alias table whose display-cased keys had stopped matching entirely."""
     fam = hp.get("ff_aliases", {}).get(ff_raw) or hp.get("ff_aliases", {}).get(ff_raw.upper())
     if fam is None:
         fl = ff_raw.lower()

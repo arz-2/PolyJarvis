@@ -282,3 +282,15 @@ def test_a_scaffold_plan_still_names_an_unverified_blocker():
 def test_a_clean_scaffold_plan_claims_no_blocker():
     plan = mdp.make_plan("t", "PSTR", _CLEAN, {"density"})
     assert not [a for a in plan["assumptions"] if a.startswith("D-01_ff UNVERIFIED")]
+
+
+def test_every_runnable_field_has_an_explicit_hardware_family():
+    """resolve_ff_family's substring chain is a last resort, not the routing table. The alias
+    keys were display-cased ("TraPPE-UA", "GAFF2_mod") and stopped matching once the class
+    values were canonicalized -- silently, because the fallback happened to agree."""
+    from rules_common import hardware_policy, resolve_ff_family
+    aliases = hardware_policy(load_rules()).get("ff_aliases", {})
+    missing = sorted(f for f in sf.RUNNABLE_FIELDS if f not in aliases)
+    assert not missing, f"no explicit hardware family for {missing}"
+    families = {resolve_ff_family(f, {"ff_aliases": aliases}) for f in sf.RUNNABLE_FIELDS}
+    assert families <= {"pcff", "opls", "trappe", "gaff"}
