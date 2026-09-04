@@ -137,6 +137,26 @@
         "why_trappe_cannot_be_patched_cleanly": "Checked against the installed trappe/2014/trappe-ua.prm. The torsion across a DIsubstituted C=C exists (ITEM TORSION 'c* c3h c3h c*'), which is why PBD builds; there is no row with c3h/c3 as the central pair, and ITEM EQUIVALENCE_AUTO maps c3 to itself in the torsion column, so no fallback reaches one. Copying the disubstituted values onto the trisubstituted case would assert the two have the same torsional barrier -- a physical claim about chain stiffness, not a transcription. That is invention, and is exactly the kind of row this file's PEST/PURT entries already refuse to write.",
         "bearing_on_options": "Option 1 (route substituted dienes to PCFF) is now evidence-backed rather than a hypothesis needing admissibility testing -- the test has been run. Option 2 (author the TraPPE torsion rows) is ruled out on the no-invented-numbers standard. Option 3 (mark PI unsupported) remains the smallest honest step while option 1 is unimplemented: preferred_ff is class-level today, so splitting PDIE's field by member needs a per-member routing mechanism that does not exist yet.",
         "not_done": "No routing change made. Recorded as evidence only, so the probe does not have to be re-run to make the decision."
+      },
+      "literature_resolution_2026-09-02": {
+        "question": "Are the missing trisubstituted-alkene torsions published anywhere, so they could be transcribed into emc_fields/ rather than invented?",
+        "answer": "Not in TraPPE. They are published, in a different force field.",
+        "trappe_checked_at_source": {
+          "Wick2000_TraPPE4_10.1021/jp001044x": "Table 4 carries CHx-CH2-CH2-CHy, CHx-CH2-CH=CHy, and CHx-CH=CH-CHy cis/trans (harmonic, d0=12400/13400 K). All DIsubstituted. C(sp2) was parametrized from 2-methylpropene only, where no through-chain torsion across it is needed.",
+          "Maerzke2009_acrylates_10.1021/jp810558v": "Fit the C(sp2) site to isoprene and added the MONOMER conjugated-diene torsion CH2=CH-C(sp2)-CH3 (a0=1861.27, a1=-349.97). EMC already carries exactly this row -- trappe/2014/trappe-ua.prm 'c3* c3* c3h c4*' 1861/-349.97. It is not the term polyisoprene needs, which is the dihedral about a trisubstituted C=C inside the chain (EMC asks for c4h2:c3h:c3:c4h2 and c4h2:c3h:c3:c4h3)."
+        },
+        "where_the_parameters_do_exist": {
+          "Harmandaris2002_cis-1,4-PI_10.1063/1.1416872": "J. Chem. Phys. 116, 436-446. Table I(b) gives the complete UA set: bending (CH2-C=CH 125.9 deg), a HARMONIC DIHEDRAL C(2)-CH(3)-CH2(4) with phi0=160 deg -- the term EMC reports missing -- and torsional potentials for the backbone.",
+          "Faller2001_trans-PI_10.1021/ma0016782": "Macromolecules 34, 1436-1448. Table 2, force-field parameters for the torsion angles of trans-PI, fit to quantum-chemical energies.",
+          "Sharma2016_validation_10.1021/acs.jpcb.5b10789": "Validated and QC-refined those force fields for cis/trans PI and PB against Tg, density, thermal expansion (cis-PI alpha 5.1e-4 vs exp 6.7-7.5e-4, better than the original 10e-4), Rg, end-to-end distance and BULK MODULUS. This is the paper polymer_rules.json already cites for PDIE -- and it validates Harmandaris/Faller, NOT TraPPE-UA, which is what the class is routed to."
+        },
+        "why_transcription_into_trappe_is_still_refused": "Harmandaris/Faller are a self-consistent force field with their own LJ parameterization (epsilon in kcal/mol, r_min 3.8 A for C) that is not TraPPE's (epsilon/kB in K, sigma). Lifting their dihedrals into trappe-ua.prm mixes two fields -- the same transplant this file already refuses for PEST and PURT, and the failure mode Turney 2025 (10.1021/acs.macromol.5c01166) names directly: 'parameter proliferation, loss of transferability, and importantly poor reproducibility, since new parameters are often generated using different methods from those used in the original force field.'",
+        "clean_options_remaining": [
+          "Route substituted dienes to PCFF. Measured to build polyisoprene to a runnable cell (forcefield.py capability, typing_evidence=built_cell). Zero invention, but no PI-specific PCFF validation exists.",
+          "Register Harmandaris/Faller as a NEW EMC field rather than patching TraPPE. Zero invention, and it is the only route with published PI Tg + density + bulk-modulus validation. Cost: authoring EMC .prm/.top/.define for a field that has none.",
+          "Mark PI unsupported in member_smiles so it stops presenting as available."
+        ],
+        "mechanism_status_2026-09-04": "Option 1 is no longer blocked on missing machinery. The mechanized_recheck entry above says 'splitting PDIE's field by member needs a per-member routing mechanism that does not exist yet' -- that was true when written. forcefield.select_by_moiety now resolves D-01 per SMILES and writes decided_params.preferred_ff, and the class key is a literature prior (ff_accuracy_prior) that routes nothing. Routing substituted dienes to PCFF is now a rules change, not a build. The scientific question -- no PI-specific PCFF validation exists -- is unchanged and is still what this decision turns on."
       }
     },
     {
