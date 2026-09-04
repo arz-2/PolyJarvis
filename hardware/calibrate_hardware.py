@@ -177,22 +177,66 @@ def _repo_rel(path) -> str | None:
         return str(path)
 
 
-def _carry_provenance(prior_probe: dict, probe: dict) -> None:
-    """Carry hand-authored provenance sub-blocks (e.g. kokkos_offload_study) across a fresh
-    directional_probe rebuild. Those record cross-host engine rationale that isn't re-derived
-    by a throughput sweep, so wiping them on every calibration would lose real history."""
-    for key in ("kokkos_offload_study", "size_points"):
+def _same_host(prior: dict | None, live: dict) -> bool:
+    """Whether a PREVIOUSLY RECORDED hardware_policy.host is the box we are on now. Same
+    GPU-model/count/core comparison hardware_runtime.host_matches uses (loose model match,
+    because nvidia-smi and the saved name format the same card differently). A missing or
+    empty prior host means the policy was never calibrated anywhere -> not this host."""
+    if not prior:
+        return False
+    return (hardware_runtime._gpu_model_matches(live.get("gpu_model", ""),
+                                                prior.get("gpu_model", ""))
+            and live.get("gpus") == prior.get("gpus")
+            and live.get("phys_cores") == prior.get("phys_cores"))
+
+
+def _carry_provenance(prior_probe: dict, probe: dict, same_host: bool) -> str | None:
+    """Carry hand-authored provenance sub-blocks across a fresh directional_probe rebuild,
+    and return a note about anything deliberately DROPPED (None when nothing was).
+
+    Two different kinds of block live here and they do NOT travel the same way:
+
+      kokkos_offload_study — hand-authored engine RATIONALE (why class2+PPPM wants full
+        offload while small UA cells do not). That reasoning is about interaction styles,
+        not about one box, and is not re-derived by a throughput sweep, so it always
+        survives; wiping it on every calibration would lose real history.
+
+      size_points — MEASURED ns/day at several atom counts, i.e. this box's throughput
+        curve. It must NOT survive a move to different hardware. select_hardware's
+        _size_points() prefers these points over the freshly measured single point AND
+        reports "high" confidence once hardware_policy.host matches -- and `host` is
+        overwritten by this same calibration. Carrying them across a host change would
+        therefore make the cost model quote the OLD machine's curve, at high confidence,
+        on hardware it never ran on. Dropped on a host change; estimate_ns_per_day then
+        falls back to the single measured point and honestly reports lower confidence.
+    """
+    for key in ("kokkos_offload_study",):
         if key in prior_probe:
             probe[key] = prior_probe[key]
+
+    if "size_points" not in prior_probe:
+        return None
+    if same_host:
+        probe["size_points"] = prior_probe["size_points"]
+        return None
+    prior_measured_on = prior_probe.get("measured_on", "an unrecorded host")
+    return (f"size_points DROPPED: those ns/day-vs-atoms points were measured on "
+            f"{prior_measured_on}, not this box, and the cost model would otherwise have "
+            f"quoted that machine's throughput curve here at high confidence. Cost estimates "
+            f"now fall back to the single measured point per family (lower confidence). "
+            f"Re-measure with: hardware/calibrate_hardware.py --revalidate --size-points")
 
 
 def ingest(host: dict, per_ff: dict, date: str, clean: bool) -> None:
     hp = json.loads(RULES.read_text())["hardware_policy"]
-    hp["host"] = host
+    prior_host = hp.get("host")                   # read BEFORE overwriting — _carry_provenance
+    hp["host"] = host                             # needs to know if the box actually changed
     prior_probe = hp.get("directional_probe", {})
     probe = {}                                    # rebuild fresh — drop any stale prior-box keys
     hp["directional_probe"] = probe
-    _carry_provenance(prior_probe, probe)
+    dropped = _carry_provenance(prior_probe, probe, _same_host(prior_host, host))
+    if dropped:
+        probe["carry_over_note"] = dropped
     probe["measured_on"] = (f"{host['gpus']}x {host['gpu_model']} / "
                             f"{host['phys_cores']} phys cores (calibrate_hardware.py)")
     probe["date"] = date
@@ -348,11 +392,14 @@ def ingest_revalidate(host: dict, records: list[dict], st: dict, date: str) -> b
     fallback, and the CPU was uncontended. Engine CHOICES are unchanged (revalidate confirms,
     it does not re-decide). Returns the clean flag."""
     hp = json.loads(RULES.read_text())["hardware_policy"]
+    prior_host = hp.get("host")                   # read BEFORE overwriting (see _carry_provenance)
     hp["host"] = host
     prior_probe = hp.get("directional_probe", {})
     probe: dict = {}
     hp["directional_probe"] = probe
-    _carry_provenance(prior_probe, probe)
+    dropped = _carry_provenance(prior_probe, probe, _same_host(prior_host, host))
+    if dropped:
+        probe["carry_over_note"] = dropped
     probe["measured_on"] = (f"{host['gpus']}x {host['gpu_model']} / "
                             f"{host['phys_cores']} phys cores (calibrate_hardware.py --revalidate)")
     probe["date"] = date
