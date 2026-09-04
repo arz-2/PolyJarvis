@@ -146,7 +146,8 @@ def _d04_choice(cls: dict, smiles: str | None, field: str = None) -> str:
     return f"DP={dp}, nchain={nchain}"
 
 
-def build_decisions(cls: dict, smiles: str | None = None, field: str = None) -> list:
+def build_decisions(cls: dict, smiles: str | None = None, field: str = None,
+                    resolution: dict = None) -> list:
     """Structured default decision rows carrying evidence/confidence/alternatives, mirroring
     run_summary.json decision IDs. Evidence is transcribed from existing class fields.
 
@@ -170,10 +171,15 @@ def build_decisions(cls: dict, smiles: str | None = None, field: str = None) -> 
 
     conf = "class_default"
     return [
-        {"id": "D-01_ff", "choice": _field_of(cls, field),
+        {"id": "D-01_ff",
+         "choice": resolution["field"] if resolution else _field_of(cls, field),
          "criteria_evaluated": criteria.get("D-01_ff", []),
          "evidence": ff_evidence, "confidence": conf,
-         "alternatives": cls.get("forcefield_alternatives", [])},
+         "alternatives": cls.get("forcefield_alternatives", []),
+         # Only when a trial build actually ran: validate_run_plan's ff_no_admissible_field
+         # gate keys off this, and an unprobed [] would read as "nothing types this SMILES".
+         **({"admissible": [resolution["field"]] if resolution["field"] else []}
+            if (resolution or {}).get("probed") else {})},
         {"id": "D-02_charges", "choice": cls.get("charge_method"),
          "criteria_evaluated": criteria.get("D-02_charges", []),
          "evidence": [], "confidence": conf, "alternatives": []},
@@ -269,6 +275,40 @@ def _assert_tg_rates_feasible(cls: dict, polymer_class: str) -> None:
         )
 
 
+def _ff_screen_assumptions(resolution) -> list:
+    """One line when the moiety screen found a measured blocker that nothing verified.
+
+    Without this a scaffold plan carries the screen result nowhere: build_decisions' D-01 row
+    transcribes class fields only and has no parameter_coverage entry to put it in.
+    """
+    if not resolution or not resolution.get("blockers") or resolution.get("probed"):
+        return []
+    ids = [b["id"] for b in resolution["blockers"]]
+    return [f"D-01_ff UNVERIFIED: guides/ff_moiety_rules.json matched {ids} in this repeat "
+            f"unit, groups measured to block every registered EMC field. No trial build was "
+            f"run (--with-ff-probe off), so {resolution['prior']!r} is asserted, not measured."]
+
+
+def resolve_d01(cls: dict, smiles, with_ff_probe: bool = False) -> tuple:
+    """(field_for_sizing, resolution). D-01's answer for this SMILES.
+
+    The moiety screen always runs -- it is one RDKit round trip and no trial build -- so even a
+    scaffold plan knows whether its chemistry has a measured blocker. `with_ff_probe` adds the
+    real EMC trial build that turns the screen into a measurement.
+
+    The returned field is never None: D-04 and D-08 still have to size and price something. A
+    resolution that typed nothing says so in resolution["field"], and D-01 refuses on that.
+    """
+    prior = cls.get("ff_accuracy_prior")
+    if not smiles:
+        return prior, None
+    try:
+        resolution = forcefield.select_by_moiety(smiles, prior, probe=with_ff_probe)
+    except Exception:  # noqa: BLE001 -- a broken screen must not block planning
+        return prior, None
+    return resolution["field"] or prior, resolution
+
+
 def size_the_cell(polymer_class: str, smiles, properties: set,
                   size_solve: dict | None = None, field: str = None) -> tuple[dict, list]:
     """(dp_typical/nchain for decided_params, assumptions) -- the cell, resolved per-SMILES.
@@ -309,17 +349,17 @@ def size_the_cell(polymer_class: str, smiles, properties: set,
 
 
 def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
-              size_solve: dict | None = None) -> dict:
+              size_solve: dict | None = None, with_ff_probe: bool = False) -> dict:
     rules = load_rules()
     if polymer_class.upper() not in rules.get("classes", {}):
         raise ValueError(f"unknown polymer class {polymer_class!r}")
     cls = get_class_entry(rules, polymer_class)
     _assert_tg_rates_feasible(cls, polymer_class.upper())
     decided_params = {k: cls[k] for k in SNAPSHOT_KEYS if k in cls}
-    # D-01: decided_params.preferred_ff is the field this run BUILDS with. It starts as the
-    # class ff_accuracy_prior and is re-resolved per SMILES by decision_rows(); this scaffold
-    # path runs no probe, so the prior stands and D-01's parameter_coverage stays NOT MEASURED.
-    field = cls.get("ff_accuracy_prior")
+    # D-01: decided_params.preferred_ff is the field this run BUILDS with, resolved per SMILES.
+    # It is never None -- a resolution that typed nothing refuses through the D-01 row's
+    # admissible=[] instead, so the cell is still sized and priced against a real field.
+    field, ff_resolution = resolve_d01(cls, smiles, with_ff_probe)
     decided_params["preferred_ff"] = field
     sized, size_assumptions = size_the_cell(polymer_class, smiles, properties, size_solve, field)
     decided_params.update(sized)
@@ -345,6 +385,10 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
         "dominant": True,
         "reduction_probe": "planning_agent_review",
     }]
+    prior_ack = _ff_prior_uncertainty(polymer_class.upper(), cls.get("ff_accuracy_prior"),
+                                      (ff_resolution or {}).get("field", field), ff_resolution)
+    if prior_ack:
+        uncertainties.append(prior_ack)
     return {
         "schema_version": "1.0",
         "goal": f"Predict {', '.join(sorted(properties))} for {polymer_class.upper()}"
@@ -358,10 +402,11 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
         "assumptions": size_assumptions + [
             "polymer_rules.json class defaults are a starting hypothesis pending "
             "scientific-agent review.",
-        ],
+        ] + ([prior_ack["detail"]] if prior_ack else [])
+          + _ff_screen_assumptions(ff_resolution),
         "uncertainties": uncertainties,
         "decided_params": decided_params,
-        "decisions": build_decisions(cls, smiles, field),
+        "decisions": build_decisions(cls, smiles, field, ff_resolution),
         "planned_stages": build_planned_stages(cls, properties, smiles),
         "critique": {"status": "pending_scientific_review", "rounds": 0, "findings": []},
         "provenance": {"generator": "make_deterministic_plan.py",
@@ -920,16 +965,11 @@ def make_decision(polymer_class: str, smiles: str, properties: set, *,
     # only) and to D-08 (engine/MPI defaults are per FF family), so it cannot be read off the
     # class entry by each of them independently.
     prior = cls.get("ff_accuracy_prior")
-    try:
-        resolution = forcefield.select_by_moiety(smiles, prior, probe=with_ff_probe)
-        # D-04/D-08 still have to price and size something even when nothing types, so they
-        # fall back to the prior; D-01 keeps the None and refuses.
-        field = resolution["field"] or prior
-        resolvers["forcefield.select_by_moiety"] = (
-            f"ok ({'probed ' + ', '.join(resolution['probed']) if resolution['probed'] else 'screen only'})")
-    except Exception as e:  # noqa: BLE001 -- a broken screen must not block planning
-        resolution, field = None, prior
-        resolvers["forcefield.select_by_moiety"] = f"error: {e}"
+    field, resolution = resolve_d01(cls, smiles, with_ff_probe)
+    resolvers["forcefield.select_by_moiety"] = (
+        "error: screen unavailable" if resolution is None
+        else f"ok (probed {', '.join(resolution['probed'])})" if resolution["probed"]
+        else "ok (screen only)")
 
     # Same argument shape materialize_plan uses, so default_choice and decided_params can't drift.
     try:
@@ -1032,7 +1072,8 @@ def _cmd_run_plan(args) -> int:
     properties = _properties_from_arg(args.properties)
     cache_path = Path(args.cache_path) if args.cache_path else None
     plan = (_try_cache(args.run_name, args.polymer_class, args.smiles, properties, cache_path)
-            or make_plan(args.run_name, args.polymer_class, args.smiles, properties))
+            or make_plan(args.run_name, args.polymer_class, args.smiles, properties,
+                         with_ff_probe=args.with_ff_probe))
     text = json.dumps(plan, indent=2)
 
     if args.out == "-":

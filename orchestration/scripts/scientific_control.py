@@ -413,6 +413,15 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
                 row["evidence"] = list(evaluation["evidence"])
             if "alternatives" in evaluation:
                 row["alternatives"] = list(evaluation["alternatives"])
+            if row["id"] == "D-01_ff":
+                # The decision tool measured this; build_decisions above only transcribes class
+                # fields and would quietly restore the prior. Without both keys a plan whose
+                # SMILES types under no field builds anyway and dies in EMC, which is the whole
+                # failure this resolution exists to prevent.
+                if "admissible" in evaluation:
+                    row["admissible"] = list(evaluation["admissible"])
+                if "default_choice" in evaluation:
+                    row["choice"] = evaluation["default_choice"]
         if auto_filled and row["id"] == "D-04_system_size":
             row["evidence"] = list(row.get("evidence") or []) + [
                 {"claim": reason} for reason in size_solve.get("recommendation_reasons", [])]

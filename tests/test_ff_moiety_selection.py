@@ -235,3 +235,50 @@ def test_match_moieties_refuses_both_or_neither_input():
     r = subprocess.run([sys.executable, cli, "match-moieties"],
                        capture_output=True, text=True, timeout=60)
     assert r.returncode == 1 and "exactly one" in r.stdout
+
+
+# ─── the refusal has to survive every layer that rebuilds the row ─────────────────────
+
+def test_the_refusal_survives_materialize_plan(monkeypatch):
+    """materialize_plan re-derives plan["decisions"] from build_decisions, which transcribes
+    class fields only. Without carrying D-01's measured choice AND admissible set through,
+    a SMILES that types under no field silently gets the class prior back and dies in EMC --
+    the exact failure this resolution exists to prevent."""
+    monkeypatch.setattr(sf, "check_typing", lambda *a, **k: {"types_smiles": False})
+    decision = mdp.make_decision("PSTR", _BLOCKED, {"density"}, with_ff_probe=True)
+    d01 = decision["decision_evaluations"]["D-01_ff"]
+    assert d01["default_choice"] is None and d01["admissible"] == []
+
+    intent = sc.ScientificIntent(run_name="t", goal="g", smiles=_BLOCKED,
+                                 requested_properties=("density",), polymer_class_hint="PSTR")
+    plan = sc.materialize_plan(
+        intent, sc.PlanDecision.from_dict(dict(decision, confidence="medium")))
+    row = next(r for r in plan["decisions"] if r["id"] == "D-01_ff")
+    assert row["choice"] is None
+    assert row["admissible"] == []
+    # and the cell is still sized/priced against a real field, not None
+    assert plan["decided_params"]["preferred_ff"] == "pcff"
+
+
+def test_a_plan_that_types_nowhere_is_refused_by_the_validator(monkeypatch):
+    import validate_run_plan as vrp
+    monkeypatch.setattr(sf, "check_typing", lambda *a, **k: {"types_smiles": False})
+    plan = mdp.make_plan("t", "PSTR", _BLOCKED, {"density"}, with_ff_probe=True)
+    checks = {f["check"] for f in vrp._forcefield_findings(plan)}
+    assert "ff_no_admissible_field" in checks
+
+
+def test_a_scaffold_plan_still_names_an_unverified_blocker():
+    """No probe means nothing was measured -- but the screen already ran, and a plan that
+    stayed silent about a matched blocker would hide the one fact it does know."""
+    plan = mdp.make_plan("t", "PSTR", _BLOCKED, {"density"})
+    unverified = [a for a in plan["assumptions"] if a.startswith("D-01_ff UNVERIFIED")]
+    assert unverified and "carbonyl_adjacent_N" in unverified[0]
+    row = next(r for r in plan["decisions"] if r["id"] == "D-01_ff")
+    assert "admissible" not in row       # nothing was measured, so claim nothing
+    assert row["choice"] == "pcff"
+
+
+def test_a_clean_scaffold_plan_claims_no_blocker():
+    plan = mdp.make_plan("t", "PSTR", _CLEAN, {"density"})
+    assert not [a for a in plan["assumptions"] if a.startswith("D-01_ff UNVERIFIED")]
