@@ -163,6 +163,26 @@ ITEM END
 # Pipeline steps
 # ---------------------------------------------------------------------------
 
+EMC_LOG_NAME = "emc_build.log"
+
+
+def _append_log(work_dir: Path, step: str, cmd, returncode: int, output: str) -> None:
+    """Append one build step's real output to <work_dir>/emc_build.log.
+
+    Both EMC steps captured their output only to raise it on failure, so a SUCCESSFUL build
+    left no record of what the toolchain said -- including the per-pair "increment pair {X, Y}
+    not found" warnings that are exactly how a silently zeroed coefficient announces itself.
+    Never raises: losing the log must not lose the cell.
+    """
+    try:
+        with (Path(work_dir) / EMC_LOG_NAME).open("a") as fh:
+            fh.write(f"$ {' '.join(str(c) for c in cmd)}\n")
+            fh.write(f"# exit {returncode}\n")
+            fh.write((output or "").rstrip() + "\n\n")
+    except OSError:
+        pass
+
+
 def run_emc_setup(
     esh_path: Path,
     field: str = "pcff",
@@ -195,6 +215,7 @@ def run_emc_setup(
         stderr=subprocess.STDOUT,
         text=True,
     )
+    _append_log(esh_path.parent, "emc_setup.pl", cmd, proc.returncode, proc.stdout)
     if proc.returncode != 0:
         raise RuntimeError(
             f"emc_setup.pl exited {proc.returncode} on {esh_path.name}:\n"
@@ -220,14 +241,17 @@ def run_emc_build(build_emc: Path) -> Path:
     Returns the path to the generated .data file.
     """
     env = {**os.environ, "EMC_ROOT": str(EMC_ROOT)}
+    cmd = [str(EMC_BIN), str(build_emc.name)]
     result = subprocess.run(
-        [str(EMC_BIN), str(build_emc.name)],
+        cmd,
         cwd=build_emc.parent,
         env=env,
         check=False,
         capture_output=True,
         text=True,
     )
+    _append_log(build_emc.parent, "emc", cmd, result.returncode,
+                (result.stdout or "") + (result.stderr or ""))
 
     if result.returncode != 0:
         # A negative returncode is a signal kill (typically SIGSEGV when a monomer hits the

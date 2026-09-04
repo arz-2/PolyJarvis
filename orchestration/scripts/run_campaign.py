@@ -241,6 +241,22 @@ def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNames
 
 # ─── Stage: build ───────────────────────────────────────────────────────────
 
+def _place(src, dest: Path) -> None:
+    """Put a build product at `dest`, without a pointless second copy of a 4 MB .data.
+
+    EMC now writes into the attempt's own cell directory, so `src` is usually already there
+    under EMC's fixed name (emc_build.data) and this is a rename. A caller that pointed EMC
+    somewhere else still gets a copy.
+    """
+    src = Path(src)
+    if src.resolve() == dest.resolve():
+        return
+    if src.parent.resolve() == dest.parent.resolve():
+        os.replace(src, dest)
+    else:
+        shutil.copy(src, dest)
+
+
 def _ff_provenance(cell_dir: Path, field: str, params_path) -> dict:
     """Classify every coefficient this build actually emitted against the installed field.
 
@@ -297,11 +313,19 @@ def do_build(args, cls: dict, emc, lammps) -> dict:
     emc_seed = (p["emc_seed"] if p["emc_seed"] is not None else
                 1 + int(hashlib.sha256(args.run_name.encode()).hexdigest(), 16) % 999_999)
 
+    # EMC writes straight into this run's own build attempt. Until 2026-09-04 it wrote to
+    # ~/polyjarvis_emc_jobs/<job_id>/ -- outside the repo entirely -- and do_build copied only
+    # the .data and .params out, so the .esh that the whole build turns on, the generated
+    # build.emc and emc_build.in, and EMC's own log were never part of the run at all.
+    # resolve(): the engine always hands an absolute attempt_dir, but submit_emc_cell_job
+    # rejects a relative output_dir and this must not depend on the caller getting it right.
+    cell_dir = (work_dir / "cell").resolve()
+    cell_dir.mkdir(parents=True, exist_ok=True)
     job = emc.submit_emc_cell_job(
         smiles=p["smiles"], polymer_class=args.polymer_class.upper(),
         dp=p["dp"], nchains=p["nchain"], density_initial=p["density_initial_gcm3"],
         temperature=p["build_temperature_K"], seed=emc_seed,
-        field_override=p["preferred_ff"],
+        field_override=p["preferred_ff"], output_dir=str(cell_dir),
     )
     if job.get("error"):
         raise SystemExit(f"submit_emc_cell_job failed: {job['error']}")
@@ -327,10 +351,8 @@ def do_build(args, cls: dict, emc, lammps) -> dict:
             f"{job_output.get('error') or status}. Working files: {job.get('output_dir')}")
     out = job_output["result"]
 
-    cell_dir = work_dir / "cell"
-    cell_dir.mkdir(parents=True, exist_ok=True)
     dest_data = cell_dir / "cell.data"
-    shutil.copy(out["data_path"], dest_data)
+    _place(out["data_path"], dest_data)
     # get_emc_job_output's result has no "params_path" key (only "output_dir") -- EMC always
     # writes the coefficients file as "emc_build.params" (fixed filename -- see
     # smiles_to_emc.py's "'emc_build' never collides with the cluster name" comment) inside
@@ -340,13 +362,19 @@ def do_build(args, cls: dict, emc, lammps) -> dict:
     src_params_matches = sorted(Path(out["output_dir"]).glob("*.params"))
     if src_params_matches:
         dest_params = cell_dir / "emc_build.params"
-        shutil.copy(src_params_matches[0], dest_params)
+        _place(src_params_matches[0], dest_params)
 
     base_outputs = {
         "data_path": str(dest_data),
         "emc_params_path": str(dest_params) if dest_params else None,
         "emc_seed": emc_seed,
         "lammps_flags": out["lammps_flags"],
+        # The build's own inputs and log, recorded so the manifest names them rather than
+        # leaving them to be found by walking the attempt directory.
+        "emc_inputs": {name: str(cell_dir / name)
+                       for name in ("emc_build.esh", "build.emc", "emc_build.in",
+                                    "emc_build.log", "emc_metadata.json")
+                       if (cell_dir / name).is_file()},
     }
 
     # Force-field provenance, before the cell is worth spending MD on. Uses the field EMC

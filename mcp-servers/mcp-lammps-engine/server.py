@@ -31,6 +31,7 @@ Tools exposed:
   17. extract_bulk_modulus              - Isothermal K via NPT volume fluctuations
 """
 
+import getpass
 import os
 import sys
 import json
@@ -67,15 +68,19 @@ logging.basicConfig(
 logger = logging.getLogger("lammps_engine")
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-LAMBDA_USER     = os.environ.get("LAMBDA_USER",    "arz2")
-LAMBDA_WORKDIR  = os.environ.get("LAMBDA_WORKDIR", f"/home/{LAMBDA_USER}/simulations")
-LAMBDA_LAMMPS   = os.environ.get("LAMBDA_LAMMPS",  f"/home/{LAMBDA_USER}/lammps-install/bin/lmp")
+# Default to the INVOKING user / their real home rather than a baked-in username + /home/<user>
+# guess: the latter is wrong on any box where the account differs or homes are not under /home
+# (macOS, /Users; clusters, /nfs/home). Every value stays env-overridable via .mcp.json.
+LAMBDA_USER     = os.environ.get("LAMBDA_USER",    getpass.getuser())
+_LAMBDA_HOME    = Path(os.path.expanduser(f"~{LAMBDA_USER}"))
+LAMBDA_WORKDIR  = os.environ.get("LAMBDA_WORKDIR", str(_LAMBDA_HOME / "simulations"))
+LAMBDA_LAMMPS   = os.environ.get("LAMBDA_LAMMPS",  str(_LAMBDA_HOME / "lammps-install/bin/lmp"))
 # KOKKOS full-offload binary (pair + class2 bonded + pppm + neigh on GPU). Separate prefix so the
 # GPU-package binary above stays the production fallback; selected per run via engine="kokkos".
 LAMBDA_LAMMPS_KOKKOS = os.environ.get("LAMBDA_LAMMPS_KOKKOS",
-                                      f"/home/{LAMBDA_USER}/lammps-install-kokkos/bin/lmp")
+                                      str(_LAMBDA_HOME / "lammps-install-kokkos/bin/lmp"))
 CONDA_ENV       = os.environ.get("CONDA_ENV",      "mol-builder")
-_openmpi_home = f"/home/{LAMBDA_USER}/openmpi"
+_openmpi_home = str(_LAMBDA_HOME / "openmpi")
 _sys_openmpi_bin = "/usr/bin"
 _sys_openmpi_lib = "/usr/lib/x86_64-linux-gnu"
 _sys_openmpi_prefix = "/usr"
@@ -220,8 +225,31 @@ class JobStatus(Enum):
     COMPLETED = "completed"
     FAILED    = "failed"
 
-# Persist run state here so chains survive server restarts
-STATE_FILE = Path.home() / "Desktop" / "Research" / "mcp-lammps-engine" / "run_state.json"
+# Persist run state here so chains survive server restarts. This lives INSIDE the repo: the
+# previous default was a personal ~/Desktop/... path that does not exist on a headless box or
+# a fresh clone, and writing run state outside the checkout means a run's own history is not
+# part of the run. Still env-overridable.
+#
+# The old location is not orphaned -- it is migrated once, on first startup, when the new file
+# does not yet exist. Copy, never move: another checkout may still be reading it.
+STATE_FILE = Path(os.environ.get(
+    "LAMMPS_ENGINE_STATE_FILE",
+    Path(__file__).resolve().parents[2] / "data" / "_engine" / "run_state.json"))
+_LEGACY_STATE_FILE = Path.home() / "Desktop" / "Research" / "mcp-lammps-engine" / "run_state.json"
+
+
+def _migrate_legacy_state() -> None:
+    if STATE_FILE.exists() or not _LEGACY_STATE_FILE.is_file():
+        return
+    try:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(_LEGACY_STATE_FILE, STATE_FILE)
+        logger.info("Migrated run state from %s to %s", _LEGACY_STATE_FILE, STATE_FILE)
+    except OSError as exc:
+        logger.warning("Could not migrate run state from %s: %s", _LEGACY_STATE_FILE, exc)
+
+
+_migrate_legacy_state()
 
 class RunManager:
     def __init__(self):

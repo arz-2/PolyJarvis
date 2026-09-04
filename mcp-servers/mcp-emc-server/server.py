@@ -52,7 +52,12 @@ logger = logging.getLogger("emc_server")
 # Job storage root
 # ---------------------------------------------------------------------------
 
-JOBS_ROOT = Path(os.environ.get("EMC_JOBS_DIR", Path.home() / "polyjarvis_emc_jobs"))
+# Inside the repo, never $HOME: a build writes ~5 MB of .esh/build.emc/.data/.params per
+# cell, and those are simulation artifacts that belong with the run that produced them.
+# do_build passes an explicit output_dir (the build attempt's own cell directory), so this
+# root is only the fallback for a direct tool call with no run to attach to.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+JOBS_ROOT = Path(os.environ.get("EMC_JOBS_DIR", REPO_ROOT / "data" / "_emc_jobs"))
 JOBS_ROOT.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -394,6 +399,7 @@ def submit_emc_cell_job(
     seed: int,
     temperature: float = 300.0,
     field_override: str = "",
+    output_dir: str = "",
 ) -> dict:
     """
     Build an amorphous polymer cell with EMC and return a LAMMPS .data file.
@@ -442,6 +448,12 @@ def submit_emc_cell_job(
                          it silently fails to type many chemistries — always check
                          the build log rather than assuming a fallback. [""]
 
+        output_dir:     Absolute directory for every file this build writes -- the .esh, the
+                        generated build.emc and emc_build.in, the EMC log, the .data and the
+                        .params. Pass the run's own build-attempt directory so the inputs stay
+                        with the cell they produced. Defaults to a scratch directory under the
+                        repo's data/_emc_jobs/ when there is no run to attach to. [""]
+
     Returns:
         {"status": "submitted", "job_id": ..., "output_dir": ..., "field": ...}
     """
@@ -451,7 +463,12 @@ def submit_emc_cell_job(
         return {"error": str(exc)}
 
     job_id = str(uuid.uuid4())[:8]
-    output_dir = str(JOBS_ROOT / job_id)
+    if output_dir:
+        if not os.path.isabs(output_dir):
+            return {"error": f"output_dir must be absolute, got {output_dir!r}"}
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+    else:
+        output_dir = str(JOBS_ROOT / job_id)
 
     kwargs = dict(
         smiles=smiles,

@@ -6,6 +6,7 @@ prove the executor and the protocol resolver cannot silently diverge.
 Does NOT submit any simulation -- --dry-run never calls the MCP servers.
 """
 import json
+import pathlib
 import os
 import subprocess
 import sys
@@ -222,11 +223,26 @@ def test_wait_for_analysis_timeout_raises():
 # ─── do_build(): finite-size forecast target density is never experimental data ────
 
 class _FakeEmc:
+    """Mirrors the real server's output_dir contract: EMC writes every file it produces into
+    the directory the caller names. A fake that ignored output_dir would let do_build stop
+    passing it without a single test noticing."""
+
+    #: files a real EMC build leaves in output_dir besides the .data and .params
+    INTERMEDIATES = ("emc_build.esh", "build.emc", "emc_build.in", "emc_build.log",
+                     "emc_metadata.json")
+
     def __init__(self, tmp_path):
         self.tmp_path = tmp_path
-        (tmp_path / "cell.data").write_text("# fake cell\n")
+        self.output_dir = None
 
     def submit_emc_cell_job(self, **kwargs):
+        self.output_dir = pathlib.Path(kwargs["output_dir"])
+        assert self.output_dir.is_absolute(), "output_dir must be absolute"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        (self.output_dir / "emc_build.data").write_text("# fake cell\n")
+        (self.output_dir / "emc_build.params").write_text("# Pair Coeffs\n")
+        for name in self.INTERMEDIATES:
+            (self.output_dir / name).write_text("# fake\n")
         return {"job_id": "job-1"}
 
     def get_emc_job_status(self, job_id):
@@ -237,8 +253,8 @@ class _FakeEmc:
         # force-field provenance check against -- a fake that omits a key the real server
         # always returns turns a contract change into a KeyError in the test rather than a
         # caught regression in the code.
-        return {"result": {"data_path": str(self.tmp_path / "cell.data"),
-                           "output_dir": str(self.tmp_path), "lammps_flags": "",
+        return {"result": {"data_path": str(self.output_dir / "emc_build.data"),
+                           "output_dir": str(self.output_dir), "lammps_flags": "",
                            "field": "pcff", "resolved_seed": 1, "natoms": 0}}
 
 
@@ -2230,3 +2246,55 @@ def test_every_melt_chain_gate_can_actually_be_extended():
     bindable = eg.BINDING_MELT & rdr.CHAIN_CONVERGENCE_GATES
     assert bindable, "no chain gate binds at the melt -- the melt clause lost its point"
     assert bindable <= eg.EXTENDABLE_GATES, sorted(bindable - eg.EXTENDABLE_GATES)
+
+
+# ─── every build artifact belongs to the run, and nothing lands outside the repo ──────
+
+def test_emc_writes_into_the_build_attempt_not_a_home_directory(tmp_path, equil_check_args_cls):
+    """Until 2026-09-04 EMC wrote to ~/polyjarvis_emc_jobs/<job_id>/ and do_build copied out
+    only the .data and .params -- so the .esh the whole build turns on, the generated
+    build.emc and emc_build.in, and EMC's own log were never part of the run at all."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+    emc = _FakeEmc(tmp_path)
+
+    out = do_build(args, cls, emc, _FakeBuildLammps())
+
+    cell_dir = (pathlib.Path(args.work_dir) / "cell").resolve()
+    assert emc.output_dir == cell_dir, "EMC must write into this attempt's own cell directory"
+    for name in _FakeEmc.INTERMEDIATES:
+        assert (cell_dir / name).is_file(), f"{name} did not reach the run directory"
+        assert out["emc_inputs"][name] == str(cell_dir / name), f"{name} is not in the manifest"
+    assert pathlib.Path(out["data_path"]) == cell_dir / "cell.data"
+
+
+def test_the_cell_is_renamed_into_place_not_duplicated(tmp_path, equil_check_args_cls):
+    """EMC's .data is ~4 MB. It is already inside the attempt directory under EMC's own fixed
+    name, so putting it at cell.data is a rename -- copying would leave two of it."""
+    args, cls = equil_check_args_cls
+    args.work_dir = str(tmp_path / "work")
+
+    do_build(args, cls, _FakeEmc(tmp_path), _FakeBuildLammps())
+
+    cell_dir = (pathlib.Path(args.work_dir) / "cell").resolve()
+    assert sorted(p.name for p in cell_dir.glob("*.data")) == ["cell.data"]
+
+
+def test_do_build_names_only_real_submit_emc_cell_job_parameters():
+    """_FakeEmc takes **kwargs, so a kwarg the real tool does not accept passes every test in
+    this file. Check do_build's call against the EMC server's actual signature instead."""
+    import ast
+    server = ast.parse((REPO_ROOT / "mcp-servers" / "mcp-emc-server" / "server.py").read_text())
+    fn = next(n for n in ast.walk(server)
+              if isinstance(n, ast.FunctionDef) and n.name == "submit_emc_cell_job")
+    accepted = {a.arg for a in fn.args.args} | {a.arg for a in fn.args.kwonlyargs}
+
+    campaign = ast.parse((REPO_ROOT / "orchestration" / "scripts" / "run_campaign.py").read_text())
+    build = next(n for n in ast.walk(campaign)
+                 if isinstance(n, ast.FunctionDef) and n.name == "do_build")
+    call = next(n for n in ast.walk(build) if isinstance(n, ast.Call)
+                and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "submit_emc_cell_job")
+    passed = {kw.arg for kw in call.keywords if kw.arg}
+    assert passed <= accepted, f"do_build passes unknown kwargs: {sorted(passed - accepted)}"
+    assert "output_dir" in passed, "do_build must name the directory EMC writes into"
