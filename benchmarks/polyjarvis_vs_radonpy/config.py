@@ -8,16 +8,21 @@ unset so RadonPy's own env-var defaults (sample_script/eq.py) apply as-is.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 BENCHMARK_ROOT = Path(__file__).resolve().parent
 DATA_ROOT = BENCHMARK_ROOT / "data"
 
-RADONPY_SOURCE_ROOT = Path("/home/arz2/RadonPy")
+# The RadonPy checkout, its conda interpreter, and the LAMMPS build all live OUTSIDE this
+# repo, so there is no repo-relative form for them. Resolve from the environment first, then
+# fall back to the conventional per-user prefix under $HOME.
+RADONPY_SOURCE_ROOT = Path(os.environ.get("RADONPY_PATH", Path.home() / "RadonPy"))
 RADONPY_SAMPLE_SCRIPT_DIR = RADONPY_SOURCE_ROOT / "sample_script"
-RADONPY_ENV_PYTHON = Path("/home/arz2/miniforge3/envs/radonpy/bin/python")
-LAMMPS_EXEC = Path("/home/arz2/lammps-install/bin/lmp")
+RADONPY_ENV_PYTHON = Path(os.environ.get(
+    "RADONPY_ENV_PYTHON", Path.home() / "miniforge3" / "envs" / "radonpy" / "bin" / "python"))
+LAMMPS_EXEC = Path(os.environ.get("LAMBDA_LAMMPS", Path.home() / "lammps-install" / "bin" / "lmp"))
 
 
 def _load_physical_cores() -> int:

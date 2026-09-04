@@ -37,8 +37,8 @@ def test_live_pids_matches_orchestrator_process():
 def test_live_pids_matches_detached_simulation_process():
     """A LAMMPS chain outlives the orchestrator that launched it -- the watchdog must not
     treat a dead orchestrator as a dead run when the simulation itself is still running."""
-    ps_output = _ps("200 /home/arz2/lammps-install/bin/lmp -in "
-                    "/home/arz2/PolyJarvis_v2/data/i-PMMA1/attempts/equilibration/"
+    ps_output = _ps("200 /opt/lammps/bin/lmp -in "
+                    "/repo/data/i-PMMA1/attempts/equilibration/"
                     "attempt-0002/work/cool_block_01/cool_block_01.in")
     assert watchdog._live_pids_for_run("i-PMMA1", ps_output) == [200]
 

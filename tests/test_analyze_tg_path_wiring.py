@@ -35,15 +35,15 @@ def _args(**overrides):
 
 def test_real_execution_reads_the_sweeps_own_log_not_the_equilibration_data_file():
     args = _args(
-        work_dir="/home/arz2/PolyJarvis_v2/data/PE1/attempts/thermal/attempt-0002/work",
-        data_path="/home/arz2/PolyJarvis_v2/data/PE1/attempts/equilibration/attempt-0001/work/npt_production/npt_production_out.data",
+        work_dir="/repo/data/PE1/attempts/thermal/attempt-0002/work",
+        data_path="/repo/data/PE1/attempts/equilibration/attempt-0001/work/npt_production/npt_production_out.data",
     )
     p = _resolve_analyze_tg_params(args, PHYC)
     assert p["tg_log_path"] == (
-        "/home/arz2/PolyJarvis_v2/data/PE1/attempts/thermal/attempt-0002/work/tg_sweep/tg_sweep.log"
+        "/repo/data/PE1/attempts/thermal/attempt-0002/work/tg_sweep/tg_sweep.log"
     )
     assert p["per_t_dump_file"] == (
-        "/home/arz2/PolyJarvis_v2/data/PE1/attempts/thermal/attempt-0002/work/tg_sweep/per_t_structs.dump"
+        "/repo/data/PE1/attempts/thermal/attempt-0002/work/tg_sweep/per_t_structs.dump"
     )
     # the equilibration attempt's real .data output is the correct structural reference here
     assert p["tg_data_file"] == args.data_path

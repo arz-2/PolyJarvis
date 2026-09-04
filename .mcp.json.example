@@ -10,6 +10,8 @@
         "LAMBDA_USER": "your_username",
         "LAMBDA_WORKDIR": "/path/to/simulations",
         "LAMBDA_LAMMPS": "/path/to/lammps-install/bin/lmp",
+        "LAMBDA_LAMMPS_KOKKOS": "/path/to/lammps-install-kokkos/bin/lmp",
+        "LAMMPS_ENGINE_STATE_FILE": "/path/to/run_state.json",
         "CONDA_ENV": "mol-builder",
         "MDA_SCRIPTS_DIR": "/path/to/simulations/analysis_scripts"
       }

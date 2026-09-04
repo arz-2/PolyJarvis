@@ -61,9 +61,11 @@ CALIB_CELLS = {
 }
 PPPM_FOR = {"pcff": True, "opls": True, "gaff": True, "trappe": False}  # UA has no kspace
 
-LMP        = os.environ.get("LAMBDA_LAMMPS", bh.LMP_DEFAULT)
-LMP_KOKKOS = os.environ.get("LAMBDA_LAMMPS_KOKKOS", bh.LMP_KOKKOS_DEFAULT)
-CALIB_TMP  = Path("/tmp/polyjarvis/calib")
+# bh.LMP_DEFAULT / bh.LMP_KOKKOS_DEFAULT already consult LAMBDA_LAMMPS / LAMBDA_LAMMPS_KOKKOS
+# and fall back to the per-user $HOME install prefix, so no second env lookup is needed here.
+LMP        = bh.LMP_DEFAULT
+LMP_KOKKOS = bh.LMP_KOKKOS_DEFAULT
+CALIB_TMP  = bh.BENCH_ROOT / "calib"          # single scratch root, shared with benchmark_hardware
 REVALIDATE_TIMEOUT_S = 1800             # generous per-run cap (timed run + two run-0 evals)
 
 
@@ -106,7 +108,7 @@ def plan_configs(phys: int, st: dict, allow_busy: bool):
 def benchmark_cell(cell: str, ff: str, pppm: bool, steps: int, st: dict,
                    only_names: list[str], dry: bool, allow_busy: bool) -> dict | None:
     label = f"calib_{ff}_{Path(cell).parent.name}"
-    out_json = Path("/tmp/polyjarvis/bench") / label / "benchmark.json"
+    out_json = bh.BENCH_ROOT / "bench" / label / "benchmark.json"
     cmd = ["nice", "-n", "19", sys.executable, str(HERE / "benchmark_hardware.py"),
            "--data", cell, "--ff", ff, "--label", label,
            "--steps", str(steps), "--out", str(out_json),
@@ -163,6 +165,18 @@ def splice_hardware_policy(new_hp: dict) -> None:
     RULES.write_text(text[:start] + body + text[end:])
 
 
+def _repo_rel(path) -> str | None:
+    """Record calibration-cell paths REPO-RELATIVE so directional_probe.cells stays valid in
+    any clone (the shipped CALIB_* cells are in-repo). A cell passed via --cell from outside
+    the repo has no relative form, so it is kept absolute."""
+    if not path:
+        return None
+    try:
+        return str(Path(path).resolve().relative_to(REPO))
+    except ValueError:
+        return str(path)
+
+
 def _carry_provenance(prior_probe: dict, probe: dict) -> None:
     """Carry hand-authored provenance sub-blocks (e.g. kokkos_offload_study) across a fresh
     directional_probe rebuild. Those record cross-host engine rationale that isn't re-derived
@@ -182,7 +196,7 @@ def ingest(host: dict, per_ff: dict, date: str, clean: bool) -> None:
     probe["measured_on"] = (f"{host['gpus']}x {host['gpu_model']} / "
                             f"{host['phys_cores']} phys cores (calibrate_hardware.py)")
     probe["date"] = date
-    probe["cells"] = {ff: d["data_file"] for ff, d in per_ff.items()}
+    probe["cells"] = {ff: _repo_rel(d["data_file"]) for ff, d in per_ff.items()}
     probe["ff_coverage_note"] = (
         "Benchmarked per FORCE-FIELD FAMILY, not per polymer template: the mpi/gpu optimum is "
         "set by the interaction-style mix (pair + k-space), which the FF family fixes, while the "
@@ -356,7 +370,7 @@ def ingest_revalidate(host: dict, records: list[dict], st: dict, date: str) -> b
 
     for r in ran:
         fam = r["ff"]
-        cells[fam] = r.get("cell")
+        cells[fam] = _repo_rel(r.get("cell"))
         if r.get("atoms"):
             cells_atoms[fam] = r["atoms"]
         probe[f"{fam}_ns_per_day"] = {r["config_name"]: r["ns_per_day"]}

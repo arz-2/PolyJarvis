@@ -38,7 +38,7 @@ during a resume through it dead-ends immediately with no agent ever consulted) -
 run gets the same real agent coverage a live orchestrating session would have given it.
 
 Intended to run from cron/systemd-timer, e.g. every 10-15 minutes:
-    */15 * * * *  cd /home/arz2/PolyJarvis_v2 && \\
+    */15 * * * *  cd /path/to/PolyJarvis_v2 && \\
                   mcp-servers/.venv/bin/python orchestration/scripts/campaign_watchdog.py \\
                   >> data/_watchdog_logs/watchdog.jsonl 2>&1
 """

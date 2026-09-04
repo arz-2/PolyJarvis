@@ -4,7 +4,7 @@ extract_solubility_parameter_tally.py — Cohesive energy density (CED) /
 Hildebrand solubility parameter (delta) via a true per-molecule energy
 decomposition, re-implementing the physics of RadonPy's
 `radonpy.sim.preset.sp.SPMD.rerun()` / `SPMD_analyze.Solubility_Parameter()`
-(/home/arz2/RadonPy/radonpy/sim/preset/sp.py) in this project's own plain
+($RADONPY_PATH/radonpy/sim/preset/sp.py) in this project's own plain
 functional style (stdlib+numpy+pandas, matching every other script in
 analysis_scripts/) rather than RadonPy's Preset/MD OOP framework, which this
 project doesn't use elsewhere.
@@ -15,7 +15,7 @@ LAMMPS's TALLY package (compute_pe_mol_tally.cpp, compute_force_tally.cpp, ...)
 must be compiled into the LAMMPS binary that runs the rerun below. Neither of
 this project's two production binaries (lammps-install, lammps-install-kokkos)
 has PKG_TALLY enabled (`grep PKG_TALLY .../CMakeCache.txt` -> OFF in both). The
-LAMMPS *source* tree at /home/arz2/lammps already contains the TALLY package —
+LAMMPS *source* tree at your LAMMPS already contains the TALLY package —
 building a third, separate binary with PKG_TALLY=yes is confirmed low-risk (it
 never touches the two binaries every live run depends on) but is its own,
 not-yet-done, ops step (docs/ROADMAP.md Track J2b). Until that binary exists
@@ -74,7 +74,7 @@ Usage (once the TALLY-enabled binary exists):
         --output_dir /path/to/raw/ [--charge_method AM1-BCC] [--system_label PE4]
 
 References:
-    /home/arz2/RadonPy/radonpy/sim/preset/sp.py (SPMD.rerun, SPMD_analyze.Solubility_Parameter)
+    $RADONPY_PATH/radonpy/sim/preset/sp.py (SPMD.rerun, SPMD_analyze.Solubility_Parameter)
     docs/ROADMAP.md Track J2 / J2b
 """
 

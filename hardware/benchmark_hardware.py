@@ -58,9 +58,23 @@ sys.path.insert(0, str(REPO / "orchestration" / "scripts"))  # hardware_runtime 
 # shared host/GPU probes (re-exported here so calibrate_hardware.py keeps using bh.detect_phys_cores / bh.gpu_status)
 from hardware_runtime import detect_phys_cores, gpu_status
 
-LMP_DEFAULT = "/home/arz2/lammps-install/bin/lmp"
-LMP_KOKKOS_DEFAULT = "/home/arz2/lammps-install-kokkos/bin/lmp"
-CONDA_ACTIVATE = "source ~/miniforge3/etc/profile.d/conda.sh; conda activate mol-builder"
+# External toolchain — these live OUTSIDE the repo, so there is no repo-relative form:
+# resolve from the environment first (the LAMBDA_* names the MCP engine already uses), then
+# fall back to the conventional per-user install prefix under $HOME. Note the two LAMMPS
+# builds share the basename `lmp`, so shutil.which() cannot tell the GPU-package binary from
+# the KOKKOS one -- the prefix is what distinguishes them and must stay explicit.
+LMP_DEFAULT = os.environ.get(
+    "LAMBDA_LAMMPS", str(Path.home() / "lammps-install" / "bin" / "lmp"))
+LMP_KOKKOS_DEFAULT = os.environ.get(
+    "LAMBDA_LAMMPS_KOKKOS", str(Path.home() / "lammps-install-kokkos" / "bin" / "lmp"))
+CONDA_SH = os.environ.get("CONDA_SH", "~/miniforge3/etc/profile.d/conda.sh")
+CONDA_ENV = os.environ.get("CONDA_ENV", "mol-builder")
+CONDA_ACTIVATE = f"source {CONDA_SH}; conda activate {CONDA_ENV}"
+
+# Benchmark scratch root. Kept OUT of the repo on purpose -- a --full sweep writes GB-scale
+# LAMMPS trajectories/logs -- but overridable because a cluster /tmp is often a small
+# node-local tmpfs. calibrate_hardware.py imports this so both agree on one root.
+BENCH_ROOT = Path(os.environ.get("POLYJARVIS_SCRATCH", "/tmp/polyjarvis"))
 
 # Execution arms — how LAMMPS offloads work to the GPU. A0 is the current production
 # behavior (GPU package: pair on GPU; bonded/kspace/neigh on CPU). A1/A2 are the
@@ -398,7 +412,7 @@ def main() -> int:
         pppm = (args.ff in ("pcff", "opls", "gaff"))   # UA has no kspace
     timestep = args.timestep or (2.0 if args.ff == "trappe" else 1.0)
 
-    work = Path("/tmp/polyjarvis/bench") / label
+    work = BENCH_ROOT / "bench" / label
     work.mkdir(parents=True, exist_ok=True)
     master_in = work / "deck.in"
     if args.reuse_in:
