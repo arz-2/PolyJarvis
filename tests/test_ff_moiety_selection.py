@@ -148,7 +148,13 @@ def test_not_measured_survives_a_screen_that_found_nothing():
     claim, _ = mdp._coverage_claim("PSTR", "pcff", "pcff",
                                    {"probed": [], "blockers": []})
     assert claim.startswith("NOT MEASURED")
-    assert "moiety screen ran" in claim
+    assert "matched no rule" in claim and "UNSCREENED" in claim
+    # and it must not blame a flag that WAS passed: a SMILES matching no rule is never probed
+    assert "--with-ff-probe" not in claim
+
+    blocked = mdp._coverage_claim("PSTR", "pcff", "pcff",
+                                  {"probed": [], "blockers": [{"id": "nitro"}]})[0]
+    assert "probing was off (--with-ff-probe)" in blocked
 
 
 def test_a_real_probe_replaces_not_measured():

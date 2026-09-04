@@ -500,6 +500,18 @@ def assess_all(smiles, fields=None, lmp=LMP, keep_dir=None):
 #
 # Prints JSON, always exits 0 -- callers transcribe the verdict.
 # ===========================================================================
+# `# <Name> Coeffs` section header -> interaction kind. A Class II deck reuses the same
+# `*_coeff` keyword for its cross terms (BondBond, EndBondTorsion, AngleAngle, ...),
+# distinguishing them by a sub-tag in column 2, so the section header is the only
+# reliable discriminator. Cross terms are reported as unchecked rather than silently
+# dropped -- each has its own .frc section and tuple convention, and a half-right check
+# would be worse than none.
+#
+# Lost in acd07dd's 36->24 consolidation, which kept the arity table beside it and dropped
+# this one. parse_params then raised NameError on every call, do_build's except swallowed it
+# as {"available": false}, and the ZERO_SUBSTITUTED gate silently stopped running.
+_KINDS = {"Pair": "pair", "Bond": "bond", "Angle": "angle",
+          "Dihedral": "torsion", "Improper": "improper"}
 _LAMMPS_COEFF_ARITY = {"pair": 1, "bond": 2, "angle": 3, "torsion": 4, "improper": 4}
 
 _HEADER_RE = re.compile(r"^#\s*(\w+)\s+Coeffs\s*$")

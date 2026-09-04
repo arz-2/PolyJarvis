@@ -194,3 +194,60 @@ def test_cross_terms_are_reported_unchecked_not_dropped():
     cell = next(c for c in _cells() if c.parents[1].name.startswith("PMMA"))
     r = assess_provenance(str(cell), "pcff")
     assert r["unchecked_cross_terms"], "Class II cross terms must be reported, not hidden"
+
+
+# --- params parsing, WITHOUT the archive ----------------------------------------
+# Every test above that exercises parse_params is @needs_archive, and manuscript/data is
+# absent from a fresh checkout. So when acd07dd's consolidation dropped the _KINDS table --
+# keeping the arity table that sat beside it -- parse_params raised NameError on every call,
+# run_campaign._ff_provenance swallowed it as {"available": false}, and do_build's
+# ZERO_SUBSTITUTED gate silently stopped running for every build. Nothing failed.
+# These two run everywhere.
+
+_MINI_PARAMS = """\
+# Pair Coeffs
+
+pair_coeff 1 1 0.0540 4.0100 # c,c
+pair_coeff 1 2 0.0230 3.3000 # c,hc
+
+# Bond Coeffs
+
+bond_coeff 1 1.5300 299.6700 -501.7700 679.8100 # c,c
+
+# Angle Coeffs
+
+angle_coeff 1 110.7700 39.5160 -7.4430 -9.5583 # c,c,c
+
+# BondBond Coeffs
+
+angle_coeff 1 bb 0.0000 1.5300 1.5300 # c,c,c
+
+# Dihedral Coeffs
+
+dihedral_coeff 1 0.0000 0.0000 0.0316 0.0000 # c,c,c,c
+
+# Improper Coeffs
+
+improper_coeff 1 0.0000 0.0000 # c,c,c,c
+"""
+
+
+def test_every_primary_section_maps_to_a_kind(tmp_path):
+    """The five primary sections must resolve to a kind; a Class II cross term must not.
+    parse_params reads the kind off a module-level table, so a missing table is a NameError
+    at the first coeff row rather than a wrong answer."""
+    path = tmp_path / "emc_build.params"
+    path.write_text(_MINI_PARAMS)
+    rows = parse_params(path)
+    by_section = {r["section"]: r["kind"] for r in rows}
+    assert by_section == {"Pair": "pair", "Bond": "bond", "Angle": "angle",
+                          "BondBond": None, "Dihedral": "torsion", "Improper": "improper"}
+    pair = next(r for r in rows if r["section"] == "Pair")
+    assert pair["index"] == "1 1" and pair["types"] == ["c", "c"]
+    assert next(r for r in rows if r["section"] == "Bond")["index"] == "1"
+
+
+def test_every_checkable_kind_has_an_arity():
+    """The two tables are read together on every row. They were split apart once already."""
+    import forcefield as ff
+    assert set(ff._KINDS.values()) == set(ff._LAMMPS_COEFF_ARITY)

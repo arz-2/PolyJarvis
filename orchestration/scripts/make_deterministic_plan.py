@@ -617,14 +617,23 @@ def _coverage_claim(polymer_class, prior, ff, resolution=None):
     """
     probed = list((resolution or {}).get("probed") or [])
     if not probed:
-        screened = (resolution or {}).get("blockers")
-        screen = ("" if screened is None else
-                  f" A moiety screen ran and found {len(screened) or 'no'} known blocker(s), "
-                  "which narrows the risk but measures nothing.")
-        return (f"NOT MEASURED for this SMILES. No EMC trial build was run (--with-ff-probe off), "
-                f"so coverage is asserted from polymer_rules.json:classes.{polymer_class}."
+        # Say WHY no build ran, not which flag was passed: with --with-ff-probe on, a SMILES
+        # that matches no rule is still never probed, and reporting that as "flag off" is wrong.
+        blockers = (resolution or {}).get("blockers")
+        if blockers is None:
+            why = "The moiety screen was unavailable, so nothing narrowed the risk either."
+        elif blockers:
+            why = (f"The moiety screen matched {[b['id'] for b in blockers]}, groups measured to "
+                   "block every registered EMC field, but probing was off (--with-ff-probe).")
+        else:
+            why = ("The moiety screen ran and matched no rule, so no trial build was triggered. "
+                   "That narrows the risk and measures nothing: the rules cover 77% of the "
+                   "measured failures (guides/ff_moiety_rules.json), so this SMILES is "
+                   "UNSCREENED for the rest, not cleared.")
+        return (f"NOT MEASURED for this SMILES. No EMC trial build was run, so coverage is "
+                f"asserted from polymer_rules.json:classes.{polymer_class}."
                 f"ff_accuracy_prior={prior!r} only; whether {ff!r} can type THIS repeat unit is "
-                f"unverified until the build stage runs.{screen}",
+                f"unverified until the build stage runs. {why}",
                 f"polymer_rules.json:classes.{polymer_class}.ff_accuracy_prior")
     if not ff:
         return (f"MEASURED: an EMC trial build was run against {probed} and none typed this "
