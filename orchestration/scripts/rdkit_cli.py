@@ -45,6 +45,7 @@ Usage:
 import argparse
 import json
 import sys
+from pathlib import Path
 
 try:
     from rdkit import Chem
@@ -501,6 +502,77 @@ def _cmd_rigidity(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Moiety matching -- D-01's force-field screen
+# ---------------------------------------------------------------------------
+# Same shape as _MOTIFS/_compiled_motifs above, with two deliberate differences:
+#   * the patterns come from guides/ff_moiety_rules.json, not a table in this file, because
+#     each one carries a measured precision that has to stay next to the number it was
+#     measured against;
+#   * matching runs on the raw repeat unit (Chem.MolFromSmiles), NOT _prepare_repeat_unit --
+#     that helper strips the "*" atoms, and the precisions were measured on the raw string.
+_MOIETY_RULES_PATH = (Path(__file__).resolve().parent.parent.parent
+                      / "guides" / "ff_moiety_rules.json")
+_MOIETY_CACHE: dict = {}
+
+
+def _compiled_moieties(rules_path=None) -> list:
+    """[(rule, compiled_pattern)], compiled once per rules file on first use."""
+    key = str(rules_path or _MOIETY_RULES_PATH)
+    if key not in _MOIETY_CACHE:
+        doc = json.loads(Path(key).read_text())
+        out = []
+        for rule in doc.get("moieties", []):
+            pat = Chem.MolFromSmarts(rule["smarts"])
+            if pat is None:
+                raise ValueError(f"Bad SMARTS for {rule['id']!r}: {rule['smarts']!r}")
+            out.append((rule, pat))
+        _MOIETY_CACHE[key] = out
+    return _MOIETY_CACHE[key]
+
+
+def match_moieties(smiles: str, rules_path=None) -> dict:
+    """Which measured build-blocking groups this repeat unit contains.
+
+    `unmatched_heavy_frac` mirrors estimate_tg's own bookkeeping and is the honest half of the
+    answer: no match means UNSCREENED, not cleared -- these rules cover 77% of the measured
+    failures, so the caller still has to probe.
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return {"smiles": smiles, "error": f"Could not parse SMILES: {smiles!r}"}
+    assigned: set = set()
+    hits = []
+    for rule, pat in _compiled_moieties(rules_path):
+        matches = mol.GetSubstructMatches(pat)
+        if not matches:
+            continue
+        for m in matches:
+            assigned.update(m)
+        hits.append({"id": rule["id"], "label": rule.get("label"),
+                     "smarts": rule["smarts"], "n_matches": len(matches),
+                     "blocks": rule.get("blocks", {}),
+                     "precision": (rule.get("evidence") or {}).get("precision")})
+    heavy = sum(1 for a in mol.GetAtoms() if a.GetAtomicNum() != 1)
+    return {"smiles": smiles, "moieties": hits,
+            "unmatched_heavy_frac": round(max(0.0, 1.0 - len(assigned) / max(heavy, 1)), 3)}
+
+
+def _cmd_match_moieties(args) -> int:
+    if bool(args.smiles) == bool(args.input):
+        print(json.dumps({"error": "give exactly one of --smiles or --input"}))
+        return 1
+    if args.smiles:
+        result = match_moieties(args.smiles, args.rules)
+    else:
+        # One subprocess for the whole list: a per-SMILES round trip through the conda seam
+        # is what makes a 982-molecule sweep take minutes instead of seconds.
+        smiles_list = json.loads(Path(args.input).read_text())
+        result = {"results": [match_moieties(s, args.rules) for s in smiles_list]}
+    print(json.dumps(result, indent=2))
+    return 1 if "error" in result else 0
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def main() -> int:
@@ -534,6 +606,15 @@ def main() -> int:
     c = sub.add_parser("rigidity", help="backbone-path rigidity classification")
     c.add_argument("--smiles", required=True)
     c.set_defaults(func=_cmd_rigidity)
+
+    c = sub.add_parser("match-moieties",
+                       help="measured build-blocking chemical groups in a repeat unit")
+    c.add_argument("--smiles", default=None)
+    c.add_argument("--input", default=None,
+                   help="JSON file holding a list of SMILES; one subprocess for the batch")
+    c.add_argument("--rules", default=None,
+                   help="Override guides/ff_moiety_rules.json (testing only)")
+    c.set_defaults(func=_cmd_match_moieties)
 
     args = p.parse_args()
     return args.func(args)

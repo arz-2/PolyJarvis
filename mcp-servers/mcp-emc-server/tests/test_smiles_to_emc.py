@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from smiles_to_emc import make_esh
+from smiles_to_emc import make_esh, strip_bond_stereo
 
 # ---------------------------------------------------------------------------
 # Representative SMILES for the five PCFF target classes
@@ -265,3 +265,36 @@ class TestPerClass:
         assert f"{case['density']:.6f}" in s["OPTIONS"], (
             f"{case['polymer']}: density={case['density']} not in OPTIONS"
         )
+
+
+# ---------------------------------------------------------------------------
+# cis/trans bond stereo: "/" terminates a comment in the .esh grammar
+# ---------------------------------------------------------------------------
+
+class TestBondStereo:
+    """24 of the 982 PI1070 polymers died here, across 4 classes -- not on chemistry EMC
+    could not represent, but on a "/" the .esh parser read as a comment delimiter."""
+
+    @pytest.mark.parametrize("raw,clean", [
+        ("*CC/C=C/*",     "*CCC=C*"),
+        ("*/C=C\\CC*",    "*C=CCC*"),
+        ("*CC(*)c1ccccc1", "*CC(*)c1ccccc1"),
+    ])
+    def test_only_bond_stereo_is_removed(self, raw, clean):
+        assert strip_bond_stereo(raw) == (clean, raw != clean)
+
+    def test_stereocentres_are_left_alone(self):
+        """EMC DOES honour @/@@ -- that is how tacticity reaches a built cell."""
+        iso = "*C[C@@H](*)C"
+        assert strip_bond_stereo(iso) == (iso, False)
+
+    def test_the_esh_carries_no_comment_delimiter(self):
+        esh = make_esh("*CC/C=C/*", field="trappe-ua")
+        assert "/" not in esh.split("ITEM GROUPS")[1].split("ITEM END")[0]
+        assert "*CCC=C*" in esh
+
+    def test_star_count_is_checked_after_stripping(self):
+        """The check must see the stripped string: "/" never carries a * but a future
+        normalisation might, and a mismatch here would report the wrong SMILES."""
+        with pytest.raises(ValueError, match="exactly 2"):
+            make_esh("*CC/C=C/CC")

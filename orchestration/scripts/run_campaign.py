@@ -2233,6 +2233,7 @@ def run_campaign_workflow(plan_path: Path, *, dry_run: bool = False,
     run_dir = repo_root / "data" / run_name
     policy_hashes = {}
     for path in (repo_root / "guides" / "polymer_rules.json",
+                 repo_root / "guides" / "ff_moiety_rules.json",
                  repo_root / "orchestration" / "decision_policy.json"):
         if path.exists():
             policy_hashes[str(path.relative_to(repo_root))] = hashlib.sha256(path.read_bytes()).hexdigest()

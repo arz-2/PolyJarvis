@@ -21,7 +21,8 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import track_registry  # noqa: E402
 
 from rules_common import get_class_entry, load_rules  # noqa: E402
-from make_deterministic_plan import build_decisions, build_planned_stages, make_plan  # noqa: E402
+from make_deterministic_plan import (build_decisions, build_planned_stages, make_plan,  # noqa: E402
+                                     _field_of, _ff_prior_uncertainty)
 from select_system_size import solve_system_size  # noqa: E402
 import rules_common  # noqa: E402  -- module import so tests can monkeypatch rules_common.canonicalize
 import select_hardware as cost_model  # noqa: E402  -- cost model merged into it 2026-09-02
@@ -104,8 +105,9 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "mechanical_sampling_factor": (1, 10),
 }
 # Derived, never hand-listed: the hand-written copy had "trappe" (real key: "trappe-ua") and
-# omitted the UA/CHARMM/GAFF entries, so 4 of the 6 values in use failed validation.
-FF_OVERRIDE_VALUES = frozenset(forcefield.FIELDS)
+# omitted the UA/GAFF entries, so 4 of the 6 values in use failed validation. RUNNABLE_FIELDS,
+# not FIELDS: a field with no LAMMPS deck must not be nameable as an override.
+FF_OVERRIDE_VALUES = forcefield.RUNNABLE_FIELDS
 ENUM_OVERRIDES = {
     "preferred_builder": frozenset({"emc", "radonpy"}),
     "preferred_ff": FF_OVERRIDE_VALUES,
@@ -378,9 +380,13 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     # Solved BEFORE make_plan and handed to it: make_plan sizes the cell itself now (a
     # scaffold plan used to carry none at all), and the solve shells into the RDKit env, so
     # passing this in is what keeps a reasoned plan to one round-trip instead of two.
+    # D-01's field is an input to the solve (united-atom cells count heavy atoms only), and an
+    # override may already have demoted it off the class prior.
+    field = _field_of(effective_class)
     size_solve = solve_system_size(
         decision.polymer_class, intent.smiles, properties,
-        dp_typical=class_entry.get("dp_typical"), nchain=class_entry.get("nchain"))
+        dp_typical=class_entry.get("dp_typical"), nchain=class_entry.get("nchain"),
+        field=field)
     plan = make_plan(intent.run_name, decision.polymer_class, intent.smiles, properties,
                      size_solve=size_solve)
     auto_filled = {k: v for k, v in size_solve.get("recommended_params", {}).items()
@@ -421,7 +427,8 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
     if final_dp is not None:
         final_check = solve_system_size(
             decision.polymer_class, intent.smiles, properties, dp_typical=final_dp,
-            nchain=plan["decided_params"].get("nchain"))
+            nchain=plan["decided_params"].get("nchain"),
+            field=plan["decided_params"].get("preferred_ff") or field)
         final_size_advisories = list(final_check.get("uncertainties", []))
         if any(u.get("name") == "size_over_provisioned" for u in final_size_advisories):
             over_provisioned_ack = [{"name": "system_size_over_provisioned", "dominant": False,
@@ -451,6 +458,14 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
             continue
         seen_uncertainty_names.add(name)
         plan_uncertainties.append(advisory)
+
+    # Computed from the plan, not asked of the agent: a plan that builds with anything other
+    # than its class prior has lost D-01's only DOI-backed evidence and must say so.
+    ff_prior_ack = _ff_prior_uncertainty(decision.polymer_class,
+                                         class_entry.get("ff_accuracy_prior"),
+                                         plan["decided_params"].get("preferred_ff"))
+    if ff_prior_ack and ff_prior_ack["name"] not in seen_uncertainty_names:
+        plan_uncertainties.append(ff_prior_ack)
 
     plan.update({
         "goal": intent.goal,

@@ -208,7 +208,8 @@ def _finite_size_findings(plan: dict) -> list:
         return findings
 
     try:
-        rec = select_hardware(polymer_class, smiles, dp.get("dp_typical"), dp.get("nchain"))
+        rec = select_hardware(polymer_class, smiles, dp.get("dp_typical"), dp.get("nchain"),
+                              dp.get("preferred_ff"))
         cell_mass = rec.get("cell_mass_g_per_mol_estimate")
     except Exception:
         return findings
@@ -280,7 +281,8 @@ def _hardware_findings(plan: dict) -> list:
         return findings
 
     try:
-        rec = select_hardware(polymer_class, smiles, dp.get("dp_typical"), dp.get("nchain"))
+        rec = select_hardware(polymer_class, smiles, dp.get("dp_typical"), dp.get("nchain"),
+                              dp.get("preferred_ff"))
     except Exception as e:
         findings.append({"check": "hardware_safety", "severity": "structural",
                          "detail": f"select_hardware.py raised: {e}"})
@@ -435,7 +437,33 @@ def _forcefield_findings(plan: dict) -> list:
                        "uncertainties entry named 'ff_parameter_provenance' acknowledges "
                        "them. The flag does not veto the field — it must be carried as a "
                        "stated uncertainty, not inherited silently.")})
+
+    # D-01's only DOI-backed evidence is the class ff_justification_doi, which describes the
+    # class prior. Once the field changes, that citation no longer covers the run.
+    prior = _class_prior(plan)
+    if prior and dp_ff and dp_ff != prior and not any(
+            u.get("name") == "ff_accuracy_prior_not_met"
+            for u in plan.get("uncertainties", [])):
+        findings.append({
+            "check": "ff_prior_departure_unacknowledged", "severity": "structural",
+            "detail": (f"decided_params.preferred_ff={dp_ff!r} is not the class prior "
+                       f"{prior!r}, and no uncertainties entry named "
+                       "'ff_accuracy_prior_not_met' acknowledges the departure. The class "
+                       "ff_justification_doi is D-01's only DOI-backed evidence and it "
+                       f"describes {prior!r}, not {dp_ff!r}.")})
     return findings
+
+
+def _class_prior(plan: dict) -> str | None:
+    """classes.<CLASS>.ff_accuracy_prior for this plan's class, or None if unresolvable."""
+    polymer_class = plan.get("polymer_class")
+    if not polymer_class:
+        return None
+    try:
+        return get_class_entry(load_rules(), polymer_class,
+                               warn_on_miss=False).get("ff_accuracy_prior")
+    except Exception:  # noqa: BLE001 -- a broken lookup must not block a plan
+        return None
 
 
 def _system_size_findings(plan: dict) -> list:
@@ -459,7 +487,8 @@ def _system_size_findings(plan: dict) -> list:
         rec = select_system_size(polymer_class, smiles,
                                  properties=plan.get("properties"),
                                  dp_typical=dp_dict.get("dp_typical"),
-                                 nchain=dp_dict.get("nchain"))
+                                 nchain=dp_dict.get("nchain"),
+                                 field=dp_dict.get("preferred_ff"))
     except Exception as e:  # noqa: BLE001 -- a broken check must not block a plan
         findings.append({"check": "system_size_safety", "severity": "structural",
                          "detail": f"select_system_size.py raised: {e}"})
@@ -521,7 +550,8 @@ def _system_size_over_provisioned_findings(plan: dict) -> list:
 
     try:
         rec = select_system_size(polymer_class, smiles, properties=plan.get("properties"),
-                                 dp_typical=dp, nchain=dp_dict.get("nchain"))
+                                 dp_typical=dp, nchain=dp_dict.get("nchain"),
+                                 field=dp_dict.get("preferred_ff"))
     except Exception as e:  # noqa: BLE001 -- a broken check must not block a plan
         findings.append({"check": "system_size_safety", "severity": "structural",
                          "detail": f"select_system_size.py raised: {e}"})

@@ -41,7 +41,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rules_common import load_rules, get_class_entry  # noqa: E402
-from mol_python import run_in_mol_env  # noqa: E402
+from mol_python import run_in_mol_env, RDKIT_CLI  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 EMC_ROOT = os.environ.get("EMC_ROOT", os.path.expanduser("~/emc"))
@@ -1180,6 +1180,105 @@ def select_forcefield(polymer_class, smiles, fields=None, archive_root="manuscri
                  "reported and never ranks. This selects an admissible field — it does "
                  "not claim the chosen field is the most accurate one."),
     }
+
+
+# ===========================================================================
+# MOIETY SCREEN -- D-01's per-SMILES field resolution
+# ===========================================================================
+MOIETY_RULES_PATH = os.path.join(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))), "guides", "ff_moiety_rules.json")
+
+# A field is only worth probing if it fails matched monomers less often than this. Every rule
+# in the file today measures at or near 1.00 across all nine registered EMC fields, so a
+# blocker means "no field builds this", not "try the next lineage" -- the cascade arm measured
+# 21 rescues out of 347 and none of them were these groups.
+_PROBE_WORTH_TRYING_BELOW = 0.90
+
+# Fields this platform can actually RUN, not merely build. mcp-lammps-engine/script_generator.py
+# emits one deck per family (class2 / opls / trappe / dreiding, with GAFF as the else branch);
+# a CHARMM field has none, so it would silently run the GAFF deck. It stays in FIELDS as a
+# capability probe and is excluded from everything that can select a field for a real run.
+RUNNABLE_FIELDS = frozenset(f for f in FIELDS if LINEAGE.get(f) != "charmm")
+
+
+def _match_moieties(smiles, rules_path=None):
+    """rdkit_cli match-moieties for one SMILES. Returns [] on any RDKit-side failure -- an
+    unavailable screen means UNSCREENED, and the probe below is what actually decides."""
+    try:
+        r = run_in_mol_env(script_path=RDKIT_CLI,
+                           args=["match-moieties", "--smiles", smiles]
+                                + (["--rules", rules_path] if rules_path else []),
+                           timeout=120)
+        if r.returncode != 0 or not r.stdout.strip():
+            return None
+        return json.loads(r.stdout)["moieties"]
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError):
+        return None
+
+
+def _ranked_candidates(prior, blockers):
+    """Fields worth a trial build, prior first, then same lineage, then the rest.
+
+    A field every blocker measures at >= _PROBE_WORTH_TRYING_BELOW is dropped: paying 3 s for a
+    build already measured to fail ~240/240 times buys nothing.
+    """
+    def blocked(field):
+        return any(((b.get("blocks") or {}).get(field) or {}).get("fail_rate", 0.0)
+                   >= _PROBE_WORTH_TRYING_BELOW for b in blockers)
+
+    rest = [f for f in sorted(RUNNABLE_FIELDS)
+            if f != prior and FIELDS[f]["front_end"] == "emc" and not blocked(f)]
+    same = [f for f in rest if LINEAGE.get(f) == LINEAGE.get(prior)]
+    return [prior] + same + [f for f in rest if f not in same]
+
+
+def select_by_moiety(smiles, class_prior, rules_path=None, probe=True, lmp=LMP):
+    """Which force field this SMILES should BUILD with, and what was actually measured.
+
+    SMARTS narrows, a real EMC trial build decides. The screen is cheap and always runs; the
+    probe costs ~0.5-3 s per field and runs only when a blocker matched (or probe is forced).
+    Never raises for an expected failure -- an unbuildable molecule is a result, not an error.
+
+    Returns {field, prior, probed[], typed, blockers[], reason, unscreened}. `field` is None
+    only when a probe was run and nothing typed; a plan with field=None must not build.
+    """
+    blockers = _match_moieties(smiles, rules_path)
+    unscreened = blockers is None
+    blockers = blockers or []
+    out = {"prior": class_prior, "blockers": blockers, "probed": [], "typed": None,
+           "field": class_prior, "unscreened": unscreened}
+
+    if not blockers:
+        # No measured blocker: keep the prior and pay for no build. The rules cover 77% of
+        # measured failures, so this is a screen passing, NOT a coverage measurement --
+        # _coverage_claim keeps saying NOT MEASURED, which is what sends it to the critic.
+        out["reason"] = ("no known blocking moiety" if not unscreened
+                         else "moiety screen unavailable; prior kept unverified")
+        return out
+
+    if not probe:
+        out["reason"] = (f"blocking moieties {[b['id'] for b in blockers]} matched, but probing "
+                         "is off -- the prior stands unverified")
+        return out
+
+    styles = installed_styles(lmp)
+    for field in _ranked_candidates(class_prior, blockers):
+        if field not in FIELDS or not styles:
+            continue
+        if not check_integration(field, styles)["integrates"]:
+            continue
+        out["probed"].append(field)
+        if check_typing(smiles, field)["types_smiles"]:
+            out["field"], out["typed"] = field, True
+            out["reason"] = (f"{[b['id'] for b in blockers]} matched, but {field!r} typed this "
+                             "repeat unit in a real EMC trial build")
+            return out
+
+    out["field"], out["typed"] = None, False
+    out["reason"] = (f"blocking moieties {[b['id'] for b in blockers]} matched and no field "
+                     f"typed this repeat unit (probed {out['probed']}). Every other registered "
+                     "EMC field was measured to fail these groups too, so no cascade applies.")
+    return out
 
 
 # ===========================================================================

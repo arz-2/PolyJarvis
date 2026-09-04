@@ -66,6 +66,7 @@ from select_system_size import solve_system_size, SYSTEM_MW_FLOOR_DOI  # noqa: E
 from select_hardware import select_hardware       # noqa: E402  -- D-08, live host + derived cell size
 from hardware_runtime import gpu_status, host_matches  # noqa: E402  -- D-08 concurrent_load / host_match
 from rules_common import primary_source, source_evidence  # noqa: E402  -- citations[] id -> real DOI
+import forcefield  # noqa: E402  -- D-01's moiety screen + EMC trial probe
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DECISION_POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
@@ -620,7 +621,9 @@ def _d01_ff_row(rules, cls, polymer_class, hw, criteria, field=None,
     uncertainty (see _ff_prior_uncertainty).
     """
     prior = cls.get("ff_accuracy_prior")
-    ff = _field_of(cls, field)
+    # A resolution is authoritative even when it says None -- that is "nothing types this
+    # SMILES", not "no field was supplied", and _field_of cannot tell the two apart.
+    ff = resolution["field"] if resolution else _field_of(cls, field)
     ev = []
 
     # literature_support -- the class's own FF justification, with a real DOI. 7 of 21 classes
@@ -680,10 +683,17 @@ def _d01_ff_row(rules, cls, polymer_class, hw, criteria, field=None,
         alts = [f"NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.{polymer_class} "
                 f"has no forcefield_alternatives, and this layer will not invent one. Run with "
                 f"--with-ff-probe, or let the literature critic name a candidate."]
-    return {"default_choice": ff, "criteria_evaluated": criteria,
-            "evidence": ev, "alternatives": alts,
-            "resolved_by": (f"polymer_rules.json:classes.{polymer_class}.ff_accuracy_prior"
-                            if ff == prior else "forcefield.select_by_moiety")}
+    row = {"default_choice": ff, "criteria_evaluated": criteria,
+           "evidence": ev, "alternatives": alts,
+           "resolved_by": (f"polymer_rules.json:classes.{polymer_class}.ff_accuracy_prior"
+                           if ff == prior and not (resolution or {}).get("probed")
+                           else "forcefield.select_by_moiety")}
+    # Only when a probe actually ran: validate_run_plan's ff_no_admissible_field /
+    # ff_not_admissible gates key off this list, and an unprobed [] would read as a
+    # measurement that nothing types.
+    if (resolution or {}).get("probed"):
+        row["admissible"] = [ff] if ff else []
+    return row
 
 
 def _d02_charges_row(rules, cls, polymer_class, smiles, criteria, field=None) -> dict:
@@ -888,11 +898,15 @@ def _dominant_uncertainty(cls, size, hw) -> str:
 
 
 def make_decision(polymer_class: str, smiles: str, properties: set, *,
-                   baseline: bool = False) -> dict:
+                   baseline: bool = False, with_ff_probe: bool = False) -> dict:
     """The complete deterministic decision for this class + SMILES.
 
     Costs ~10-20 s: solve_system_size and select_hardware each shell into the RDKit conda env
     for the monomer atom count, and D-08 shells out to nvidia-smi. The old scaffold was instant.
+
+    `with_ff_probe` adds a real EMC trial build for D-01 when the moiety screen finds a known
+    blocker (~0.5-3 s, and only for the ~1 in 3 SMILES that match one). It is what turns D-01's
+    parameter_coverage from "NOT MEASURED" into a measurement.
     """
     rules = load_rules()
     if polymer_class.upper() not in rules.get("classes", {}):
@@ -905,9 +919,17 @@ def make_decision(polymer_class: str, smiles: str, properties: set, *,
     # D-01 first: the resolved field is an INPUT to D-04 (united-atom cells count heavy atoms
     # only) and to D-08 (engine/MPI defaults are per FF family), so it cannot be read off the
     # class entry by each of them independently.
-    field = cls.get("ff_accuracy_prior")
-    resolution = None
-    resolvers["forcefield.select_by_moiety"] = "skipped (--with-ff-probe not implemented yet)"
+    prior = cls.get("ff_accuracy_prior")
+    try:
+        resolution = forcefield.select_by_moiety(smiles, prior, probe=with_ff_probe)
+        # D-04/D-08 still have to price and size something even when nothing types, so they
+        # fall back to the prior; D-01 keeps the None and refuses.
+        field = resolution["field"] or prior
+        resolvers["forcefield.select_by_moiety"] = (
+            f"ok ({'probed ' + ', '.join(resolution['probed']) if resolution['probed'] else 'screen only'})")
+    except Exception as e:  # noqa: BLE001 -- a broken screen must not block planning
+        resolution, field = None, prior
+        resolvers["forcefield.select_by_moiety"] = f"error: {e}"
 
     # Same argument shape materialize_plan uses, so default_choice and decided_params can't drift.
     try:
@@ -963,9 +985,18 @@ def make_decision(polymer_class: str, smiles: str, properties: set, *,
     if "error" in (hw or {}):
         assumptions.append(f"D-08 hardware unresolved: {hw['error']}")
     assumptions.append(
-        "overrides is deliberately empty: materialize_plan() only auto-fills dp_typical/nchain "
-        "for keys overrides does not set, so writing the derived cell here would suppress the "
+        "overrides carries preferred_ff only when D-01 resolved a field other than the class "
+        "prior; dp_typical/nchain stay out of it, because materialize_plan() only auto-fills "
+        "keys overrides does not set and writing the derived cell here would suppress the "
         "solve it came from.")
+    # A null field means "nothing types this SMILES". It must never reach decided_params --
+    # D-01's admissible=[] is what stops the run (validate_run_plan.ff_no_admissible_field).
+    overrides = {} if field in (prior, None) else {"preferred_ff": field}
+    prior_ack = _ff_prior_uncertainty(polymer_class, prior,
+                                     resolution["field"] if resolution else field, resolution)
+    if prior_ack:
+        assumptions.append(prior_ack["detail"])
+        rationale.append(f"D-01_ff DEPARTS FROM THE CLASS PRIOR: {prior_ack['detail']}")
 
     confidence = "unreviewed"
     if baseline:
@@ -979,7 +1010,7 @@ def make_decision(polymer_class: str, smiles: str, properties: set, *,
         "polymer_class": polymer_class,
         "properties": sorted(properties),
         "rationale": rationale,
-        "overrides": {},
+        "overrides": overrides,
         "decision_evaluations": rows,
         "assumptions": assumptions,
         "dominant_uncertainty": _dominant_uncertainty(cls, size, hw),
@@ -1019,7 +1050,7 @@ def _cmd_run_plan(args) -> int:
 def _cmd_decision(args) -> int:
     properties = _properties_from_arg(args.properties)
     decision = make_decision(args.polymer_class, args.smiles, properties,
-                             baseline=args.baseline)
+                             baseline=args.baseline, with_ff_probe=args.with_ff_probe)
     text = json.dumps(decision, indent=2)
 
     if args.out == "-":
@@ -1054,6 +1085,10 @@ def main():
         sp.add_argument("--properties", default="all",
                         help="Comma-separated: density,tg,bulk_modulus or 'all'")
         sp.add_argument("--out", default=None, help="Output path; '-' = stdout")
+        sp.add_argument("--with-ff-probe", action="store_true",
+                        help="Run a real EMC trial build for D-01 when the moiety screen finds "
+                             "a known blocker, instead of asserting the class prior "
+                             "(~0.5-3 s, only for a SMILES that matches a rule)")
         return sp
 
     rp = _common(sub.add_parser("run-plan", help="emit run_plan.json"))

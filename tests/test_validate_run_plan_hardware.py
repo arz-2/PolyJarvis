@@ -22,7 +22,9 @@ def _plan(**decided_params):
 
 
 def _fake_select_hardware(confidence, cell_atoms, ff_family="pcff"):
-    def _inner(polymer_class, smiles, dp_typical, nchain):
+    # Signature mirrors select_hardware exactly, `field` included: the real call passes it
+    # positionally, and a fake that silently swallowed it would fail the check open.
+    def _inner(polymer_class, smiles, dp_typical, nchain, field=None):
         choice = {"engine": "kokkos", "gpu_per_run": 1, "mpi_ranks": 1}
         return {"decision": {"id": "D-08_hardware", "choice": choice,
                              "confidence": confidence, "evidence": [], "alternatives": []},
