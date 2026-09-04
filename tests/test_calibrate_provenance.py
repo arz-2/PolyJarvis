@@ -65,3 +65,44 @@ def test_engine_rationale_always_survives_because_it_is_not_a_measurement():
 def test_carry_over_is_silent_when_there_were_no_prior_size_points():
     probe = {}
     assert ch._carry_provenance({"kokkos_offload_study": {}}, probe, same_host=False) is None
+
+
+# --- --size-points: turning timed records into an interpolatable curve -----------------
+
+def _rec(fam, atoms, ns, size_point=False, status="ok"):
+    return {"ff": fam, "atoms": atoms, "ns_per_day": ns, "status": status,
+            "engine": "kokkos", "mpi": 1, "gpu_per_run": 1, "size_point": size_point}
+
+
+def test_a_family_measured_at_several_sizes_gets_a_sorted_curve():
+    curves = ch._fresh_size_curves([
+        _rec("pcff", 15040, 17.384, size_point=True),
+        _rec("pcff", 3020, 42.269),                      # base cell, measured with parity
+        _rec("pcff", 5140, 30.63, size_point=True),
+    ])
+    assert [p["atoms"] for p in curves["pcff"]] == [3020, 5140, 15040]
+    assert curves["pcff"][0]["ns_per_day"] == 42.269
+
+
+def test_a_single_measured_size_writes_no_curve():
+    # select_hardware._size_points needs 2 points to interpolate; a lone point in the JSON
+    # would read as a curve it is not. This is the plain --revalidate case.
+    assert ch._fresh_size_curves([_rec("pcff", 3020, 42.269)]) == {}
+
+
+def test_a_family_missing_its_size_cells_is_omitted_not_half_written():
+    curves = ch._fresh_size_curves([
+        _rec("pcff", 3020, 42.269), _rec("pcff", 15040, 17.384, size_point=True),
+        _rec("gaff", 3000, 20.0),                        # no CALIB_GAFF_5K/_15K in-repo
+    ])
+    assert "pcff" in curves and "gaff" not in curves
+
+
+def test_repeated_atom_counts_do_not_fake_a_second_point():
+    assert ch._fresh_size_curves([_rec("pcff", 3020, 42.0), _rec("pcff", 3020, 41.0)]) == {}
+
+
+def test_records_without_a_throughput_number_are_ignored():
+    curves = ch._fresh_size_curves([
+        _rec("pcff", 3020, 42.269), _rec("pcff", 5140, None, size_point=True)])
+    assert curves == {}
