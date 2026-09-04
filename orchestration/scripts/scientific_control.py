@@ -25,6 +25,7 @@ from make_deterministic_plan import build_decisions, build_planned_stages, make_
 from select_system_size import solve_system_size  # noqa: E402
 import rules_common  # noqa: E402  -- module import so tests can monkeypatch rules_common.canonicalize
 import select_hardware as cost_model  # noqa: E402  -- cost model merged into it 2026-09-02
+import forcefield  # noqa: E402  -- FIELDS is the only registry of real force-field names
 
 
 # Re-exported from the registry -- imported by name in several modules.
@@ -102,9 +103,12 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "npt_continuation_ns": (0.01, 1000),
     "mechanical_sampling_factor": (1, 10),
 }
+# Derived, never hand-listed: the hand-written copy had "trappe" (real key: "trappe-ua") and
+# omitted the UA/CHARMM/GAFF entries, so 4 of the 6 values in use failed validation.
+FF_OVERRIDE_VALUES = frozenset(forcefield.FIELDS)
 ENUM_OVERRIDES = {
     "preferred_builder": frozenset({"emc", "radonpy"}),
-    "preferred_ff": frozenset({"pcff", "pcff_ore", "compass", "opls/2024/opls-aa", "trappe", "gaff2", "gaff2_mod", "dreiding"}),
+    "preferred_ff": FF_OVERRIDE_VALUES,
     "charge_method": frozenset({"none", "embedded", "bond-increment", "opls-library",
                                   "gasteiger", "am1bcc", "am1-bcc", "resp"}),
     "electrostatics": frozenset({"pppm", "lj_cut"}),
@@ -326,7 +330,7 @@ def planning_context(intent: ScientificIntent) -> dict[str, Any]:
         summaries[class_id] = {
             "name": entry.get("name") or entry.get("polymer_name"),
             "preferred_builder": entry.get("preferred_builder", "emc"),
-            "preferred_ff": entry.get("preferred_ff"),
+            "ff_accuracy_prior": entry.get("ff_accuracy_prior"),
             "experimental_tg_K": entry.get("experimental_tg_K"),
             "supported_properties": sorted(VALID_PROPERTIES),
         }

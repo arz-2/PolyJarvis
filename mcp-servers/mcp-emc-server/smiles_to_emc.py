@@ -55,6 +55,22 @@ def _check_emc():
 _ESH_NTOTAL_INERT = 3000
 
 
+
+_STEREO_BONDS = str.maketrans("", "", "/\\")
+
+
+def strip_bond_stereo(smiles: str) -> tuple[str, bool]:
+    """(smiles without cis/trans bond markers, whether any were removed).
+
+    "/" opens a comment in the .esh grammar, so a stereo SMILES kills the build outright --
+    24 of the 982 PI1070 polymers in docs/ff_coverage_sweep/. Nothing is lost that EMC would
+    have kept: it discards SMILES double-bond stereo regardless and packs a mixed cis/trans
+    cell. Stereocentres ("@"/"@@") ARE honoured by EMC and are left untouched.
+    """
+    clean = smiles.translate(_STEREO_BONDS)
+    return clean, clean != smiles
+
+
 def make_esh(
     smiles: str,
     field: str = "pcff",
@@ -75,6 +91,7 @@ def make_esh(
     seed and temperature are passed as emc_setup.pl CLI flags (not .esh options).
     Returns the .esh file as a string (does not write to disk).
     """
+    smiles, _stereo_dropped = strip_bond_stereo(smiles)
     n_stars = smiles.count("*")
     if n_stars != 2:
         raise ValueError(
@@ -168,14 +185,20 @@ def run_emc_setup(
         "-replace",
         str(esh_path.name),
     ]
-    subprocess.run(
+    # No check=True: CalledProcessError discards the captured output, which is the only place
+    # emc_setup.pl reports WHY it refused (e.g. "unmatched comment delimitor" for a stray "/").
+    proc = subprocess.run(
         cmd,
         cwd=esh_path.parent,
         env=env,
-        check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        text=True,
     )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"emc_setup.pl exited {proc.returncode} on {esh_path.name}:\n"
+            f"{(proc.stdout or '').strip() or '(no output)'}")
 
     build_emc = esh_path.parent / "build.emc"
     if not build_emc.exists():

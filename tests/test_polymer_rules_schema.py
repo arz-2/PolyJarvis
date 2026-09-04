@@ -25,8 +25,7 @@ CLASSES = RULES["classes"]
 REQUIRED_KEYS = [
     "name",
     "preferred_builder",
-    "preferred_ff",
-    "forcefield",
+    "ff_accuracy_prior",
     "charge_method",
     # dp_typical / nchain / dp_min ALL REMOVED 2026-09-02: cell size is derived per-SMILES
     # from select_system_size's system-mass floor, not stored per class. None of the 21 classes
@@ -113,7 +112,7 @@ def test_routing_fields_are_known(cid):
 # is sourced from the same JSON; duplicating those exact values here only invites the
 # two tests to contradict each other.
 EMC_FF_FAMILIES = ("pcff", "opls", "trappe", "compass")   # substring families (both opls spellings)
-# compass added 2026-08-26: it's a legal ENUM_OVERRIDES["preferred_ff"] value
+# compass added 2026-08-26: it is a legal ENUM_OVERRIDES["preferred_ff"] value
 # (scientific_control.py), stage_params.py already treats it as pcff-equivalent
 # (class_ii = 'pcff' in ff or ff in ('compass', 'pcff_ore')), and it is mechanically
 # EMC-admissible for at least one class (POXI) -- the tuple was simply incomplete,
@@ -125,13 +124,13 @@ QM_CHARGE_JOBS = {"resp", "am1-bcc", "am1bcc", "gasteiger"}
 @pytest.mark.parametrize("cid", sorted(CLASSES))
 def test_build_route_consistency(cid):
     e = CLASSES[cid]
-    builder, pref_ff = e["preferred_builder"], e["preferred_ff"]
+    builder, pref_ff = e["preferred_builder"], e["ff_accuracy_prior"]
     if builder == "emc":
         # EMC builds with one of its own all-atom/UA fields and embeds the
         # force field's charges directly — it never schedules a QM charge job.
         assert any(fam in pref_ff.lower() for fam in EMC_FF_FAMILIES), (
             f"{cid}: EMC build requires an EMC FF family {EMC_FF_FAMILIES}, "
-            f"got preferred_ff={pref_ff!r}"
+            f"got ff_accuracy_prior={pref_ff!r}"
         )
         assert e["charge_method"].lower() not in QM_CHARGE_JOBS, (
             f"{cid}: EMC embeds force-field charges → must not run a QM charge job, "
@@ -142,10 +141,10 @@ def test_build_route_consistency(cid):
         # submit_copolymerize_job now support it (radonpy.ff.dreiding.Dreiding, confirmed
         # installed and build-tested end-to-end after patching a dict-vs-list bug in that
         # module's assign_atypes/assign_dtypes/assign_itypes — see docs/ff_capability_gaps.json).
-        assert pref_ff in {"GAFF2", "GAFF2_mod", "Dreiding"}, (
-            f"{cid}: RadonPy route expects a GAFF2 or Dreiding field, got preferred_ff={pref_ff!r}"
+        assert pref_ff in {"gaff2", "gaff2_mod", "dreiding"}, (
+            f"{cid}: RadonPy route expects a GAFF2 or Dreiding field, got "
+            f"ff_accuracy_prior={pref_ff!r}"
         )
-        assert e["forcefield"] in {"GAFF2", "GAFF2_mod", "Dreiding"}
         assert e["charge_method"] in {"RESP", "AM1-BCC"}, (
             f"{cid}: RadonPy runs a charge job → charge_method must be RESP/AM1-BCC, "
             f"got {e['charge_method']!r}"
@@ -263,13 +262,13 @@ FF_CUTOFF_FLOOR_A = {
 @pytest.mark.parametrize("cid", sorted(CLASSES))
 def test_cutoff_respects_its_force_fields_parameterization(cid):
     entry = CLASSES[cid]
-    floor = FF_CUTOFF_FLOOR_A.get(entry.get("preferred_ff"))
+    floor = FF_CUTOFF_FLOOR_A.get(entry.get("ff_accuracy_prior"))
     if floor is None:
         pytest.skip(f"{cid}: no published cutoff floor pinned for "
-                    f"{entry.get('preferred_ff')!r}")
+                    f"{entry.get('ff_accuracy_prior')!r}")
     assert entry["cutoff_A"] >= floor, (
         f"{cid}: cutoff_A={entry['cutoff_A']} A is below the {floor} A its own "
-        f"force field ({entry['preferred_ff']}) was parameterized with"
+        f"force field ({entry['ff_accuracy_prior']}) was parameterized with"
     )
 
 

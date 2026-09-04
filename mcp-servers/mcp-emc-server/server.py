@@ -34,7 +34,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from smiles_to_emc import build_cell
+from smiles_to_emc import build_cell, strip_bond_stereo
 
 from mcp.server.fastmcp import FastMCP
 
@@ -258,6 +258,13 @@ def _build_emc_cell(
     temperature: float,
     seed: int,
 ) -> dict:
+    # EMC discards SMILES double-bond stereo, and "/" additionally breaks the .esh parser.
+    # Record the drop here so the run's provenance says the cell is cis/trans-mixed by
+    # construction rather than leaving it to be inferred from a silent success.
+    _, stereo_stripped = strip_bond_stereo(smiles)
+    if stereo_stripped:
+        logger.warning("cis/trans bond stereo stripped from %s: EMC packs a mixed cell", smiles)
+
     # Resolve seed before calling EMC so the cell is reproducible.
     if seed == -1:
         seed = random.randint(1, 2**31 - 1)
@@ -283,6 +290,7 @@ def _build_emc_cell(
             "dp": dp,
             "density": density,
             "smiles": smiles,
+            "stereo_stripped": stereo_stripped,
         }
         (Path(output_dir) / "emc_metadata.json").write_text(
             json.dumps(meta, indent=2)
@@ -311,6 +319,7 @@ def _build_emc_cell(
         "density":       density,
         "natoms":        natoms,
         "resolved_seed": seed,
+        "stereo_stripped": stereo_stripped,
         "lammps_flags":  _lammps_flags(field),
         "message":       f"LAMMPS .data file written: {data_path}",
     }

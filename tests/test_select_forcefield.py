@@ -49,13 +49,19 @@ def _fake_field(candidate=True):
             "typing_error": None, "cell_dir": None}
 
 
-def test_class_default_matched_case_insensitively(monkeypatch):
-    """polymer_rules.json's preferred_ff casing need not match sf.FIELDS'
-    canonical (lowercase) keys -- e.g. PURA stores "GAFF2_mod" against the registry's
-    "gaff2_mod". A class default that IS admissible must never be reported as
-    inadmissible, and decided_params_override must never fire, merely because of a
-    casing mismatch (regression: this previously fell through to the "not admissible"
-    branch and proposed overriding PURA's DOI-justified default to dreiding)."""
+def test_every_class_prior_is_a_canonical_field_name():
+    """polymer_rules.json stored display casing ("GAFF2_mod", "Dreiding") against FIELDS'
+    lowercase keys, so select_forcefield needed a case-insensitive rescue and
+    ENUM_OVERRIDES["preferred_ff"] rejected 4 of the 6 values in real use. The values are now
+    canonical at the source; pin that so neither workaround has to come back."""
+    classes = sf.load_rules()["classes"]
+    off = {cid: e.get("ff_accuracy_prior") for cid, e in classes.items()
+           if e.get("ff_accuracy_prior") not in sf.FIELDS}
+    assert not off, f"ff_accuracy_prior must be a forcefield.FIELDS key verbatim: {off}"
+
+
+def test_class_prior_is_chosen_when_admissible(monkeypatch):
+    """An admissible class prior is chosen at high confidence and proposes no override."""
     fake_cap = {"fields": {"gaff2_mod": _fake_field(), "gaff": _fake_field(),
                           "gaff2": _fake_field(), "dreiding": _fake_field()}}
     monkeypatch.setattr(sf, "assess_all", lambda *a, **k: fake_cap)
@@ -64,8 +70,7 @@ def test_class_default_matched_case_insensitively(monkeypatch):
     assert result["decision"]["choice"] == "gaff2_mod"
     assert result["decision"]["confidence"] == "high"
     assert result["decided_params_override"] == {}
-    # the raw JSON casing is still shown verbatim in the evidence trail
-    assert "'GAFF2_mod'" in result["decision"]["evidence"][-1]["claim"]
+    assert "'gaff2_mod'" in result["decision"]["evidence"][-1]["claim"]
 
 
 # --- validator -------------------------------------------------------------------

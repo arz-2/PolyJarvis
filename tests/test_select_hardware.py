@@ -58,7 +58,7 @@ def test_small_cell_floor_forces_one_gpu_regardless_of_family_default(monkeypatc
         "directional_probe": {},
     })
     monkeypatch.setattr(sh, "get_class_entry",
-                        lambda rules, cls, warn_on_miss=False: {"preferred_ff": "testff"})
+                        lambda rules, cls, warn_on_miss=False: {"ff_accuracy_prior": "testff"})
     # dp=5*nchain=5 -> 250 atoms, far under the 10k floor.
     result = sh.select_hardware("ANYCLASS", "*CC*", dp_typical=5, nchain=5)
     assert result["decision"]["choice"]["gpu_per_run"] == 1

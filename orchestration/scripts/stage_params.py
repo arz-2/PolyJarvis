@@ -76,7 +76,9 @@ def resolve_hardware(args, cls: dict, rules: dict) -> None:
         live = live_host()
         live_desc = f"{live['gpus']}x {live['gpu_model']} / {live['phys_cores']} cores"
         print(f"INFO: hardware_policy was benchmarked on {saved_desc}; you are on {live_desc} (values_are_benchmarked={hp.get('values_are_benchmarked', False)}). Run /calibrate-hardware once to host-match the per-FF engine defaults.", file=sys.stderr)
-    ff_raw = cls.get('preferred_ff') or cls.get('forcefield') or ''
+    # `cls` here is apply_plan's overlay, so preferred_ff is the plan's RESOLVED field.
+    # ff_accuracy_prior is the class prior, reached only on the no-plan path.
+    ff_raw = cls.get('preferred_ff') or cls.get('ff_accuracy_prior') or ''
     fam = resolve_ff_family(ff_raw, hp)
     pol = hp.get('by_forcefield', {}).get(fam, {})
     if getattr(args, 'engine', None) is None:
@@ -101,7 +103,7 @@ def _pick(arg_val, cls: dict, key: str, default):
 def _lammps_flags(flags_json: str | None, cls: dict) -> dict:
     if flags_json:
         return json.loads(flags_json)
-    ff = cls.get('preferred_ff', '').lower()
+    ff = (cls.get('preferred_ff') or cls.get('ff_accuracy_prior') or '').lower()
     class_ii = 'pcff' in ff or ff in ('compass', 'pcff_ore')
     return {'use_pcff': class_ii, 'use_opls': 'opls' in ff, 'use_trappe': 'trappe' in ff,
             'use_dreiding': 'dreiding' in ff}
@@ -980,7 +982,9 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
     dp = args.dp if args.dp is not None else cls.get('dp_typical')
     nchain = args.nchain if args.nchain is not None else cls.get('nchain')
     charge_method = args.charge_method or cls.get('charge_method')
-    ff = args.ff or cls.get('preferred_ff', 'pcff')
+    # No 'pcff' default: run-summary REPORTS what ran. An unresolved field is recorded as
+    # null, not as a guess that would enter the provenance record as fact.
+    ff = args.ff or cls.get('preferred_ff')
     d01 = args.d01 or ff
     d02 = args.d02 or charge_method
     d03 = args.d03 or cls.get('electrostatics')

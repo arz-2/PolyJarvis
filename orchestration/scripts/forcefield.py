@@ -1077,22 +1077,14 @@ def select_forcefield(polymer_class, smiles, fields=None, archive_root="manuscri
                       emc_root=EMC_ROOT, keep_dir=None):
     rules = load_rules()
     cls = get_class_entry(rules, polymer_class, warn_on_miss=True)
-    default_raw = cls.get("preferred_ff") or cls.get("forcefield")
-    if not default_raw:
-        return {"error": f"polymer_rules.json class {polymer_class!r} has no preferred_ff"}
+    default = cls.get("ff_accuracy_prior")
+    if not default:
+        return {"error": f"polymer_rules.json class {polymer_class!r} has no ff_accuracy_prior"}
 
     tmp = keep_dir or tempfile.mkdtemp(prefix="ffsel_")
     cap = assess_all(smiles, fields, keep_dir=tmp)
     if "error" in cap:
         return cap
-
-    # polymer_rules.json's preferred_ff casing does not always match
-    # FIELDS' canonical (lowercase) keys -- e.g. PURA stores
-    # "GAFF2_mod" against the registry key "gaff2_mod". Resolve to the registry's
-    # casing so an admissible class default is never mistaken for inadmissible;
-    # the raw JSON value is still shown verbatim in the evidence claim below.
-    default = next((f for f in cap["fields"] if f.lower() == default_raw.lower()),
-                   default_raw)
 
     assessed = {}
     for field, r in cap["fields"].items():
@@ -1163,8 +1155,8 @@ def select_forcefield(polymer_class, smiles, fields=None, archive_root="manuscri
             "evidence": [
                 {"claim": reason},
                 {"claim": f"admissible fields (integrate + type this SMILES): {admissible}"},
-                {"claim": f"class default source: polymer_rules.json:classes."
-                          f"{polymer_class}.preferred_ff = {default_raw!r}",
+                {"claim": f"class prior source: polymer_rules.json:classes."
+                          f"{polymer_class}.ff_accuracy_prior = {default!r}",
                  "ff_justification_doi": cls.get("ff_justification_doi"),
                  "ff_note": cls.get("ff_note")},
             ],

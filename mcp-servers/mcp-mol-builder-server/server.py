@@ -902,8 +902,8 @@ def cancel_job(job_id: str) -> dict:
 # ============================================================================
 
 # PoLyInfo class ID → name/description lookup
-def _get_preferred_ff(smiles: str, class_name: str) -> dict:
-    """Authoritative FF/builder routing for a polymer class, from polymer_rules.json.
+def _get_ff_accuracy_prior(smiles: str, class_name: str) -> dict:
+    """Class-level FF/builder routing for a polymer class, from polymer_rules.json.
 
     Single source of truth: the routing fields are looked up from
     ``guides/polymer_rules.json`` (via the dependency-light ``ff_routing`` module)
@@ -919,11 +919,11 @@ def _get_preferred_ff(smiles: str, class_name: str) -> dict:
         _here = os.path.dirname(os.path.abspath(__file__))
         if _here not in sys.path:
             sys.path.insert(0, _here)
-        from ff_routing import get_preferred_ff
-        return get_preferred_ff(class_name)
+        from ff_routing import get_ff_accuracy_prior
+        return get_ff_accuracy_prior(class_name)
     except Exception as exc:  # never break classification on a routing-lookup failure
         return {
-            "preferred_ff": None,
+            "ff_accuracy_prior": None,
             "preferred_builder": None,
             "ff_confidence": "uncited",
             "ff_justification": f"routing lookup failed: {exc}",
@@ -978,7 +978,7 @@ def classify_polymer(smiles: str) -> dict:
 
     Returns:
         dict with class_id, class_name, description, flags (all 21 groups),
-        co_occurring_groups, any warnings, and the routing fields preferred_ff,
+        co_occurring_groups, any warnings, and the routing fields ff_accuracy_prior,
         preferred_builder, ff_confidence, ff_justification, ff_justification_doi
         (sourced from polymer_rules.json)
     """
@@ -1018,7 +1018,7 @@ def classify_polymer(smiles: str) -> dict:
                 "cis vs trans isomers can differ by ~60K in Tg."
             )
 
-        ff_routing = _get_preferred_ff(smiles, class_name)
+        ff_routing = _get_ff_accuracy_prior(smiles, class_name)
 
         return {
             "status": "success",
@@ -1028,7 +1028,7 @@ def classify_polymer(smiles: str) -> dict:
             "flags": flags,
             "co_occurring_groups": co_occurring,
             "warning": warning,
-            "preferred_ff": ff_routing["preferred_ff"],
+            "ff_accuracy_prior": ff_routing["ff_accuracy_prior"],
             "preferred_builder": ff_routing["preferred_builder"],
             "ff_confidence": ff_routing["ff_confidence"],
             "ff_justification": ff_routing["ff_justification"],

@@ -61,6 +61,7 @@ import track_registry  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from stage_params import _exp_tg_point, _regime_exp_tg  # reuse the proven resolvers, don't duplicate them
 from select_system_size import derive_cell  # per-SMILES cell derivation; the class dp_typical/nchain keys were removed 2026-09-02
+from select_system_size import _is_ua  # noqa: E402  -- one UA-field definition, shared with D-04
 from select_system_size import solve_system_size, SYSTEM_MW_FLOOR_DOI  # noqa: E402  -- D-04, the same call materialize_plan makes
 from select_hardware import select_hardware       # noqa: E402  -- D-08, live host + derived cell size
 from hardware_runtime import gpu_status, host_matches  # noqa: E402  -- D-08 concurrent_load / host_match
@@ -71,7 +72,7 @@ DECISION_POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
 # Decision-relevant class keys consumed by stage_params.py. Only keys that
 # EXIST in the class entry are snapshotted, so the overlay stays an exact identity.
 SNAPSHOT_KEYS = [
-    "preferred_ff", "preferred_builder", "charge_method", "electrostatics",
+    "preferred_builder", "charge_method", "electrostatics",
     "cutoff_A", "dt_fs",
     "dp_typical", "nchain", "density_initial_gcm3",
     "T_equil_K", "annealing_T_high_K", "P_equil_atm", "final_T_K", "anneal_margin_K",
@@ -97,14 +98,23 @@ def _policy_criteria() -> dict:
     return {p["decision_id"]: p.get("evaluate", []) for p in policy.get("policies", {}).values()}
 
 
-def _build_hardware_decision(cls: dict, criteria_evaluated: list) -> dict:
+def _field_of(cls: dict, field: str | None = None) -> str | None:
+    """The force field a decision row should describe.
+
+    D-01's resolved choice wins; then a plan-overlaid `decided_params.preferred_ff`; then the
+    class `ff_accuracy_prior`, which is a literature prior and not by itself a routing decision.
+    """
+    return field or cls.get("preferred_ff") or cls.get("ff_accuracy_prior")
+
+
+def _build_hardware_decision(cls: dict, criteria_evaluated: list, field: str = None) -> dict:
     """D-08_hardware default: engine/mpi/gpu_per_run from hardware_policy.by_forcefield[fam],
     the same FF-family resolver stage_params.resolve_hardware uses. Deliberately NOT
     select_hardware.py's live-host/atom-count-aware defensibility check -- that needs a SMILES
     and nvidia-smi and stays the independent check validate_run_plan.py already runs; this is
     the pure, fast, deterministic class default."""
     hp = hardware_policy()
-    fam = resolve_ff_family(cls.get("preferred_ff") or "", hp)
+    fam = resolve_ff_family(_field_of(cls, field) or "", hp)
     default = hp.get("by_forcefield", {}).get(fam, {})
     choice = {"engine": default.get("engine"), "gpu_per_run": default.get("gpu_per_run"),
               "mpi_ranks": default.get("mpi")}
@@ -114,7 +124,7 @@ def _build_hardware_decision(cls: dict, criteria_evaluated: list) -> dict:
             "evidence": evidence, "confidence": "class_default", "alternatives": []}
 
 
-def _d04_choice(cls: dict, smiles: str | None) -> str:
+def _d04_choice(cls: dict, smiles: str | None, field: str = None) -> str:
     """D-04's default_choice string.
 
     guides/polymer_rules.json's per-class dp_typical/nchain were removed 2026-09-02 (every cell
@@ -125,7 +135,7 @@ def _d04_choice(cls: dict, smiles: str | None) -> str:
     dp, nchain = cls.get("dp_typical"), cls.get("nchain")
     if (dp is None or nchain is None) and smiles:
         try:
-            _dp, _n, _mw, _note = derive_cell(smiles, cls.get("preferred_ff", "") == "trappe-ua")
+            _dp, _n, _mw, _note = derive_cell(smiles, _is_ua(cls, field))
         except Exception:
             _dp = _n = None
         dp = dp if dp is not None else _dp
@@ -135,7 +145,7 @@ def _d04_choice(cls: dict, smiles: str | None) -> str:
     return f"DP={dp}, nchain={nchain}"
 
 
-def build_decisions(cls: dict, smiles: str | None = None) -> list:
+def build_decisions(cls: dict, smiles: str | None = None, field: str = None) -> list:
     """Structured default decision rows carrying evidence/confidence/alternatives, mirroring
     run_summary.json decision IDs. Evidence is transcribed from existing class fields.
 
@@ -159,7 +169,7 @@ def build_decisions(cls: dict, smiles: str | None = None) -> list:
 
     conf = "class_default"
     return [
-        {"id": "D-01_ff", "choice": cls.get("preferred_ff"),
+        {"id": "D-01_ff", "choice": _field_of(cls, field),
          "criteria_evaluated": criteria.get("D-01_ff", []),
          "evidence": ff_evidence, "confidence": conf,
          "alternatives": cls.get("forcefield_alternatives", [])},
@@ -172,10 +182,10 @@ def build_decisions(cls: dict, smiles: str | None = None) -> list:
                        "source": "polymer_rules.json:electrostatics_decision_guide"}],
          "confidence": conf, "alternatives": []},
         {"id": "D-04_system_size",
-         "choice": _d04_choice(cls, smiles),
+         "choice": _d04_choice(cls, smiles, field),
          "criteria_evaluated": criteria.get("D-04_system_size", []),
          "evidence": [], "confidence": conf, "alternatives": []},
-        _build_hardware_decision(cls, criteria.get("D-08_hardware", [])),
+        _build_hardware_decision(cls, criteria.get("D-08_hardware", []), field),
     ]
 
 
@@ -259,7 +269,7 @@ def _assert_tg_rates_feasible(cls: dict, polymer_class: str) -> None:
 
 
 def size_the_cell(polymer_class: str, smiles, properties: set,
-                  size_solve: dict | None = None) -> tuple[dict, list]:
+                  size_solve: dict | None = None, field: str = None) -> tuple[dict, list]:
     """(dp_typical/nchain for decided_params, assumptions) -- the cell, resolved per-SMILES.
 
     SNAPSHOT_KEYS can only copy keys the class entry HAS, and per-class dp_typical/nchain
@@ -280,7 +290,7 @@ def size_the_cell(polymer_class: str, smiles, properties: set,
                         "to build this plan rather than default the cell."]
         try:
             size_solve = solve_system_size(polymer_class, smiles, properties,
-                                           dp_typical=None, nchain=None)
+                                           dp_typical=None, nchain=None, field=field)
         except Exception as e:  # noqa: BLE001 -- an unsized plan must say so, not crash here
             return {}, [f"D-04_system_size UNRESOLVED: solve_system_size raised {e!r}. "
                         "run_campaign will refuse to build this plan rather than default "
@@ -305,7 +315,12 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
     cls = get_class_entry(rules, polymer_class)
     _assert_tg_rates_feasible(cls, polymer_class.upper())
     decided_params = {k: cls[k] for k in SNAPSHOT_KEYS if k in cls}
-    sized, size_assumptions = size_the_cell(polymer_class, smiles, properties, size_solve)
+    # D-01: decided_params.preferred_ff is the field this run BUILDS with. It starts as the
+    # class ff_accuracy_prior and is re-resolved per SMILES by decision_rows(); this scaffold
+    # path runs no probe, so the prior stands and D-01's parameter_coverage stays NOT MEASURED.
+    field = cls.get("ff_accuracy_prior")
+    decided_params["preferred_ff"] = field
+    sized, size_assumptions = size_the_cell(polymer_class, smiles, properties, size_solve, field)
     decided_params.update(sized)
     # Regime call (see _regime_exp_tg): a novel polymer's Tg estimate now drives this instead of
     # defaulting glassy by omission, padded toward glassy for an uncertain estimate.
@@ -345,7 +360,7 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
         ],
         "uncertainties": uncertainties,
         "decided_params": decided_params,
-        "decisions": build_decisions(cls, smiles),
+        "decisions": build_decisions(cls, smiles, field),
         "planned_stages": build_planned_stages(cls, properties, smiles),
         "critique": {"status": "pending_scientific_review", "rounds": 0, "findings": []},
         "provenance": {"generator": "make_deterministic_plan.py",
@@ -372,7 +387,8 @@ def make_plan_from_cache(run_name: str, polymer_class: str, smiles: str, canonic
     protocol = cache_entry["protocol"]
     decided_params = dict(protocol["decided_params"])  # literal replay, no recomputation
     decisions = [dict(d) for d in protocol["decisions"]]
-    decisions.append(_build_hardware_decision(cls, _policy_criteria().get("D-08_hardware", [])))
+    decisions.append(_build_hardware_decision(cls, _policy_criteria().get("D-08_hardware", []),
+                                              decided_params.get("preferred_ff")))
     return {
         "schema_version": "1.0",
         "goal": f"Predict {', '.join(sorted(properties))} for {polymer_class.upper()} ({smiles})",
@@ -546,9 +562,65 @@ def _ev(criterion: str, claim: str, resolver: str, **extra) -> dict:
     return out
 
 
-def _d01_ff_row(rules, cls, polymer_class, hw, criteria) -> dict:
-    """D-01_ff. evidence_required=true, so at least one entry must carry source_doi/citation."""
-    ff = cls.get("preferred_ff")
+def _coverage_claim(polymer_class, prior, ff, resolution=None):
+    """(claim, resolver) for D-01's parameter_coverage criterion.
+
+    The "NOT MEASURED" prefix is emitted unless a real EMC trial build typed THIS SMILES.
+    A moiety screen that found no known blocker does not count: 16% of the measured failures
+    in docs/ff_coverage_sweep/SUMMARY.json matched no rule.
+    """
+    probed = list((resolution or {}).get("probed") or [])
+    if not probed:
+        screened = (resolution or {}).get("blockers")
+        screen = ("" if screened is None else
+                  f" A moiety screen ran and found {len(screened) or 'no'} known blocker(s), "
+                  "which narrows the risk but measures nothing.")
+        return (f"NOT MEASURED for this SMILES. No EMC trial build was run (--with-ff-probe off), "
+                f"so coverage is asserted from polymer_rules.json:classes.{polymer_class}."
+                f"ff_accuracy_prior={prior!r} only; whether {ff!r} can type THIS repeat unit is "
+                f"unverified until the build stage runs.{screen}",
+                f"polymer_rules.json:classes.{polymer_class}.ff_accuracy_prior")
+    if not ff:
+        return (f"MEASURED: an EMC trial build was run against {probed} and none typed this "
+                f"repeat unit. There is no admissible field; this plan must not build.",
+                "forcefield.select_by_moiety")
+    return (f"MEASURED: an EMC trial build with {ff!r} typed this repeat unit "
+            f"(fields probed: {probed}).",
+            "forcefield.select_by_moiety")
+
+
+def _ff_prior_uncertainty(polymer_class, prior, ff, resolution=None):
+    """The uncertainty a plan MUST carry when it does not build with its class prior.
+
+    D-01's only DOI-backed evidence is the class ff_justification_doi, which describes `prior`.
+    Once the field changes, that citation no longer covers the run.
+    """
+    if ff == prior:
+        return None
+    blockers = [b.get("id") for b in (resolution or {}).get("blockers") or []]
+    return {
+        "name": "ff_accuracy_prior_not_met",
+        "dominant": ff is None,
+        "reduction_probe": "literature_anchor",
+        "detail": (f"polymer_rules.json:classes.{polymer_class}.ff_accuracy_prior={prior!r} is "
+                   f"the literature-supported field for this class, but this SMILES "
+                   + (f"builds with {ff!r} instead" if ff else "has no admissible field")
+                   + (f" (blocking moieties: {blockers})" if blockers else "")
+                   + f". The class ff_justification_doi does not cover {ff!r}."),
+    }
+
+
+def _d01_ff_row(rules, cls, polymer_class, hw, criteria, field=None,
+                resolution=None) -> dict:
+    """D-01_ff. evidence_required=true, so at least one entry must carry source_doi/citation.
+
+    `prior` is the class's literature recommendation; `ff` is what this run will build with.
+    They differ when the resolver demotes the prior for this SMILES -- the DOI evidence below
+    still describes `prior`, so a demoted plan must also carry an ff_accuracy_prior_not_met
+    uncertainty (see _ff_prior_uncertainty).
+    """
+    prior = cls.get("ff_accuracy_prior")
+    ff = _field_of(cls, field)
     ev = []
 
     # literature_support -- the class's own FF justification, with a real DOI. 7 of 21 classes
@@ -566,7 +638,7 @@ def _d01_ff_row(rules, cls, polymer_class, hw, criteria) -> dict:
         e = source_evidence(
             rules, backup,
             f"polymer_rules.json:classes.{polymer_class} carries no ff_justification_doi; "
-            f"{ff!r} is the class default and the strongest support on file is the class's own "
+            f"{prior!r} is the class prior and the strongest support on file is the class's own "
             f"first cited source. {note}",
             criterion="literature_support",
             resolver=f"polymer_rules.json:classes.{polymer_class}.citations[0]")
@@ -582,15 +654,11 @@ def _d01_ff_row(rules, cls, polymer_class, hw, criteria) -> dict:
             criterion="validation_data",
             resolver=f"polymer_rules.json:_metadata.primary_sources[{sid}]"))
 
-    # parameter_coverage -- the honest gap. Whether this FF can TYPE this repeat unit is not
-    # knowable without running forcefield.py select (an EMC trial build per field, minutes).
-    ev.append(_ev(
-        "parameter_coverage",
-        f"NOT MEASURED for this SMILES. forcefield.py select was not run (--with-ff-probe off), "
-        f"so coverage is asserted from the class default "
-        f"polymer_rules.json:classes.{polymer_class}.preferred_ff={ff!r} only; whether {ff!r} "
-        f"can type THIS repeat unit is unverified until the build stage runs.",
-        f"polymer_rules.json:classes.{polymer_class}.preferred_ff"))
+    # parameter_coverage -- honest only when a real EMC trial build ran. The "NOT MEASURED"
+    # prefix is load-bearing: the rationale gap list below collects criteria whose claim starts
+    # with it, so it must survive every path where nothing was actually measured.
+    ev.append(_ev("parameter_coverage",
+                  *_coverage_claim(polymer_class, prior, ff, resolution)))
 
     # computational_cost -- reuse the D-08 pricing, don't re-call.
     if hw and "error" not in hw:
@@ -614,10 +682,11 @@ def _d01_ff_row(rules, cls, polymer_class, hw, criteria) -> dict:
                 f"--with-ff-probe, or let the literature critic name a candidate."]
     return {"default_choice": ff, "criteria_evaluated": criteria,
             "evidence": ev, "alternatives": alts,
-            "resolved_by": f"polymer_rules.json:classes.{polymer_class}.preferred_ff"}
+            "resolved_by": (f"polymer_rules.json:classes.{polymer_class}.ff_accuracy_prior"
+                            if ff == prior else "forcefield.select_by_moiety")}
 
 
-def _d02_charges_row(rules, cls, polymer_class, smiles, criteria) -> dict:
+def _d02_charges_row(rules, cls, polymer_class, smiles, criteria, field=None) -> dict:
     method = cls.get("charge_method")
     facts = _CHARGE_METHOD_FACTS.get(method, {})
     census = _element_census(smiles) if smiles else {}
@@ -638,7 +707,7 @@ def _d02_charges_row(rules, cls, polymer_class, smiles, criteria) -> dict:
         _ev("ff_embedded_vs_qm",
             f"{method!r} is {'QM-derived' if facts.get('qm') else 'force-field-embedded'}: "
             f"{facts.get('pairing', 'pairing with the chosen FF not characterized')} "
-            f"(preferred_ff={cls.get('preferred_ff')!r}).",
+            f"(force field={_field_of(cls, field)!r}).",
             f"polymer_rules.json:classes.{polymer_class}.charge_method"),
     ]
     alts = [f"{m} (not adopted): {f['cost']}"
@@ -747,7 +816,7 @@ def _d04_system_size_row(size, hw, criteria) -> dict:
             "resolved_by": "select_system_size.solve_system_size"}
 
 
-def _d08_hardware_row(rules, cls, hw, criteria) -> dict:
+def _d08_hardware_row(rules, cls, hw, criteria, field=None) -> dict:
     if not hw or "error" in hw:
         return {"default_choice": None, "criteria_evaluated": criteria,
                 "evidence": [_ev("benchmark_evidence",
@@ -766,7 +835,7 @@ def _d08_hardware_row(rules, cls, hw, criteria) -> dict:
 
     ev = [
         _ev("forcefield_cost_structure",
-            f"preferred_ff={cls.get('preferred_ff')!r} resolves to FF family "
+            f"force field={_field_of(cls, field)!r} resolves to FF family "
             f"{hw['ff_family']!r}; hardware_policy.by_forcefield note: "
             f"{default.get('note', 'none')}",
             "select_hardware.resolve_ff_family + polymer_rules.json:hardware_policy"),
@@ -833,10 +902,17 @@ def make_decision(polymer_class: str, smiles: str, properties: set, *,
     criteria = _policy_criteria()
     resolvers = {}
 
+    # D-01 first: the resolved field is an INPUT to D-04 (united-atom cells count heavy atoms
+    # only) and to D-08 (engine/MPI defaults are per FF family), so it cannot be read off the
+    # class entry by each of them independently.
+    field = cls.get("ff_accuracy_prior")
+    resolution = None
+    resolvers["forcefield.select_by_moiety"] = "skipped (--with-ff-probe not implemented yet)"
+
     # Same argument shape materialize_plan uses, so default_choice and decided_params can't drift.
     try:
         size = solve_system_size(polymer_class, smiles, properties,
-                                 dp_typical=None, nchain=None)
+                                 dp_typical=None, nchain=None, field=field)
         resolvers["select_system_size.solve_system_size"] = "ok"
     except Exception as e:
         size = {}
@@ -848,22 +924,23 @@ def make_decision(polymer_class: str, smiles: str, properties: set, *,
     # cls.get("dp_typical", 50)/cls.get("nchain", 10), and those class keys no longer exist.
     try:
         hw = select_hardware(polymer_class, smiles,
-                             sized_cls.get("dp_typical"), sized_cls.get("nchain"))
+                             sized_cls.get("dp_typical"), sized_cls.get("nchain"), field)
         resolvers["select_hardware.select_hardware"] = (
             "ok" if "error" not in hw else f"error: {hw['error']}")
     except Exception as e:
         hw = {"error": str(e)}
         resolvers["select_hardware.select_hardware"] = f"error: {e}"
-    resolvers["forcefield.select_forcefield"] = "skipped (--with-ff-probe not implemented yet)"
 
     rows = {
-        "D-01_ff": _d01_ff_row(rules, cls, polymer_class, hw, criteria.get("D-01_ff", [])),
+        "D-01_ff": _d01_ff_row(rules, cls, polymer_class, hw, criteria.get("D-01_ff", []),
+                               field, resolution),
         "D-02_charges": _d02_charges_row(rules, cls, polymer_class, smiles,
-                                          criteria.get("D-02_charges", [])),
+                                          criteria.get("D-02_charges", []), field),
         "D-03_electrostatics": _d03_electrostatics_row(rules, cls, polymer_class, smiles, hw,
                                                         criteria.get("D-03_electrostatics", [])),
         "D-04_system_size": _d04_system_size_row(size, hw, criteria.get("D-04_system_size", [])),
-        "D-08_hardware": _d08_hardware_row(rules, cls, hw, criteria.get("D-08_hardware", [])),
+        "D-08_hardware": _d08_hardware_row(rules, cls, hw, criteria.get("D-08_hardware", []),
+                                           field),
     }
 
     rationale = [

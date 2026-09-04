@@ -1,9 +1,9 @@
 """Single source of truth for force-field / builder routing.
 
-Routing (preferred force field + builder + justification) is read from
+Routing (class force-field prior + builder + justification) is read from
 ``guides/polymer_rules.json`` — the authoritative per-class table the orchestrator
 already uses. Previously this logic was a second, hardcoded copy inside
-``server.py:_get_preferred_ff`` that re-derived the force field from SMILES chemistry
+``server.py:_get_ff_accuracy_prior`` that re-derived the force field from SMILES chemistry
 and diverged from the JSON (e.g. advising ``opls-aa/2024`` for classes the JSON routes
 to ``pcff``/``trappe-ua``). Centralising it here removes that drift.
 
@@ -43,7 +43,7 @@ def _fallback(reason: str) -> dict:
     Never raises — classify_polymer must still return its classification.
     """
     return {
-        "preferred_ff": None,
+        "ff_accuracy_prior": None,
         "preferred_builder": None,
         "ff_confidence": "uncited",
         "ff_justification": f"routing unavailable ({reason}); consult polymer_rules.json",
@@ -51,11 +51,12 @@ def _fallback(reason: str) -> dict:
     }
 
 
-def get_preferred_ff(class_name: str) -> dict:
-    """Authoritative FF/builder routing for a PoLyInfo class code (e.g. "PHYC").
+def get_ff_accuracy_prior(class_name: str) -> dict:
+    """Class-level FF/builder routing for a PoLyInfo class code (e.g. "PHYC").
 
-    Returns the same keys the previous hardcoded helper did, but sourced from
-    polymer_rules.json so they agree with the rest of the pipeline.
+    ``ff_accuracy_prior`` is the field the literature supports for the class, not the field a
+    run will build with -- that is D-01's per-SMILES answer, in run_plan.json's
+    decided_params.preferred_ff. This lookup has no SMILES and cannot decide it.
     """
     try:
         rules = load_polymer_rules()
@@ -67,7 +68,7 @@ def get_preferred_ff(class_name: str) -> dict:
         return _fallback(f"class {class_name!r} not in polymer_rules.json")
 
     return {
-        "preferred_ff": entry.get("preferred_ff"),
+        "ff_accuracy_prior": entry.get("ff_accuracy_prior"),
         "preferred_builder": entry.get("preferred_builder"),
         # Derived from citation presence, the same rule stage_params.py applies when it resolves
         # ff_confidence into the build prompt. The old classes.<CLASS>.confidence field this

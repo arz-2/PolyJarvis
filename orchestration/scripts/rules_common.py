@@ -176,7 +176,7 @@ def resolve_member_value(cls: dict, value_field: str, smiles: str):
 
 
 def resolve_ff_family(ff_raw: str, hp: dict) -> str:
-    """Map a class's preferred_ff string to a by_forcefield family key
+    """Map a force-field name to a by_forcefield family key
     (pcff | opls | trappe | gaff) via hardware_policy.ff_aliases, with a substring
     fallback. Used by stage_params.resolve_hardware and any consumer keying on FF family."""
     fam = hp.get("ff_aliases", {}).get(ff_raw) or hp.get("ff_aliases", {}).get(ff_raw.upper())

@@ -76,7 +76,7 @@
         "validation_data",
         "computational_cost"
       ],
-      "default_source": "polymer_rules.json:classes.<CLASS>.preferred_ff"
+      "default_source": "polymer_rules.json:classes.<CLASS>.ff_accuracy_prior"
     },
     "charges": {
       "decision_id": "D-02_charges",

@@ -38,9 +38,14 @@ def _args(polymer_class="PEST", smiles=PLA):
 
 
 def _sized_cls(polymer_class="PEST", **overrides):
-    """A class entry as apply_plan would hand it over: rules plus a sized cell."""
+    """A class entry as apply_plan would hand it over: rules plus decided_params.
+
+    decided_params carries preferred_ff (D-01's resolved field) -- the class entry itself only
+    holds ff_accuracy_prior, the literature prior, which the builder never reads.
+    """
     cls = dict(RULES["classes"][polymer_class])
-    cls.update({"dp_typical": 70, "nchain": 10})
+    cls.update({"dp_typical": 70, "nchain": 10,
+                "preferred_ff": cls["ff_accuracy_prior"]})
     cls.update(overrides)
     return cls
 

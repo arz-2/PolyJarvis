@@ -37,9 +37,9 @@
       "date": "2026-08-08",
       "mode": "revalidate — ran the shipped by_forcefield default per FF (no engine re-search) + run-0 parity vs CPU; records host-matched ns/day. Use --full for a fresh engine×config sweep on a drained box.",
       "cells": {
-        "pcff": "/home/arz2/PolyJarvis/hardware/CALIB_PCFF/emc_build.data",
-        "opls": "/home/arz2/PolyJarvis/hardware/CALIB_OPLS/emc_build.data",
-        "trappe": "/home/arz2/PolyJarvis/hardware/CALIB_TRAPPE/emc_build.data"
+        "pcff": "hardware/CALIB_PCFF/emc_build.data",
+        "opls": "hardware/CALIB_OPLS/emc_build.data",
+        "trappe": "hardware/CALIB_TRAPPE/emc_build.data"
       },
       "cells_atoms": {
         "pcff": 3020,
@@ -220,7 +220,7 @@
     "version": "2.1.0",
     "created": "2026-05-23",
     "units": {
-      "forcefield": "Active force field for the class. preferred_builder and preferred_ff fields are authoritative for routing. forcefield is the active FF for the class; for EMC classes this matches preferred_ff. For RadonPy-routed PURA this is GAFF2_mod.",
+      "ff_accuracy_prior": "Force field the literature supports for this class's chemistry, paired with ff_justification_doi. A PRIOR, not a routing decision: D-01 resolves the field actually built per SMILES and writes it to run_plan.json decided_params.preferred_ff, which is what the builder reads. preferred_builder still routes EMC vs RadonPy.",
       "charge_method": "Method for partial charge assignment: Gasteiger (apolar), AM1-BCC (moderately polar), RESP/HF/6-31G* (aromatic/strongly polar)",
       "dp_typical": "Degree of polymerization (repeat units per chain) for production runs",
       "nchain": "Number of chains in simulation cell",
@@ -333,7 +333,7 @@
         "id": "Ramos2015",
         "citation": "Ramos, J.; Vega, J. F.; Martínez-Salazar, J. Molecular Dynamics Simulations for the Description of Experimental Molecular Conformation, Melt Dynamics, and Phase Transitions in Polyethylene. Macromolecules 2015, 48, 5016–5027.",
         "doi": "10.1021/acs.macromol.5b00823",
-        "relevance": "PE TraPPE-UA MD: Tg=187 K, excellent agreement with extrapolated experimental Tg(U)~195 K (Boyer 1973). Characteristic ratio C_n=8.2 at 500 K. Justifies preferred_ff=trappe-ua for PHYC/PDIE and sets ff_justification_doi for those classes."
+        "relevance": "PE TraPPE-UA MD: Tg=187 K, excellent agreement with extrapolated experimental Tg(U)~195 K (Boyer 1973). Characteristic ratio C_n=8.2 at 500 K. Justifies ff_accuracy_prior=trappe-ua for PHYC/PDIE and sets ff_justification_doi for those classes."
       },
       {
         "id": "Martin1998",
@@ -512,11 +512,10 @@
         "LDPE",
         "aPP"
       ],
-      "preferred_ff": "trappe-ua",
+      "ff_accuracy_prior": "trappe-ua",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acs.macromol.5b00823",
       "ff_note": "TraPPE-UA via EMC: purely apolar C/H backbone (charge <0.1 e), which qualifies for the lj/cut-only routing tier -- PCFF/OPLS-AA's PPPM machinery is unnecessary and TraPPE-UA is far cheaper per atom. Ramos2015: PE Tg=187K vs exp 185-195K, density within +/-7% -- directly validated. Branched types (PP, PIB) have UA parameters but no published polymer-Tg validation; treat with medium confidence until confirmed. TraPPE-UA's own founding paper (Martin & Siepmann 1998) validates only C1-C12 n-alkane VLE/critical-point data via Monte Carlo -- PE's confidence rests on the downstream Ramos2015 MD validation, not the 1998 origin paper.",
-      "forcefield": "TraPPE-UA",
       "charge_method": "embedded",
       "tacticity": {
         "default": "atactic",
@@ -614,11 +613,10 @@
         "SAN",
         "aPS"
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/jp980939v",
       "ff_note": "PCFF (Class II) via EMC. TraPPE-UA was rejected: its united-atom representation ignores the phenyl ring partial charges and pi-dihedral barriers that govern PS's Tg (~373K), and no TraPPE-UA PS Tg validation exists. PCFF explicitly parameterizes aromatic C-H charges and cross-terms; Soldera2006 (COMPASS/OPLS) confirms MD reaches PS Tg ~449-484K raw, WLF-corrected ~373K -- no direct PCFF PS Tg paper exists, so confidence is medium. DENSITY CAVEAT: PCFF underpredicts PS 300K density by -5.85% to -6.32% across three independent runs; PCFF's founding paper documents the same aromatic-ring deficit for benzene/toluene (-6.3%/-6.5%), which COMPASS reduces to -1.1%/-1.2% for the same compounds -- field_override='compass' is EMC-admissible but not build-tested against PS's SMILES. Do not generalize this aromatic-ring finding to non-aromatic classes.",
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "tacticity": {
         "default": "atactic",
@@ -710,7 +708,6 @@
         "PVAc",
         "PVF"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "tacticity": {
         "default": "atactic",
@@ -763,7 +760,7 @@
         "Exp. RT density: PVC=1.38 g/cm³, PVA=1.26 g/cm³, PVAc=1.19 g/cm³. Initial 0.55 g/cm³ is conservative (avoids overlaps for full class range).",
         "SYSTEM-SIZE AUDIT NOTE (2026-08-26): the only verified PVC-specific MD DP-convergence study found (Olowookere 2023, DOI 10.1080/08927022.2023.2234493) puts property convergence (including Tg) at DP~100-120, above the DP=81 this SMILES now derives from the system-mass floor -- but that study is dissolved PVC in THF/DMF, not PolyJarvis's neat bulk amorphous cell, so this is a soft flag, not a confirmed contradiction. No bulk-melt PVC DP-convergence study or PVC-specific entanglement Me/packing-length source was found. dp_typical/nchain left unchanged pending stronger (bulk-melt) evidence."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1007/s10118-019-2249-5",
       "ff_note": "PCFF via EMC (build-tested: PVC/PVAc/PVA all PASS). OPLS-AA was tried and failed to build for PVC and PVAc. A full-text-verified COMPASS (Class-II) study of neat PVC reports K=2.947 GPa at 298K, numerically overlapping PolyJarvis's own PCFF-measured K=2.7-2.9 GPa -- two independent Class-II variants converge on the same value, suggesting the ~20-35% K deficit vs the experimental band [3.5,4.5] GPa is a Class-II-family-wide limitation rather than a PCFF-specific bug; switching to COMPASS would likely not fix it. No field-override recommended.",
@@ -793,7 +790,6 @@
         "PAA",
         "PEA"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "tacticity": {
         "default": "atactic",
@@ -866,7 +862,7 @@
         "STRAIN RATE ARTIFACT: see PSTR class note. Same systematic ~1.5-2x K overestimate applies to PMMA deformation runs.",
         "CTE NOTE: Wu2020 (CG-MD, ≤400K) reports melt CTE ≈4.4e-4/K, ~40% below alpha_melt_per_K=6.15e-4 (Mark2007, ~550K) — likely different state-point, not a contradiction. Context only if UNDER_ANNEALED_COOLING or unexpected melt density near 400-450K appears."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1016/j.commatsci.2025.113861",
       "ff_note": "PCFF via EMC (build-tested: PMMA PASS). GAFF/GAFF2 (Class I) was rejected: NkepsuMbitou2025 reports >45% Tg error for PMMA under GAFF vs <10% under PCFF. An unresolved discrepancy remains open: the same review's <2% Class-II density figure for PMMA is 3-4x smaller than PolyJarvis's own measured -5.7% to -6.6% PCFF density deficit; a dedicated search for a tacticity/DP/charge-method mechanism found nothing. Treat PACR density as this class's known-weakest/lowest-confidence property; no field-override recommended.",
@@ -896,11 +892,10 @@
         "PCTFE",
         "PVF"
       ],
-      "preferred_ff": "opls/2024/opls-aa",
+      "ff_accuracy_prior": "opls/2024/opls-aa",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/jp004071w",
       "ff_note": "OPLS-AA via EMC: native Watkins & Jorgensen 2001 F LJ parameters (opls_965: sigma=2.95 A, epsilon=0.053 kcal/mol) cover CF2/CF3 backbones; PCFF lacks fluorocarbon parameterization and TraPPE-UA/GAFF2 are not the chemistry-appropriate fit for this backbone. Afzal2021 reports halogen-class R2=0.87, MAE=20.8K for OPLS3e. PVDF's mixed CF2-CH2 dihedrals use general OPLS-AA CT/HC types (Byutner2000 provides a bespoke density-target reference, not the routing justification itself). CAUTION: a same-family fluoropolymer comparison (Viton A, VDF/HFP) reports OPLS-derived fields producing systematically too-soft, under-packed structures relative to PCFF -- qualitative only, worth watching if PHAL modulus/K results come back low. OPLS-AA's own founding paper never tested a fluorine-containing liquid, so today's routing is an extrapolation beyond its stated scope, consistent with (not contradicted by) the Viton A caution.",
-      "forcefield": "OPLS-AA",
       "charge_method": "opls-library",
       "tacticity": {
         "default": "atactic",
@@ -977,11 +972,10 @@
         "1,4-polybutadiene",
         "cis-polyisoprene"
       ],
-      "preferred_ff": "trappe-ua",
+      "ff_accuracy_prior": "trappe-ua",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/jp001044x",
       "ff_note": "TraPPE-UA via EMC: purely apolar diene backbone qualifies for the lj/cut-only tier over PCFF/OPLS-AA's heavier PPPM path. Wick2000 TraPPE-4 defines the cis/trans-CH=CH- and CH2=CH- UA types used for 1,3-butadiene and isoprene; Sharma2016 validates multiple UA FFs for PBD/PI Tg at microsecond timescales with excellent agreement vs experiment (PBD ~181K, PI ~200K); Afzal2021 butadiene-class OPLS3e R2=0.87, MAE=13.1K corroborates from a Class-I angle. cis/trans microstructure must be encoded directly in the input SMILES. TraPPE-UA's own 1998 founding paper covers only saturated n-alkanes; today's routing rests on the downstream Wick2000/Sharma2016/Afzal2021 extensions, not the 1998 origin paper.",
-      "forcefield": "TraPPE-UA",
       "charge_method": "embedded",
       "tacticity": {
         "default": "not_applicable",
@@ -1066,7 +1060,6 @@
         "POM",
         "poly(tetrahydrofuran)"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "tacticity": {
         "default": "atactic",
@@ -1133,7 +1126,7 @@
         "Chain length: PEG Tg independent of MW above ~4000 g/mol (DP~90 for PEO); DP≥50 minimum. DP=100 (4,400 g/mol) provides margin above Klajmon2023 Tg convergence threshold (Klajmon2023).",
         "Exp. RT density: PEO=1.21 g/cm³, PPO=1.00 g/cm³, POM=1.42 g/cm³. Initial 0.61 g/cm³ = ~0.5× PEO density. Validation target: bulk PEO density at 300 K ~1.10–1.12 g/cm³ (Wu2011 OPLS-AA; experimental 1.112 g/cm³). Thermal expansion H-T region: α=8.08×10⁻⁴ K⁻¹ (Wu2011 density method) vs experimental 8.53×10⁻⁴ K⁻¹ (−5%)."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acs.iecr.3c03038",
       "ff_note": "PCFF via EMC (build-tested 2026-05-31: PEO PASS). GAFF2 was rejected: PCFF (Class II) outperforms it for thermomechanical properties (NkepsuMbitou2025). Klajmon2023 benchmarks PLA/PEG/PVP with AA-MD and is this class's cited PEG/PEO reference (CrossRef-verified DOI); full text remains ACS-paywall-blocked, so PEG-specific Tg/density figures are treated as topic-relevant, not independently re-confirmed numerics.",
@@ -1163,7 +1156,6 @@
         "poly(ethylene sulfide)",
         "PPSO2"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "tacticity": {
         "default": "not_applicable",
@@ -1213,7 +1205,7 @@
         "Class schedule (T_equil 560 K, anneal 640 K, 8 cycles, density_initial 0.65) is curated for aromatic PPS. Aliphatic sp3 thioethers (e.g. poly(propylene sulfide): Tg 220-236 K, rho ~1.03 g/cm3) are RUBBERY at 300 K — planner must re-derive the schedule (T_workflow 300, T_equil ~450, ~3 cycles, density_initial ~0.50) and treat FF confidence as LOW (no aliphatic-thioether PCFF MD validation).",
         "Exp. RT density: PPS=1.35 g/cm³, PSU=1.30 g/cm³. Initial 0.65 g/cm³ = ~0.5x PPS density."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": null,
       "ff_note": "PCFF via EMC (build-tested: PPS PASS). PCFF has native sulfone/sulfide types; the polar S-containing backbone is outside TraPPE-UA/lj_cut's apolar scope and outside OPLS-AA's covered chemistries, so PCFF is the only EMC-supported fit. No PCFF-vs-experiment polythioether/PPS literature has been located despite a dedicated search -- a genuine open validation gap. A 2024 on-chemistry PPS paper exists but uses COMPASS II, not PCFF, and reports no extractable quantitative baseline.",
@@ -1242,7 +1234,6 @@
         "PBS",
         "PHB"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "tacticity": {
         "default": "not_applicable",
@@ -1303,7 +1294,7 @@
         "PLA: biodegradable; PCFF ester-type parameters (c_1, o_2, oe) cover lactide linkage; Klajmon2023 benchmarks PLA with AA-MD.",
         "Exp. RT density: PET=1.38 g/cm³, PLA=1.25 g/cm³, PCL=1.15 g/cm³. Initial 0.63 g/cm³ = ~0.5x PET density."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acs.iecr.3c03038",
       "ff_note": "PCFF via EMC (build-tested: PLA PASS, PET PASS). PCFF has explicit ester types (c_1, o_2, oe) covering this backbone; GAFF2 was rejected for the same Class-I Tg-accuracy reasons general to polar EMC-routed classes. Klajmon2023 benchmarks PLA/PEG AA-MD (CrossRef-verified DOI, full text ACS-paywall-blocked this session -- treated as topic-relevant, not independently re-confirmed). No PCFF-specific (as opposed to COMPASS/DREIDING/GAFF) density or Tg error for PLA or a small-molecule ester analog has been found despite a dedicated search. This class's +12.8% measured Tg offset is attributed to the known single-rate cooling-rate artifact common to all classes, with no independent literature FF-accuracy check available either way. No field-override recommended.",
@@ -1345,7 +1336,6 @@
         "Nylon-46",
         "aramid"
       ],
-      "forcefield": "GAFF2",
       "charge_method": "RESP",
       "tacticity": {
         "default": "not_applicable",
@@ -1402,7 +1392,7 @@
         "Exp. RT density: PA6=1.14 g/cm³, PA66=1.14 g/cm³. Initial 0.57 g/cm³ = ~0.5x PA6 density.",
         "WARNING: Nylon semi-crystallinity: crystalline domains can form above Tg. Quench from 700 K to prevent. Verify amorphous density ~1.08-1.14 g/cm³."
       ],
-      "preferred_ff": "GAFF2",
+      "ff_accuracy_prior": "gaff2",
       "preferred_builder": "radonpy",
       "ff_justification_doi": "10.1038/s41524-022-00906-4",
       "ff_note": "GAFF2 via RadonPy -- REPLACES prior EMC/pcff routing (2026-08-26): a mechanized orchestration/scripts/select_forcefield.py check found pcff INADMISSIBLE for all three curated PAMD members (Nylon6, Nylon66, Nylon12; typing_error 'Missing force field parameters', types_smiles=false for every one) -- pcff cannot type this class's amide backbone at all in this EMC installation, contrary to the prior ff_note's claim that it was 'the only builder-supported path for this chemistry.' Every EMC-admissible alternative found (dreiding, gaff, gaff2, gaff2_mod, opls/2024/opls-ua, trappe-ua) is nonetheless UNUSABLE via the EMC route: tests/test_polymer_rules_schema.py's build-route-consistency check restricts preferred_builder=emc to the pcff/opls/trappe families only (confirmed structurally, not just by convention -- the build stage's lammps_flags only ever carries use_pcff/use_opls/use_trappe, with no EMC wiring for gaff/dreiding at all). RadonPy/GAFF2 is therefore the only actually-executable route, matching PURA's precedent for the same class of EMC gap. Evidence: RadonPy itself (Hayashi et al. 2022, npj Comput. Mater., 10.1038/s41524-022-00906-4) validates plain GAFF2 (not the GAFF2_mod fluorine/urea-torsion patch -- irrelevant to this chemistry) across a 1,070-polymer/21-class amorphous set that includes a distinct 'Polyamides' class, uses an aliphatic caprolactam/Nylon-6-type repeat unit ('*NC(=O)CCCCC*') as one of its own pipeline examples, and reports overall amorphous-density accuracy R^2=0.890 (slope 0.805) across the full set -- no polyamide-isolated error statistic exists, so this is class-level, not molecule-specific, evidence; confidence medium. charge_method=RESP follows RadonPy's own RESP-derived partial-charge pipeline. Per the platform-wide GAFF/GAFF2 caution (see class-list _metadata note), treat Tg results as screening-quality (+/-20-30K) unless validated against experiment.",
@@ -1430,7 +1420,6 @@
         "PU",
         "segmented polyurethane"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
@@ -1470,7 +1459,7 @@
         "WARNING: Segmented TPU with soft/hard block alternation cannot be reliably modeled as homopolymer. Tg reported reflects hard-segment-like environment.",
         "RE-AUDIT NOTE (2026-08-26): the only genuinely on-chemistry (aliphatic HDI-based) MD benchmark found uses OPLS-AA/OpenFF, not PCFF, and over-predicts DSC Tg by 20-75K at its ~5 K/ns cooling rate -- an accuracy caution, but plain opls/2024/opls-aa is NOT in this SMILES's EMC-admissible set (mechanized check: admissible=[dreiding, gaff, gaff2, gaff2_mod, pcff, trappe-ua]), so it's not a switchable recommendation here; PCFF remains the only viable Class-II option. Separately: one verified system-size source (PTMO soft-segment proxy, not the full urethane chain) found chain length converges by DP=50, modestly above this class's dp_typical=40 -- a soft caution given the proxy mismatch and since the paper never tested below DP=50; dp_typical left unchanged pending stronger direct-chemistry evidence."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": null,
       "ff_note": "PCFF via EMC (build-tested: aliphatic TPU PASS). WARNING: aromatic MDI-type urethane SMILES fail with a {o,c_2} increment error -- test-build before submitting aromatic TPU. GAFF2/RadonPy was tried and replaced by this EMC/PCFF path. No PCFF-specific validation for a linear/aliphatic TPU melt has been located in the literature; a 2026 PCFF/COMPASS paper exists but studies a crosslinked/curing thermoset network, a different physical system from the linear melt this class actually simulates, so it is not cited as justification. This remains a genuine open gap.",
@@ -1485,7 +1474,6 @@
         "poly(urea)",
         "segmented polyurea"
       ],
-      "forcefield": "GAFF2_mod",
       "charge_method": "RESP",
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
@@ -1522,7 +1510,7 @@
         "Exp. RT density estimated ~1.15-1.25 g/cm³ (no dedicated GAFF2 polyurea paper; estimated from urea monomer and PURT analogy). Initial 0.60 g/cm³.",
         "WARNING: Low confidence — polyurea MD-specific literature is sparse; parameters inferred from PURT analogy and known urea H-bonding chemistry."
       ],
-      "preferred_ff": "GAFF2_mod",
+      "ff_accuracy_prior": "gaff2_mod",
       "preferred_builder": "radonpy",
       "ff_justification_doi": null,
       "ff_note": "GAFF2_mod via RadonPy -- EMC does not yet implement this class (missing the n_2/hn amide-N increment), so PCFF/OPLS-AA/TraPPE-UA are all unavailable here; RadonPy/GAFF2 is the only builder path. No GAFF2-vs-experiment polyurea literature has been located: neither of two partial analogs closes the gap -- GAFF2 on a urea crystal (Anker2023) gets the force field and functional group right but the wrong physical state (crystal, not amorphous melt); a 2025 'polyureas' paper gets the physical state right but turns out on full-text inspection to be a urea-urethane hybrid under COMPASS, not GAFF2. Per the platform-wide GAFF/GAFF2 caution, Tg results for this class should be treated as screening-quality (+/-20-30K) unless validated against experiment.",
@@ -1539,7 +1527,6 @@
         "Kapton",
         "BPDA-ODA"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "density_initial_gcm3": 0.71,
       "electrostatics": "pppm",
@@ -1583,7 +1570,7 @@
         "Exp. RT density: Kapton=1.42 g/cm³. Initial 0.71 g/cm³ = ~0.5x Kapton density.",
         "WARNING: Do not simulate crystalline polyimide (BPDA-PDA) in amorphous mode without verifying density matches amorphous values (~1.35-1.42 g/cm³)."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": null,
       "ff_note": "PCFF via EMC -- Sun1994 (CFF93/PCFF) is the FF's general origin; no class-specific PCFF MD validation paper for this class's own exemplar (PMDA-ODA/Kapton) has been located. A 2024 paper validates PMDA-ODA/Kapton mechanical properties directly (Young's modulus 2.5 GPa MD vs 2.5-3.2 GPa experimental range) but under OPLS-AA, not PCFF -- a source combining PCFF with this class's actual chemistry does not yet exist. This is a genuine open gap, not a routing concern (PCFF remains the correct choice for this polar, charge-bearing backbone).",
@@ -1604,7 +1591,6 @@
         "poly(sebacic anhydride)",
         "PLGA-like anhydrides"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
@@ -1642,7 +1628,7 @@
         "WARNING: Low confidence — polyanhydride-specific PCFF MD literature is sparse. Parameters inferred from PEST class analogy.",
         "CITATION CAVEAT: ff_justification_doi (Afzal2021) is an OPLS3e screen — not PCFF, no polyanhydride coverage, does not validate PCFF routing. Kept (no better source exists) but ff_confidence still renders 'cited' off it — treat as effectively uncited."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": null,
       "ff_note": "PCFF via EMC (build-tested: poly(sebacic anhydride) PASS). PCFF's ester-like types cover the anhydride linkage; the polar backbone rules out TraPPE-UA/lj_cut and OPLS-AA lacks matching parameters, so PCFF is the only EMC-supported fit. No PCFF/COMPASS/Class-II density or Tg source for any polyanhydride has been located despite a dedicated search of the drug-delivery/biodegradable-polymer MD literature specifically. This is a genuine, confirmed-open validation gap.",
@@ -1662,7 +1648,6 @@
         "TMBPA-PC",
         "PC-PDMS"
       ],
-      "forcefield": "Dreiding",
       "charge_method": "RESP",
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
@@ -1716,7 +1701,7 @@
         "Exp. RT density: BPA-PC=1.20 g/cm³. Initial 0.60 g/cm³ = ~0.5x PC density.",
         "Langevin thermostat at 500 K then NPT equilibration at 500 K before cooling is a documented protocol for PC MD."
       ],
-      "preferred_ff": "Dreiding",
+      "ff_accuracy_prior": "dreiding",
       "preferred_builder": "radonpy",
       "ff_justification_doi": "10.1021/ma00087a004",
       "ff_note": "Dreiding (modified, per Fan/Cagin/Chen/Smith 1994) via RadonPy -- REPLACES the 2026-08-26 GAFF2/RadonPy interim fix (which itself replaced a broken EMC/pcff default; see git history for that intermediate step). Fan, Cagin, Chen & Smith (1994, Macromolecules, DOI 10.1021/ma00087a004, verified to resolve) developed a modified DREIDING field specifically for BPA-PC, validated against the crystallographic density of a BPA-PC model compound -- the strongest possible kind of literature match, a force-field-development paper written for this exact polymer, not an analog or a class-aggregate survey. ROUTING HISTORY (2026-08-26): DREIDING was first found EMC-admissible by a mechanized select_forcefield.py probe, but that was WRONG -- ff_capability.py's own registry marks dreiding front_end='radonpy', and no ~/emc/field/dreiding directory exists; the probe's 'admissible: true' was a RadonPy-side result, not an EMC one. Attempting a real RadonPy build then surfaced a genuine upstream bug: radonpy.ff.dreiding.Dreiding's assign_atypes/assign_dtypes/assign_itypes methods reset mol.angles/dihedrals/impropers to empty lists (`setattr(mol, 'angles', [])` etc.) instead of preserving the dict every other RadonPy ff module (amber.py, tip.py, glycam.py, gaff.py) and core/utils.py's combine_mols/MolToJSON_dict expect -- this broke amorphous-cell generation for ANY polymer built with Dreiding, not just BPA-PC. Patched directly in the installed package (~/miniforge3/envs/mol-builder/.../radonpy/ff/dreiding.py, 3 methods, dict-keyed to match amber.py/gaff.py's own '%i,%i,%i[,%i]' % (a,b,c[,d]) convention) and mcp-mol-builder-server.py extended (Dreiding added to the forcefield Literal + construction branches in assign_forcefield/_run_copolymerize). Verified end-to-end: built a real BPA-PC cell (3-mer x 2 chains), ran ff_assign (177 angles, 256 dihedrals, 39 impropers, all correctly dict-keyed), generated a LAMMPS .data file, and inspected it directly -- confirms bond_style=harmonic, angle_style=harmonic, dihedral_style=harmonic (K,d,n -- NOT GAFF2's fourier), improper_style=umbrella (K,X0 -- NOT GAFF2's cvff), pair coefficients as plain epsilon/sigma (compatible with the existing lj/charmm/coul/long 8.0 12.0 convention already used for GAFF2). Mixing rule (mix geometric) is NOT independently verified from an emitted file -- RadonPy's own module doesn't write a LAMMPS script, only the .data file -- and is instead taken from the original published DREIDING force field's own stated geometric-combining convention (Mayo, Olafson, Goddard 1990); flagged here as the one piece of this routing resting on domain knowledge rather than a directly inspected file, unlike everything else above.",
@@ -1739,7 +1724,6 @@
         "Ultem",
         "DGEBA-amine epoxy"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "density_initial_gcm3": 0.6,
       "electrostatics": "pppm",
@@ -1780,7 +1764,7 @@
         "WARNING: PEI is ambiguous between poly(ethylenimine) (aliphatic amine) and polyetherimide (Ultem). Confirm structure before applying parameters.",
         "WARNING: Crosslinked epoxy networks (DGEBA + curing agent) require a crosslinked simulation protocol not supported by the standard EMC/PCFF pipeline."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1002/pol.20200050",
       "ff_note": "PCFF via EMC (build-tested: PEI PASS). PCFF has amine N types covering this backbone. Wen2020 explicitly confirms PCFF usage ('All MD simulations were performed using LAMMPS with the PCFF force field') and validates Ultem (4,4-BPADA+MPD): the paper's less-accurate specific-volume method gives Tg=525K/+7.1% vs exp; its own preferred self-diffusion method gives 504K/+2.9%. Four other BPADA-etherimide variants are also reported (Tg errors +2.3% to +9.1%). This evidence covers only the polyetherimide/Ultem side of this class's dual scope -- linear poly(ethylenimine) remains uncited, a genuine open gap.",
@@ -1802,7 +1786,6 @@
         "poly(methylphenylsiloxane)",
         "Q resin"
       ],
-      "forcefield": "opls/2024/opls-aa",
       "charge_method": "opls-library",
       "density_initial_gcm3": 0.49,
       "electrostatics": "pppm",
@@ -1851,7 +1834,7 @@
         "Exp. RT density: PDMS=0.97 g/cm³. Initial 0.49 g/cm³ = ~0.5x PDMS density.",
         "Density validation mandatory before reporting Tg: OPLS-AA charge increments for Si-O are estimated (o2_si4=-0.22/+0.22); adjust if equilibrated density deviates >5% from 0.97 g/cm³."
       ],
-      "preferred_ff": "opls/2024/opls-aa",
+      "ff_accuracy_prior": "opls/2024/opls-aa",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1021/acs.jpcb.4c08471",
       "ff_note": "OPLS-AA via EMC with patched siloxane typing rules -- PCFF lacks {si, osi} parameters, ruling it out outright. Charges from BCIs: si4_internal=+0.94, si4_terminal=+0.82, o2(bridge)=-0.44, o2h(silanol)=-0.60; validate density against PDMS exp. target ~0.97 g/cm3. This class has the strongest literature backing of any class in the file: a same-polymer 5-force-field PDMS benchmark ranks OPLS-AA 2nd-best of five by density RMSE (0.0414 g/cm3), well ahead of COMPASS (worst of five, RMSE 0.178, wrong-sign over-prediction) -- a direct, same-polymer, multi-force-field comparison that independently confirms the routing choice despite OPLS-AA's own founding paper never testing a Si-O liquid. No field-override warranted.",
@@ -1873,7 +1856,6 @@
         "PDCP",
         "poly(ethoxyphosphazene)"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "density_initial_gcm3": 0.55,
       "electrostatics": "pppm",
@@ -1911,7 +1893,7 @@
         "Fox equation can predict Tg for copolymer variants (Allcock et al. ScienceDirect 2021).",
         "WARNING: Low confidence — polyphosphazene-specific PCFF parameterization uses newly added pcff.frc types; validate against experiment before treating as high-confidence."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": null,
       "ff_note": "PCFF via EMC (build-tested: poly(ethoxyphosphazene) PASS; pcff.frc explicitly added polyphosphazene types). WARNING: Cl-substituted PDCP not tested. No PCFF-vs-experiment polyphosphazene validation paper has been located -- a 1998 COMPASS-phosphazene parameterization paper (Sun/Ren/Fried) explains the pcff.frc phosphazene types mechanistically (COMPASS's phosphazene nonbonded terms were derived from PCFF) but is small-molecule/crystal-scoped, not a bulk-polymer validation. This is a genuine, confirmed-open validation gap for this class.",
@@ -1930,7 +1912,6 @@
         "PEKK",
         "poly(ether ketone)"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "density_initial_gcm3": 0.66,
       "electrostatics": "pppm",
@@ -1986,7 +1967,7 @@
         "WARNING: PEEK semi-crystallinity (Tm=616 K): amorphous cell construction critical. Verify density ~1.26 g/cm³ at 298 K (amorphous ref) before Tg sweep; 1.30–1.32 indicates partial crystallinity.",
         "DENSITY SYSTEMATIC: PCFF MD systematically underestimates amorphous PEEK density by ~5% (rho_sim ~= 1.194 vs amorphous-ref 1.263 g/cm^3, band [1.199,1.326]). The run-summary density warning is ANTICIPATED, not a failure - accept rho_sim near the lower bound as a valid amorphous baseline. No band widening (1.263 stays the amorphous comparator; widening would mask a real FF systematic)."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.3390/polym12051054",
       "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF's general origin; no class-specific PCFF MD validation paper for PEEK has been located. PEEK2020 validates COMPASS II (same Class-II family) for PEEK: Tg=424-429K vs exp 418K (+1-3%), but its density figure over-predicts by +2.2% (1.364 vs exp 1.328 g/cm3) on a small cyclic-oligomer model -- the opposite sign from PolyJarvis's own measured PCFF density deficit of -5.1% on a linear amorphous melt. This is a genuine unresolved sign discrepancy (different Class-II variant, different structural model), not a confirmation or refutation of the internal PCFF number; no field-override recommended, and 'Class-II under-predicts PEEK density' should not be treated as a settled family-wide rule.",
@@ -2016,7 +1997,6 @@
         "PPSU",
         "poly(aryl ether sulfone)"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "density_initial_gcm3": 0.62,
       "electrostatics": "pppm",
@@ -2071,7 +2051,7 @@
         "Exp. RT density: PSF=1.24 g/cm³. Initial 0.62 g/cm³ = ~0.5x PSF density.",
         "OPEN QUESTION: whether DP~12 behaves as a chain-length-dependent oligomer for this stiff backbone is UNRESOLVED -- no chain-length-convergence study exists for rigid aromatics. The previous form of this note asserted a DP>=50 plateau on the strength of the retired Patrone attribution. It is now reported per run as RIGID_BACKBONE_CHAIN_LENGTH_BIAS rather than asserted here."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": null,
       "ff_note": "PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF's general origin; no class-specific PCFF MD validation paper for polysulfone has been located. A dedicated literature search found no PCFF- or COMPASS-vs-experiment density/Tg number for polysulfone, polyethersulfone, or a small-molecule diaryl-sulfone analog. PolyJarvis's own measured -4.0% to -4.3% density deficit and +2-8% Tg overestimate are internal measurements only, neither literature-corroborated nor contradicted. No field-override recommended; this is a genuine open validation gap.",
@@ -2102,7 +2082,6 @@
         "poly(p-phenylene)",
         "P3HT-like"
       ],
-      "forcefield": "PCFF",
       "charge_method": "bond-increment",
       "density_initial_gcm3": 0.55,
       "electrostatics": "pppm",
@@ -2148,7 +2127,7 @@
         "Charge transfer states in conjugated polymers cannot be modeled by any classical FF — Tg (structural) is accessible; optical/electronic properties require QM.",
         "SYSTEM-SIZE AUDIT NOTE (2026-08-26): the retired dp_typical=25/dp_min=20 sat below the best verified DP-floor evidence found, DP>=50 (Yoshimoto et al. 2020/2021, arXiv:2010.01962, confirmed full-text) -- but that evidence is cross-chemistry (P3HT thiophene backbone, not PPV) and coarse-grained (not atomistic/PCFF), so it's a soft caution about transferability, not a confirmed contradiction. PPNL's own primary citation (Venkatanarayanan2016, PCFF Tg=416+/-8K for PPV) is Wiley-paywalled and its own DP/nchain could not be independently checked. Both were removed 2026-09-02; PPV now derives DP=44 at nchain=10 from the 50,000 g/mol system-mass floor, which happens to sit closer to Yoshimoto's DP>=50 than the retired defaults did. Direct atomistic-PPV convergence evidence is still missing."
       ],
-      "preferred_ff": "pcff",
+      "ff_accuracy_prior": "pcff",
       "preferred_builder": "emc",
       "ff_justification_doi": "10.1002/mats.201600006",
       "ff_note": "PCFF via EMC (build-tested: PPV PASS). OPLS-AA was tried and failed for PPV (no vinyl rule). Venkatanarayanan2016 validates PCFF directly for PPV: Tg=416+/-8K vs exp ~416K, independently corroborated via CrossRef and multiple converging sources -- an essentially exact match. Young's modulus at 298K is also reported: 9.20+/-0.57 GPa (PPV), 1.81+/-0.34 GPa (polyacetylene, no Tg observed 120-500K). CAVEAT: the paper's own PCFF usage could not be re-confirmed from primary text this round (paywalled) -- reported as unconfirmed-through-paywall, not contradicted. Conjugated-torsion/backbone-planarity accuracy remains fully open.",
@@ -2168,7 +2147,7 @@
   },
   "global_defaults": {
     "description": "Fallback parameters for any polymer class not otherwise specified, or when class is ambiguous.",
-    "forcefield": "GAFF2_mod",
+    "ff_accuracy_prior": "gaff2_mod",
     "charge_method": "AM1-BCC",
     "density_initial_gcm3": 0.6,
     "electrostatics": "pppm",

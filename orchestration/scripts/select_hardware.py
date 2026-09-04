@@ -299,7 +299,9 @@ def plan_cost_estimate(plan: dict, hp: dict = None, rules: dict = None) -> dict:
 
     cls = dict(get_class_entry(rules, polymer_class, warn_on_miss=False))
     effective_class = {**cls, **dp_dict}
-    ff_raw = effective_class.get("preferred_ff") or effective_class.get("forcefield") or ""
+    # decided_params.preferred_ff (the field this run actually builds with) wins; the class
+    # ff_accuracy_prior is only the fallback for a plan that predates D-01 resolution.
+    ff_raw = effective_class.get("preferred_ff") or effective_class.get("ff_accuracy_prior") or ""
     fam = resolve_ff_family(ff_raw, hp)
     dt_fs = effective_class.get("dt_fs", 1.0)
     dp = dp_dict.get("dp_typical") or effective_class.get("dp_typical")
@@ -417,14 +419,16 @@ def _monomer_atoms_and_mw(smiles: str, is_ua: bool, env: str = "radonpy",
 
 
 def select_hardware(polymer_class: str, smiles: str, dp_typical: int | None,
-                     nchain: int | None) -> dict:
+                     nchain: int | None, field: str | None = None) -> dict:
+    """`field` is D-01's resolved force field. Engine/MPI/GPU defaults are per FF family, so a
+    run demoted off its class prior must be priced against the field it will actually run."""
     rules = load_rules()
     cls = get_class_entry(rules, polymer_class, warn_on_miss=True)
     hp = hardware_policy(rules)
     if not hp:
         return {"error": "guides/polymer_rules.json has no hardware_policy block"}
 
-    ff_raw = cls.get("preferred_ff") or cls.get("forcefield") or ""
+    ff_raw = field or cls.get("ff_accuracy_prior") or ""
     fam = resolve_ff_family(ff_raw, hp)
     default = hp.get("by_forcefield", {}).get(fam, {})
     if not default:

@@ -194,13 +194,13 @@ def test_ff_confidence_derived_from_citation_not_retired_field():
     assert all("confidence" not in e for e in rules.values()), \
         "classes.<CLASS>.confidence was retired; nothing should reintroduce it"
 
-    got = ff_routing.get_preferred_ff("PSTR")
+    got = ff_routing.get_ff_accuracy_prior("PSTR")
     assert got["ff_confidence"] == "cited"
     # It must agree with deterministic build-parameter resolution.
     expected = "cited" if rules["PSTR"].get("ff_justification_doi") else "uncited"
     assert got["ff_confidence"] == expected
 
-    assert not any(ff_routing.get_preferred_ff(c)["ff_confidence"] == "low" for c in rules)
+    assert not any(ff_routing.get_ff_accuracy_prior(c)["ff_confidence"] == "low" for c in rules)
 
 
 # ── Bug 2: cooling-contraction densities must be plateau means, not one final frame ──

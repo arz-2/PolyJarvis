@@ -179,7 +179,19 @@ DP_TYPICAL_HARD_CEILING = 1000      # mirrors scientific_control.py's OVERRIDE_R
                                      # a circular import (scientific_control.py imports this module)
 
 
-def _fox_flory_floor(polymer_class: str, smiles: str = None, cls: dict = None) -> tuple:
+# Named explicitly, not pattern-matched: trappe-EH is explicit-hydrogen despite the shared
+# "trappe" prefix, and forcefield.LINEAGE groups it with trappe-ua under "ua".
+_UA_FIELDS = frozenset({"trappe-ua", "opls/2012/opls-ua", "opls/2024/opls-ua"})
+
+
+def _is_ua(cls: dict, field: str = None) -> bool:
+    """United-atom cells count heavy atoms only, so the mass floor needs the field this run will
+    actually build with. `field` is D-01's resolved choice; the class prior is the fallback."""
+    return (field or (cls or {}).get("ff_accuracy_prior") or "") in _UA_FIELDS
+
+
+def _fox_flory_floor(polymer_class: str, smiles: str = None, cls: dict = None,
+                     field: str = None) -> tuple:
     """(floor_dp, note) from the system-mass floor, derived from this SMILES.
 
     Keeps the `fox_flory_tg` source name so downstream consumers (validate_run_plan,
@@ -189,7 +201,7 @@ def _fox_flory_floor(polymer_class: str, smiles: str = None, cls: dict = None) -
     if not smiles:
         return None, ("no SMILES supplied -- cell size is derived per-molecule and cannot be "
                       "resolved from the class alone")
-    is_ua = (cls or {}).get("preferred_ff", "") == "trappe-ua"
+    is_ua = _is_ua(cls, field)
     dp, _n, mw_s, note = derive_cell(smiles, is_ua)
     return dp, note
 
@@ -297,7 +309,8 @@ def _rigid_backbone_uncertainty(rigidity: dict, dp: int, m_repeat_gmol: float) -
 _KNOWN_PROPERTY_ORDER = ("tg", "bulk_modulus", "density")
 
 
-def _property_floors(polymer_class: str, smiles: str, properties, cls: dict = None) -> dict:
+def _property_floors(polymer_class: str, smiles: str, properties, cls: dict = None,
+                     field: str = None) -> dict:
     """Per-property DP floor -- the piece select_system_size() collapses via max().
 
     One entry per element of `properties`, keyed by property name:
@@ -317,7 +330,7 @@ def _property_floors(polymer_class: str, smiles: str, properties, cls: dict = No
     for prop in sorted(properties, key=lambda p: _KNOWN_PROPERTY_ORDER.index(p)
                        if p in _KNOWN_PROPERTY_ORDER else len(_KNOWN_PROPERTY_ORDER)):
         if prop == "tg":
-            floor, note = _fox_flory_floor(polymer_class, smiles, cls)
+            floor, note = _fox_flory_floor(polymer_class, smiles, cls, field)
             result[prop] = {"floor_dp": floor, "source": "fox_flory_tg", "note": note,
                             "unmet": None}
         elif prop == "bulk_modulus":
@@ -334,7 +347,8 @@ def _property_floors(polymer_class: str, smiles: str, properties, cls: dict = No
 
 
 def select_system_size(polymer_class: str, smiles: str, properties=None,
-                       dp_typical: int = None, nchain: int = None) -> dict:
+                       dp_typical: int = None, nchain: int = None,
+                       field: str = None) -> dict:
     rules = load_rules()
     cls = get_class_entry(rules, polymer_class, warn_on_miss=True)
     # Class-level dp_typical/nchain were removed 2026-09-02 (none of the 21 classes carried any
@@ -343,7 +357,7 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
     dp = dp_typical if dp_typical is not None else cls.get("dp_typical")
     nchain_v = nchain if nchain is not None else cls.get("nchain")
     if dp is None or nchain_v is None:
-        _dp, _n, _mw, _note = derive_cell(smiles, cls.get("preferred_ff", "") == "trappe-ua")
+        _dp, _n, _mw, _note = derive_cell(smiles, _is_ua(cls, field))
         dp = dp if dp is not None else _dp
         nchain_v = nchain_v if nchain_v is not None else _n
         if dp is None:
@@ -353,7 +367,7 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
     uncertainties = []
     floors = []  # (source, floor_dp, note)
 
-    for prop, info in _property_floors(polymer_class, smiles, properties, cls=cls).items():
+    for prop, info in _property_floors(polymer_class, smiles, properties, cls=cls, field=field).items():
         if info["floor_dp"] is not None and info["source"] == "entanglement_bm":
             # User-directed benchmark acceptance criterion, 2026-08-25 (see decision_policy.json
             # D-04_system_size): entanglement Me gates the plateau shear modulus / viscoelastic
@@ -428,7 +442,7 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
     # the same fact twice under two names and scientific_control.py carried a hand-maintained
     # filter to drop one of them. The text below is the survivor (the more current of the two).
     if nchain_v and nchain_v < PCFF_NCHAIN_PRODUCTION_MINIMUM:
-        ff = (cls.get("preferred_ff") or "").lower()
+        ff = (field or cls.get("ff_accuracy_prior") or "").lower()
         if "pcff" in ff:
             uncertainties.append({
                 "name": "nchain_below_production_minimum", "dominant": False,
@@ -472,7 +486,8 @@ def select_system_size(polymer_class: str, smiles: str, properties=None,
 
 
 def solve_system_size(polymer_class: str, smiles: str, properties=None,
-                      dp_typical: int = None, nchain: int = None) -> dict:
+                      dp_typical: int = None, nchain: int = None,
+                      field: str = None) -> dict:
     """Cost-minimizing companion to select_system_size(): the DP/nchain a reasoned/novel
     plan should actually USE, not merely a check of whether the class default clears its
     floor.
@@ -498,7 +513,7 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
 
 """
     base = select_system_size(polymer_class, smiles, properties=properties,
-                              dp_typical=dp_typical, nchain=nchain)
+                              dp_typical=dp_typical, nchain=nchain, field=field)
     if "error" in base:
         return base
 
@@ -512,7 +527,7 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
     dp_was_derived = dp is None
     nchain_was_derived = nchain_v is None
     if dp is None or nchain_v is None:
-        _dp, _n, _mw, _note = derive_cell(smiles, cls.get("preferred_ff", "") == "trappe-ua")
+        _dp, _n, _mw, _note = derive_cell(smiles, _is_ua(cls, field))
         dp = dp if dp is not None else _dp
         nchain_v = nchain_v if nchain_v is not None else _n
         if dp is None:
@@ -585,7 +600,7 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
         if dp_was_derived and not reasons:
             # The cell was derived rather than pinned, so nothing else explains it. Without this
             # the D-04 decision row carries no evidence for the size it chose.
-            _, _, _mw, _note = derive_cell(smiles, cls.get("preferred_ff", "") == "trappe-ua")
+            _, _, _mw, _note = derive_cell(smiles, _is_ua(cls, field))
             reasons.append(f"dp_typical={recommended_dp} derived from this SMILES' own repeat "
                           f"unit to clear the {SYSTEM_MW_FLOOR_GMOL:,.0f} g/mol system-mass "
                           f"floor (Wang 2021): {_note}")
@@ -603,7 +618,7 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
                       f"{SYSTEM_MW_FLOOR_GMOL:,.0f} g/mol system-mass floor; no property-specific "
                       "chain-length floor applies to the requested properties")
 
-    ff = (cls.get("preferred_ff") or "").lower()
+    ff = (field or cls.get("ff_accuracy_prior") or "").lower()
     recommended_nchain = None
     # The PCFF-minimum advisory is emitted once, by select_system_size() above, and arrives
     # here in `uncertainties` -- PCFF_NCHAIN_PRODUCTION_MINIMUM is advisory (see its docstring)
