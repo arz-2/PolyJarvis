@@ -10,7 +10,7 @@ guides or generate worker prompts.
 | `run_campaign.py` | Resumable end-to-end campaign execution (the CLI accepts a plan, never an individual stage): build, the equilibration core ending at the gated melt hold, the cooling descent to `final_T_K`, thermal, mechanical, summary |
 | `stage_params.py` | Plan and class configuration to concrete tool arguments |
 | `protocol_policy.py` | Pressure-ladder selection and bounded recovery |
-| `make_deterministic_plan.py` | Reproducible plan generation for configured classes: `run-plan` (run_plan.json) and `decision` (the fully-resolved decision.json the literature critic then critiques) |
+| `make_deterministic_plan.py` | Reproducible plan generation for configured classes: `run-plan` writes the complete `run_plan.json` the literature critic then critiques. The separate `decision` subcommand and its decision.json were folded into the plan on 2026-09-04 |
 | `validate_run_plan.py` | Structural and policy validation of plan artifacts |
 | `enforce_gate.py` | Deterministic gate enforcement for both gated cells: `require_melt` on the melt hold (where `rg`/`ct` bind) and `require_glassy`/`require_rubbery` on the assessment cell |
 | `hardware_runtime.py` | What this box has and who currently has it: live host/GPU probes (cores, nvidia-smi, host-fingerprint match) and the atomic GPU claim/release ledger: `status`, `claim`, `release`, `budget` |
@@ -21,8 +21,9 @@ guides or generate worker prompts.
 | `rules_common.py` | `guides/polymer_rules.json` access, class/member resolution, and the RDKit canonicalization both rest on (`canon` CLI) — the most-imported module here |
 | `rdkit_cli.py` | Every RDKit computation (canonicalization, Morgan/Tanimoto similarity, repeat-unit atom count and mass, group-contribution Tg estimate, backbone-path rigidity) as one CLI, run inside the RDKit-capable conda env via `mol_python.run_in_mol_env`; never imported directly |
 
-Control events live in `data/<run>/raw/control_state.json`; execution state lives in
-`data/<run>/workflow_state.json` (per-stage status/attempts) and each attempt's own
-`data/<run>/attempts/<stage>/<attempt_id>/executor_state.json` (that attempt's resolved
-parameters + computed outputs). Completed stages are skipped on resume. The recovery agent
+`data/<run>/raw/control_state.json` is a thin session record -- which session is on this run
+and whether it is over -- written by the control plane AND by the resume path, so it is not
+frozen at the first call. Execution state lives in `data/<run>/workflow_state.json` (per-stage
+status/attempts) and each attempt's own
+`data/<run>/attempts/<stage>/<attempt_id>/executor_state.json` (the plan-level `decided_params` that were in force for that attempt, plus its computed outputs -- NOT the resolver's per-stage arguments, which are computed transiently and never persisted). Completed stages are skipped on resume. The recovery agent
 is never called unless validation or a deterministic stage returns a structured issue.

@@ -50,7 +50,7 @@ exact formulas/caps rather than trusting this table to stay current. Summary, by
 | Foundation | `MINIMIZE_NOT_CONVERGED` | `raise_minimize_tolerance`, ×2 — escalates `minimize_maxiter`/`minimize_maxeval` ×4/attempt and loosens `minimize_etol`/`minimize_ftol` ×10/attempt, full restart each time (minimize is stage 0) | Structure still won't relax after 2 rungs — likely a genuinely bad initial pack, not a tolerance problem; escalate rather than loosening further |
 | Foundation | `HOMOG_HETEROGENEOUS`/`DENSITY_HETEROGENEITY` | `melt_homogeneity`, ×2 | Melt-only signal — don't apply to a glassy 300K read |
 | Thermal | `TG_NOT_REPORTABLE` | `tg_sampling` — doubles `tg_steps_per_t`, then halves `tg_t_step_K` (floor 5K), ×7 | Fit genuinely won't resolve at any floor-respecting rate |
-| Thermal | `TG_REVIEW` | `tg_breakpoint` — halves `tg_t_step_K` once, ×1 | primary/alt Tg gap >20K persists — check whether the class needs `tg_slope_gate_fallback=slowest_rate` |
+| Thermal | `TG_REVIEW` | `tg_breakpoint` — halves `tg_t_step_K` once, ×1 | primary/alt Tg gap >20K persists — consider LOWERING the class's `tg_rate_K_per_ns` (the retired `tg_slope_gate_fallback` is gone) |
 | Mechanical | `BM_FALLBACK_DEFORM` | `deformation_fallback`, ×1 | — |
 | Mechanical | `BM_INADMISSIBLE_NONMONOTONIC` | `murnaghan_resample`, ×1 | — |
 | Mechanical | `BM_INADMISSIBLE` | `conditional_deformation`, ×1, glassy only | Rubbery + inadmissible has no auto-fallback — `agent_only` |

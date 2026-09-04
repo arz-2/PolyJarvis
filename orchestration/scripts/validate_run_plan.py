@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from select_hardware import select_hardware
 from select_system_size import select_system_size
 from rules_common import load_rules, get_class_entry, hardware_policy
+from make_deterministic_plan import PLAN_SCHEMA_VERSION  # single source of truth
 from hardware_runtime import host_matches
 
 _ENGINE_SCRIPTS = (Path(__file__).resolve().parents[2]
@@ -144,19 +145,36 @@ def _stage_properties_findings(plan: dict) -> list:
 
 
 def _uncertainty_findings(plan: dict, policy: dict) -> list:
-    findings = []
-    uncs = plan.get("uncertainties", [])
-    if uncs and not any(u.get("dominant") and u.get("name") for u in uncs):
-        findings.append({"check": "dominant_uncertainty", "severity": "structural",
-                         "detail": "no uncertainties[] entry has dominant=true with a name"})
-    valid_probes = set(policy.get("uncertainty_reduction_probes", {}).keys()) - {"description"}
-    for u in uncs:
-        rp = u.get("reduction_probe")
-        if rp and rp != "none" and rp not in valid_probes:
-            findings.append({"check": "reduction_probe", "severity": "structural",
-                             "detail": f"unknown reduction_probe {rp!r} on uncertainty "
-                                       f"{u.get('name')!r}"})
-    return findings
+    """The plan must name its dominant uncertainty.
+
+    It was an uncertainties[] list carrying exactly one entry flagged dominant=true, mixed in
+    with the solver's advisories; this check policed that exactly one carried the flag. The
+    headline is a scalar of its own since 2026-09-04 and the advisories moved onto the records
+    they qualify, so there is nothing left to police -- only to require.
+    """
+    if not plan.get("dominant_uncertainty"):
+        return [{"check": "dominant_uncertainty", "severity": "structural",
+                 "detail": "plan names no dominant_uncertainty"}]
+    return []
+
+
+def _schema_version_findings(plan: dict) -> list:
+    """Reject a plan file written against an older schema.
+
+    Pairs with workflow_engine.ENGINE_VERSION and covers the other half of the break:
+    ENGINE_VERSION invalidates RESUMABLE RUN STATE (it is folded into every stage's
+    _input_hash), while this rejects a stale PLAN FILE before it is ever executed. Neither
+    substitutes for the other -- a v1.0 plan carries retired keys (tg_rates_K_per_ns,
+    tg_steps_per_t) and a five-row decisions[] that today's readers would silently misread.
+    """
+    got = plan.get("schema_version")
+    if got == PLAN_SCHEMA_VERSION:
+        return []
+    return [{"check": "schema_version", "severity": "structural",
+             "detail": (f"run_plan schema_version is {got!r}, expected "
+                        f"{PLAN_SCHEMA_VERSION!r}. Regenerate it with "
+                        "`make_deterministic_plan.py run-plan`; a plan written against an "
+                        "older schema carries retired parameters and decision rows.")}]
 
 
 def _exp_tg_companion_findings(plan: dict) -> list:
@@ -427,27 +445,28 @@ def _forcefield_findings(plan: dict) -> list:
 
     flags = d.get("provenance_flags") or {}
     blocking = sorted(f for f in flags if f in _PROVENANCE_BLOCKING and flags[f])
-    acknowledged = any(u.get("name") == "ff_parameter_provenance"
-                       for u in plan.get("uncertainties", []))
+    # Acknowledgements live on the decision they qualify. They were a plan-wide uncertainties[]
+    # list matched by NAME until 2026-09-04 -- a bag of strings acting as per-decision flags.
+    acknowledged = "ff_parameter_provenance" in (d.get("acknowledgements") or {})
     if blocking and not acknowledged:
         findings.append({
             "check": "ff_provenance_unacknowledged", "severity": "structural",
             "detail": (f"D-01_ff.provenance_flags {blocking} record parameters that were "
                        "locally patched, silently zeroed, or unexplained, and no "
-                       "uncertainties entry named 'ff_parameter_provenance' acknowledges "
+                       "acknowledgements entry named 'ff_parameter_provenance' on the "
+                       "D-01_ff row acknowledges "
                        "them. The flag does not veto the field — it must be carried as a "
                        "stated uncertainty, not inherited silently.")})
 
     # D-01's only DOI-backed evidence is the class ff_justification_doi, which describes the
     # class prior. Once the field changes, that citation no longer covers the run.
     prior = _class_prior(plan)
-    if prior and dp_ff and dp_ff != prior and not any(
-            u.get("name") == "ff_accuracy_prior_not_met"
-            for u in plan.get("uncertainties", [])):
+    if prior and dp_ff and dp_ff != prior and (
+            "ff_accuracy_prior_not_met" not in (d.get("acknowledgements") or {})):
         findings.append({
             "check": "ff_prior_departure_unacknowledged", "severity": "structural",
             "detail": (f"decided_params.preferred_ff={dp_ff!r} is not the class prior "
-                       f"{prior!r}, and no uncertainties entry named "
+                       f"{prior!r}, and no acknowledgements entry named "
                        "'ff_accuracy_prior_not_met' acknowledges the departure. The class "
                        "ff_justification_doi is D-01's only DOI-backed evidence and it "
                        f"describes {prior!r}, not {dp_ff!r}.")})
@@ -502,14 +521,15 @@ def _system_size_findings(plan: dict) -> list:
     dp = dp_dict.get("dp_typical")
     if dp is None or dp >= required_floor:
         return findings
-    acknowledged = any(u.get("name") == "system_size_dp_floor"
-                       for u in plan.get("uncertainties", []))
+    acknowledged = "system_size_dp_floor" in (plan.get("system_size", {}).get(
+        "acknowledgements") or {})
     if not acknowledged:
         findings.append({
             "check": "system_size_dp_floor_unacknowledged", "severity": "structural",
             "detail": (f"decided_params.dp_typical={dp} is below the measured "
                       f"required_dp_floor={required_floor} ({rec['decision'].get('floor_sources')}) "
-                      "and no uncertainties entry named 'system_size_dp_floor' acknowledges "
+                      "and no system_size.acknowledgements entry named 'system_size_dp_floor' "
+                      "acknowledges "
                       "it. Raise dp_typical to the floor or record the gap as a stated "
                       "uncertainty -- re-run orchestration/scripts/select_system_size.py.")})
     return findings
@@ -561,13 +581,13 @@ def _system_size_over_provisioned_findings(plan: dict) -> list:
 
     if not any(u.get("name") == "size_over_provisioned" for u in rec.get("uncertainties", [])):
         return findings
-    acknowledged = any(u.get("name") == "system_size_over_provisioned"
-                      for u in plan.get("uncertainties", []))
+    acknowledged = "system_size_over_provisioned" in (plan.get("system_size", {}).get(
+        "acknowledgements") or {})
     if not acknowledged:
         findings.append({
             "check": "system_size_over_provisioned_unacknowledged", "severity": "structural",
             "detail": (f"decided_params.dp_typical={dp} clears select_system_size.py's "
-                      "size_over_provisioned threshold and no uncertainties entry named "
+                      "size_over_provisioned threshold and no system_size.acknowledgements entry named "
                       "'system_size_over_provisioned' acknowledges it. A plan built through "
                       "materialize_plan() self-acknowledges this automatically -- re-run it, "
                       "or add the uncertainty by hand if this plan was edited directly.")})
@@ -579,6 +599,7 @@ def validate_plan(plan: dict, policy: dict) -> list:
     findings += _criteria_and_evidence_findings(plan, policy)
     findings += _stage_schema_findings(plan, policy)
     findings += _stage_properties_findings(plan)
+    findings += _schema_version_findings(plan)
     findings += _uncertainty_findings(plan, policy)
     findings += _exp_tg_companion_findings(plan)
     findings += _hardware_findings(plan)

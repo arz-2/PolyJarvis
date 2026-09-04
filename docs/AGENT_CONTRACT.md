@@ -5,60 +5,80 @@ PolyJarvis has two agent roles and one deterministic runtime.
 ## Scientific Planning Agent
 
 The planning agent runs once at campaign start. As of 2026-09-02 it does **not** author the
-decision file at all: `orchestration/scripts/make_deterministic_plan.py decision --smiles ...`
-writes a *complete* `decision.json`, resolving one row per pre-simulation policy in
-`orchestration/decision_policy.json` (`D-01_ff`, `D-02_charges`, `D-03_electrostatics`,
-`D-04_system_size`, `D-08_hardware`) from this repo's own resolvers — `solve_system_size`,
-`select_hardware`, the `electrostatics_decision_guide`, and `polymer_rules.json`'s
-`_metadata.primary_sources` citation records. Every criterion the policy names gets its own
-evidence entry, tagged `origin: "autofill"`, including the criteria that layer cannot reach
-(those say `NOT MEASURED` / `NOT ASSESSABLE` explicitly). `rationale` is written for it.
+plan at all, and as of 2026-09-04 there is no separate decision file for it to author:
+`orchestration/scripts/make_deterministic_plan.py run-plan --smiles ...` writes a *complete*
+`run_plan.json`. The file the agent critiques and the file that executes are the same file.
 
-The agent's job is to **critique** that file, not fill it: the `literature-grounding-worker`
-subagent returns an agree/disagree verdict per decision, and the calling session applies or
-declines each `suggested_override`, transcribes any critic-backed sources with
+`decisions` holds exactly **one** row, `D-01_ff`. The others were retired because none was a
+decision:
+
+| retired row | why it was never a choice |
+|---|---|
+| `D-02_charges` | the charge scheme is the force field's own (`pcff` -> bond-increment, `opls` -> opls-library, `trappe` -> embedded, `gaff` -> RESP) |
+| `D-03_electrostatics` | follows the same family (`lj_cut` iff `trappe`, otherwise `pppm`) |
+| `D-08_hardware` | `hardware_policy.by_forcefield[family]`, a property of this host |
+| `D-04_system_size` | a solver (`solve_system_size`), not a choice -- `overrides` cannot carry `dp_typical`/`nchain` |
+
+All four were verified to be exact functions of the resolved field across all 21 classes before
+retirement. They are now derived by `_derived_from_field()` **after** D-01 resolves, into
+`decided_params` (charges, electrostatics), `hardware`, and `system_size`. That ordering is the
+point: they used to be snapshotted from the class entry *before* the field was known and never
+reconciled, so a SMILES resolving outside its class family recorded a charge scheme that
+contradicted the field it built with.
+
+`D-05_convergence`, `D-06_tg_fit_quality` and `D-07_property_method` still have no row: each is
+defined in `decision_policy.json` as a mechanized runtime gate verdict (`equil_verdict`,
+`tg_gate_verdict`, `bm_gate_verdict`) to route on rather than a decision with a pre-simulation
+default, and stays enforced solely through `planned_stages[*].success_criteria`.
+
+The agent's job is to **critique** the D-01 row, not fill it: the `literature-grounding-worker`
+subagent returns an agree/disagree verdict on the force field, and the calling session applies
+or declines its `suggested_override`, transcribes any critic-backed sources with
 `origin: "critic"`, and sets `confidence`. `confidence` comes back `"unreviewed"` (invalid) and
-is the **only** remaining block on materialization — `--baseline` stamps `"low"` instead, for
+is the **only** remaining block on materialization -- `--baseline` stamps `"low"` instead, for
 the deterministic arm that runs with no LLM in the loop.
 
-`default_choice` stays read-only provenance: `materialize_plan()` reads only
-`criteria_evaluated`/`evidence`/`alternatives` off each row, so disagreement is expressed
-through `overrides`. It returns only scientific decisions:
+The row's `choice` stays read-only provenance: `materialize_plan()` reads only
+`criteria_evaluated`/`evidence`/`alternatives` off it, so disagreement is expressed through
+`overrides`.
 
 ```json
 {
-  "polymer_class": "PSTR",
-  "properties": ["density", "bulk_modulus"],
-  "rationale": ["The requested 300 K state is glassy."],
-  "overrides": {"npt_prod_ns": 8.0},
-  "decision_evaluations": {
-    "D-03_electrostatics": {
-      "default_choice": "pppm",
-      "criteria_evaluated": [
-        "backbone_heteroatoms",
-        "max_partial_charge",
-        "computational_cost"
-      ],
-      "evidence": [{"claim": "PCFF electrostatics", "citation": "source"}],
-      "alternatives": ["short-range treatment"]
+  "schema_version": "2.0",
+  "plan_mode": "scaffold",
+  "confidence": "unreviewed",
+  "dominant_uncertainty": "protocol_transferability",
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "admissible": ["pcff"],
+      "criteria_evaluated": ["literature_support", "parameter_coverage",
+                             "validation_data", "computational_cost"],
+      "evidence": [{"claim": "...", "source_doi": "...", "origin": "autofill"}],
+      "alternatives": ["gaff2"],
+      "acknowledgements": {"ff_accuracy_prior_not_met": "..."},
+      "critique": {"status": "pending_scientific_review", "rounds": 0, "findings": []}
     }
-  },
-  "assumptions": [],
-  "dominant_uncertainty": "forcefield_transferability",
-  "confidence": "medium"
+  ],
+  "system_size": {"dp_typical": 30, "nchain": 10, "acknowledgements": {}},
+  "hardware": {"engine": "kokkos", "mpi_ranks": 1, "gpu_per_run": 1, "ff_family": "pcff"},
+  "overrides": {}
 }
 ```
 
-`default_choice` is read-only provenance of what the class defaulted to — code never reads it
-back out of `decision_evaluations` when materializing the plan, so editing it has no effect; a
-disagreement is expressed through `overrides` instead. `D-05_convergence`,
-`D-06_tg_fit_quality`, and `D-07_property_method` have no `decision_evaluations` row: each is
-defined in `decision_policy.json` as a mechanized runtime gate verdict (`equil_verdict`,
-`tg_gate_verdict`, `bm_gate_verdict`) to route on rather than a decision with a pre-simulation
-default, and stay enforced solely through `planned_stages[*].success_criteria`.
+Two facts a plan MUST carry when it departs from its own evidence live on the record they
+qualify, not in a plan-wide list: `ff_parameter_provenance` and `ff_accuracy_prior_not_met` in
+`decisions[0].acknowledgements`, and `system_size_dp_floor` / `system_size_over_provisioned` in
+`system_size.acknowledgements`. `validate_run_plan.py` reads them there.
 
-The agent cannot set paths, commands, filenames, templates, or raw LAMMPS content. Code validates
-every override and materializes the complete `run_plan.json`.
+`schema_version` is enforced: a plan written against an older schema is rejected structurally
+rather than misread. It covers a different failure from `workflow_engine.ENGINE_VERSION` --
+that one invalidates resumable *run state*, this one rejects a stale *plan file* before it
+executes.
+
+The agent cannot set paths, commands, filenames, templates, or raw LAMMPS content. Code
+validates every override and materializes the complete `run_plan.json`.
 
 ## Deterministic Chain
 

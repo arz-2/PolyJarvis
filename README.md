@@ -65,13 +65,13 @@ python3 orchestration/scripts/scientific_control.py \
   --goal 'Compute density, Tg, and bulk modulus at 300 K' \
   --smiles '*CC(*)c1ccccc1' \
   --properties density,tg,bulk_modulus \
-  --decision-file examples/pstr_decision.json \
+  --plan examples/pstr_run_plan.json \
   --dry-run
 ```
 
-The control layer persists `control_state.json`; the workflow engine persists per-run
-`workflow_state.json` and, per stage attempt, `executor_state.json` (resolved parameters +
-computed outputs). Successful runs never invoke the recovery command. Remove `--dry-run` to
+The control layer persists a thin session record in `control_state.json` (run name, plan path,
+status, session start/end, recovery-agent calls); the workflow engine persists the actual run
+state in per-run `workflow_state.json` and, per stage attempt, `executor_state.json` (the plan-level `decided_params` that were in force for that attempt, plus its computed outputs -- NOT the resolver's per-stage arguments, which are computed transiently and never persisted). Successful runs never invoke the recovery command. Remove `--dry-run` to
 execute the simulation chain.
 
 ## Scientific Workflow

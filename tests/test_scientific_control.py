@@ -201,22 +201,18 @@ def test_materializer_applies_bounded_scientific_overrides():
     assert plan["plan_mode"] == "reasoned"
     assert plan["decided_params"]["stage8_min_steps"] == 8000000
     assert plan["decided_params"]["nchain"] == 12
-    assert plan["uncertainties"][0] == {
-        "name": "sampling", "dominant": True, "reduction_probe": "none"
-    }
-    # Everything after the dominant entry is a solve_system_size advisory, and every one of
-    # them must be non-dominant -- they disclose, they never take over the plan's headline
-    # uncertainty.
-    assert all(u.get("dominant") is False for u in plan["uncertainties"][1:])
-    # And they must quote the FINAL decided_params, not the pre-override derivation: this plan
+    # The plan's headline uncertainty is a scalar of its own now, so a size advisory cannot
+    # displace it structurally rather than only by convention.
+    assert plan["dominant_uncertainty"] == "sampling"
+    acks = plan["system_size"]["acknowledgements"]
+    # Advisories must quote the FINAL decided_params, not the pre-override derivation: this plan
     # overrides nchain to 12, so an advisory about nchain has to say 12. It said 10 (the derived
     # value) until materialize_plan started re-running solve_system_size against the final
     # parameters -- a plan that contradicts its own decided_params is worse than one that
     # discloses nothing.
-    nchain_advisories = [u for u in plan["uncertainties"] if "nchain" in u["name"]]
+    nchain_advisories = [v for k, v in acks.items() if "nchain" in k]
     assert nchain_advisories, "expected an nchain advisory: nchain=12 is below the PCFF advisory minimum 20"
-    assert all("nchain=12" in u["detail"] for u in nchain_advisories)
-    assert "decision_sha256" in plan["provenance"]
+    assert all("nchain=12" in a["detail"] for a in nchain_advisories)
 
 
 def test_materializer_rejects_unknown_polymer_class():
@@ -402,10 +398,10 @@ def test_materializer_auto_fills_the_floor_clearing_dp_when_unset(monkeypatch):
     )
     plan = materialize_plan(PHYC_INTENT, decision)
     assert plan["decided_params"]["dp_typical"] == 179
-    d04 = next(d for d in plan["decisions"] if d["id"] == "D-04_system_size")
-    assert d04["choice"] == "DP=179, nchain=10"
-    assert any("floor" in e.get("claim", "") for e in d04["evidence"])
-    assert any("D-04_system_size auto-filled" in a for a in plan["assumptions"])
+    size = plan["system_size"]
+    assert (size["dp_typical"], size["nchain"]) == (179, 10)
+    assert any("floor" in r for r in size["reasons"]), size["reasons"]
+    assert any("auto-filled" in r for r in size["reasons"])
 
 
 def test_materializer_explicit_override_wins_over_the_auto_fill():
@@ -418,7 +414,7 @@ def test_materializer_explicit_override_wins_over_the_auto_fill():
     assert plan["decided_params"]["dp_typical"] == 40  # the agent's pin, not the derived floor
     # nchain is still auto-filled (it is derived now, and the agent pinned only dp_typical), so
     # an auto-fill assumption legitimately fires -- it must just not claim dp_typical.
-    autofill = [a for a in plan["assumptions"] if "D-04_system_size auto-filled" in a]
+    autofill = [r for r in plan["system_size"]["reasons"] if "auto-filled" in r]
     assert not any("dp_typical" in a for a in autofill), autofill
 
 
@@ -466,34 +462,6 @@ def test_materializer_cost_estimate_failure_degrades_to_error_payload_not_a_rais
     )
     plan = materialize_plan(PHYC_INTENT, decision)
     assert "boom" in plan["cost_estimate"]["error"]
-
-
-def test_materializer_flags_tg_ladder_cost_unoptimized_when_tg_is_planned():
-    """D-06: no accuracy-vs-cooling-rate curve exists anywhere in this codebase (only an
-    aggregate fast-cooling bias is documented, not a per-rate slope), so the rate ladder stays
-    floor-only rather than fabricating an optimizer. Surface that gap explicitly rather than
-    silently implying the ladder is cost-optimal."""
-    decision = PlanDecision(
-        polymer_class="PHYC", properties=("tg",),
-        rationale=("Just need Tg.",), dominant_uncertainty="none", confidence="high",
-    )
-    plan = materialize_plan(PHYC_INTENT, decision)
-    names = {u["name"] for u in plan["uncertainties"]}
-    assert "tg_ladder_cost_unoptimized" in names
-
-
-def test_materializer_omits_tg_ladder_flag_when_tg_is_not_planned():
-    intent = ScientificIntent(
-        run_name="D06_NO_TG_TEST", goal="test", smiles="*CC*",
-        requested_properties=("bulk_modulus",), polymer_class_hint="PHYC",
-    )
-    decision = PlanDecision(
-        polymer_class="PHYC", properties=("bulk_modulus",),
-        rationale=("Just need K.",), dominant_uncertainty="none", confidence="high",
-    )
-    plan = materialize_plan(intent, decision)
-    names = {u["name"] for u in plan["uncertainties"]}
-    assert "tg_ladder_cost_unoptimized" not in names
 
 
 def test_apply_recovery_refreshes_the_stale_cost_estimate():
@@ -567,26 +535,29 @@ def test_stiff_backbone_chain_length_bias_reaches_the_plan():
     wiring: a heavy aromatic repeat unit clears the 50k g/mol system-mass floor at a very
     short DP, and nothing else in the plan says so."""
     plan = _tg_plan("PKTN", PEEK_SMILES, "RIGIDITY_DISCLOSURE_TEST")
-    bias = [u for u in plan["uncertainties"] if u["name"] == "RIGID_BACKBONE_CHAIN_LENGTH_BIAS"]
-    assert len(bias) == 1, [u["name"] for u in plan["uncertainties"]]
-    assert bias[0]["class"] == "stiff"
-    assert bias[0]["dominant"] is False, "advisory only -- it must never displace the headline"
-    assert "UNQUANTIFIED" in bias[0]["detail"]
+    acks = plan["system_size"]["acknowledgements"]
+    assert "RIGID_BACKBONE_CHAIN_LENGTH_BIAS" in acks, sorted(acks)
+    bias = acks["RIGID_BACKBONE_CHAIN_LENGTH_BIAS"]
+    assert bias["class"] == "stiff"
+    assert "UNQUANTIFIED" in bias["detail"]
+    # advisory only -- it cannot displace the headline, which is a separate scalar
+    assert plan["dominant_uncertainty"] != "RIGID_BACKBONE_CHAIN_LENGTH_BIAS"
 
 
 def test_flexible_backbone_carries_no_chain_length_bias_advisory():
     """The counterpart: PE is flexible, so there is no rigid-backbone bias to disclose. A
     disclosure that fires on every plan tells a reader nothing."""
     plan = _tg_plan("PHYC", "*CC*", "RIGIDITY_FLEXIBLE_TEST")
-    names = {u["name"] for u in plan["uncertainties"]}
-    assert "RIGID_BACKBONE_CHAIN_LENGTH_BIAS" not in names
+    assert "RIGID_BACKBONE_CHAIN_LENGTH_BIAS" not in plan["system_size"]["acknowledgements"]
 
 
 def test_plan_size_advisories_never_displace_the_dominant_uncertainty():
-    """Every advisory folded in from solve_system_size is non-dominant, and the planner's own
-    dominant uncertainty stays first -- validate_run_plan.py's _uncertainty_findings requires
-    exactly one named dominant entry, so a plumbing mistake here is a structural finding."""
+    """The planner's headline uncertainty and the solver's advisories live in different places.
+
+    They shared one uncertainties[] list until 2026-09-04, distinguished only by a `dominant`
+    flag that every writer had to remember to set -- validate_run_plan then required exactly one
+    entry carrying it. The headline is now a scalar and the advisories are a dict on
+    system_size, so an advisory cannot displace the headline at all."""
     plan = _tg_plan("PKTN", PEEK_SMILES, "RIGIDITY_DOMINANCE_TEST")
-    assert plan["uncertainties"][0] == {"name": "sampling", "dominant": True,
-                                        "reduction_probe": "none"}
-    assert sum(1 for u in plan["uncertainties"] if u.get("dominant")) == 1
+    assert plan["dominant_uncertainty"] == "sampling"
+    assert isinstance(plan["system_size"]["acknowledgements"], dict)

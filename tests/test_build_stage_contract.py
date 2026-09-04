@@ -107,7 +107,7 @@ def test_a_scaffold_plan_carries_a_cell_sized_from_its_own_smiles():
     # DP = ceil(SYSTEM_MW_FLOOR_GMOL / (nchain * M_repeat)) = ceil(50000 / (10 * 72.06))
     assert dp["nchain"] == 10
     assert dp["dp_typical"] == 70
-    assert any("D-04_system_size resolved" in a for a in plan["assumptions"])
+    assert any("resolved" in r for r in plan["system_size"]["reasons"])
 
 
 def test_two_members_of_one_class_get_different_cells():
@@ -121,7 +121,7 @@ def test_two_members_of_one_class_get_different_cells():
 def test_a_plan_with_no_smiles_says_so_instead_of_sizing_blind():
     plan = make_plan("BUILD_CONTRACT", "PEST", None, {"density"})
     assert "dp_typical" not in plan["decided_params"]
-    assert any("D-04_system_size UNRESOLVED" in a for a in plan["assumptions"])
+    assert any("UNRESOLVED" in r for r in plan["system_size"]["reasons"])
 
 
 def test_an_unsized_plan_is_refused_at_execution_rather_than_silently_built():

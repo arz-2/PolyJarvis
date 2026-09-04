@@ -27,7 +27,7 @@ VALIDATED_ENTRY = {
     "protocol": {
         "decided_params": {
             "dp_typical": 60, "nchain": 40, "T_workflow_K": 300,
-            "tg_rates_K_per_ns": [10, 25, 40],
+            "tg_rate_K_per_ns": 40,
             "alpha_glass_per_K": 2.1e-4, "alpha_melt_per_K": 6.0e-4,
         },
         "decisions": [

@@ -129,7 +129,9 @@ def main() -> None:
     start_parser.add_argument("--polymer-class-hint")
     start_source = start_parser.add_mutually_exclusive_group(required=True)
     start_source.add_argument("--scientific-agent-command")
-    start_source.add_argument("--decision-file", type=Path)
+    start_source.add_argument("--plan", "--decision-file", dest="plan_file", type=Path,
+                              help="An adjudicated run_plan.json; --decision-file is a "
+                                   "kept alias from before the fold.")
     start_parser.add_argument("--recovery-agent-command")
     start_parser.add_argument("--dry-run", action="store_true")
     resume_parser = subparsers.add_parser("resume")
@@ -152,7 +154,7 @@ def main() -> None:
                                        if item.strip()),
             polymer_class_hint=args.polymer_class_hint,
         )
-        planning = (FilePlanningAgent(args.decision_file) if args.decision_file else
+        planning = (FilePlanningAgent(args.plan_file) if args.plan_file else
                     SubprocessPlanningAgent(JsonSubprocessAgent(
                         args.scientific_agent_command.split())))
         recovery = (SubprocessRecoveryAgent(JsonSubprocessAgent(args.recovery_agent_command.split()))

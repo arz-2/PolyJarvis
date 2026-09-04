@@ -26,7 +26,7 @@ from protocol_policy import ATM_PER_GPA  # noqa: E402
 import track_registry  # noqa: E402  (stdlib-only, no repo-local imports)
 
 
-ENGINE_VERSION = "workflow-engine-v2"
+ENGINE_VERSION = "workflow-engine-v3"
 """v2 (2026-09-02): the equilibration stage was split into an `equilibration` core that
 ends at a gated melt hold and a separate `cooling` stage that descends to final_T_K.
 Bumped deliberately -- implementation_version is inside every stage's _input_hash, so
@@ -132,9 +132,14 @@ PARAMETER_STAGE: dict[str, str] = {
     "baseline_minimize_etol": "equilibration", "baseline_minimize_ftol": "equilibration",
     "baseline_minimize_maxiter": "equilibration", "baseline_minimize_maxeval": "equilibration",
     "tg_t_low_K": "thermal", "tg_t_step_K": "thermal",
+    "tg_rate_K_per_ns": "thermal",
+    # RETIRED 2026-09-04 with the single-rate collapse (tg_rates_K_per_ns -> tg_rate_K_per_ns).
+    # Mappings kept, like the alpha_* pair above: an on-disk effective_parameters written before
+    # the collapse still carries these, and an unmapped key falls through .get(key, "build") and
+    # would invalidate the whole pipeline back to build instead of just thermal.
     "tg_primary_rate_index": "thermal", "tg_rates_K_per_ns": "thermal",
-    "tg_slope_gate_fallback": "thermal",
-    "tg_steps_per_t": "thermal", "tg_min_steps_per_T": "thermal",
+    "tg_slope_gate_fallback": "thermal", "tg_steps_per_t": "thermal",
+    "tg_min_steps_per_T": "thermal",
     # RETIRED with the reheat probe (_bracket_tg_start_temp): the sweep starts from the gated
     # melt hold, so there is nothing to bracket. Mapping kept, as above.
     "tg_bracket_max_iters": "thermal", "tg_bracket_probe_steps": "thermal",

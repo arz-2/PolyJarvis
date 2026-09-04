@@ -180,23 +180,19 @@ def test_electrostatics_matches_its_own_decision_guide():
 # invariant is now that NO per-class DP floor exists to clear.
 
 
-def test_tg_slope_gate_fallback_valid():
-    """tg_slope_gate_fallback marks classes whose highest configured Tg rate is
-    documented as unreliable (degenerate/inverted fit); value names which rate
-    the thermal track sweeps by default instead of the highest-rate default.
+def test_no_class_carries_tg_slope_gate_fallback():
+    """The key is retired: it named which entry of a rate LIST to sweep, and there is no list.
 
-    PKTN and PSFO carried "slowest_rate" until 2026-09-01. Their inversion was diagnosed as a
-    cold-start artifact -- the staircase reheated the finished 300 K cell, so the top plateaus
-    under-equilibrated, and a FASTER sweep spent less time contaminated there. The melt-start
-    sweep removes that cause, so both returned to the highest rate. The key also gates
-    method_gap_exempt, so dropping it re-arms the primary/alt Tg gap gate for those two
-    classes: the next PEEK/PSU run tests the fix rather than assuming it."""
-    expected = {"PEST": "highest_rate"}
+    PKTN and PSFO carried "slowest_rate" until 2026-09-01, for an inversion diagnosed as a
+    cold-start artifact and fixed at the root by the melt-start sweep. PEST then carried
+    "highest_rate" until 2026-09-04 -- a value NEITHER reader recognised (both tested
+    == "slowest_rate"), so it silently did nothing while docs/PROPERTIES.md and
+    docs/decision_rationale.md both stated no class carried the key at all. It is gone with the
+    single-rate collapse; the remedy for a class whose fit will not resolve is to LOWER
+    tg_rate_K_per_ns, which _assert_tg_rate_feasible bounds."""
     found = {cid: c["tg_slope_gate_fallback"] for cid, c in CLASSES.items()
              if "tg_slope_gate_fallback" in c}
-    assert found == expected
-    for cid in found:
-        assert isinstance(CLASSES[cid].get("_tg_slope_gate_note"), str), cid
+    assert found == {}, f"retired key still present: {found}"
 
 
 # The staircase has to bracket the MD Tg, which is NOT the experimental Tg: at the
@@ -540,14 +536,16 @@ def test_the_sweep_top_is_the_melt_hold_and_has_no_override():
 def test_cooldown_rate_matches_the_classes_own_sweep_rate(cid):
     import stage_params as sp
     entry = RULES["classes"][cid]
-    rates = entry.get("tg_rates_K_per_ns")
-    if not rates:
-        pytest.skip(f"{cid} configures no Tg rates")
+    # Deliberately NOT a skip-if-missing: this invariant is load-bearing (a mismatch means a
+    # run's density and its Tg describe glasses with different thermal histories), and when the
+    # rate key was renamed on 2026-09-04 a skip-guard here turned all 21 parametrisations into
+    # vacuous passes. An unconfigured rate is a failure, not a skip.
+    expected = entry.get("tg_rate_K_per_ns")
+    assert expected, f"{cid} configures no tg_rate_K_per_ns"
     dt = entry.get("dt_fs", 1.0)
     dT = entry.get("cool_block_dT_K") or 25.0
     hold = sp.rate_matched_cool_block_hold_steps(entry, dt, dT)
     executed = dT / (hold * dt * 1e-06)
-    expected = rates[sp.select_primary_tg_rate_index(entry)]
     assert abs(executed - expected) < 0.6, (
         f"{cid}: cool_block executes {executed:.1f} K/ns against a sweep at {expected} K/ns"
     )
@@ -566,13 +564,13 @@ def test_no_class_pins_cool_block_hold_steps(cid):
     )
 
 
-def test_the_primary_rate_index_is_shared_with_do_thermal():
-    """do_thermal picks the sweep rate and _resolve_equil_params picks the cooldown rate. They
+def test_the_sweep_rate_is_shared_with_do_thermal():
+    """do_thermal picks the sweep rate and _resolve_cool_params picks the cooldown rate. They
     are the same descent, so they read the same function -- this is the guard against the two
     re-deriving it and drifting."""
     import stage_params as sp
     import run_campaign as rc
-    assert rc.select_primary_tg_rate_index is sp.select_primary_tg_rate_index
+    assert rc.tg_rate is sp.tg_rate
 
 
 # ─── the Tg FIT window is an analysis bound, not a start temperature ──────────────

@@ -78,9 +78,10 @@ def test_class_prior_is_chosen_when_admissible(monkeypatch):
 def _plan(**kw):
     d = {"id": "D-01_ff", "choice": kw.get("choice", "pcff"),
          "admissible": kw.get("admissible", ["pcff"]),
-         "provenance_flags": kw.get("flags", {})}
-    return {"decisions": [d], "decided_params": {"preferred_ff": kw.get("dp", "pcff")},
-            "uncertainties": kw.get("uncertainties", [])}
+         "provenance_flags": kw.get("flags", {}),
+         # acknowledgements live on the row they qualify, not in a plan-wide list
+         "acknowledgements": {k: "acknowledged" for k in kw.get("acks", ())}}
+    return {"decisions": [d], "decided_params": {"preferred_ff": kw.get("dp", "pcff")}}
 
 
 def test_choice_outside_the_measured_admissible_set_is_structural():
@@ -111,7 +112,7 @@ def test_acknowledged_provenance_flag_clears():
     """PSIL builds only because of a local patch -- the flag states the uncertainty,
     it does not veto the only field the class has."""
     f = _forcefield_findings(_plan(flags={"LOCAL_PATCH": 7},
-                                   uncertainties=[{"name": "ff_parameter_provenance"}]))
+                                   acks=("ff_parameter_provenance",)))
     assert f == []
 
 

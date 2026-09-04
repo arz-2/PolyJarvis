@@ -22,6 +22,7 @@ import track_registry  # noqa: E402
 
 from rules_common import get_class_entry, load_rules  # noqa: E402
 from make_deterministic_plan import (build_decisions, build_planned_stages, make_plan,  # noqa: E402
+                                     ordered_plan, KNOWN_DECISIONS, _derived_from_field,
                                      _field_of, _ff_prior_uncertainty)
 from select_system_size import solve_system_size  # noqa: E402
 import rules_common  # noqa: E402  -- module import so tests can monkeypatch rules_common.canonicalize
@@ -32,6 +33,10 @@ import forcefield  # noqa: E402  -- FIELDS is the only registry of real force-fi
 # Re-exported from the registry -- imported by name in several modules.
 VALID_PROPERTIES = track_registry.VALID_PROPERTIES
 VALID_CONFIDENCE = frozenset({"low", "medium", "high"})
+# Rows that WERE decisions and are now derivations of D-01's resolved field. Kept as a named
+# set so a pre-2026-09-04 decision file gets an explanation instead of "unknown decision".
+RETIRED_DECISIONS = frozenset({"D-02_charges", "D-03_electrostatics",
+                               "D-04_system_size", "D-08_hardware"})
 VALID_RECOVERY_ACTIONS = frozenset({"retry", "revise_plan", "stop"})
 MAX_RECOVERY_ATTEMPTS = 2
 
@@ -179,6 +184,28 @@ class PlanDecision:
     confidence: str = "medium"
 
     @classmethod
+    def from_run_plan(cls, plan: dict) -> "PlanDecision":
+        """Read the adjudicated decision back off run_plan.json.
+
+        decision.json was folded into run_plan.json on 2026-09-04, so the file the reviewer
+        edits IS the plan. What used to be the decision file's fields now live as: the D-01_ff
+        row (decisions[0]) instead of decision_evaluations, the row's critique.findings instead
+        of rationale, and top-level overrides/confidence/dominant_uncertainty.
+        """
+        rows = {r.get("id"): r for r in plan.get("decisions") or []}
+        d01 = rows.get("D-01_ff", {})
+        return cls(
+            polymer_class=str(plan["polymer_class"]).upper(),
+            properties=tuple(plan.get("properties") or ()),
+            rationale=tuple((d01.get("critique") or {}).get("findings") or ()),
+            overrides=dict(plan.get("overrides") or {}),
+            decision_evaluations={k: v for k, v in rows.items()},
+            dominant_uncertainty=str(plan.get("dominant_uncertainty")
+                                     or "protocol_transferability"),
+            confidence=str(plan.get("confidence") or "").lower(),
+        )
+
+    @classmethod
     def from_dict(cls, value: dict) -> "PlanDecision":
         return cls(
             polymer_class=str(value["polymer_class"]).upper(),
@@ -315,13 +342,24 @@ class SubprocessRecoveryAgent:
 
 
 class FilePlanningAgent:
-    """Replays a captured scientific-agent decision for testing or audited execution."""
+    """Replays a captured scientific-agent decision for testing or audited execution.
+
+    Accepts either shape: an adjudicated run_plan.json (the current flow) or a legacy
+    decision.json. They are told apart by `decided_params`, which only a plan carries.
+    """
 
     def __init__(self, path: Path):
         self.path = path
+        self.base_plan = None
 
     def decide(self, intent: ScientificIntent, context: dict[str, Any]) -> PlanDecision:
-        return PlanDecision.from_dict(json.loads(self.path.read_text()))
+        value = json.loads(self.path.read_text())
+        if "decided_params" in value:
+            # Keep the file itself: its D-01 row carries the critic's evidence and the probe's
+            # admissible set, neither of which can be regenerated from the decision alone.
+            self.base_plan = value
+            return PlanDecision.from_run_plan(value)
+        return PlanDecision.from_dict(value)
 
 
 def planning_context(intent: ScientificIntent) -> dict[str, Any]:
@@ -369,8 +407,16 @@ def planning_context(intent: ScientificIntent) -> dict[str, Any]:
     }
 
 
-def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
-    """Convert a narrow agent decision into a complete executable run plan."""
+def materialize_plan(intent: ScientificIntent, decision: PlanDecision,
+                     base_plan: dict | None = None) -> dict:
+    """Convert a narrow agent decision into a complete executable run plan.
+
+    `base_plan` is the adjudicated run_plan.json when there is one: decision.json was folded
+    into run_plan.json on 2026-09-04, so the critic's edits live on that file's D-01 row and
+    must not be regenerated away. Without it the plan is built from scratch, WITH the force
+    field probe -- the D-01 refusal (choice=None, admissible=[]) is a safety property and has
+    to be measured here, not inherited from whoever generated a scaffold earlier.
+    """
     _validate_decision(decision)
     properties = set(decision.properties or intent.requested_properties)
     rules = load_rules()
@@ -387,8 +433,8 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
         decision.polymer_class, intent.smiles, properties,
         dp_typical=class_entry.get("dp_typical"), nchain=class_entry.get("nchain"),
         field=field)
-    plan = make_plan(intent.run_name, decision.polymer_class, intent.smiles, properties,
-                     size_solve=size_solve)
+    plan = base_plan or make_plan(intent.run_name, decision.polymer_class, intent.smiles,
+                                  properties, size_solve=size_solve, with_ff_probe=True)
     auto_filled = {k: v for k, v in size_solve.get("recommended_params", {}).items()
                    if k not in decision.overrides}
     if auto_filled:
@@ -402,102 +448,84 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision) -> dict:
         plan["decided_params"]["T_workflow_K"] = decision.overrides["T_equil_K"]
         effective_class["T_workflow_K"] = decision.overrides["T_equil_K"]
     plan["planned_stages"] = build_planned_stages(effective_class, properties, intent.smiles)
-    plan["decisions"] = build_decisions(effective_class, intent.smiles)
-    for row in plan["decisions"]:
+    # The rows make_plan already resolved are KEPT, never rebuilt. Rebuilding them here
+    # transcribed class fields over the measured result and silently restored the class prior --
+    # a SMILES that types under no field then built anyway and died in EMC, which is the whole
+    # failure D-01's resolution exists to prevent.
+    for row in plan.get("decisions", []):
         row["confidence"] = decision.confidence
         evaluation = decision.decision_evaluations.get(row["id"])
-        if evaluation:
-            if "criteria_evaluated" in evaluation:
-                row["criteria_evaluated"] = list(evaluation["criteria_evaluated"])
-            if "evidence" in evaluation:
-                row["evidence"] = list(evaluation["evidence"])
-            if "alternatives" in evaluation:
-                row["alternatives"] = list(evaluation["alternatives"])
-            if row["id"] == "D-01_ff":
-                # The decision tool measured this; build_decisions above only transcribes class
-                # fields and would quietly restore the prior. Without both keys a plan whose
-                # SMILES types under no field builds anyway and dies in EMC, which is the whole
-                # failure this resolution exists to prevent.
-                if "admissible" in evaluation:
-                    row["admissible"] = list(evaluation["admissible"])
-                if "default_choice" in evaluation:
-                    row["choice"] = evaluation["default_choice"]
-        if auto_filled and row["id"] == "D-04_system_size":
-            row["evidence"] = list(row.get("evidence") or []) + [
-                {"claim": reason} for reason in size_solve.get("recommendation_reasons", [])]
+        if not evaluation:
+            continue
+        # An adjudicating agent may add evidence (origin: "critic") or narrow the alternatives;
+        # it may not invent a choice -- that is what `overrides` is for, and it is validated.
+        for key in ("criteria_evaluated", "evidence", "alternatives"):
+            if key in evaluation:
+                row[key] = list(evaluation[key])
 
-    size_assumptions = ([f"D-04_system_size auto-filled {auto_filled} via "
-                        "solve_system_size() -- see D-04_system_size's evidence for why"]
-                        if auto_filled else [])
+    size_reasons = list(size_solve.get("recommendation_reasons") or [])
+    if auto_filled:
+        size_reasons.insert(0, f"system size auto-filled {auto_filled} via solve_system_size()")
 
+    # Re-solve at the FINAL cell (which an override may have moved) to catch advisories that
+    # only apply to what the plan actually carries, not to what the solver first recommended.
     final_dp = plan["decided_params"].get("dp_typical")
-    over_provisioned_ack = []
-    final_size_advisories = []
+    size_acks = {}
     if final_dp is not None:
         final_check = solve_system_size(
             decision.polymer_class, intent.smiles, properties, dp_typical=final_dp,
             nchain=plan["decided_params"].get("nchain"),
             field=plan["decided_params"].get("preferred_ff") or field)
-        final_size_advisories = list(final_check.get("uncertainties", []))
-        if any(u.get("name") == "size_over_provisioned" for u in final_size_advisories):
-            over_provisioned_ack = [{"name": "system_size_over_provisioned", "dominant": False,
-                                     "reduction_probe": "none"}]
+        for u in final_check.get("uncertainties", []) or []:
+            name = u.get("name")
+            if name == "size_over_provisioned":
+                name = "system_size_over_provisioned"
+            # The whole advisory, not just its detail string: entries carry extra fields
+            # (class, current_nchain, ...) that a reader needs. `dominant` is dropped -- every
+            # entry here is advisory by construction now, because the plan's headline lives in
+            # the separate scalar dominant_uncertainty and no longer shares this container.
+            size_acks[name] = {k: v for k, v in u.items()
+                               if k not in ("name", "dominant", "reduction_probe")}
 
-    tg_ladder_ack = ([{"name": "tg_ladder_cost_unoptimized", "dominant": False,
-                       "reduction_probe": "none"}]
-                      if any(s.get("stage") == "tg" for s in plan.get("planned_stages", []))
-                      else [])
-
-    # size_over_provisioned is re-stated as system_size_over_provisioned in
-    # over_provisioned_ack above, so passing the raw advisory through too would double it.
-    # nchain_below_production_minimum used to be listed here as well, back when
-    # select_system_size() and solve_system_size() each emitted their own name for the same
-    # PCFF-minimum fact; select_system_size() is now the single emitter (2026-09-02), so the
-    # advisory reaches the plan directly and must not be filtered.
-    _SIZE_ADVISORIES_COVERED_ELSEWHERE = {"size_over_provisioned"}
-    plan_uncertainties = [{
-        "name": decision.dominant_uncertainty,
-        "dominant": True,
-        "reduction_probe": "none",
-    }] + over_provisioned_ack + tg_ladder_ack
-    seen_uncertainty_names = {u["name"] for u in plan_uncertainties}
-    for advisory in final_size_advisories:
-        name = advisory.get("name")
-        if name in seen_uncertainty_names or name in _SIZE_ADVISORIES_COVERED_ELSEWHERE:
-            continue
-        seen_uncertainty_names.add(name)
-        plan_uncertainties.append(advisory)
+    plan["system_size"] = {
+        "dp_typical": final_dp,
+        "nchain": plan["decided_params"].get("nchain"),
+        "resolved_by": "select_system_size.solve_system_size",
+        "reasons": size_reasons,
+        "acknowledgements": size_acks,
+    }
 
     # Computed from the plan, not asked of the agent: a plan that builds with anything other
-    # than its class prior has lost D-01's only DOI-backed evidence and must say so.
-    ff_prior_ack = _ff_prior_uncertainty(decision.polymer_class,
-                                         class_entry.get("ff_accuracy_prior"),
-                                         plan["decided_params"].get("preferred_ff"))
-    if ff_prior_ack and ff_prior_ack["name"] not in seen_uncertainty_names:
-        plan_uncertainties.append(ff_prior_ack)
+    # than its class prior has lost D-01's only DOI-backed evidence and must say so. Recorded on
+    # the D-01 row itself now -- it describes that decision and nothing else reads it.
+    d01 = next((r for r in plan.get("decisions", []) if r.get("id") == "D-01_ff"), None)
+    if d01 is not None:
+        ff_prior_ack = _ff_prior_uncertainty(decision.polymer_class,
+                                             class_entry.get("ff_accuracy_prior"),
+                                             plan["decided_params"].get("preferred_ff"))
+        if ff_prior_ack:
+            d01.setdefault("acknowledgements", {})["ff_accuracy_prior_not_met"] = (
+                ff_prior_ack.get("detail", ""))
+        d01["critique"] = {"status": "scientific_agent_decision", "rounds": 1,
+                           "findings": list(decision.rationale) + list(decision.assumptions)}
 
-    plan.update({
-        "goal": intent.goal,
-        "properties": sorted(properties),
-        "confidence": decision.confidence,
-        "plan_mode": "reasoned",
-        "assumptions": list(decision.assumptions) + size_assumptions,
-        "uncertainties": plan_uncertainties,
-        "critique": {
-            "status": "scientific_agent_decision",
-            "rounds": 1,
-            "findings": list(decision.rationale),
-        },
-    })
-    decision_payload = asdict(decision)
-    plan["provenance"] = {
-        "generator": "scientific_control.py",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "decision_sha256": hashlib.sha256(
-            json.dumps(decision_payload, sort_keys=True, default=list).encode()
-        ).hexdigest(),
-        "agent_rationale": list(decision.rationale),
-    }
+    derived = _derived_from_field(plan["decided_params"].get("preferred_ff"), load_rules())
+    plan = ordered_plan(
+        run_name=plan.get("run_name"),
+        polymer_class=plan.get("polymer_class"),
+        smiles=plan.get("smiles"),
+        goal=intent.goal,
+        properties=sorted(properties),
+        plan_mode="reasoned",
+        confidence=decision.confidence,
+        dominant_uncertainty=decision.dominant_uncertainty,
+        decisions=plan.get("decisions", []),
+        system_size=plan["system_size"],
+        hardware={k: derived[k] for k in ("engine", "mpi_ranks", "gpu_per_run", "ff_family")},
+        overrides=dict(decision.overrides),
+        decided_params=plan["decided_params"],
+        planned_stages=plan.get("planned_stages", []),
+    )
 
     try:
         plan["cost_estimate"] = cost_model.plan_cost_estimate(plan)
@@ -517,14 +545,21 @@ def apply_recovery(plan: dict, decision: RecoveryDecision) -> dict:
     decided_params = revised["decided_params"]
     if "preferred_ff" in decision.modifications and "D-01_ff" in by_id:
         by_id["D-01_ff"]["choice"] = decided_params["preferred_ff"]
-    if "charge_method" in decision.modifications and "D-02_charges" in by_id:
-        by_id["D-02_charges"]["choice"] = decided_params["charge_method"]
-    if "electrostatics" in decision.modifications and "D-03_electrostatics" in by_id:
-        by_id["D-03_electrostatics"]["choice"] = decided_params["electrostatics"]
-    if {"dp_typical", "nchain"} & set(decision.modifications) and "D-04_system_size" in by_id:
-        by_id["D-04_system_size"]["choice"] = (
-            f"DP={decided_params.get('dp_typical')}, nchain={decided_params.get('nchain')}"
-        )
+    # A recovery that changes the FIELD must carry everything the field implies with it.
+    # Without this, recovery reintroduced exactly the disagreement the derivation exists to
+    # prevent: decided_params.preferred_ff moved, and charge_method/electrostatics/hardware
+    # kept describing the field the run started with.
+    if "preferred_ff" in decision.modifications:
+        derived = _derived_from_field(decided_params["preferred_ff"], load_rules())
+        for key in ("charge_method", "electrostatics"):
+            if key not in decision.modifications:
+                decided_params[key] = derived[key]
+        revised["hardware"] = {k: derived[k]
+                               for k in ("engine", "mpi_ranks", "gpu_per_run", "ff_family")}
+    if {"dp_typical", "nchain"} & set(decision.modifications):
+        revised.setdefault("system_size", {}).update(
+            {"dp_typical": decided_params.get("dp_typical"),
+             "nchain": decided_params.get("nchain")})
     class_entry = dict(get_class_entry(load_rules(), revised["polymer_class"], warn_on_miss=False))
     effective_class = {**class_entry, **decided_params}
     _validate_protocol_relationships(effective_class, set(decision.modifications))
@@ -619,7 +654,12 @@ class ScientificControlPlane:
                 decision = self.planning_agent.decide(intent, context)
                 events.append({"event": "scientific_agent_called",
                                "attempt": planning_attempt + 1})
-                plan = materialize_plan(intent, decision)
+                # A FilePlanningAgent fed an adjudicated run_plan.json hands the file back
+                # so materialize_plan promotes it in place. Regenerating instead would discard
+                # the critic's evidence and the FF probe's admissible set.
+                plan = materialize_plan(
+                    intent, decision,
+                    base_plan=getattr(self.planning_agent, "base_plan", None))
                 break
             except Exception as exc:
                 events.append({"event": "scientific_agent_contract_error",
@@ -637,6 +677,8 @@ class ScientificControlPlane:
         plan_path = run_dir / "run_plan.json"
         _write_json(plan_path, plan)
         events.append({"event": "plan_materialized", "path": str(plan_path)})
+        write_control_state(self.repo_root, intent.run_name, status="running",
+                            plan_path=plan_path)
 
         for attempt in range(MAX_RECOVERY_ATTEMPTS + 1):
             outcome = self.workflow.execute(plan_path, dry_run=dry_run, attempt=attempt)
@@ -716,8 +758,63 @@ class ScientificControlPlane:
         raise AssertionError("recovery loop exhausted without terminal result")
 
     def _save_control_state(self, run_name: str, result: dict) -> None:
-        path = self.repo_root / "data" / run_name / "raw" / "control_state.json"
-        _write_json(path, result)
+        write_control_state(self.repo_root, run_name,
+                            status=result.get("status"),
+                            plan_path=result.get("plan_path"),
+                            recovery_agent_calls=result.get("recovery_agent_calls"),
+                            ended=True)
+
+
+def write_control_state(repo_root, run_name: str, *, status: str, plan_path=None,
+                        recovery_agent_calls=None, current_stage=None,
+                        ended: bool = False) -> Path:
+    """Write data/<run>/raw/control_state.json: WHICH SESSION IS ON THIS RUN, and is it over.
+
+    Deliberately thin. It used to carry the control plane's whole return value -- an ~8 KB
+    resolved-stage-params dump under `result`, plus an `events` list whose last entry embedded
+    that same dump a second time, byte-identical. Nothing ever read either: the only fields any
+    consumer touches are `status` (agent_api.inspect_run, the benchmark runner) and
+    `recovery_agent_calls` (benchmark adaptive-gating).
+
+    Worse, it was written ONCE, by the first control-plane call, and `run_campaign.py --plan` --
+    the resume path -- never touched it. So a resumed run's file froze at the first session's
+    status and escalation count; adaptive_gating.py carried a max(control, engine) workaround
+    for exactly that. Both writers now update it, so `session_ended_at` and the counts describe
+    the session that actually last ran.
+
+    recovery_agent_calls is read from the engine's own workflow_state.agent_escalations rather
+    than counted here, so it cannot drift from the engine's record.
+    """
+    path = Path(repo_root) / "data" / run_name / "raw" / "control_state.json"
+    now = datetime.now(timezone.utc).isoformat()
+
+    existing = {}
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            existing = {}
+
+    if recovery_agent_calls is None:
+        recovery_agent_calls = 0
+        state_file = Path(repo_root) / "data" / run_name / "workflow_state.json"
+        if state_file.exists():
+            try:
+                recovery_agent_calls = len(json.loads(state_file.read_text()).get(
+                    "agent_escalations", []))
+            except (OSError, json.JSONDecodeError):
+                pass
+
+    _write_json(path, {
+        "run_name": run_name,
+        "plan_path": str(plan_path) if plan_path else existing.get("plan_path"),
+        "status": status,
+        "session_started_at": existing.get("session_started_at") or now,
+        "session_ended_at": now if ended else None,
+        "current_stage": current_stage,
+        "recovery_agent_calls": recovery_agent_calls,
+    })
+    return path
 
 
 def _validate_decision(decision: PlanDecision) -> None:
@@ -737,10 +834,20 @@ def _validate_decision(decision: PlanDecision) -> None:
     if decision.polymer_class not in rules.get("classes", {}):
         raise ValueError(f"unknown polymer class {decision.polymer_class!r}")
     validate_overrides(decision.overrides)
-    known_decisions = {row["id"] for row in build_decisions(
-        get_class_entry(rules, decision.polymer_class, warn_on_miss=False)
-    )}
-    unknown_decisions = set(decision.decision_evaluations) - known_decisions
+    supplied = set(decision.decision_evaluations)
+    retired = supplied & RETIRED_DECISIONS
+    if retired:
+        # Not an error: these rows carry no information any more. Each was a pure function of
+        # D-01's field and is now derived (make_deterministic_plan._derived_from_field), so a
+        # decision file written before 2026-09-04 is still materializable -- its retired rows
+        # are dropped rather than silently honoured, because honouring them is what let a
+        # recorded charge scheme disagree with the field actually built.
+        print(f"INFO: ignoring retired decision evaluations {sorted(retired)} -- each is now "
+              f"derived from D-01_ff's resolved field, not decided independently.",
+              file=sys.stderr)
+        for rid in retired:
+            decision.decision_evaluations.pop(rid, None)
+    unknown_decisions = supplied - KNOWN_DECISIONS - RETIRED_DECISIONS
     if unknown_decisions:
         raise ValueError(f"unknown decision evaluations: {sorted(unknown_decisions)}")
 
@@ -860,7 +967,10 @@ def main() -> None:
     parser.add_argument("--polymer-class-hint")
     planning = parser.add_mutually_exclusive_group(required=True)
     planning.add_argument("--scientific-agent-command")
-    planning.add_argument("--decision-file")
+    planning.add_argument("--plan", "--decision-file", dest="plan_file",
+                          help="An adjudicated run_plan.json (or a legacy decision.json). "
+                               "--decision-file is kept as an alias so existing invocations "
+                               "and the skill's older command line keep working.")
     parser.add_argument("--recovery-agent-command")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -872,8 +982,8 @@ def main() -> None:
         requested_properties=tuple(p.strip() for p in args.properties.split(",") if p.strip()),
         polymer_class_hint=args.polymer_class_hint,
     )
-    if args.decision_file:
-        planning_agent: PlanningAgent = FilePlanningAgent(Path(args.decision_file))
+    if args.plan_file:
+        planning_agent: PlanningAgent = FilePlanningAgent(Path(args.plan_file))
     else:
         planning_agent = SubprocessPlanningAgent(
             JsonSubprocessAgent(shlex.split(args.scientific_agent_command))

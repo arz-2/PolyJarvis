@@ -70,19 +70,23 @@ def extract_llm_contribution(run_dir: Path) -> LLMContributionBlock:
             "or treat its contribution as zero-by-construction, not measured."
         )
 
-    if not decision_path.is_file():
-        block.note += f" (no decision.json at {decision_path})"
-        return block
+    # decision.json was folded into run_plan.json on 2026-09-04, and the five decision rows
+    # became one: D-02/D-03/D-08 were pure functions of D-01's field and D-04 was a solver, so
+    # only D-01_ff was ever a decision an LLM could contribute to. A historical run dir still
+    # scores off its own decision.json, so the two vintages stay comparable on the axis that
+    # matters -- how many rows carry evidence the critic (not the autofill) put there.
+    if decision_path.is_file():
+        rows = list(json.loads(decision_path.read_text())
+                    .get("decision_evaluations", {}).values())
+    else:
+        rows = list(run_plan.get("decisions", []))
 
-    decision = json.loads(decision_path.read_text())
-    evaluations = decision.get("decision_evaluations", {})
-    block.llm_authored_decisions_total = len(evaluations)
+    block.llm_authored_decisions_total = len(rows)
     block.llm_authored_decisions_with_evidence = sum(
-        1 for row in evaluations.values()
-        if any(_has_real_citation(e) for e in row.get("evidence", []))
+        1 for row in rows if any(_has_real_citation(e) for e in row.get("evidence", []))
     )
     block.autofilled_decisions_with_evidence = sum(
-        1 for row in evaluations.values()
+        1 for row in rows
         if any(e.get("origin") == "autofill"
                and (e.get("source_doi") or e.get("citation"))
                for e in row.get("evidence", []))

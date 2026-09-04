@@ -21,13 +21,13 @@ sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 
 from stage_params import _resolve_analyze_tg_params  # noqa: E402
 
-PHYC = {"tg_rates_K_per_ns": [10, 25, 40], "T_workflow_K": 300.0}
+PHYC = {"tg_rate_K_per_ns": 40, "T_workflow_K": 300.0}
 
 
 def _args(**overrides):
     base = dict(
         run_name="PE1", work_dir=None, data_path=None, equil_data_path=None,
-        output_dir=None, tg_rate_index=None, enthalpy_col=None, backbone_types=None,
+        output_dir=None, enthalpy_col=None, backbone_types=None,
     )
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -40,20 +40,23 @@ def test_real_execution_reads_the_sweeps_own_log_not_the_equilibration_data_file
     )
     p = _resolve_analyze_tg_params(args, PHYC)
     assert p["tg_log_path"] == (
-        "/repo/data/PE1/attempts/thermal/attempt-0002/work/tg_sweep/tg_sweep.log"
+        "/repo/data/PE1/attempts/thermal/attempt-0002/work/tg_sweep_r40/tg_sweep.log"
     )
     assert p["per_t_dump_file"] == (
-        "/repo/data/PE1/attempts/thermal/attempt-0002/work/tg_sweep/per_t_structs.dump"
+        "/repo/data/PE1/attempts/thermal/attempt-0002/work/tg_sweep_r40/per_t_structs.dump"
     )
     # the equilibration attempt's real .data output is the correct structural reference here
     assert p["tg_data_file"] == args.data_path
 
 
-def test_multirate_suffix_threaded_into_all_three_paths():
+def test_rate_suffix_threaded_into_all_three_paths():
+    """The _r<rate> suffix is derived from the class's tg_rate_K_per_ns on BOTH the tg and the
+    analyze-tg side, so the sweep and its analysis cannot disagree about the directory. It used
+    to come from args.tg_rate_index, which only do_thermal set -- any caller that resolved
+    analyze-tg params without it looked in the flat dir for a sweep written to the suffixed one."""
     args = _args(
         work_dir="/data/PE1/attempts/thermal/attempt-0001/work",
         data_path="/data/PE1/attempts/equilibration/attempt-0001/work/npt_production/npt_production_out.data",
-        tg_rate_index=2,
     )
     p = _resolve_analyze_tg_params(args, PHYC)
     assert p["tg_log_path"] == "/data/PE1/attempts/thermal/attempt-0001/work/tg_sweep_r40/tg_sweep.log"

@@ -535,22 +535,21 @@ def temperature_schedule(args, cls: dict) -> dict:
             'ceiling_source': ceiling_source}
 
 
-def select_primary_tg_rate_index(cls: dict) -> int:
-    """Which entry of tg_rates_K_per_ns this run actually sweeps at.
+def tg_rate(cls: dict):
+    """The single cooling rate this run sweeps at, in K/ns, or None when unconfigured.
 
     ONE definition, because three places need it and they must not drift: do_thermal (which rate
-    the staircase runs), _resolve_equil_params (which rate cool_block cools at, below), and
-    cost_model (which rate to price). Highest configured rate by default; a class carrying
-    tg_slope_gate_fallback="slowest_rate" runs rates[0] instead, and an explicit
-    tg_primary_rate_index pins it outright.
+    the staircase runs), rate_matched_cool_block_hold_steps (which rate cool_block cools at,
+    below), and cost_model (which rate to price).
+
+    Was select_primary_tg_rate_index() over a tg_rates_K_per_ns list until 2026-09-04. The
+    runtime had already been single-rate since the multi-rate protocol was retired -- do_thermal
+    swept exactly one rate and the other list entries were priced but never run -- so the list,
+    its index, and tg_slope_gate_fallback were removed in favour of the scalar the class
+    actually uses.
     """
-    rates = cls.get('tg_rates_K_per_ns') or []
-    if not rates:
-        return 0
-    planned = cls.get('tg_primary_rate_index')
-    if planned is not None:
-        return int(planned)
-    return 0 if cls.get('tg_slope_gate_fallback') == 'slowest_rate' else len(rates) - 1
+    rate = cls.get('tg_rate_K_per_ns')
+    return float(rate) if rate else None
 
 
 def rate_matched_cool_block_hold_steps(cls: dict, dt_fs: float, dT_K: float):
@@ -566,14 +565,11 @@ def rate_matched_cool_block_hold_steps(cls: dict, dt_fs: float, dT_K: float):
     cooldown runs at the rate the staircase would have used, so its glass has the same thermal
     history as a Tg run's.
 
-    Returns None when the class configures no rates (nothing to match); the caller then falls
+    Returns None when the class configures no rate (nothing to match); the caller then falls
     through to generate_equilibration_workflow's own atom-count tier default.
     """
-    rates = cls.get('tg_rates_K_per_ns') or []
-    if not rates or not dT_K or not dt_fs:
-        return None
-    rate = rates[select_primary_tg_rate_index(cls)]
-    if not rate:
+    rate = tg_rate(cls)
+    if not rate or not dT_K or not dt_fs:
         return None
     return int(round(dT_K / (rate * dt_fs * 1e-06)))
 
@@ -723,16 +719,14 @@ def _resolve_cool_params(args, cls: dict) -> dict:
         'exp_density_gcm3': _exp_density_point(cls, args.smiles),
     }
 
-def _resolve_tg_rate(args, cls: dict):
-    """Resolve the selected cooling rate + a per-rate output-dir suffix for multi-rate
-    Tg sweeps. Returns (selected_rate | None, rate_suffix). When --tg_rate_index is unset,
-    suffix is "" so the single-rate path stays byte-identical to the legacy pipeline."""
-    tg_rates = cls.get('tg_rates_K_per_ns', [])
-    rate_idx = getattr(args, 'tg_rate_index', None)
-    if rate_idx is not None and tg_rates and (rate_idx < len(tg_rates)):
-        selected_rate = tg_rates[rate_idx]
-        return (selected_rate, f'_r{int(selected_rate)}')
-    return (None, '')
+def _rate_suffix(rate) -> str:
+    """The tg_sweep output-dir suffix for a cooling rate, e.g. 100.0 -> "_r100".
+
+    Still derived (not stored): do_summary and _resolve_analyze_tg_params must rebuild the same
+    directory name from the plan alone, and the rate is the only thing that varies. Empty string
+    when the class configures no rate, which keeps the unconfigured path on the flat dir name.
+    """
+    return f'_r{int(rate)}' if rate else ''
 
 def _melt_start_data_path(args) -> str:
     """The cell the core equilibration chain ends on: nvt_melt_hold_out.data.
@@ -748,9 +742,8 @@ def _melt_start_data_path(args) -> str:
 def _resolve_tg_params(args, cls: dict) -> dict:
     """Resolve deterministic single-rate Tg sweep arguments."""
     dt = _pick(args.dt_fs, cls, 'dt_fs', 1.0)
-    tg_rates = cls.get('tg_rates_K_per_ns', [])
-    rate_idx = getattr(args, 'tg_rate_index', None)
-    (selected_rate, rate_suffix) = _resolve_tg_rate(args, cls)
+    rate = tg_rate(cls)
+    rate_suffix = _rate_suffix(rate)
     t_step = _pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)
     floor = cls.get('tg_min_steps_per_T', 200000)
     # The staircase starts AT the melt hold and cools to tg_t_low_K -- one continuous descent
@@ -758,12 +751,12 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     # bounds come from the shared temperature schedule so the thermal and equilibration stages
     # cannot disagree about this polymer's melt.
     _sched = temperature_schedule(args, cls)
-    if selected_rate is not None:
-        n_steps_per_t = int(t_step / (selected_rate * dt * 1e-06))
-    else:
-        n_steps_per_t = _pick(args.tg_steps_per_t, cls, 'tg_steps_per_t', 500000)
+    # The rate IS the per-T step count: one plateau of t_step K takes t_step/(rate*dt) steps.
+    # There is no tg_steps_per_t fallback any more -- it was unreachable (do_thermal always
+    # resolved a rate) and recorded a step count the deck never used.
+    n_steps_per_t = int(t_step / (rate * dt * 1e-06)) if rate else None
     work_dir = args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/thermal'
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rates_K_per_ns': tg_rates, 'tg_rate_index': rate_idx, 'selected_rate_K_per_ns': selected_rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _sched['T_melt_hold_K'], 'T_end_K': _sched['tg_t_low_K'], 'tg_window_source': _sched['window_source'], 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'below_steps_floor': selected_rate is not None and n_steps_per_t < floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': _melt_start_data_path(args), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0),
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm', 'work_dir': work_dir, 'dt_fs': dt, 'tg_rate_K_per_ns': rate, 'tg_sweep_dir': f'{work_dir}/tg_sweep{rate_suffix}', 'T_start_K': _sched['T_melt_hold_K'], 'T_end_K': _sched['tg_t_low_K'], 'tg_window_source': _sched['window_source'], 'T_step_K': t_step, 'n_steps_per_t': n_steps_per_t, 'tg_min_steps_per_T': floor, 'pressure_atm': cls.get('P_equil_atm', 1.0), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'equil_data_path': _melt_start_data_path(args), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0),
             'T_workflow_K': _resolve_t_workflow(args, cls),
             'final_T_K': _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0),
             'tg_per_t_max_extensions': int(cls.get('tg_per_t_max_extensions', 2)),
@@ -782,8 +775,9 @@ def _run_graphs_dir(args) -> str:
 
 def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     """Resolve deterministic per-rate Tg analysis arguments."""
-    (selected_rate, rate_suffix) = _resolve_tg_rate(args, cls)
-    raw_suffix = f'tg_r{int(selected_rate)}/' if selected_rate is not None else ''
+    rate = tg_rate(cls)
+    rate_suffix = _rate_suffix(rate)
+    raw_suffix = f'tg_r{int(rate)}/' if rate else ''
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/{raw_suffix}'
     # Flat, unlike output_dir -- generate_run_summary's rel_fig() looks for tg_fit.png directly
     # under the run-level graphs/ dir; a rate-suffixed graphs/tg_r40/ would hide it from summary
@@ -804,7 +798,7 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     # during execution; the flat-convention guess is a --dry-run-only fallback.
     equil_data = args.equil_data_path or _melt_start_data_path(args)
     per_t_dump = f'{tg_sweep_dir}/per_t_structs.dump'
-    return {'selected_rate_K_per_ns': selected_rate, 'tg_rate_index': args.tg_rate_index, 'tg_log_path': tg_log, 'tg_data_file': equil_data, 'per_t_dump_file': per_t_dump, 'enthalpy_col': getattr(args, 'enthalpy_col', None) or 'Enthalpy', 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'output_dir': output_dir, 'graphs_dir': graphs_dir, 'method_gap_exempt': bool(cls.get('tg_slope_gate_fallback') == 'slowest_rate'),
+    return {'tg_rate_K_per_ns': rate, 'tg_log_path': tg_log, 'tg_data_file': equil_data, 'per_t_dump_file': per_t_dump, 'enthalpy_col': getattr(args, 'enthalpy_col', None) or 'Enthalpy', 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'output_dir': output_dir, 'graphs_dir': graphs_dir, 'method_gap_exempt': False,
             'fit_t_max_K': temperature_schedule(args, cls)['tg_fit_top_K']}
 
 def _derive_npt_prod_log_path(args, effective_data_path, lammps_base: str) -> str:
@@ -982,14 +976,29 @@ def _resolve_run_summary_params(args, cls: dict) -> dict:
     dp = args.dp if args.dp is not None else cls.get('dp_typical')
     nchain = args.nchain if args.nchain is not None else cls.get('nchain')
     charge_method = args.charge_method or cls.get('charge_method')
+    electrostatics = cls.get('electrostatics')
     # No 'pcff' default: run-summary REPORTS what ran. An unresolved field is recorded as
     # null, not as a guess that would enter the provenance record as fact.
     ff = args.ff or cls.get('preferred_ff')
-    d01 = args.d01 or ff
-    d02 = args.d02 or charge_method
-    d03 = args.d03 or cls.get('electrostatics')
-    d04 = args.d04 or (f'DP={dp}, {nchain} chains' if dp and nchain else None)
-    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'run_plan': run_plan, 'dp': dp, 'nchain': nchain, 'charge_method': charge_method, 'ff': ff, 'd01_ff': d01, 'd02_charges': d02, 'd03_electrostatics': d03, 'd04_system_size': d04}
+    # d01_ff/d02_charges/d03_electrostatics/d04_system_size were carried here as four more
+    # stage params -- a fifth copy of what the plan, decided_params, the summary and (until
+    # 2026-09-04) decision.json all already said. They are derived at report time from the same
+    # values the run actually used, so they cannot disagree with them.
+    return {'output_dir': output_dir, 'graphs_dir': graphs_dir, 'run_plan': run_plan, 'dp': dp, 'nchain': nchain, 'charge_method': charge_method, 'electrostatics': electrostatics, 'ff': ff}
+
+
+def run_summary_decision_labels(p: dict) -> dict:
+    """The D-0N labels generate_run_summary reports, derived from the resolved run-summary
+    params. D-01 is the field; the rest follow from it or from the solved cell.
+
+    Keys are the generate_run_summary TOOL's kwarg names (d01..d04), not the report's field
+    names -- the in-process test fakes take **kwargs, so a mismatch here passes the whole suite
+    and only fails against the real MCP server.
+    """
+    dp, nchain = p.get('dp'), p.get('nchain')
+    return {'d01': p.get('ff'), 'd02': p.get('charge_method'),
+            'd03': p.get('electrostatics'),
+            'd04': f"DP={dp}, {nchain} chains" if dp and nchain else None}
 _STAGE_RESOLVERS = {'build': _resolve_build_params, 'equil': _resolve_equil_params, 'cool': _resolve_cool_params, 'cool-check': _resolve_cool_check_params, 'tg': _resolve_tg_params, 'deform': _resolve_deform_params, 'analyze-tg': _resolve_analyze_tg_params, 'equil-check': _resolve_equil_check_params, 'murnaghan': _resolve_murnaghan_params, 'analyze-bm': _resolve_analyze_bm_params, 'run-summary': _resolve_run_summary_params}
 
 def resolve_stage_params(stage: str, args, cls: dict) -> dict:

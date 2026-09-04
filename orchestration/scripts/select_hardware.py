@@ -187,7 +187,7 @@ def _cool_total_steps(effective_class: dict) -> tuple:
     Resolvable, unlike the core equilibration chain, because none of its three terms depends on
     an atom-count tier the planner cannot see: the block count is
     ceil((T_melt_hold - final_T)/cool_block_dT_K), each block's hold is rate-matched to this
-    class's own primary Tg rate (stage_params.rate_matched_cool_block_hold_steps -- the same
+    class's own Tg sweep rate (stage_params.rate_matched_cool_block_hold_steps -- the same
     arithmetic, not a second copy), and stage7/stage8 carry explicit class defaults.
     """
     dt = effective_class.get("dt_fs", 1.0)
@@ -200,16 +200,10 @@ def _cool_total_steps(effective_class: dict) -> tuple:
 
     hold = effective_class.get("cool_block_hold_steps")
     if not hold:
-        rates = effective_class.get("tg_rates_K_per_ns") or []
-        if not rates:
-            return None, ("no cool_block_hold_steps and no tg_rates_K_per_ns to rate-match "
-                          "against -- the generator's atom-count tier default applies")
-        idx = (0 if effective_class.get("tg_slope_gate_fallback") == "slowest_rate"
-               else len(rates) - 1)
-        idx = int(effective_class.get("tg_primary_rate_index", idx))
-        rate = rates[idx] if 0 <= idx < len(rates) else rates[-1]
+        rate = effective_class.get("tg_rate_K_per_ns")
         if not rate:
-            return None, "primary tg rate is zero -- cannot rate-match the cooldown"
+            return None, ("no cool_block_hold_steps and no tg_rate_K_per_ns to rate-match "
+                          "against -- the generator's atom-count tier default applies")
         hold = int(round(dT / (rate * dt * 1e-06)))
 
     stage8 = int(effective_class.get("stage8_min_steps") or (5.0e5 / dt))
@@ -220,11 +214,15 @@ def _cool_total_steps(effective_class: dict) -> tuple:
 
 
 def _tg_sweep_total_steps(effective_class: dict) -> tuple:
-    """(total_steps, note) summed over every configured tg_rates_K_per_ns entry -- the
-    documented multi-rate protocol (decision_policy.json D-06's primary/alternative-rate
-    reportability check needs more than one rate run). Reuses the exact
-    n_steps_per_t = t_step / (rate * dt * 1e-6) arithmetic stage_params._resolve_tg_params
-    already computes, rather than a second, driftable copy."""
+    """(total_steps, note) for the ONE sweep this run performs, at tg_rate_K_per_ns.
+
+    Priced every entry of the old tg_rates_K_per_ns list until 2026-09-04, which overstated the
+    thermal budget by the length of that list -- roughly 3x for the 3-rate classes, on a term
+    large enough to dominate total_gpu_hours. The runtime had swept a single rate since the
+    multi-rate protocol was retired; only the cost model still believed in the ladder.
+
+    Reuses the exact n_steps_per_t = t_step / (rate * dt * 1e-6) arithmetic
+    stage_params._resolve_tg_params computes, rather than a second, driftable copy."""
     dt = effective_class.get("dt_fs", 1.0)
     t_step = effective_class.get("tg_t_step_K", 20)
     # The sweep's top is the melt hold: the staircase starts from the gated melt cell and runs
@@ -233,10 +231,10 @@ def _tg_sweep_total_steps(effective_class: dict) -> tuple:
     # above it, which is most of them.)
     t_high = effective_class.get("T_melt_hold_K") or effective_class.get("T_equil_K", 600)
     t_low = effective_class.get("tg_t_low_K", 200)
-    rates = effective_class.get("tg_rates_K_per_ns") or []
+    rate = effective_class.get("tg_rate_K_per_ns")
     floor = effective_class.get("tg_min_steps_per_T", 200000)
-    if not rates or not t_step:
-        return None, "no tg_rates_K_per_ns / tg_t_step_K configured -- cannot size the sweep"
+    if not rate or not t_step:
+        return None, "no tg_rate_K_per_ns / tg_t_step_K configured -- cannot size the sweep"
     # Mirrors script_generator.py's actual temp-list construction (T_START down to T_END,
     # always force-appending T_END) rather than a closed-form round() -- confirmed against
     # PE1's real tg logs that round((t_high-t_low)/t_step) undercounts by 1 whenever the
@@ -250,12 +248,10 @@ def _tg_sweep_total_steps(effective_class: dict) -> tuple:
     if not temps or abs(temps[-1] - t_low) > 1e-6:
         temps.append(t_low)
     n_bins = max(1, len(temps))
-    total = 0
-    for rate in rates:
-        n_steps_per_t = max(int(t_step / (rate * dt * 1e-6)), floor if floor else 0)
-        total += n_bins * n_steps_per_t
-    return total, (f"{len(rates)} rate(s) x {n_bins} T-bin(s), floor-checked against "
-                    f"tg_min_steps_per_T={floor}")
+    n_steps_per_t = max(int(t_step / (rate * dt * 1e-6)), floor if floor else 0)
+    total = n_bins * n_steps_per_t
+    return total, (f"1 rate ({rate:g} K/ns) x {n_bins} T-bin(s) x {n_steps_per_t} steps, "
+                   f"floor-checked against tg_min_steps_per_T={floor}")
 
 
 def _murnaghan_total_steps(effective_class: dict) -> tuple:

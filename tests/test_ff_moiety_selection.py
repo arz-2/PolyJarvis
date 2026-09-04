@@ -183,12 +183,13 @@ def test_no_admissible_field_is_a_dominant_uncertainty():
 
 def test_a_demoted_plan_without_the_uncertainty_is_a_structural_finding():
     import validate_run_plan as vrp
-    plan = {"polymer_class": "PSTR", "uncertainties": [],
+    plan = {"polymer_class": "PSTR",
             "decided_params": {"preferred_ff": "compass"},
             "decisions": [{"id": "D-01_ff", "choice": "compass"}]}
     checks = {f["check"] for f in vrp._forcefield_findings(plan)}
     assert "ff_prior_departure_unacknowledged" in checks
-    plan["uncertainties"] = [{"name": "ff_accuracy_prior_not_met"}]
+    # acknowledged on the row it describes, not in a plan-wide uncertainties[] list
+    plan["decisions"][0]["acknowledgements"] = {"ff_accuracy_prior_not_met": "departure noted"}
     checks = {f["check"] for f in vrp._forcefield_findings(plan)}
     assert "ff_prior_departure_unacknowledged" not in checks
 
@@ -251,14 +252,17 @@ def test_the_refusal_survives_materialize_plan(monkeypatch):
     a SMILES that types under no field silently gets the class prior back and dies in EMC --
     the exact failure this resolution exists to prevent."""
     monkeypatch.setattr(sf, "check_typing", lambda *a, **k: {"types_smiles": False})
-    decision = mdp.make_decision("PSTR", _BLOCKED, {"density"}, with_ff_probe=True)
-    d01 = decision["decision_evaluations"]["D-01_ff"]
-    assert d01["default_choice"] is None and d01["admissible"] == []
+    # The scaffold plan carries the refusal directly now -- decision.json was folded into
+    # run_plan.json on 2026-09-04, so there is no separate artifact to carry it through.
+    scaffold = mdp.make_plan("t", "PSTR", _BLOCKED, {"density"}, with_ff_probe=True)
+    d01 = scaffold["decisions"][0]
+    assert d01["choice"] is None and d01["admissible"] == []
 
     intent = sc.ScientificIntent(run_name="t", goal="g", smiles=_BLOCKED,
                                  requested_properties=("density",), polymer_class_hint="PSTR")
-    plan = sc.materialize_plan(
-        intent, sc.PlanDecision.from_dict(dict(decision, confidence="medium")))
+    plan = sc.materialize_plan(intent, sc.PlanDecision(
+        polymer_class="PSTR", properties=("density",), rationale=("reviewed",),
+        dominant_uncertainty="ff_transferability", confidence="medium"))
     row = next(r for r in plan["decisions"] if r["id"] == "D-01_ff")
     assert row["choice"] is None
     assert row["admissible"] == []
@@ -278,7 +282,10 @@ def test_a_scaffold_plan_still_names_an_unverified_blocker():
     """No probe means nothing was measured -- but the screen already ran, and a plan that
     stayed silent about a matched blocker would hide the one fact it does know."""
     plan = mdp.make_plan("t", "PSTR", _BLOCKED, {"density"})
-    unverified = [a for a in plan["assumptions"] if a.startswith("D-01_ff UNVERIFIED")]
+    # The screen result is recorded on the decision it qualifies, not in a plan-wide
+    # assumptions[] bag -- it describes D-01's field and nothing else reads it.
+    findings = plan["decisions"][0]["critique"]["findings"]
+    unverified = [a for a in findings if a.startswith("D-01_ff UNVERIFIED")]
     assert unverified and "carbonyl_adjacent_N" in unverified[0]
     row = next(r for r in plan["decisions"] if r["id"] == "D-01_ff")
     assert "admissible" not in row       # nothing was measured, so claim nothing
@@ -287,7 +294,8 @@ def test_a_scaffold_plan_still_names_an_unverified_blocker():
 
 def test_a_clean_scaffold_plan_claims_no_blocker():
     plan = mdp.make_plan("t", "PSTR", _CLEAN, {"density"})
-    assert not [a for a in plan["assumptions"] if a.startswith("D-01_ff UNVERIFIED")]
+    assert not [a for a in plan["decisions"][0]["critique"]["findings"]
+                if a.startswith("D-01_ff UNVERIFIED")]
 
 
 def test_every_runnable_field_has_an_explicit_hardware_family():

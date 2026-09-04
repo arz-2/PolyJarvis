@@ -28,7 +28,7 @@ if str(_ENGINE_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_ENGINE_SCRIPTS))
 
 from stage_params import (resolve_stage_params, apply_plan, resolve_hardware, load_plan,  # noqa: E402
-                          select_primary_tg_rate_index)
+                          tg_rate, run_summary_decision_labels)
 import track_registry  # noqa: E402
 from analysis_utils import estimate_fluctuation_K_GPa  # noqa: E402
 from rules_common import load_rules, get_class_entry, resolve_member_value  # noqa: E402
@@ -231,7 +231,7 @@ def _base_args(run_name: str, polymer_class: str, plan_path: str) -> SimpleNames
         npt_prod_dump=None, melt_data_path=None, ff=None, backbone_types=None, enthalpy_col="Enthalpy",
         output_dir=None, equil_data_path=None, npt_prod_ns=None,
         T_equil_K=None, T_anneal_high_K=None, md_tg_ceiling_K=None, tg_t_low_K=None,
-        tg_t_step_K=None, tg_steps_per_t=None, tg_rate_index=None,
+        tg_t_step_K=None,
         n_replicates=1, K_strain_max=None, K_deform_rate_inv_s=None,
         dt_fs=None, density_initial=None, properties="all", exp_K_min=None, exp_K_max=None,
         exp_tg_K=None, exp_tg_min=None, exp_tg_max=None, exp_density_min=None,
@@ -1333,27 +1333,20 @@ def _run_tg_sweep_adaptive(args, cls: dict, lammps, p: dict, start_data_path: st
 
 
 def do_thermal(args, cls: dict, lammps, melt_density_gcm3=None) -> dict:
-    """Single-rate-primary: run one sweep at the class's primary configured rate (highest by
-    default; a tg_slope_gate_fallback="slowest_rate" class runs rates[0] instead, its
-    highest-rate fit being documented as degenerate/inverted).
+    """Run the Tg staircase at this class's single configured cooling rate.
 
-    No class carries that fallback as of 2026-09-01: PKTN and PSFO did, and their inversion was
-    a cold-start artifact -- the staircase used to reheat a finished 300 K glass. It now starts
-    from the gated melt hold, so there is neither a reheat probe nor a mid-ramp waypoint to
-    select between. The branch stays because the fallback remains a valid, validated diagnosis
-    for a class that genuinely cannot resolve its highest rate."""
-    tg_rates = cls.get("tg_rates_K_per_ns", [])
+    The rate used to be an index into a tg_rates_K_per_ns list, with a
+    tg_slope_gate_fallback="slowest_rate" branch for classes whose highest-rate fit inverted.
+    That inversion was a cold-start artifact -- the staircase used to reheat a finished 300 K
+    glass -- and was fixed at the root on 2026-09-01 by starting from the gated melt hold. No
+    class has carried the fallback since, and the list was collapsed to a scalar on 2026-09-04:
+    only one rate was ever swept, so the other entries were priced but never run."""
+    rate = tg_rate(cls)
     gpu_per_run = cls.get("gpu_per_run") or 1
     per_rate = []
-    if tg_rates:
+    if rate:
         # Shared with _resolve_cool_params' cool_block rate matching -- the cooldown and the
         # staircase descend from the same melt cell and must not drift apart on which rate.
-        idx = select_primary_tg_rate_index(cls)
-        if not 0 <= idx < len(tg_rates):
-            return {"halted": True, "reason": "TG_PRIMARY_RATE_INDEX_INVALID",
-                    "detail": {"index": idx, "n_rates": len(tg_rates)}}
-        rate = tg_rates[idx]
-        args.tg_rate_index = idx
         p = resolve_stage_params("tg", args, cls)
         with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
             args.gpu_ids = gpu_ids
@@ -1385,7 +1378,7 @@ def do_thermal(args, cls: dict, lammps, melt_density_gcm3=None) -> dict:
         ), f"tg analysis rate={rate}")
         per_rate.append({"rate": rate, "Tg_K": thermal.get("Tg_K"),
                          "fit_quality": thermal.get("fit_quality"), "r_squared": thermal.get("r_squared"),
-                         "output_dir": ap["output_dir"], "used_highest_rate": idx == len(tg_rates) - 1,
+                         "output_dir": ap["output_dir"],
                          "tg_gate_verdict": thermal.get("tg_gate_verdict"),
                          "velocity_seed": p["velocity_seed"],
                          "tg_start_cell": start_cell, "tg_per_t_sampling": sweep.get("per_t"),
@@ -1393,11 +1386,11 @@ def do_thermal(args, cls: dict, lammps, melt_density_gcm3=None) -> dict:
 
     highest = per_rate[-1] if per_rate else None
 
-    # is_glassy determination (THERMAL_TRACK.md's single-sweep algorithm): only trust this
-    # sweep's Tg for is_glassy when it ran at the class's highest configured rate — a class that
-    # deliberately ran the slowest rate instead (PKTN, PSFO) falls through to the exp-Tg
-    # decision, the same outcome those classes got via the old slope-gate-failure path.
-    degenerate = (not highest) or highest["fit_quality"] == "POOR" or not highest["used_highest_rate"]
+    # is_glassy determination (THERMAL_TRACK.md's single-sweep algorithm): trust this sweep's Tg
+    # only when the fit is usable, otherwise fall through to the experimental Tg. The old
+    # used_highest_rate term is gone with the rate list -- there is one configured rate, so the
+    # sweep always runs it and the term could never be false.
+    degenerate = (not highest) or highest["fit_quality"] == "POOR"
     if degenerate:
         exp_tg_val = resolve_member_value(cls, "experimental_tg_K", getattr(args, "smiles", None))
         is_glassy = bool(exp_tg_val and exp_tg_val > 300)
@@ -1966,7 +1959,7 @@ def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_v
         output_dir=sp["output_dir"], graphs_dir=sp["graphs_dir"], run_name=args.run_name,
         smiles=args.smiles or "", polymer_class=args.polymer_class.upper(), ff=sp["ff"],
         charge_method=sp["charge_method"] or "", dp=sp["dp"], n_chains=sp["nchain"],
-        d01=sp["d01_ff"], d02=sp["d02_charges"], d03=sp["d03_electrostatics"], d04=sp["d04_system_size"],
+        **run_summary_decision_labels(sp),
         d05=args.d05, d06=args.tg_fit_quality or "N/A (not requested)",
         n_replicates=args.n_replicates, tg_path=tg_path,
         equilibration_path=equilibration_path,
@@ -2254,6 +2247,16 @@ def run_campaign_workflow(plan_path: Path, *, dry_run: bool = False,
     if dry_run:
         stages = track_registry.resolver_stages_for(properties)
         return {name: resolve_stage_params(name, args, cls) for name in stages}
+    # This is the RESUME path -- `run_campaign.py --plan` bypasses scientific_control entirely,
+    # so control_state.json used to freeze at whatever the first control-plane call wrote and a
+    # resumed run reported that stale status forever (adaptive_gating.py carried a workaround
+    # for exactly this). Claim the session here and close it below, so the file describes the
+    # session that actually last ran.
+    try:
+        from scientific_control import write_control_state
+        write_control_state(repo_root, run_name, status="running", plan_path=plan_path)
+    except Exception as exc:  # never fail a campaign on session bookkeeping
+        print(f"WARNING: control_state open failed for {run_name}: {exc}", file=sys.stderr)
     lammps = _load_server_module("lammps_engine_server", LAMMPS_ENGINE_DIR / "server.py",
                                  LAMMPS_ENGINE_DIR, _mcp_env("mcp-lammps-engine"))
     emc = _load_server_module("emc_server_module", EMC_SERVER_DIR / "server.py",
@@ -2296,6 +2299,15 @@ def run_campaign_workflow(plan_path: Path, *, dry_run: bool = False,
         except Exception as exc:  # never fail an accepted campaign on an evidence-ingest problem
             print(f"WARNING: internal-run evidence ingest failed for {run_name}: {exc}",
                  file=sys.stderr)
+    try:
+        from scientific_control import write_control_state
+        write_control_state(repo_root, run_name,
+                            status=(engine_result or {}).get("status"),
+                            plan_path=plan_path,
+                            current_stage=(engine_result or {}).get("stage"),
+                            ended=True)
+    except Exception as exc:  # never fail a campaign on session bookkeeping
+        print(f"WARNING: control_state close failed for {run_name}: {exc}", file=sys.stderr)
     return engine_result
 
 

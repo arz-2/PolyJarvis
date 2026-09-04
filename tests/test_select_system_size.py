@@ -315,11 +315,11 @@ def test_property_floors_order_is_canonical_not_set_iteration_order():
 # ever runs for them (Fox-Flory is class-level, not member-resolved).
 
 def _plan(polymer_class="PKTN", smiles=PKTN_SMILES, properties=None,
-          dp=32, nchain=None, uncertainties=None):
+          dp=32, nchain=None, acks=()):
     return {"smiles": smiles, "polymer_class": polymer_class,
             "properties": properties if properties is not None else ["tg"],
             "decided_params": {"dp_typical": dp, "nchain": nchain},
-            "uncertainties": uncertainties or []}
+            "system_size": {"acknowledgements": {k: "acknowledged" for k in acks}}}
 
 
 def test_floor_violation_unacknowledged_is_structural():
@@ -335,7 +335,7 @@ def test_floor_violation_unacknowledged_is_structural():
 
 
 def test_floor_violation_acknowledged_clears():
-    f = _system_size_findings(_plan(dp=10, uncertainties=[{"name": "system_size_dp_floor"}]))
+    f = _system_size_findings(_plan(dp=10, acks=("system_size_dp_floor",)))
     assert f == []
 
 
@@ -421,11 +421,12 @@ def test_solve_no_change_when_class_default_already_at_the_floor():
 
 
 def _reasoned_plan(polymer_class="PHYC", smiles=PHYC_SMILES, properties=None,
-                   dp=120, nchain=None, uncertainties=None, plan_mode="reasoned"):
+                   dp=120, nchain=None, acks=(), plan_mode="reasoned"):
     return {"smiles": smiles, "polymer_class": polymer_class,
             "properties": properties if properties is not None else ["tg"],
             "decided_params": {"dp_typical": dp, "nchain": nchain},
-            "uncertainties": uncertainties or [], "plan_mode": plan_mode}
+            "system_size": {"acknowledgements": {k: "acknowledged" for k in acks}},
+            "plan_mode": plan_mode}
 
 
 def test_over_provisioned_unacknowledged_is_structural_for_a_reasoned_plan():
@@ -437,7 +438,7 @@ def test_over_provisioned_unacknowledged_is_structural_for_a_reasoned_plan():
 
 def test_over_provisioned_acknowledged_clears():
     f = _system_size_over_provisioned_findings(_reasoned_plan(
-        dp=120, uncertainties=[{"name": "system_size_over_provisioned"}]))
+        dp=120, acks=("system_size_over_provisioned",)))
     assert f == []
 
 

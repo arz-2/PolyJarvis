@@ -17,7 +17,7 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import rules_common
 from make_deterministic_plan import (  # noqa: E402
-    _try_cache, make_plan_from_cache, make_plan, _build_hardware_decision, _policy_criteria,
+    _try_cache, make_plan_from_cache, make_plan,
 )
 from rules_common import load_rules, get_class_entry  # noqa: E402
 
@@ -61,20 +61,28 @@ def test_validated_entry_replays_frozen_protocol(tmp_path):
     plan = _try_cache("RUN1", CLASS, SMILES, PROPERTIES, cache_path)
     assert plan is not None
     assert plan["plan_mode"] == "deterministic"
+    # charge_method/electrostatics are re-derived from the frozen field, so they appear
+    # alongside the three frozen keys rather than being replayed.
     assert plan["decided_params"] == {"preferred_ff": "trappe-ua", "cutoff_A": 14.0,
-                                      "T_workflow_K": 300.0}
+                                      "T_workflow_K": 300.0,
+                                      "charge_method": "embedded", "electrostatics": "lj_cut"}
     ids = [d["id"] for d in plan["decisions"]]
-    assert ids == ["D-01_ff", "D-08_hardware"]
+    assert ids == ["D-01_ff"]
 
 
-def test_d08_hardware_freshly_resolved_not_frozen(tmp_path):
+def test_hardware_freshly_derived_not_frozen(tmp_path):
+    """Hardware follows the frozen FIELD, never a frozen hardware row.
+
+    It was a D-08_hardware decisions[] row appended on replay until 2026-09-04. Keeping it out
+    of the frozen protocol is the point: engine/mpi/gpu are host-and-policy facts, so a run
+    replayed on a recalibrated host must pick up the new policy rather than the old cell's."""
     cache_path = _write_cache(tmp_path, _validated_entry())
     plan = _try_cache("RUN1", CLASS, SMILES, PROPERTIES, cache_path)
     rules = load_rules()
-    cls = get_class_entry(rules, CLASS)
-    expected = _build_hardware_decision(cls, _policy_criteria().get("D-08_hardware", []))
-    hardware_row = next(d for d in plan["decisions"] if d["id"] == "D-08_hardware")
-    assert hardware_row == expected
+    hp = rules["hardware_policy"]["by_forcefield"]["trappe"]
+    assert plan["hardware"] == {"engine": hp["engine"], "mpi_ranks": hp["mpi"],
+                                "gpu_per_run": hp["gpu_per_run"], "ff_family": "trappe"}
+    assert not any(d["id"] == "D-08_hardware" for d in plan["decisions"])
 
 
 def test_no_cache_file_falls_back_to_none(tmp_path):

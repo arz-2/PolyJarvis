@@ -21,17 +21,20 @@ To request a subset, pass `--properties density,tg` to `run_campaign.py`. Omitti
 
 ## 2. Glass Transition Temperature (Tg)
 
-Tg is measured **single-rate-primary**: one stepped cooling sweep runs at the class's primary
-configured rate (the highest entry in `tg_rates_K_per_ns` by default; a class carrying
-`tg_slope_gate_fallback: "slowest_rate"` — one whose highest-rate fit is documented as
-degenerate/inverted — runs `tg_rates_K_per_ns[0]` instead).
+Tg is measured **single-rate**: one stepped cooling sweep runs at the class's configured
+`tg_rate_K_per_ns`. That was a `tg_rates_K_per_ns` LIST with a
+`tg_slope_gate_fallback` selecting an entry until 2026-09-04; only one entry was ever swept, so
+the list and the fallback were retired. The remedy for a class whose fit will not resolve is to
+LOWER `tg_rate_K_per_ns`, which `_assert_tg_rate_feasible` bounds against
+`tg_min_steps_per_T`.
 
-No class carries that fallback as of 2026-09-01. PKTN and PSFO did: their staircase reheated
+PKTN and PSFO carried the fallback until 2026-09-01: their staircase reheated
 the finished 300 K cell, so the top plateaus under-equilibrated and a faster sweep, spending
 less time contaminated there, read a *lower* Tg — an inverted rate dependence. The sweep now
 starts from the gated melt hold and runs the whole descent to `tg_t_low_K`, so both returned to
-the highest rate. There is no reheat probe and no mid-ramp waypoint to select between: the
-staircase's first point is the cell the melt gate certified.
+the fast rate. (PEST then carried the key with an unrecognised `"highest_rate"` value until it
+was retired — see docs/decision_rationale.md.) There is no reheat probe and no mid-ramp
+waypoint to select between: the staircase's first point is the cell the melt gate certified.
 
 ### Sweep
 

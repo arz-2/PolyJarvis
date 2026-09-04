@@ -21,6 +21,13 @@ on the resume path; the outer control plane's counter is not necessarily re-touc
 authoritative call count is `max(control_state.recovery_agent_calls, len(agent_escalations))`,
 and cap-hit is derived from that count plus whether the run actually finished (`final_pass`),
 not from control_state's own possibly-stale `status` string.
+
+FIXED AT THE SOURCE 2026-09-04, but the max() STAYS: control_state.json is now written by the
+resume path too (run_campaign_workflow), and its counter is read from
+workflow_state.agent_escalations at write time rather than counted independently, so for a run
+recorded after that date the two agree by construction and the max() is a no-op. Historical run
+dirs -- a-PS among them -- still carry the frozen counter, and dropping the max() would silently
+under-score exactly the runs this note was written from.
 """
 from __future__ import annotations
 

@@ -602,13 +602,16 @@ def evidence_records_from_completed_run(entry: dict, run_name: str, smiles: str)
             provenance=_provenance(),
         ))
 
-    if "tg" in validated_properties and decided_params.get("tg_rates_K_per_ns"):
-        rates = decided_params["tg_rates_K_per_ns"]
+    # The rate this run actually swept. Recorded every CONFIGURED rate until 2026-09-04, which
+    # certified rates the run never ran as validated protocol -- the evidence store's whole
+    # point is that a record describes what was done.
+    if "tg" in validated_properties and decided_params.get("tg_rate_K_per_ns"):
+        rate = decided_params["tg_rate_K_per_ns"]
         records.append(build_record(
             field="cooling_rate", polymer_class=polymer_class, polymer_names=[], smiles=[smiles],
-            claim=(f"PolyJarvis validated Tg using cooling rate(s) {rates} K/ns for "
+            claim=(f"PolyJarvis validated Tg using cooling rate {rate} K/ns for "
                    f"{polymer_class} ({smiles}) in run {run_name}."),
-            value={"rates_K_per_ns": rates}, doi=pseudo_doi, url=None, title=title, year=year,
+            value={"rate_K_per_ns": rate}, doi=pseudo_doi, url=None, title=title, year=year,
             doi_verified=True, trust_tier="internal_validated_run", relevance=relevance,
             provenance=_provenance(),
         ))

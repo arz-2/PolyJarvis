@@ -1,48 +1,27 @@
 #!/usr/bin/env python3
 """
-make_deterministic_plan.py — Emit the deterministic planning artifacts for a polymer class.
+make_deterministic_plan.py — Emit the deterministic planning artifact for a polymer class.
 
-Two subcommands. Both transcribe guides/polymer_rules.json, and build_decisions() is shared:
+One subcommand, `run-plan`: the complete run_plan.json the novel-run-plan skill's literature
+critic then CRITIQUES (it does not author it -- see below).
 
-  run-plan   the full run_plan.json (class-default plan materializer)
-  decision   the complete decision.json the novel-run-plan skill's literature critic then
-             CRITIQUES (it does not author it -- see below)
+There were two until 2026-09-04. `decision` emitted a separate decision.json carrying the same
+decision rows in a second shape, which scientific_control then merged back into the plan; the
+two files restated each other almost entirely (evidence blocks byte-identical), so the decision
+was folded into the plan and the subcommand deleted. The file the critic adjudicates and the
+file that executes are now the same file.
 
-`decision` lived in its own make_decision_scaffold.py until 2026-09-02; it was a 116-line leaf
-whose only reason to import this module was build_decisions(), and finding "the thing that
-writes decision.json" meant knowing that file existed.
+`run-plan` is not a scaffold: it resolves every row itself and writes the rationale too. What is
+left for review is `confidence`, which comes back "unreviewed" (invalid per scientific_control's
+VALID_CONFIDENCE) and is the ONLY thing blocking materialization. --baseline stamps "low"
+instead, for the deterministic arm that runs with no LLM in the loop, and --force is required to
+overwrite a plan a reviewer may already have edited.
 
-`decision` stopped being a scaffold on 2026-09-02. It used to emit rationale=[] and blank
-evidence for an agent to fill in; it now resolves every row itself -- solve_system_size (D-04),
-select_hardware (D-08), the electrostatics_decision_guide and _metadata.primary_sources
-citation records (D-01/D-02/D-03) -- and writes the rationale too. What is left for review is
-`confidence`, which comes back "unreviewed" (invalid per scientific_control's VALID_CONFIDENCE)
-and is now the ONLY thing blocking materialization. --baseline stamps "low" instead, for the
-deterministic benchmark arm that runs with no LLM in the loop at all.
-
-That inversion is the point: the autofilled file is a real end-to-end deterministic baseline,
-and whatever the critic changes on top of it is the measurable LLM contribution. Evidence
-written here is tagged origin="autofill" so benchmarks/.../metrics/llm_contribution.py can tell
-the two apart.
-
-Reproducibility guarantee: decided_params snapshots ONLY keys already present in
-the class entry, with their existing values. stage_params.py overlays them as
-{**cls, **decided_params}, which is therefore an identity for an unmodified plan.
-
-`scientific_control.py` turns a decision into a reasoned plan and records the rationale,
-evidence, uncertainty, confidence, and decision digest.
-
-Usage:
-  python3 orchestration/scripts/make_deterministic_plan.py run-plan \
-      --run_name PE7 --polymer_class PHYC \
-      [--smiles "*CC*"] [--properties density,tg,bulk_modulus] \
-      [--out PATH]        # default: data/<run_name>/raw/run_plan.json; "-" = stdout
-
-  python3 orchestration/scripts/make_deterministic_plan.py decision \
-      --run_name PE7 --polymer_class PHYC --smiles "*CC*" \
-      [--properties ...] [--out PATH] [--force] [--baseline]
-                          # --smiles is REQUIRED here: all five decisions resolve per-molecule
-                          # default: data/<run_name>/raw/decision.json; "-" = stdout
+decisions[] holds exactly ONE row, D-01_ff. D-02_charges, D-03_electrostatics and D-08_hardware
+were rows until 2026-09-04 and were never decisions -- each is a pure function of the field D-01
+resolves (verified 21/21 across the class table), so _derived_from_field() derives them AFTER
+the field is known. D-04_system_size was a solver, not a choice; its result lives in
+plan["system_size"].
 """
 
 import argparse
@@ -72,8 +51,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DECISION_POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
 # Decision-relevant class keys consumed by stage_params.py. Only keys that
 # EXIST in the class entry are snapshotted, so the overlay stays an exact identity.
+# charge_method and electrostatics are NOT snapshotted: they are properties of the field D-01
+# resolves, derived by _derived_from_field() below. Snapshotting them from the class copied them
+# BEFORE resolve_d01 ran, so a SMILES that typed under a field outside its class's family got a
+# recorded charge scheme that contradicted preferred_ff.
 SNAPSHOT_KEYS = [
-    "preferred_builder", "charge_method", "electrostatics",
+    "preferred_builder",
     "cutoff_A", "dt_fs",
     "dp_typical", "nchain", "density_initial_gcm3",
     "T_equil_K", "annealing_T_high_K", "P_equil_atm", "final_T_K", "anneal_margin_K",
@@ -83,11 +66,10 @@ SNAPSHOT_KEYS = [
     "stage8_min_steps", "stage8_cap_steps",
     "melt_ramp_steps", "melt_hold_min_steps", "melt_hold_cap_steps",
     "nvt_melt_min_steps", "nvt_melt_cap_steps",
-    "md_tg_ceiling_K", "tg_t_low_K", "tg_t_step_K", "tg_steps_per_t", "tg_rates_K_per_ns",
-    "tg_min_steps_per_T", "tg_slope_gate_fallback",
+    "md_tg_ceiling_K", "tg_t_low_K", "tg_t_step_K", "tg_rate_K_per_ns",
+    "tg_min_steps_per_T",
     "K_deform_rate_inv_s", "K_deform_rate_slow_inv_s", "K_strain_max",
     "bm_pressures_atm", "ct_min_decay_melt",
-    "alpha_glass_per_K", "alpha_melt_per_K",
 ]
 
 
@@ -108,60 +90,71 @@ def _field_of(cls: dict, field: str | None = None) -> str | None:
     return field or cls.get("preferred_ff") or cls.get("ff_accuracy_prior")
 
 
-def _build_hardware_decision(cls: dict, criteria_evaluated: list, field: str = None) -> dict:
-    """D-08_hardware default: engine/mpi/gpu_per_run from hardware_policy.by_forcefield[fam],
-    the same FF-family resolver stage_params.resolve_hardware uses. Deliberately NOT
-    select_hardware.py's live-host/atom-count-aware defensibility check -- that needs a SMILES
-    and nvidia-smi and stays the independent check validate_run_plan.py already runs; this is
-    the pure, fast, deterministic class default."""
-    hp = hardware_policy()
-    fam = resolve_ff_family(_field_of(cls, field) or "", hp)
-    default = hp.get("by_forcefield", {}).get(fam, {})
-    choice = {"engine": default.get("engine"), "gpu_per_run": default.get("gpu_per_run"),
-              "mpi_ranks": default.get("mpi")}
-    evidence = ([{"claim": default["note"], "source": "polymer_rules.json:hardware_policy.by_forcefield"}]
-                if default.get("note") else [])
-    return {"id": "D-08_hardware", "choice": choice, "criteria_evaluated": criteria_evaluated,
-            "evidence": evidence, "confidence": "class_default", "alternatives": []}
+def _derived_from_field(field: str | None, rules: dict) -> dict:
+    """Everything that follows from D-01's resolved field, in one place.
 
+    charge_method, electrostatics and the hardware triple are not independent decisions -- each
+    is a property of the force field. Verified across all 21 classes before D-02/D-03/D-08 were
+    retired (2026-09-04): every class's curated charge_method and electrostatics equalled the
+    value its ff_accuracy_prior's family carries here, 21/21.
 
-def _d04_choice(cls: dict, smiles: str | None, field: str = None) -> str:
-    """D-04's default_choice string.
-
-    guides/polymer_rules.json's per-class dp_typical/nchain were removed 2026-09-02 (every cell
-    is now derived per-SMILES from the system-mass floor), so reading them off `cls` rendered the
-    literal string "DP=None, nchain=None" for all 21 classes. Fall back to the same derive_cell()
-    that select_system_size/materialize_plan use, so this string and decided_params cannot drift.
+    Reuses rules_common.resolve_ff_family (the same alias table stage_params.resolve_hardware and
+    select_hardware.plan_cost_estimate key off), so there is exactly one family resolver.
     """
-    dp, nchain = cls.get("dp_typical"), cls.get("nchain")
-    if (dp is None or nchain is None) and smiles:
-        try:
-            _dp, _n, _mw, _note = derive_cell(smiles, _is_ua(cls, field))
-        except Exception:
-            _dp = _n = None
-        dp = dp if dp is not None else _dp
-        nchain = nchain if nchain is not None else _n
-    if dp is None or nchain is None:
-        return "UNRESOLVED (no SMILES supplied; cell size is derived per-molecule)"
-    return f"DP={dp}, nchain={nchain}"
+    hp = rules.get("hardware_policy", {})
+    fam = resolve_ff_family(field or "", hp)
+    pol = hp.get("by_forcefield", {}).get(fam, {})
+    return {
+        "ff_family": fam,
+        "charge_method": pol.get("charge_method"),
+        "electrostatics": pol.get("electrostatics"),
+        "engine": pol.get("engine"),
+        "mpi_ranks": pol.get("mpi"),
+        "gpu_per_run": pol.get("gpu_per_run"),
+    }
+
+
+#: The plan's decision ids. One, since 2026-09-04. scientific_control validates a supplied
+#: plan against this rather than re-deriving it from a build_decisions() call.
+KNOWN_DECISIONS = frozenset({"D-01_ff"})
 
 
 def build_decisions(cls: dict, smiles: str | None = None, field: str = None,
-                    resolution: dict = None) -> list:
-    """Structured default decision rows carrying evidence/confidence/alternatives, mirroring
-    run_summary.json decision IDs. Evidence is transcribed from existing class fields.
+                    resolution: dict = None, rules: dict = None,
+                    polymer_class: str = None, hw: dict = None) -> list:
+    """The plan's decision rows. Exactly one: D-01_ff.
 
-    Covers D-01_ff, D-02_charges, D-03_electrostatics, D-04_system_size, D-08_hardware --
-    the decisions a planning agent can actually reason about before any simulation exists.
-    D-05_convergence, D-06_tg_fit_quality, D-07_property_method are deliberately excluded:
+    D-02_charges, D-03_electrostatics and D-08_hardware were rows until 2026-09-04. None was a
+    decision: each is a pure function of the force field D-01 resolves. Verified over all 21
+    classes -- charge_method and electrostatics equalled their family's value 21/21 (pcff ->
+    bond-increment, opls -> opls-library, trappe -> embedded, gaff -> RESP; lj_cut iff trappe),
+    and hardware comes from hardware_policy.by_forcefield[family]. They are now derived by
+    _derived_from_field() into decided_params and plan["hardware"], which is also what stops a
+    recorded charge scheme from contradicting preferred_ff.
+
+    D-04_system_size was a row too, but it is a solver (select_system_size.solve_system_size),
+    not a choice: no agent input, and overrides deliberately cannot carry dp_typical/nchain. Its
+    result and reasons live in plan["system_size"].
+
+    D-05_convergence, D-06_tg_fit_quality and D-07_property_method are still excluded:
     decision_policy.json defines all three as mechanized runtime gate verdicts (equil_verdict,
     tg_gate_verdict, bm_gate_verdict) to route on, not re-derive -- they have no pre-simulation
     default choice to annotate here and stay enforced solely via planned_stages success_criteria.
 
     "confidence" here is a fixed "class_default" placeholder. The scientific control layer
-    replaces it with the planning agent's confidence before execution.
+    replaces it with the adjudicating agent's confidence before execution.
     """
     criteria = _policy_criteria()
+    if rules is not None:
+        # The full row: one evidence entry per criterion the policy names, including the ones
+        # this layer cannot reach (they say NOT MEASURED / NOT ASSESSABLE explicitly). This is
+        # what decision.json carried until it was folded into run_plan.json on 2026-09-04.
+        row = _d01_ff_row(rules, cls, polymer_class or "", hw, criteria.get("D-01_ff", []),
+                          field, resolution)
+        row["id"] = "D-01_ff"
+        row["choice"] = row.pop("default_choice", None)
+        return [row]
+
     ff_evidence = []
     if cls.get("ff_justification_doi"):
         ff_evidence.append({"claim": cls.get("ff_note", "force field choice"),
@@ -169,31 +162,85 @@ def build_decisions(cls: dict, smiles: str | None = None, field: str = None,
     for cit in cls.get("citations", []):
         ff_evidence.append({"claim": "supporting validation", "citation": cit})
 
-    conf = "class_default"
     return [
         {"id": "D-01_ff",
          "choice": resolution["field"] if resolution else _field_of(cls, field),
          "criteria_evaluated": criteria.get("D-01_ff", []),
-         "evidence": ff_evidence, "confidence": conf,
+         "evidence": ff_evidence, "confidence": "class_default",
          "alternatives": cls.get("forcefield_alternatives", []),
          # Only when a trial build actually ran: validate_run_plan's ff_no_admissible_field
          # gate keys off this, and an unprobed [] would read as "nothing types this SMILES".
          **({"admissible": [resolution["field"]] if resolution["field"] else []}
             if (resolution or {}).get("probed") else {})},
-        {"id": "D-02_charges", "choice": cls.get("charge_method"),
-         "criteria_evaluated": criteria.get("D-02_charges", []),
-         "evidence": [], "confidence": conf, "alternatives": []},
-        {"id": "D-03_electrostatics", "choice": cls.get("electrostatics"),
-         "criteria_evaluated": criteria.get("D-03_electrostatics", []),
-         "evidence": [{"claim": "see electrostatics_decision_guide",
-                       "source": "polymer_rules.json:electrostatics_decision_guide"}],
-         "confidence": conf, "alternatives": []},
-        {"id": "D-04_system_size",
-         "choice": _d04_choice(cls, smiles, field),
-         "criteria_evaluated": criteria.get("D-04_system_size", []),
-         "evidence": [], "confidence": conf, "alternatives": []},
-        _build_hardware_decision(cls, criteria.get("D-08_hardware", []), field),
     ]
+
+
+#: run_plan.json key order. Presentation only -- workflow_engine._canonical_hash sorts keys, so
+#: this cannot move plan_hash -- but the file is read by people, so it reads in the order they
+#: ask questions in: what is this run, what was decided, how, and then the protocol it implies.
+PLAN_KEY_ORDER = [
+    "schema_version", "run_name", "polymer_class", "smiles", "goal", "properties",
+    "plan_mode", "confidence", "dominant_uncertainty",
+    "decisions", "system_size", "hardware", "overrides",
+    "decided_params", "planned_stages", "recovery_history", "cost_estimate",
+]
+PLAN_SCHEMA_VERSION = "2.0"
+
+
+def ordered_plan(**parts) -> dict:
+    """Assemble a plan with PLAN_KEY_ORDER honoured, from whichever writer is building it.
+
+    Every writer routes through here (make_plan, make_plan_from_cache, and
+    scientific_control.materialize_plan) so none of them can scramble the order by appending in
+    call order, which is what dict.update() did.
+    """
+    parts.setdefault("schema_version", PLAN_SCHEMA_VERSION)
+    plan = {k: parts.pop(k) for k in PLAN_KEY_ORDER if k in parts}
+    plan.update(parts)  # anything unrecognised still lands, at the end, rather than vanishing
+    return plan
+
+
+def attach_acknowledgements(d01_row: dict, prior_ack: dict | None, resolution: dict | None):
+    """Record on the D-01 row the two facts a plan MUST carry when it departs from its evidence.
+
+    These lived in a top-level uncertainties[] list until 2026-09-04, where validate_run_plan
+    matched them by NAME -- a plan-wide bag of strings acting as per-decision flags. They belong
+    on the decision they qualify: both describe D-01's field, and nothing else reads them.
+    """
+    acks = d01_row.setdefault("acknowledgements", {})
+    if prior_ack:
+        acks["ff_accuracy_prior_not_met"] = prior_ack.get("detail", "")
+    flags = (resolution or {}).get("provenance_flags") or {}
+    if flags:
+        d01_row["provenance_flags"] = flags
+    return d01_row
+
+
+def build_system_size(decided_params: dict, size_solve: dict | None, assumptions: list) -> dict:
+    """The cell, and why. D-04_system_size was a decisions[] row until 2026-09-04; it is a
+    solver (select_system_size.solve_system_size), not a choice -- no agent input, and overrides
+    deliberately cannot carry dp_typical/nchain.
+
+    Deliberately NOT inside decided_params: workflow_engine.PARAMETER_STAGE maps every
+    decided_params key to an owning stage and falls through to "build" for anything unmapped, so
+    a reasons/acknowledgements blob there would invalidate the whole pipeline back to build on
+    every resume.
+    """
+    solve = size_solve or {}
+    acks = {}
+    for u in solve.get("uncertainties", []) or []:
+        name = u.get("name")
+        if name == "size_over_provisioned":
+            name = "system_size_over_provisioned"
+        acks[name] = {k: v for k, v in u.items()
+                      if k not in ("name", "dominant", "reduction_probe")}
+    return {
+        "dp_typical": decided_params.get("dp_typical"),
+        "nchain": decided_params.get("nchain"),
+        "resolved_by": "select_system_size.solve_system_size",
+        "reasons": list(solve.get("recommendation_reasons") or []) + list(assumptions or []),
+        "acknowledgements": acks,
+    }
 
 
 # Re-exported: recovery_agent_cli, validate_run_plan and the tests all import this name.
@@ -223,8 +270,8 @@ def build_planned_stages(cls: dict, properties: set, smiles: str | None = None) 
         # assessment cell. Present only when a property needs a cell at that temperature.
         "cool":        {"chain_submitted": True},
         "cool-check":  {"cool_verdict": "PASS"},
-        # Single-rate-primary: one sweep at the class's primary configured rate (see
-        # stage_params.select_primary_tg_rate_index, shared with do_thermal and the cooldown).
+        # One sweep at the class's configured tg_rate_K_per_ns (see stage_params.tg_rate,
+        # shared with do_thermal and the cooldown's rate matching).
         "tg":          {"bilinear_fit_r_squared_min": 0.80,
                         "t_range_brackets_exp_tg": exp_tg_bracket},
         "analyze-tg":  {},
@@ -248,29 +295,31 @@ def build_planned_stages(cls: dict, properties: set, smiles: str | None = None) 
             for name in track_registry.planned_stage_names(properties)]
 
 
-def _assert_tg_rates_feasible(cls: dict, polymer_class: str) -> None:
-    """Reject a configured Tg rate set where any rate gives too few steps per temperature.
+def _assert_tg_rate_feasible(cls: dict, polymer_class: str) -> None:
+    """Reject a configured Tg rate that gives too few steps per temperature.
 
     Per-T simulation TIME (not step count) sets bilinear-fit quality: too few ps at each
     temperature collapses the Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400 degenerate).
     Rate IS the per-T step knob (N = tg_t_step_K/(rate*dt*1e-6)), so an infeasible rate
-    cannot be salvaged at run time — fail at plan time. Floor = tg_min_steps_per_T
+    cannot be salvaged at run time - fail at plan time. Floor = tg_min_steps_per_T
     (default 200000 steps = 200 ps at dt=1fs; TraPPE dt=2fs classes set 100000 = 200 ps).
+
+    Checked a whole tg_rates_K_per_ns list until 2026-09-04; there is one rate now, and it is
+    the only knob left for a class whose fit will not resolve -- lower it.
     """
-    rates = cls.get("tg_rates_K_per_ns")
+    rate = cls.get("tg_rate_K_per_ns")
     t_step = cls.get("tg_t_step_K")
-    if not rates or t_step is None:
+    if not rate or t_step is None:
         return
     dt = cls.get("dt_fs", 1.0)
     floor = cls.get("tg_min_steps_per_T", 200000)
-    bad = [(r, int(t_step / (r * dt * 1e-6)))
-           for r in rates if t_step / (r * dt * 1e-6) < floor - 1]
-    if bad:
+    n_steps = t_step / (rate * dt * 1e-6)
+    if n_steps < floor - 1:
         max_rate = t_step / (floor * dt * 1e-6)
         raise ValueError(
-            f"{polymer_class}: infeasible tg_rates_K_per_ns {rates} — "
-            f"rate(s) {[b[0] for b in bad]} give {[b[1] for b in bad]} steps/T, below "
-            f"tg_min_steps_per_T={floor} (tg_t_step_K={t_step}, dt_fs={dt}). Lower the rates "
+            f"{polymer_class}: infeasible tg_rate_K_per_ns {rate} - it gives "
+            f"{int(n_steps)} steps/T, below tg_min_steps_per_T={floor} "
+            f"(tg_t_step_K={t_step}, dt_fs={dt}). Lower the rate "
             f"so N = tg_t_step_K/(rate*dt*1e-6) >= floor (max feasible rate = {max_rate:.0f} K/ns)."
         )
 
@@ -349,18 +398,25 @@ def size_the_cell(polymer_class: str, smiles, properties: set,
 
 
 def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
-              size_solve: dict | None = None, with_ff_probe: bool = False) -> dict:
+              size_solve: dict | None = None, with_ff_probe: bool = False,
+              baseline: bool = False) -> dict:
     rules = load_rules()
     if polymer_class.upper() not in rules.get("classes", {}):
         raise ValueError(f"unknown polymer class {polymer_class!r}")
     cls = get_class_entry(rules, polymer_class)
-    _assert_tg_rates_feasible(cls, polymer_class.upper())
+    _assert_tg_rate_feasible(cls, polymer_class.upper())
     decided_params = {k: cls[k] for k in SNAPSHOT_KEYS if k in cls}
     # D-01: decided_params.preferred_ff is the field this run BUILDS with, resolved per SMILES.
     # It is never None -- a resolution that typed nothing refuses through the D-01 row's
     # admissible=[] instead, so the cell is still sized and priced against a real field.
     field, ff_resolution = resolve_d01(cls, smiles, with_ff_probe)
     decided_params["preferred_ff"] = field
+    # ORDER IS LOAD-BEARING: everything the field implies is derived here, AFTER the field is
+    # known. These two used to be snapshotted from the class above, four lines before `field`
+    # existed, and were never reconciled with it.
+    derived = _derived_from_field(field, rules)
+    decided_params["charge_method"] = derived["charge_method"]
+    decided_params["electrostatics"] = derived["electrostatics"]
     sized, size_assumptions = size_the_cell(polymer_class, smiles, properties, size_solve, field)
     decided_params.update(sized)
     # Regime call (see _regime_exp_tg): a novel polymer's Tg estimate now drives this instead of
@@ -380,38 +436,40 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
         decided_params["T_melt_hold_K"] = _sched["T_melt_hold_K"]
     except Exception:  # noqa: BLE001 -- a planning-time convenience, never a hard dependency
         pass
-    uncertainties = [{
-        "name": "scientific_review_pending",
-        "dominant": True,
-        "reduction_probe": "planning_agent_review",
-    }]
     prior_ack = _ff_prior_uncertainty(polymer_class.upper(), cls.get("ff_accuracy_prior"),
                                       (ff_resolution or {}).get("field", field), ff_resolution)
-    if prior_ack:
-        uncertainties.append(prior_ack)
-    return {
-        "schema_version": "1.0",
-        "goal": f"Predict {', '.join(sorted(properties))} for {polymer_class.upper()}"
-                + (f" ({smiles})" if smiles else ""),
-        "run_name": run_name,
-        "polymer_class": polymer_class.upper(),
-        "smiles": smiles,
-        "properties": sorted(properties),
-        "confidence": "unreviewed",
-        "plan_mode": "scaffold",
-        "assumptions": size_assumptions + [
-            "polymer_rules.json class defaults are a starting hypothesis pending "
-            "scientific-agent review.",
-        ] + ([prior_ack["detail"]] if prior_ack else [])
-          + _ff_screen_assumptions(ff_resolution),
-        "uncertainties": uncertainties,
-        "decided_params": decided_params,
-        "decisions": build_decisions(cls, smiles, field, ff_resolution),
-        "planned_stages": build_planned_stages(cls, properties, smiles),
-        "critique": {"status": "pending_scientific_review", "rounds": 0, "findings": []},
-        "provenance": {"generator": "make_deterministic_plan.py",
-                       "generated_at": datetime.now(timezone.utc).isoformat()},
-    }
+    # select_hardware prices the resolved cell; its estimate is D-01's computational_cost
+    # evidence, so it is resolved here rather than by a second caller.
+    try:
+        hw = select_hardware(polymer_class.upper(), smiles, decided_params.get("dp_typical"),
+                             decided_params.get("nchain"), field)
+    except Exception as e:  # noqa: BLE001 -- pricing is evidence, never a hard dependency
+        hw = {"error": str(e)}
+    rows = build_decisions(cls, smiles, field, ff_resolution, rules=rules,
+                           polymer_class=polymer_class.upper(), hw=hw)
+    attach_acknowledgements(rows[0], prior_ack, ff_resolution)
+    rows[0].setdefault("critique", {"status": "pending_scientific_review", "rounds": 0,
+                                    "findings": _ff_screen_assumptions(ff_resolution)})
+    return ordered_plan(
+        run_name=run_name,
+        polymer_class=polymer_class.upper(),
+        smiles=smiles,
+        goal=f"Predict {', '.join(sorted(properties))} for {polymer_class.upper()}"
+             + (f" ({smiles})" if smiles else ""),
+        properties=sorted(properties),
+        plan_mode="scaffold",
+        # "unreviewed" is not in VALID_CONFIDENCE, so it is what blocks materialization until a
+        # reviewer sets it. --baseline stamps "low" for the deterministic arm that runs with no
+        # LLM in the loop.
+        confidence="low" if baseline else "unreviewed",
+        dominant_uncertainty="scientific_review_pending",
+        decisions=rows,
+        system_size=build_system_size(decided_params, size_solve, size_assumptions),
+        hardware={k: derived[k] for k in ("engine", "mpi_ranks", "gpu_per_run", "ff_family")},
+        overrides={},
+        decided_params=decided_params,
+        planned_stages=build_planned_stages(cls, properties, smiles),
+    )
 
 
 CACHE_PATH_DEFAULT = REPO_ROOT / "guides" / "system_characterization_cache.json"
@@ -423,41 +481,47 @@ def make_plan_from_cache(run_name: str, polymer_class: str, smiles: str, canonic
     protocol previously proven to reach "accepted" for this exact molecule -- instead of
     polymer_rules.json class defaults. This is the "system, not class" fast path.
 
-    D-08_hardware is the one exception: always resolved fresh via _build_hardware_decision,
-    matching decision_policy.json's stance that hardware stays host-dependent and is never
-    frozen/replayed (the cache's protocol.decisions never carries a D-08 row in the first place --
-    write_characterization_cache.py drops it before freezing).
+    Hardware and everything else the force field implies is the exception: always re-derived
+    from the frozen field, never replayed. Hardware stays host-dependent, so a run replayed on a
+    recalibrated host must pick up the current policy rather than the original cell's.
     """
     rules = load_rules()
     cls = get_class_entry(rules, polymer_class)
     protocol = cache_entry["protocol"]
     decided_params = dict(protocol["decided_params"])  # literal replay, no recomputation
-    decisions = [dict(d) for d in protocol["decisions"]]
-    decisions.append(_build_hardware_decision(cls, _policy_criteria().get("D-08_hardware", []),
-                                              decided_params.get("preferred_ff")))
-    return {
-        "schema_version": "1.0",
-        "goal": f"Predict {', '.join(sorted(properties))} for {polymer_class.upper()} ({smiles})",
-        "run_name": run_name,
-        "polymer_class": polymer_class.upper(),
-        "smiles": smiles,
-        "properties": sorted(properties),
-        "confidence": "high",
-        "plan_mode": "deterministic",
-        "assumptions": [
-            f"decided_params/decisions/planned_stages replayed verbatim from "
-            f"guides/system_characterization_cache.json[{canonical_smiles!r}], validated by "
-            f"run {cache_entry.get('source_run_name')!r} on {cache_entry.get('validated_at')}.",
-        ],
-        "uncertainties": [{"name": "none_dominant", "dominant": True, "reduction_probe": "none"}],
-        "decided_params": decided_params,
-        "decisions": decisions,
-        "planned_stages": list(protocol["planned_stages"]),
-        "critique": {"status": "protocol_validated_replay", "rounds": 0, "findings": []},
-        "provenance": {"generator": "make_deterministic_plan.py:make_plan_from_cache",
-                       "generated_at": datetime.now(timezone.utc).isoformat(),
-                       "cache_canonical_smiles": canonical_smiles},
-    }
+    # Retired rows are dropped on replay: a pre-2026-09-04 freeze carries five, and honouring a
+    # frozen D-02/D-03/D-08 would reinstate exactly the field/charge disagreement the
+    # derivation exists to prevent. The field is frozen; everything it implies is re-derived.
+    decisions = [dict(d) for d in protocol["decisions"] if d.get("id") == "D-01_ff"]
+    derived = _derived_from_field(decided_params.get("preferred_ff"), rules)
+    decided_params["charge_method"] = derived["charge_method"]
+    decided_params["electrostatics"] = derived["electrostatics"]
+    replay_note = (
+        f"decided_params/decisions/planned_stages replayed verbatim from "
+        f"guides/system_characterization_cache.json[{canonical_smiles!r}], validated by "
+        f"run {cache_entry.get('source_run_name')!r} on {cache_entry.get('validated_at')}.")
+    if decisions:
+        decisions[0].setdefault("critique", {"status": "protocol_validated_replay",
+                                             "rounds": 0, "findings": [replay_note]})
+    return ordered_plan(
+        run_name=run_name,
+        polymer_class=polymer_class.upper(),
+        smiles=smiles,
+        goal=f"Predict {', '.join(sorted(properties))} for {polymer_class.upper()} ({smiles})",
+        properties=sorted(properties),
+        plan_mode="deterministic",
+        confidence="high",
+        dominant_uncertainty="none_dominant",
+        decisions=decisions,
+        system_size={"dp_typical": decided_params.get("dp_typical"),
+                     "nchain": decided_params.get("nchain"),
+                     "resolved_by": "system_characterization_cache (frozen)",
+                     "reasons": [replay_note], "acknowledgements": {}},
+        hardware={k: derived[k] for k in ("engine", "mpi_ranks", "gpu_per_run", "ff_family")},
+        overrides={},
+        decided_params=decided_params,
+        planned_stages=list(protocol["planned_stages"]),
+    )
 
 
 def _try_cache(run_name: str, polymer_class: str, smiles, properties: set,
@@ -502,78 +566,14 @@ def _try_cache(run_name: str, polymer_class: str, smiles, properties: set,
 
 
 # ---------------------------------------------------------------------------
-# decision.json (the `decision` subcommand)
+# D-01_ff row construction
 #
-# This is the SMALL agent-facing file (PlanDecision's schema in scientific_control.py), not the
-# full run_plan.json above. Since 2026-09-02 it is NOT a scaffold: it is a complete, deterministic
-# decision. Every row is resolved here from this repo's own resolvers -- solve_system_size (D-04),
-# select_hardware (D-08), polymer_rules.json's electrostatics_decision_guide (D-03) and its
-# _metadata.primary_sources citation records (D-01/D-02/D-03) -- and every criterion the matching
-# policy in decision_policy.json names gets its own evidence entry, including the criteria this
-# layer honestly cannot reach (those say NOT MEASURED / NOT ASSESSABLE rather than going silent).
-#
-# The division of labour this establishes:
-#
-#   written here (origin="autofill")   default_choice, criteria_evaluated, evidence,
-#                                      alternatives, rationale, assumptions,
-#                                      dominant_uncertainty
-#   left to the reviewer               confidence -- "unreviewed" is invalid per
-#                                      scientific_control.py's VALID_CONFIDENCE, so it is now
-#                                      the ONLY thing blocking materialization
-#   the critic's only lever            overrides (always emitted {} here)
-#
-# `overrides` staying {} is load-bearing: materialize_plan() only auto-fills dp_typical/nchain
-# for keys `overrides` does not already set, so writing the derived cell into overrides would
-# suppress the very solve it came from and let the two paths drift.
-#
-# default_choice is READ-ONLY provenance: materialize_plan() reads only criteria_evaluated /
-# evidence / alternatives off each row. To disagree with a shown default, add the corresponding
-# key to top-level `overrides`.
-#
-# --baseline stamps confidence="low" instead, for the deterministic benchmark arm that runs with
-# no LLM in the loop at all. Evidence written here is tagged origin="autofill" so
-# benchmarks/.../metrics/llm_contribution.py scores it as baseline, never as LLM reasoning.
+# Every criterion the `forcefield` policy in decision_policy.json names gets its own evidence
+# entry, including the ones this layer cannot reach -- those say NOT MEASURED / NOT ASSESSABLE
+# explicitly rather than going silent, which is what tells the critic where its search is worth
+# the most. Entries are tagged origin: "autofill"; the critic's own additions are tagged
+# origin: "critic", and the benchmark's LLM-contribution metric keys off that split.
 # ---------------------------------------------------------------------------
-
-# cls["charge_method"] -> the facts D-02's three criteria need. Closed set: these four are the
-# only values across all 21 classes in guides/polymer_rules.json.
-_CHARGE_METHOD_FACTS = {
-    "embedded": {
-        "qm": False,
-        "cost": "zero at plan time -- charges are the force field's own atom-type parameters; "
-                "no separate QM or empirical charge step runs",
-        "pairing": "FF-embedded charges are what the field was parameterized against; "
-                   "substituting QM charges would break that internal consistency",
-    },
-    "bond-increment": {
-        "qm": False,
-        "cost": "zero at plan time -- EMC applies the field's INCREMENT table during the build",
-        "pairing": "bond-increment is the Class II (PCFF/COMPASS) native scheme; the field's "
-                   "valence and nonbond terms were fit alongside it",
-    },
-    "opls-library": {
-        "qm": False,
-        "cost": "zero at plan time -- charges come from the OPLS library by atom type",
-        "pairing": "OPLS-AA ships library charges per type; they are part of the parameter set",
-    },
-    "none": {
-        "qm": False,
-        "cost": "zero -- united-atom sites carry no partial charge",
-        "pairing": "TraPPE-UA apolar backbones are parameterized with no Coulomb term at all",
-    },
-    "gasteiger": {
-        "qm": False,
-        "cost": "negligible -- empirical electronegativity equalization, no QM",
-        "pairing": "a fast empirical fallback; weaker than a field's native scheme",
-    },
-    "RESP": {
-        "qm": True,
-        "cost": "per-chemistry QM (HF/6-31G*) before any MD can start -- the dominant "
-                "pre-simulation cost for a novel repeat unit",
-        "pairing": "GAFF2/AMBER-lineage fields expect RESP-fit charges",
-    },
-}
-_HETEROATOMS = ("O", "N", "S", "F", "Cl", "Br", "P", "Si")
 
 
 def _element_census(smiles: str) -> dict:
@@ -750,194 +750,6 @@ def _d01_ff_row(rules, cls, polymer_class, hw, criteria, field=None,
     return row
 
 
-def _d02_charges_row(rules, cls, polymer_class, smiles, criteria, field=None) -> dict:
-    method = cls.get("charge_method")
-    facts = _CHARGE_METHOD_FACTS.get(method, {})
-    census = _element_census(smiles) if smiles else {}
-    hetero = {el: n for el, n in census.items() if el in _HETEROATOMS}
-    rule_name, _ = _electrostatics_guide_rule(rules, polymer_class)
-
-    ev = [
-        _ev("backbone_polarity",
-            f"Repeat-unit element census from the SMILES: {census or 'unavailable'}; "
-            f"heteroatoms present: {hetero or 'none'}. "
-            f"polymer_rules.json:electrostatics_decision_guide places {polymer_class} in "
-            f"{rule_name or 'neither rule block'}.",
-            "make_deterministic_plan._element_census + electrostatics_decision_guide"),
-        _ev("charge_method_cost",
-            f"charge_method={method!r}: {facts.get('cost', 'cost not characterized for this method')}. "
-            f"preferred_builder={cls.get('preferred_builder')}.",
-            f"polymer_rules.json:classes.{polymer_class}.charge_method"),
-        _ev("ff_embedded_vs_qm",
-            f"{method!r} is {'QM-derived' if facts.get('qm') else 'force-field-embedded'}: "
-            f"{facts.get('pairing', 'pairing with the chosen FF not characterized')} "
-            f"(force field={_field_of(cls, field)!r}).",
-            f"polymer_rules.json:classes.{polymer_class}.charge_method"),
-    ]
-    alts = [f"{m} (not adopted): {f['cost']}"
-            for m, f in _CHARGE_METHOD_FACTS.items() if m != method]
-    return {"default_choice": method, "criteria_evaluated": criteria,
-            "evidence": ev, "alternatives": alts,
-            "resolved_by": f"polymer_rules.json:classes.{polymer_class}.charge_method"}
-
-
-def _d03_electrostatics_row(rules, cls, polymer_class, smiles, hw, criteria) -> dict:
-    """D-03. evidence_required=true -- and the old stub's bare `source` key never satisfied it."""
-    choice = cls.get("electrostatics")
-    rule_name, rule = _electrostatics_guide_rule(rules, polymer_class)
-    other_name = "use_pppm" if rule_name == "use_lj_cut" else "use_lj_cut"
-    other = (rules.get("electrostatics_decision_guide", {}) or {}).get(other_name, {}) or {}
-    census = _element_census(smiles) if smiles else {}
-    hetero = {el: n for el, n in census.items() if el in _HETEROATOMS}
-
-    # The guide's rationale strings name their sources inline ("(Afzal2021; Webb2024)");
-    # _metadata.primary_sources holds the real DOIs. Join them.
-    cited = [sid for sid in ("Afzal2021", "Webb2024") if sid in (rule.get("rationale") or "")]
-
-    ev = []
-    e = source_evidence(
-        rules, cited[0] if cited else None,
-        f"polymer_rules.json:electrostatics_decision_guide places {polymer_class} in "
-        f"{rule_name}.classes. Guide criterion: \"{rule.get('criteria', 'n/a')}\" "
-        f"Repeat-unit element census: {census or 'unavailable'}; "
-        f"heteroatoms: {hetero or 'none'}.",
-        criterion="backbone_heteroatoms",
-        resolver=f"polymer_rules.json:electrostatics_decision_guide.{rule_name}")
-    ev.append(e)
-
-    ev.append(_ev(
-        "max_partial_charge",
-        f"NOT ASSESSABLE PRE-BUILD. The guide's |q| > 0.1 e threshold is on assigned partial "
-        f"charges, which do not exist until the build runs charge_method="
-        f"{cls.get('charge_method')!r}. The heteroatom leg of the same criteria clause is "
-        f"satisfied independently, so the {choice!r} choice does not rest on this. No value is "
-        f"asserted.",
-        f"polymer_rules.json:electrostatics_decision_guide.{rule_name}.criteria"))
-
-    cost = (f"Guide rationale: \"{rule.get('rationale', 'n/a')}\" "
-            f"Rejected alternative {other_name.replace('use_', '')}: "
-            f"\"{other.get('rationale', 'n/a')}\"")
-    if hw and "error" not in hw:
-        cost += (f" Priced at this run's cell: {hw['cell_atoms_estimate']} atoms, "
-                 f"{hw['ff_family']} family.")
-    ev.append(source_evidence(
-        rules, cited[-1] if cited else None, cost,
-        criterion="computational_cost",
-        resolver=f"polymer_rules.json:electrostatics_decision_guide.{rule_name}.rationale"))
-
-    alts = [f"{other_name.replace('use_', '')} (rejected): guide criterion is "
-            f"\"{other.get('criteria', 'n/a')}\" and lists only "
-            f"{', '.join(other.get('classes') or []) or 'no classes'}. "
-            f"{polymer_class} does not qualify."] if other else []
-    return {"default_choice": choice, "criteria_evaluated": criteria,
-            "evidence": ev, "alternatives": alts,
-            "resolved_by": f"polymer_rules.json:electrostatics_decision_guide.{rule_name}"}
-
-
-def _d04_system_size_row(size, hw, criteria) -> dict:
-    """D-04. solve_system_size already returns a full decision row -- enrich, don't rebuild."""
-    d = size.get("decision", {}) or {}
-    ev = []
-    for src in (d.get("floor_sources") or []):
-        ev.append(_ev("property_target",
-                      f"{src.get('source')}: floor_dp={src.get('floor_dp')}",
-                      "select_system_size.property_floors"))
-    if not ev:
-        ev.append(_ev("property_target",
-                      "no chain-length floor applies to the requested properties",
-                      "select_system_size.property_floors"))
-
-    for entry in (d.get("evidence") or []):
-        ev.append(_ev("finite_size_effects", entry.get("claim", ""),
-                      "select_system_size.derive_cell",
-                      source_doi=SYSTEM_MW_FLOOR_DOI))
-    ev.append(_ev("finite_size_effects",
-                  "NOT ASSESSED HERE: minimum-image (validate_run_plan._finite_size_findings) "
-                  "and chain self-imaging L>=2*Rg (inspect_data_file's finite_size_forecast, "
-                  "post-build) are separate, already-mechanized checks.",
-                  "select_system_size.solve_system_size"))
-
-    if hw and "error" not in hw:
-        est = (hw["decision"]["evidence"] or [{}])[0]
-        ev.append(_ev("gpu_budget",
-                      f"derived cell = {hw['cell_atoms_estimate']} atoms "
-                      f"({hw['cell_mass_g_per_mol_estimate']} g/mol) -> "
-                      f"{est.get('claim', 'unpriced')} on {hw['decision']['choice']}",
-                      "select_hardware.select_hardware"))
-    else:
-        ev.append(_ev("gpu_budget",
-                      f"NOT PRICED: select_hardware returned {(hw or {}).get('error', 'no result')}.",
-                      "select_hardware.select_hardware"))
-
-    alts = list(d.get("alternatives") or [])
-    for u in (size.get("uncertainties") or []):
-        if u.get("name") == "entanglement_dp_advisory" and u.get("dp_at_me"):
-            alts.append(f"DP={u['dp_at_me']} (entanglement Me): considered and NOT adopted -- "
-                        "Me gates plateau shear modulus / reptation, not the isothermal bulk "
-                        "modulus. Advisory only per decision_policy.json D-04.")
-    return {"default_choice": d.get("choice"), "criteria_evaluated": criteria,
-            "evidence": ev, "alternatives": alts,
-            "resolved_by": "select_system_size.solve_system_size"}
-
-
-def _d08_hardware_row(rules, cls, hw, criteria, field=None) -> dict:
-    if not hw or "error" in hw:
-        return {"default_choice": None, "criteria_evaluated": criteria,
-                "evidence": [_ev("benchmark_evidence",
-                                 f"UNRESOLVED: {(hw or {}).get('error', 'no result')}",
-                                 "select_hardware.select_hardware")],
-                "alternatives": [], "resolved_by": "select_hardware.select_hardware (failed)"}
-    d = hw["decision"]
-    hp = hardware_policy(rules)
-    default = hp.get("by_forcefield", {}).get(hw["ff_family"], {})
-    est = (d["evidence"] or [{}])[0]
-
-    gpus = gpu_status()
-    load = (", ".join(f"GPU{g['index']}: {g['util']}% util, {g['mem_used_mb']} MiB"
-                      for g in gpus)
-            if gpus else "nvidia-smi unavailable -- concurrent load UNASSESSED")
-
-    ev = [
-        _ev("forcefield_cost_structure",
-            f"force field={_field_of(cls, field)!r} resolves to FF family "
-            f"{hw['ff_family']!r}; hardware_policy.by_forcefield note: "
-            f"{default.get('note', 'none')}",
-            "select_hardware.resolve_ff_family + polymer_rules.json:hardware_policy"),
-        _ev("atom_count",
-            f"cell estimate {hw['cell_atoms_estimate']} atoms at the derived DP/nchain "
-            f"({hw['cell_mass_g_per_mol_estimate']} g/mol)",
-            "select_hardware.select_hardware"),
-        _ev("concurrent_load",
-            f"live GPUs at plan time: {load}. This is a plan-time snapshot, not a submit-time "
-            "reservation -- hardware_runtime's claim ledger is what actually reserves a GPU.",
-            "hardware_runtime.gpu_status"),
-        _ev("benchmark_evidence",
-            f"{est.get('claim', 'unpriced')}; basis: {est.get('basis', 'n/a')}",
-            "select_hardware.estimate_ns_per_day"),
-        _ev("cell_size_vs_benchmark_cell",
-            f"basis {est.get('basis', 'n/a')} states whether this interpolated within "
-            "hardware_policy.directional_probe.size_points or extrapolated beyond them",
-            "select_hardware.estimate_ns_per_day"),
-        _ev("host_match",
-            f"hardware_policy.host {'MATCHES' if host_matches(rules) else 'does NOT match'} "
-            "this host; benchmark numbers are "
-            f"{'first-party' if host_matches(rules) else 'from a different machine'}",
-            "hardware_runtime.host_matches"),
-    ]
-    alts = ["NONE PRICED -- this repo has no second engine/mpi/gpu configuration with its own "
-            "measured ns_per_day to argmin against; see select_hardware.select_hardware's own "
-            "note. Pricing an unmeasured config would be fabrication, not selection."]
-    return {"default_choice": d["choice"], "criteria_evaluated": criteria,
-            "evidence": ev, "alternatives": alts,
-            "resolved_by": "select_hardware.select_hardware"}
-
-
-_DOMINANT_UNCERTAINTY_PRECEDENCE = (
-    "ff_transferability", "ff_parameter_provenance", "system_size_chain_length_bias",
-    "system_size_mw_floor_unknown", "hardware_optimum", "protocol_transferability",
-)
-
-
 def _dominant_uncertainty(cls, size, hw) -> str:
     names = {u.get("name") for u in (size.get("uncertainties") or [])}
     if not cls.get("ff_justification_doi"):
@@ -951,126 +763,6 @@ def _dominant_uncertainty(cls, size, hw) -> str:
     return "protocol_transferability"
 
 
-def make_decision(polymer_class: str, smiles: str, properties: set, *,
-                   baseline: bool = False, with_ff_probe: bool = False) -> dict:
-    """The complete deterministic decision for this class + SMILES.
-
-    Costs ~10-20 s: solve_system_size and select_hardware each shell into the RDKit conda env
-    for the monomer atom count, and D-08 shells out to nvidia-smi. The old scaffold was instant.
-
-    `with_ff_probe` adds a real EMC trial build for D-01 when the moiety screen finds a known
-    blocker (~0.5-3 s, and only for the ~1 in 3 SMILES that match one). It is what turns D-01's
-    parameter_coverage from "NOT MEASURED" into a measurement.
-    """
-    rules = load_rules()
-    if polymer_class.upper() not in rules.get("classes", {}):
-        raise ValueError(f"unknown polymer class {polymer_class!r}")
-    polymer_class = polymer_class.upper()
-    cls = get_class_entry(rules, polymer_class)
-    criteria = _policy_criteria()
-    resolvers = {}
-
-    # D-01 first: the resolved field is an INPUT to D-04 (united-atom cells count heavy atoms
-    # only) and to D-08 (engine/MPI defaults are per FF family), so it cannot be read off the
-    # class entry by each of them independently.
-    prior = cls.get("ff_accuracy_prior")
-    field, resolution = resolve_d01(cls, smiles, with_ff_probe)
-    resolvers["forcefield.select_by_moiety"] = (
-        "error: screen unavailable" if resolution is None
-        else f"ok (probed {', '.join(resolution['probed'])})" if resolution["probed"]
-        else "ok (screen only)")
-
-    # Same argument shape materialize_plan uses, so default_choice and decided_params can't drift.
-    try:
-        size = solve_system_size(polymer_class, smiles, properties,
-                                 dp_typical=None, nchain=None, field=field)
-        resolvers["select_system_size.solve_system_size"] = "ok"
-    except Exception as e:
-        size = {}
-        resolvers["select_system_size.solve_system_size"] = f"error: {e}"
-
-    rec = size.get("recommended_params", {}) or {}
-    sized_cls = {**cls, **rec}
-    # Passing the DERIVED dp/nchain is mandatory: select_hardware falls back to
-    # cls.get("dp_typical", 50)/cls.get("nchain", 10), and those class keys no longer exist.
-    try:
-        hw = select_hardware(polymer_class, smiles,
-                             sized_cls.get("dp_typical"), sized_cls.get("nchain"), field)
-        resolvers["select_hardware.select_hardware"] = (
-            "ok" if "error" not in hw else f"error: {hw['error']}")
-    except Exception as e:
-        hw = {"error": str(e)}
-        resolvers["select_hardware.select_hardware"] = f"error: {e}"
-
-    rows = {
-        "D-01_ff": _d01_ff_row(rules, cls, polymer_class, hw, criteria.get("D-01_ff", []),
-                               field, resolution),
-        "D-02_charges": _d02_charges_row(rules, cls, polymer_class, smiles,
-                                          criteria.get("D-02_charges", []), field),
-        "D-03_electrostatics": _d03_electrostatics_row(rules, cls, polymer_class, smiles, hw,
-                                                        criteria.get("D-03_electrostatics", [])),
-        "D-04_system_size": _d04_system_size_row(size, hw, criteria.get("D-04_system_size", [])),
-        "D-08_hardware": _d08_hardware_row(rules, cls, hw, criteria.get("D-08_hardware", []),
-                                           field),
-    }
-
-    rationale = [
-        f"Deterministic decision for {polymer_class} ({smiles}), targeting "
-        f"{', '.join(sorted(properties))}. Every row below was resolved by this repo's own "
-        f"resolvers, not by an agent; each criterion the matching decision_policy.json policy "
-        f"names carries its own evidence entry, including the ones this layer cannot reach.",
-    ]
-    for rid, row in rows.items():
-        gaps = [e["criterion"] for e in row["evidence"]
-                if e.get("claim", "").startswith(("NOT MEASURED", "NOT ASSESSABLE",
-                                                  "NOT PRICED", "UNRESOLVED"))]
-        rationale.append(
-            f"{rid} = {row['default_choice']!r} via {row['resolved_by']}. "
-            + (f"Unreached criteria for the critic to weigh in on: {', '.join(gaps)}."
-               if gaps else "All criteria resolved deterministically."))
-
-    assumptions = [u.get("detail", u.get("name", ""))
-                   for u in (size.get("uncertainties") or [])]
-    if "error" in (hw or {}):
-        assumptions.append(f"D-08 hardware unresolved: {hw['error']}")
-    assumptions.append(
-        "overrides carries preferred_ff only when D-01 resolved a field other than the class "
-        "prior; dp_typical/nchain stay out of it, because materialize_plan() only auto-fills "
-        "keys overrides does not set and writing the derived cell here would suppress the "
-        "solve it came from.")
-    # A null field means "nothing types this SMILES". It must never reach decided_params --
-    # D-01's admissible=[] is what stops the run (validate_run_plan.ff_no_admissible_field).
-    overrides = {} if field in (prior, None) else {"preferred_ff": field}
-    prior_ack = _ff_prior_uncertainty(polymer_class, prior,
-                                     resolution["field"] if resolution else field, resolution)
-    if prior_ack:
-        assumptions.append(prior_ack["detail"])
-        rationale.append(f"D-01_ff DEPARTS FROM THE CLASS PRIOR: {prior_ack['detail']}")
-
-    confidence = "unreviewed"
-    if baseline:
-        confidence = "low"
-        rationale.append(
-            "BASELINE ARM: confidence stamped 'low' by --baseline so this plan materializes with "
-            "no LLM in the loop. This file is the deterministic baseline the LLM arm is measured "
-            "against; it carries no literature critique.")
-
-    return {
-        "polymer_class": polymer_class,
-        "properties": sorted(properties),
-        "rationale": rationale,
-        "overrides": overrides,
-        "decision_evaluations": rows,
-        "assumptions": assumptions,
-        "dominant_uncertainty": _dominant_uncertainty(cls, size, hw),
-        "confidence": confidence,
-        "provenance": {"generator": "make_deterministic_plan.py:decision",
-                       "generated_at": datetime.now(timezone.utc).isoformat(),
-                       "smiles": smiles,
-                       "resolvers": resolvers},
-    }
-
-
 def _properties_from_arg(properties: str) -> set:
     props_str = properties.strip().lower()
     return (set(track_registry.DEFAULT_PROPERTIES) if props_str == "all"
@@ -1082,7 +774,8 @@ def _cmd_run_plan(args) -> int:
     cache_path = Path(args.cache_path) if args.cache_path else None
     plan = (_try_cache(args.run_name, args.polymer_class, args.smiles, properties, cache_path)
             or make_plan(args.run_name, args.polymer_class, args.smiles, properties,
-                         with_ff_probe=args.with_ff_probe))
+                         with_ff_probe=args.with_ff_probe,
+                         baseline=getattr(args, "baseline", False)))
     text = json.dumps(plan, indent=2)
 
     if args.out == "-":
@@ -1090,37 +783,17 @@ def _cmd_run_plan(args) -> int:
         return 0
     out_path = (Path(args.out) if args.out
                 else REPO_ROOT / "data" / args.run_name / "raw" / "run_plan.json")
+    # Refuse to clobber: this file is where the critique is adjudicated, so regenerating it
+    # after a review has begun would silently discard that work. Inherited from the `decision`
+    # subcommand -- the protection has to follow the file the reviewer edits.
+    if out_path.exists() and not getattr(args, "force", False):
+        print(json.dumps({"status": "exists", "run_plan": str(out_path),
+                          "detail": "refusing to overwrite; pass --force to replace it"}))
+        return 1
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(text)
     print(json.dumps({"status": "success", "run_plan": str(out_path),
                       "plan_mode": plan["plan_mode"], "confidence": plan["confidence"]}))
-    return 0
-
-
-def _cmd_decision(args) -> int:
-    properties = _properties_from_arg(args.properties)
-    decision = make_decision(args.polymer_class, args.smiles, properties,
-                             baseline=args.baseline, with_ff_probe=args.with_ff_probe)
-    text = json.dumps(decision, indent=2)
-
-    if args.out == "-":
-        print(text)
-        return 0
-    out_path = (Path(args.out) if args.out
-                else REPO_ROOT / "data" / args.run_name / "raw" / "decision.json")
-    if out_path.exists() and not args.force:
-        print(json.dumps({
-            "status": "error",
-            "error": f"{out_path} already exists; pass --force to overwrite (this destroys "
-                     "any annotation already written)",
-        }), file=sys.stderr)
-        return 1
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(text)
-    print(json.dumps({"status": "success", "decision_file": str(out_path),
-                      "decision_ids": sorted(decision["decision_evaluations"]),
-                      "confidence": decision["confidence"],
-                      "resolvers": decision["provenance"]["resolvers"]}))
     return 0
 
 
@@ -1142,29 +815,27 @@ def main():
         return sp
 
     rp = _common(sub.add_parser("run-plan", help="emit run_plan.json"))
-    rp.add_argument("--cache_path", default=None,
-                    help="Override guides/system_characterization_cache.json path (testing only)")
-    rp.set_defaults(func=_cmd_run_plan)
-
-    dc = _common(sub.add_parser("decision", help="emit the fully-resolved decision.json"))
-    dc.add_argument("--force", action="store_true",
-                    help="Overwrite an existing decision.json (default: refuse, to protect "
+    rp.add_argument("--force", action="store_true",
+                    help="Overwrite an existing run_plan.json (default: refuse, to protect "
                          "in-progress critique work)")
-    dc.add_argument("--baseline", action="store_true",
+    rp.add_argument("--baseline", action="store_true",
                     help="Stamp confidence='low' instead of 'unreviewed', so the plan "
                          "materializes with no LLM in the loop. For the deterministic benchmark "
                          "arm only -- a normal reasoned run leaves this off and the literature "
                          "critic's review sets the confidence.")
-    dc.set_defaults(func=_cmd_decision)
+    rp.add_argument("--cache_path", default=None,
+                    help="Override guides/system_characterization_cache.json path (testing only)")
+    rp.set_defaults(func=_cmd_run_plan)
 
     args = p.parse_args()
     if not args.run_name:
         p.error("--run_name is required")
-    # `decision` resolves the cell and the hardware from the molecule itself, so the SMILES is
-    # load-bearing there. `run-plan` still tolerates None (cache replay / class-default path).
-    if args.command == "decision" and not args.smiles:
-        p.error("--smiles is required for `decision`: D-01/D-02/D-03/D-04/D-08 are all resolved "
-                "per-molecule, not per-class")
+    # `decision` hard-required a SMILES, because it resolved the cell and the hardware from the
+    # molecule. `run-plan` now does that same resolution but deliberately tolerates None: the
+    # cache-replay and class-default paths have no SMILES to give, and the no-SMILES case is
+    # SAFE rather than silent -- size_the_cell records D-04 UNRESOLVED and run_campaign refuses
+    # to build, instead of defaulting the cell (test_a_plan_with_no_smiles_says_so_instead_of_
+    # sizing_blind). A hard error here would break replay for no gain.
     return args.func(args)
 
 

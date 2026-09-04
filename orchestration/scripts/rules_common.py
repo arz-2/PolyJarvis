@@ -196,7 +196,7 @@ def resolve_ff_family(ff_raw: str, hp: dict) -> str:
 def main() -> int:
     """`canon` CLI, inherited from canon_smiles.py.
 
-    The novel-run-plan skill canonicalizes a SMILES from a shell before writing decision.json,
+    The novel-run-plan skill canonicalizes a SMILES from a shell before writing run_plan.json,
     and does it from the base env -- so the entry point has to be a module that runs HERE and
     shells inward, not rdkit_cli.py, which only runs inside the RDKit env. Output contract is
     canon_smiles.py's, unchanged:

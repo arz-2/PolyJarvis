@@ -140,22 +140,26 @@ def test_no_benchmark_data_gpu_hours_is_none(monkeypatch):
 
 EFFECTIVE_CLASS_TG = {
     "dt_fs": 1.0, "tg_t_step_K": 20, "tg_t_high_K": 600, "tg_t_low_K": 200,
-    "tg_rates_K_per_ns": [25, 50], "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 50, "tg_min_steps_per_T": 200000,
 }
 
 
-def test_tg_sweep_total_steps_sums_across_configured_rates():
+def test_tg_sweep_prices_exactly_one_rate():
+    """The run sweeps ONE rate, so the estimate must charge for one.
+
+    It summed every entry of the old tg_rates_K_per_ns list until 2026-09-04, which overcharged
+    by the sum of the step-count ratios -- for a [25,50,100] class that is 7x on the thermal
+    term (800k+400k+200k steps/bin charged against the 200k actually run), enough to dominate
+    total_gpu_hours. Guarding the multiplication is the point of this test."""
     total, note = cm._tg_sweep_total_steps(EFFECTIVE_CLASS_TG)
     # n_bins mirrors script_generator.py's real temp-list construction: T_START down to
     # T_END by T_STEP, always force-appending T_END even when the range divides evenly --
     # for 600->200 step 20 that's 20 grid points (600,580,...,220) plus the forced 200 = 21,
     # not the naive (600-200)/20=20 a range-length/step formula would give.
     n_bins = 21
-    # rate=25: n_steps_per_t = 20/(25*1*1e-6) = 800000 (above floor)
     # rate=50: n_steps_per_t = 20/(50*1*1e-6) = 400000 (above floor)
-    expected = n_bins * 800000 + n_bins * 400000
-    assert total == expected
-    assert "2 rate(s)" in note
+    assert total == n_bins * 400000
+    assert "1 rate (50 K/ns)" in note
 
 
 def test_tg_sweep_n_bins_matches_real_generator_on_a_non_exact_range():
@@ -168,7 +172,7 @@ def test_tg_sweep_n_bins_matches_real_generator_on_a_non_exact_range():
     The top is T_melt_hold_K now (the staircase starts at the gated melt cell), not the
     retired tg_t_high_K -- the arithmetic under test is unchanged."""
     cls = {"dt_fs": 2.0, "tg_t_step_K": 20, "T_melt_hold_K": 450, "tg_t_low_K": 100,
-           "tg_rates_K_per_ns": [40], "tg_min_steps_per_T": 250000}
+           "tg_rate_K_per_ns": 40, "tg_min_steps_per_T": 250000}
     total, note = cm._tg_sweep_total_steps(cls)
     assert "19 T-bin(s)" in note
     assert total == 19 * 250000
@@ -177,7 +181,7 @@ def test_tg_sweep_n_bins_matches_real_generator_on_a_non_exact_range():
 def test_tg_sweep_missing_config_is_unpriced():
     total, note = cm._tg_sweep_total_steps({"dt_fs": 1.0})
     assert total is None
-    assert "no tg_rates_K_per_ns" in note
+    assert "no tg_rate_K_per_ns" in note
 
 
 def test_murnaghan_total_steps_multiplies_pressures_by_sampling_factor():
@@ -195,7 +199,7 @@ def test_plan_cost_estimate_reports_equil_as_unpriced_but_prices_tg(monkeypatch)
                                                         "preferred_ff": "pcff", "dt_fs": 1.0,
                                                         "tg_t_step_K": 20, "tg_t_high_K": 600,
                                                         "tg_t_low_K": 200,
-                                                        "tg_rates_K_per_ns": [25, 50],
+                                                        "tg_rate_K_per_ns": 50,
                                                         "tg_min_steps_per_T": 200000,
                                                     }}})
     monkeypatch.setattr(cm, "hardware_policy", lambda rules=None: HP)

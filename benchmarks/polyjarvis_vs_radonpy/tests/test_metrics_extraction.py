@@ -22,7 +22,9 @@ pytestmark = pytest.mark.skipif(
 def test_llm_contribution_pe1_clean_pass():
     block = extract_llm_contribution(DATA / "PE1")
     assert block.plan_mode == "reasoned"
-    assert block.llm_authored_decisions_total == 4  # D-01..D-04 on PE1's decision.json vintage
+    # PE1 is a pre-2026-09-04 run dir with its own decision.json, so it still scores its
+    # four rows; a plan written after the fold carries one (D-01_ff) and scores that.
+    assert block.llm_authored_decisions_total == 4
     assert block.note == ""
 
 

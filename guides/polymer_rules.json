@@ -178,6 +178,9 @@
     },
     "by_forcefield": {
       "pcff": {
+        "charge_method": "bond-increment",
+        "electrostatics": "pppm",
+        "_derived_note": "D-02/D-03 were retired 2026-09-04: charge_method and electrostatics are not independent decisions, they are properties of the field D-01 resolves. make_deterministic_plan._derived_from_field() reads them from here via rules_common.resolve_ff_family(), so decided_params can never record a charge scheme that disagrees with preferred_ff.",
         "engine": "kokkos",
         "mpi": 1,
         "mpi_single_run_hint": 1,
@@ -190,6 +193,9 @@
         }
       },
       "opls": {
+        "charge_method": "opls-library",
+        "electrostatics": "pppm",
+        "_derived_note": "D-02/D-03 were retired 2026-09-04: charge_method and electrostatics are not independent decisions, they are properties of the field D-01 resolves. make_deterministic_plan._derived_from_field() reads them from here via rules_common.resolve_ff_family(), so decided_params can never record a charge scheme that disagrees with preferred_ff.",
         "engine": "kokkos",
         "mpi": 1,
         "mpi_single_run_hint": 1,
@@ -202,6 +208,9 @@
         }
       },
       "trappe": {
+        "charge_method": "embedded",
+        "electrostatics": "lj_cut",
+        "_derived_note": "D-02/D-03 were retired 2026-09-04: charge_method and electrostatics are not independent decisions, they are properties of the field D-01 resolves. make_deterministic_plan._derived_from_field() reads them from here via rules_common.resolve_ff_family(), so decided_params can never record a charge scheme that disagrees with preferred_ff.",
         "engine": "gpu",
         "mpi": 1,
         "mpi_single_run_hint": 1,
@@ -215,6 +224,9 @@
         }
       },
       "gaff": {
+        "charge_method": "RESP",
+        "electrostatics": "pppm",
+        "_derived_note": "D-02/D-03 were retired 2026-09-04: charge_method and electrostatics are not independent decisions, they are properties of the field D-01 resolves. make_deterministic_plan._derived_from_field() reads them from here via rules_common.resolve_ff_family(), so decided_params can never record a charge scheme that disagrees with preferred_ff.",
         "engine": "gpu",
         "mpi": 4,
         "mpi_single_run_hint": 8,
@@ -554,11 +566,7 @@
       "tg_steps_per_t": 250000,
       "tg_min_steps_per_T": 250000,
       "_tg_min_steps_per_T_note": "500 ps per temperature (250,000 steps at dt=2 fs), deliberately 2.5x the 200 ps every 1 fs class gets. From PE3 run evidence (PolyJarvis commit 6691eb1, 2026-06-24): at dt=2 fs with T_step=20 K, rates above 40 K/ns fall below this floor and produce fit_swapped / inflated Tg, so tg_rates_K_per_ns was cut from [25,50,100] to [10,25,40] and the floor raised from 100,000 in the same change. The two numbers are one decision: the floor is what makes 40 K/ns this class's ceiling. CONSEQUENCE (2026-09-01): cool_block_hold_steps now derives from the primary sweep rate, so this floor also sets the cooldown to 40 K/ns -- 312,500 steps per block against the 100,000 the flat tier default gave, the largest cooling-cost increase of any class. That is the price of the cooldown and the staircase being one continuous descent at one rate. Note the floor is a MEASUREMENT requirement (each plateau must settle before the bilinear fit reads its density); cool_block is preparation and its blocks are adaptive (check_block_gate extends an unstable block anyway), so part of the nominal increase may be work those blocks were already doing. Worth measuring on the first TraPPE run rather than assumed.",
-      "tg_rates_K_per_ns": [
-        10,
-        25,
-        40
-      ],
+      "tg_rate_K_per_ns": 40,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.25,
       "experimental_tg_K": {
@@ -659,11 +667,7 @@
       "tg_t_low_K": 200,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 10000000.0,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
@@ -739,11 +743,7 @@
       "tg_t_low_K": 150,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
@@ -833,11 +833,7 @@
       "tg_t_low_K": 150,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
@@ -926,11 +922,7 @@
       "tg_t_low_K": 100,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.2,
       "experimental_tg_K": {
@@ -1004,11 +996,7 @@
       "tg_steps_per_t": 250000,
       "tg_min_steps_per_T": 250000,
       "_tg_min_steps_per_T_note": "500 ps per temperature (250,000 steps at dt=2 fs), deliberately 2.5x the 200 ps every 1 fs class gets. From PE3 run evidence (PolyJarvis commit 6691eb1, 2026-06-24): at dt=2 fs with T_step=20 K, rates above 40 K/ns fall below this floor and produce fit_swapped / inflated Tg, so tg_rates_K_per_ns was cut from [25,50,100] to [10,25,40] and the floor raised from 100,000 in the same change. The two numbers are one decision: the floor is what makes 40 K/ns this class's ceiling. CONSEQUENCE (2026-09-01): cool_block_hold_steps now derives from the primary sweep rate, so this floor also sets the cooldown to 40 K/ns -- 312,500 steps per block against the 100,000 the flat tier default gave, the largest cooling-cost increase of any class. That is the price of the cooldown and the staircase being one continuous descent at one rate. Note the floor is a MEASUREMENT requirement (each plateau must settle before the bilinear fit reads its density); cool_block is preparation and its blocks are adaptive (check_block_gate extends an unstable block anyway), so part of the nominal increase may be work those blocks were already doing. Worth measuring on the first TraPPE run rather than assumed.",
-      "tg_rates_K_per_ns": [
-        10,
-        25,
-        40
-      ],
+      "tg_rate_K_per_ns": 40,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.25,
       "experimental_tg_K": {
@@ -1097,11 +1085,7 @@
       "tg_t_low_K": 100,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 2000000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.2,
       "bm_pressures_atm": [
@@ -1181,11 +1165,7 @@
       "tg_t_low_K": 150,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
@@ -1260,12 +1240,7 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
       "tg_min_steps_per_T": 200000,
-      "tg_rates_K_per_ns": [
-        40,
-        80,
-        100
-      ],
-      "tg_slope_gate_fallback": "highest_rate",
+      "tg_rate_K_per_ns": 100,
       "_tg_slope_gate_note": "Slope-gate FAIL is structural for stiff ester backbones: the transition delocalizes at slow rates, so every tested rate set fails the b>0 gate. Headline Tg = HIGHEST rate (cleanest, least delocalized bilinear fit). Do not spend /recover attempts on seed rerolls or rate changes.",
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.15,
@@ -1361,11 +1336,7 @@
       "tg_t_low_K": 150,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 1000000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.15,
       "experimental_tg_K": {
@@ -1439,11 +1410,7 @@
       "tg_t_low_K": 100,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 1000000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
@@ -1493,11 +1460,7 @@
       "tg_t_low_K": 150,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
@@ -1547,11 +1510,7 @@
       "tg_t_low_K": 300,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 2000000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
@@ -1610,11 +1569,7 @@
       "tg_t_low_K": 150,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.15,
       "experimental_tg_K": {
@@ -1668,11 +1623,7 @@
       "tg_t_low_K": 200,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 1000000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
@@ -1744,11 +1695,7 @@
       "tg_t_low_K": 200,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
@@ -1807,11 +1754,7 @@
       "tg_t_low_K": 50,
       "tg_t_step_K": 10,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        10,
-        25,
-        50
-      ],
+      "tg_rate_K_per_ns": 50,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.25,
       "bm_pressures_atm": [
@@ -1876,11 +1819,7 @@
       "tg_t_low_K": 80,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
       "experimental_tg_K": {
@@ -1935,11 +1874,7 @@
       "tg_t_step_K": 20,
       "tg_steps_per_t": 2000000,
       "tg_min_steps_per_T": 200000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "_tg_slope_gate_note": "Slope-gate FAIL is structural for rigid aromatics: the staircase cold-starts from the 300 K glassy cell, so the highest-T plateaus under-equilibrate at fast rates and invert the Tg-vs-rate trend. Headline Tg was the SLOWEST (most-equilibrated) rate + a degeneracy caveat, because seed rerolls could not fix a cold-start artifact. RETIRED 2026-09-01 together with the root fix: the sweep now starts from the cool_block the equilibration cooldown already wrote at tg_t_high_K (see _annealing_T_high_K_note on PCBN/PIMD/PIMN/POXI/PPHS for the ceiling headroom that guarantees one exists), so the top plateaus are melt-cooled rather than reheated from the 300 K glass and this class runs tg_rates_K_per_ns[-1] (100 K/ns) like every other -- a 4x cut in its thermal cost. Removing the key also RE-ARMS the primary/alt Tg method-gap gate (stage_params' method_gap_exempt), which existed only to absorb this same artifact: the next PEEK/PSU run therefore TESTS the fix rather than assuming it. If the >20 K gap or the inverted Tg-vs-rate trend returns, the diagnosis was wrong and the cause is not the cold start -- restore tg_slope_gate_fallback=\"slowest_rate\" rather than widening the gate.",
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
@@ -2019,11 +1954,7 @@
       "tg_t_low_K": 250,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 2000000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "_tg_slope_gate_note": "Slope-gate FAIL is structural for rigid aromatics: the staircase cold-starts from the 300 K glassy cell, so the highest-T plateaus under-equilibrate at fast rates and invert the Tg-vs-rate trend. Headline Tg was the SLOWEST (most-equilibrated) rate + a degeneracy caveat, because seed rerolls could not fix a cold-start artifact. RETIRED 2026-09-01 together with the root fix: the sweep now starts from the cool_block the equilibration cooldown already wrote at tg_t_high_K (see _annealing_T_high_K_note on PCBN/PIMD/PIMN/POXI/PPHS for the ceiling headroom that guarantees one exists), so the top plateaus are melt-cooled rather than reheated from the 300 K glass and this class runs tg_rates_K_per_ns[-1] (100 K/ns) like every other -- a 4x cut in its thermal cost. Removing the key also RE-ARMS the primary/alt Tg method-gap gate (stage_params' method_gap_exempt), which existed only to absorb this same artifact: the next PEEK/PSU run therefore TESTS the fix rather than assuming it. If the >20 K gap or the inverted Tg-vs-rate trend returns, the diagnosis was wrong and the cause is not the cold start -- restore tg_slope_gate_fallback=\"slowest_rate\" rather than widening the gate.",
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
@@ -2101,11 +2032,7 @@
       "tg_t_low_K": 200,
       "tg_t_step_K": 20,
       "tg_steps_per_t": 500000,
-      "tg_rates_K_per_ns": [
-        25,
-        50,
-        100
-      ],
+      "tg_rate_K_per_ns": 100,
       "K_deform_rate_inv_s": 100000000.0,
       "ct_min_decay_melt": 0.1,
       "ct_gate_reliable": false,
@@ -2171,11 +2098,7 @@
     "tg_t_step_K": 20,
     "tg_steps_per_t": 500000,
     "tg_min_steps_per_T": 200000,
-    "tg_rates_K_per_ns": [
-      25,
-      50,
-      100
-    ],
+    "tg_rate_K_per_ns": 100,
     "K_deform_rate_inv_s": 100000000.0,
     "K_strain_max": 0.03,
     "notes": [
@@ -2267,11 +2190,7 @@
       "Patrone2016 screening criterion: verify ≥90% convergence to both asymptotes on BOTH sides of Tg before accepting a Tg estimate. Transition half-width ΔT = e^(c/2)(2P̂−1)/√(P̂(1−P̂)) where P̂=0.90. Practical rule: sweep must extend ≥100 K below T_low and ≥150 K above T_high relative to expected Tg. If transition region spans >50% of the sweep window, widen range and re-run. Datasets failing this test should be held for review, not reported.",
       "Hyperbola fit (Patrone2016 Eq. 1): ρ(T) = ρ₀ − a(T−T₀) − b·H₀(T,T₀,c) is preferred over piecewise bilinear fit. Fits all data simultaneously; Tg = T₀ (hyperbola center). Slope in glassy state = −a; slope in rubbery state = −(a+b). As c→−∞, hyperbola converges to piecewise linear (bilinear is a special case)."
     ],
-    "tg_rates_K_per_ns": [
-      25,
-      50,
-      100
-    ],
+    "tg_rate_K_per_ns": 100,
     "tg_min_steps_per_T_pcff": 200000,
     "tg_min_steps_per_T_trappe": 100000
   }
