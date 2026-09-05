@@ -589,3 +589,36 @@ def test_low_confidence_bm_ladder_finding_escalates_before_plan_mutation(tmp_pat
     assert result["status"] == "escalation_required"
     assert "mechanical_resample_points" not in engine.state["effective_parameters"]
     assert engine.state["remedy_counters"]["total"] == 0
+
+
+# ── One rate, two branches ───────────────────────────────────────────────────────────────
+
+def test_lowering_the_tg_rate_invalidates_the_cooldown_as_well_as_the_staircase(tmp_path):
+    """The Tg staircase and the cool_block descent run at the SAME rate, by construction
+    (stage_params.rate_matched_cool_block_hold_steps) -- a run's density and its Tg have to
+    describe one glass. But cooling and thermal both descend from the melt hold INDEPENDENTLY,
+    so invalidate_from("thermal") never reaches cooling: mapped to "thermal" alone,
+    tg_rate_K_per_ns re-ran the staircase at the new rate while the already-accepted cooldown
+    stayed at the old one. Lowering the rate is the only lever left for a Tg fit that will not
+    resolve, so this is the path a recovery actually takes.
+    """
+    engine = WorkflowEngine(tmp_path, plan(tg_rate_K_per_ns=100), FakeExecutor())
+    assert engine.run()["status"] == "accepted"
+
+    resumed = WorkflowEngine(tmp_path, plan(tg_rate_K_per_ns=40), FakeExecutor())
+
+    for stage in ("cooling", "thermal"):
+        assert resumed.state["stages"][stage]["status"] == "stale", (
+            f"{stage} still accepted at the old rate")
+    # ...and the melt hold it descends from is untouched: the rate does not move the melt.
+    assert resumed.state["stages"]["equilibration"]["status"] == "accepted"
+
+
+def test_a_thermal_only_knob_leaves_the_cooldown_accepted(tmp_path):
+    """The counterpart: widening the temperature step is thermal's business alone."""
+    engine = WorkflowEngine(tmp_path, plan(tg_rate_K_per_ns=100, tg_t_step_K=20), FakeExecutor())
+    assert engine.run()["status"] == "accepted"
+
+    resumed = WorkflowEngine(tmp_path, plan(tg_rate_K_per_ns=100, tg_t_step_K=10), FakeExecutor())
+    assert resumed.state["stages"]["thermal"]["status"] == "stale"
+    assert resumed.state["stages"]["cooling"]["status"] == "accepted"

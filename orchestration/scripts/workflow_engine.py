@@ -183,6 +183,27 @@ def atomic_write_json(path: Path, value: Mapping[str, Any]) -> None:
     temporary.replace(path)
 
 
+# A decided_param whose effect reaches a SECOND, independent branch. PARAMETER_STAGE names the
+# one stage a key is hashed under; invalidate_from walks only DEPENDENTS, and _dependencies
+# makes cooling and thermal both descend from the gated melt hold independently -- neither is
+# the other's dependent, so no single mapping can cover a key that drives both.
+#
+# tg_rate_K_per_ns is the only such key. It sets the Tg staircase rate AND, through
+# stage_params.rate_matched_cool_block_hold_steps, the cooling blocks' hold; the two being ONE
+# rate is what makes a run's density and its Tg describe the same glass (glass density moves
+# ~1.1% per decade of cooling rate). Mapped to "thermal" alone, lowering the rate -- the one
+# lever left for TG_NOT_REPORTABLE now that tg_sampling is retired -- re-ran the staircase at
+# the new rate while cooling stayed ACCEPTED at the old one, silently.
+PARAMETER_EXTRA_STAGES: dict[str, tuple[str, ...]] = {
+    "tg_rate_K_per_ns": ("cooling",),
+}
+
+
+def stages_for(key: str) -> tuple[str, ...]:
+    """Every stage a decided_params key invalidates and is hashed into."""
+    return (PARAMETER_STAGE.get(key, "build"),) + PARAMETER_EXTRA_STAGES.get(key, ())
+
+
 @dataclass(frozen=True)
 class Finding:
     code: str
@@ -687,12 +708,16 @@ class WorkflowEngine:
         changed = {key for key in set(old) | set(new) if old.get(key) != new.get(key)}
         self.state["plan_hash"] = new_hash
         self.state["effective_parameters"] = new
-        affected = [PARAMETER_STAGE.get(key, "build") for key in changed]
+        affected = {stage for key in changed for stage in stages_for(key)}
         if affected:
             enabled = self.enabled_stages()
-            earliest = min((stage for stage in affected if stage in enabled),
-                           key=enabled.index, default="build")
-            self.invalidate_from(earliest, "executable plan changed")
+            targets = sorted(affected & set(enabled), key=enabled.index)
+            # One call per INDEPENDENT branch, not just the earliest: invalidate_from walks
+            # dependents, and cooling and thermal are not each other's dependents, so a key
+            # reaching both (see PARAMETER_EXTRA_STAGES) needs both named. Calls after the
+            # first are no-ops for anything the first already reached.
+            for stage in targets or ["build"]:
+                self.invalidate_from(stage, "executable plan changed")
         else:
             self._save()
 
@@ -747,7 +772,7 @@ class WorkflowEngine:
             }
         relevant_parameters = {
             key: value for key, value in self.state["effective_parameters"].items()
-            if PARAMETER_STAGE.get(key, "build") == stage
+            if stage in stages_for(key)
             # Global scientific parameters intentionally belong to build only. Descendants
             # receive their effect through dependency artifact checksums.
         }
