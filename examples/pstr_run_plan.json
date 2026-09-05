@@ -14,6 +14,8 @@
   "dominant_uncertainty": "protocol_transferability",
   "decisions": [
     {
+      "id": "D-01_ff",
+      "choice": "pcff",
       "criteria_evaluated": [
         "literature_support",
         "parameter_coverage",
@@ -87,12 +89,9 @@
           "citation": "Tang, Z.; Okazaki, S. All-Atomistic Molecular Dynamics Study of the Glass Transition of Amorphous Polymers. Polymer 2022, 254, 125044."
         }
       ],
-      "alternatives": [
-        "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PSTR has no forcefield_alternatives, and this layer will not invent one. Run with --with-ff-probe, or let the literature critic name a candidate."
-      ],
       "resolved_by": "polymer_rules.json:classes.PSTR.ff_accuracy_prior",
-      "id": "D-01_ff",
-      "choice": "pcff",
+      "alternatives": [],
+      "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PSTR has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
       "acknowledgements": {},
       "critique": {
         "status": "scientific_agent_decision",

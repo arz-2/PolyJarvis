@@ -151,8 +151,12 @@ def build_decisions(cls: dict, smiles: str | None = None, field: str = None,
         # what decision.json carried until it was folded into run_plan.json on 2026-09-04.
         row = _d01_ff_row(rules, cls, polymer_class or "", hw, criteria.get("D-01_ff", []),
                           field, resolution)
-        row["id"] = "D-01_ff"
-        row["choice"] = row.pop("default_choice", None)
+        row = {"id": "D-01_ff", "choice": row.pop("default_choice", None), **row}
+        # admissible reads as the answer to "what typed this SMILES", so keep it beside choice
+        # rather than after the evidence block it summarizes.
+        if "admissible" in row:
+            row = {k: row[k] for k in ("id", "choice", "admissible")} | {
+                k: v for k, v in row.items() if k not in ("id", "choice", "admissible")}
         return [row]
 
     ff_evidence = []
@@ -392,7 +396,7 @@ def size_the_cell(polymer_class: str, smiles, properties: set,
                     "dp_typical/nchain. run_campaign will refuse to build this plan "
                     "rather than default the cell."]
     reasons = size_solve.get("recommendation_reasons") or []
-    return sized, [f"D-04_system_size resolved to {sized} by "
+    return sized, [f"resolved to {sized} by "
                    f"select_system_size.solve_system_size()"
                    + (f" -- {'; '.join(reasons)}" if reasons else ".")]
 
@@ -732,16 +736,21 @@ def _d01_ff_row(rules, cls, polymer_class, hw, criteria, field=None,
 
     # No class carries forcefield_alternatives (0/21), so there is no deterministic source for
     # an alternative. Say that rather than inventing one or leaving a bare [].
+    # No class carries forcefield_alternatives (0/21). `alternatives` stays a list of FIELD
+    # NAMES -- the prose that used to be its single element read as a field to anything
+    # iterating it -- and the explanation moves to its own string beside it.
     alts = list(cls.get("forcefield_alternatives") or [])
-    if not alts:
-        alts = [f"NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.{polymer_class} "
-                f"has no forcefield_alternatives, and this layer will not invent one. Run with "
-                f"--with-ff-probe, or let the literature critic name a candidate."]
     row = {"default_choice": ff, "criteria_evaluated": criteria,
            "evidence": ev, "alternatives": alts,
            "resolved_by": (f"polymer_rules.json:classes.{polymer_class}.ff_accuracy_prior"
                            if ff == prior and not (resolution or {}).get("probed")
                            else "forcefield.select_by_moiety")}
+    if not alts:
+        row["alternatives_note"] = (
+            f"NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.{polymer_class} "
+            f"has no forcefield_alternatives, and this layer will not invent one. The moiety "
+            f"probe names what actually types this SMILES; the literature critic may name a "
+            f"candidate on the evidence.")
     # Only when a probe actually ran: validate_run_plan's ff_no_admissible_field /
     # ff_not_admissible gates key off this list, and an unprobed [] would read as a
     # measurement that nothing types.

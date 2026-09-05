@@ -21,9 +21,10 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import track_registry  # noqa: E402
 
 from rules_common import get_class_entry, load_rules  # noqa: E402
-from make_deterministic_plan import (build_decisions, build_planned_stages, make_plan,  # noqa: E402
-                                     ordered_plan, KNOWN_DECISIONS, _derived_from_field,
-                                     _field_of, _ff_prior_uncertainty)
+from make_deterministic_plan import (_assert_tg_rate_feasible,  # noqa: E402
+                                     build_decisions, build_planned_stages, make_plan,
+                                     ordered_plan, resolve_d01, KNOWN_DECISIONS,
+                                     _derived_from_field, _field_of, _ff_prior_uncertainty)
 from select_system_size import solve_system_size  # noqa: E402
 import rules_common  # noqa: E402  -- module import so tests can monkeypatch rules_common.canonicalize
 import select_hardware as cost_model  # noqa: E402  -- cost model merged into it 2026-09-02
@@ -83,15 +84,17 @@ OVERRIDE_RANGES: dict[str, tuple[Optional[float], Optional[float]]] = {
     "cooling_continuation_ns": (0.01, 1000),
     "thermostat_damp_fs": (1, 100000),
     "barostat_damp_fs": (1, 1_000_000),
-    "alpha_glass_per_K": (0.0, 0.1),
-    "alpha_melt_per_K": (0.0, 0.1),
     "ct_min_decay_melt": (0.0, 1.0),
     "md_tg_ceiling_K": (100, 2000),
     "tg_t_low_K": (1, 1500),
     "tg_t_step_K": (1, 200),
     "tg_min_steps_per_T": (1, 2_000_000_000),
-    "tg_steps_per_t": (1, 2_000_000_000),
-    "tg_primary_rate_index": (0, 100),
+    # THE Tg knob since the single-rate collapse: n_steps_per_T = tg_t_step_K/(rate*dt*1e-6),
+    # and cool_block_hold_steps is rate-matched to it, so this one number sets both the
+    # staircase and the cooldown. tg_rates_K_per_ns (list), tg_primary_rate_index and
+    # tg_steps_per_t were settable here until 2026-09-04 and reached no deck -- an override
+    # that validates and changes nothing is worse than one that is rejected.
+    "tg_rate_K_per_ns": (1, 1000),
     "K_strain_max": (0.001, 0.25),
     "K_deform_rate_inv_s": (1e3, 1e12),
     "K_deform_rate_slow_inv_s": (1e3, 1e12),
@@ -120,11 +123,10 @@ ENUM_OVERRIDES = {
                                   "gasteiger", "am1bcc", "am1-bcc", "resp"}),
     "electrostatics": frozenset({"pppm", "lj_cut"}),
     "engine": frozenset({"gpu", "kokkos", "cpu"}),
-    "tg_slope_gate_fallback": frozenset({"highest_rate", "slowest_rate"}),
     "mechanical_method": frozenset({"murnaghan", "deformation"}),
     "equilibration_phase": frozenset({"melt_then_cool", "melt_only"}),
 }
-SEQUENCE_OVERRIDES = frozenset({"tg_rates_K_per_ns", "bm_pressures_atm", "backbone_types",
+SEQUENCE_OVERRIDES = frozenset({"bm_pressures_atm", "backbone_types",
                                 "mechanical_resample_points"})
 BOOLEAN_OVERRIDES = frozenset({"ct_gate_reliable"})
 INTEGER_OVERRIDES = frozenset({
@@ -135,9 +137,9 @@ INTEGER_OVERRIDES = frozenset({
     "stage8_min_steps", "stage8_cap_steps",
     "melt_ramp_steps", "melt_hold_min_steps", "melt_hold_cap_steps",
     "nvt_melt_min_steps", "nvt_melt_cap_steps",
-    "tg_min_steps_per_T", "tg_steps_per_t",
+    "tg_min_steps_per_T",
     "deform_eq_steps", "deform_avg_window", "bm_npt_steps", "bm_thermo_freq",
-    "emc_seed", "velocity_seed", "gpu_per_run", "mpi_ranks", "tg_primary_rate_index",
+    "emc_seed", "velocity_seed", "gpu_per_run", "mpi_ranks",
     "mechanical_sampling_factor",
 })
 
@@ -407,6 +409,42 @@ def planning_context(intent: ScientificIntent) -> dict[str, Any]:
     }
 
 
+def _measure_d01_if_unprobed(plan: dict, smiles, rules: dict) -> None:
+    """Run the force-field probe on an adjudicated plan that never had one.
+
+    `--with-ff-probe` is opt-in on run-plan, so a plan generated without it carries a D-01 row
+    asserting the class prior with NO `admissible` key -- nothing was measured. The refusal
+    (nothing types this SMILES) is a safety property that has to bind on every path to
+    execution, and between 2026-09-04 and this fix it bound only on the path with no plan file,
+    because supplying `base_plan` skipped make_plan entirely. Probing here is idempotent: a row
+    that already carries `admissible` was measured and is left alone.
+
+    A probe that rescues a different field carries everything the field implies with it, the
+    same way apply_recovery does -- a moved preferred_ff with a stale charge scheme is exactly
+    the disagreement the derivation exists to prevent.
+    """
+    row = next((r for r in plan.get("decisions") or [] if r.get("id") == "D-01_ff"), None)
+    if row is None or "admissible" in row or not smiles:
+        return
+    class_entry = dict(get_class_entry(rules, plan.get("polymer_class", ""), warn_on_miss=False))
+    _, resolution = resolve_d01({**class_entry, **plan.get("decided_params", {})},
+                                smiles, with_ff_probe=True)
+    if not (resolution or {}).get("probed"):
+        return                                   # no measured blocker -- nothing to measure
+    field = resolution.get("field")
+    row["admissible"] = [field] if field else []
+    row["resolved_by"] = "forcefield.select_by_moiety"
+    if not field or field == row.get("choice"):
+        return
+    row["choice"] = field
+    derived = _derived_from_field(field, rules)
+    plan["decided_params"]["preferred_ff"] = field
+    plan["decided_params"]["charge_method"] = derived["charge_method"]
+    plan["decided_params"]["electrostatics"] = derived["electrostatics"]
+    plan["hardware"] = {k: derived[k]
+                        for k in ("engine", "mpi_ranks", "gpu_per_run", "ff_family")}
+
+
 def materialize_plan(intent: ScientificIntent, decision: PlanDecision,
                      base_plan: dict | None = None) -> dict:
     """Convert a narrow agent decision into a complete executable run plan.
@@ -415,7 +453,8 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision,
     into run_plan.json on 2026-09-04, so the critic's edits live on that file's D-01 row and
     must not be regenerated away. Without it the plan is built from scratch, WITH the force
     field probe -- the D-01 refusal (choice=None, admissible=[]) is a safety property and has
-    to be measured here, not inherited from whoever generated a scaffold earlier.
+    to be measured here, not inherited from whoever generated a scaffold earlier. With a
+    base_plan, _measure_d01_if_unprobed enforces the same thing on the file it was handed.
     """
     _validate_decision(decision)
     properties = set(decision.properties or intent.requested_properties)
@@ -435,6 +474,8 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision,
         field=field)
     plan = base_plan or make_plan(intent.run_name, decision.polymer_class, intent.smiles,
                                   properties, size_solve=size_solve, with_ff_probe=True)
+    if base_plan is not None:
+        _measure_d01_if_unprobed(plan, intent.smiles, rules)
     auto_filled = {k: v for k, v in size_solve.get("recommended_params", {}).items()
                    if k not in decision.overrides}
     if auto_filled:
@@ -818,8 +859,12 @@ def write_control_state(repo_root, run_name: str, *, status: str, plan_path=None
 
 
 def _validate_decision(decision: PlanDecision) -> None:
-    if not decision.rationale:
-        raise ValueError("scientific agent must provide at least one rationale")
+    # No rationale check. It required at least one entry until 2026-09-04, when the fold read
+    # `rationale` off decisions[0].critique.findings -- which run-plan writes empty, because a
+    # critique that has not happened yet must not be pre-populated with a finding. The result
+    # blocked BOTH documented paths: a freshly generated plan, and --baseline, the arm that
+    # exists precisely to materialize with no LLM in the loop. `confidence` is the only gate
+    # (docs/AGENT_CONTRACT.md says so), and it is checked next.
     if decision.confidence not in VALID_CONFIDENCE:
         raise ValueError(
             f"confidence must be one of {sorted(VALID_CONFIDENCE)}; got "
@@ -874,7 +919,7 @@ def validate_overrides(overrides: dict[str, Any]) -> None:
                 raise ValueError(f"{key} must be a non-empty JSON list")
             if not all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value):
                 raise ValueError(f"{key} values must be numeric")
-            if key in {"tg_rates_K_per_ns", "backbone_types"} and any(item <= 0 for item in value):
+            if key == "backbone_types" and any(item <= 0 for item in value):
                 raise ValueError(f"{key} values must be positive")
 
 
@@ -898,25 +943,11 @@ def _validate_protocol_relationships(parameters: dict[str, Any], changed: set[st
             fast_rate is not None and slow_rate is not None and slow_rate > fast_rate):
         raise ValueError("K_deform_rate_slow_inv_s cannot exceed K_deform_rate_inv_s")
 
-    rates = parameters.get("tg_rates_K_per_ns") or []
-    primary_index = parameters.get("tg_primary_rate_index")
-    if ({"tg_primary_rate_index", "tg_rates_K_per_ns"} & changed and
-            primary_index is not None and not 0 <= primary_index < len(rates)):
-        raise ValueError(
-            f"tg_primary_rate_index={primary_index} outside planned rate list of length {len(rates)}"
-        )
-    if rates and ({"tg_rates_K_per_ns", "dt_fs", "tg_t_step_K",
-                   "tg_min_steps_per_T"} & changed):
-        dt_fs = parameters.get("dt_fs", 1.0)
-        t_step = parameters.get("tg_t_step_K", 20.0)
-        minimum_steps = parameters.get("tg_min_steps_per_T", 200000)
-        infeasible = [rate for rate in rates
-                      if t_step / (rate * dt_fs * 1e-6) < minimum_steps - 1]
-        if infeasible:
-            raise ValueError(
-                "tg_rates_K_per_ns contains rates that violate tg_min_steps_per_T: "
-                f"{infeasible}"
-            )
+    # One rate since 2026-09-04, and it IS the per-T step count. Delegated to the planner's own
+    # assertion rather than re-derived here: two copies of N = t_step/(rate*dt*1e-6) drifted
+    # apart once already, and this one was still checking a list nobody writes.
+    if {"tg_rate_K_per_ns", "dt_fs", "tg_t_step_K", "tg_min_steps_per_T"} & changed:
+        _assert_tg_rate_feasible(parameters, "overrides")
 
     pressures = parameters.get("bm_pressures_atm")
     if pressures is not None and "bm_pressures_atm" in changed:

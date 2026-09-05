@@ -36,7 +36,16 @@ subagent returns an agree/disagree verdict on the force field, and the calling s
 or declines its `suggested_override`, transcribes any critic-backed sources with
 `origin: "critic"`, and sets `confidence`. `confidence` comes back `"unreviewed"` (invalid) and
 is the **only** remaining block on materialization -- `--baseline` stamps `"low"` instead, for
-the deterministic arm that runs with no LLM in the loop.
+the deterministic arm that runs with no LLM in the loop. Only since 2026-09-04 is that literally
+true: `_validate_decision` also demanded at least one `rationale`, which the fold re-pointed at
+`decisions[0].critique.findings` -- empty on a fresh plan, because a critique that has not
+happened must not be pre-populated. Both documented paths (run-plan -> dry-run, and `--baseline`)
+were closed by it; `tests/test_scaffold_plan_materializes.py` now walks that seam.
+
+`alternatives` is a list of FIELD NAMES and is empty on every class (0/21 carry
+`forcefield_alternatives`); the prose explaining why lives beside it in `alternatives_note`,
+because a sentence stored as the list's only element reads as a force field to anything that
+iterates it.
 
 The row's `choice` stays read-only provenance: `materialize_plan()` reads only
 `criteria_evaluated`/`evidence`/`alternatives` off it, so disagreement is expressed through
@@ -56,7 +65,8 @@ The row's `choice` stays read-only provenance: `materialize_plan()` reads only
       "criteria_evaluated": ["literature_support", "parameter_coverage",
                              "validation_data", "computational_cost"],
       "evidence": [{"claim": "...", "source_doi": "...", "origin": "autofill"}],
-      "alternatives": ["gaff2"],
+      "alternatives": [],
+      "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- ...",
       "acknowledgements": {"ff_accuracy_prior_not_met": "..."},
       "critique": {"status": "pending_scientific_review", "rounds": 0, "findings": []}
     }

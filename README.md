@@ -57,7 +57,7 @@ python3 orchestration/scripts/scientific_control.py \
   --recovery-agent-command 'python /path/to/recovery_agent.py'
 ```
 
-For an audited decision replay or dry-run, use a captured decision file:
+For an audited plan replay or dry-run, use a captured, already-adjudicated `run_plan.json`:
 
 ```bash
 python3 orchestration/scripts/scientific_control.py \

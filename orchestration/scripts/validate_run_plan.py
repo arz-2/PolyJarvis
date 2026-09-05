@@ -87,12 +87,17 @@ def _criteria_and_evidence_findings(plan: dict, policy: dict) -> list:
                                  "severity": "structural",
                                  "detail": "evidence_required policy but no evidence entry "
                                            "has source_doi/citation"})
-            if not d.get("alternatives"):
+            # alternatives_note is the explicit "none, and here is why" answer. It has to be
+            # accepted, because the prose used to be stored as alternatives[0] -- which
+            # satisfied this check while making the list unreadable as field names. An
+            # unexplained empty list is still worth saying out loud.
+            if not d.get("alternatives") and not d.get("alternatives_note"):
                 findings.append({"check": "alternatives_empty", "decision_id": d["id"],
                                  "severity": "advisory",
                                  "detail": "evidence_required decision has empty alternatives "
-                                           "-- the planning agent should record alternatives "
-                                           "when scientifically meaningful"})
+                                           "and no alternatives_note -- record the alternatives "
+                                           "when scientifically meaningful, or say why there "
+                                           "are none"})
     return findings
 
 
@@ -286,7 +291,12 @@ def _hardware_findings(plan: dict) -> list:
     hardware require/prefer thresholds live there once, not duplicated here."""
     findings = []
     dp = plan.get("decided_params", {})
-    pin = {k: dp.get(k) for k in ("engine", "gpu_per_run", "mpi_ranks")}
+    # decided_params first (an override lands there and is what stage_params actually reads),
+    # then the plan's own derived hardware block. Reading only decided_params silently disarmed
+    # every check below on 2026-09-04, when the derived triple moved to plan["hardware"].
+    hw = plan.get("hardware") or {}
+    pin = {k: (dp.get(k) if dp.get(k) is not None else hw.get(k))
+           for k in ("engine", "gpu_per_run", "mpi_ranks")}
     if not any(pin.values()):
         return findings  # unpinned -> runtime by_forcefield fallback, always safe
 
@@ -311,7 +321,6 @@ def _hardware_findings(plan: dict) -> list:
         return findings
 
     rec_choice = rec["decision"]["choice"]
-    d08 = next((d for d in plan.get("decisions", []) if d.get("id") == "D-08_hardware"), None)
 
     if pin.get("mpi_ranks") == 1 and pin.get("engine") == "gpu" and rec["ff_family"] != "trappe":
         findings.append({"check": "hardware_anti_pattern", "severity": "structural",
@@ -334,16 +343,17 @@ def _hardware_findings(plan: dict) -> list:
                                        "number at gpu=1 is not evidence for a multi-GPU pin"})
 
     deviates = any(pin.get(k) not in (None, rec_choice.get(k)) for k in rec_choice)
-    if deviates:
-        if d08 is None:
-            findings.append({"check": "hardware_missing_decision", "severity": "structural",
-                             "detail": "decided_params pins non-default hardware but no "
-                                       "D-08_hardware entry in decisions[]"})
-        elif d08.get("confidence") != "low" and rec["decision"]["confidence"] != "high":
-            findings.append({"check": "hardware_staleness", "severity": "structural",
-                             "detail": f"pin {pin} deviates from the policy-recommended "
-                                       f"{rec_choice} without confidence:low on D-08_hardware "
-                                       "(not cleanly benchmarked on this host/cell size)"})
+    if deviates and rec["decision"]["confidence"] != "high":
+        # Info, not structural. Until 2026-09-04 a deviating pin demanded a D-08_hardware row
+        # to acknowledge it; D-08 was retired that day, so the structural finding had become
+        # unsatisfiable -- no legal edit could clear it. Writing the pin into `overrides` IS the
+        # acknowledgement now, and the anti-pattern/multi-GPU checks above stay structural
+        # because those are unsafe rather than merely unbenchmarked.
+        findings.append({"check": "hardware_staleness", "severity": "info",
+                         "detail": f"pin {pin} deviates from the policy-recommended "
+                                   f"{rec_choice} and this host/cell size is not cleanly "
+                                   "benchmarked (select_hardware confidence="
+                                   f"{rec['decision']['confidence']!r})"})
     return findings
 
 
@@ -356,12 +366,15 @@ UNIMPLEMENTED_PARAMS = {}
 # decided_params that ARE wired, but that another decided_param silently overrides. The plan
 # then records a protocol the deck did not run. Keyed by the overridden param; the value is
 # (overriding param, why).
-OVERRIDDEN_PARAMS = {
-    "tg_steps_per_t": ("tg_rate_index",
-                       "stage_params._resolve_tg_params computes n_steps_per_t from the selected "
-                       "cooling rate (T_step / (rate*dt)) whenever a rate index is given, and "
-                       "ignores tg_steps_per_t entirely"),
-}
+# Empty since 2026-09-04. Its only entry keyed tg_steps_per_t on tg_rate_index, and
+# tg_rate_index stopped being a decided_params key on every planner path with the single-rate
+# collapse -- so the guard could never fire on a real plan, while its unit test kept passing by
+# hand-building a plan carrying a key no producer writes. Both retired keys are now rejected at
+# the override allowlist instead, which is the earlier and louder place to catch them.
+# Add an entry here only after a plan->resolver->executor trace shows a RECORDED value that a
+# LIVE decided_param silently replaces; _overridden_param_findings and the remove_noop remedy
+# stay wired for that case.
+OVERRIDDEN_PARAMS = {}
 
 
 def _overridden_param_findings(plan: dict) -> list:

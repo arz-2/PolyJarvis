@@ -41,7 +41,7 @@ def apply_plan(cls: dict, plan: dict, args) -> dict:
     return effective
 
 def _apply_plan_hardware(args, dp: dict) -> None:
-    """Honor a reasoned plan's D-08_hardware override (engine / gpu_per_run / mpi_ranks in
+    """Honor a plan-level hardware override (engine / gpu_per_run / mpi_ranks in
     decided_params) when the CLI omitted the value. Precedence: CLI > plan > policy — the CLI
     stays authoritative, and resolve_hardware() fills anything still unset from hardware_policy.
     Deterministic plans never carry these keys (make_deterministic_plan.SNAPSHOT_KEYS excludes

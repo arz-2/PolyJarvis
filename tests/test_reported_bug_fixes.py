@@ -232,13 +232,25 @@ def test_assess_cooling_contraction_prefers_log_plateau_over_final_frame():
 
 # ── Bug 15: a recorded knob the deck silently overrides is a false protocol record ──
 
-def test_overridden_tg_steps_per_t_is_flagged():
-    from validate_run_plan import _overridden_param_findings
+def test_a_retired_tg_knob_is_rejected_rather_than_recorded_and_ignored():
+    """Rewritten 2026-09-04. This asserted that _overridden_param_findings flags
+    tg_steps_per_t when tg_rate_index is also set -- but the single-rate collapse left
+    tg_rate_index a key NO producer writes, so the guard could not fire on any real plan
+    while the test kept passing on a hand-built dict. The protection moved earlier and
+    harder: both retired keys are now off the override allowlist, so an agent proposing one
+    is told at adjudication time instead of having it silently recorded and ignored.
+    """
+    from scientific_control import validate_overrides
+    from validate_run_plan import OVERRIDDEN_PARAMS, _overridden_param_findings
 
-    plan = {"decided_params": {"tg_steps_per_t": 500000, "tg_rate_index": 0}}
-    findings = _overridden_param_findings(plan)
-    assert len(findings) == 1
-    assert findings[0]["check"] == "decided_param_overridden"
+    for dead in ("tg_steps_per_t", "tg_rates_K_per_ns", "tg_primary_rate_index"):
+        with pytest.raises(ValueError, match="unsupported overrides"):
+            validate_overrides({dead: 500000})
 
-    # Only fires when the overriding knob is actually set.
-    assert _overridden_param_findings({"decided_params": {"tg_steps_per_t": 500000}}) == []
+    # The one live knob IS settable -- rejecting the dead keys must not leave the rate
+    # unreachable, since it is the only lever for a Tg fit that will not resolve.
+    validate_overrides({"tg_rate_K_per_ns": 40})
+
+    # The registry is empty and its finder stays wired for the next real case.
+    assert OVERRIDDEN_PARAMS == {}
+    assert _overridden_param_findings({"decided_params": {"tg_rate_K_per_ns": 40}}) == []

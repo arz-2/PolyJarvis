@@ -24,13 +24,14 @@ State which of the three were parsed from $ARGUMENTS and which are missing, then
 - Prefer the `classify_polymer` MCP tool (`mcp-mol-builder-server`) if connected this session.
 - Otherwise reason from the repeat-unit SMILES against `guides/polymer_rules.json`'s `classes` (PHYC, PSTR, PVNL, PACR, PHAL, PDIE, POXI, PSUL, PEST, PAMD, PURT, PURA, PIMD, PANH, PCBN, PIMN, PSIL, PPHS, PKTN, PSFO, PPNL). No good fit → say so explicitly rather than forcing a match.
 
-## 3. Generate the decision
+## 3. Generate the plan
 
 Run once, before any critique begins:
 
 ```bash
 python3 orchestration/scripts/make_deterministic_plan.py run-plan \
-  --run_name <name> --polymer_class <CLASS> --smiles '<smiles>' --properties <props>
+  --run_name <name> --polymer_class <CLASS> --smiles '<smiles>' --properties <props> \
+  --with-ff-probe
 ```
 
 This deterministically writes `data/<run_name>/raw/run_plan.json` — **complete, not a scaffold**.
@@ -50,6 +51,16 @@ entry on that row — including the criteria this layer honestly cannot reach, w
 an existing plan; without it the tool refuses, so a regeneration cannot silently discard
 critique work already done.
 
+**Pass `--with-ff-probe`, and read `decisions[0].admissible` before going further.** When the
+moiety screen finds a measured build-blocking group, the probe runs real EMC trial builds
+(~5 s) and reports what actually types this SMILES; without it the row asserts the class prior
+unverified, and `resolved_by` says so. Step 6 measures it either way (`materialize_plan` probes
+an unprobed row before anything can execute), so omitting the flag here does not make the run
+safer — it just moves the answer to *after* the critic has spent a full literature pass on a
+field that may already be refused. If `admissible` comes back `[]`,
+**stop**: nothing types this SMILES, the plan cannot build, and there is nothing for the critic
+to weigh in on. Report that instead.
+
 `confidence` comes back `"unreviewed"`, which is invalid — it is the **only** thing blocking
 materialization, and step 5 is where you replace it. (`--baseline` stamps `"low"` instead, for
 the deterministic benchmark arm that runs with no LLM in the loop; a normal reasoned run leaves
@@ -63,7 +74,7 @@ This step runs **exactly once** per run. Re-running it requires `--force` and de
 critique already applied — never re-run it as part of step 6's fix loop; re-run `--dry-run` there
 instead.
 
-## 4. Critique the decision against published MD literature
+## 4. Critique D-01_ff against published MD literature
 
 This skill only proceeds past step 1 in `reasoned` mode (novel / not yet `protocol_validated` for
 the requested properties), so this step always fires.
@@ -138,11 +149,14 @@ never an `overrides.experimental_*` value. This is safe by design:
   this SMILES is, pin it via `overrides.experimental_tg_K` / `experimental_density_gcm3` /
   `exp_K_min_GPa` / `exp_K_max_GPa` with real curated data.
 
-**Then sign off.** Append your adjudication reasoning to `rationale` (don't replace what the tool
-wrote — it is the provenance of every deterministic choice), add any `assumptions` the critique
-raised, set `dominant_uncertainty` if the critique changed which gap matters most, and replace
-`confidence: "unreviewed"` with `low`/`medium`/`high`. **That last edit is the only thing
-standing between this file and execution** — deleting the key does not skip the gate.
+**Then sign off.** Two edits, both at the top level of the plan:
+
+- `dominant_uncertainty` — a single scalar naming the gap that matters most. Overwrite the
+  tool's value only if the critique changed which gap that is. (It replaced an `uncertainties[]`
+  list on 2026-09-04; there are no `assumptions` and no top-level `rationale` keys to write —
+  the row's own `critique.findings` is where adjudication prose belongs, and it is optional.)
+- `confidence` — replace `"unreviewed"` with `low`/`medium`/`high`. **This is the only thing
+  standing between the file and execution**; deleting the key does not skip the gate.
 
 ## 6. Materialize, preview, and self-review — never execute yet
 
