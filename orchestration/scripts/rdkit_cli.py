@@ -530,14 +530,62 @@ def _compiled_moieties(rules_path=None) -> list:
     return _MOIETY_CACHE[key]
 
 
+def _dimer_for_screening(smiles: str):
+    """Two repeat units joined tail-to-head, outer `*` markers kept; None if not buildable.
+
+    A repeat unit may be cut anywhere along the backbone, and the groups these rules describe
+    are bonds, not atoms. Nylon-6 written `*NCCCCCC(=O)*` and `*CCCCCC(=O)N*` is the same
+    polymer, but only the second shows an amide to `[NX3][CX3]=[OX1]`: in the first, the
+    N-C(=O) bond is exactly the one the two `*` markers stand for, so the monomer never
+    contains it. The chain always does, so the screen has to see a chain -- matching the 2-mer
+    makes the answer independent of where the author cut the unit.
+
+    Deliberately NOT built on _prepare_repeat_unit: freezing H counts and capping the outer
+    ends breaks kekulization on aromatic-backbone repeat units (PPS, PEEK, PSU, PPV all failed).
+    Joining the two INNER wildcards' neighbours and deleting only those two wildcards keeps every
+    atom's degree unchanged, so RDKit's implicit-H bookkeeping needs no help and the outer `*`
+    pair -- which the SMARTS ignore -- marks the ends exactly as in the monomer.
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    wc = [a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() == 0]
+    if len(wc) != 2:
+        return None
+    n = mol.GetNumAtoms()
+    combo = RWMol(Chem.CombineMols(mol, mol))
+    inner_a, inner_b = wc[1], wc[0] + n          # copy 1's tail, copy 2's head
+    try:
+        nbr_a = combo.GetAtomWithIdx(inner_a).GetNeighbors()[0].GetIdx()
+        nbr_b = combo.GetAtomWithIdx(inner_b).GetNeighbors()[0].GetIdx()
+    except IndexError:
+        return None                              # malformed: a `*` with no neighbour
+    combo.AddBond(nbr_a, nbr_b, Chem.BondType.SINGLE)
+    for idx in sorted((inner_a, inner_b), reverse=True):
+        combo.RemoveAtom(idx)
+    try:
+        Chem.SanitizeMol(combo)
+    except Exception:
+        return None
+    return combo.GetMol()
+
+
 def match_moieties(smiles: str, rules_path=None) -> dict:
-    """Which measured build-blocking groups this repeat unit contains.
+    """Which measured build-blocking groups this polymer contains.
+
+    Matched against the 2-mer (see _capped_dimer) so the answer does not depend on where the
+    repeat unit was cut; falls back to the monomer when the dimer will not build, which is the
+    pre-2026-09-04 behaviour and still better than no screen.
 
     `unmatched_heavy_frac` mirrors estimate_tg's own bookkeeping and is the honest half of the
     answer: no match means UNSCREENED, not cleared -- these rules cover 77% of the measured
     failures, so the caller still has to probe.
     """
-    mol = Chem.MolFromSmiles(smiles)
+    mol = _dimer_for_screening(smiles)
+    screened_on = "2-mer"
+    if mol is None:
+        mol = Chem.MolFromSmiles(smiles)
+        screened_on = "repeat_unit"
     if mol is None:
         return {"smiles": smiles, "error": f"Could not parse SMILES: {smiles!r}"}
     assigned: set = set()
@@ -553,7 +601,7 @@ def match_moieties(smiles: str, rules_path=None) -> dict:
                      "blocks": rule.get("blocks", {}),
                      "precision": (rule.get("evidence") or {}).get("precision")})
     heavy = sum(1 for a in mol.GetAtoms() if a.GetAtomicNum() != 1)
-    return {"smiles": smiles, "moieties": hits,
+    return {"smiles": smiles, "screened_on": screened_on, "moieties": hits,
             "unmatched_heavy_frac": round(max(0.0, 1.0 - len(assigned) / max(heavy, 1)), 3)}
 
 

@@ -308,3 +308,59 @@ def test_every_runnable_field_has_an_explicit_hardware_family():
     assert not missing, f"no explicit hardware family for {missing}"
     families = {resolve_ff_family(f, {"ff_aliases": aliases}) for f in sf.RUNNABLE_FIELDS}
     assert families <= {"pcff", "opls", "trappe", "gaff"}
+
+
+def test_the_screen_does_not_care_where_the_repeat_unit_was_cut():
+    """A repeat unit may be cut anywhere along the backbone, and every rule in
+    ff_moiety_rules.json describes a BOND. Nylon-6 written `*NCCCCCC(=O)*` and `*CCCCCC(=O)N*`
+    is the same polymer, but in the first the N-C(=O) bond is exactly the one the two `*`
+    markers stand for -- so the monomer does not contain the amide the chain always has, and
+    the screen returned "no known blocking moiety" for it until 2026-09-04. It screens the
+    2-mer now (rdkit_cli._dimer_for_screening), which makes the answer cut-invariant.
+    """
+    for smiles in ("*NCCCCCC(=O)*", "*CCCCCC(=O)N*", "*C(=O)NCCCCC*"):
+        blockers = sf.select_by_moiety(smiles, "pcff", probe=False)["blockers"]
+        assert sorted(b["id"] for b in blockers) == ["carbonyl_adjacent_N"], smiles
+
+
+def test_every_curated_member_smiles_still_screens_the_same_way():
+    """The 2-mer switch must ADD the cut-hidden linkages and change nothing else: a newly
+    matching blocker costs a real EMC trial build, so a false positive here is not free."""
+    curated = {}
+    for cid, cls in load_rules()["classes"].items():
+        for name, value in (cls.get("member_smiles") or {}).items():
+            for smiles in (value if isinstance(value, list) else [value]):
+                if isinstance(smiles, str) and smiles.count("*") == 2:
+                    curated[f"{cid}/{name}"] = smiles
+    assert len(curated) >= 40, "member_smiles shrank; this test is no longer a real sweep"
+
+    monomer = _monomer_blockers(list(curated.values()))
+    if monomer is None:
+        pytest.skip("RDKit unavailable -- the screen itself degrades to UNSCREENED here")
+
+    changed = []
+    for label, smiles in curated.items():
+        hits = sf._match_moieties(smiles)
+        if hits is not None and sorted(b["id"] for b in hits) != monomer[smiles]:
+            changed.append(label)
+    assert not changed, f"2-mer screening changed the verdict for {changed}"
+
+
+def _monomer_blockers(smiles_list):
+    """{smiles: [rule ids]} as the pre-2026-09-04 monomer-only screen would have found them.
+
+    In-process, not a subprocess: the documented test runner IS the mol env
+    (mcp-servers/.venv/bin/python, see AGENTS.md), so RDKit is importable here. Shelling out
+    to a hard-coded interpreter path instead raised FileNotFoundError in any checkout without
+    that venv built -- a clean `git worktree add`, for instance -- turning "the screen is
+    unavailable, skip" into a hard failure.
+    """
+    Chem = pytest.importorskip("rdkit.Chem")
+    pytest.importorskip("rdkit.RDLogger").DisableLog("rdApp.*")
+    rules = json.loads((REPO_ROOT / "guides" / "ff_moiety_rules.json").read_text())["moieties"]
+    patterns = [(r["id"], Chem.MolFromSmarts(r["smarts"])) for r in rules]
+    out = {}
+    for smiles in smiles_list:
+        mol = Chem.MolFromSmiles(smiles)
+        out[smiles] = sorted(i for i, pat in patterns if mol and mol.HasSubstructMatch(pat))
+    return out
