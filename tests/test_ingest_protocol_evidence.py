@@ -77,12 +77,13 @@ def test_ff_ingest_backfills_paper_metadata_from_md_studies(tmp_path):
     assert rec["year"] == 1999
 
 
-def test_system_size_advisory_ingest_is_refused_not_silently_empty(tmp_path):
+def test_non_ff_store_ingest_is_refused_not_silently_empty(tmp_path):
     """The literature critic stopped emitting a system-size advisory on 2026-09-02 (the
-    dp_typical/nchain/convergence fields it fed were retired). A caller still passing one must
-    hear about it rather than get records_added: 0 and assume the store was updated. The
-    system_size STORE itself is untouched -- ingest-internal still writes it from completed
-    runs, and query --store system_size still reads it."""
+    dp_typical/nchain/convergence fields it fed were retired) and the system_size store was
+    deleted 2026-09-05 as write-only. A caller still passing either must hear about it rather
+    than get records_added: 0 and assume something was written. `ff` is the only store;
+    argparse choices enforce that at the CLI, and this covers the direct-call path ingest()
+    also serves."""
     with pytest.raises(ValueError, match="no advisory ingest path"):
         pe.ingest("system_size", {"polymer_class": "PACR"}, run_name="PE1",
                   store_path=str(tmp_path / "s.json"))

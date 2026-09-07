@@ -2,8 +2,9 @@
 
 decision_policy.json used to carry ~52KB of prose (rationale, evidence-level
 definitions, the confidence-gate description) inline alongside the handful of
-fields code actually reads. That prose now lives in docs/decision_rationale.md;
-this file only holds what orchestration/scripts/*.py reads at runtime. This test
+fields code actually reads. That prose moved to docs/decision_rationale.md, which was
+itself deleted 2026-09-05: no code ever read it, and it is recoverable from Git history.
+This file only holds what orchestration/scripts/*.py reads at runtime. This test
 pins the paths those readers hard-index, so a future edit that drops one of them
 fails loudly here instead of silently breaking scientific_control.py,
 validate_run_plan.py, make_deterministic_plan.py, or remedy_economics.py.

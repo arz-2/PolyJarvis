@@ -161,8 +161,9 @@ python3 orchestration/scripts/protocol_evidence.py ingest --store ff \
 ```
 
 This reads your own file and folds every `verified: true` source into
-`docs/protocol_evidence_ff.json`, deduplicated. `--store ff` is the only advisory ingest path;
-the system_size store is written only by `ingest-internal`, from completed runs. Report
+`docs/protocol_evidence_ff.json`, deduplicated. `--store ff` is the only store there is — the
+system_size store was deleted 2026-09-05 (cell size is derived per SMILES by
+`select_system_size.py` and was never read from any evidence store). Report
 `records_added` in your final message.
 
 ## Output JSON schema

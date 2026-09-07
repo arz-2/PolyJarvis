@@ -327,35 +327,6 @@ def _finite_size(params: dict[str, Any], finding: Finding, _: int) -> dict[str, 
     return _merge(params, nchain=_required_nchain(finding))
 
 
-def _hardware(params: dict[str, Any], finding: Finding, _: int) -> dict[str, Any]:
-    recommendation = finding.details.get("recommendation") or finding.details.get("selected_hardware")
-    if not isinstance(recommendation, Mapping):
-        raise ValueError("hardware remedy requires a deterministic recommendation")
-    revised = dict(params)
-    for key in ("gpu_per_run", "mpi_ranks", "engine"):
-        if key in recommendation:
-            revised[key] = recommendation[key]
-    return revised
-
-
-def _remove_noop(params: dict[str, Any], finding: Finding, _: int) -> dict[str, Any]:
-    key = finding.details.get("parameter") or finding.details.get("key")
-    if not key:
-        raise ValueError("no-op remedy requires details.parameter")
-    revised = dict(params)
-    revised.pop(str(key), None)
-    return revised
-
-
-def _forcefield(params: dict[str, Any], finding: Finding, _: int) -> dict[str, Any]:
-    alternatives = finding.details.get("admissible_alternatives") or []
-    if len(alternatives) != 1:
-        raise ValueError("force-field switch is not uniquely determined")
-    alternative = alternatives[0]
-    value = alternative.get("forcefield") if isinstance(alternative, Mapping) else alternative
-    return _merge(params, preferred_ff=value)
-
-
 def _continue_npt(params: dict[str, Any], finding: Finding, attempt: int) -> dict[str, Any]:
     """EQUIL_DRIFT/EQUIL_SEM/EQUIL_N_EFF/EXTEND: extend the gated stage's own trajectory via
     restart-continuation (read_restart, appended log/dump) -- see the *_extend_base_stage /
@@ -540,11 +511,18 @@ def default_remedies() -> tuple[Remedy, ...]:
         Remedy("transient_retry", transient, 2, lambda p, _f, _a: dict(p), "same"),
         Remedy("finite_size_rebuild", frozenset({"SIZE_MIN_IMAGE_VIOLATION", "SIZE_CHAIN_SELF_IMAGE",
                                                   "FINITE_SIZE_FAILED"}), 2, _finite_size, "build"),
-        Remedy("safe_hardware", frozenset({"UNSAFE_HARDWARE_PIN"}), 1, _hardware, "build"),
-        Remedy("remove_noop", frozenset({"UNIMPLEMENTED_PARAMETER", "OVERRIDDEN_NOOP_PARAMETER"}),
-               1, _remove_noop, "build"),
-        Remedy("unique_forcefield", frozenset({"FORCE_FIELD_TYPING_FAILED"}), 1,
-               _forcefield, "build"),
+        # safe_hardware (UNSAFE_HARDWARE_PIN), remove_noop (UNIMPLEMENTED_PARAMETER,
+        # OVERRIDDEN_NOOP_PARAMETER) and unique_forcefield (FORCE_FIELD_TYPING_FAILED)
+        # REMOVED 2026-09-07, with their action functions. Unlike slower_cooling above these
+        # were not retired on a measurement: nothing in the repo emits any of their four
+        # codes, so no finding could ever route to them (validate_run_plan.py's
+        # UNIMPLEMENTED_PARAMS is `{}`; the other three codes have no producer at all).
+        # A registered row that cannot match is not inert -- RemedyRegistry.route sends
+        # anything unrouted to the agent_only catch-all, so the row read as ladder coverage
+        # the engine did not have, which is the same illusion recover.md's rows for these
+        # codes carried until they were removed the same day. If a producer is ever added,
+        # tests/test_recovery_code_inventory.py fails on the new code and git history holds
+        # the mutations.
         # "same", not "equilibration": these codes come from whichever gate raised them, and a
         # cooling-stage drift must not re-melt an already-accepted equilibration stage.
         Remedy("continue_npt", frozenset({"EQUIL_DRIFT", "EQUIL_SEM", "EQUIL_N_EFF", "EXTEND"}),

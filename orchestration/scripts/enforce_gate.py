@@ -146,14 +146,25 @@ def resolve_regime(final_t_k, tg_k=None):
     return "rubbery" if final_t_k > tg_k else "glassy"
 
 
-def resolve_regime_legacy(t_workflow_k):
-    """The pre-2026-08-31 proxy: 'rubbery' iff T_workflow <= 300 K.
+def resolve_regime_legacy(t_workflow_k, final_t_k=300.0):
+    """The Tg-free fallback: 'rubbery' iff T_workflow sits at the assessment temperature.
 
     Kept ONLY for plans that carry no resolvable Tg -- neither a curated member value, a
-    frozen decided_params pin, nor a SMILES to match on. It encodes `exp_Tg < 300` indirectly
-    via _resolve_t_workflow's own branch, so it is correct exactly while final_T_K is 300 and
-    silently misclassifies otherwise. Never use it for new work; prefer resolve_regime."""
-    return "rubbery" if t_workflow_k is not None and t_workflow_k <= 300.0 else "glassy"
+    frozen decided_params pin, nor a SMILES to match on. It reads the regime back OUT of
+    T_workflow, which stage_params.workflow_reference_temperature sets to final_T_K when the
+    polymer is rubbery there and to T_equil_K (necessarily higher -- the melt) when it is not.
+
+    Compared against final_t_k rather than a literal 300, which is what this was until the
+    reference temperature stopped hardcoding 300 itself. `<=` and not `==` deliberately: it
+    must not turn on float equality, and the glassy branch returns a melt temperature that is
+    strictly above the assessment temperature in every case that matters.
+
+    Never use it for new work; prefer resolve_regime, which asks Tg directly."""
+    if t_workflow_k is None:
+        return "glassy"
+    if not isinstance(final_t_k, (int, float)):
+        final_t_k = 300.0
+    return "rubbery" if t_workflow_k <= final_t_k else "glassy"
 
 
 def _regime_tg_for_plan(plan, cls_rules):
@@ -340,8 +351,10 @@ EXTENDABLE_GATES = {"density_drift", "energy_drift", "density_sem", "energy_sem"
 #
 # density_value_binding was a member until 2026-09-01 and is now ADVISORY. It was classified
 # Class A on the grounds that its structural remedy (re-melt + slow re-cool) removes the defect
-# completely at a bounded one-time cost -- decision_rationale's own "class_A_is_always_worth_paying"
-# criterion. Measurement retired that claim. Across 21 archived multi-rate sweeps, glass density
+# completely at a bounded one-time cost -- Class A's own defining criterion. (That criterion
+# was written down in docs/decision_rationale.md as "class_A_is_always_worth_paying"; the doc
+# was deleted 2026-09-05 as documentation no code read, so it is stated here, at the constant
+# that enforces it.) Measurement retired that claim. Across 21 archived multi-rate sweeps, glass density
 # moves ~1.1% per DECADE of cooling rate, so the slower_cooling remedy (x2 then x4, capped)
 # recovers 0.33-0.67% against archived shortfalls of 3-9%: applying the maximum remedy to every
 # flagged run clears NONE of them. The gate therefore fails its own class's defining criterion.
@@ -387,7 +400,7 @@ def enforce(run_name, repo_root: Path):
     final_t = dp.get("final_T_K", 300.0)
     tg = _regime_tg_for_plan(plan, cls_rules)
     regime = (resolve_regime(final_t, tg) if tg is not None
-              else resolve_regime_legacy(dp.get("T_workflow_K")))
+              else resolve_regime_legacy(dp.get("T_workflow_K"), final_t))
 
     dp_typical = dp.get("dp_typical") or cls_rules.get("dp_typical")
     ct_gate_reliable = cls_rules.get("ct_gate_reliable")

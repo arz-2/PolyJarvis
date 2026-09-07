@@ -30,9 +30,6 @@ from workflow_engine import PARAMETER_STAGE, Finding, default_remedies  # noqa: 
 _DETAILS_BY_REMEDY = {
     "transient_retry": {},
     "finite_size_rebuild": {"required_nchain": 50},
-    "safe_hardware": {"recommendation": {"gpu_per_run": 1, "mpi_ranks": 4, "engine": "gpu"}},
-    "remove_noop": {"parameter": "some_dead_key"},
-    "unique_forcefield": {"admissible_alternatives": [{"forcefield": "pcff"}]},
     "continue_npt": {},
     "slower_cooling": {},
     "raise_minimize_tolerance": {},

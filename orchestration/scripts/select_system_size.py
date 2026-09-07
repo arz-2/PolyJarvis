@@ -53,9 +53,10 @@ elsewhere. The L>=2*Rg chain-self-imaging criterion stays with the existing
 post-build gate (check_equilibration_comprehensive) and its nchain_scale_for remedy;
 validate_run_plan.py's _finite_size_findings already covers the pre-build L>=2*cutoff_A
 half. This script adds only the one nchain fact global_notes documents and nothing
-downstream currently surfaces: nchain=10 is a "throughput compromise" (Hayashi 2022)
-while nchain=20 is the "literature-recommended production minimum for PCFF classes"
-(Bejagam 2020).
+downstream currently surfaces: nchain=10 is the verified requirement (Wang 2021; Hayashi
+2022 ran it at low variance across its full polymer set), while Bejagam 2020's 20-chain
+recommendation is surfaced as an advisory uncertainty only -- see
+PCFF_NCHAIN_PRODUCTION_MINIMUM's own docstring for why it stopped binding on 2026-09-02.
 
 Usage:
   python3 orchestration/scripts/select_system_size.py <CLASS> "<SMILES>" \\

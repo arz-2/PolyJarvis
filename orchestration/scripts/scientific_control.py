@@ -267,21 +267,40 @@ class Workflow(Protocol):
     def execute(self, plan_path: Path, dry_run: bool = False, attempt: int = 0) -> WorkflowOutcome: ...
 
 
+#: Ceiling on one agent subprocess. Sized above what recovery_agent_cli.py bounds itself to
+#: (600 s per headless call x its retry-once convention = 1200 s worst case) plus start-up, so
+#: this never pre-empts a call that adapter would still have completed. It exists because THIS
+#: class is the model-provider-neutral boundary: the timeout on the far side is a property of
+#: one particular command string, and swapping that string -- the whole point of this adapter
+#: -- would otherwise leave a campaign blocked forever on a wedged subprocess.
+AGENT_SUBPROCESS_TIMEOUT_S = 1800
+
+
 class JsonSubprocessAgent:
     """Model-provider-neutral agent adapter using JSON stdin/stdout and no shell."""
 
-    def __init__(self, command: Sequence[str]):
+    def __init__(self, command: Sequence[str], timeout_s: int = AGENT_SUBPROCESS_TIMEOUT_S):
         if not command:
             raise ValueError("agent command cannot be empty")
         self.command = tuple(command)
+        self.timeout_s = timeout_s
 
     def invoke(self, payload: dict) -> dict:
-        completed = subprocess.run(
-            self.command,
-            input=json.dumps(payload),
-            capture_output=True,
-            text=True,
-        )
+        try:
+            completed = subprocess.run(
+                self.command,
+                input=json.dumps(payload),
+                capture_output=True,
+                text=True,
+                timeout=self.timeout_s,
+            )
+        except subprocess.TimeoutExpired as exc:
+            # A RuntimeError, like every other wrapper failure here: it carries no decision,
+            # and the callers that map wrapper failures to a bounded retry rather than to a
+            # considered `stop` depend on seeing an exception.
+            raise RuntimeError(
+                f"agent command timed out after {self.timeout_s}s: {' '.join(self.command)}"
+            ) from exc
         if completed.returncode != 0:
             raise RuntimeError(
                 f"agent command failed ({completed.returncode}): {completed.stderr.strip()}"
@@ -481,10 +500,12 @@ def materialize_plan(intent: ScientificIntent, decision: PlanDecision,
     if auto_filled:
         effective_class.update(auto_filled)
 
+    _bind_bm_temperature(effective_class, set(decision.overrides))
     _validate_protocol_relationships(effective_class, set(decision.overrides))
     plan["decided_params"].update(track_registry.forced_params_for(properties))
     plan["decided_params"].update(decision.overrides)
     plan["decided_params"].update(auto_filled)
+    _bind_bm_temperature(plan["decided_params"], set(decision.overrides))
     if "T_equil_K" in decision.overrides and "T_workflow_K" not in decision.overrides:
         plan["decided_params"]["T_workflow_K"] = decision.overrides["T_equil_K"]
         effective_class["T_workflow_K"] = decision.overrides["T_equil_K"]
@@ -603,6 +624,8 @@ def apply_recovery(plan: dict, decision: RecoveryDecision) -> dict:
              "nchain": decided_params.get("nchain")})
     class_entry = dict(get_class_entry(load_rules(), revised["polymer_class"], warn_on_miss=False))
     effective_class = {**class_entry, **decided_params}
+    _bind_bm_temperature(effective_class, set(decision.modifications))
+    _bind_bm_temperature(decided_params, set(decision.modifications))
     _validate_protocol_relationships(effective_class, set(decision.modifications))
     revised["planned_stages"] = build_planned_stages(
         effective_class, set(revised.get("properties", [])), revised.get("smiles")
@@ -863,8 +886,9 @@ def _validate_decision(decision: PlanDecision) -> None:
     # `rationale` off decisions[0].critique.findings -- which run-plan writes empty, because a
     # critique that has not happened yet must not be pre-populated with a finding. The result
     # blocked BOTH documented paths: a freshly generated plan, and --baseline, the arm that
-    # exists precisely to materialize with no LLM in the loop. `confidence` is the only gate
-    # (docs/AGENT_CONTRACT.md says so), and it is checked next.
+    # exists precisely to materialize with no LLM in the loop. `confidence` is the only gate,
+    # and it is checked next. (docs/AGENT_CONTRACT.md stated that too; it was deleted
+    # 2026-09-05 as documentation no code read. This function is now the statement.)
     if decision.confidence not in VALID_CONFIDENCE:
         raise ValueError(
             f"confidence must be one of {sorted(VALID_CONFIDENCE)}; got "
@@ -923,6 +947,21 @@ def validate_overrides(overrides: dict[str, Any]) -> None:
                 raise ValueError(f"{key} values must be positive")
 
 
+def _bind_bm_temperature(params: dict[str, Any], changed: set[str]) -> None:
+    """bm_temperature_K follows final_T_K unless it was moved in its own right.
+
+    One assessment temperature per run: the modulus is measured on the cooling track's
+    npt_final cell, which is gated only at final_T_K. Same shape as the T_equil_K ->
+    T_workflow_K rule in materialize_plan. Without this, moving ONLY final_T_K -- which is
+    exactly what "assess this run at 400 K" looks like -- would leave the modulus at the
+    previously derived temperature and _validate_protocol_relationships would reject the plan
+    the caller obviously meant.
+    """
+    if "final_T_K" in changed and "bm_temperature_K" not in changed:
+        if params.get("final_T_K") is not None:
+            params["bm_temperature_K"] = params["final_T_K"]
+
+
 def _validate_protocol_relationships(parameters: dict[str, Any], changed: set[str]) -> None:
     """Reject internally inconsistent plans before any files or jobs are created."""
     t_low = parameters.get("tg_t_low_K")
@@ -930,6 +969,23 @@ def _validate_protocol_relationships(parameters: dict[str, Any], changed: set[st
     if ({"tg_t_low_K", "T_melt_hold_K"} & changed and
             t_low is not None and t_high is not None and t_low >= t_high):
         raise ValueError("tg_t_low_K must be lower than T_melt_hold_K")
+
+    # One assessment temperature per run. The mechanical track measures on the COOLING track's
+    # npt_final cell (track_registry._MECHANICAL.requires), and npt_final is gated at final_T_K
+    # and at no other temperature -- cool_block ramps there regardless of regime. A
+    # bm_temperature_K that disagrees re-thermostats a gated cell to a temperature nothing
+    # gated it at, and _regime (which reads final_T_K) would label it with the wrong phase.
+    # Measuring a modulus at some other T means another run with another final_T_K, not another
+    # knob within this one.
+    bm_temp = parameters.get("bm_temperature_K")
+    final_t = parameters.get("final_T_K")
+    if ({"bm_temperature_K", "final_T_K"} & changed and
+            bm_temp is not None and final_t is not None and
+            float(bm_temp) != float(final_t)):
+        raise ValueError(
+            f"bm_temperature_K ({bm_temp}) must equal final_T_K ({final_t}): the modulus is "
+            f"measured on the cooling track's npt_final cell, which is gated only at final_T_K"
+        )
 
     strain_start = parameters.get("deform_strain_start")
     strain_max = parameters.get("K_strain_max")

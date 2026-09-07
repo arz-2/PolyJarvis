@@ -368,8 +368,9 @@ def test_cooling_verdict_insufficient_data_satisfies_without_blocking(tmp_path):
 def test_cooling_verdict_under_annealed_is_reported_but_advisory(tmp_path):
     """density_value_binding was Class A and routed STRUCTURAL_FAIL until 2026-09-01.
 
-    decision_rationale's own class_A_is_always_worth_paying criterion is that the class's
-    structural remedy removes the defect COMPLETELY at a bounded cost. Measurement retired that:
+    Class A's defining criterion is that the class's structural remedy removes the defect
+    COMPLETELY at a bounded cost (stated at enforce_gate.STRUCTURAL_GATES). Measurement retired
+    that:
     across 21 archived multi-rate sweeps glass density moves ~1.1% per DECADE of cooling rate, so
     slower_cooling (x2 then x4, capped) recovers 0.33-0.67% against archived shortfalls of 3-9%.
     The maximum remedy clears none of the flagged archived runs -- the gate failed its own class's

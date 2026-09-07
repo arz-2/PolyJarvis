@@ -45,7 +45,8 @@ def scaffold():
 
 
 def test_run_plans_own_output_materializes_once_confidence_is_set(scaffold):
-    """confidence is the ONLY gate (docs/AGENT_CONTRACT.md). Set it and nothing else."""
+    """confidence is the ONLY gate (scientific_control._validate_decision). Set it and
+    nothing else."""
     plan = json.loads(json.dumps(scaffold))
     assert plan["decisions"][0]["critique"]["findings"] == [], (
         "run-plan must not pre-write a critique finding; if it starts to, this test stops "

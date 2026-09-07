@@ -28,6 +28,20 @@ human -- see `diagnose()`.
 import json
 import subprocess
 import sys
+from pathlib import Path
+
+#: A headless `claude -p` session resolves relative paths -- including this repo's own
+#: .claude/ configuration, which is where the /recover playbook lives -- from its working
+#: directory. This adapter used to inherit its caller's cwd: campaign_watchdog.py sets it
+#: (:224), but agent_api.py start/resume run from wherever the operator happened to be. From
+#: a foreign cwd `/recover` is not a resolvable command, so the model receives that line as
+#: plain prose with no playbook behind it and still returns a well-formed decision -- a
+#: wrapper failure laundered into a considered answer, the one thing this module exists to
+#: prevent (see the module docstring). Pinned explicitly, as headless_claude.py already does.
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import headless_claude  # noqa: E402  -- shared `claude -p` mechanics; see _run_headless_claude_once
 
 # A CHECKED COPY of track_registry.STAGE_TRACK, not derived from it: the values are
 # (track, step) and the step is not always the key -- equil-check reports as step "equil", and
@@ -47,12 +61,27 @@ STAGE_TRACK = {
     "deform": ("mechanical", "deform"),
     "murnaghan": ("mechanical", "murnaghan"),
     "analyze-bm": ("mechanical", "analyze-bm"),
+    "structure": ("structure", "analyze-structure"),
+    "analyze-structure": ("structure", "analyze-structure"),
+    "cohesive": ("cohesive", "vacuum-build"),
+    "vacuum-build": ("cohesive", "vacuum-build"),
+    "vacuum-chain": ("cohesive", "vacuum-chain"),
+    "analyze-solubility": ("cohesive", "analyze-solubility"),
     "run-summary": ("summary", "run-summary"),
 }
 
+#: Read plus a read-only Bash allowlist. `Bash(<cmd>:*)` matches on the command PREFIX, so a
+#: pattern is only as read-only as every invocation of that command: `Bash(find:*)` also admits
+#: `find . -delete` and `find . -exec rm -rf {} +`, which is not a permission this agent should
+#: ever hold. It is replaced by the native Glob/Grep tools, which have no exec path at all.
+#: `Bash(grep:*)` stays because grep cannot write or execute and recover.md's reattach check
+#: pipes into it (`ps aux | grep run_campaign`), whose every segment must be permitted.
+#: `Bash(tail:*)` likewise admits `tail -f`, which cannot be excluded by prefix and would block
+#: until the 600 s timeout, burning an escalation rung for nothing -- recover.md forbids the
+#: follow flags in prose, which is the only lever the pattern language leaves here.
 READ_ONLY_TOOLS = [
-    "Read",
-    "Bash(find:*)", "Bash(grep:*)", "Bash(ls:*)", "Bash(ps:*)",
+    "Read", "Glob", "Grep",
+    "Bash(grep:*)", "Bash(ls:*)", "Bash(ps:*)",
     "Bash(cat:*)", "Bash(tail:*)", "Bash(head:*)", "Bash(wc:*)", "Bash(jq:*)",
 ]
 
@@ -174,9 +203,11 @@ def _build_prompt(problem: dict) -> str:
     return (
         f'/recover run_name={run_name} track={track} step={step} symptom={json.dumps(symptom)}\n\n'
         f'{_spent_rungs(problem)}\n\n'
-        "Follow recover.md's procedure with the Read/Bash tools available (no MCP tools "
-        "here -- reason from files/logs directly, the same way a live session would when "
-        "they are unavailable). You never write, edit, resubmit, or claim/release any "
+        "Follow recover.md's procedure with the Read/Glob/Grep/Bash tools available (no MCP "
+        "tools here -- reason from files/logs directly, the same way a live session would "
+        "when they are unavailable; never `tail -f` or any following read, it cannot "
+        "return and would spend your whole timeout). You never write, edit, resubmit, or "
+        "claim/release any "
         "resource yourself -- the calling engine re-validates and applies whatever you "
         f"decide. Choose one action from {valid_actions}: `retry` re-attempts with "
         "unchanged params (only when you've confirmed the cause was transient and is now "
@@ -188,43 +219,50 @@ def _build_prompt(problem: dict) -> str:
     )
 
 
-def _run_headless_claude_once(prompt: str, schema: dict, timeout_s: int) -> dict:
-    cmd = [
-        "claude", "-p", "--output-format", "json",
-        "--allowedTools", *READ_ONLY_TOOLS,
-        "--json-schema", json.dumps(schema),
-        "--max-budget-usd", "1.0",
-        "--fallback-model", "sonnet",
-        prompt,
-    ]
-    completed = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
-    if completed.returncode != 0:
-        raise RuntimeError(
-            f"headless claude exited {completed.returncode}: {completed.stderr.strip()[:2000]}"
-        )
-    outer = json.loads(completed.stdout)
-    if outer.get("is_error"):
-        raise RuntimeError(
-            f"headless claude reported an error: {outer.get('terminal_reason')} "
-            f"{outer.get('errors') or outer.get('result')}"
-        )
-    structured = outer.get("structured_output")
-    if not isinstance(structured, dict):
-        raise RuntimeError("headless claude did not return structured_output")
-    return structured
+def _answering_model(outer: dict) -> str:
+    """Which model actually produced this decision.
+
+    `--fallback-model sonnet` means a recovery decision may come from a different model than
+    the one the run started with, and a decision that changed a run's parameters should say
+    who made it (CLAUDE.md: code owns provenance). The wrapper JSON has carried this under
+    more than one key across versions, so probe rather than assume, and degrade to a plain
+    "unknown model" instead of asserting a model that may not have answered.
+    """
+    model = outer.get("model")
+    if isinstance(model, str) and model:
+        return model
+    usage = outer.get("modelUsage")
+    if isinstance(usage, dict) and usage:
+        return "+".join(sorted(str(k) for k in usage))
+    return "unknown model"
 
 
-def _run_headless_claude(prompt: str, schema: dict, timeout_s: int = 600, retries: int = 1) -> dict:
+def _run_headless_claude_once(prompt: str, schema: dict, timeout_s: int) -> tuple[dict, str]:
+    """One headless session, plus which model answered it.
+
+    The argv, the structured_output extraction and the wrapper-failure rule live in
+    headless_claude, shared with the LangGraph driver's critic and adjudicator nodes -- they
+    were duplicated, and the copies had already drifted apart on --strict-mcp-config and cwd.
+    What stays HERE is this adapter's own policy: its tool allowlist (Read/Glob/Grep plus a
+    read-only Bash set, deliberately not the driver's) and its budget.
+    """
+    structured, outer = headless_claude.invoke_once_with_meta(
+        prompt, schema, timeout_s=timeout_s, allowed_tools=READ_ONLY_TOOLS,
+        max_budget_usd=1.0, cwd=REPO_ROOT)
+    return structured, _answering_model(outer)
+
+
+def _run_headless_claude(prompt: str, schema: dict, timeout_s: int = 600,
+                         retries: int = 1) -> tuple[dict, str]:
     """One retry on any failure (transient streaming aborts observed in testing) before
     giving up -- matches this codebase's own retry-once convention (workflow_engine.py's
-    transient_retry local_cap=2, scientific_control.py's MAX_RECOVERY_ATTEMPTS=2)."""
-    last_exc: Exception = RuntimeError("no attempts made")
-    for _ in range(retries + 1):
-        try:
-            return _run_headless_claude_once(prompt, schema, timeout_s)
-        except Exception as exc:
-            last_exc = exc
-    raise last_exc
+    transient_retry local_cap=2, scientific_control.py's MAX_RECOVERY_ATTEMPTS=2).
+
+    The lambda resolves _run_headless_claude_once from the module at CALL time, so tests
+    that patch either name still bite.
+    """
+    return headless_claude.retry_once(
+        lambda: _run_headless_claude_once(prompt, schema, timeout_s), retries)
 
 
 def diagnose(payload: dict) -> dict:
@@ -232,12 +270,18 @@ def diagnose(payload: dict) -> dict:
     problem = _trim_payload(payload)
     valid_actions = problem.get("valid_actions") or list(DEFAULT_ACTIONS)
     try:
-        structured = _run_headless_claude(_build_prompt(problem), _output_schema(valid_actions))
+        structured, model = _run_headless_claude(_build_prompt(problem),
+                                                 _output_schema(valid_actions))
         action = structured.get("action")
         if action not in valid_actions:
             action = "stop"
         modifications = dict(structured.get("modifications") or {}) if action == "revise_plan" else {}
-        rationale = f"[recovery-agent diagnosis] {structured.get('rationale', '')}"
+        # The model goes in the rationale rather than a fourth key because RecoveryDecision
+        # (scientific_control.py:225) is a three-field frozen dataclass whose from_dict drops
+        # anything else -- an extra key would be silently discarded and record nothing. The
+        # rationale is persisted verbatim into recovery_log.jsonl and the control-plane event
+        # trail, so this is the field that actually carries provenance downstream.
+        rationale = f"[recovery-agent diagnosis via {model}] {structured.get('rationale', '')}"
     except Exception as exc:
         # The invocation itself failed (subprocess crash, timeout, malformed/missing
         # structured output) -- this carries no diagnosis of the underlying issue, so it

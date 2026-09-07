@@ -4,8 +4,7 @@
     "consumed_by": [
       "scientific_control.py",
       "validate_run_plan.py"
-    ],
-    "see_also": "docs/decision_rationale.md holds the rationale, evidence levels, confidence-gate description, and per-decision prose this file omits."
+    ]
   },
   "stage_schema_requirements": {
     "description": "Schema that every planned_stages entry must satisfy. The Critic enforces this in step 3 for reasoned plans; make_deterministic_plan.py satisfies it automatically via the STAGE_TRACK dict.",
@@ -19,6 +18,8 @@
       "cooling",
       "thermal",
       "mechanical",
+      "structure",
+      "cohesive",
       "summary"
     ],
     "track_map": {
@@ -32,6 +33,10 @@
       "murnaghan": "mechanical",
       "deform": "mechanical",
       "analyze-bm": "mechanical",
+      "analyze-structure": "structure",
+      "vacuum-build": "cohesive",
+      "vacuum-chain": "cohesive",
+      "analyze-solubility": "cohesive",
       "run-summary": "summary"
     }
   },

@@ -16,3 +16,8 @@ MDAnalysis>=2.4
 # .github/workflows/tests.yml), that call runs in-process via this pip wheel instead of
 # shelling into a conda env — no conda/RadonPy needed for the pure-logic suite.
 rdkit>=2023.9
+
+# LangGraph driver (orchestration/langgraph/). Present here so the topology and
+# node-contract tests are part of the default pure-logic suite rather than
+# silently skipping in CI -- the graph's shape is exactly what those tests guard.
+langgraph==1.2.11

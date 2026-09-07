@@ -53,10 +53,10 @@ def test_trim_payload_handles_inner_finding_shape():
 
 
 def test_diagnose_passes_through_revise_plan_with_modifications():
-    with patch.object(rac, "_run_headless_claude", return_value={
+    with patch.object(rac, "_run_headless_claude", return_value=({
         "action": "revise_plan", "modifications": {"nchain": 320},
         "rationale": "finite-size violation, rebuilding larger",
-    }):
+    }, "claude-opus-5")):
         decision = rac.diagnose(OUTER_PAYLOAD)
     assert decision["action"] == "revise_plan"
     assert decision["modifications"] == {"nchain": 320}
@@ -64,10 +64,10 @@ def test_diagnose_passes_through_revise_plan_with_modifications():
 
 
 def test_diagnose_passes_through_retry():
-    with patch.object(rac, "_run_headless_claude", return_value={
+    with patch.object(rac, "_run_headless_claude", return_value=({
         "action": "retry", "modifications": {},
         "rationale": "stale orphan process confirmed killed",
-    }):
+    }, "claude-opus-5")):
         decision = rac.diagnose(OUTER_PAYLOAD)
     assert decision["action"] == "retry"
     assert decision["modifications"] == {}
@@ -75,10 +75,10 @@ def test_diagnose_passes_through_retry():
 
 
 def test_diagnose_stop_still_works():
-    with patch.object(rac, "_run_headless_claude", return_value={
+    with patch.object(rac, "_run_headless_claude", return_value=({
         "action": "stop", "modifications": {},
         "rationale": "novel failure mode, needs human review",
-    }):
+    }, "claude-opus-5")):
         decision = rac.diagnose(OUTER_PAYLOAD)
     assert decision["action"] == "stop"
     assert decision["modifications"] == {}
@@ -86,20 +86,20 @@ def test_diagnose_stop_still_works():
 
 
 def test_diagnose_zeroes_modifications_when_action_not_revise_plan():
-    with patch.object(rac, "_run_headless_claude", return_value={
+    with patch.object(rac, "_run_headless_claude", return_value=({
         "action": "retry", "modifications": {"nchain": 320},
         "rationale": "misbehaving model sent modifications with retry",
-    }):
+    }, "claude-opus-5")):
         decision = rac.diagnose(OUTER_PAYLOAD)
     assert decision["action"] == "retry"
     assert decision["modifications"] == {}
 
 
 def test_diagnose_falls_back_to_stop_on_invalid_action():
-    with patch.object(rac, "_run_headless_claude", return_value={
+    with patch.object(rac, "_run_headless_claude", return_value=({
         "action": "do_something_unlisted", "modifications": {"nchain": 320},
         "rationale": "model invented an action",
-    }):
+    }, "claude-opus-5")):
         decision = rac.diagnose(OUTER_PAYLOAD)
     assert decision["action"] == "stop"
     assert decision["modifications"] == {}
@@ -112,12 +112,14 @@ def test_run_headless_claude_retries_once_then_succeeds():
         calls["n"] += 1
         if calls["n"] == 1:
             raise RuntimeError("aborted_streaming")
-        return {"action": "stop", "modifications": {}, "rationale": "x"}
+        return {"action": "stop", "modifications": {}, "rationale": "x"}, "claude-opus-5"
 
     with patch.object(rac, "_run_headless_claude_once", side_effect=flaky):
-        result = rac._run_headless_claude("prompt", rac._output_schema(rac.DEFAULT_ACTIONS), retries=1)
+        result, model = rac._run_headless_claude(
+            "prompt", rac._output_schema(rac.DEFAULT_ACTIONS), retries=1)
     assert calls["n"] == 2
     assert result["action"] == "stop"
+    assert model == "claude-opus-5"
 
 
 def test_run_headless_claude_gives_up_after_retries_exhausted():
@@ -156,9 +158,9 @@ def test_diagnose_falls_back_to_stop_on_invocation_failure_when_retry_not_offere
 
 def test_main_reads_stdin_writes_one_json_line(capsys, monkeypatch):
     monkeypatch.setattr(sys, "stdin", __import__("io").StringIO(json.dumps(OUTER_PAYLOAD)))
-    with patch.object(rac, "_run_headless_claude", return_value={
+    with patch.object(rac, "_run_headless_claude", return_value=({
         "action": "stop", "modifications": {}, "rationale": "x",
-    }):
+    }, "claude-opus-5")):
         rac.main()
     out = capsys.readouterr().out.strip()
     decision = json.loads(out)
@@ -221,3 +223,79 @@ def test_outer_loop_agent_decisions_render_as_decisions_not_empty_rungs():
     rendered = rac._spent_rungs(problem)
     assert "revise_plan" in rendered and "nchain" in rendered
     assert "None" not in rendered
+
+
+# --- The invocation itself: what the headless session is allowed to do, and where it runs ---
+
+class _Completed:
+    def __init__(self, stdout, returncode=0):
+        self.stdout, self.returncode, self.stderr = stdout, returncode, ""
+
+
+def _capture_argv(monkeypatch, stdout):
+    """Run one _run_headless_claude_once and return the subprocess.run call it made."""
+    seen = {}
+
+    def fake_run(cmd, **kwargs):
+        seen["cmd"], seen["kwargs"] = cmd, kwargs
+        return _Completed(stdout)
+
+    monkeypatch.setattr(rac.subprocess, "run", fake_run)
+    rac._run_headless_claude_once("p", {"type": "object"}, 600)
+    return seen
+
+
+def test_the_recovery_session_gets_no_mcp_servers(monkeypatch):
+    """The prompt promises the agent "no MCP tools here". Without --strict-mcp-config the
+    repo's own .mcp.json was loaded anyway and that promise was prose, not a constraint --
+    the agent must not be able to submit a job, claim a GPU, or reach the engines."""
+    seen = _capture_argv(monkeypatch, json.dumps({"structured_output": {"action": "stop"}}))
+    assert "--strict-mcp-config" in seen["cmd"]
+    assert "--mcp-config" not in seen["cmd"]
+
+
+def test_cwd_is_pinned_to_the_repo(monkeypatch):
+    """A `claude -p` session resolves .claude/ from its working directory. Launched from a
+    foreign cwd, `/recover` is not a resolvable command: the model gets that line as plain
+    prose with no playbook and still returns a well-formed decision -- a wrapper failure
+    laundered into a considered answer."""
+    seen = _capture_argv(monkeypatch, json.dumps({"structured_output": {"action": "stop"}}))
+    assert seen["kwargs"]["cwd"] == str(rac.REPO_ROOT)
+    assert (rac.REPO_ROOT / ".claude" / "commands" / "recover.md").exists()
+
+
+def test_the_allowlist_grants_no_find_no_write_and_no_edit():
+    """`Bash(<cmd>:*)` matches on command prefix, so `Bash(find:*)` also admitted
+    `find . -delete` and `find . -exec rm -rf {} +`. Glob/Grep have no exec path.
+
+    This checks tool NAMES, which is not the same as proving read-only: whether the
+    permission layer blocks a shell redirect (`cat x > y`) on an allowlisted prefix is
+    unverified here, so that remains the untested remainder."""
+    assert not any(t.startswith(("Write", "Edit", "Bash(find")) for t in rac.READ_ONLY_TOOLS)
+    assert "Glob" in rac.READ_ONLY_TOOLS and "Grep" in rac.READ_ONLY_TOOLS
+
+
+def test_the_command_allowlist_matches_the_playbooks_frontmatter():
+    """recover.md declares its own allowed-tools. If the two drift, the session is granted
+    one set and the playbook documents another."""
+    frontmatter = (rac.REPO_ROOT / ".claude" / "commands" / "recover.md").read_text()
+    declared = [t.strip() for t in
+                frontmatter.split("allowed-tools:", 1)[1].split("\n", 1)[0].split(",")]
+    assert declared == list(rac.READ_ONLY_TOOLS)
+
+
+def test_the_answering_model_is_recorded_in_the_rationale():
+    """--fallback-model means a decision may come from a different model than the run
+    started with. RecoveryDecision is a 3-field frozen dataclass that drops any extra key,
+    so the rationale -- persisted verbatim -- is what can carry provenance downstream."""
+    with patch.object(rac, "_run_headless_claude", return_value=(
+            {"action": "stop", "modifications": {}, "rationale": "novel failure"}, "sonnet")):
+        decision = rac.diagnose(OUTER_PAYLOAD)
+    assert "via sonnet" in decision["rationale"]
+    assert "novel failure" in decision["rationale"]
+
+
+def test_an_unreported_model_degrades_to_unknown_rather_than_asserting_one():
+    assert rac._answering_model({}) == "unknown model"
+    assert rac._answering_model({"model": "claude-opus-5"}) == "claude-opus-5"
+    assert rac._answering_model({"modelUsage": {"sonnet": {}}}) == "sonnet"

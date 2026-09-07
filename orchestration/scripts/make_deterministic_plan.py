@@ -38,7 +38,8 @@ import rules_common  # noqa: E402  -- module import so tests can monkeypatch rul
 from rules_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family  # shared rules access (single source of truth)
 import track_registry  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from stage_params import _exp_tg_point, _regime_exp_tg  # reuse the proven resolvers, don't duplicate them
+from stage_params import (_exp_tg_point, _regime_exp_tg,  # reuse the proven resolvers,
+                          workflow_reference_temperature)  # don't duplicate them
 from select_system_size import derive_cell  # per-SMILES cell derivation; the class dp_typical/nchain keys were removed 2026-09-02
 from select_system_size import _is_ua  # noqa: E402  -- one UA-field definition, shared with D-04
 from select_system_size import solve_system_size, SYSTEM_MW_FLOOR_DOI  # noqa: E402  -- D-04, the same call materialize_plan makes
@@ -69,7 +70,7 @@ SNAPSHOT_KEYS = [
     "md_tg_ceiling_K", "tg_t_low_K", "tg_t_step_K", "tg_rate_K_per_ns",
     "tg_min_steps_per_T",
     "K_deform_rate_inv_s", "K_deform_rate_slow_inv_s", "K_strain_max",
-    "bm_pressures_atm", "ct_min_decay_melt",
+    "bm_pressures_atm", "ct_min_decay_melt", "bm_temperature_K",
 ]
 
 
@@ -257,8 +258,12 @@ def build_planned_stages(cls: dict, properties: set, smiles: str | None = None) 
     exp_tg_bracket = _exp_tg_point(cls, smiles)
     # murnaghan deform-fallback hint: regime call, not the bracket -- _regime_exp_tg pads an
     # estimated Tg toward glassy (see its docstring), so this can disagree with the bracket.
+    # Compared against the ASSESSMENT temperature, not a bare 300 -- the fallback exists
+    # because a glassy cell's Murnaghan fit can go inadmissible, and "glassy" means below Tg at
+    # final_T_K. On the reasoned path `cls` is the effective class, so an overridden final_T_K
+    # reaches here; on the deterministic path no class declares one and it resolves to 300.
     glassy_hint = ((regime_tg := _regime_exp_tg(cls, smiles)) is not None
-                   and regime_tg > 300)
+                   and regime_tg > float(cls.get("final_T_K", 300.0)))
 
     def _s(stage, criteria, **extra):
         return {"stage": stage, "track": STAGE_TRACK[stage],
@@ -288,6 +293,13 @@ def build_planned_stages(cls: dict, properties: set, smiles: str | None = None) 
         # murnaghan. Otherwise it is murnaghan's contingent fallback and never a plan entry.
         "deform":      {"chain_submitted": True},
         "analyze-bm":  {},
+        # Structure is analysis-only over a cell the foundation track already gated, so there is
+        # no submission to assert and no admissibility of its own to check.
+        "analyze-structure": {},
+        # The vacuum reference: a build, then the NVT hold whose log the extractor reads.
+        "vacuum-build":      {"data_file_written": True},
+        "vacuum-chain":      {"chain_submitted": True},
+        "analyze-solubility": {},
         "run-summary": {},
     }
     # Glassy carries the deform fallback; rubbery (empirical or PROBE ladder) does not. The
@@ -416,6 +428,16 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
     slow_deform_rate = rules_common.resolve_slow_deform_rate(cls)
     if slow_deform_rate is not None:
         decided_params["K_deform_rate_slow_inv_s"] = slow_deform_rate
+    # The assessment temperature, for the same reason: no class declares final_T_K OR
+    # bm_temperature_K, so SNAPSHOT_KEYS copied NEITHER and both fell to a hardcoded 300.0
+    # buried in stage_params. That made final_T_K un-freezable and un-overridable in practice
+    # -- the run had no record of the temperature it was assessed at. Derive them so the plan
+    # states the assessment temperature, and so a remedy or an agent override has a key to
+    # move. bm_temperature_K follows final_T_K because the mechanical track measures on the
+    # cooling track's npt_final cell, which is gated at final_T_K and nowhere else;
+    # _validate_protocol_relationships holds them equal.
+    decided_params.setdefault("final_T_K", float(cls.get("final_T_K", 300.0)))
+    decided_params.setdefault("bm_temperature_K", decided_params["final_T_K"])
     # D-01: decided_params.preferred_ff is the field this run BUILDS with, resolved per SMILES.
     # It is never None -- a resolution that typed nothing refuses through the D-01 row's
     # admissible=[] instead, so the cell is still sized and priced against a real field.
@@ -433,7 +455,11 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
     # defaulting glassy by omission, padded toward glassy for an uncertain estimate.
     exp_tg = _regime_exp_tg(cls, smiles)
     T_equil = decided_params.get("T_equil_K", 600.0)
-    decided_params["T_workflow_K"] = 300.0 if (exp_tg is not None and exp_tg < 300) else T_equil
+    # Against the ASSESSMENT temperature, which decided_params now carries (see final_T_K
+    # above), not a literal 300 -- shared with stage_params._resolve_t_workflow so the plan
+    # records the reference the deck will actually run at.
+    decided_params["T_workflow_K"] = workflow_reference_temperature(
+        exp_tg, T_equil, decided_params["final_T_K"])
     # T_melt_hold_K is resolved by stage_params.temperature_schedule at execution time from this
     # same class entry plus the SMILES; recording it here makes it visible in the plan artifact,
     # freezable (write_characterization_cache.FREEZE_KEYS), and readable by the cost model, which

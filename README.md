@@ -31,20 +31,11 @@ The runtime source of truth is code and machine-readable configuration:
 There are no stage worker prompts and no agent-owned simulation state. The prior multi-agent
 implementation and manuscript archive remain available in Git history on `main`.
 
-## Agent Contract
-
-```bash
-python3 orchestration/scripts/agent_api.py contract
-python3 orchestration/scripts/agent_api.py inspect RUN_NAME
-```
-
-The contract requires scientific planning before execution and proves recovery is issue-triggered.
-The complete JSON schemas are documented in `docs/AGENT_CONTRACT.md`.
-
 ## Plan and Run
 
 Connect a model-provider wrapper that reads one JSON object from stdin and returns the planning
-decision JSON described in `docs/AGENT_CONTRACT.md`:
+decision JSON that `scientific_control.py` validates (run
+`python3 orchestration/scripts/agent_api.py contract` for the live schema):
 
 ```bash
 python3 orchestration/scripts/scientific_control.py \

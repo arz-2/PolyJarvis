@@ -33,7 +33,8 @@ the finished 300 K cell, so the top plateaus under-equilibrated and a faster swe
 less time contaminated there, read a *lower* Tg — an inverted rate dependence. The sweep now
 starts from the gated melt hold and runs the whole descent to `tg_t_low_K`, so both returned to
 the fast rate. (PEST then carried the key with an unrecognised `"highest_rate"` value until it
-was retired — see docs/decision_rationale.md.) There is no reheat probe and no mid-ramp
+was retired — see `tests/test_polymer_rules_schema.py`'s `tg_slope_gate_fallback` guard, which
+records that history.) There is no reheat probe and no mid-ramp
 waypoint to select between: the staircase's first point is the cell the melt gate certified.
 
 ### Sweep

@@ -14,6 +14,11 @@ to every grep for `from rdkit import`, and none of them able to share a line of 
 the others. This file is all five, so the wildcard-stripping trick is written once and
 the in-env dependency is one path.
 
+The `classify` subcommand additionally needs RadonPy (installed in the `mol-builder`
+env, not `radonpy`); its import is deliberately deferred into the handler so every
+other subcommand keeps working wherever only RDKit is present -- notably CI, which
+sets POLYJARVIS_MOL_PYTHON to a venv holding rdkit and no RadonPy.
+
 IMPORT-SAFE ONLY IN THE MOL ENVIRONMENT. This module is a CLI, not a library: base-env
 callers must reach it through mol_python.run_in_mol_env(script_path=RDKIT_CLI, ...), which
 is what every wrapper listed below already does. Do not `import rdkit_cli` from
@@ -25,6 +30,9 @@ Subcommands, and the wrapper each one exists for:
   monomer-info  -> select_hardware._monomer_atoms_and_mw() (cell sizing + D-08 hardware)
   tg-estimate   -> stage_params._estimate_tg_group_contribution() (exp-Tg fallback/bracket)
   rigidity      -> select_system_size._backbone_rigidity() (D-04 chain-length advisory)
+  match-moieties-> forcefield.select_by_moiety()           (D-01 build-blocker screen)
+  classify      -> classify_cli.classify_polymer()         (polymer_class + group profile)
+  chemistry     -> classify_cli.chemistry_profile()        (functional groups, all locations)
 
 Output contracts differ per subcommand ON PURPOSE -- each wrapper's error handling was
 written against its own, and unifying them would silently change wrapper behavior:
@@ -36,6 +44,8 @@ written against its own, and unifying them would silently change wrapper behavio
   tg-estimate          {"error": ...} JSON on stdout, exit 0 (json mode); the wrapper tests
                        for the key, and an unestimable Tg is not a crash.
   rigidity             {"error": ...} JSON on stdout, exit 1.
+  match-moieties,      {"error": ...} JSON on stdout, exit 1; a batch always exits 0 and
+  classify             reports per-SMILES errors inside its own results list.
 
 Usage:
   python3 orchestration/scripts/rdkit_cli.py canon --smiles '*CC*'
@@ -304,6 +314,13 @@ def estimate_tg(smiles: str) -> dict:
     annealing_high = tg_est + 300
     tg_t_high      = max(round(tg_est * 1.5), T_equil + 20)
     tg_t_low       = max(round(tg_est * 0.65), 100)
+    # ASSUMES an assessment temperature of 300 K, which is final_T_K's default. This estimator
+    # runs before a plan exists (isolated RDKit env -- see the module docstring's "do not import
+    # rdkit_cli"), so it cannot know a run's actual final_T_K. It is a SUGGESTION for a human
+    # curating a new class entry, consumed by nothing: stage_params reads only tg_estimated_K
+    # from this payload and derives T_workflow itself via workflow_reference_temperature, which
+    # does compare against the real final_T_K. If a curator pastes this value into a class entry
+    # for a run assessed off 300 K, it will be wrong -- re-derive it there.
     T_workflow     = 300.0 if tg_est < 300 else float(T_equil)
 
     confidence = "very_low" if unmatched_frac > 0.30 else "low"
@@ -621,6 +638,400 @@ def _cmd_match_moieties(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# classify
+# ---------------------------------------------------------------------------
+PROFILE_RULES = Path(__file__).resolve().parent.parent.parent / "guides" / "polymer_group_profile.json"
+
+
+def _load_profile(rules_path=None) -> dict:
+    return json.loads(Path(rules_path or PROFILE_RULES).read_text())
+
+
+def _group_locations(smiles: str, profile: dict, flags: dict) -> dict:
+    """Every group family in the profile, tagged backbone vs pendant.
+
+    This is the part RadonPy structurally cannot report. polyinfo_classifier matches its
+    tier-1 SMARTS on extract_mainchain(smi) -- the BACKBONE ONLY -- so a pendant ester
+    (PMMA's -C(=O)OMe) never appears in its `flags` at all. That distinction is not
+    cosmetic: "polyester" and "acrylic carrying an ester" want different protocols.
+
+    So the two halves are read from two different places, and neither is re-derived:
+      backbone  <- RadonPy's own `flags`, which are by construction mainchain-only.
+      pendant   <- the same SMARTS re-matched on the 2-mer (_dimer_for_screening, so a
+                   chain-end cut cannot hide a group) for families RadonPy did NOT flag.
+
+    Tier-2 (styrene/acryl) and the element-count families are reported from `flags` alone.
+    Their SMARTS are written against the `[14C]` mainchain isotope tagging that
+    polyinfo_classifier applies to its own working copy; matching them raw against an
+    untagged molecule yields noise, not information, so this does not try.
+    """
+    dimer = _dimer_for_screening(smiles)
+    out = {}
+    for cls, rule in profile["groups"].items():
+        flagged = bool(flags.get(cls, False))
+        patterns = rule.get("smarts")
+        tier = rule.get("tier")
+        if flagged:
+            out[cls] = {"location": "backbone", "source": "polyinfo_flags",
+                        "smarts_var": rule.get("smarts_var")}
+            continue
+        if tier != 1 or not patterns or dimer is None:
+            continue  # see docstring: tier-2/element-count are not independently matchable
+        n = 0
+        for smarts in patterns:
+            pat = Chem.MolFromSmarts(smarts)
+            if pat is not None:
+                n += len(dimer.GetSubstructMatches(pat))
+        if n:
+            out[cls] = {"location": "pendant", "source": "dimer_rematch",
+                        "n_matches_2mer": n, "smarts_var": rule.get("smarts_var")}
+    return out
+
+
+def classify(smiles: str, rules_path=None, overrides_path=None, fg_rules_path=None) -> dict:
+    """Full chemical-group profile of a repeat unit, plus its PoLyInfo class.
+
+    The LABEL is RadonPy's -- poly.polyinfo_classifier is called directly, never
+    reimplemented, because docs/ff_coverage_sweep/arm0.jsonl (this repo's classification
+    ground truth) IS that function's output. Everything else here is additive:
+
+      groups        every family present, tagged backbone vs pendant -- see
+                    _group_locations for why RadonPy cannot report the pendant half.
+      co_occurring  families RadonPy flagged that did not win the priority ladder.
+      runner_up     the next class down that ladder; carried as evidence, never applied.
+      chemistry     the REAL chemistry: every functional group in guides/functional_groups.json
+                    that the repeat unit contains, wherever it sits, with per-group backbone/
+                    pendant location plus composition and the descriptors that bear on
+                    protocol choice. This is the half a backbone taxonomy cannot give -- see
+                    chemistry_profile.
+
+    `polymer_class` may differ from `polyinfo_class` when guides/class_overrides.json
+    records a deliberate departure (see that file). Both are always reported, and
+    `class_source` says which one is binding, so the substitution is never silent.
+    """
+    from radonpy.core import poly as _poly
+
+    profile = _load_profile(rules_path)
+    groups = profile["groups"]
+    by_id = {v["class_id"]: k for k, v in groups.items()}
+
+    try:
+        class_id, flags = _poly.polyinfo_classifier(smiles, return_flag=True)
+    except Exception as exc:
+        return {"smiles": smiles, "error": f"polyinfo_classifier failed: {exc}"}
+
+    polyinfo_class = by_id.get(class_id)
+    if class_id == 0 or polyinfo_class is None:
+        return {"smiles": smiles, "error": "UNRESOLVED_CLASS",
+                "detail": (f"polyinfo_classifier returned class_id={class_id}; the repeat unit "
+                           "matched no PoLyInfo family. A guessed class would silently set "
+                           "charge_method, electrostatics, cutoff_A, dt_fs, T_equil_K and the "
+                           "experimental bands, so this refuses instead."),
+                "class_id": class_id}
+
+    ranked = sorted((c for c, on in flags.items() if on and c in groups),
+                    key=lambda c: groups[c]["priority_rank"])
+    runner_up = next((c for c in ranked if c != polyinfo_class), None)
+
+    result = {
+        "smiles": smiles,
+        "class_id": class_id,
+        "polyinfo_class": polyinfo_class,
+        "polymer_class": polyinfo_class,
+        "class_source": "radonpy_polyinfo",
+        "priority_rank": groups[polyinfo_class]["priority_rank"],
+        "flags": {c: bool(flags.get(c, False)) for c in groups},
+        "co_occurring": [c for c in ranked if c != polyinfo_class],
+        "runner_up": runner_up,
+        "groups": _group_locations(smiles, profile, flags),
+        "chemistry": chemistry_profile(smiles, fg_rules_path),
+    }
+
+    override = _lookup_override(smiles, overrides_path)
+    if override:
+        result["polymer_class"] = override["polymer_class"]
+        result["class_source"] = "override"
+        result["override"] = {**override, "displaced": polyinfo_class}
+    return result
+
+
+def _lookup_override(smiles: str, overrides_path=None) -> dict | None:
+    """A deliberate, documented departure from polyinfo's label for this exact molecule.
+
+    Keyed on the isomeric canonical SMILES so it cannot be dodged by rewriting the input.
+    Absent file or absent key means no override -- this is a small allowlist, not a
+    second taxonomy.
+    """
+    path = Path(overrides_path or (PROFILE_RULES.parent / "class_overrides.json"))
+    if not path.is_file():
+        return None
+    entries = json.loads(path.read_text()).get("overrides", {})
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    return entries.get(Chem.MolToSmiles(mol))
+
+
+def _cmd_classify(args) -> int:
+    if bool(args.smiles) == bool(args.input):
+        print(json.dumps({"error": "give exactly one of --smiles or --input"}))
+        return 1
+    if args.smiles:
+        result = classify(args.smiles, args.rules, args.overrides, args.fg_rules)
+    else:
+        # One subprocess for the whole list -- the 982-molecule sweep is minutes, not
+        # hours, only because it does not re-cross the conda seam per SMILES.
+        smiles_list = json.loads(Path(args.input).read_text())
+        result = {"results": [classify(s, args.rules, args.overrides, args.fg_rules)
+                              for s in smiles_list]}
+    print(json.dumps(result, indent=2))
+    return 1 if "error" in result else 0
+
+
+# ---------------------------------------------------------------------------
+# chemistry profile (functional groups, wherever they sit)
+# ---------------------------------------------------------------------------
+FG_RULES = Path(__file__).resolve().parent.parent.parent / "guides" / "functional_groups.json"
+
+#: Strongest wins. The molecule's polarity class is the strongest category it contains.
+POLARITY_ORDER = ("apolar", "weakly_polar", "polar_aprotic", "polar_protic", "ionic")
+
+_FG_CACHE: dict = {}
+
+
+def _compiled_fgs(rules_path=None) -> list:
+    key = str(rules_path or FG_RULES)
+    if key not in _FG_CACHE:
+        doc = json.loads(Path(key).read_text())
+        out = []
+        for rule in doc.get("groups", []):
+            pat = Chem.MolFromSmarts(rule["smarts"])
+            if pat is None:
+                raise ValueError(f"Bad SMARTS for {rule['id']!r}: {rule['smarts']!r}")
+            out.append((rule, pat))
+        _FG_CACHE[key] = out
+    return _FG_CACHE[key]
+
+
+def _backbone_path_of_dimer(mol) -> set:
+    """Atom indices along the main chain of a 2-mer built by _dimer_for_screening.
+
+    That helper keeps the OUTER two wildcards, so the chain runs from one to the other and
+    the shortest path between their neighbours is the backbone -- through both repeat units,
+    including the junction bond a single repeat unit cannot show.
+    """
+    wc = [a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() == 0]
+    if len(wc) != 2:
+        return set()
+    ends = []
+    for idx in wc:
+        nbrs = mol.GetAtomWithIdx(idx).GetNeighbors()
+        if len(nbrs) != 1:
+            return set()
+        ends.append(nbrs[0].GetIdx())
+    return set(Chem.GetShortestPath(mol, ends[0], ends[1]))
+
+
+def _core_atoms(mol, match) -> list:
+    """The atoms that make a functional group the group it is.
+
+    Its heteroatoms, plus any carbon double-bonded to one -- a carbonyl carbon is as much
+    the identity of an ester or a ketone as its oxygens are. Everything else in a match is
+    context: the SMARTS for a ketone names the two flanking carbons, the one for a hydroxyl
+    names the carbon it hangs from, and those say nothing about where the group sits.
+    """
+    core = []
+    for idx in match:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetAtomicNum() not in (1, 6):
+            core.append(idx)
+            continue
+        for bond in atom.GetBonds():
+            other = bond.GetOtherAtom(atom)
+            if (bond.GetBondType() == Chem.BondType.DOUBLE
+                    and other.GetAtomicNum() not in (1, 6)):
+                core.append(idx)
+                break
+    return core
+
+
+def _match_location(mol, match, backbone: set, polarity: str | None = None) -> str:
+    """Is this functional group IN the main chain, or hanging off it?
+
+    Decided on the group's core atoms (see _core_atoms), because that is the distinction
+    that matters and the one polyinfo_classifier structurally cannot draw -- it matches on
+    the extracted mainchain, so it never sees a pendant group at all. PLA's ester oxygen and
+    carbonyl carbon lie on the backbone path (in-chain ester -> polyester); PMMA's lie off
+    it (pendant ester on a hydrocarbon backbone -> acrylic). Same SMARTS, opposite answer.
+
+    Two failure modes this avoids. Testing ALL match atoms would call PVA's hydroxyl
+    "backbone", because the SMARTS names the backbone carbon the -OH hangs from. Testing
+    heteroatoms alone would call PEEK's ketone "pendant", because its only heteroatom is the
+    exocyclic =O while the carbonyl carbon it belongs to is squarely in the chain.
+
+    Apolar groups -- a phenyl ring, an alkene, a quaternary centre -- are exempt from the
+    core test entirely, not merely expected to have no core. Their identity is carbon, so any
+    heteroatom the SMARTS happens to name is context: quaternary_carbon matches the alpha
+    carbon AND its four neighbours, one of which in PMMA is an ester carbonyl carbon. Letting
+    that carbonyl become the "core" would report PMMA's backbone alpha-carbon as pendant.
+    They fall back to the whole match: PS's pendant phenyl touches no backbone atom, PEEK's
+    in-chain arylene is threaded by the path.
+    """
+    probe = (list(match) if polarity == "apolar"
+             else (_core_atoms(mol, match) or list(match)))
+    return "backbone" if any(i in backbone for i in probe) else "pendant"
+
+
+def chemistry_profile(smiles: str, rules_path=None) -> dict:
+    """Every functional group in the repeat unit, how many, and where.
+
+    Matched on the 2-mer for the same reason the build-blocker screen is (see
+    _dimer_for_screening): a repeat unit can be cut anywhere along the chain, and a group
+    that spans the cut is invisible in the monomer.
+
+    Descriptors are computed on the wildcard-stripped MONOMER so counts are per repeat unit
+    rather than doubled, and so H counts reflect true backbone connectivity.
+    """
+    dimer = _dimer_for_screening(smiles)
+    screened_on = "2-mer"
+    if dimer is None:
+        dimer = Chem.MolFromSmiles(smiles)
+        screened_on = "repeat_unit"
+    if dimer is None:
+        return {"error": f"Could not parse SMILES: {smiles!r}"}
+
+    backbone = _backbone_path_of_dimer(dimer)
+    groups = []
+    for rule, pat in _compiled_fgs(rules_path):
+        matches = dimer.GetSubstructMatches(pat)
+        if not matches:
+            continue
+        locations = [_match_location(dimer, m, backbone, rule.get("polarity"))
+                     for m in matches]
+        groups.append({
+            "id": rule["id"], "label": rule.get("label"), "polarity": rule.get("polarity"),
+            # Per repeat unit: the 2-mer contains two copies of everything that does not
+            # span the junction, so halve and keep at least one.
+            "count": max(1, len(matches) // 2),
+            "count_2mer": len(matches),
+            "location": "backbone" if "backbone" in locations else "pendant",
+            "locations": {"backbone": locations.count("backbone"),
+                          "pendant": locations.count("pendant")},
+            "hbond_donors": rule.get("hbond_donors", 0),
+            "hbond_acceptors": rule.get("hbond_acceptors", 0),
+            "note": rule.get("note"),
+        })
+
+    # Descriptors come off the 2-mer, not _prepare_repeat_unit's monomer. That helper
+    # freezes H counts and caps the ends, which breaks kekulization on aromatic-backbone
+    # repeat units -- PPS, PEEK, PSU and PPV all fail it, and so does every fused polyimide.
+    # Silently empty descriptors there made `elements` empty, and an empty set is a subset of
+    # {C,H}: polyimides were reporting as apolar hydrocarbons. Extensive quantities are
+    # halved back to one repeat unit; the dimer joins two units without losing an atom, so
+    # the division is exact rather than approximate.
+    descriptors = _descriptors(dimer, per_unit=2 if screened_on == "2-mer" else 1)
+
+    # The molecule's OWN transition temperature, carried alongside its chemistry so a caller
+    # is not forced to read Tg off a class label. estimate_tg also derives a T_equil_K from it
+    # (Tg + 200 K); chemistry_policy.check_melt_margin uses the Tg to ask whether the class's
+    # prescribed melt temperature leaves enough headroom for THIS repeat unit.
+    tg = estimate_tg(smiles)
+
+    present = {g["polarity"] for g in groups}
+    polarity = next((p for p in reversed(POLARITY_ORDER) if p in present), "apolar")
+
+    elements = descriptors.get("elements", {})
+    # Aromatic carbon is not electrostatically inert. An aryl ring is quadrupolar and the
+    # all-atom fields assign real partial charges to it -- polymer_rules' own ff_note for
+    # PSTR says PCFF is preferred over TraPPE-UA precisely because of aromatic ring charges.
+    # So "pure hydrocarbon" alone is not a licence to drop long-range electrostatics; PS is
+    # C/H only and correctly carries pppm.
+    # Fail CLOSED when composition is unknown: no elements means no evidence of apolarity,
+    # and lj_cut is the answer that can be a physics error.
+    hydrocarbon_only = bool(elements) and set(elements) <= {"C", "H"}
+    apolar_aliphatic = hydrocarbon_only and not descriptors.get("n_aromatic_rings")
+    return {
+        "screened_on": screened_on,
+        "functional_groups": sorted(groups, key=lambda g: (g["location"], g["id"])),
+        "backbone_groups": [g["id"] for g in groups if g["location"] == "backbone"],
+        "pendant_groups": [g["id"] for g in groups if g["location"] == "pendant"],
+        "tg_estimate": ({k: tg.get(k) for k in
+                         ("tg_estimated_K", "T_equil_K", "method", "confidence",
+                          "unmatched_heavy_frac")}
+                        if "error" not in tg else {"error": tg["error"]}),
+        "polarity_class": polarity,
+        "hydrocarbon_only": hydrocarbon_only,
+        "apolar_aliphatic": apolar_aliphatic,
+        # The only two classes carrying lj_cut in polymer_rules.json are PHYC and PDIE --
+        # the aliphatic-hydrocarbon ones -- so this reconstructs that table's own rule from
+        # the MOLECULE rather than from its class label. Advisory: chemistry_policy compares
+        # the two and reports a divergence; it never overrides the class.
+        "implied_electrostatics": (None if not elements
+                                   else "lj_cut" if apolar_aliphatic else "pppm"),
+        **descriptors,
+    }
+
+
+def _descriptors(mol, per_unit: int = 1) -> dict:
+    """Composition and the physicochemical descriptors that bear on protocol choice.
+
+    `per_unit` divides the EXTENSIVE quantities (counts, mass, polar surface area) so they
+    describe one repeat unit when the molecule handed in is an n-mer. Fractions are
+    intensive and pass through unchanged. Wildcard atoms are excluded from every count --
+    they are chain-end markers, not chemistry.
+    """
+    if mol is None:
+        return {}
+    real = [a for a in mol.GetAtoms() if a.GetAtomicNum() != 0]
+    if not real:
+        return {}
+    hetero = [a for a in real if a.GetAtomicNum() not in (1, 6)]
+    aromatic = [a for a in real if a.GetIsAromatic()]
+
+    elements: dict = {}
+    try:
+        for atom in Chem.AddHs(mol).GetAtoms():
+            if atom.GetAtomicNum() == 0:
+                continue
+            elements[atom.GetSymbol()] = elements.get(atom.GetSymbol(), 0) + 1
+    except Exception:  # noqa: BLE001 -- composition is advisory; never sink a profile for it
+        for atom in real:
+            elements[atom.GetSymbol()] = elements.get(atom.GetSymbol(), 0) + 1
+
+    def per(value):
+        return round(value / per_unit, 3) if isinstance(value, float) else value // per_unit
+
+    out = {
+        "elements": {k: per(v) for k, v in sorted(elements.items())},
+        "n_heavy_atoms": per(len(real)),
+        "heteroatom_fraction": round(len(hetero) / len(real), 3),
+        "aromatic_atom_fraction": round(len(aromatic) / len(real), 3),
+        "descriptor_basis": f"{per_unit}-mer, divided to one repeat unit" if per_unit > 1
+                            else "repeat unit",
+    }
+    for name, fn, cast in (
+        ("n_aromatic_rings", Chem.rdMolDescriptors.CalcNumAromaticRings, int),
+        ("hbond_donors", Chem.rdMolDescriptors.CalcNumHBD, int),
+        ("hbond_acceptors", Chem.rdMolDescriptors.CalcNumHBA, int),
+        ("rotatable_bonds", Chem.rdMolDescriptors.CalcNumRotatableBonds, int),
+        ("tpsa", Chem.rdMolDescriptors.CalcTPSA, float),
+        ("mw_repeat_unit", Descriptors.MolWt, float),
+    ):
+        try:
+            out[name] = per(cast(fn(mol)))
+        except Exception:  # noqa: BLE001
+            out[name] = None
+    out["formal_charge"] = Chem.GetFormalCharge(mol) // per_unit
+    return out
+
+
+def _cmd_chemistry(args) -> int:
+    result = chemistry_profile(args.smiles, args.rules)
+    print(json.dumps(result, indent=2))
+    return 1 if "error" in result else 0
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def main() -> int:
@@ -663,6 +1074,26 @@ def main() -> int:
     c.add_argument("--rules", default=None,
                    help="Override guides/ff_moiety_rules.json (testing only)")
     c.set_defaults(func=_cmd_match_moieties)
+
+    c = sub.add_parser("classify",
+                       help="PoLyInfo class + full chemical-group profile of a repeat unit")
+    c.add_argument("--smiles", default=None)
+    c.add_argument("--input", default=None,
+                   help="JSON file holding a list of SMILES; one subprocess for the batch")
+    c.add_argument("--rules", default=None,
+                   help="Override guides/polymer_group_profile.json (testing only)")
+    c.add_argument("--overrides", default=None,
+                   help="Override guides/class_overrides.json (testing only)")
+    c.add_argument("--fg-rules", default=None,
+                   help="Override guides/functional_groups.json (testing only)")
+    c.set_defaults(func=_cmd_classify)
+
+    c = sub.add_parser("chemistry",
+                       help="functional-group inventory of a repeat unit, backbone and pendant")
+    c.add_argument("--smiles", required=True)
+    c.add_argument("--rules", default=None,
+                   help="Override guides/functional_groups.json (testing only)")
+    c.set_defaults(func=_cmd_chemistry)
 
     args = p.parse_args()
     return args.func(args)

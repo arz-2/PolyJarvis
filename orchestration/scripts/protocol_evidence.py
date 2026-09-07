@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-protocol_evidence.py — the protocol evidence stores: schema, both ingest paths, and retrieval.
+protocol_evidence.py — the protocol evidence store: schema, both ingest paths, and retrieval.
 
 One store format, two ways in, one way out. Until 2026-09-02 that was five files
 (protocol_evidence_store.py, ingest_protocol_evidence.py, ingest_internal_run_evidence.py,
@@ -10,10 +10,10 @@ so answering "what is a record, and who may write one" meant opening four of the
 _now_iso()/STORE_PATHS were each defined more than once.
 
 Subcommands:
-  ingest           fold the literature critic's advisory JSON into the ff store (DOI-verified
+  ingest           fold the literature critic's advisory JSON into the store (DOI-verified
                    external sources; the critic writes the advisory, this validates it).
-                   --store ff only: the critic stopped emitting a system-size advisory on
-                   2026-09-02, so that store is now written by ingest-internal alone.
+                   `--store ff` is the only value: the critic stopped emitting a system-size
+                   advisory on 2026-09-02, and that store was deleted 2026-09-05.
   ingest-internal  fold a COMPLETED, gate-passing run of this pipeline into the store as
                    internal_validated_run evidence
   query            tiered retrieval: exact_smiles > exact_class > similar_class
@@ -45,7 +45,6 @@ from mol_python import run_in_mol_env, RDKIT_CLI  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 STORE_PATHS = {
     "ff": os.path.join(REPO, "docs", "protocol_evidence_ff.json"),
-    "system_size": os.path.join(REPO, "docs", "protocol_evidence_system_size.json"),
 }
 
 
@@ -58,19 +57,21 @@ STORE_PATHS = {
 # by migrate_ff_selection_literature.py, query_protocol_evidence.py, and
 # ingest_protocol_evidence.py so the three scripts can't drift on record shape. stdlib only.
 #
-# Two store files exist, same record shape, different `field` values populated:
-#   docs/protocol_evidence_ff.json          — forcefield, electrostatics, tg_target (plus
-#                                              cooling_rate, density_target, cte_glass_melt on
-#                                              records written before 2026-09-02: those three
-#                                              fields were retired from the critic's schema as
-#                                              non-essential to protocol adjustment, so nothing
-#                                              writes them any more, but stored records stay
-#                                              valid and queryable)
-#   docs/protocol_evidence_system_size.json — system_size (ingest-internal only)
+# ONE store file, docs/protocol_evidence_ff.json — forcefield, electrostatics, tg_target (plus
+# cooling_rate, density_target, cte_glass_melt on records written before 2026-09-02: those three
+# fields were retired from the critic's schema as non-essential to protocol adjustment, so
+# nothing writes them any more, but stored records stay valid and queryable).
 #
-# Both stores hold ONLY already-verified findings (doi_verified: true) — they are a cache
+# docs/protocol_evidence_system_size.json was a SECOND store until 2026-09-05. It was write-ONLY
+# from the day D-04 stopped being a literature question: the critic's system-size advisory went
+# on 2026-09-02, select_system_size.derive_cell/solve_system_size size the cell from a per-SMILES
+# mass floor and never open an evidence store, and literature-grounding-worker.md queries
+# `--store ff` only. ingest-internal wrote 19 records that nothing ever read. Deleted with its
+# whole write path; those records are recoverable at commit 22ed783 if the question comes back.
+#
+# The store holds ONLY already-verified findings (doi_verified: true) — it is a cache
 # of verified evidence, not a scratchpad of candidates. An unverified source never enters
-# either store; it stays in a run's own advisory JSON only. "Verified" has two forms:
+# it; it stays in a run's own advisory JSON only. "Verified" has two forms:
 # literature evidence is DOI-verified by the literature workers; internal-run evidence
 # (ingest_internal_run_evidence.py, trust_tier "internal_validated_run") is verified by
 # that run's own binding gate actually passing — doi_verified stays True for both, the
@@ -78,7 +79,7 @@ STORE_PATHS = {
 # ===========================================================================
 FIELDS = (
     "forcefield", "electrostatics", "cooling_rate", "density_target",
-    "tg_target", "cte_glass_melt", "system_size",
+    "tg_target", "cte_glass_melt",
 )
 # internal_validated_run ranks above peer_reviewed_doi: a finding this exact pipeline
 # reproduced end-to-end under its own gates is stronger evidence for future planning here
@@ -274,11 +275,10 @@ def compute_similarities(query_smiles: str, candidate_smiles: list[str],
 # This is the ONLY writer of docs/protocol_evidence_ff.json besides the one-time
 # migrate_ff_selection_literature.py migration. literature-grounding-worker calls it once (via
 # Bash) as its last step, rather than writing to the store directly — code, not the LLM subagent,
-# owns the store's provenance (CLAUDE.md). `--store ff` is the only advisory path: the critic's
-# system-size half was removed 2026-09-02 along with the literature->cell-size fold-in, so
-# docs/protocol_evidence_system_size.json is now written exclusively by ingest-internal, from
-# completed validated runs. Passing --store system_size here raises rather than quietly adding
-# nothing.
+# owns the store's provenance (CLAUDE.md). `--store ff` is the only path there is: the critic's
+# system-size half was removed 2026-09-02 along with the literature->cell-size fold-in, and the
+# system_size store itself was deleted 2026-09-05 as write-only. Any other --store value raises
+# rather than quietly adding nothing — a caller still passing one must hear about it.
 #
 # Only `verified: true` sources are ingested — an unverified candidate in the advisory JSON
 # is silently skipped (it was already excluded from backing any recommendation by the
@@ -429,13 +429,16 @@ def _records_from_ff_advisory(advisory: dict, run_name: str) -> tuple[list[dict]
 
 def ingest(store_kind: str, advisory: dict, run_name: str, store_path: str,
            dry_run: bool = False) -> dict:
-    # `ff` is the only advisory ingest path since 2026-09-02: the literature critic no longer
-    # emits a system-size advisory (the DP/nchain/convergence fields it fed were retired). The
-    # system_size store is still written -- but only by ingest-internal, from completed runs.
+    # `ff` is the only ingest path since 2026-09-02, when the literature critic stopped emitting
+    # a system-size advisory (the DP/nchain/convergence fields it fed were retired); the
+    # system_size store itself was deleted 2026-09-05. This stays an explicit raise rather than
+    # leaning on argparse choices, because ingest() is also called directly (tests, and any
+    # future caller that skips the CLI).
     if store_kind != "ff":
         raise ValueError(
-            f"no advisory ingest path for --store {store_kind!r}; system_size records come from "
-            "`ingest-internal` (completed validated runs) only")
+            f"no advisory ingest path for --store {store_kind!r}; `ff` is the only store. "
+            "system_size was retired 2026-09-05 -- cell size is derived per SMILES by "
+            "select_system_size.py, never grounded from evidence")
     new_records, store_origin_ids = _records_from_ff_advisory(advisory, run_name)
     with_methodology = True
 
@@ -480,8 +483,8 @@ def ingest(store_kind: str, advisory: dict, run_name: str, store_path: str,
 # make_plan_from_cache() is its only reader). It never becomes evidence for a DIFFERENT,
 # chemically-related polymer's novel-run-plan grounding. This script closes that gap: it
 # reads a run's frozen system_characterization_cache.json entry and emits
-# ProtocolEvidenceRecords into the same docs/protocol_evidence_ff.json /
-# protocol_evidence_system_size.json stores query_protocol_evidence.py already reads —
+# ProtocolEvidenceRecords into the same docs/protocol_evidence_ff.json store the `query`
+# subcommand already reads —
 # tagged provenance.origin="internal_run", trust_tier="internal_validated_run" (ranked
 # above peer_reviewed_doi, since it's directly reproduced in this exact pipeline, not
 # merely cited).
@@ -496,7 +499,8 @@ def ingest(store_kind: str, advisory: dict, run_name: str, store_path: str,
 # protocol_validated: true (never a blocked entry, e.g. one held back by a requires_*
 # precondition like cis-PBD's requires_cis_lock).
 #
-# Only emits protocol-CHOICE fields (forcefield, electrostatics, system_size, cooling_rate)
+# Only emits protocol-CHOICE fields (forcefield, electrostatics, cooling_rate -- system_size
+# was emitted too until 2026-09-05, into a second store nothing ever read)
 # — never density_target/tg_target/cte_glass_melt. A run's acceptance certifies that its
 # binding gate(s) passed, i.e. that the protocol choices produced a valid simulation; it
 # does NOT certify that a measured property value is accurate against experiment. Gates
@@ -505,8 +509,8 @@ def ingest(store_kind: str, advisory: dict, run_name: str, store_path: str,
 # documented ~6% systematic deficit). Emitting measured values as *_target records at the
 # top trust tier — where a worker's skip-rule lets them stand in for a fresh literature
 # search — would institutionalize this pipeline's own known biases as its own highest-trust
-# targets for the next polymer. What the gate DOES certify (FF/electrostatics/system-size
-# choice worked; a cooling-rate schedule produced a well-fit Tg extrapolation) is safe to
+# targets for the next polymer. What the gate DOES certify (FF/electrostatics choice worked;
+# a cooling-rate schedule produced a well-fit Tg extrapolation) is safe to
 # record and is what this module emits.
 #
 # Re-ingesting the same run_name (e.g. after a re-validation with different measured
@@ -523,13 +527,15 @@ def ingest(store_kind: str, advisory: dict, run_name: str, store_path: str,
 # ===========================================================================
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-# decisions[].id -> the store `field` it grounds. Only D-01/D-03/D-04 map onto this
-# schema's fields (D-02_charges, D-05..D-08 aren't part of the FIELDS enum — see
-# literature-grounding-worker.md's own field table (Part A) for the same scope).
+# decisions[].id -> the store `field` it grounds. D-04_system_size mapped to "system_size"
+# until 2026-09-05: its records went to a store nothing read, and the decision is not
+# evidence-grounded at all -- cell size is derived per SMILES from a system-mass floor
+# (select_system_size.derive_cell), so a completed run contributes no size FINDING, only an
+# arithmetic result. D-02_charges and D-05..D-08 were never part of the FIELDS enum — see
+# literature-grounding-worker.md's own field table (Part A) for the same scope.
 _DECISION_ID_TO_FIELD = {
     "D-01_ff": "forcefield",
     "D-03_electrostatics": "electrostatics",
-    "D-04_system_size": "system_size",
 }
 
 
@@ -583,18 +589,10 @@ def evidence_records_from_completed_run(entry: dict, run_name: str, smiles: str)
         if not decision or not decision.get("choice"):
             continue
         choice = decision["choice"]
-        if field == "system_size":
-            value = {"dp_typical": decided_params.get("dp_typical"),
-                      "nchain": decided_params.get("nchain"),
-                      "convergence_basis": "internal_run_validated"}
-            claim = (f"PolyJarvis validated {polymer_class} ({smiles}) at "
-                     f"dp_typical={value['dp_typical']}, nchain={value['nchain']} in run "
-                     f"{run_name}; validated properties: {sorted(validated_properties)}.")
-        else:
-            value = {"recommendation": choice}
-            claim = (f"PolyJarvis validated {choice} for {field} on {polymer_class} "
-                     f"({smiles}) in run {run_name}; validated properties: "
-                     f"{sorted(validated_properties)}.")
+        value = {"recommendation": choice}
+        claim = (f"PolyJarvis validated {choice} for {field} on {polymer_class} "
+                 f"({smiles}) in run {run_name}; validated properties: "
+                 f"{sorted(validated_properties)}.")
         records.append(build_record(
             field=field, polymer_class=polymer_class, polymer_names=[], smiles=[smiles],
             claim=claim, value=value, doi=pseudo_doi, url=None, title=title, year=year,
@@ -626,7 +624,6 @@ def evidence_records_from_completed_run(entry: dict, run_name: str, smiles: str)
 def ingest_from_completed_run(run_name: str, *, repo_root: Path = REPO_ROOT,
                                cache_path: Optional[Path] = None,
                                ff_store_path: Optional[Path] = None,
-                               system_size_store_path: Optional[Path] = None,
                                dry_run: bool = False) -> dict:
     repo_root = Path(repo_root)
     run_dir = repo_root / "data" / run_name
@@ -661,49 +658,42 @@ def ingest_from_completed_run(run_name: str, *, repo_root: Path = REPO_ROOT,
     if not records:
         return {"status": "skipped", "reason": "no mappable decisions/measurements to record"}
 
-    ff_records = [r for r in records if r["field"] != "system_size"]
-    size_records = [r for r in records if r["field"] == "system_size"]
-
+    # ONE store since 2026-09-05. This was a two-store fan-out (ff + system_size) until the
+    # system_size store was deleted as write-only; the ff/size record split and the
+    # (store, group, with_methodology) loop went with it. `result` keeps the same key shape.
     ff_store_path = Path(ff_store_path) if ff_store_path else repo_root / "docs" / "protocol_evidence_ff.json"
-    size_store_path = (Path(system_size_store_path) if system_size_store_path
-                        else repo_root / "docs" / "protocol_evidence_system_size.json")
 
     result = {"status": "written", "records_added": 0, "records_skipped_duplicate": 0,
               "records_rejected": [], "records_replaced": 0}
 
-    for store_path, group, with_methodology in (
-        (ff_store_path, ff_records, True), (size_store_path, size_records, False),
-    ):
-        if not group:
-            continue
-        accepted, rejected = [], []
-        for r in group:
-            errors = validate_record(r)
-            if errors:
-                rejected.append({"reason": "; ".join(errors), "field": r.get("field")})
-            else:
-                accepted.append(r)
-        result["records_rejected"].extend(rejected)
+    accepted, rejected = [], []
+    for r in records:
+        errors = validate_record(r)
+        if errors:
+            rejected.append({"reason": "; ".join(errors), "field": r.get("field")})
+        else:
+            accepted.append(r)
+    result["records_rejected"].extend(rejected)
 
-        with locked_store(str(store_path)):
-            store = load_store(str(store_path), with_methodology=with_methodology)
-            # Re-ingesting this run_name REPLACES its prior internal-run generation rather
-            # than accumulating alongside it (see module docstring) -- only strips records
-            # this exact mechanism wrote for this exact run, never a literature worker's
-            # findings that happen to share the same source_run.
-            existing = store["records"]
-            kept = [r for r in existing
-                    if not (r.get("provenance", {}).get("origin") == "internal_run"
-                            and r.get("provenance", {}).get("source_run") == run_name)]
-            result["records_replaced"] += len(existing) - len(kept)
+    with locked_store(str(ff_store_path)):
+        store = load_store(str(ff_store_path), with_methodology=True)
+        # Re-ingesting this run_name REPLACES its prior internal-run generation rather
+        # than accumulating alongside it (see module docstring) -- only strips records
+        # this exact mechanism wrote for this exact run, never a literature worker's
+        # findings that happen to share the same source_run.
+        existing = store["records"]
+        kept = [r for r in existing
+                if not (r.get("provenance", {}).get("origin") == "internal_run"
+                        and r.get("provenance", {}).get("source_run") == run_name)]
+        result["records_replaced"] += len(existing) - len(kept)
 
-            merged, skipped_ids = dedupe(kept, accepted)
-            added = len(accepted) - len(skipped_ids)
-            result["records_added"] += added
-            result["records_skipped_duplicate"] += len(skipped_ids)
-            if not dry_run and (merged != existing):
-                store["records"] = merged
-                save_store(str(store_path), store)
+        merged, skipped_ids = dedupe(kept, accepted)
+        added = len(accepted) - len(skipped_ids)
+        result["records_added"] += added
+        result["records_skipped_duplicate"] += len(skipped_ids)
+        if not dry_run and (merged != existing):
+            store["records"] = merged
+            save_store(str(ff_store_path), store)
 
     return result
 
@@ -711,7 +701,7 @@ def ingest_from_completed_run(run_name: str, *, repo_root: Path = REPO_ROOT,
 # ===========================================================================
 # QUERY  (`query`)
 #
-# query_protocol_evidence.py — deterministic retrieval over the protocol evidence stores.
+# query_protocol_evidence.py — deterministic retrieval over the protocol evidence store.
 #
 # Replaces "the literature-grounding-worker reads the whole legacy JSON file and reasons
 # over it" with a real query. Always exits 0; errors surface as {"error": ...} in the JSON
@@ -733,10 +723,10 @@ def ingest_from_completed_run(run_name: str, *, repo_root: Path = REPO_ROOT,
 # descending, then doi ascending — fully deterministic, no tie resolved by file order.
 #
 # Usage:
-#   python3 orchestration/scripts/query_protocol_evidence.py \
-#       --store ff|system_size \
+#   python3 orchestration/scripts/protocol_evidence.py query \
+#       --store ff \
 #       [--polymer-class CLASS] [--smiles '<repeat-unit SMILES>'] \
-#       [--field forcefield|electrostatics|cooling_rate|density_target|tg_target|cte_glass_melt|system_size] \
+#       [--field forcefield|electrostatics|cooling_rate|density_target|tg_target|cte_glass_melt] \
 #       [--methodology-only] [--top-k 5] [--similarity-threshold 0.4] [--no-chem-similarity]
 # ===========================================================================
 def _canon(smiles: str | None):
@@ -929,7 +919,7 @@ def main():
     c.set_defaults(func=_cmd_ingest_internal)
 
     c = sub.add_parser("query", help="tiered retrieval over a store")
-    c.add_argument("--store", choices=["ff", "system_size"], required=True)
+    c.add_argument("--store", choices=["ff"], required=True)
     c.add_argument("--polymer-class")
     c.add_argument("--smiles")
     c.add_argument("--field", choices=FIELDS)

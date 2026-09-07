@@ -38,8 +38,10 @@ CACHE_PATH_DEFAULT = REPO_ROOT / "guides" / "system_characterization_cache.json"
 
 # decided_params keys worth freezing as "the exact validated protocol." SNAPSHOT_KEYS plus
 # T_workflow_K, which make_plan() computes AFTER the SNAPSHOT_KEYS comprehension
-# (make_deterministic_plan.py:206-211) but which stage_params.py treats as THE regime-determining
-# field (is_glassy = T_workflow_K > 300). Not folded into SNAPSHOT_KEYS itself -- that constant's
+# (make_deterministic_plan.py) and which records the melt/production REFERENCE temperature the
+# run actually used. It is NO LONGER the regime-determining field -- stage_params._regime asks
+# final_T_K against Tg directly -- but it still defines the protocol that ran, which is what
+# freezing is for. Not folded into SNAPSHOT_KEYS itself -- that constant's
 # docstring guarantees decided_params-as-identity for an unmodified class scaffold, a narrower
 # contract than "the protocol actually executed." If SNAPSHOT_KEYS gains a future key with a
 # similar computed-after-the-fact sibling, FREEZE_KEYS needs the same treatment -- check both

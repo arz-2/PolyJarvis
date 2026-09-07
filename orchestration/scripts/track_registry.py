@@ -117,8 +117,8 @@ _COOLING = Track(
     stages=(ResolverStage("cool", "cooling", "cooling"),
             ResolverStage("cool-check", "cooling", "cooling")),
     macro_stages=("cooling",),
-    note="The blockwise descent from the melt hold to final_T_K, then nvt_kinetic_stability and "
-         "npt_final -- the assessment cell, carrying the gate set that used to be the only one. "
+    note="The blockwise descent from the melt hold to final_T_K, then npt_final -- the "
+         "assessment cell, carrying the gate set that used to be the only one. "
          "Runs only when something needs a cell at the assessment temperature: a density at "
          "final_T_K, or any mechanical property (see _MECHANICAL.requires).",
 )
@@ -149,14 +149,44 @@ _MECHANICAL = Track(
          "bm_temperature_K, which only the cooldown reaches -- hence `requires`.",
 )
 
+_STRUCTURE = Track(
+    name="structure", order=4,
+    stages=(ResolverStage("analyze-structure", "structure", "structure"),),
+    macro_stages=("structure",),
+    note="Pure analysis over the MELT cell the foundation track already wrote -- its data file "
+         "and its dump. No MD of its own, so requesting a structural observable costs one "
+         "analysis pass and nothing else. The melt, not the assessment cell, because chain "
+         "dimensions are only meaningful where the chains are actually equilibrated: below Tg "
+         "the conformation is frozen-in melt structure, so measuring it there measures the "
+         "melt anyway, less reliably.",
+)
+
+_COHESIVE = Track(
+    name="cohesive", order=5,
+    stages=(ResolverStage("vacuum-build", "cohesive", "cohesive"),
+            ResolverStage("vacuum-chain", "cohesive", "cohesive"),
+            ResolverStage("analyze-solubility", "cohesive", "cohesive")),
+    macro_stages=("cohesive",),
+    requires=("cooling",),
+    note="CED and the Hildebrand parameter, via the vacuum single-chain reference. The bulk log "
+         "must be a cell at the temperature delta is reported at -- conventionally ~300 K, i.e. "
+         "npt_final -- hence `requires`, exactly as for mechanical.\n"
+         "Three stages, not one, because the reference does not exist yet: the extractor needs "
+         "a log of ONE isolated chain of the SAME system, and nothing in the pipeline produces "
+         "a single-chain topology. vacuum-build is a second EMC build at nchain=1 and near-zero "
+         "density (a big box, so no periodic image touches the chain); vacuum-chain is the NVT "
+         "hold that log comes from. Both are cheap next to any bulk stage.",
+)
+
 _SUMMARY = Track(
-    name="summary", order=4, always=True,
+    name="summary", order=6, always=True,
     stages=(ResolverStage("run-summary", "summary", "summary"),),
     macro_stages=("summary",),
 )
 
 TRACKS: dict[str, Track] = {t.name: t for t in
-                            (_FOUNDATION, _COOLING, _THERMAL, _MECHANICAL, _SUMMARY)}
+                            (_FOUNDATION, _COOLING, _THERMAL, _MECHANICAL, _STRUCTURE,
+                             _COHESIVE, _SUMMARY)}
 
 for _t in TRACKS.values():
     for _r in _t.requires:
@@ -239,7 +269,7 @@ _OBS: tuple[Observable, ...] = (
     # ---- mechanical -------------------------------------------------------------
     Observable(
         "bulk_modulus", "mechanical", "requestable",
-        extractor_json="bulk_modulus_murnaghan.json", extractor_field="bulk_modulus_GPa",
+        extractor_json="mechanical.json", extractor_field="bulk_modulus_GPa",
         unit="GPa", gate_macro_stage="mechanical", gate_field="bm_gate_verdict",
         legacy_property="bulk_modulus", summary_path=("results", "bulk_modulus", "value_GPa"),
         note="Falls back to the deform path on BM_INADMISSIBLE, whose gate field is "
@@ -250,7 +280,12 @@ _OBS: tuple[Observable, ...] = (
         extractor_json="bulk_modulus_deform.json", extractor_field="G_GPa", unit="GPa",
         gate_macro_stage="mechanical", gate_field="deform_gate_verdict",
         legacy_property="shear_modulus",
-        summary_path=("results", "shear_modulus", "value"),
+        # summary_path is None for all three deformation moduli: generate_run_summary's
+        # `results` has exactly tg/density/melt_density/bulk_modulus, so a declared path would
+        # name a key nothing writes. Requesting one of these today runs the deformation stage
+        # and writes bulk_modulus_deform.json, but the run summary reports only the K that
+        # rides along with it. Guarded by test_declared_summary_paths_are_real.
+
         forced_params={"mechanical_method": "deformation"},
         note="Already computed and already dispatchable -- extract_bulk_modulus_deform emits "
              "G_GPa/E_GPa/nu_Poisson, and run_campaign dispatches on mechanical_method, which is "
@@ -261,15 +296,47 @@ _OBS: tuple[Observable, ...] = (
         extractor_json="bulk_modulus_deform.json", extractor_field="E_GPa", unit="GPa",
         gate_macro_stage="mechanical", gate_field="deform_gate_verdict",
         legacy_property="youngs_modulus",
-        summary_path=("results", "youngs_modulus", "value"), forced_params={"mechanical_method": "deformation"},
+ forced_params={"mechanical_method": "deformation"},
     ),
     Observable(
         "poisson_ratio", "mechanical", "requestable",
         extractor_json="bulk_modulus_deform.json", extractor_field="nu_Poisson", unit="",
         gate_macro_stage="mechanical", gate_field="deform_gate_verdict",
         legacy_property="poisson_ratio",
-        summary_path=("results", "poisson_ratio", "value"), forced_params={"mechanical_method": "deformation"},
+ forced_params={"mechanical_method": "deformation"},
         note="nu_Poisson, not nu -- the extractor's own key name.",
+    ),
+    # ---- structure --------------------------------------------------------------
+    Observable(
+        "chain_dimensions", "structure", "requestable",
+        extractor_json="end_to_end_summary.json", extractor_field="overall_mean_R", unit="A",
+        gate_macro_stage="structure", legacy_property="chain_dimensions",
+        note="Mean end-to-end distance over the melt dump. mda_end_to_end also writes "
+             "overall_mean_R2 and the per-chain table; this is the headline scalar. Needs "
+             "backbone_types, which derive_backbone_types already resolves for the equil gate.",
+    ),
+    Observable(
+        "radial_distribution", "structure", "requestable",
+        extractor_json="rdf_summary.json", extractor_field="pairs_computed", unit="",
+        gate_macro_stage="structure", legacy_property="radial_distribution",
+        note="The deliverable is a set of g(r) CURVES, not a scalar -- extractor_field names "
+             "the list of pairs actually computed, which is the closest thing to a value this "
+             "observable has. Anything reading extractor_field expecting a number must not "
+             "route here; nothing does today (only byproducts_spec reads it, and this is not a "
+             "byproduct).",
+    ),
+    # ---- cohesive ---------------------------------------------------------------
+    Observable(
+        "solubility_parameter", "cohesive", "requestable",
+        extractor_json="solubility_parameter.json",
+        extractor_field="solubility_parameter_MPa0p5", unit="MPa^0.5",
+        gate_macro_stage="cohesive", gate_field="ced_confidence",
+        legacy_property="solubility_parameter",
+        note="delta = sqrt(CED), CED = -(E_bulk - n_chains*E_intra)/V_bulk. ced_confidence is "
+             "'degraded' for embedded/Gasteiger charges (20%+ CED error risk) -- carried as the "
+             "gate field, but it grades the number rather than admitting it, so it never blocks. "
+             "NEVER cache this across a class: two monomers of one class differ in cohesion, "
+             "which is the extractor's own standing caution.",
     ),
 )
 
@@ -313,8 +380,13 @@ def _tracks_for(properties) -> tuple[Track, ...]:
     This one function is the routing rule -- "the shortest path to what was asked for" -- and it
     replaces seven hand-written if-chains.
     """
+    # `status` matters as much as `kind`: a `declared` observable is routable in principle but
+    # its resolver stages do not exist, so honouring a request for one would plan a track that
+    # cannot run. VALID_PROPERTIES already filters on it, which is what keeps this unreachable
+    # today -- stated here so it stays true if a declared name ever becomes nameable early.
     wanted = {o.track for o in _OBS
-              if o.legacy_property in set(properties or ()) and o.kind == "requestable"}
+              if o.legacy_property in set(properties or ())
+              and o.kind == "requestable" and o.status == "wired"}
     wanted |= {t.name for t in TRACKS.values() if t.always}
     # Close over `requires`: a track can need another track's cell without any observable of
     # that track's having been asked for (mechanical needs the cooldown's npt_final). The
@@ -373,10 +445,13 @@ def stage_for_property(prop: str) -> str:
     """== write_characterization_cache.STAGE_FOR_PROPERTY: the macro stage whose acceptance
     proves that property's binding gate passed.
 
-    Several observables can share one legacy_property -- shear/Young's/Poisson all map onto
-    bulk_modulus, since they come out of the same mechanical track. They necessarily agree on
-    gate_macro_stage (it is a property of the track), so the first match is the answer; the
+    Several observables CAN share one legacy_property (melt_density and equilibration both
+    map onto the foundation track's gate). They necessarily agree on gate_macro_stage -- it is
+    a property of the track, not of the observable -- so the first match is the answer; the
     assertion below states that rather than leaving it to luck.
+
+    shear/Young's/Poisson each carry their OWN legacy_property, not bulk_modulus: they are
+    separately requestable names that happen to share the mechanical track.
     """
     stages = {o.gate_macro_stage for o in _OBS
               if o.legacy_property == prop and o.kind == "requestable" and o.status == "wired"}

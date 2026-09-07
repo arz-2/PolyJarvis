@@ -6,3 +6,9 @@ MDAnalysis==2.10.0
 numpy==2.4.6
 scipy==1.17.1
 pandas==3.0.3
+
+# LangGraph driver (orchestration/langgraph/): topology only -- it decides WHEN the
+# existing deterministic scripts run, never what they do. Installed here because this
+# venv is the interpreter run_campaign re-execs into and the one that can import the
+# MCP server modules in-process.
+langgraph==1.2.11

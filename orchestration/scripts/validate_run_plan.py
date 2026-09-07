@@ -29,6 +29,7 @@ from select_hardware import select_hardware
 from select_system_size import select_system_size
 from rules_common import load_rules, get_class_entry, hardware_policy
 from make_deterministic_plan import PLAN_SCHEMA_VERSION  # single source of truth
+import track_registry  # the property -> stage authority
 from hardware_runtime import host_matches
 
 _ENGINE_SCRIPTS = (Path(__file__).resolve().parents[2]
@@ -122,30 +123,34 @@ def _stage_schema_findings(plan: dict, policy: dict) -> list:
 
 
 def _stage_properties_findings(plan: dict) -> list:
+    """The plan's stage list must be exactly what its properties route to.
+
+    This was seven hand-written clauses covering `tg` and `bulk_modulus` only -- the same
+    if-chain shape, in the same file, that track_registry was created to delete. It had already
+    drifted: a plan requesting `shear_modulus` with no `deform` stage passed (only the cooling
+    clause fired), and `melt_density` had no clause at all.
+
+    Asking the registry instead makes the check total, and catches the inverse defect the
+    clauses could not express -- a plan naming a stage its properties do not route, which is
+    how a plan artifact comes to disagree with the run it describes.
+    """
     findings = []
-    stages_present = {s.get("stage") for s in plan.get("planned_stages", [])}
+    present = [s.get("stage") for s in plan.get("planned_stages", [])]
     props = set(plan.get("properties", []))
-    for base in ("build", "equil", "equil-check", "run-summary"):
-        if base not in stages_present:
-            findings.append({"check": "stage_properties", "severity": "structural",
-                             "detail": f"missing always-required stage {base!r}"})
-    if "tg" in props and not (stages_present & {"tg", "analyze-tg"}):
+    expected = track_registry.planned_stage_names(props)
+
+    missing = [stage for stage in expected if stage not in present]
+    if missing:
         findings.append({"check": "stage_properties", "severity": "structural",
-                         "detail": "tg requested but no tg/analyze-tg stage present"})
-    if "bulk_modulus" in props and not (stages_present & {"murnaghan", "deform", "analyze-bm"}):
+                         "detail": f"{sorted(props)} route stages {missing} but the plan does "
+                                   f"not contain them"})
+    unexpected = [stage for stage in present if stage not in expected]
+    if unexpected:
         findings.append({"check": "stage_properties", "severity": "structural",
-                         "detail": "bulk_modulus requested but no murnaghan/deform/analyze-bm "
-                                   "stage present"})
-    # The cooling stage is genuinely optional (a melt-only or Tg-only run never runs it), so it
-    # is not in the always-required list -- but anything measured at the assessment temperature
-    # depends on the cell it produces. track_registry._MECHANICAL.requires routes it in
-    # automatically; this catches a hand-written or replayed plan that omitted it.
-    needs_cooling = props & {"density", "bulk_modulus", "shear_modulus", "youngs_modulus",
-                             "poisson_ratio"}
-    if needs_cooling and not (stages_present & {"cool", "cool-check"}):
-        findings.append({"check": "stage_properties", "severity": "structural",
-                         "detail": f"{sorted(needs_cooling)} require a cell at final_T_K but no "
-                                   "cool/cool-check stage is present"})
+                         "detail": f"plan contains stages {unexpected} that {sorted(props)} do "
+                                   f"not route"})
+    # Set semantics, deliberately: the plan's stage ORDER is cosmetic -- workflow_engine
+    # executes from track_registry.macro_stages_for(), never from this list's sequence.
     return findings
 
 
@@ -372,8 +377,10 @@ UNIMPLEMENTED_PARAMS = {}
 # hand-building a plan carrying a key no producer writes. Both retired keys are now rejected at
 # the override allowlist instead, which is the earlier and louder place to catch them.
 # Add an entry here only after a plan->resolver->executor trace shows a RECORDED value that a
-# LIVE decided_param silently replaces; _overridden_param_findings and the remove_noop remedy
-# stay wired for that case.
+# LIVE decided_param silently replaces; _overridden_param_findings stays wired for that case.
+# The remove_noop REMEDY that used to answer it was deleted from workflow_engine.py's registry
+# 2026-09-07 -- with this dict empty and UNIMPLEMENTED_PARAMS empty, neither of its codes had a
+# producer, so no finding could reach it. Re-adding an entry here means re-adding that row.
 OVERRIDDEN_PARAMS = {}
 
 

@@ -72,6 +72,24 @@ def _not(v):
     return (not v) if v is not None else None
 
 
+def _density_temperature(density_block):
+    """The temperature a gated density was measured at.
+
+    Prefers the MEASURED mean (`actual_T_mean`) over the requested setpoint
+    (`target_temp_K`), so a cell that did not hold its temperature reports what it actually
+    did. Both keys come from extract_equilibrated_density; it writes neither when no
+    --target_temp was passed, in which case there is no temperature to report.
+
+    NB the key is `target_temp_K`, not `target_temp`. This was read as `target_temp` from the
+    day melt_density gained a temperature, so results.melt_density.temperature_K was silently
+    null on every run ever produced.
+    """
+    if not density_block:
+        return None
+    measured = density_block.get("actual_T_mean")
+    return measured if measured is not None else density_block.get("target_temp_K")
+
+
 def _collect_byproducts(spec_path, loaded):
     """Surface free measurements with their own gate verdicts. Never raises: a byproduct that
     cannot be read is simply absent, because nothing here may affect the run's own verdict."""
@@ -347,6 +365,7 @@ def main():
         K_method = "deformation"
     else:
         K_val = K_sem = K_method = None
+    K_temp = bulk_murnaghan.get("temperature_K") if K_method == "murnaghan" else None
 
     # -----------------------------------------------------------------------
     # Artifact pointers (relative to data/[RUN]/)
@@ -456,6 +475,12 @@ def main():
             },
             "density": {
                 "value_g_cm3":    rho_val,
+                # The assessment temperature (final_T_K), read from the cooling gate's own
+                # density block the same way melt_density reads the melt gate's. Without it a
+                # run assessed at 400 K and one assessed at 300 K produce indistinguishable
+                # summaries -- which is what makes "one assessment temperature per run"
+                # workable: the temperature travels with the number.
+                "temperature_K":  _density_temperature(eq_dens),
             },
             # The melt at T_melt_hold_K, from the equilibration stage's own gate file. A
             # DIFFERENT measurement from "density" above, which is the assessment cell at
@@ -465,12 +490,17 @@ def main():
             "melt_density": {
                 "value_g_cm3":    (melt_dens.get("plateau_density_mean")
                                    or melt_dens.get("density_mean")),
-                "temperature_K":  melt_dens.get("target_temp"),
+                "temperature_K":  _density_temperature(melt_dens),
             },
             "bulk_modulus": {
                 "value_GPa":      K_val,
                 "sem_GPa":        K_sem,
                 "method":         K_method,
+                # MEASURED from the series logs, not copied from the plan -- the point is to
+                # catch a modulus that ran at a different temperature than the cell was gated
+                # at. Only the Murnaghan extractor records it; the deform path has no
+                # equivalent yet, so this is None there.
+                "temperature_K":  K_temp,
             },
         },
         # Measurements this run produced without being asked for -- a Tg request already computes

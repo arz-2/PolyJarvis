@@ -186,8 +186,8 @@ def test_no_class_carries_tg_slope_gate_fallback():
     PKTN and PSFO carried "slowest_rate" until 2026-09-01, for an inversion diagnosed as a
     cold-start artifact and fixed at the root by the melt-start sweep. PEST then carried
     "highest_rate" until 2026-09-04 -- a value NEITHER reader recognised (both tested
-    == "slowest_rate"), so it silently did nothing while docs/PROPERTIES.md and
-    docs/decision_rationale.md both stated no class carried the key at all. It is gone with the
+    == "slowest_rate"), so it silently did nothing while docs/PROPERTIES.md stated no class
+    carried the key at all. It is gone with the
     single-rate collapse; the remedy for a class whose fit will not resolve is to LOWER
     tg_rate_K_per_ns, which _assert_tg_rate_feasible bounds."""
     found = {cid: c["tg_slope_gate_fallback"] for cid, c in CLASSES.items()

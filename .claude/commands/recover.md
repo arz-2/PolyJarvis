@@ -1,6 +1,6 @@
 ---
 description: Diagnose and plan recovery for a failed PolyJarvis simulation stage
-allowed-tools: Read, Bash(find:*), Bash(grep:*), Bash(ls:*), Bash(ps:*), Bash(cat:*), Bash(tail:*), Bash(head:*), Bash(wc:*), Bash(jq:*)
+allowed-tools: Read, Glob, Grep, Bash(grep:*), Bash(ls:*), Bash(ps:*), Bash(cat:*), Bash(tail:*), Bash(head:*), Bash(wc:*), Bash(jq:*)
 ---
 
 Source of truth for headless `/recover` diagnosis, invoked by
@@ -20,6 +20,12 @@ either the `Finding.code` has no registered remedy (`agent_only`), or its per-ro
 attempts, rather than re-deriving a fix it already attempted.
 
 ## 1. Orient on the run
+
+**Never use a following/streaming read** — `tail -f`, `tail -F`, `watch`. You are a headless
+session on a 600 s timeout with a capped number of escalations; a command that never returns
+spends the whole budget and the run gets an invocation failure instead of your diagnosis. Read
+files as they stand. The permission grammar matches on command prefix and cannot express
+"`tail` but not `tail -f`", so this rule lives here rather than in the allowlist above.
 
 You're given `run_name`, `track`, `step`, `symptom` (a JSON blob — `code`, `detail`, `severity`,
 `recovery_history`). Read the durable state directly, not a log transcript:
@@ -124,12 +130,14 @@ Return exactly one JSON object matching `recovery_agent_cli.py`'s schema — no 
 ```
 
 Choose `revise_plan` only when you're confident of both the root cause and the fix, and the
-modification is a single, well-evidenced `decided_params` override — e.g. `FORCE_FIELD_TYPING_
-AMBIGUOUS` → `{"preferred_ff": "<the alternative you picked>"}`. Choose `retry` only when you've
+modification is a single, well-evidenced `decided_params` override — e.g.
+`FF_PROVENANCE_ZERO_SUBSTITUTED` → `{"preferred_ff": "<a field that types this chemistry>"}`.
+(The example named `FORCE_FIELD_TYPING_AMBIGUOUS` until 2026-09-07; nothing emits that code,
+so the playbook's one worked example was for a failure that cannot occur.) Choose `retry` only when you've
 confirmed the cause was transient (stale process, disk, GPU claim) and is now resolved — never as
 a third blind attempt. Choose `stop` for anything genuinely novel or ambiguous, or any row above
-marked `agent_only` with no clear single fix (`UNSAFE_HARDWARE_PIN`, `DEFORM_ANISOTROPIC`/
-`DEFORM_INADMISSIBLE`, the cross-cutting rows). The engine re-validates `modifications` against
+marked `agent_only` with no clear single fix (`DEFORM_ANISOTROPIC`/`DEFORM_INADMISSIBLE`,
+the cross-cutting rows). The engine re-validates `modifications` against
 its own parameter whitelist and rejects unsafe keys regardless of what you send.
 
 ## Session reattach

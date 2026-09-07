@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-30T23:08:18Z",
+  "generated_at": "2026-09-07T17:26:34Z",
   "records": [
     {
       "schema_version": 1,
@@ -3176,6 +3176,35 @@
         "source_run": "PEG1_gate_validation",
         "migrated_from": null,
         "added_at": "2026-08-30T23:08:18Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "46fe368a8528",
+      "field": "forcefield",
+      "polymer_class": "PVNL",
+      "polymer_names": [
+        "Polyvinyl alcohol (PVA)"
+      ],
+      "smiles": [
+        "*CC(*)O"
+      ],
+      "claim": "PubMed abstract (PMID 28983671), fetched verbatim: 'Using combined Monte Carlo and molecular dynamics techniques, we present an extensive comparative study of second- and third-generation force fields Universal, COMPASS, COMPASS II, PCFF, and the newly developed INTERFACE, as applied to this system [PVA]. In particular, we show that an INTERFACE force field provides a possibility of composing a reliable atomistic model to reproduce density change of PVA matrix in a narrow temperature range (298-348 K) and calculate a thermal expansion coefficient with reasonable accuracy... being a scaffold for hydrogels, with much greater accuracy than latter approaches.' No numeric PCFF-specific error is given; PCFF is grouped with Universal/COMPASS/COMPASS II as less accurate than INTERFACE for PVA density.",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "10.1007/s00894-017-3472-z",
+      "url": "https://doi.org/10.1007/s00894-017-3472-z",
+      "title": "Molecular modeling studies of structural properties of polyvinyl alcohol: a comparative study using INTERFACE force field",
+      "year": 2017,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "LGReason1",
+        "migrated_from": null,
+        "added_at": "2026-09-07T17:26:34Z"
       }
     }
   ],

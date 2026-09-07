@@ -71,6 +71,27 @@ ATM_TO_GPA = ATM_TO_PA * PA_TO_GPA
 # ---------------------------------------------------------------------------
 
 
+def mean_production_temperature(log_path, eq_fraction):
+    """The temperature this pressure point was actually held at, over the same production
+    window extract_mean_volume averages the volume on. None when the log carries no Temp
+    column or cannot be read -- never raises, exactly like compute_fluctuation_cross_check.
+
+    Recorded because the modulus had no temperature anywhere in its output: the series ran at
+    whatever temp_K the deck was handed, and mechanical.json never said what that was, so a
+    run_summary could not tell a 300 K modulus from a 400 K one. Deliberately separate from
+    extract_mean_volume so that function's tested return signature stays put.
+    """
+    try:
+        df = parse_lammps_log(log_path)
+        temp_col = next((c for c in ["Temp", "temp", "Temperature"] if c in df.columns), None)
+        if temp_col is None:
+            return None
+        prod = df.iloc[int(len(df) * (1.0 - eq_fraction)):]
+        return float(prod[temp_col].mean()) if len(prod) else None
+    except Exception:
+        return None
+
+
 def extract_mean_volume(log_path, eq_fraction):
     """Parse log, discard first (1-eq_fraction) rows, return mean Volume (Å³) plus
     autocorrelation-corrected sampling stats for that point.
@@ -545,6 +566,7 @@ def main():
     tau_frames_list = []
     n_eff_list = []
     vol_sem_list = []
+    temps_K = []
     errors = []
     for log_path, p_atm in zip(args.log_files, args.pressures_atm):
         try:
@@ -556,6 +578,7 @@ def main():
             tau_frames_list.append(tau_frames)
             n_eff_list.append(n_eff)
             vol_sem_list.append(vol_sem)
+            temps_K.append(mean_production_temperature(log_path, args.eq_fraction))
         except Exception as e:
             errors.append(f"{log_path} @ {p_atm} atm: {e}")
 
@@ -769,9 +792,17 @@ def main():
     # (the screened, primary answer); all_points_fit preserves the original
     # unscreened fit for continuity/comparison/audit.
     # -------------------------------------------------------------------
+    # The temperature the series was actually held at. A spread means the points were not
+    # isothermal, so the EOS fit mixes temperatures -- surfaced rather than averaged away.
+    _measured_T = [t for t in temps_K if t is not None]
+    series_temp_K = round(sum(_measured_T) / len(_measured_T), 2) if _measured_T else None
+    series_temp_spread_K = round(max(_measured_T) - min(_measured_T), 2) if _measured_T else None
+
     result = {
         "status": "success",
         "method": primary_method,
+        "temperature_K": series_temp_K,
+        "temperature_spread_K": series_temp_spread_K,
         "fit_converged": primary_converged,
         "bm_gate_verdict": bm_gate_verdict,
         "bm_gate_reasons": gate_reasons,

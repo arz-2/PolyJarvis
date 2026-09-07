@@ -261,17 +261,42 @@ def _resolve_build_params(args, cls: dict) -> dict:
     """
     return {'smiles': args.smiles, 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps', 'preferred_builder': cls.get('preferred_builder', 'emc'), 'preferred_ff': _decided(args, cls, 'preferred_ff', None, 'D-01_ff decides the force field.'), 'dp': _decided(args, cls, 'dp_typical', args.dp, 'D-04_system_size decides the cell.'), 'nchain': _decided(args, cls, 'nchain', args.nchain, 'D-04_system_size decides the cell.'), 'density_initial_gcm3': _pick(args.density_initial, cls, 'density_initial_gcm3', 0.6), 'build_temperature_K': cls.get('build_temperature_K', BUILD_TEMPERATURE_DEFAULT_K), 'emc_seed': args.emc_seed if getattr(args, 'emc_seed', None) is not None else None, 'charge_method': str(_decided(args, cls, 'charge_method', getattr(args, 'charge_method', None), 'D-02_charges decides the charge model.')).lower(), 'electrostatics': cls.get('electrostatics', 'pppm'), 'cutoff_A': cls.get('cutoff_A', 12.0), 'dt_fs': cls.get('dt_fs', 1.0), 'phal_patch': args.polymer_class.upper() == 'PHAL', 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'ff_confidence': 'cited' if cls.get('ff_justification_doi') else 'uncited'}
 
+def workflow_reference_temperature(exp_tg, T_equil, final_T) -> float:
+    """The melt/production REFERENCE temperature, given the regime AT THE ASSESSMENT T.
+
+    Rubbery -- Tg below the temperature the run is assessed at -- means the run is produced and
+    reported at that temperature, so the reference IS final_T_K. Glassy means the reference is
+    the melt-equilibration temperature, because that is where the chains were last mobile.
+
+    final_T_K, never a literal 300. This rule was written out as `300.0 if exp_tg < 300` in
+    four separate places, which is the same drift shape track_registry was created to end, and
+    it was wrong in the same way each time: a Tg=380 polymer assessed at 400 K is rubbery, but
+    every copy called it glassy and set its reference to the melt temperature. 300 is only
+    final_T_K's default (temperature_schedule), not its definition.
+
+    Pure function of three numbers on purpose: make_deterministic_plan computes this at plan
+    time from decided_params and stage_params resolves it at execution time from args+cls, and
+    the two MUST agree -- a plan that records one reference while the deck runs another is
+    exactly the artifact-disagrees-with-the-run bug class.
+    """
+    if isinstance(exp_tg, (int, float)) and exp_tg < final_T:
+        return float(final_T)
+    return float(T_equil)
+
+
 def _resolve_t_workflow(args, cls: dict) -> float:
-    """Equilibration workflow temperature (K). Plan's T_workflow_K wins; otherwise 300 K for
-    rubbery (exp_Tg < 300) and T_equil_K for glassy. Mirrors generate_equilibration_workflow,
+    """Equilibration workflow temperature (K). Plan's T_workflow_K wins; otherwise the regime
+    call in workflow_reference_temperature. Mirrors generate_equilibration_workflow.
+
     Retained as the melt/production REFERENCE temperature: it still feeds the anneal ceiling and
     the regime-adjacent bookkeeping, but it no longer selects a chain shape -- the core chain
     always ends at the melt hold and the cooling chain always ends at npt_final."""
-    exp_tg = _regime_tg(args, cls)
     if 'T_workflow_K' in cls:
         return cls['T_workflow_K']
-    T_equil = _pick(getattr(args, 'T_equil_K', None), cls, 'T_equil_K', 600.0)
-    return 300.0 if isinstance(exp_tg, (int, float)) and exp_tg < 300 else T_equil
+    return workflow_reference_temperature(
+        _regime_tg(args, cls),
+        _pick(getattr(args, 'T_equil_K', None), cls, 'T_equil_K', 600.0),
+        _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0))
 
 def _regime(args, cls: dict) -> str:
     """Single regime oracle: the state of the cell AT THE TEMPERATURE IT IS ASSESSED.
@@ -337,6 +362,20 @@ def _regime_tg(args, cls: dict):
         return override
     return _regime_exp_tg(cls, getattr(args, 'smiles', None))
 
+def assessment_temperature(args, cls: dict) -> float:
+    """final_T_K -- the temperature this run is assessed, gated and reported at.
+
+    Public because run_campaign had four copies of a bare `300` standing in for it, each of
+    which silently decided a regime or an experimental-lookup condition. 300 is its default,
+    not its definition (see temperature_schedule)."""
+    return float(_pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0))
+
+
+def assessment_regime(args, cls: dict) -> str:
+    """Public alias for the regime oracle -- 'glassy' | 'rubbery' at final_T_K. See _regime."""
+    return _regime(args, cls)
+
+
 def _is_glassy(args, cls: dict) -> bool:
     """Whether the BM stages treat this cell as glassy. The orchestrator's `--is_glassy`, set from
     the thermal track's measured Tg, wins; with the flag absent the regime oracle decides. An
@@ -346,6 +385,21 @@ def _is_glassy(args, cls: dict) -> bool:
     if flag is not None:
         return str(flag).lower() not in ('false', '0', 'no')
     return _regime(args, cls) == 'glassy'
+
+def _bm_temperature(args, cls: dict) -> float:
+    """The temperature the modulus is measured at.
+
+    Defaults to final_T_K, NOT a bare 300. The mechanical track starts from the COOLING
+    track's npt_final cell (track_registry._MECHANICAL.requires), which is equilibrated and
+    gated at final_T_K. A bare-300 default re-thermostats that cell to a temperature nothing
+    gated it at the moment final_T_K is moved -- silently, since bm_temperature_K carries no
+    class default either. Precedence is _pick's: CLI > plan/class > final_T_K.
+
+    _validate_protocol_relationships rejects an explicit bm_temperature_K that disagrees with
+    final_T_K, so this default is what makes "bulk modulus at T" mean the same T everywhere.
+    """
+    return float(_pick(getattr(args, 'bm_temperature_K', None), cls, 'bm_temperature_K',
+                       _pick(getattr(args, 'final_T_K', None), cls, 'final_T_K', 300.0)))
 
 def _velocity_seed(args) -> int:
     """The equilibration chain's `velocity all create` seed. generate_equilibration_workflow
@@ -940,7 +994,7 @@ def _resolve_murnaghan_params(args, cls: dict) -> dict:
     default_equil_data = f'{lammps_base}/cool/npt_final/npt_final_out.data'
     equil_data_path = args.data_path or default_equil_data
     npt_prod_log_path = _derive_npt_prod_log_path(args, equil_data_path, lammps_base)
-    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': is_glassy, 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'cutoff_A': cls.get('cutoff_A'), 'use_long_range': cls.get('electrostatics', 'pppm') == 'pppm', 'equil_data_path': equil_data_path, 'npt_prod_log_path': npt_prod_log_path, 'temp_K': cls.get('bm_temperature_K', 300.0), 'npt_steps': int(cls.get('bm_npt_steps', 500000)) * sampling_factor, 'thermo_freq': int(cls.get('bm_thermo_freq', 100)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'mechanical_sampling_factor': sampling_factor, 'bm_per_point_max_extensions': int(cls.get('bm_per_point_max_extensions', 2)), 'bm_per_point_stability_pct': cls.get('bm_per_point_stability_pct', 1.0), 'bm_per_point_min_n_eff': cls.get('bm_per_point_min_n_eff', 5.0), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': is_glassy, 'bm_pressures_atm': cls.get('mechanical_resample_points') or cls.get('bm_pressures_atm', None), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'cutoff_A': cls.get('cutoff_A'), 'use_long_range': cls.get('electrostatics', 'pppm') == 'pppm', 'equil_data_path': equil_data_path, 'npt_prod_log_path': npt_prod_log_path, 'temp_K': _bm_temperature(args, cls), 'npt_steps': int(cls.get('bm_npt_steps', 500000)) * sampling_factor, 'thermo_freq': int(cls.get('bm_thermo_freq', 100)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'barostat_damp_fs': cls.get('barostat_damp_fs', 1000.0), 'mechanical_sampling_factor': sampling_factor, 'bm_per_point_max_extensions': int(cls.get('bm_per_point_max_extensions', 2)), 'bm_per_point_stability_pct': cls.get('bm_per_point_stability_pct', 1.0), 'bm_per_point_min_n_eff': cls.get('bm_per_point_min_n_eff', 5.0), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args)}
 
 def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     """Resolve deterministic bulk-modulus extraction arguments."""
@@ -1000,7 +1054,117 @@ def run_summary_decision_labels(p: dict) -> dict:
     return {'d01': p.get('ff'), 'd02': p.get('charge_method'),
             'd03': p.get('electrostatics'),
             'd04': f"DP={dp}, {nchain} chains" if dp and nchain else None}
-_STAGE_RESOLVERS = {'build': _resolve_build_params, 'equil': _resolve_equil_params, 'cool': _resolve_cool_params, 'cool-check': _resolve_cool_check_params, 'tg': _resolve_tg_params, 'deform': _resolve_deform_params, 'analyze-tg': _resolve_analyze_tg_params, 'equil-check': _resolve_equil_check_params, 'murnaghan': _resolve_murnaghan_params, 'analyze-bm': _resolve_analyze_bm_params, 'run-summary': _resolve_run_summary_params}
+# ─── structure: RDF and chain dimensions over the melt cell ───────────────────────────
+
+def _melt_cell(args, cls: dict) -> tuple[str, str]:
+    """The foundation track's melt data file and its dump.
+
+    args.data_path is the accepted equilibration manifest's melt cell in real execution
+    (run_campaign sets it before the resolver runs); the literals are --dry-run preview
+    defaults, matching what _make_stage_builders names the nvt_melt_hold stage's outputs.
+    """
+    base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
+    data = (getattr(args, 'melt_start_data_path', None) or args.data_path
+            or f'{base}/equil/nvt_melt_hold/nvt_melt_hold_out.data')
+    dump = getattr(args, 'melt_dump_path', None) or f'{base}/equil/nvt_melt_hold/nvt_melt_hold.dump'
+    return data, dump
+
+
+def _resolve_analyze_structure_params(args, cls: dict) -> dict:
+    """Resolve the structural analysis pass -- RDF plus end-to-end -- over the melt cell.
+
+    Analysis only: no deck, no submission, no GPU. Both tools read the SAME data file and dump,
+    which is why they share one stage rather than getting one each.
+
+    rdf_atom_type_pairs left None means mda_rdf picks its own pairs; backbone_types comes from
+    the same derivation the equilibration gate already ran (derive_backbone_types), never from a
+    guess -- mda_end_to_end requires it and silently measures the wrong thing if handed the
+    wrong types.
+    """
+    data_path, dump_path = _melt_cell(args, cls)
+    work = args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/raw'
+    return {'data_path': data_path, 'dump_path': dump_path,
+            'output_dir': work, 'graphs_dir': f'{REPO_ROOT}/data/{args.run_name}/graphs',
+            'backbone_types': args.backbone_types or cls.get('backbone_types'),
+            'rdf_rmax_A': float(cls.get('rdf_rmax_A', 15.0)),
+            'rdf_nbins': int(cls.get('rdf_nbins', 150)),
+            'rdf_atom_type_pairs': cls.get('rdf_atom_type_pairs'),
+            'skip_frames': int(cls.get('structure_skip_frames', 0)),
+            'max_frames': cls.get('structure_max_frames'),
+            'atom_style': cls.get('atom_style', 'id resid type charge x y z')}
+
+
+# ─── cohesive: the vacuum single-chain reference ──────────────────────────────────────
+
+def _resolve_vacuum_build_params(args, cls: dict) -> dict:
+    """A second cell: ONE chain of the same system, at near-zero density.
+
+    Everything that defines the chemistry -- smiles, field, dp, charge model -- is taken from
+    the bulk build's own resolved parameters, never re-decided here. If the reference chain
+    differed from the bulk chains in ANY of those, E_intra would not be the bulk's
+    intramolecular energy and the CED subtraction would be meaningless.
+
+    nchain=1 and a low density are the only deliberate differences: the box must be large
+    enough that no periodic image of the chain touches it, which is what makes 100% of the
+    chain's nonbonded energy self-interaction by construction.
+    """
+    build = _resolve_build_params(args, cls)
+    return {**build,
+            'work_dir': f'{REPO_ROOT}/data/{args.run_name}/lammps/cohesive/vacuum_build',
+            'nchain': 1,
+            'density_initial_gcm3': float(cls.get('vacuum_density_gcm3', 0.001))}
+
+
+def _resolve_vacuum_chain_params(args, cls: dict) -> dict:
+    """The isolated chain's NVT hold, at the temperature the bulk log was taken at.
+
+    NVT, not NPT: the box is fixed by construction -- barostatting a near-vacuum cell would
+    collapse it onto the chain and destroy the isolation the reference depends on. The
+    temperature is final_T_K because the bulk log is npt_final's; a reference at a different
+    temperature would subtract the wrong intramolecular energy.
+    """
+    work = f'{REPO_ROOT}/data/{args.run_name}/lammps/cohesive/vacuum_chain'
+    return {'lammps_flags': _lammps_flags(args.lammps_flags, cls),
+            'work_dir': work,
+            'data_path': (getattr(args, 'vacuum_data_path', None)
+                          or f'{REPO_ROOT}/data/{args.run_name}/lammps/cohesive/vacuum_build/vacuum_build.data'),
+            'temp_K': assessment_temperature(args, cls),
+            'nvt_steps': int(cls.get('vacuum_nvt_steps', 200000)),
+            'thermo_freq': int(cls.get('vacuum_thermo_freq', 100)),
+            'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0),
+            'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0),
+            'cutoff_A': cls.get('cutoff_A', 12.0),
+            'use_long_range_electrostatics': cls.get('electrostatics', 'pppm') == 'pppm',
+            'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine,
+            'velocity_seed': _velocity_seed(args)}
+
+
+def _resolve_analyze_solubility_params(args, cls: dict) -> dict:
+    """CED / delta from the bulk npt_final log and the vacuum chain's log.
+
+    n_chains MUST be the bulk cell's own nchain -- the subtraction is
+    E_inter = E_bulk - n_chains * E_intra, so a wrong count scales the answer directly. It is
+    read from the same _decided() path the build stage used, not from a default.
+
+    charge_method is passed through so the extractor can set ced_confidence: embedded/Gasteiger
+    charges carry a 20%+ CED error risk, and the number should arrive labelled rather than bare.
+    """
+    lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
+    return {'bulk_log': (getattr(args, 'npt_prod_log', None)
+                         or f'{lammps_base}/cool/npt_final/npt_final.log'),
+            'vacuum_log': (getattr(args, 'vacuum_log', None)
+                           or f'{lammps_base}/cohesive/vacuum_chain/vacuum_chain.log'),
+            'n_chains': int(_decided(args, cls, 'nchain', args.nchain,
+                                     'D-04_system_size decides the cell.')),
+            'output_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/raw',
+            'charge_method': str(_decided(args, cls, 'charge_method',
+                                          getattr(args, 'charge_method', None),
+                                          'D-02_charges decides the charge model.')).lower(),
+            'eq_fraction': float(cls.get('solubility_eq_fraction', 0.5)),
+            'system_label': args.run_name}
+
+
+_STAGE_RESOLVERS = {'build': _resolve_build_params, 'equil': _resolve_equil_params, 'cool': _resolve_cool_params, 'cool-check': _resolve_cool_check_params, 'tg': _resolve_tg_params, 'deform': _resolve_deform_params, 'analyze-tg': _resolve_analyze_tg_params, 'equil-check': _resolve_equil_check_params, 'murnaghan': _resolve_murnaghan_params, 'analyze-bm': _resolve_analyze_bm_params, 'analyze-structure': _resolve_analyze_structure_params, 'vacuum-build': _resolve_vacuum_build_params, 'vacuum-chain': _resolve_vacuum_chain_params, 'analyze-solubility': _resolve_analyze_solubility_params, 'run-summary': _resolve_run_summary_params}
 
 def resolve_stage_params(stage: str, args, cls: dict) -> dict:
     """Resolve routing and physics decisions into concrete tool arguments."""

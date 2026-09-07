@@ -298,3 +298,60 @@ def test_global_chain_configuration_caveat_absent_when_large_s_is_gaussian(tmp_p
     summary = json.loads((tmp_path / "run_summary.json").read_text())
 
     assert summary["convergence"]["caveats"] == []
+
+
+def test_every_measured_result_carries_the_temperature_it_was_measured_at(tmp_path):
+    """results.density / melt_density / bulk_modulus must each report their own temperature.
+
+    Two regressions in one:
+      * melt_density read `target_temp`, but extract_equilibrated_density writes
+        `target_temp_K` -- so the one temperature-annotated result was silently null on every
+        run ever produced.
+      * density and bulk_modulus carried no temperature at all, which made two runs assessed
+        at two different temperatures produce indistinguishable summaries.
+    """
+    (tmp_path / "cooling.json").write_text(json.dumps({
+        "density": {"plateau_density_mean": 1.183,
+                    "target_temp_K": 400.0, "actual_T_mean": 399.4},
+        "gate": {"verdict": "PASS"},
+    }))
+    (tmp_path / "equilibration.json").write_text(json.dumps({
+        "density": {"plateau_density_mean": 1.041,
+                    "target_temp_K": 578.0, "actual_T_mean": 577.8},
+        "gate": {"verdict": "PASS"},
+    }))
+    (tmp_path / "mechanical.json").write_text(json.dumps({
+        "status": "success", "method": "murnaghan", "B0_GPa": 3.42,
+        "B0_sem_GPa": 0.11, "temperature_K": 399.6, "temperature_spread_K": 0.7,
+    }))
+
+    subprocess.run([sys.executable, str(SCRIPT), "--output_dir", str(tmp_path),
+                    "--run_name", "TCHK",
+                    "--equilibration_path", str(tmp_path / "cooling.json"),
+                    "--melt_equilibration_path", str(tmp_path / "equilibration.json"),
+                    "--mechanical_path", str(tmp_path / "mechanical.json")],
+                   check=True, capture_output=True)
+
+    results = json.loads((tmp_path / "run_summary.json").read_text())["results"]
+    # The MEASURED mean wins over the setpoint: a cell that drifted reports what it did.
+    assert results["density"]["temperature_K"] == 399.4
+    assert results["melt_density"]["temperature_K"] == 577.8
+    assert results["bulk_modulus"]["temperature_K"] == 399.6
+    # The assessment cell and the modulus are the same cell at the same temperature.
+    assert abs(results["density"]["temperature_K"]
+               - results["bulk_modulus"]["temperature_K"]) < 1.0
+
+
+def test_density_temperature_falls_back_to_the_setpoint_and_tolerates_absence(tmp_path):
+    (tmp_path / "cooling.json").write_text(json.dumps({
+        "density": {"plateau_density_mean": 1.18, "target_temp_K": 300.0},
+        "gate": {"verdict": "PASS"},
+    }))
+    subprocess.run([sys.executable, str(SCRIPT), "--output_dir", str(tmp_path),
+                    "--run_name", "TCHK2",
+                    "--equilibration_path", str(tmp_path / "cooling.json")],
+                   check=True, capture_output=True)
+    results = json.loads((tmp_path / "run_summary.json").read_text())["results"]
+    assert results["density"]["temperature_K"] == 300.0      # setpoint fallback
+    assert results["melt_density"]["temperature_K"] is None  # no melt gate passed
+    assert results["bulk_modulus"]["temperature_K"] is None  # no mechanical run

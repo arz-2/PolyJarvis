@@ -1,7 +1,7 @@
 """protocol_evidence.py ingest-internal — turns a completed, validated PolyJarvis run into
 protocol evidence for planning OTHER polymers, closing the gap between
 guides/system_characterization_cache.json (same-SMILES-only replay) and
-docs/protocol_evidence_ff.json / protocol_evidence_system_size.json (class/analogue
+docs/protocol_evidence_ff.json (class/analogue
 evidence). rules_common.canonicalize shells into a conda env, so it's monkeypatched to
 identity here (same convention as write_characterization_cache.py's own tests)."""
 import json
@@ -34,6 +34,7 @@ VALIDATED_ENTRY = {
             {"id": "D-01_ff", "choice": "pcff"},
             {"id": "D-02_charges", "choice": "none"},
             {"id": "D-03_electrostatics", "choice": "pppm"},
+            # Still present in real cache entries; deliberately unmapped since 2026-09-05.
             {"id": "D-04_system_size", "choice": "fox_flory_floor"},
         ],
         "planned_stages": [],
@@ -62,7 +63,8 @@ def _identity_canonicalize(monkeypatch):
 def test_evidence_records_cover_only_protocol_choice_fields():
     records = pe.evidence_records_from_completed_run(VALIDATED_ENTRY, "PE1", PMMA_SMILES)
     fields = {r["field"] for r in records}
-    assert fields == {"forcefield", "electrostatics", "system_size", "cooling_rate"}
+    # system_size was a fourth field until 2026-09-05; D-04 no longer produces evidence.
+    assert fields == {"forcefield", "electrostatics", "cooling_rate"}
 
 
 def test_evidence_records_never_emit_measured_value_fields():
@@ -126,46 +128,39 @@ def _write_run_fixture(tmp_path, run_name, smiles):
     return run_dir
 
 
-def test_ingest_from_completed_run_writes_both_stores(tmp_path):
+def test_ingest_from_completed_run_writes_the_store(tmp_path):
     run_dir = _write_run_fixture(tmp_path, "PE1", PMMA_SMILES)
     cache_path = tmp_path / "system_characterization_cache.json"
     cache_path.write_text(json.dumps({PMMA_SMILES: VALIDATED_ENTRY}))
     ff_store = tmp_path / "protocol_evidence_ff.json"
-    size_store = tmp_path / "protocol_evidence_system_size.json"
 
     result = pe.ingest_from_completed_run(
         "PE1", repo_root=tmp_path, cache_path=cache_path,
-        ff_store_path=ff_store, system_size_store_path=size_store)
+        ff_store_path=ff_store)
 
     assert result["status"] == "written"
-    assert result["records_added"] == 4
+    assert result["records_added"] == 3
     ff_data = pe.load_store(str(ff_store), with_methodology=True)
-    size_data = pe.load_store(str(size_store))
     assert len(ff_data["records"]) == 3  # forcefield, electrostatics, cooling_rate
-    assert len(size_data["records"]) == 1
-    assert size_data["records"][0]["field"] == "system_size"
 
 
 def test_ingest_from_completed_run_content_is_stable_across_reingest(tmp_path):
     # Re-ingesting unchanged data must not accumulate a second generation of records --
-    # content stays at 4 total, even though internally it's replace-then-add, not skip.
+    # content stays at 3 total, even though internally it's replace-then-add, not skip.
     _write_run_fixture(tmp_path, "PE1", PMMA_SMILES)
     cache_path = tmp_path / "system_characterization_cache.json"
     cache_path.write_text(json.dumps({PMMA_SMILES: VALIDATED_ENTRY}))
     ff_store = tmp_path / "protocol_evidence_ff.json"
-    size_store = tmp_path / "protocol_evidence_system_size.json"
 
     pe.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path,
-                                    ff_store_path=ff_store, system_size_store_path=size_store)
+                                    ff_store_path=ff_store)
     second = pe.ingest_from_completed_run(
         "PE1", repo_root=tmp_path, cache_path=cache_path,
-        ff_store_path=ff_store, system_size_store_path=size_store)
+        ff_store_path=ff_store)
 
-    assert second["records_replaced"] == 4  # prior generation stripped before re-adding
+    assert second["records_replaced"] == 3  # prior generation stripped before re-adding
     ff_data = pe.load_store(str(ff_store), with_methodology=True)
-    size_data = pe.load_store(str(size_store))
     assert len(ff_data["records"]) == 3
-    assert len(size_data["records"]) == 1
 
 
 def test_reingest_after_revalidation_replaces_not_accumulates(tmp_path):
@@ -175,17 +170,16 @@ def test_reingest_after_revalidation_replaces_not_accumulates(tmp_path):
     _write_run_fixture(tmp_path, "PE1", PMMA_SMILES)
     cache_path = tmp_path / "system_characterization_cache.json"
     ff_store = tmp_path / "protocol_evidence_ff.json"
-    size_store = tmp_path / "protocol_evidence_system_size.json"
 
     cache_path.write_text(json.dumps({PMMA_SMILES: VALIDATED_ENTRY}))
     pe.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path,
-                                    ff_store_path=ff_store, system_size_store_path=size_store)
+                                    ff_store_path=ff_store)
 
     revalidated_entry = json.loads(json.dumps(VALIDATED_ENTRY))  # deep copy
     revalidated_entry["protocol"]["decisions"][0]["choice"] = "compass"  # FF choice changed
     cache_path.write_text(json.dumps({PMMA_SMILES: revalidated_entry}))
     pe.ingest_from_completed_run("PE1", repo_root=tmp_path, cache_path=cache_path,
-                                    ff_store_path=ff_store, system_size_store_path=size_store)
+                                    ff_store_path=ff_store)
 
     ff_data = pe.load_store(str(ff_store), with_methodology=True)
     ff_records = [r for r in ff_data["records"] if r["field"] == "forcefield"]

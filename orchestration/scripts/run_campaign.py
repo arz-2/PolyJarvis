@@ -28,7 +28,8 @@ if str(_ENGINE_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_ENGINE_SCRIPTS))
 
 from stage_params import (resolve_stage_params, apply_plan, resolve_hardware, load_plan,  # noqa: E402
-                          tg_rate, run_summary_decision_labels)
+                          tg_rate, run_summary_decision_labels,
+                          assessment_temperature, assessment_regime)
 import track_registry  # noqa: E402
 from analysis_utils import estimate_fluctuation_K_GPa  # noqa: E402
 from rules_common import load_rules, get_class_entry, resolve_member_value  # noqa: E402
@@ -1413,11 +1414,16 @@ def do_thermal(args, cls: dict, lammps, melt_density_gcm3=None) -> dict:
     # used_highest_rate term is gone with the rate list -- there is one configured rate, so the
     # sweep always runs it and the term could never be false.
     degenerate = (not highest) or highest["fit_quality"] == "POOR"
+    # Glassy iff the cell is BELOW Tg at the temperature it is assessed at. That temperature is
+    # final_T_K, not a bare 300: 300 is only its default. A run assessed at 400 K on a Tg=380
+    # polymer is rubbery, and the bare literal called it glassy.
+    final_t = assessment_temperature(args, cls)
     if degenerate:
         exp_tg_val = resolve_member_value(cls, "experimental_tg_K", getattr(args, "smiles", None))
-        is_glassy = bool(exp_tg_val and exp_tg_val > 300)
+        is_glassy = bool(exp_tg_val and exp_tg_val > final_t)
     else:
-        is_glassy = bool(highest and isinstance(highest["Tg_K"], (int, float)) and highest["Tg_K"] > 300)
+        is_glassy = bool(highest and isinstance(highest["Tg_K"], (int, float))
+                         and highest["Tg_K"] > final_t)
 
     # tg_gate_cause rides alongside the verdict because binding_gate_failure turns the verdict
     # into a Finding and the tg_breakpoint remedy needs the sub-case to pick a lever.
@@ -1913,6 +1919,147 @@ def do_deformation(args, cls: dict, lammps) -> dict:
     return result
 
 
+# ─── Stage: structure ───────────────────────────────────────────────────────
+
+def do_structure(args, cls: dict, lammps) -> dict:
+    """RDF and chain dimensions over the melt cell the foundation track already gated.
+
+    Analysis only -- no deck, no submission, no GPU claim. Both tools read the same data file
+    and the same dump, which is the whole reason they share one stage.
+
+    Neither is allowed to fail the run on its own: they are requestable observables, but the
+    cell they describe was already adjudicated by the equilibration gate, so a failure here is
+    a tooling failure (a missing dump, unresolved backbone types), not a scientific verdict.
+    The outputs carry the error and the stage still reports what it got.
+    """
+    p = resolve_stage_params("analyze-structure", args, cls)
+    Path(p["output_dir"]).mkdir(parents=True, exist_ok=True)
+    outputs: dict = {"data_path": p["data_path"], "dump_path": p["dump_path"]}
+
+    rdf = wait_for_analysis(lammps, lammps.calculate_rdf(
+        data_file=p["data_path"], dump_file=p["dump_path"],
+        atom_type_pairs=p["rdf_atom_type_pairs"], rmax=p["rdf_rmax_A"], nbins=p["rdf_nbins"],
+        skip_frames=p["skip_frames"], max_frames=p["max_frames"],
+        output_dir=p["output_dir"], graphs_dir=p["graphs_dir"], atom_style=p["atom_style"],
+    ), "rdf")
+    outputs["pairs_computed"] = rdf.get("pairs_computed")
+    outputs["rdf_summary_json_path"] = str(Path(p["output_dir"]) / "rdf_summary.json")
+
+    # backbone_types is REQUIRED by mda_end_to_end and it measures the wrong thing silently if
+    # handed the wrong ones, so an unresolved value is a skip, never a guess.
+    if p["backbone_types"]:
+        e2e = wait_for_analysis(lammps, lammps.extract_end_to_end_vectors(
+            data_file=p["data_path"], dump_file=p["dump_path"],
+            backbone_types=p["backbone_types"], skip_frames=p["skip_frames"],
+            max_frames=p["max_frames"], output_dir=p["output_dir"],
+            graphs_dir=p["graphs_dir"], atom_style=p["atom_style"],
+        ), "end-to-end")
+        outputs["overall_mean_R"] = e2e.get("overall_mean_R")
+        outputs["overall_mean_R2"] = e2e.get("overall_mean_R2")
+        outputs["num_chains"] = e2e.get("num_chains")
+    else:
+        outputs["overall_mean_R"] = None
+        outputs["backbone_types_unresolved"] = True
+    outputs["end_to_end_summary_json_path"] = str(
+        Path(p["output_dir"]) / "end_to_end_summary.json")
+    return outputs
+
+
+# ─── Stage: cohesive ────────────────────────────────────────────────────────
+
+def do_cohesive(args, cls: dict, emc, lammps) -> dict:
+    """CED and the Hildebrand parameter, via the vacuum single-chain reference.
+
+    Three steps, because the reference does not exist anywhere else in the pipeline:
+      1. build ONE chain of the same system at near-zero density (a big box, so no periodic
+         image of the chain touches it -- that isolation is what makes 100% of its nonbonded
+         energy intramolecular by construction);
+      2. hold it in NVT at the temperature the bulk log was taken at;
+      3. subtract: E_inter = E_bulk - n_chains * E_intra, CED = -E_inter / V_bulk.
+
+    NVT and not NPT in step 2 on purpose: barostatting a near-vacuum cell collapses the box
+    onto the chain and destroys the isolation step 1 exists to create.
+    """
+    vb = resolve_stage_params("vacuum-build", args, cls)
+    build_dir = Path(vb["work_dir"])
+    build_dir.mkdir(parents=True, exist_ok=True)
+    # The reference chain must match the bulk chains in chemistry, field, DP and charge model
+    # -- _resolve_vacuum_build_params takes all of those from the bulk build's own resolution.
+    # Only nchain and the density differ. A different seed is fine (and wanted): one chain's
+    # packing is not a property of the bulk cell.
+    job = emc.submit_emc_cell_job(
+        smiles=vb["smiles"], polymer_class=args.polymer_class.upper(),
+        dp=vb["dp"], nchains=1, density_initial=vb["density_initial_gcm3"],
+        temperature=vb["build_temperature_K"], seed=vb["emc_seed"] or 1,
+        field_override=vb["preferred_ff"], output_dir=str(build_dir.resolve()),
+    )
+    if job.get("error"):
+        raise SystemExit(f"vacuum-build submit_emc_cell_job failed: {job['error']}")
+
+    started = time.time()
+    while True:
+        status = emc.get_emc_job_status(job["job_id"])
+        if status.get("status") in ("completed", "failed"):
+            break
+        if time.time() - started > BUILD_TIMEOUT_S:
+            raise SystemExit(f"vacuum-build job {job['job_id']} did not finish within "
+                             f"{BUILD_TIMEOUT_S}s (last status {status.get('status')!r})")
+        time.sleep(POLL_SECONDS)
+    job_output = emc.get_emc_job_output(job["job_id"])
+    if status["status"] != "completed":
+        raise SystemExit(f"vacuum-build job {job['job_id']} failed: "
+                         f"{job_output.get('error') or status}")
+    vacuum_data = str(build_dir / "vacuum_build.data")
+    _place(job_output["result"]["data_path"], Path(vacuum_data))
+
+    args.vacuum_data_path = vacuum_data
+    vc = resolve_stage_params("vacuum-chain", args, cls)
+    chain_dir = Path(vc["work_dir"])
+    chain_dir.mkdir(parents=True, exist_ok=True)
+    script = lammps.generate_script(
+        template_name="nvt", data_file=vacuum_data,
+        output_script=str(chain_dir / "vacuum_chain.in"),
+        velocity_seed=vc["velocity_seed"],
+        params={"LOG_FILE": "vacuum_chain.log", "T_START": vc["temp_K"],
+                "T_FINAL": vc["temp_K"], "T_DAMP": vc["thermostat_damp_fs"],
+                "N_STEPS": vc["nvt_steps"], "THERMO_FREQ": vc["thermo_freq"],
+                "TIMESTEP": vc["dt_fs"], "DUMP_FILE": ""},
+    )
+    # One chain in a large box: a single rank, and no GPU claim -- this is the cheapest MD in
+    # the pipeline and taking a GPU for it would block a bulk stage behind it.
+    run = lammps.run_lammps_script(
+        script=script["output_script"], work_dir=str(chain_dir),
+        log_file="vacuum_chain_run.log", gpu_ids="", mpi=1, engine="cpu",
+        data_file=vacuum_data, lj_cutoff=vc["cutoff_A"],
+    )
+    result = wait_for_run(lammps, run["run_id"], "vacuum single-chain NVT")
+    if result.get("status") != "completed":
+        raise SystemExit(f"vacuum-chain NVT did not complete: {result}")
+    vacuum_log = str(chain_dir / "vacuum_chain.log")
+
+    args.vacuum_log = vacuum_log
+    sp = resolve_stage_params("analyze-solubility", args, cls)
+    Path(sp["output_dir"]).mkdir(parents=True, exist_ok=True)
+    delta = wait_for_analysis(lammps, lammps.extract_solubility_parameter(
+        bulk_log=sp["bulk_log"], vacuum_log=sp["vacuum_log"], n_chains=sp["n_chains"],
+        output_dir=sp["output_dir"], charge_method=sp["charge_method"],
+        eq_fraction=sp["eq_fraction"], system_label=sp["system_label"],
+    ), "solubility parameter")
+    return {
+        "chain_submitted": True,
+        "data_file_written": True,
+        "vacuum_data_path": vacuum_data,
+        "vacuum_log": vacuum_log,
+        "solubility_parameter_MPa0p5": delta.get("solubility_parameter_MPa0p5"),
+        "CED_MPa": delta.get("CED_MPa"),
+        # Grades the number, never admits it: "degraded" means embedded/Gasteiger charges and a
+        # 20%+ CED error risk, which is a caveat on delta, not a reason to withhold it.
+        "ced_confidence": delta.get("ced_confidence"),
+        "solubility_warnings": delta.get("warnings"),
+        "solubility_json_path": str(Path(sp["output_dir"]) / "solubility_parameter.json"),
+    }
+
+
 # ─── Stage: summary ─────────────────────────────────────────────────────────
 
 def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_verdict: str,
@@ -1930,7 +2077,10 @@ def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_v
     subprocess.run([
         sys.executable, str(REPO_ROOT / "db" / "query_best_match.py"),
         "--polymer_name", args.polymer_name or args.run_name, "--polymer_class", args.polymer_class.upper(),
-        "--T_sim_K", "300.0", "--is_glassy", "true" if is_glassy else "false",
+        # The condition the run was actually assessed at. Hardcoding 300 graded an off-300
+        # run against reference data at the wrong temperature.
+        "--T_sim_K", str(assessment_temperature(args, cls)),
+        "--is_glassy", "true" if is_glassy else "false",
         "--properties", ",".join(sorted(properties)), "--output_path", str(exp_lookup_path),
     ], check=False)
 
@@ -2070,11 +2220,18 @@ class CampaignStageExecutor:
         if equil:
             args.melt_start_data_path = equil.get("melt_start_data_path")
             args.melt_data_path = equil.get("melt_data_path")
-            if stage in ("cooling", "thermal"):
+            # structure joins them: it describes the MELT cell's chains, so it reads the same
+            # handoff, not the assessment cell.
+            if stage in ("cooling", "thermal", "structure"):
                 args.data_path = equil.get("melt_start_data_path")
+                args.melt_dump_path = equil.get("melt_dump_path")
         if cool:
             if stage in ("mechanical", "summary"):
                 args.data_path = cool.get("npt_prod_data_path")
+            # Cohesive needs the assessment cell's LOG, not its data file: the CED subtraction
+            # reads E_vdwl+E_coul and the volume out of the npt_final thermo trace.
+            if stage == "cohesive":
+                args.npt_prod_log = cool.get("npt_prod_log_path")
         if stage == "equilibration" and context["parameters"].get("npt_continuation_ns"):
             for prior in reversed(context.get("prior_attempts") or ()):
                 manifest_path = prior.get("manifest")
@@ -2190,15 +2347,19 @@ class CampaignStageExecutor:
                 outputs = do_thermal(args, cls, self.lammps, equil.get("melt_density_gcm3"))
             elif stage == "mechanical":
                 is_glassy = (thermal.get("is_glassy") if thermal else
-                              resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0)
+                              assessment_regime(args, cls) == "glassy")
                 if context["parameters"].get("mechanical_method") == "deformation":
                     args.is_glassy = "true" if is_glassy else "false"
                     outputs = do_deformation(args, cls, self.lammps)
                 else:
                     outputs = do_mechanical(args, cls, self.lammps, is_glassy, args.data_path)
+            elif stage == "structure":
+                outputs = do_structure(args, cls, self.lammps)
+            elif stage == "cohesive":
+                outputs = do_cohesive(args, cls, self.emc, self.lammps)
             elif stage == "summary":
                 is_glassy = (thermal.get("is_glassy") if thermal else
-                              resolve_stage_params("equil", args, cls)["T_workflow_K"] != 300.0)
+                              assessment_regime(args, cls) == "glassy")
                 # D-05 has two verdicts now. Report the one for the cell the run actually
                 # reports on: the assessment cell when the cooldown ran, the melt otherwise.
                 d05_verdict = (cool.get("cool_verdict") if cool

@@ -21,6 +21,7 @@ from scientific_control import (  # noqa: E402
     WorkflowIssue,
     WorkflowOutcome,
     JsonSubprocessAgent,
+    AGENT_SUBPROCESS_TIMEOUT_S,
     SubprocessPlanningAgent,
     materialize_plan,
     planning_context,
@@ -561,3 +562,25 @@ def test_plan_size_advisories_never_displace_the_dominant_uncertainty():
     plan = _tg_plan("PKTN", PEEK_SMILES, "RIGIDITY_DOMINANCE_TEST")
     assert plan["dominant_uncertainty"] == "sampling"
     assert isinstance(plan["system_size"]["acknowledgements"], dict)
+
+
+def test_a_wedged_agent_subprocess_times_out_instead_of_blocking_the_campaign():
+    """JsonSubprocessAgent is the model-provider-neutral boundary. Its only bound used to
+    be self-imposed by recovery_agent_cli on the far side -- a property of one particular
+    command string, lost the moment that string is swapped, which is the whole point of the
+    adapter. A wedged subprocess would then block a campaign forever."""
+    agent = JsonSubprocessAgent(
+        [sys.executable, "-c", "import time; time.sleep(30)"], timeout_s=1)
+    try:
+        agent.invoke({"task": "diagnose_polymer_simulation_issue"})
+        assert False, "expected the timeout to surface"
+    except RuntimeError as exc:
+        # A RuntimeError like every other wrapper failure: callers that map those to a
+        # bounded retry rather than a considered `stop` depend on seeing an exception.
+        assert "timed out" in str(exc)
+
+
+def test_the_default_agent_timeout_exceeds_what_the_recovery_cli_bounds_itself_to():
+    """600 s per headless call x the retry-once convention = 1200 s worst case. The
+    transport must never pre-empt a call the adapter would still have completed."""
+    assert AGENT_SUBPROCESS_TIMEOUT_S > 2 * 600
