@@ -377,6 +377,27 @@ def do_build(args, cls: dict, emc, lammps) -> dict:
                        if (cell_dir / name).is_file()},
     }
 
+    # The cell is NOT the molecule that was asked for when this is true: "/" and "\\" are
+    # stripped before EMC ever sees the SMILES (they open a comment in the .esh grammar), and
+    # EMC discards double-bond stereo regardless, so it packs ~48:52 cis/trans. The server has
+    # recorded the drop in its job result and emc_metadata.json since 2026-08-11; nothing on
+    # this side read it, so a cis-PBD run reported a cis-PBD result with no qualification.
+    #
+    # Advisory, not halting, and deliberately so: the documented fix (a cis-lock MD stage)
+    # does not exist, so blocking would fail every polydiene run carrying a stereo SMILES for
+    # a defect it cannot repair. "@"/"@@" stereocentres ARE honoured by EMC and are untouched
+    # by this -- tacticity is a separate, unmeasured question.
+    if out.get("stereo_stripped"):
+        base_outputs["stereo_stripped"] = True
+        base_outputs["build_advisories"] = [{
+            "code": "BUILD_STEREO_DISCARDED",
+            "severity": "advisory",
+            "requested_smiles": p["smiles"],
+            "detail": ("SMILES double-bond stereo was discarded before building: EMC packs a "
+                       "mixed cis/trans cell (~48:52) regardless of the requested isomer. Any "
+                       "property this run reports is for the mixed cell, not the pure isomer."),
+        }]
+
     # Force-field provenance, before the cell is worth spending MD on. Uses the field EMC
     # reports it actually used, not the one the plan asked for.
     provenance = _ff_provenance(cell_dir, out["field"], dest_params)
@@ -1380,6 +1401,7 @@ def do_thermal(args, cls: dict, lammps, melt_density_gcm3=None) -> dict:
                          "fit_quality": thermal.get("fit_quality"), "r_squared": thermal.get("r_squared"),
                          "output_dir": ap["output_dir"],
                          "tg_gate_verdict": thermal.get("tg_gate_verdict"),
+                         "tg_gate_cause": thermal.get("tg_gate_cause"),
                          "velocity_seed": p["velocity_seed"],
                          "tg_start_cell": start_cell, "tg_per_t_sampling": sweep.get("per_t"),
                          "tg_melt_start_density_consistent": melt_start_consistent})
@@ -1397,8 +1419,11 @@ def do_thermal(args, cls: dict, lammps, melt_density_gcm3=None) -> dict:
     else:
         is_glassy = bool(highest and isinstance(highest["Tg_K"], (int, float)) and highest["Tg_K"] > 300)
 
+    # tg_gate_cause rides alongside the verdict because binding_gate_failure turns the verdict
+    # into a Finding and the tg_breakpoint remedy needs the sub-case to pick a lever.
     result = {"per_rate": per_rate, "is_glassy": is_glassy,
-              "tg_gate_verdict": (highest or {}).get("tg_gate_verdict")}
+              "tg_gate_verdict": (highest or {}).get("tg_gate_verdict"),
+              "tg_gate_cause": (highest or {}).get("tg_gate_cause")}
     return result
 
 
@@ -2182,6 +2207,12 @@ class CampaignStageExecutor:
                                      d05_verdict, attempt_dir / "raw",
                                      equil_result=equil, mechanical_result=mechanical,
                                      cool_result=cool or None)
+                # Build-stage advisories are qualifications on what the run MEASURED (today:
+                # a cis/trans-mixed cell built from a stereo SMILES), so they have to survive
+                # into the reported result rather than staying in the build attempt's own
+                # manifest where nobody reading the summary would look.
+                if build.get("build_advisories"):
+                    outputs = {**outputs, "build_advisories": build["build_advisories"]}
             else:
                 raise ValueError(f"unknown workflow stage {stage!r}")
         except SystemExit as exc:

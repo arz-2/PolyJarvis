@@ -37,20 +37,22 @@ of a capped ladder are spent), `agent_escalations` (prior calls to you this run,
 ## 2. What auto-remedied and what didn't
 
 `workflow_engine.py`'s `default_remedies()` is the authoritative registry — read it directly for
-exact formulas/caps rather than trusting this table to stay current. Summary, by track:
+exact formulas/caps rather than trusting this table to stay current. Rows for codes that no
+stage actually emits were removed 2026-09-07 (`UNSAFE_HARDWARE_PIN`,
+`UNIMPLEMENTED_PARAMETER`/`OVERRIDDEN_NOOP_PARAMETER`, `FORCE_FIELD_TYPING_FAILED`,
+`EQUIL_DRIFT`/`EQUIL_SEM`/`EQUIL_N_EFF`, `PROCESS_TIMEOUT`/`*_PROCESS_FAILED`) — their remedies
+are still registered but unreachable, so do not plan around them. Summary, by track:
 
 | Track | Blocking code | Auto-remedy (capped) | If it reaches you |
 |---|---|---|---|
 | Foundation | `SIZE_MIN_IMAGE_VIOLATION`, `SIZE_CHAIN_SELF_IMAGE`, `FINITE_SIZE_FAILED` | `finite_size_rebuild` — larger `nchain`, ×2 | Structural; only escalates if the rebuilt cell still fails |
-| Foundation | `UNSAFE_HARDWARE_PIN` | `safe_hardware`, ×1 | Policy has no safe hardware recommendation — needs a human call |
-| Foundation | `UNIMPLEMENTED_PARAMETER`, `OVERRIDDEN_NOOP_PARAMETER` | `remove_noop`, ×1 | — |
-| Foundation | `FORCE_FIELD_TYPING_FAILED` | `unique_forcefield`, ×1 (only if exactly one alternative) | `FORCE_FIELD_TYPING_AMBIGUOUS` (>1 alternative) is `agent_only` — pick one, cite the evidence |
-| Foundation | `EQUIL_DRIFT`/`EQUIL_SEM`/`EQUIL_N_EFF`/`EXTEND` | `continue_npt`, ×2 — extension length from measured τ_relax | **Price it first (§3)** — a Class B gate whose gap is actually bias (not variance) is the wrong lever |
+| Foundation | `EXTEND` | `continue_npt`, ×2 — extension length from measured τ_relax | **Price it first (§3)** — a Class B gate whose gap is actually bias (not variance) is the wrong lever |
 | Foundation | `UNDER_ANNEALED_COOLING` | none — `slower_cooling` retired 2026-09-01; the gate is advisory (`enforce_gate.STRUCTURAL_GATES`) because doubling the hold recovers ~0.33% against 3–9% shortfalls | Self-consistency trigger now (melt→glass contraction vs. this run's own thermal-expansion prediction, contraction_shortfall<0.97) — unconditional, no experimental density involved; do not conflate with melt-stage deficits |
 | Foundation | `MINIMIZE_NOT_CONVERGED` | `raise_minimize_tolerance`, ×2 — escalates `minimize_maxiter`/`minimize_maxeval` ×4/attempt and loosens `minimize_etol`/`minimize_ftol` ×10/attempt, full restart each time (minimize is stage 0) | Structure still won't relax after 2 rungs — likely a genuinely bad initial pack, not a tolerance problem; escalate rather than loosening further |
 | Foundation | `HOMOG_HETEROGENEOUS`/`DENSITY_HETEROGENEITY` | `melt_homogeneity`, ×2 | Melt-only signal — don't apply to a glassy 300K read |
 | Thermal | `TG_NOT_REPORTABLE` | none — `tg_sampling` retired 2026-08-17 (its `baseline_tg_steps_per_t` cascaded an already-verified equilibration back to stale, and `tg_steps_per_t` reaches no deck); routes to `agent_only` | Fit genuinely won't resolve. The one lever left is `overrides.tg_rate_K_per_ns` — LOWER it; rate IS the per-T step count |
-| Thermal | `TG_REVIEW` | `tg_breakpoint` — halves `tg_t_step_K` once, ×1 | primary/alt Tg gap >20K persists — consider LOWERING the class's `tg_rate_K_per_ns` (the retired `tg_slope_gate_fallback` is gone) |
+| Thermal | `TG_REVIEW` (`tg_gate_cause=breakpoint_ambiguity`) | `tg_breakpoint` — halves `tg_t_step_K` once, ×1. **In practice this always declines:** all 21 classes are configured at exactly 1.00× their `tg_min_steps_per_T`, and halving the step exactly halves steps/T, so the validated remedy never clears the floor. Expect to receive this sub-case too | The grid still can't place the breakpoint after the extra points — the transition may not be resolvable at this rate |
+| Thermal | `TG_REVIEW` (`tg_gate_cause=method_gap`) | **none — `tg_breakpoint` declines this sub-case.** Halving the step would halve the samples per temperature, making a noisy transition worse | Hyperbola and bilinear disagree >20K on the SAME points, i.e. each point is too noisy. The lever is LOWERING `tg_rate_K_per_ns` — agent-only because it carries `EXTRA_INVALIDATION` to `cooling` and so re-runs the whole cooldown too. **Price it first (§3)** |
 | Mechanical | `BM_FALLBACK_DEFORM` | `deformation_fallback`, ×1 | — |
 | Mechanical | `BM_INADMISSIBLE_NONMONOTONIC` | `murnaghan_resample`, ×1 | — |
 | Mechanical | `BM_INADMISSIBLE` | `conditional_deformation`, ×1, glassy only | Rubbery + inadmissible has no auto-fallback — `agent_only` |
@@ -59,7 +61,7 @@ exact formulas/caps rather than trusting this table to stay current. Summary, by
 | Mechanical | `DEFORM_RATE_SENSITIVE` | `rate_sensitivity` — lowers the slow-leg rate toward a floor, ×1 | `DEFORM_RATE_SENSITIVITY_PERSISTS` after that is `agent_only` |
 | Mechanical | `DEFORM_ANISOTROPIC`, `DEFORM_INADMISSIBLE` | none | `agent_only` — single-axis K is a biased estimator here; no lever fixes it, needs a different deform direction or a human call |
 | Cross-cutting | `PLAN_VALIDATION_FAILED`, `PLAN_AGENT_CONTRACT_ERROR`, `ARTIFACT_INTEGRITY_FAILED`, `UNEXPLAINED_STAGE_FAILURE`, `REMEDY_EXHAUSTED`, `AUTOMATIC_REMEDY_CAP_REACHED` | none | Always `agent_only` by design |
-| Any | `PROCESS_FAILED`/`PROCESS_DEAD_NO_SENTINEL`/`PROCESS_TIMEOUT`/`*_PROCESS_FAILED` | `transient_retry`, unchanged params, ×2 | Look for a real cause (disk, GPU claim, host) before recommending a third blind retry |
+| Any | `PROCESS_FAILED`/`PROCESS_DEAD_NO_SENTINEL` | `transient_retry`, unchanged params, ×2 — preflights free disk and free GPUs first and declines (escalating to you) when either is short | Look for a real cause (disk, GPU claim, host) before recommending a third blind retry |
 
 A `Finding` with `confidence="low"` never auto-remedies even if a route exists (routes straight
 here) — check whether that's warranted or whether the emitting check should have scored higher

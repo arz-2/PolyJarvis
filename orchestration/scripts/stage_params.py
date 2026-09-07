@@ -11,7 +11,8 @@ import json
 import sys
 from functools import lru_cache
 from pathlib import Path
-from rules_common import load_rules, resolve_ff_family, get_class_entry, resolve_member_value
+from rules_common import (load_rules, resolve_ff_family, get_class_entry,
+                          resolve_member_value, resolve_slow_deform_rate)
 from hardware_runtime import host_matches, live_host
 from mol_python import run_in_mol_env, RDKIT_CLI
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -765,7 +766,7 @@ def _resolve_tg_params(args, cls: dict) -> dict:
 
 def _resolve_deform_params(args, cls: dict) -> dict:
     """Resolve deterministic deformation arguments."""
-    return {'deform_rate_mode': args.deform_rate_mode, 'equil_data_path': args.data_path, 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'K_deform_rate_inv_s': _pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 100000000.0), 'K_deform_rate_slow_inv_s': cls.get('K_deform_rate_slow_inv_s', 'null'), 'K_strain_max': _pick(args.K_strain_max, cls, 'K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0)}
+    return {'deform_rate_mode': args.deform_rate_mode, 'equil_data_path': args.data_path, 'lammps_flags': _lammps_flags(args.lammps_flags, cls), 'work_dir': args.work_dir or f'{REPO_ROOT}/data/{args.run_name}/lammps/mechanical', 'is_glassy': _is_glassy(args, cls), 'K_deform_rate_inv_s': _pick(args.K_deform_rate_inv_s, cls, 'K_deform_rate_inv_s', 100000000.0), 'K_deform_rate_slow_inv_s': (resolve_slow_deform_rate(cls) or 'null'), 'K_strain_max': _pick(args.K_strain_max, cls, 'K_strain_max', 0.03), 'deform_eq_steps': int(cls.get('deform_eq_steps', 200000)), 'deform_strain_start': cls.get('deform_strain_start', 0.002), 'deform_avg_window': int(cls.get('deform_avg_window', 2000)), 'thermostat_damp_fs': cls.get('thermostat_damp_fs', 100.0), 'dt_fs': _pick(args.dt_fs, cls, 'dt_fs', 1.0), 'gpu_ids': args.gpu_ids, 'mpi_ranks': args.mpi_ranks, 'engine': args.engine, 'velocity_seed': _velocity_seed(args), 'cutoff_A': cls.get('cutoff_A', 12.0)}
 
 def _run_graphs_dir(args) -> str:
     """Run-level graphs directory, shared by every plotting stage -- NOT output_dir with its
@@ -948,7 +949,7 @@ def _resolve_analyze_bm_params(args, cls: dict) -> dict:
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
     _k_from_cls = _exp_K_range(cls)
     exp_K = [args.exp_K_min if args.exp_K_min is not None else _k_from_cls[0], args.exp_K_max if args.exp_K_max is not None else _k_from_cls[1]]
-    K_deform_rate_slow_inv_s = cls.get('K_deform_rate_slow_inv_s', None)
+    K_deform_rate_slow_inv_s = resolve_slow_deform_rate(cls)
     # Same bug and fix as _resolve_equil_check_params: args.npt_prod_log is never set in real
     # execution, so this always fell to a nonexistent flat-convention path -- silently disabling
     # the fluctuation cross-check (PE1's real bulk_modulus_murnaghan.json carried

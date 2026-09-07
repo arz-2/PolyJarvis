@@ -55,6 +55,44 @@ def get_class_entry(rules: dict, polymer_class: str, warn_on_miss: bool = False)
     return entry
 
 
+K_DEFORM_SLOW_RATE_DIVISOR = 10.0
+"""Decade separation between the two deformation legs of the rate-sensitivity cross-check.
+
+Every class that declares K_deform_rate_slow_inv_s uses exactly one tenth of its own
+K_deform_rate_inv_s, so deriving the slow leg reproduces all of them (PSTR included, whose
+primary is itself a decade below everyone else's) rather than hardcoding one number that
+would contradict PSTR.
+"""
+
+
+def resolve_slow_deform_rate(cls: dict) -> float | None:
+    """The slow deformation leg's strain rate, defaulting to one decade below the fast leg.
+
+    PDIE, PHYC, PSIL and PURA carried no K_deform_rate_slow_inv_s until 2026-09-07, and a
+    missing slow leg is not inert: _submit_deform returns None for mode="slow", so
+    do_deformation never passes log_file_2/strain_rate_2, so extract_bulk_modulus_deform
+    reports no rate_sensitivity, so workflow_engine.binding_gate_failure's
+    `rate_sensitivity.verdict == "WARNING"` test can never be true. DEFORM_RATE_SENSITIVE
+    was unreachable for exactly the four rubbery/soft classes where a 1e8 1/s strain rate is
+    most likely to read stiff. It also silently degraded the _negative_modulus remedy, whose
+    `slow or fast` fallback reassigned the fast rate to itself.
+
+    Note this is NOT free: the slow leg runs a decade slower over the same K_strain_max, and
+    N_STEPS = STRAIN_MAX / (STRAIN_RATE * TIMESTEP), so it costs roughly 10x the primary
+    deform. That is the price the other 17 classes already pay for the cross-check.
+
+    A class may still pin its own value; only absence is filled in. None only when the class
+    declares no fast rate either.
+    """
+    slow = cls.get("K_deform_rate_slow_inv_s")
+    if slow not in (None, "null"):
+        return float(slow)
+    fast = cls.get("K_deform_rate_inv_s")
+    if fast in (None, "null"):
+        return None
+    return float(fast) / K_DEFORM_SLOW_RATE_DIVISOR
+
+
 def primary_source(rules: dict, source_id: str) -> dict | None:
     """Resolve a class `citations[]` id to its full record in _metadata.primary_sources.
 

@@ -12,6 +12,7 @@ import hashlib
 import json
 import math
 import os
+import shutil
 import sys
 from types import SimpleNamespace
 from dataclasses import asdict, dataclass, field
@@ -33,9 +34,19 @@ Bumped deliberately -- implementation_version is inside every stage's _input_has
 this is what makes the invalidation of every resumable run on disk explicit rather than
 an accident of the decision_policy.json hash changing underneath them."""
 MAX_AUTOMATIC_REMEDIES = 12
+MIN_FREE_DISK_GB = 60.0
+"""Free disk below which transient_retry refuses to resubmit rather than repeat a crash.
+
+Sized from the largest routine consumer: a Murnaghan bulk-modulus series writes ~790 MB of
+dumps per series, and a full ENOSPC does not merely fail the stage -- it kills the chain and
+truncates the orchestrator's own captured stdout, which is how the failure presents.
+"""
 MAX_AGENT_DECISIONS = 2
 TRANSIENT_RETRIES = 2
-STAGE_ORDER = ("build", "equilibration", "cooling", "thermal", "mechanical", "summary")
+STAGE_ORDER = ("build", "equilibration", "cooling", "thermal", "mechanical",
+               "structure", "cohesive", "summary")
+GPU_STAGES = frozenset({"equilibration", "cooling", "thermal", "mechanical"})
+"""Stages that take a hardware_runtime GPU claim. build runs EMC; summary is analysis."""
 STAGE_RESULTS = frozenset({"accepted", "remedy_required", "escalation_required", "failed"})
 BLOCKING_SEVERITIES = frozenset({"blocking", "structural", "error", "fatal"})
 
@@ -152,6 +163,17 @@ PARAMETER_STAGE: dict[str, str] = {
     "bm_temperature_K": "mechanical", "bm_thermo_freq": "mechanical",
     "mechanical_method": "mechanical", "mechanical_resample_points": "mechanical",
     "mechanical_sampling_factor": "mechanical",
+    # ── structure: analysis-only over the melt cell's dump ──────────────────────────
+    "rdf_rmax_A": "structure", "rdf_nbins": "structure",
+    "rdf_atom_type_pairs": "structure", "structure_skip_frames": "structure",
+    "structure_max_frames": "structure",
+    # ── cohesive: the vacuum single-chain reference ─────────────────────────────────
+    # vacuum_* drive the second EMC build and its NVT hold. They MUST be hashed under
+    # "cohesive" and not fall through to "build": an unmapped key hashes as "build" and would
+    # invalidate the entire pipeline back to the cell every time one moved.
+    "vacuum_density_gcm3": "cohesive", "vacuum_nvt_steps": "cohesive",
+    "vacuum_box_margin_A": "cohesive", "vacuum_thermo_freq": "cohesive",
+    "solubility_eq_fraction": "cohesive",
     "bm_per_point_max_extensions": "mechanical", "bm_per_point_stability_pct": "mechanical",
     "bm_per_point_min_n_eff": "mechanical",
     # Only consumed by _exp_K_range (analyze-bm's exp_K_range grading target) -- mechanical.
@@ -408,7 +430,39 @@ def _melt_homogeneity(params: dict[str, Any], finding: Finding, attempt: int) ->
     return revised
 
 
-def _tg_review(params: dict[str, Any], _finding: Finding, _attempt: int) -> dict[str, Any]:
+def _tg_review(params: dict[str, Any], finding: Finding, _attempt: int) -> dict[str, Any]:
+    """Halve the sweep's temperature step -- for ONE of TG_REVIEW's two sub-cases.
+
+    extract_thermal raises TG_REVIEW for two causes that want opposite levers:
+
+      breakpoint_ambiguity -- several splits explain the data about equally well, so the
+        transition is real but the grid is too coarse to place it. More temperature points
+        is exactly the fix, and it is free: total sweep steps = T_range/(rate*dt), so
+        halving the step doubles the points and halves the time at each, at identical cost.
+
+      method_gap -- hyperbola and bilinear fit the SAME points and land >20 K apart, i.e.
+        each point is too noisy. That needs more time per temperature, which means lowering
+        tg_rate_K_per_ns -- the opposite of halving the step, which would make it worse.
+
+    Only the first is handled here. The rate lever stays agent-only because
+    tg_rate_K_per_ns carries EXTRA_INVALIDATION to `cooling`: lowering it re-runs the whole
+    cooldown as well as the sweep, which is not a cheap automatic rung. Raising ValueError
+    is how a remedy declines -- _apply_remedy catches it and the finding escalates.
+    """
+    # NOTE (measured 2026-09-07): every one of the 21 classes is configured at exactly 1.00x
+    # its tg_min_steps_per_T floor, and steps/T = tg_t_step_K/(rate*dt), so halving the step
+    # ALWAYS lands under the floor. _apply_remedy's validation therefore declines this remedy
+    # for every class as currently configured -- which is the point: before that validation
+    # existed it shipped those sub-floor plans silently. Getting more temperature points
+    # genuinely requires lowering the rate as well, and that invalidates cooling. Left
+    # registered rather than marked agent_only so the ladder still reads as intended if a
+    # class is ever given headroom over its floor.
+    cause = (finding.details.get("gate_output") or {}).get("tg_gate_cause")
+    if cause != "breakpoint_ambiguity":
+        raise ValueError(
+            f"tg_breakpoint only addresses breakpoint_ambiguity; tg_gate_cause={cause!r} "
+            "needs a lower tg_rate_K_per_ns, which invalidates cooling and is agent-only"
+        )
     return _merge(params, tg_t_step_K=max(5.0, float(params.get("tg_t_step_K", 20)) / 2.0))
 
 
@@ -560,6 +614,74 @@ class RemedyRegistry:
         missing = set(active_codes) - set(self._by_code)
         if missing:
             raise AssertionError(f"blocking verdicts lack remedy routes: {sorted(missing)}")
+
+
+def _transient_retry_blocked(run_dir: Path, gpus_needed: int) -> Optional[str]:
+    """Why an unchanged resubmission would fail again, or None if it is worth trying.
+
+    transient_retry is the only auto-remedy that has ever actually fired on this checkout,
+    and every application was blind: the same parameters, resubmitted, with nothing checked
+    in between. The two causes that make an "unchanged retry" certain to repeat are the two
+    the engine can see for itself -- a full filesystem and no free GPU. Both are genuinely
+    transient (someone else's run ends, a cleanup lands), which is why this declines rather
+    than failing outright: declining escalates to the recovery agent WITH a named cause,
+    instead of spending the second rung reproducing the first.
+
+    Deliberately not a claim check: gpu_claim is a `with` block scoped to each submission,
+    so by the time a remedy runs the claim is already released and "do we still hold one"
+    is always false. Availability is the question.
+    """
+    try:
+        free_gb = shutil.disk_usage(run_dir).free / 1e9
+    except OSError as exc:  # an unreadable run dir is its own, different problem
+        return f"run directory {run_dir} is not stat-able: {exc}"
+    if free_gb < MIN_FREE_DISK_GB:
+        return (f"only {free_gb:.1f} GB free on the run filesystem, below the "
+                f"{MIN_FREE_DISK_GB:.0f} GB a resubmission needs")
+    try:
+        import hardware_runtime
+        free = hardware_runtime.free_gpus()
+    except Exception:
+        return None  # no GPU ledger on this host -- not a reason to block a retry
+    if gpus_needed and len(free) < gpus_needed:
+        return (f"{len(free)} GPU(s) free, {gpus_needed} needed -- a resubmission would "
+                "queue behind the same contention")
+    return None
+
+
+def _validate_revised_parameters(before: Mapping[str, Any],
+                                after: Mapping[str, Any]) -> Optional[str]:
+    """Scientific validation of an auto-remedy's output. None when acceptable.
+
+    An agent decision reaching decided_params passes validate_overrides and
+    _validate_protocol_relationships (which is what reaches _assert_tg_rate_feasible);
+    an automatic remedy used to bypass both, so `tg_breakpoint` could halve tg_t_step_K
+    straight through a class's tg_min_steps_per_T floor. The two paths now apply the same
+    bounds.
+
+    Only the keys a remedy actually CHANGED are checked, and only those inside the
+    planning contract: remedies also write engine-internal keys that are not overrides at
+    all (equilibration_phase, rerun_homogeneity_gate, mechanical_resample_points,
+    mechanical_sampling_factor, npt_continuation_ns), and validate_overrides rejects any
+    key outside ALLOWED_OVERRIDES outright -- passing the whole dict would reject every
+    remedy in the registry. _validate_protocol_relationships takes the full parameter set
+    plus that changed-key set, and gates each of its own checks on it, so it is passed
+    everything.
+
+    Imported here rather than at module scope: scientific_control imports
+    make_deterministic_plan, which imports back into this package.
+    """
+    from scientific_control import (ALLOWED_OVERRIDES, validate_overrides,
+                                    _validate_protocol_relationships)
+    changed = {key for key in after if after.get(key) != before.get(key)}
+    if not changed:
+        return None
+    try:
+        validate_overrides({key: after[key] for key in changed & ALLOWED_OVERRIDES})
+        _validate_protocol_relationships(dict(after), changed)
+    except ValueError as exc:
+        return str(exc)
+    return None
 
 
 def binding_gate_failure(stage: str, outputs: Mapping[str, Any]) -> Optional[Finding]:
@@ -736,6 +858,14 @@ class WorkflowEngine:
             # _MECHANICAL.requires), but filter anyway -- an unenabled dependency KeyErrors in
             # run() and _input_hash rather than degrading.
             return tuple(name for name in ("cooling", "thermal") if name in enabled)
+        # Structure reads the MELT cell's data file and dump, so it descends from the melt hold
+        # like cooling and thermal do, and does not wait for either.
+        if stage == "structure":
+            return ("equilibration",)
+        # Cohesive needs the bulk log of the cell delta is reported at -- npt_final. Same
+        # `requires` relation mechanical has, and the same reason to filter.
+        if stage == "cohesive":
+            return tuple(name for name in ("cooling",) if name in enabled)
         return tuple(name for name in enabled if name != "summary")
 
     def _accepted_manifest(self, stage: str) -> dict[str, Any]:
@@ -908,6 +1038,17 @@ class WorkflowEngine:
                                         context["parameters"])
         return result, manifest
 
+    def _gpus_needed(self) -> int:
+        """GPUs one attempt of a GPU-bearing stage claims. Defaults to 1 the way
+        do_deformation's `cls.get("gpu_per_run") or 1` does; 0 only if the class is
+        unreadable, which disables the check rather than blocking on a guess."""
+        try:
+            from rules_common import get_class_entry, load_rules
+            entry = get_class_entry(load_rules(), str(self.plan.get("polymer_class") or ""))
+            return int(entry.get("gpu_per_run") or 1)
+        except Exception:
+            return 0
+
     def _apply_remedy(self, finding: Finding) -> bool:
         remedy = self.registry.route(finding)
         counters = self.state["remedy_counters"]
@@ -917,9 +1058,35 @@ class WorkflowEngine:
             return False
         if int(counters["total"]) >= MAX_AUTOMATIC_REMEDIES:
             return False
+        if remedy.remedy_id == "transient_retry":
+            # In _apply_remedy rather than in the remedy action, which is handed only the
+            # parameter dict and has no way to reach the run directory or the GPU ledger.
+            #
+            # GPUs are only checked for stages that actually claim one: the build runs EMC and
+            # the summary is pure analysis, so blocking either on GPU contention would refuse a
+            # retry for a resource the stage never wanted. gpu_per_run comes from the class
+            # entry, NOT from effective_parameters -- it is not in make_deterministic_plan's
+            # SNAPSHOT_KEYS, so reading it there always yielded 0 and disabled the check.
+            blocked = _transient_retry_blocked(
+                self.state_path.parent,
+                self._gpus_needed() if finding.stage in GPU_STAGES else 0)
+            if blocked is not None:
+                self._log_recovery_event({
+                    "event": "auto_remedy_rejected", "code": finding.code,
+                    "stage": finding.stage, "remedy_id": remedy.remedy_id, "reason": blocked,
+                })
+                return False
+        params = dict(self.state["effective_parameters"])
         try:
-            revised = remedy.action(dict(self.state["effective_parameters"]), finding, used + 1)
+            revised = remedy.action(params, finding, used + 1)
         except (KeyError, TypeError, ValueError):
+            return False
+        rejection = _validate_revised_parameters(params, revised)
+        if rejection is not None:
+            self._log_recovery_event({
+                "event": "auto_remedy_rejected", "code": finding.code, "stage": finding.stage,
+                "remedy_id": remedy.remedy_id, "reason": rejection,
+            })
             return False
         self.state["effective_parameters"] = revised
         counters["total"] += 1
@@ -970,9 +1137,38 @@ class WorkflowEngine:
                     "polymer_class_hint": self.plan.get("polymer_class"),
                 }
                 intent = SimpleNamespace(to_dict=lambda: intent_payload)
+                # SubprocessRecoveryAgent.diagnose serializes issue.to_dict() and nothing
+                # else, so anything absent from it never reaches the agent. Returning the
+                # bare finding used to discard the whole payload above: the LLM was told the
+                # code and the stage, and got its history from plan_summary.recovery_history
+                # -- which is plan["recovery_history"], written only by the OUTER loop and
+                # therefore empty here. It was being told nothing had been tried on a run
+                # that had just burned both automatic rungs.
+                #
+                # engine_context, not `detail`/`details`: recovery_agent_cli._trim_payload
+                # reads issue.get("detail", issue.get("details")), so a `detail` key would
+                # shadow the finding's own details -- including gate_output, the thing being
+                # diagnosed.
+                engine_context = {
+                    "confidence": finding.confidence,
+                    "escalation_attempt": len(escalations) + 1,
+                    "max_agent_decisions": MAX_AGENT_DECISIONS,
+                    "run_dir": str(self.state_path.parent.resolve()),
+                    "failed_attempt_manifest": manifest.get("attempt_id"),
+                    # Trimmed: this rides into a one-line prompt, and the full records carry
+                    # whole findings and manifest paths.
+                    "remedy_history": [
+                        {"remedy_id": entry.get("remedy_id"),
+                         "code": (entry.get("finding") or {}).get("code"),
+                         "stage": (entry.get("finding") or {}).get("stage"),
+                         "application": entry.get("application")}
+                        for entry in self.state.get("remedy_history", [])
+                    ],
+                }
+                issue_payload = {**finding.to_dict(), "engine_context": engine_context}
                 issue = SimpleNamespace(code=finding.code, stage=finding.stage,
                                         detail=payload, attempt=len(escalations) + 1,
-                                        to_dict=lambda: finding.to_dict())
+                                        to_dict=lambda: issue_payload)
                 decision = self.recovery_agent.diagnose(intent, self.plan, issue)
         else:
             decision = self.recovery_agent(payload)

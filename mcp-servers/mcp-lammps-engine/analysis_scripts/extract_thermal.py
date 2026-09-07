@@ -1122,6 +1122,13 @@ def main():
         Tg_alt = round(alt_result["Tg_K"], 1) if alt_result else round(cf_result["Tg_alt_K"], 1)
         method_gap_K = round(abs(round(Tg_primary, 1) - Tg_alt), 1) if Tg_alt is not None else None
     gate_reasons = []
+    # Structured counterpart to the TG_REVIEW prose below. The two TG_REVIEW sub-cases need
+    # OPPOSITE remedies -- breakpoint_ambiguity wants more temperature points (halve
+    # tg_t_step_K, which is cost-neutral: total sweep steps = T_range/(rate*dt) regardless of
+    # step size), method_gap wants more time per point (lower tg_rate_K_per_ns) -- so
+    # workflow_engine's tg_breakpoint remedy has to tell them apart. It must not do that by
+    # parsing tg_gate_reasons.
+    gate_cause = None
     if fit_quality == "POOR":
         gate_reasons.append(f"fit_quality=POOR ({', '.join(fit_warnings) or 'low r²'})")
     if primary_fit_invalid:
@@ -1137,6 +1144,7 @@ def main():
         else:
             gate_verdict = "TG_REVIEW"
             if fit_method_used == "bilinear_curvefit" and cf_result.get("breakpoint_spread_K") is not None:
+                gate_cause = "breakpoint_ambiguity"
                 gate_reasons.append(
                     f"breakpoint_ambiguity={method_gap_K:.1f} K exceeds {method_gap_max_K:.0f} K "
                     f"(spread={cf_result['breakpoint_spread_K']:.1f} K over "
@@ -1145,6 +1153,7 @@ def main():
                     "transition is not resolved by this sweep"
                 )
             else:
+                gate_cause = "method_gap"
                 gate_reasons.append(
                     f"method_gap={method_gap_K:.1f} K between {fit_method_used} and the alternative "
                     f"fit exceeds {method_gap_max_K:.0f} K — transition region noisy or sweep too narrow"
@@ -1159,6 +1168,7 @@ def main():
         "tg_method_gap_K":     method_gap_K,
         "tg_gate_verdict":     gate_verdict,
         "tg_gate_reasons":     gate_reasons,
+        "tg_gate_cause":       gate_cause,
         "tg_reportable":       gate_verdict == "TG_REPORTABLE",
         "r_squared":           round(r2_primary, 4),
         "fit_quality":         fit_quality,
@@ -1167,11 +1177,6 @@ def main():
                                  if cf_result.get("transition_width_c_K") is not None else None),
         "tg_uncertainty_K":    (round(cf_result["tg_uncertainty_K"], 1)
                                 if cf_result.get("tg_uncertainty_K") is not None else None),
-        # Interval on Tg_alternative_K, not on Tg_K. Non-null only for bilinear_curvefit, whose
-        # Tg_K is an unrefined seed with no meaningful covariance -- so it must not be read as
-        # the headline's error bar.
-        "tg_alt_uncertainty_K": (round(cf_result["tg_alt_uncertainty_K"], 1)
-                                 if cf_result.get("tg_alt_uncertainty_K") is not None else None),
         "binning_method":      binning_method,
         # Provenance for the fit window: how many bins the sweep produced vs how many were
         # actually fitted. A reader can tell "fitted the whole descent" from "fitted the sized

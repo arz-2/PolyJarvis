@@ -410,6 +410,12 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
     cls = get_class_entry(rules, polymer_class)
     _assert_tg_rate_feasible(cls, polymer_class.upper())
     decided_params = {k: cls[k] for k in SNAPSHOT_KEYS if k in cls}
+    # SNAPSHOT_KEYS copies only keys the class HAS, and four classes declare no slow
+    # deformation leg. decided_params is what the _negative_modulus remedy reads, so leaving
+    # the key absent made its "switch to the slow rate" step a no-op. Derive it.
+    slow_deform_rate = rules_common.resolve_slow_deform_rate(cls)
+    if slow_deform_rate is not None:
+        decided_params["K_deform_rate_slow_inv_s"] = slow_deform_rate
     # D-01: decided_params.preferred_ff is the field this run BUILDS with, resolved per SMILES.
     # It is never None -- a resolution that typed nothing refuses through the D-01 row's
     # admissible=[] instead, so the cell is still sized and priced against a real field.

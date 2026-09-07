@@ -1,6 +1,8 @@
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -151,9 +153,11 @@ def test_retry_ignores_any_attached_modifications(tmp_path):
 
 
 def test_tg_gate_cannot_be_accepted_from_process_completion(tmp_path):
+    review = {"Tg_K": 350.0, "tg_gate_verdict": "TG_REVIEW",
+              "tg_gate_cause": "breakpoint_ambiguity"}
     fake = FakeExecutor({"thermal": [
-        StageResult("accepted", outputs={"Tg_K": 350.0, "tg_gate_verdict": "TG_REVIEW"}),
-        StageResult("accepted", outputs={"Tg_K": 351.0, "tg_gate_verdict": "TG_REVIEW"}),
+        StageResult("accepted", outputs=dict(review)),
+        StageResult("accepted", outputs={**review, "Tg_K": 351.0}),
     ]})
     result = WorkflowEngine(tmp_path, plan(tg_t_step_K=20), fake).run()
 
@@ -161,6 +165,119 @@ def test_tg_gate_cannot_be_accepted_from_process_completion(tmp_path):
     thermal_calls = [call for call in fake.calls if call[0] == "thermal"]
     assert len(thermal_calls) == 2
     assert thermal_calls[-1][1]["parameters"]["tg_t_step_K"] == 10
+
+
+def test_transient_retry_declines_when_the_disk_is_full(tmp_path):
+    """Every recovery event on this checkout has been a blind transient_retry. A full
+    filesystem makes an unchanged resubmission certain to repeat, so the rung is worth more
+    escalated with a named cause than spent reproducing the crash."""
+    import workflow_engine
+
+    finding = Finding("PROCESS_FAILED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+
+    full = SimpleNamespace(total=int(1e12), used=int(1e12), free=int(1e9))  # 1 GB free
+    with patch.object(workflow_engine.shutil, "disk_usage", return_value=full):
+        result = engine.run()
+
+    assert result["status"] == "escalation_required"
+    assert len([c for c in fake.calls if c[0] == "equilibration"]) == 1
+    events = [json.loads(line) for line in
+              (tmp_path / "recovery_log.jsonl").read_text().splitlines()]
+    rejected = [e for e in events if e["event"] == "auto_remedy_rejected"]
+    assert rejected and "GB free" in rejected[0]["reason"]
+
+
+def test_transient_retry_still_applies_when_resources_are_fine(tmp_path):
+    import workflow_engine
+
+    finding = Finding("PROCESS_FAILED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+
+    roomy = SimpleNamespace(total=int(1e13), used=0, free=int(9e12))
+    with patch.object(workflow_engine.shutil, "disk_usage", return_value=roomy):
+        result = engine.run()
+
+    assert result["status"] == "accepted"
+    assert len([c for c in fake.calls if c[0] == "equilibration"]) == 2
+
+
+def test_transient_retry_declines_when_no_gpu_is_free(tmp_path):
+    """The GPU half of the preflight read gpu_per_run from effective_parameters, where it
+    never appears (it is not in SNAPSHOT_KEYS), so the check silently never fired."""
+    import hardware_runtime
+    import workflow_engine
+
+    finding = Finding("PROCESS_FAILED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+
+    roomy = SimpleNamespace(total=int(1e13), used=0, free=int(9e12))
+    with patch.object(workflow_engine.shutil, "disk_usage", return_value=roomy), \
+         patch.object(hardware_runtime, "free_gpus", return_value=[]):
+        result = engine.run()
+
+    assert result["status"] == "escalation_required"
+    events = [json.loads(line) for line in
+              (tmp_path / "recovery_log.jsonl").read_text().splitlines()]
+    rejected = [e for e in events if e["event"] == "auto_remedy_rejected"]
+    assert rejected and "GPU(s) free" in rejected[0]["reason"]
+
+
+def test_transient_retry_ignores_gpus_for_stages_that_never_claim_one(tmp_path):
+    """EMC builds on CPU and the summary is pure analysis, so GPU contention is not a reason
+    to refuse either a build or a summary retry."""
+    import hardware_runtime
+    import workflow_engine
+
+    finding = Finding("PROCESS_FAILED", "build")
+    fake = FakeExecutor({"build": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+
+    roomy = SimpleNamespace(total=int(1e13), used=0, free=int(9e12))
+    with patch.object(workflow_engine.shutil, "disk_usage", return_value=roomy), \
+         patch.object(hardware_runtime, "free_gpus", return_value=[]):
+        result = engine.run()
+
+    assert result["status"] == "accepted"
+    assert len([c for c in fake.calls if c[0] == "build"]) == 2
+
+
+def test_auto_remedy_is_rejected_when_it_violates_a_protocol_floor(tmp_path):
+    """Auto-remedies used to bypass every check an agent decision must pass, so tg_breakpoint
+    could halve tg_t_step_K straight through the class's tg_min_steps_per_T floor. The
+    rejection escalates instead of silently shipping an infeasible sweep."""
+    review = {"Tg_K": 350.0, "tg_gate_verdict": "TG_REVIEW",
+              "tg_gate_cause": "breakpoint_ambiguity"}
+    fake = FakeExecutor({"thermal": [StageResult("accepted", outputs=dict(review))]})
+    engine = WorkflowEngine(tmp_path, plan(tg_t_step_K=20, tg_rate_K_per_ns=100, dt_fs=1.0),
+                            fake)
+
+    result = engine.run()
+
+    assert result["status"] == "escalation_required"
+    assert engine.state["effective_parameters"]["tg_t_step_K"] == 20
+    assert len([call for call in fake.calls if call[0] == "thermal"]) == 1
+    events = [json.loads(line) for line in
+              (tmp_path / "recovery_log.jsonl").read_text().splitlines()]
+    rejected = [e for e in events if e["event"] == "auto_remedy_rejected"]
+    assert rejected and "tg_min_steps_per_T" in rejected[0]["reason"]
+
+
+def test_tg_review_method_gap_declines_the_breakpoint_remedy(tmp_path):
+    """Halving tg_t_step_K halves the samples per temperature. That resolves an ambiguous
+    breakpoint but makes a noisy transition worse, so the method_gap sub-case must escalate
+    to the agent (whose lever, a lower tg_rate_K_per_ns, invalidates cooling) rather than
+    spend a rung making the fit worse."""
+    review = {"Tg_K": 350.0, "tg_gate_verdict": "TG_REVIEW", "tg_gate_cause": "method_gap"}
+    fake = FakeExecutor({"thermal": [StageResult("accepted", outputs=dict(review))]})
+    result = WorkflowEngine(tmp_path, plan(tg_t_step_K=20), fake).run()
+
+    assert result["status"] == "escalation_required"
+    assert len([call for call in fake.calls if call[0] == "thermal"]) == 1
+    assert result["finding"]["code"] == "TG_REVIEW"
 
 
 def test_minimize_not_converged_escalates_tolerance_and_iteration_caps(tmp_path):

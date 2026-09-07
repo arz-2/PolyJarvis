@@ -71,10 +71,29 @@ the chain's own Rg, and decision_policy's rationale_glassy/rationale_rubbery rec
 self-diffusion is unattainable within MD timescales for DP>=30 and aromatic backbones -- binding
 it would make overall_pass unsatisfiable for exactly the classes that most need a melt gate.
 
-residual_stress stays advisory by calibration status, not physics: this module's own note says
-melts ARE stress-isotropic while glasses carry 100-290 atm, so a melt should pass it -- but the
-magnitude bound has never been set, and binding an uncalibrated gate on the strength of an
-expectation is how a whole track halts. Promote once the bound exists."""
+residual_stress stays advisory by calibration status, not physics: a resolved deviatoric stress
+IS a genuine mechanical-equilibrium violation, but the magnitude bound has never been set, and
+binding an uncalibrated gate on the strength of an expectation is how a whole track halts.
+
+The expectation this note previously rested on -- "melts ARE stress-isotropic, so a melt should
+pass it" -- did not survive measurement (2026-09-07). Every residual_stress record on disk
+(n=7, data/_engine/run_state.json):
+
+    glassy  a-PS   168.5, 280.5, 386.3 atm   all resolved (z 4.36-8.06)
+    rubbery PEG     78.9,  81.3             unresolved   (z 0.95, 0.98)
+    rubbery PEG    152.3, 171.7 atm         both resolved (z 3.54, 3.92)
+
+The direction is right -- glasses do sit higher -- but rubbery cells are NOT stress-isotropic:
+half the rubbery records carry a RESOLVED 152-172 atm, which overlaps the glassy floor of 168.
+So the two regimes are not separable by magnitude on this evidence, and a melt-side bound low
+enough to mean anything would fail real rubbery runs. There is no melt/glass split to promote on
+yet, and binding either side would halt that whole track.
+
+Calibrating a bound needs the magnitude expressed against a physical scale -- _residual_stress's
+own docstring names the planned pressure increment, i.e. von_mises_atm as a fraction of the
+smallest non-zero |bm_pressures_atm| -- measured across several classes in both regimes. Two
+polymers cannot do it. Until that exists this stays advisory, and the gate keeps reporting the
+magnitude so the calibration has something to be run on."""
 
 # MSD diffusivity metrics are advisory everywhere, unconditionally -- decision_policy.json's
 # rationale_glassy/rationale_rubbery (2026-06-20, user-authorized, PVC1 route-back) documents
@@ -86,10 +105,13 @@ expectation is how a whole track halts. Promote once the bound exists."""
 #
 # residual_stress joins them for the same class of reason, but by calibration status
 # rather than by physics: a resolved deviatoric stress IS a genuine mechanical-equilibrium
-# violation (glassy cells carry 100-290 atm, 10-29% of the +/-1000 atm Murnaghan increment,
-# while their melts are stress-isotropic), but every archived glassy run violates it to some
-# degree, so binding it before the magnitude bound is calibrated would halt the whole glassy
-# track. It is emitted and logged now; promote to STRUCTURAL_GATES once the bound is set.
+# violation (archived cells carry 79-386 atm, 8-39% of the +/-1000 atm Murnaghan increment),
+# but every archived run violates it to some degree -- rubbery ones included, contrary to the
+# stress-isotropic-melt expectation this carve-out used to cite; see ADVISORY_MELT above for
+# the per-regime measurements -- so binding it before the magnitude bound is calibrated would
+# halt not just the glassy track but the rubbery one too. It is emitted and logged now;
+# promote once the bound is calibrated against a physical scale in both regimes, which the
+# two polymers currently on disk cannot do.
 ALWAYS_ADVISORY = {"msd_not_trapped", "msid_gaussian", "residual_stress"}
 
 

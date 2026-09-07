@@ -79,21 +79,88 @@ def _output_schema(actions) -> dict:
 
 
 def _trim_payload(payload: dict) -> dict:
-    """Only the problem -- not the full intent/plan dump the outer contract carries."""
+    """Only the problem -- not the full intent/plan dump the outer contract carries.
+
+    Every engine_context field is optional: the OUTER control-plane loop sends a real
+    WorkflowIssue.to_dict() which has none of them, and must keep working unchanged.
+
+    plan_summary.recovery_history is the PLAN-level history, written by the outer loop's
+    apply_recovery. On the inner (WorkflowEngine) path it is always empty, which used to
+    tell the agent nothing had been tried on a run that had just spent both automatic
+    rungs. The engine's own remedy_history, when present, is the truthful one and wins.
+    """
     issue = payload.get("issue") or {}
     plan_summary = payload.get("plan_summary") or {}
     contract = payload.get("output_contract") or {}
+    context = issue.get("engine_context") or {}
     problem = {
         "run_name": plan_summary.get("run_name"),
+        "run_dir": context.get("run_dir"),
         "stage": issue.get("stage"),
         "code": issue.get("code"),
         "detail": issue.get("detail", issue.get("details")),
         "severity": issue.get("severity"),
-        "recovery_history": plan_summary.get("recovery_history"),
+        # Why this escalated at all, when the code itself has a registered auto-remedy:
+        # a Finding with confidence="low" never auto-remedies.
+        "confidence": issue.get("confidence") or context.get("confidence"),
+        "recovery_history": (context.get("remedy_history")
+                             or plan_summary.get("recovery_history")),
+        "failed_attempt_manifest": context.get("failed_attempt_manifest"),
+        "escalation_attempt": context.get("escalation_attempt"),
+        "max_agent_decisions": context.get("max_agent_decisions"),
         "valid_actions": contract.get("action"),
         "modification_contract": contract.get("modifications"),
     }
     return {k: v for k, v in problem.items() if v not in (None, [], {})}
+
+
+_PROMPT_HEADER_KEYS = ("run_name", "run_dir", "stage", "valid_actions",
+                       "modification_contract", "recovery_history",
+                       "escalation_attempt", "max_agent_decisions")
+
+
+def _render_history_entry(entry) -> str:
+    """The two loops keep DIFFERENT history shapes and both reach here.
+
+    The inner engine writes {remedy_id, code, stage, application} -- an automatic rung. The
+    outer control plane's apply_recovery writes {action, rationale, modifications, at} -- a
+    prior agent decision. Rendering one shape's keys against the other produced
+    "None x None on None@None", which reads as a spent rung that never happened.
+    """
+    if not isinstance(entry, dict):
+        return str(entry)
+    if entry.get("remedy_id"):
+        return (f"{entry['remedy_id']} x{entry.get('application')} on "
+                f"{entry.get('code')}@{entry.get('stage')}")
+    if entry.get("action"):
+        mods = entry.get("modifications") or {}
+        return (f"agent decision {entry['action']}"
+                + (f" with {sorted(mods)}" if mods else "")
+                + (f" ({entry['rationale'][:120]})" if entry.get("rationale") else ""))
+    return json.dumps(entry, default=str)
+
+
+def _spent_rungs(problem: dict) -> str:
+    """State the spent ladder in the prompt itself rather than burying it in the symptom
+    blob -- which rung is already used is what decides whether a remedy is still available."""
+    history = problem.get("recovery_history") or []
+    attempt = problem.get("escalation_attempt")
+    cap = problem.get("max_agent_decisions")
+    parts = []
+    if attempt and cap:
+        parts.append(f"This is escalation {attempt} of {cap} for this workflow.")
+    if history:
+        parts.append("Recovery already applied: "
+                     + "; ".join(_render_history_entry(e) for e in history) + ".")
+    else:
+        parts.append("No automatic remedy has been applied on this run.")
+    run_dir = problem.get("run_dir")
+    if run_dir:
+        parts.append(f"Run directory (absolute): {run_dir}.")
+    manifest = problem.get("failed_attempt_manifest")
+    if manifest:
+        parts.append(f"Failing attempt id: {manifest}.")
+    return " ".join(parts)
 
 
 def _build_prompt(problem: dict) -> str:
@@ -101,12 +168,12 @@ def _build_prompt(problem: dict) -> str:
     stage = problem.get("stage") or problem.get("code") or "unknown"
     track, step = STAGE_TRACK.get(stage, ("unknown", stage))
     symptom = json.dumps({k: v for k, v in problem.items()
-                          if k not in ("run_name", "stage", "valid_actions",
-                                       "modification_contract")}, default=str)
+                          if k not in _PROMPT_HEADER_KEYS}, default=str)
     valid_actions = problem.get("valid_actions") or list(DEFAULT_ACTIONS)
     modification_contract = problem.get("modification_contract") or {}
     return (
         f'/recover run_name={run_name} track={track} step={step} symptom={json.dumps(symptom)}\n\n'
+        f'{_spent_rungs(problem)}\n\n'
         "Follow recover.md's procedure with the Read/Bash tools available (no MCP tools "
         "here -- reason from files/logs directly, the same way a live session would when "
         "they are unavailable). You never write, edit, resubmit, or claim/release any "

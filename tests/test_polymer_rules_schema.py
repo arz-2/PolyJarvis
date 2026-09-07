@@ -649,3 +649,23 @@ def test_the_melt_holds_resolve_to_the_uniform_defaults(cid):
     assert p["melt_hold_cap_steps"] == 3 * p["melt_hold_min_steps"]
     # The structural hold is never the shorter of the two.
     assert p["nvt_melt_min_steps"] >= p["melt_hold_min_steps"]
+
+
+def test_every_class_resolves_a_slow_deformation_leg():
+    """A missing K_deform_rate_slow_inv_s is not inert: _submit_deform skips the slow leg, so
+    extract_bulk_modulus_deform reports no rate_sensitivity, so DEFORM_RATE_SENSITIVE can
+    never fire. PDIE/PHYC/PSIL/PURA had no slow rate at all -- exactly the rubbery classes
+    where a 1e8 1/s strain rate is most likely to read stiff."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "orchestration" / "scripts"))
+    from rules_common import (K_DEFORM_SLOW_RATE_DIVISOR, load_rules,
+                              resolve_slow_deform_rate)
+
+    for class_id, entry in load_rules()["classes"].items():
+        slow = resolve_slow_deform_rate(entry)
+        assert slow is not None and slow > 0, f"{class_id} resolves no slow deformation rate"
+        # One decade below the class's OWN fast leg -- reproduces every declared value,
+        # PSTR's decade-lower pair included, rather than pinning a single number.
+        assert slow == pytest.approx(
+            float(entry["K_deform_rate_inv_s"]) / K_DEFORM_SLOW_RATE_DIVISOR), class_id

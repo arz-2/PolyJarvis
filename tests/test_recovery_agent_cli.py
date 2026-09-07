@@ -164,3 +164,60 @@ def test_main_reads_stdin_writes_one_json_line(capsys, monkeypatch):
     decision = json.loads(out)
     assert decision["action"] == "stop"
     assert set(decision.keys()) == {"action", "rationale", "modifications"}
+
+
+def test_engine_context_reaches_the_prompt_with_the_spent_rungs():
+    """_escalate used to hand the agent only finding.to_dict(), and the agent read its
+    history from plan_summary.recovery_history -- which the inner engine path never writes.
+    The prompt claimed nothing had been tried on a run that had spent both rungs."""
+    payload = {
+        "plan_summary": {"run_name": "PEG1", "recovery_history": []},
+        "issue": {
+            "code": "PROCESS_FAILED", "stage": "equilibration", "severity": "blocking",
+            "confidence": "low", "details": {"error": "boom"},
+            "engine_context": {
+                "confidence": "low", "escalation_attempt": 2, "max_agent_decisions": 2,
+                "run_dir": "/abs/data/PEG1", "failed_attempt_manifest": "attempt-7",
+                "remedy_history": [{"remedy_id": "transient_retry", "code": "PROCESS_FAILED",
+                                    "stage": "equilibration", "application": 1}],
+            },
+        },
+        "output_contract": {"action": ["retry", "revise_plan", "stop"], "modifications": {}},
+    }
+    problem = rac._trim_payload(payload)
+    assert problem["confidence"] == "low"
+    assert problem["run_dir"] == "/abs/data/PEG1"
+    # The engine's real history wins over the empty plan-level one.
+    assert problem["recovery_history"][0]["remedy_id"] == "transient_retry"
+
+    prompt = rac._build_prompt(problem)
+    assert "escalation 2 of 2" in prompt
+    assert "transient_retry x1 on PROCESS_FAILED@equilibration" in prompt
+    assert "/abs/data/PEG1" in prompt
+    # details must survive: `detail` would have shadowed it, losing gate_output.
+    assert "boom" in prompt
+
+
+def test_outer_control_plane_payload_without_engine_context_still_trims():
+    """The outer loop sends a real WorkflowIssue.to_dict() carrying none of the new keys."""
+    payload = {
+        "plan_summary": {"run_name": "PEG1", "recovery_history": []},
+        "issue": {"code": "TG_REVIEW", "stage": "thermal", "detail": {"gap": 31.0}},
+        "output_contract": {"action": ["retry", "stop"], "modifications": {}},
+    }
+    problem = rac._trim_payload(payload)
+    assert problem["code"] == "TG_REVIEW"
+    assert "engine_context" not in problem and "run_dir" not in problem
+    prompt = rac._build_prompt(problem)
+    assert "No automatic remedy has been applied" in prompt
+
+
+def test_outer_loop_agent_decisions_render_as_decisions_not_empty_rungs():
+    """apply_recovery's history entries are {action, rationale, modifications}, not
+    {remedy_id, code, stage, application}. Rendering one shape's keys against the other
+    printed "None x None on None@None" -- a spent rung that never happened."""
+    problem = {"recovery_history": [{"action": "revise_plan", "rationale": "cell too small",
+                                     "modifications": {"nchain": 60}}]}
+    rendered = rac._spent_rungs(problem)
+    assert "revise_plan" in rendered and "nchain" in rendered
+    assert "None" not in rendered
