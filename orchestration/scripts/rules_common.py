@@ -213,6 +213,60 @@ def resolve_member_value(cls: dict, value_field: str, smiles: str):
     return v if isinstance(v, (int, float)) else None
 
 
+#: Integration timestep by force-field family. This is a FORCE-FIELD property, not a class
+#: property: it is set by the fastest vibration the field has to integrate. United-atom fields
+#: carry no explicit hydrogens, so their fastest mode is a heavy-atom stretch and 2 fs is
+#: stable; every all-atom field here has explicit C-H and needs 1 fs.
+#:
+#: It lived on all 21 class entries in polymer_rules.json until 2026-09-07, where it was a
+#: perfect function of ff_accuracy_prior -- 21 copies of 5 facts, with nothing keeping them
+#: in step. Worse, the class carried the PRIOR while the run builds with the field D-01
+#: actually resolved for this SMILES; when the probe cascades to another field, the class dt
+#: no longer describes what runs. Deriving it from the resolved field fixes that too.
+FF_TIMESTEP_FS = {"trappe": 2.0, "pcff": 1.0, "opls": 1.0, "gaff": 1.0, "dreiding": 1.0}
+
+#: Fallback for a family with no entry: the conservative all-atom value. Never 2 fs -- an
+#: over-long timestep is a silent integration error, not a slow run.
+DEFAULT_TIMESTEP_FS = 1.0
+
+
+def timestep_fs(ff_raw: str, hp: dict | None = None) -> float:
+    """The integration timestep this force field requires, in fs.
+
+    Pass the field the run actually BUILDS with (decided_params.preferred_ff), not the
+    class's ff_accuracy_prior -- see FF_TIMESTEP_FS.
+    """
+    if not ff_raw:
+        return DEFAULT_TIMESTEP_FS
+    family = resolve_ff_family(ff_raw, hp if hp is not None else hardware_policy())
+    return FF_TIMESTEP_FS.get(family, DEFAULT_TIMESTEP_FS)
+
+
+# NOTE -- a tg_steps_per_bin() helper was written here and REMOVED.
+#
+# It derived the per-bin step count as (dT / rate) / dt, on the observation that
+# tg_min_steps_per_T equalled exactly that for every class carrying it. The observation was
+# true and the inference was wrong: tg_min_steps_per_T is an independent FLOOR, not a derived
+# value. workflow_engine and scientific_control both check a proposed remedy or override
+# against it precisely to catch a change that would halve tg_t_step_K, or raise the rate,
+# straight through the sampling this class needs. Deriving the floor FROM the rate makes it
+# move with whatever it was meant to constrain, so it can never be violated -- and
+# test_auto_remedy_is_rejected_when_it_violates_a_protocol_floor duly went green while the
+# guard it covers had stopped existing.
+#
+# Classes land exactly on their floor because the rate was chosen to sit there, not because
+# the floor is a restatement of the rate. PSIL is the proof: rate 50 K/ns over a 20 K step is
+# 0.4 ns per bin against a 0.2 ns floor -- comfortably above the minimum, not in conflict
+# with it.
+#
+# One real wrinkle survives and is left for a human: the floor is stored in STEPS, so the
+# physical time it guarantees is dt-dependent. With dt now resolved from the force field, a
+# SMILES whose D-01 probe cascades to a field with a different timestep gets a different
+# effective sampling floor from the same stored number. Storing it as ns per bin would fix
+# that, but it is a data migration to guides/polymer_rules.json and a change to what the
+# guard means, so it is not being made silently.
+
+
 def resolve_ff_family(ff_raw: str, hp: dict) -> str:
     """Map a force-field name to a by_forcefield family key (pcff | opls | trappe | gaff).
 

@@ -35,7 +35,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import rules_common  # noqa: E402  -- module import so tests can monkeypatch rules_common.canonicalize
-from rules_common import load_rules, get_class_entry, hardware_policy, resolve_ff_family  # shared rules access (single source of truth)
+from rules_common import (load_rules, get_class_entry, hardware_policy,  # noqa: E501
+                          resolve_ff_family, timestep_fs)  # shared rules access (single source of truth)
 import track_registry  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from stage_params import (_exp_tg_point, _regime_exp_tg,  # reuse the proven resolvers,
@@ -94,8 +95,12 @@ def _field_of(cls: dict, field: str | None = None) -> str | None:
 def _derived_from_field(field: str | None, rules: dict) -> dict:
     """Everything that follows from D-01's resolved field, in one place.
 
-    charge_method, electrostatics and the hardware triple are not independent decisions -- each
-    is a property of the force field. Verified across all 21 classes before D-02/D-03/D-08 were
+    charge_method, electrostatics, the integration timestep and the hardware triple are not
+    independent decisions -- each is a property of the force field. dt_fs joined them on
+    2026-09-07: it had sat on all 21 class entries as a perfect function of ff_accuracy_prior,
+    which meant the class carried the PRIOR while the run integrates with the field D-01
+    actually resolved for this SMILES. When the probe cascades, the class value stops
+    describing what runs. Verified across all 21 classes before D-02/D-03/D-08 were
     retired (2026-09-04): every class's curated charge_method and electrostatics equalled the
     value its ff_accuracy_prior's family carries here, 21/21.
 
@@ -109,6 +114,7 @@ def _derived_from_field(field: str | None, rules: dict) -> dict:
         "ff_family": fam,
         "charge_method": pol.get("charge_method"),
         "electrostatics": pol.get("electrostatics"),
+        "dt_fs": timestep_fs(field or "", hp),
         "engine": pol.get("engine"),
         "mpi_ranks": pol.get("mpi"),
         "gpu_per_run": pol.get("gpu_per_run"),
@@ -327,7 +333,7 @@ def _assert_tg_rate_feasible(cls: dict, polymer_class: str) -> None:
     t_step = cls.get("tg_t_step_K")
     if not rate or t_step is None:
         return
-    dt = cls.get("dt_fs", 1.0)
+    dt = timestep_fs(cls.get("ff_accuracy_prior") or "", hardware_policy())
     floor = cls.get("tg_min_steps_per_T", 200000)
     n_steps = t_step / (rate * dt * 1e-6)
     if n_steps < floor - 1:
@@ -449,6 +455,7 @@ def make_plan(run_name: str, polymer_class: str, smiles, properties: set,
     derived = _derived_from_field(field, rules)
     decided_params["charge_method"] = derived["charge_method"]
     decided_params["electrostatics"] = derived["electrostatics"]
+    decided_params["dt_fs"] = derived["dt_fs"]
     sized, size_assumptions = size_the_cell(polymer_class, smiles, properties, size_solve, field)
     decided_params.update(sized)
     # Regime call (see _regime_exp_tg): a novel polymer's Tg estimate now drives this instead of

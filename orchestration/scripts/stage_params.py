@@ -800,6 +800,9 @@ def _resolve_tg_params(args, cls: dict) -> dict:
     rate = tg_rate(cls)
     rate_suffix = _rate_suffix(rate)
     t_step = _pick(args.tg_t_step_K, cls, 'tg_t_step_K', 20)
+    # An INDEPENDENT floor, deliberately not derived from the rate: its job is to catch a
+    # remedy or override that raises the rate (or halves tg_t_step_K) past the sampling this
+    # chemistry needs, and a floor computed from the rate would move with it and never bind.
     floor = cls.get('tg_min_steps_per_T', 200000)
     # The staircase starts AT the melt hold and cools to tg_t_low_K -- one continuous descent
     # from the cell the equilibration stage gated, with no reheat and no mid-ramp waypoint. Both

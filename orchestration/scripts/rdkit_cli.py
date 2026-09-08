@@ -955,6 +955,7 @@ def chemistry_profile(smiles: str, rules_path=None) -> dict:
         "functional_groups": sorted(groups, key=lambda g: (g["location"], g["id"])),
         "backbone_groups": [g["id"] for g in groups if g["location"] == "backbone"],
         "pendant_groups": [g["id"] for g in groups if g["location"] == "pendant"],
+        "tm_estimate": estimate_tm_boyer(smiles),
         "tg_estimate": ({k: tg.get(k) for k in
                          ("tg_estimated_K", "T_equil_K", "method", "confidence",
                           "unmatched_heavy_frac")}
@@ -1031,6 +1032,106 @@ def _cmd_chemistry(args) -> int:
     return 1 if "error" in result else 0
 
 
+def backbone_symmetry(smiles: str):
+    """Boyer-Beaman backbone symmetry, from the SMILES alone.
+
+    A chain is UNSYMMETRICAL if any backbone atom carries two different substituents -- the
+    -CH2-CHR- of a vinyl polymer. It is SYMMETRICAL when every backbone atom's two pendant
+    slots are filled identically: PE's CH2, PIB's C(CH3)2, PTFE's CF2.
+
+    Identity is decided by RDKit's canonical ranking with breakTies=False, which gives
+    constitutionally equivalent atoms the same rank. Comparing pendant SUBSTRUCTURES instead
+    was tried and is fragile: a fixed-radius environment around each pendant reaches back
+    through the backbone, so two identical groups can look different purely from where the
+    traversal ran out.
+
+    Returns (is_symmetric, [backbone atom indices that break it]), or (None, reason).
+    """
+    mol = _dimer_for_screening(smiles)
+    if mol is None:
+        return None, "repeat unit does not build a 2-mer"
+    backbone = _backbone_path_of_dimer(mol)
+    if not backbone:
+        return None, "no backbone path"
+    rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    asymmetric = []
+    for idx in backbone:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetAtomicNum() == 0:
+            continue
+        pendant = [n.GetIdx() for n in atom.GetNeighbors()
+                   if n.GetIdx() not in backbone and n.GetAtomicNum() != 0]
+        slots = [rank[p] for p in pendant] + ["H"] * atom.GetTotalNumHs()
+        if len(slots) == 2 and slots[0] != slots[1]:
+            asymmetric.append(idx)
+    return (not asymmetric), asymmetric
+
+
+#: Boyer-Beaman ratios Tg/Tm. Symmetrical chains sit near 0.5, unsymmetrical near 0.667.
+BOYER_TG_OVER_TM = {True: 0.5, False: 0.667}
+
+#: Mean absolute error of the Boyer Tm below, measured 2026-09-07 against experimental Tm for
+#: the 16 crystallizable curated members. See estimate_tm_boyer for why that number matters.
+BOYER_TM_MAE_K = 130
+
+
+def estimate_tm_boyer(smiles: str, tg_K=None) -> dict:
+    """Melting point from the SMILES, via Boyer-Beaman on the estimated or supplied Tg.
+
+    READ THE ACCURACY BEFORE USING THIS. Measured against experimental Tm for the 16
+    crystallizable curated members it carries a mean absolute error of 130 K, spanning -280 K
+    (PTFE, whose 600 K Tm it puts at 320) to +242 K (PEK, whose 638 K it puts at 880). Boyer
+    is a correlation over crystallizable chains, not a predictor.
+
+    It is also a CATEGORY ERROR on amorphous polymers, which have no Tm at all. Applied to
+    PSU (Tg 493) it returns 986 K, well into thermal decomposition. `crystallizable` is
+    reported but not decided here -- backbone symmetry is a necessary condition for
+    crystallinity, not a sufficient one, and PSU, PPO and BPA-PC are all symmetric and
+    amorphous.
+
+    So this is EVIDENCE, for a critic or a human weighing a per-SMILES melt temperature
+    against literature. It is deliberately not wired to T_equil_K: at +-130 K it cannot be
+    trusted to lower a curated melt, and lowering one below Tm produces a run that never
+    melts -- silently, since every downstream gate would still pass on a stuck structure.
+    """
+    symmetric, detail = backbone_symmetry(smiles)
+    if symmetric is None:
+        return {"error": f"backbone symmetry unresolved: {detail}"}
+
+    if tg_K is None:
+        tg = estimate_tg(smiles)
+        if "error" in tg:
+            return {"error": f"no Tg to work from: {tg['error']}"}
+        tg_K = tg.get("tg_estimated_K")
+        tg_source, tg_confidence = "group_contribution", tg.get("confidence")
+    else:
+        tg_source, tg_confidence = "supplied", "curated"
+    if not isinstance(tg_K, (int, float)):
+        return {"error": "no usable Tg"}
+
+    ratio = BOYER_TG_OVER_TM[bool(symmetric)]
+    return {
+        "tm_estimated_K": round(tg_K / ratio),
+        "tg_K": tg_K,
+        "tg_source": tg_source,
+        "tg_confidence": tg_confidence,
+        "backbone_symmetric": bool(symmetric),
+        "boyer_ratio_tg_over_tm": ratio,
+        "n_asymmetric_backbone_atoms": len(detail),
+        "method": "boyer_beaman",
+        "mae_vs_experimental_K": BOYER_TM_MAE_K,
+        "valid_only_if_crystallizable": True,
+        "caution": ("+-130 K mean absolute error; meaningless for amorphous polymers, which "
+                    "have no Tm. Evidence only -- not a basis for setting T_equil_K."),
+    }
+
+
+def _cmd_tm_estimate(args) -> int:
+    result = estimate_tm_boyer(args.smiles, args.tg_K)
+    print(json.dumps(result, indent=2))
+    return 1 if "error" in result else 0
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -1087,6 +1188,13 @@ def main() -> int:
     c.add_argument("--fg-rules", default=None,
                    help="Override guides/functional_groups.json (testing only)")
     c.set_defaults(func=_cmd_classify)
+
+    c = sub.add_parser("tm-estimate",
+                       help="Boyer-Beaman melting point from backbone symmetry (EVIDENCE ONLY)")
+    c.add_argument("--smiles", required=True)
+    c.add_argument("--tg_K", type=float, default=None,
+                   help="use a curated Tg instead of the group-contribution estimate")
+    c.set_defaults(func=_cmd_tm_estimate)
 
     c = sub.add_parser("chemistry",
                        help="functional-group inventory of a repeat unit, backbone and pendant")

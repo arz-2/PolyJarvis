@@ -217,3 +217,72 @@ def test_chemistry_implied_electrostatics_matches_every_curated_class(cls, name,
     implied = profile(smiles)["implied_electrostatics"]
     assert implied == declared, (
         f"{name} ({cls}): class declares {declared}, chemistry implies {implied}")
+
+
+# --- Boyer Tm: SMILES-derived, and deliberately advisory --------------------
+@pytest.mark.parametrize("name,smiles,symmetric", [
+    ("PE",   "*CC*",              True),
+    ("PIB",  "*CC(C)(C)*",        True),
+    ("PTFE", "*C(F)(F)C(*)(F)F",  True),
+    ("POM",  "*COC*",             True),
+    ("PEO",  "*CCO*",             True),
+    ("PDMS", "*O[Si](*)(C)C",     True),
+    ("PP",   "*CC(C)*",           False),
+    ("PS",   "*CC(*)c1ccccc1",    False),
+    ("PVC",  "*CC(*)Cl",          False),
+    ("PVA",  "*CC(*)O",           False),
+    ("PMMA", "*CC(*)(C)C(=O)OC",  False),
+    ("PLA",  "*OC(=O)C(*)C",      False),
+])
+def test_backbone_symmetry_from_smiles(name, smiles, symmetric):
+    """Boyer's branch depends on whether backbone atoms carry two identical substituents.
+    PE's CH2 and PIB's C(CH3)2 are symmetric; PP's CH(CH3) is not."""
+    assert rc.backbone_symmetry(smiles)[0] is symmetric, name
+
+
+def test_symmetry_uses_canonical_ranks_not_substructure_comparison():
+    """PIB's two methyls are constitutionally equivalent and must compare equal. Comparing
+    fixed-radius environments around each pendant instead reaches back through the backbone,
+    so identical groups can differ purely by where the traversal stopped."""
+    assert rc.backbone_symmetry("*CC(C)(C)*")[0] is True
+    assert rc.backbone_symmetry("*C(F)(F)C(*)(F)F")[0] is True
+
+
+def test_boyer_applies_the_right_ratio_to_each_branch():
+    assert rc.BOYER_TG_OVER_TM[True] == 0.5      # symmetric  -> Tm ~ 2.0 Tg
+    assert rc.BOYER_TG_OVER_TM[False] == 0.667   # unsymmetric -> Tm ~ 1.5 Tg
+    pe = rc.estimate_tm_boyer("*CC*", tg_K=195)
+    assert pe["backbone_symmetric"] is True
+    assert pe["tm_estimated_K"] == 390
+
+
+def test_the_estimate_carries_its_own_accuracy_and_scope():
+    """It is 130 K mean absolute error and meaningless for amorphous polymers. A caller that
+    cannot see that from the payload will misuse it."""
+    out = rc.estimate_tm_boyer("*CC*", tg_K=195)
+    assert out["mae_vs_experimental_K"] == 130
+    assert out["valid_only_if_crystallizable"] is True
+    assert "amorphous" in out["caution"]
+
+
+def test_boyer_is_not_wired_to_the_melt_temperature():
+    """Measured 2026-09-07: -280 K on PTFE (600 K Tm estimated at 320) and +242 K on PEK.
+    Driving T_equil from it would melt PTFE 220 K below its melting point -- a run that never
+    melts, and every downstream gate still passes on the stuck structure. It would also put
+    amorphous PSU at 986 K. So it stays evidence for a critic, and T_equil_K remains reachable
+    only through the validated `overrides` path.
+    """
+    import stage_params
+    src = Path(stage_params.__file__).read_text()
+    assert "estimate_tm_boyer" not in src
+    assert "boyer" not in src.lower() or "1.5 * tg" in src.lower()
+
+    ptfe = rc.estimate_tm_boyer("*C(F)(F)C(*)(F)F", tg_K=160)
+    assert ptfe["tm_estimated_K"] == 320          # real PTFE Tm is ~600 K
+    psu = rc.estimate_tm_boyer(
+        "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1", tg_K=463)
+    assert psu["tm_estimated_K"] == 926           # PSU is amorphous; it has no Tm
+
+
+def test_an_unresolvable_backbone_reports_an_error_not_a_number():
+    assert "error" in rc.estimate_tm_boyer("C")   # no chain-end markers
