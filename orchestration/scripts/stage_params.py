@@ -523,6 +523,23 @@ def temperature_schedule(args, cls: dict) -> dict:
     # melt left only 62 K of rubbery branch above a Tg of 488 K).
     if trustworthy and isinstance(tg, (int, float)):
         melt_clearance = tg + 200.0
+        # experimental_tg_K is a GRADING input -- the value a result is judged against -- and it
+        # is overridable precisely so a run can be graded against the right number for its
+        # stereochemistry, crystallinity or source. It must not be able to make the PROTOCOL
+        # colder. The curated class value for this member therefore FLOORS the melt clearance:
+        # an override may raise the melt, never lower it below what the class already deemed
+        # necessary for this chemistry.
+        #
+        # iPMMA_1, 2026-09-09, is the worked case. Isotactic PMMA's calorimetric Tg is 319 K
+        # against PACR's curated 378 K for (atactic) PMMA, and pinning 319 for grading -- which
+        # is correct, since grading a good i-PMMA run against 378 reads as a ~60 K failure --
+        # silently dropped the melt hold from 578 K to 550 K. The melt came back kinetically
+        # trapped: chain centres of mass displaced 0.493x their own Rg^2, g3(t) exponent 0.073,
+        # C(t) 3.8% decayed, while the plan still recorded T_melt_hold_K = 578. One field was
+        # serving two jobs, and the grading job quietly won.
+        class_tg = _regime_exp_tg(cls, smiles)
+        if isinstance(class_tg, (int, float)):
+            melt_clearance = max(melt_clearance, class_tg + 200.0)
     else:
         melt_clearance = _pick(getattr(args, 'md_tg_ceiling_K', None), cls,
                                'md_tg_ceiling_K', 600.0)
@@ -897,7 +914,16 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
     """
     output_dir = args.output_dir or f'{REPO_ROOT}/data/{args.run_name}/raw/'
     graphs_dir = _run_graphs_dir(args)
-    ct_decay = cls.get('ct_min_decay_melt', 0.1) if cls.get('ct_gate_reliable', True) else None
+    # RETIRED 2026-09-09: the C(t) decay gate is no longer binding, so no threshold is
+    # requested and check_equilibration_comprehensive returns ct.pass=True while still
+    # computing and reporting tau/beta/decay_fraction. Melt chain relaxation now binds through
+    # enforce_gate.chain_displacement_gate, which is per-SYSTEM (this run's own Rg^2) instead
+    # of per-backbone-class. The class keys `ct_min_decay_melt` and `ct_gate_reliable` are left
+    # in guides/polymer_rules.json and in PARAMETER_STAGE on purpose -- the alpha_glass_per_K
+    # precedent (workflow_engine.py:123-127): removing a key an on-disk effective_parameters
+    # still carries invalidates every run at its next resume, and polymer_rules.json is inside
+    # policy_hashes, so editing it moves every in-flight stage's input_hash.
+    ct_decay = None
     lammps_base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
     sched = temperature_schedule(args, cls)
     hold = 'npt_melt_hold'

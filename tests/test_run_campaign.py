@@ -556,7 +556,14 @@ class _FakeEquilLammps:
 
     def check_equilibration_comprehensive(self, **kwargs):
         self.check_equilibration_comprehensive_calls.append(kwargs)
-        return self._comp_results.pop(0)
+        result = dict(self._comp_results.pop(0))
+        # The real tool always emits both sections, and _run_equilibration_gate now refuses to
+        # adjudicate a result missing either -- a comp with only the section a given test cares
+        # about is a fixture shortcut, not a shape the engine can produce. Fill the other in so
+        # these tests keep exercising their own subject rather than the partial-result guard.
+        result.setdefault("thermo", {"density_drift": {"pass": True}})
+        result.setdefault("chain", {"rg": {"pass": True}})
+        return result
 
     def extract_equilibrated_density(self, **kwargs):
         return {"plateau_density_mean": 1.18}
@@ -644,7 +651,16 @@ def test_do_equil_and_check_halts_when_backbone_types_unresolved(tmp_path, equil
 
 def test_do_equil_and_check_auto_derives_backbone_types(tmp_path, equil_check_args_cls, monkeypatch):
     """The routine case: bond-topology derivation succeeds, so the halt never fires -- the
-    derived value is used immediately and persisted into decided_params for future stages/runs."""
+    derived value is used immediately and persisted for provenance.
+
+    It is persisted under `derived_inputs`, NOT decided_params. It used to go into
+    decided_params, which made it a changed PARAMETER on the next WorkflowEngine construction:
+    _reconcile_plan invalidated equilibration, the stage input_hash moved, _new_attempt's
+    reattach predicate failed, and a resumed run replayed all ten stages from minimize. See
+    test_a_derived_backbone_types_never_enters_the_protocol_contract and, in
+    test_workflow_engine.py, the pair asserting that a write outside decided_params invalidates
+    nothing while one inside it still does.
+    """
     args, cls = equil_check_args_cls
     assert args.backbone_types is None
     monkeypatch.setattr(rdr, "_pick_gpu", lambda action, run_name, need=None: (
@@ -664,7 +680,9 @@ def test_do_equil_and_check_auto_derives_backbone_types(tmp_path, equil_check_ar
     assert fake.inspect_data_file_calls == []  # never reached -- derivation succeeded
     assert cls["backbone_types"] == [1, 2]
     persisted = load_plan(args.plan)
-    assert persisted["decided_params"]["backbone_types"] == [1, 2]
+    assert persisted["derived_inputs"]["backbone_types"]["value"] == [1, 2]
+    assert "backbone_types" not in persisted.get("decided_params", {}), \
+        "a derived value must never enter the hashed protocol contract"
 
 
 def test_do_equil_and_check_extends_the_nvt_hold_on_a_structural_gate(
@@ -2298,3 +2316,423 @@ def test_do_build_names_only_real_submit_emc_cell_job_parameters():
     passed = {kw.arg for kw in call.keywords if kw.arg}
     assert passed <= accepted, f"do_build passes unknown kwargs: {sorted(passed - accepted)}"
     assert "output_dir" in passed, "do_build must name the directory EMC writes into"
+
+
+# ─── _displacement_extension_ns: sizing a melt EXTEND from measured g3(t) ──────
+
+def _comp(ratio, alpha=0.368, alpha_r2=0.9867, t_ps=4951.0, trapped=False):
+    return {"chain": {"msd": {"msd_over_rg2": ratio, "alpha": alpha, "alpha_r2": alpha_r2,
+                              "kinetic_trap_flag": trapped},
+                      "ct": {"trajectory_ps": t_ps}}}
+
+
+def test_extension_is_sized_by_inverting_the_measured_power_law():
+    """t_need = t_traj * (target/ratio)**(1/alpha), over data already in hand.
+
+    Reference point is PLLA_1's own fit (alpha=0.368, r2=0.987, t=4951 ps). At half the bar the
+    extension must be finite, positive, and nothing like the 17,453 ns the retired tau path
+    produced from the same run.
+    """
+    ns = rdr._displacement_extension_ns(_comp(0.5))
+    assert ns is not None and 0 < ns < 200
+    expected = (4951.0 * (1.2 / 0.5) ** (1 / 0.368) - 4951.0) / 1000.0
+    assert ns == pytest.approx(expected, abs=1e-3)   # the function rounds to 3 dp
+    # For scale: the retired tau path produced 17453.2 ns from this same run's C(t).
+    assert ns < 100
+
+
+def test_a_melt_already_past_the_sizing_target_is_not_extended():
+    """PLLA_1 attempt-0002 sat at 3.088x. Nothing to size -- if such a run still failed, it
+    failed on the trap flag, and more of the same sampling is not the remedy."""
+    assert rdr._displacement_extension_ns(_comp(3.088)) is None
+
+
+def test_a_power_law_that_does_not_fit_declines_rather_than_guesses():
+    """The whole lesson of the tau regression: an extrapolation is only as good as the fit
+    behind it. Below MSD_POWER_LAW_MIN_R2 the remedy stands down and says so."""
+    assert rdr._displacement_extension_ns(_comp(0.5, alpha_r2=0.5)) is None
+
+
+def test_an_extension_beyond_the_ceiling_declines():
+    """A request past MAX_DISPLACEMENT_EXTENSION_NS is not a sampling problem -- it is a cell or
+    temperature problem, and belongs with the recovery agent rather than in a silent resubmit."""
+    assert rdr._displacement_extension_ns(_comp(0.001, alpha=0.1)) is None
+
+
+@pytest.mark.parametrize("comp", [
+    {}, {"chain": {}}, _comp(None), _comp(0.5, alpha=0.0), _comp(0.5, t_ps=0.0),
+])
+def test_unmeasurable_inputs_decline(comp):
+    assert rdr._displacement_extension_ns(comp) is None
+
+
+# ─── _thermo_extension_ns: the melt cell's own length, not a constant ──────────
+
+def test_a_systematic_drift_buys_one_more_window_not_a_constant():
+    """aPS_1, 2026-09-09: density drift 1.14% at p=0.0 against a 2 ns melt hold. The legacy
+    `0.5 ns * 20` default would have bought 10 ns -- 5x the entire stage, ~12 GPU-hours, from a
+    number that had never seen the run. A systematic drift has no fitted decay constant, so the
+    honest rule is one more window and re-measure."""
+    comp = {"thermo": {"density_drift": {"pass": False},
+                       "n_eff_density": {"n_eff": 87, "n_eff_min": 20}}}
+    assert rdr._thermo_extension_ns(comp, {"density_drift", "msid_gaussian"}, 2.0) == 2.0
+
+
+def test_an_n_eff_shortfall_is_sized_exactly_from_the_shortfall():
+    """Unlike drift, this one IS fully determined: n_eff is measured and n_eff_min is stated."""
+    comp = {"thermo": {"n_eff_density": {"n_eff": 5, "n_eff_min": 20}}}
+    assert rdr._thermo_extension_ns(comp, {"n_eff_density"}, 2.0) == 6.0   # 2*(20/5-1)
+
+
+def test_an_already_sufficient_n_eff_asks_for_nothing():
+    comp = {"thermo": {"n_eff_density": {"n_eff": 87, "n_eff_min": 20}}}
+    assert rdr._thermo_extension_ns(comp, {"n_eff_density"}, 2.0) is None
+
+
+@pytest.mark.parametrize("stage_ns", [0, -1, None])
+def test_an_unknown_stage_length_declines(stage_ns):
+    assert rdr._thermo_extension_ns({"thermo": {}}, {"density_drift"}, stage_ns) is None
+
+
+def test_the_thermo_extension_respects_the_ceiling():
+    comp = {"thermo": {"n_eff_density": {"n_eff": 1, "n_eff_min": 20}}}
+    assert rdr._thermo_extension_ns(comp, {"n_eff_density"}, 500.0) == \
+        rdr.MAX_DISPLACEMENT_EXTENSION_NS
+
+
+def test_a_derived_backbone_types_never_enters_the_protocol_contract():
+    """Source guard for the 2026-09-09 replay trap.
+
+    _resolve_backbone_types auto-derives backbone_types from the built cell's bond topology and
+    persists it. Persisting into decided_params made it a changed PARAMETER: _reconcile_plan
+    invalidated equilibration, the stage input_hash moved, the reattach predicate failed, and a
+    resumed run replayed all ten stages from minimize -- on all four campaigns in flight.
+    It belongs under derived_inputs, which _reconcile_plan does not diff.
+    """
+    import ast
+    src = (Path(__file__).resolve().parent.parent / "orchestration" / "scripts" /
+           "run_campaign.py").read_text()
+    fn = next(n for n in ast.walk(ast.parse(src))
+              if isinstance(n, ast.FunctionDef) and n.name == "_resolve_backbone_types")
+    body = ast.get_source_segment(src, fn)
+    stripped = "\n".join(l for l in body.splitlines() if not l.strip().startswith("#"))
+    assert 'setdefault("derived_inputs"' in stripped
+    assert 'setdefault("decided_params"' not in stripped, \
+        "the derived backbone_types is back in the hashed protocol contract"
+
+
+# ─── restart-continuation must validate against a self-contained data file ─────
+
+def test_an_extend_validates_against_the_stage_it_continues(tmp_path):
+    """The failure that killed the first two real EXTENDs on this checkout.
+
+    An EMC-built cell.data carries ZERO Coeffs sections (they live in a separate .params file),
+    and the extend branches pass params_file="" because after read_restart the coefficients come
+    from the restart. Preflight only suppresses "Coeffs section missing" when a params file is
+    given, so validating the EMC cell failed every time -- aPS_1 and sPVC_1 both died inside a
+    second on 2026-09-09 and spent both transient_retry applications on it. The stage's own
+    LAMMPS-written _out.data is self-contained and is what an extend actually continues.
+    """
+    stage = tmp_path / "npt_melt_hold"
+    stage.mkdir()
+    restart = stage / "npt_melt_hold_out.restart"; restart.write_text("x")
+    data = stage / "npt_melt_hold_out.data"; data.write_text("Pair Coeffs # lj/class2/coul/long")
+    assert rdr._extend_reference_data(str(restart), "BUILD_CELL") == str(data)
+
+
+def test_a_missing_sibling_degrades_to_the_callers_data_file(tmp_path):
+    """A missing file must degrade to the previous behaviour, not raise mid-remedy."""
+    restart = tmp_path / "npt_melt_hold_out.restart"; restart.write_text("x")
+    assert rdr._extend_reference_data(str(restart), "BUILD_CELL") == "BUILD_CELL"
+    assert rdr._extend_reference_data(None, "BUILD_CELL") == "BUILD_CELL"
+    assert rdr._extend_reference_data("", "BUILD_CELL") == "BUILD_CELL"
+
+
+def test_both_extend_branches_use_the_helper():
+    """Equilibration and cooling share the bug shape, so they must share the fix -- a cooling
+    EXTEND (UNDER_ANNEALED_COOLING / drift at final_T_K) would have failed identically."""
+    import ast
+    src = (Path(__file__).resolve().parent.parent / "orchestration" / "scripts" /
+           "run_campaign.py").read_text()
+    tree = ast.parse(src)
+    for fn_name, gen in (("_submit_equil_chain", "generate_equilibration_workflow"),
+                         ("_submit_cool_chain", "generate_cooling_workflow")):
+        fn = next(n for n in ast.walk(tree)
+                  if isinstance(n, ast.FunctionDef) and n.name == fn_name)
+        calls = [c for c in ast.walk(fn) if isinstance(c, ast.Call)
+                 and getattr(c.func, "attr", None) == gen
+                 and any(k.arg == "extend_only" for k in c.keywords)]
+        assert calls, f"no extend_only call found in {fn_name}"
+        for c in calls:
+            df = next(k.value for k in c.keywords if k.arg == "data_file")
+            assert isinstance(df, ast.Call) and df.func.id == "_extend_reference_data", \
+                f"{fn_name} validates its extend against the wrong data file"
+
+
+def test_every_non_displacement_melt_gate_gets_one_more_window():
+    """sPVC_1, 2026-09-09: msid_gaussian was its ONLY failing gate, and fell through to the
+    `0.5 ns * 20` constant -- 10 ns against a 2 ns melt hold, ~12 GPU-hours, on a melt already
+    displaced 4.85x its own Rg with C(t) 46% decayed. None of these gates has a fitted decay
+    constant, so one bounded window and a re-measure is the honest rule for all of them."""
+    comp = {"thermo": {"n_eff_density": {"n_eff": 87, "n_eff_min": 20}}}
+    for gate in ("msid_gaussian", "torsion", "rg", "density_drift", "energy_sem"):
+        assert rdr._thermo_extension_ns(comp, {gate}, 2.0) == 2.0, gate
+
+
+def test_a_displacement_failure_is_not_given_a_window():
+    """chain_displacement has a measured power law and must be sized by
+    _displacement_extension_ns -- never by the flat one-window rule."""
+    comp = {"thermo": {"n_eff_density": {"n_eff": 87, "n_eff_min": 20}}}
+    assert rdr._thermo_extension_ns(comp, {"chain_displacement"}, 2.0) is None
+
+
+def test_a_trapped_melt_is_never_topped_up_by_a_sampling_statistic():
+    """iPMMA_1, 2026-09-09: failed density_drift + n_eff_density + msid_gaussian +
+    chain_displacement together, at MSD/Rg2 = 0.493 with kinetic_trap_flag set, alpha 0.073 and
+    C(t) 3.8% decayed. Honest displacement sizing declined (alpha_r2 0.825 < 0.9; the true
+    figure is ~970,000 ns). The thermo branch then answered a different question -- n_eff 15 vs
+    a minimum of 20 -- and sized 0.667 ns, a 40-minute top-up for a melt that had barely moved.
+
+    When displacement is among the failures the thermo fallback must stand aside so the remedy
+    declines and the finding escalates: a trapped melt is not an undersampled melt.
+    """
+    comp = {"thermo": {"n_eff_density": {"n_eff": 15, "n_eff_min": 20}},
+            "chain": {"msd": {"msd_over_rg2": 0.493, "alpha": 0.073, "alpha_r2": 0.8253,
+                              "kinetic_trap_flag": True},
+                      "ct": {"trajectory_ps": 4951.0}}}
+    failing = {"density_drift", "n_eff_density", "msid_gaussian", "chain_displacement"}
+    assert rdr._displacement_extension_ns(comp) is None       # alpha_r2 below the floor
+    # the thermo branch would happily size it -- which is exactly why the caller must not ask
+    assert rdr._thermo_extension_ns(comp, failing, 2.0) == 0.667
+
+
+# ─── a grading override must not cool the protocol ─────────────────────────────
+
+def _sched(polymer_class, smiles, exp_tg_K=None, T_equil_K=None):
+    from types import SimpleNamespace
+    from stage_params import temperature_schedule
+    cls = dict(get_class_entry(load_rules(), polymer_class))
+    args = SimpleNamespace(smiles=smiles, exp_tg_K=exp_tg_K, final_T_K=None,
+                           T_equil_K=T_equil_K, md_tg_ceiling_K=None, tg_t_low_K=None)
+    return temperature_schedule(args, cls)
+
+
+def test_a_lower_grading_tg_cannot_cool_the_melt():
+    """iPMMA_1, 2026-09-09. experimental_tg_K is what a RESULT is graded against; pinning
+    isotactic PMMA's 319 K (correct -- 378 K would read a good run as a ~60 K failure) dropped
+    the melt hold 578 -> 550 K and produced a kinetically trapped melt at 0.493x Rg^2. The
+    curated class value floors the protocol term, so an override may raise the melt, never
+    lower it."""
+    iso = _sched("PACR", "*[C@@](C)(C(=O)OC)C*", exp_tg_K=319.0)["T_melt_hold_K"]
+    base = _sched("PACR", "*[C@@](C)(C(=O)OC)C*")["T_melt_hold_K"]
+    assert iso == base == 578.0
+
+
+def test_a_higher_grading_tg_still_raises_the_melt():
+    """The floor is one-directional. sPVC_1 pins 371 K against PVNL's curated 354 K and must
+    keep the hotter 571 K melt that override earns."""
+    assert _sched("PVNL", "*C[C@@H](Cl)C[C@H](Cl)*", exp_tg_K=371.0)["T_melt_hold_K"] == 571.0
+
+
+def test_the_protocol_temperature_stays_separately_overridable():
+    """The grading/protocol split only works if the protocol has its own lever: T_equil_K
+    floors the melt independently of any Tg."""
+    s = _sched("PACR", "*[C@@](C)(C(=O)OC)C*", exp_tg_K=319.0, T_equil_K=600.0)
+    assert s["T_melt_hold_K"] == 600.0
+
+
+@pytest.mark.parametrize("cl,smi,pin,expected", [
+    ("PSTR", "*CC(*)c1ccccc1", None, 573.0),
+    ("PVNL", "*C[C@@H](Cl)C[C@H](Cl)*", 371.0, 571.0),
+    ("PEST", "*[C@@H](C)C(=O)O*", 331.0, 620.0),
+])
+def test_the_floor_changes_no_other_campaign_member(cl, smi, pin, expected):
+    """The rule fires only where an override LOWERS Tg below the class value -- verified against
+    the three runs that were in flight when it landed, none of which may move."""
+    assert _sched(cl, smi, exp_tg_K=pin)["T_melt_hold_K"] == expected
+
+
+def test_every_extendable_gate_has_a_sizing_rule():
+    """A gate in EXTENDABLE_GATES with no sizing rule does not fail loudly -- it returns None
+    from _thermo_extension_ns and the remedy falls through to the full melt_hold_min_steps
+    default, silently buying a whole stage instead of a sized extension.
+
+    That is what happened to energy_component_drift on 2026-09-09: aPS_1 was handed a 10 ns
+    extension against a 2 ns stage. The two sizing paths are _displacement_extension_ns (for
+    chain_displacement, which extrapolates from the measured power law) and
+    _thermo_extension_ns (n_eff_density by shortfall, everything else by one more window), so
+    every extendable gate must be reachable by one of them.
+    """
+    import enforce_gate
+    sized = (rdr.EXTEND_ONE_MORE_WINDOW
+             | {"n_eff_density"}          # sized from its own measured shortfall
+             | {"chain_displacement"})    # sized by _displacement_extension_ns
+    unsized = set(enforce_gate.EXTENDABLE_GATES) - sized
+    assert not unsized, f"extendable but unsized, will silently take the full stage: {unsized}"
+
+
+def test_cooling_does_not_inherit_the_equilibration_continuation(tmp_path, monkeypatch):
+    """A continuation attribute set for the melt must not survive into the cooldown.
+
+    CampaignStageExecutor.execute reuses ONE args object for every stage of a process. On
+    2026-09-09 that let sPVC_1's equilibration continuation leave pending_continuation_path set;
+    do_cool_and_check reads it unconditionally and took the extend-only branch, so all three
+    cooling attempts ran npt_final ALONE -- zero cool_blocks, a 571 K melt read from the
+    equilibration restart and held 1.5 ns at 300 K. A direct quench wearing a cooling stage's
+    name. The reset must clear it whether or not cooling has a continuation of its own.
+    """
+    import run_campaign as rc
+    from run_campaign import CampaignStageExecutor
+
+    seen = {}
+    monkeypatch.setattr(rc, "do_cool_and_check", lambda args, cls, lammps: (
+        seen.update(
+            continuation=getattr(args, "pending_continuation_path", None),
+            equil_ns=getattr(args, "npt_continuation_ns", None),
+            equil_base=getattr(args, "equilibration_extend_base_stage", None),
+            prod_dump=getattr(args, "npt_prod_dump", None),
+        ) or {"halted": True, "reason": "STOP", "detail": {}}
+    ))
+
+    args = SimpleNamespace(engine_owned_recovery=False)
+    # Exactly the state the equilibration stage leaves behind.
+    args.pending_continuation_path = "/data/equil/npt_melt_hold_out.restart"
+    args.npt_continuation_ns = 2.0
+    args.equilibration_extend_base_stage = "npt_melt_hold"
+    args.npt_prod_dump = "/data/equil/nvt_melt_hold.dump"
+
+    executor = CampaignStageExecutor(args, {}, emc=None, lammps=None, plan_path="unused")
+    attempt_dir = tmp_path / "attempt-0001"
+    attempt_dir.mkdir()
+    executor.execute("cooling", {"attempt_dir": str(attempt_dir), "parameters": {},
+                                 "dependencies": {}, "prior_attempts": []})
+
+    assert seen["continuation"] is None, (
+        "the melt's continuation restart reached the cooldown -- the descent would be skipped")
+    assert seen["equil_ns"] is None
+    assert seen["equil_base"] is None
+    assert seen["prod_dump"] is None
+
+
+def test_an_unsized_cooling_continuation_declines_instead_of_running_a_default():
+    """`float(getattr(args, "cooling_continuation_ns", 1.5))` was a constant, not a fallback.
+
+    Nothing but the remedy ever writes the attribute, so reaching the continuation branch
+    without one meant running 1.5 ns sized by nobody -- which is exactly the 1,500,000 steps
+    sPVC_1's cooling attempts recorded. Refuse instead.
+    """
+    import run_campaign as rc
+
+    with pytest.raises(SystemExit) as excinfo:
+        rc._continuation_ns(SimpleNamespace(), "cooling_continuation_ns", "cooling")
+    assert "cooling_continuation_ns" in str(excinfo.value)
+    assert rc._continuation_ns(
+        SimpleNamespace(cooling_continuation_ns=3.0), "cooling_continuation_ns", "cooling") == 3.0
+
+
+def test_no_continuation_length_defaults_survive_in_run_campaign():
+    """Source-level guard: neither continuation branch may reintroduce a bare numeric default."""
+    source = pathlib.Path(REPO_ROOT, "orchestration/scripts/run_campaign.py").read_text()
+    for key in ("npt_continuation_ns", "cooling_continuation_ns"):
+        assert f'getattr(args, "{key}", 1.5)' not in source
+        assert f"getattr(args, '{key}', 1.5)" not in source
+
+
+def test_cool_check_backbone_types_come_from_the_persisted_derivation(tmp_path):
+    """cool-check must not depend on an args attribute nothing assigns.
+
+    `cooling` depends on `equilibration` alone, so args.build_data_path is never set for it, and
+    args.backbone_types is read in exactly one place and written in none. The None reached
+    check_equilibration_comprehensive, whose first statement is
+    `" ".join(str(t) for t in backbone_types)` -- it died with "'NoneType' object is not
+    iterable" in 70 ms, before logging its own command line, on every cooling attempt sPVC_1
+    made. The equilibration stage already persists the derived value into the plan's
+    derived_inputs; that is what cool-check must read.
+    """
+    import run_campaign as rc
+
+    plan = tmp_path / "run_plan.json"
+    plan.write_text(json.dumps({
+        "schema_version": "2.0", "decided_params": {},
+        "derived_inputs": {"backbone_types": {"value": [1, 2, 3],
+                                              "source": "derive_backbone_types"}},
+    }))
+
+    def _explode(*a, **k):  # the derivation must NOT be re-run -- the value is on disk
+        raise AssertionError("re-derived a backbone_types the plan already carries")
+
+    cls = {}
+    types, derivation, halt = rc._resolve_backbone_types(
+        SimpleNamespace(plan=str(plan)), cls,
+        SimpleNamespace(derive_backbone_types=_explode),
+        "/data/cell.data", {"backbone_types": None})
+
+    assert types == [1, 2, 3]
+    assert halt is None
+    assert cls["backbone_types"] == [1, 2, 3]
+
+
+def test_a_reattach_adopts_the_gpu_its_chain_is_already_on(tmp_path):
+    """Reattaching must record the claim where the work IS, not allocate a new card.
+
+    A detached chain keeps running on its own GPU across an orchestrator restart. That GPU is
+    therefore busy, so hardware_runtime.free_gpus() will not offer it -- an ordinary claim either
+    lands on a different, idle card (ledger points at nothing, says nothing about the loaded one)
+    or fails outright when nothing else is free. The second case is the one that matters: it is
+    what stops a code fix from reaching a live campaign, which on 2026-09-09 was three of four.
+    """
+    import run_campaign as rc
+
+    work = tmp_path / "work"
+    work.mkdir()
+    (work / "chain_271e346b.sh").write_text(
+        '#!/bin/bash\nCHAIN_ID=271e346b\nMPI=1\nGPU_IDS=1\nN_GPU=1\n')
+    pending = tmp_path / "pending_cool_submission.json"
+    pending.write_text(json.dumps({"chain_id": "271e346b", "workflow": {}}))
+
+    assert rc._reattach_adopt_gpus(True, pending, str(work)) == "1"
+    # Not reattaching -> a normal claim, never an adoption.
+    assert rc._reattach_adopt_gpus(False, pending, str(work)) is None
+    # Chain script already cleaned up (chain finished) -> fall back to a normal claim.
+    (work / "chain_271e346b.sh").unlink()
+    assert rc._reattach_adopt_gpus(True, pending, str(work)) is None
+
+
+def test_adopting_a_claim_bypasses_the_idle_check(tmp_path, monkeypatch):
+    """hardware_runtime records an adopted claim on exactly the named GPUs.
+
+    free_gpus() must not be consulted: the whole point is that these GPUs are busy.
+    """
+    import importlib, sys
+    sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
+    hardware_runtime = importlib.import_module("hardware_runtime")
+
+    monkeypatch.setattr(hardware_runtime, "LEDGER", tmp_path / "gpu_locks")
+    monkeypatch.setattr(hardware_runtime, "free_gpus",
+                        lambda: (_ for _ in ()).throw(
+                            AssertionError("free_gpus consulted for an adoption")))
+
+    assert hardware_runtime.cmd_claim("PLLA_1", need=1, js=False, adopt="1") == 0
+    lock = json.loads((tmp_path / "gpu_locks" / "gpu1.lock").read_text())
+    assert lock["run"] == "PLLA_1"
+    assert lock["adopted"] is True
+
+
+def test_gpu_claim_forwards_the_adoption_to_the_ledger(monkeypatch):
+    """gpu_claim must actually hand `adopt` through -- and must NOT pass it when claiming
+    normally, which is what keeps the existing three-argument test doubles honest."""
+    import run_campaign as rc
+
+    seen = []
+    monkeypatch.setattr(rc, "_pick_gpu", lambda action, run_name, need=None, **kw: (
+        seen.append((action, kw.get("adopt"))) or
+        ({"claimed": [1]} if action == "claim" else {"released": True})))
+
+    with rc.gpu_claim("PLLA_1", 1, adopt="1") as ids:
+        assert ids == "1"
+    assert ("claim", "1") in seen
+
+    seen.clear()
+    with rc.gpu_claim("PLLA_1", 1):
+        pass
+    assert ("claim", None) in seen

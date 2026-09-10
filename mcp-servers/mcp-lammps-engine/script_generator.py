@@ -200,6 +200,20 @@ def _detect_ff_from_data_file(data_file: str) -> dict:
     Returns a dict with one of use_pcff/use_trappe/use_opls = True and the others False,
     or {} when detection is inconclusive so callers fall back to explicit flags or GAFF2 default.
     """
+    # A LAMMPS .restart is BINARY. read_text(errors="replace") happily turns it into mojibake,
+    # and the substring probes below then match by chance: on 2026-09-09 a PCFF restart
+    # (npt_melt_hold_out.restart) was classified {'use_opls': True}, the exact opposite of its
+    # own sibling .data. That surfaced only because the caller had passed an explicit use_pcff
+    # and the flag-mismatch guard raised -- with no explicit flag it would have SILENTLY emitted
+    # an OPLS deck for a class2 system. A restart-continuation legitimately passes its restart
+    # here, so refuse to classify anything that is not text and let the caller's explicit flags
+    # stand.
+    try:
+        head = Path(data_file).read_bytes()[:8192]
+    except OSError:
+        return {}
+    if b"\x00" in head:
+        return {}
     try:
         content = Path(data_file).read_text(errors="replace")
     except OSError:

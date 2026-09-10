@@ -1,0 +1,215 @@
+{
+  "master_seed": 20260908,
+  "systems": [
+    {
+      "system": "iPMMA",
+      "polymer_class": "PACR",
+      "smiles": "*[C@@](C)(C(=O)OC)C*",
+      "stereochemistry": "isotactic",
+      "canonical_plan": "benchmarks/stereo_r2/plans/iPMMA_canonical.json",
+      "replicates": [
+        {
+          "run_name": "iPMMA_1",
+          "emc_seed": 431883951,
+          "velocity_seed": 622568557,
+          "run_plan": "data/iPMMA_1/raw/run_plan.json",
+          "total_gpu_hours": 10.3291
+        },
+        {
+          "run_name": "iPMMA_2",
+          "emc_seed": 506941521,
+          "velocity_seed": 2548337,
+          "run_plan": "data/iPMMA_2/raw/run_plan.json",
+          "total_gpu_hours": 10.3291
+        },
+        {
+          "run_name": "iPMMA_3",
+          "emc_seed": 555347278,
+          "velocity_seed": 165058851,
+          "run_plan": "data/iPMMA_3/raw/run_plan.json",
+          "total_gpu_hours": 10.3291
+        }
+      ]
+    },
+    {
+      "system": "aPS",
+      "polymer_class": "PSTR",
+      "smiles": "*CC(*)c1ccccc1",
+      "stereochemistry": "atactic",
+      "canonical_plan": "benchmarks/stereo_r2/plans/aPS_canonical.json",
+      "replicates": [
+        {
+          "run_name": "aPS_1",
+          "emc_seed": 120191275,
+          "velocity_seed": 979826601,
+          "run_plan": "data/aPS_1/raw/run_plan.json",
+          "total_gpu_hours": 9.7413
+        },
+        {
+          "run_name": "aPS_2",
+          "emc_seed": 211721699,
+          "velocity_seed": 422597568,
+          "run_plan": "data/aPS_2/raw/run_plan.json",
+          "total_gpu_hours": 9.7413
+        },
+        {
+          "run_name": "aPS_3",
+          "emc_seed": 782526946,
+          "velocity_seed": 719844405,
+          "run_plan": "data/aPS_3/raw/run_plan.json",
+          "total_gpu_hours": 9.7413
+        }
+      ]
+    },
+    {
+      "system": "sPVC",
+      "polymer_class": "PVNL",
+      "smiles": "*C[C@H](Cl)C[C@@H](Cl)*",
+      "stereochemistry": "syndiotactic",
+      "canonical_plan": "benchmarks/stereo_r2/plans/sPVC_canonical.json",
+      "replicates": [
+        {
+          "run_name": "sPVC_1",
+          "emc_seed": 414243003,
+          "velocity_seed": 405550636,
+          "run_plan": "data/sPVC_1/raw/run_plan.json",
+          "total_gpu_hours": 7.5542
+        },
+        {
+          "run_name": "sPVC_2",
+          "emc_seed": 604339280,
+          "velocity_seed": 438801734,
+          "run_plan": "data/sPVC_2/raw/run_plan.json",
+          "total_gpu_hours": 7.5542
+        },
+        {
+          "run_name": "sPVC_3",
+          "emc_seed": 492680472,
+          "velocity_seed": 585758416,
+          "run_plan": "data/sPVC_3/raw/run_plan.json",
+          "total_gpu_hours": 7.5542
+        }
+      ]
+    },
+    {
+      "system": "PLLA",
+      "polymer_class": "PEST",
+      "smiles": "*[C@@H](C)C(=O)O*",
+      "stereochemistry": "L-enantiopure",
+      "canonical_plan": "benchmarks/stereo_r2/plans/PLLA_canonical.json",
+      "replicates": [
+        {
+          "run_name": "PLLA_1",
+          "emc_seed": 686928993,
+          "velocity_seed": 561359054,
+          "run_plan": "data/PLLA_1/raw/run_plan.json",
+          "total_gpu_hours": 10.3374
+        },
+        {
+          "run_name": "PLLA_2",
+          "emc_seed": 412260453,
+          "velocity_seed": 328430378,
+          "run_plan": "data/PLLA_2/raw/run_plan.json",
+          "total_gpu_hours": 10.3374
+        },
+        {
+          "run_name": "PLLA_3",
+          "emc_seed": 967838819,
+          "velocity_seed": 25364483,
+          "run_plan": "data/PLLA_3/raw/run_plan.json",
+          "total_gpu_hours": 10.3374
+        }
+      ]
+    },
+    {
+      "system": "PE",
+      "polymer_class": "PHYC",
+      "smiles": "*CC*",
+      "stereochemistry": "achiral",
+      "canonical_plan": "benchmarks/stereo_r2/plans/PE_canonical.json",
+      "replicates": [
+        {
+          "run_name": "PE_1",
+          "emc_seed": 642001918,
+          "velocity_seed": 214582469,
+          "run_plan": "data/PE_1/raw/run_plan.json",
+          "total_gpu_hours": 2.2526
+        },
+        {
+          "run_name": "PE_2",
+          "emc_seed": 440499282,
+          "velocity_seed": 423156388,
+          "run_plan": "data/PE_2/raw/run_plan.json",
+          "total_gpu_hours": 2.2526
+        },
+        {
+          "run_name": "PE_3",
+          "emc_seed": 747349219,
+          "velocity_seed": 956783445,
+          "run_plan": "data/PE_3/raw/run_plan.json",
+          "total_gpu_hours": 2.2526
+        }
+      ]
+    },
+    {
+      "system": "PEEK",
+      "polymer_class": "PKTN",
+      "smiles": "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1",
+      "stereochemistry": "achiral",
+      "canonical_plan": "benchmarks/stereo_r2/plans/PEEK_canonical.json",
+      "replicates": [
+        {
+          "run_name": "PEEK_1",
+          "emc_seed": 244828755,
+          "velocity_seed": 62028104,
+          "run_plan": "data/PEEK_1/raw/run_plan.json",
+          "total_gpu_hours": 11.4691
+        },
+        {
+          "run_name": "PEEK_2",
+          "emc_seed": 236593432,
+          "velocity_seed": 67518096,
+          "run_plan": "data/PEEK_2/raw/run_plan.json",
+          "total_gpu_hours": 11.4691
+        },
+        {
+          "run_name": "PEEK_3",
+          "emc_seed": 336331081,
+          "velocity_seed": 639162382,
+          "run_plan": "data/PEEK_3/raw/run_plan.json",
+          "total_gpu_hours": 11.4691
+        }
+      ]
+    },
+    {
+      "system": "PSU",
+      "polymer_class": "PSFO",
+      "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+      "stereochemistry": "achiral",
+      "canonical_plan": "benchmarks/stereo_r2/plans/PSU_canonical.json",
+      "replicates": [
+        {
+          "run_name": "PSU_1",
+          "emc_seed": 397855734,
+          "velocity_seed": 68365396,
+          "run_plan": "data/PSU_1/raw/run_plan.json",
+          "total_gpu_hours": 10.6249
+        },
+        {
+          "run_name": "PSU_2",
+          "emc_seed": 142120149,
+          "velocity_seed": 459645350,
+          "run_plan": "data/PSU_2/raw/run_plan.json",
+          "total_gpu_hours": 10.6249
+        },
+        {
+          "run_name": "PSU_3",
+          "emc_seed": 170956518,
+          "velocity_seed": 311895246,
+          "run_plan": "data/PSU_3/raw/run_plan.json",
+          "total_gpu_hours": 10.6249
+        }
+      ]
+    }
+  ]
+}

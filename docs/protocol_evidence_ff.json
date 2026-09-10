@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-07T17:26:34Z",
+  "generated_at": "2026-09-08T23:29:55Z",
   "records": [
     {
       "schema_version": 1,
@@ -3205,6 +3205,305 @@
         "source_run": "LGReason1",
         "migrated_from": null,
         "added_at": "2026-09-07T17:26:34Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "602a28517726",
+      "field": "forcefield",
+      "polymer_class": "PKTN",
+      "polymer_names": [
+        "poly(ether ether ketone) (PEEK)"
+      ],
+      "smiles": [
+        "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1"
+      ],
+      "claim": "Neat bulk-PEEK MD (PCFF+, pppm, 500 K/1 atm NPT production after an 800 atm/750 K anneal) gives density 1.22 g/cm3 vs experimental 1.27 g/cm3 for amorphous PEEK (-3.9%) -- same sign and comparable magnitude to PolyJarvis's own measured PCFF density deficit (-5.1%), a direct same-chemistry confirmation.",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "10.1021/acsami.3c01307",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10853907/",
+      "title": "Fundamentals of Crystalline Evolution and Properties of Carbon Nanotube-Reinforced Polyether Ether Ketone Nanocomposites in Fused Filament Fabrication",
+      "year": 2023,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEEK_1",
+        "migrated_from": null,
+        "added_at": "2026-09-08T22:54:17Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "f098e19bc08f",
+      "field": "electrostatics",
+      "polymer_class": "PKTN",
+      "polymer_names": [
+        "poly(ether ether ketone) (PEEK)"
+      ],
+      "smiles": [
+        "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1"
+      ],
+      "claim": "Long-range Coulombic interactions for a PEEK(-CNT) system were computed with a particle-particle particle-mesh (pppm) solver (LJ cutoff 20 A), using PCFF+ intramolecular parameters and MedeA forcefield-assign partial charges -- confirmed by direct fetch of the PMC full-text mirror.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.1021/acsami.3c01307",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10853907/",
+      "title": "Fundamentals of Crystalline Evolution and Properties of Carbon Nanotube-Reinforced Polyether Ether Ketone Nanocomposites in Fused Filament Fabrication",
+      "year": 2023,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PEEK_1",
+        "migrated_from": null,
+        "added_at": "2026-09-08T22:54:17Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "154e03b6fbc9",
+      "field": "forcefield",
+      "polymer_class": "PACR",
+      "polymer_names": [
+        "poly(methyl methacrylate), isotactic (iPMMA)"
+      ],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "MD of neat bulk PMMA (~50,000-atom single-chain SARW model, 300 K, 1 atm) under GAFF gave density 1.081 +/- 0.003 g/cm3 and under DREIDING gave 0.994 +/- 0.006 g/cm3 -- both notably below PMMA's typical ~1.19 g/cm3 experimental density, i.e. worse absolute density accuracy than the <2% figure the field literature attributes to Class II/PCFF.",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "10.1088/1361-651x/ab615c",
+      "url": "https://iopscience.iop.org/article/10.1088/1361-651X/ab615c",
+      "title": "Effects of an atomistic modeling approach on predicted mechanical properties of glassy polymers via molecular dynamics",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "iPMMA_1",
+        "migrated_from": null,
+        "added_at": "2026-09-08T23:09:49Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "8afd3043c1ee",
+      "field": "forcefield",
+      "polymer_class": "PSTR",
+      "polymer_names": [
+        "Polystyrene (atactic)"
+      ],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "Fully atomistic MD of bulk polystyrene (4 chains x 120 repeat units, neat/bulk) used the force fields of COMPASS (density and Tg) and PCFF (tensile properties); simulated PS density 1.021 +/- 0.0037 g/cm3 (298.15 K, 1 atm, 2.29% error vs experiment), Tg = 380 K (exp range 353-383 K), Young's modulus 3.2 +/- 0.4 GPa via the PCFF tensile leg. No stated benchmarked rationale for the FF split; no bulk modulus reported.",
+      "value": {
+        "recommendation": "compass"
+      },
+      "doi": "10.3390/nano9081088",
+      "url": "https://doi.org/10.3390/nano9081088",
+      "title": "Fully Atomistic Molecular Dynamics Computation of Physico-Mechanical Properties of PB, PS, and SBS",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "aPS_1",
+        "migrated_from": null,
+        "added_at": "2026-09-08T23:18:53Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "43475dafe54a",
+      "field": "forcefield",
+      "polymer_class": "PSTR",
+      "polymer_names": [
+        "Polystyrene (atactic)"
+      ],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "Confirmed as the correct, resolvable Sun 1998 COMPASS founding paper (J. Phys. Chem. B 102, 7338-7364). Table 5 shows COMPASS achieves ~1-3% density error on aromatic liquids (benzene, toluene, chlorobenzene, nitrobenzene included in the 102-compound set, overall avg -0.4%, rms 1.8%). Could NOT locate a direct PCFF-vs-COMPASS benzene/toluene density comparison in the paper's accessible pages -- the plan's own '-6.3%/-6.5% vs -1.1%/-1.2%' figures are not confirmed from this source.",
+      "value": {
+        "recommendation": "compass"
+      },
+      "doi": "10.1021/jp980939v",
+      "url": "https://doi.org/10.1021/jp980939v",
+      "title": "COMPASS: An ab Initio Force-Field Optimized for Condensed-Phase Applications -- Overview with Details on Alkane and Benzene Compounds",
+      "year": 1998,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "aPS_1",
+        "migrated_from": null,
+        "added_at": "2026-09-08T23:18:53Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "520b16c0319c",
+      "field": "electrostatics",
+      "polymer_class": "PSTR",
+      "polymer_names": [
+        "Polystyrene (atactic)"
+      ],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "Non-bonded electrostatic interactions were evaluated using the Ewald summation method in this all-atom bulk polystyrene MD study (COMPASS for density/Tg, PCFF for tensile).",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.3390/nano9081088",
+      "url": "https://doi.org/10.3390/nano9081088",
+      "title": "Fully Atomistic Molecular Dynamics Computation of Physico-Mechanical Properties of PB, PS, and SBS",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "aPS_1",
+        "migrated_from": null,
+        "added_at": "2026-09-08T23:18:53Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "351c72b0b731",
+      "field": "tg_target",
+      "polymer_class": "PSTR",
+      "polymer_names": [
+        "Polystyrene (atactic)"
+      ],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "Simulated PS Tg = 380 K compared against an experimental range of 353-383 K.",
+      "value": {
+        "range": [
+          353,
+          383
+        ]
+      },
+      "doi": "10.3390/nano9081088",
+      "url": "https://doi.org/10.3390/nano9081088",
+      "title": "Fully Atomistic Molecular Dynamics Computation of Physico-Mechanical Properties of PB, PS, and SBS",
+      "year": 2019,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "aPS_1",
+        "migrated_from": null,
+        "added_at": "2026-09-08T23:18:53Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "22b4c7d4024d",
+      "field": "forcefield",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(L-lactic acid) (PLLA)"
+      ],
+      "smiles": [
+        "*OC(=O)C(*)C"
+      ],
+      "claim": "COMPASS (Class-II) force field used for MD of PLA (within a PLA/natural-rubber/nanosilica nanocomposite study); reports a neat-PLA-tagged density of 1.26 g/cm3 and Tg of 332 K at 298.15 K.",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "10.1007/s00894-020-04431-3",
+      "url": "https://doi.org/10.1007/s00894-020-04431-3",
+      "title": "Investigation of nanoparticle-polymer interaction in bio-based nanosilica-filled PLA/NR nanocomposites: molecular dynamics simulation",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PLLA_1",
+        "migrated_from": null,
+        "added_at": "2026-09-08T23:29:55Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "b2b623689acc",
+      "field": "tg_target",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(L-lactic acid) (PLLA)"
+      ],
+      "smiles": [
+        "*OC(=O)C(*)C"
+      ],
+      "claim": "COMPASS MD of PLA reports glass transition temperature 332 K at 298.15 K/1 atm (neat-PLA-tagged data point).",
+      "value": {
+        "range": [
+          325,
+          351
+        ]
+      },
+      "doi": "10.1007/s00894-020-04431-3",
+      "url": "https://doi.org/10.1007/s00894-020-04431-3",
+      "title": "Investigation of nanoparticle-polymer interaction in bio-based nanosilica-filled PLA/NR nanocomposites: molecular dynamics simulation",
+      "year": 2020,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PLLA_1",
+        "migrated_from": null,
+        "added_at": "2026-09-08T23:29:55Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "48a43927cae5",
+      "field": "tg_target",
+      "polymer_class": "PEST",
+      "polymer_names": [
+        "Poly(L-lactic acid) (PLLA)"
+      ],
+      "smiles": [
+        "*OC(=O)C(*)C"
+      ],
+      "claim": "All-atom MD of a monodisperse PLA sample (MW just above 10,000 g/mol) reports glass transition temperature 351 K at 300 K.",
+      "value": {
+        "range": [
+          325,
+          351
+        ]
+      },
+      "doi": "10.1021/acs.iecr.3c03038",
+      "url": "https://doi.org/10.1021/acs.iecr.3c03038",
+      "title": "Glass Transition and Structure of Organic Polymers from All-Atom Molecular Simulations",
+      "year": 2023,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PLLA_1",
+        "migrated_from": null,
+        "added_at": "2026-09-08T23:29:55Z"
       }
     }
   ],

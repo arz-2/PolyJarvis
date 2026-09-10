@@ -263,3 +263,80 @@ def test_no_orchestrator_call_passes_an_argument_the_tool_does_not_accept():
             if kw.arg not in accepted:
                 problems.append(f"{name}(...) passed {kw.arg!r}, which it does not accept")
     assert not problems, "\n".join(sorted(set(problems)))
+
+
+def test_every_analysis_worker_accepts_the_kwargs_its_thread_hands_it():
+    """The same gap one layer down, where the tool-level guard above cannot see.
+
+    Each analysis tool hands its work to a private `_run_<tool>` in a thread:
+
+        threading.Thread(target=_analysis_run_background,
+                         args=(run_id, _run_extract_equilibrated_density, dict(...)))
+
+    The guard above checks the *tool* signature, which did gain `output_name` in the
+    equilibration/cooling split. The worker did not -- yet the worker body already spent it on
+    `--output_name {output_name}`. So every call raised
+    `_run_extract_equilibrated_density() got an unexpected keyword argument 'output_name'`,
+    and because the melt gate is the first caller to reach that line, it stayed latent for a
+    week and surfaced only after sPVC_1 burned 6.7 GPU-hours completing its chain.
+
+    `_analysis_run_background` calls the worker as `func(**kwargs)`, so this binding is exactly
+    as strict as the real call.
+    """
+    tree = ast.parse(SERVER_PY.read_text())
+    workers = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+    problems = []
+    checked = 0
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "Thread"):
+            continue
+        kw = {k.arg: k.value for k in node.keywords}
+        if getattr(kw.get("target"), "id", None) != "_analysis_run_background":
+            continue
+        call_args = kw.get("args")
+        if not isinstance(call_args, ast.Tuple) or len(call_args.elts) < 3:
+            continue
+        worker_name = getattr(call_args.elts[1], "id", None)
+        payload = call_args.elts[2]
+        if not (isinstance(payload, ast.Call) and getattr(payload.func, "id", None) == "dict"):
+            continue                      # built elsewhere -- opaque to a reader of this call
+        if any(k.arg is None for k in payload.keywords):
+            continue                      # ** splat inside dict()
+        fn = workers.get(worker_name)
+        if fn is None:
+            problems.append(f"line {node.lineno}: worker {worker_name!r} is not defined")
+            continue
+        checked += 1
+        a = fn.args
+        positional = [p.arg for p in a.posonlyargs + a.args]
+        accepted = set(positional) | {p.arg for p in a.kwonlyargs}
+        required = set(positional[:len(positional) - len(a.defaults)]) | {
+            p.arg for p, d in zip(a.kwonlyargs, a.kw_defaults) if d is None}
+        passed = {k.arg for k in payload.keywords}
+        for extra in sorted(passed - accepted):
+            problems.append(f"line {node.lineno}: {worker_name}(...) passed {extra!r}, "
+                            f"which it does not accept")
+        for missing in sorted(required - passed):
+            problems.append(f"line {node.lineno}: {worker_name}(...) never given required "
+                            f"{missing!r}")
+    assert not problems, "\n".join(problems)
+    assert checked >= 10, f"only {checked} worker threads found -- has the pattern changed?"
+
+
+def test_the_engine_has_no_undefined_names():
+    """`output_name` was also an undefined name in the worker body, which pyflakes catches for
+    free -- the half of the bug that needs no signature reasoning at all. This is a cheap net
+    under a 4600-line module that is imported in-process by run_campaign, where a NameError in
+    a rarely-reached branch costs a whole campaign rather than a stack trace at import.
+    """
+    api = pytest.importorskip("pyflakes.api")
+    reporter = pytest.importorskip("pyflakes.reporter")
+    import io
+    err = io.StringIO()
+    api.checkPath(str(SERVER_PY), reporter.Reporter(err, err))
+    undefined = [ln for ln in err.getvalue().splitlines() if "undefined name" in ln]
+    # _recover_interrupted_chains references a chain runner removed when the chain moved to a
+    # detached shell script; it is dead code reached only from __main__ and is tracked
+    # separately. Every OTHER undefined name is a defect.
+    undefined = [ln for ln in undefined if "_lammps_chain_background" not in ln]
+    assert not undefined, "\n".join(undefined)

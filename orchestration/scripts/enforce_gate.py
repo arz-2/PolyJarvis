@@ -25,12 +25,12 @@ from rules_common import resolve_member_value  # noqa: E402  (still used by othe
 BINDING_GLASSY = {"density_drift", "density_sem", "energy_drift", "energy_sem",
                    "density_homogeneity", "p2", "n_eff_density", "finite_size"}
 ADVISORY_GLASSY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "residual_stress",
-                   "torsion"}
+                   "torsion", "energy_component_drift"}
 
 BINDING_RUBBERY = {"density_sem", "density_homogeneity", "energy_drift", "energy_sem",
                    "n_eff_density", "finite_size"}
 ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_drift",
-                    "residual_stress", "torsion"}
+                    "residual_stress", "torsion", "energy_component_drift"}
 # density_drift isn't in require_rubbery's binding text (density_sem is); treated advisory here.
 
 # The MELT clause (decision_policy.json's require_melt), for the cell the equilibration stage
@@ -46,26 +46,65 @@ ADVISORY_RUBBERY = {"ct", "rg", "msid_gaussian", "msd_not_trapped", "density_dri
 # ct_gate_reliable=false -- classify() applies that carve-out to this clause exactly as it does
 # to require_glassy.
 #
-# msd_not_trapped/msid_gaussian/residual_stress stay advisory via ALWAYS_ADVISORY: MSD's melt
-# self-diffusion target is unattainable within MD timescales even here for DP>=30, MSID's
-# Gaussian-chain band is a shape check rather than a convergence one, and residual_stress is
-# uncalibrated (see its note below).
+# msd_not_trapped/msid_gaussian/residual_stress stay advisory via ALWAYS_ADVISORY. The original
+# reason given for MSD -- "melt self-diffusion is unattainable within MD timescales even here
+# for DP>=30" -- is true of a Ree^2 target (round-1 reached 0.017-0.861 of it, i.e. never) but
+# NOT of Rg^2: 25 of 36 round-1 melts clear 1.0x Rg^2 once normalised to a common 5 ns, and
+# PLLA_1 sat at 3.09x. That distinction is why chain_displacement can bind where msd_not_trapped
+# could not. MSID's Gaussian-chain band is a shape check rather than a convergence one, and
+# residual_stress is uncalibrated (see its note below).
+#
+# msid_gaussian was BINDING here from 2026-09-02 and was demoted on 2026-09-09. It bound on
+# `msid.slope`, a single power-law fit of MSID(n) = <R^2(n)> over the WHOLE separation range
+# n = 2..max_n. That range spans two physically distinct regimes -- rod-like at small n
+# (<R^2> ~ n^2, up to about a Kuhn length) and Gaussian at large n (<R^2> ~ n) -- so one
+# exponent fitted across both is neither, and it is biased high by however much of the range
+# the stiff regime occupies. Measured over the 36 round-1 campaigns
+# (manuscript/data/*/raw/equilibration_comprehensive.json, 2026-09-09):
+#
+#   * All 9 failures are HIGH. Range 0.901-1.476; nothing below 0.80. A one-sided failure
+#     distribution is a systematic fit artefact -- an under-relaxed chain would deviate both
+#     ways, since a collapsed initial configuration reads slope < 1 at large n.
+#   * Slope vs chain length: r = -0.66. SHORTER chains score WORSE, which is the crossover
+#     signature: the shorter the chain, the larger the share of the fit range still rod-like.
+#     PS fails worst (1.476) on the shortest range (n_sep = 39).
+#   * Slope vs displacement MSD/Rg^2: r = +0.46 -- the WRONG SIGN for a convergence gate.
+#     Better-relaxed runs score worse. 8 of the 9 failures sit at MSD/Rg^2 >= 1.0 with no
+#     kinetic trap; PVC1 fails at 3.99x.
+#
+# So the statistic tracks chain STIFFNESS -- chemistry, force field and DP -- not equilibration.
+# Round-1 PVC ran 1.196/1.209/1.276/1.294 across all four seeds: a reproducible signature, not
+# four failed equilibrations. What it asks that displacement does not is whether C_inf is right
+# for this chemistry, and by this repo's taxonomy that is an Agreement question, which is
+# advisory here. The convergence requirement itself is NOT dropped -- chain_displacement
+# (g3 >= Rg^2, Auhl) binds, and long-wavelength conformational modes relax on the same
+# timescale as centre-of-mass motion of order Rg. Same move that retired the C(t) decay
+# threshold: retire the statistic, keep the requirement.
+#
+# The intended binding replacement is a block-convergence test on MSID(n) -- the pattern
+# _torsion_js_stabilization already uses -- which needs a block axis on `msid_accum`
+# (currently summed over all frames). The regime-split fields (msid.large_s /
+# msid.small_intermediate) are NOT that replacement: s_split is a fixed fraction of chain
+# length (~max_n/3) where the crossover is a fixed physical length, so large_s is still
+# contaminated on short chains (PS: large_s starts at n=15, about one Kuhn length in), and
+# pairs-per-chain falls linearly to 1 at n = max_n, so its tail is noise-dominated.
 BINDING_MELT = {"density_drift", "density_sem", "energy_drift", "energy_sem", "n_eff_density",
-                "density_homogeneity", "p2", "finite_size", "rg", "ct",
-                # Chain-structure convergence, binding ONLY here. A melt is where these are
-                # both attainable and meaningful:
-                #   msid_gaussian  ideal-chain statistics -- MSID(n) ~ n over the backbone.
-                #                  THE textbook criterion for an equilibrated polymer melt, and
-                #                  the same quantity the opt-in anneal_hold probe already gates
-                #                  on mid-chain. It was in ALWAYS_ADVISORY, bundled with MSD on
-                #                  the reasoning that melt self-diffusion is unattainable -- but
-                #                  that argument is about MSD, not about chain shape.
-                #   torsion        Jensen-Shannon divergence between consecutive blocks of the
-                #                  backbone-dihedral distribution: has the torsional population
-                #                  stopped changing. A pure convergence test, computed since
-                #                  the comprehensive check was written and never collected.
-                "msid_gaussian", "torsion"}
-ADVISORY_MELT = {"msd_not_trapped", "residual_stress"}
+                "density_homogeneity", "p2", "finite_size", "rg", "chain_displacement",
+                # Per-term energy drift. Binding HERE only, on the same reasoning that binds rg
+                # and chain_displacement here and nowhere else: a melt is the state where every
+                # energy term CAN reach a stationary distribution, so a term that is still
+                # relaxing is a real defect rather than the definition of the state. Below Tg a
+                # glass ages indefinitely and its terms drift by construction, so binding it at
+                # the assessment temperature would make the clause unsatisfiable -- the argument
+                # decision_policy.json already makes for MSD. Advisory in the other two clauses.
+                "energy_component_drift",
+                # torsion: Jensen-Shannon divergence between consecutive blocks of the
+                # backbone-dihedral distribution -- has the torsional population stopped
+                # changing. A pure convergence test, and the model for what a chain-structure
+                # gate should look like: self-referential, no external constant, and it asks
+                # whether the run is still evolving rather than what shape it settled into.
+                "torsion"}
+ADVISORY_MELT = {"msd_not_trapped", "residual_stress", "msid_gaussian"}
 """msd_not_trapped stays advisory even here, deliberately. Its criterion is displacement beyond
 the chain's own Rg, and decision_policy's rationale_glassy/rationale_rubbery record that melt
 self-diffusion is unattainable within MD timescales for DP>=30 and aromatic backbones -- binding
@@ -112,7 +151,11 @@ magnitude so the calibration has something to be run on."""
 # halt not just the glassy track but the rubbery one too. It is emitted and logged now;
 # promote once the bound is calibrated against a physical scale in both regimes, which the
 # two polymers currently on disk cannot do.
-ALWAYS_ADVISORY = {"msd_not_trapped", "msid_gaussian", "residual_stress"}
+# `ct` joins these on 2026-09-09: the C(t) KWW fit stays computed and reported (tau, beta and
+# decay fraction are genuinely informative, and the manuscript reports them), but it no longer
+# binds -- see chain_displacement_gate for the measurement that retired it. msd_not_trapped is
+# now subsumed by chain_displacement and kept here for continuity of the recorded field.
+ALWAYS_ADVISORY = {"msd_not_trapped", "msid_gaussian", "residual_stress", "ct"}
 
 
 def load_json(path):
@@ -212,22 +255,29 @@ def classify(gates: dict, regime: str, dp_typical, ct_gate_reliable):
     if regime == "melt":
         clause = "require_melt"
         binding_set, advisory_set = set(BINDING_MELT), set(ADVISORY_MELT)
+        declared = set(BINDING_MELT)
         if ct_gate_reliable is False:
             # Same carve-out require_glassy already makes, applied explicitly rather than left
             # to dict membership: 6 of 21 classes cannot resolve a trustworthy C(t) decay.
             binding_set.discard("ct")
             advisory_set.add("ct")
+            declared.discard("ct")
     elif regime == "glassy" and (
         (dp_typical is not None and dp_typical >= 30) or ct_gate_reliable is False
     ):
         clause = "require_glassy"
         binding_set, advisory_set = BINDING_GLASSY, ADVISORY_GLASSY
+        declared = set(BINDING_GLASSY)
     elif regime == "rubbery":
         clause = "require_rubbery"
         binding_set, advisory_set = BINDING_RUBBERY, ADVISORY_RUBBERY
+        declared = set(BINDING_RUBBERY)
     else:
         clause = "require (plain, no carve-out)"
-        binding_set, advisory_set = set(gates.keys()), set()
+        # This branch derives its binding set from whatever the run happened to produce, so it
+        # states no requirement that a given gate be measured. `declared` below is therefore
+        # empty here: only a clause that NAMES its gates can say one of them is missing.
+        binding_set, advisory_set, declared = set(gates.keys()), set(), set()
 
     # ALWAYS_ADVISORY is "always" for the ASSESSMENT clauses. The melt clause states its own
     # split explicitly (BINDING_MELT/ADVISORY_MELT above), because the reasons those three are
@@ -236,10 +286,17 @@ def classify(gates: dict, regime: str, dp_typical, ct_gate_reliable):
     if clause != "require_melt":
         binding_set = binding_set - ALWAYS_ADVISORY
         advisory_set = advisory_set | ALWAYS_ADVISORY
+        declared = declared - ALWAYS_ADVISORY
 
     binding_results = {k: v for k, v in gates.items() if k in binding_set and v is not None}
     advisory_results = {k: v for k, v in gates.items() if k in advisory_set and v is not None}
-    return clause, binding_results, advisory_results
+    # Which of the gates this clause NAMES produced no value. Reported, not verdicted on: a
+    # single None is a calibrated "not applicable" (finite_size when the box or Rg could not be
+    # resolved, msid when available=false) and dropping it is deliberate -- see
+    # test_finite_size_unavailable_is_dropped_not_failed. What must never happen is the
+    # degenerate case where NONE of them evaluated, which the callers below now refuse.
+    unmeasured = sorted(k for k in (binding_set & declared) if gates.get(k) is None)
+    return clause, binding_results, advisory_results, unmeasured
 
 
 def collect_gates(comp: dict) -> dict:
@@ -256,6 +313,7 @@ def collect_gates(comp: dict) -> dict:
         "energy_drift": thermo.get("energy_drift", {}).get("pass"),
         "density_sem": thermo.get("density_sem", {}).get("pass"),
         "energy_sem": thermo.get("energy_sem", {}).get("pass"),
+        "energy_component_drift": energy_component_drift_gate(thermo),
         "n_eff_density": thermo.get("n_eff_density", {}).get("pass"),
         "residual_stress": residual_stress_gate(thermo),
         "rg": chain.get("rg", {}).get("pass"),
@@ -294,6 +352,27 @@ def residual_stress_gate(thermo: dict):
     return not rs.get("resolved", False)
 
 
+def energy_component_drift_gate(thermo: dict):
+    """Pass-polarity entry for per-term energy drift. None when the check was not computed.
+
+    Distinct from `energy_drift`, which tests the AGGREGATE TotEng. A canceling drift hides
+    inside that aggregate -- bond energy still relaxing downward while vdW drifts upward nets a
+    flat total while neither term has equilibrated -- which is why
+    _analyse_energy_components tests bond/angle/dihedral/vdW/Coul/Kspace independently, mirroring
+    RadonPy's check_eq (radonpy/sim/lammps.py). It was computed and reported in d05_block.md from
+    the day it was written, folded into thermo["energy"]["equilibrated"], and never flattened to
+    the top level -- so no gate could read it. aPS_1's melt (2026-09-09) had a 0.023% aggregate
+    TotEng drift, which passes, alongside a 1.691% vdW drift, which does not.
+
+    None for any comprehensive result written before the flattening landed; classify() drops it,
+    and the empty-binding-set guard covers the degenerate case where nothing else evaluated.
+    """
+    cd = thermo.get("energy_component_drift")
+    if not isinstance(cd, dict):
+        return None
+    return bool(cd.get("pass"))
+
+
 def finite_size_gate(spatial: dict):
     """Pass-polarity entry for the periodic self-imaging checks. None when the box or Rg
     could not be measured. Binding and STRUCTURAL: neither a minimum-image violation nor a
@@ -329,7 +408,56 @@ def msd_msid_gates(chain: dict) -> dict:
     msid = chain.get("msid", {})
     msd_not_trapped = (not msd["kinetic_trap_flag"]) if "kinetic_trap_flag" in msd else None
     msid_gaussian = msid.get("gaussian_pass") if msid.get("available") else None
-    return {"msd_not_trapped": msd_not_trapped, "msid_gaussian": msid_gaussian}
+    return {"msd_not_trapped": msd_not_trapped, "msid_gaussian": msid_gaussian,
+            "chain_displacement": chain_displacement_gate(chain)}
+
+
+# The melt-equilibration criterion, in the system's own units. g3(t) >= MSD_OVER_RG2 * Rg^2:
+# chain centres of mass have displaced at least their own size (Auhl et al., J. Chem. Phys.
+# 119, 12718 (2003)). 1.0 is the criterion as stated; it is not a tuning knob and must not be
+# raised to buy margin -- margin belongs to how far an EXTEND reaches, not to the pass bar.
+MSD_OVER_RG2 = 1.0
+
+
+def chain_displacement_gate(chain: dict):
+    """Pass-polarity entry for melt chain relaxation. Per-system, no class table.
+
+    This REPLACES the C(t) decay-fraction gate, which was keyed to `ct_min_decay_melt` in
+    guides/polymer_rules.json -- a per-BACKBONE-CLASS constant (0.10 standard / 0.25 fast
+    rubbery, commit 74e24ee). Three things were wrong with it, measured on the 36 round-1
+    campaigns (manuscript/data/*/raw/equilibration_comprehensive.json) on 2026-09-09:
+
+      1. It was not achievable. Round-1 decay fractions span 0.004-0.158; the PEST value of
+         0.15 would have failed 35 of 36 campaigns, INCLUDING every one whose density was
+         graded PASS at 0.0% error.
+      2. It did not track what this platform measures. Normalising every run to a common 5 ns
+         with its own MSD power law: PE1 is kinetically trapped at 0.81x Rg^2 and reproduces
+         density exactly; PS1 sits at 3.51x Rg^2, as well relaxed as anything in the set, and
+         still misses density by -1.9%. Every density FAIL is chemistry-clustered (PMMA -5.7
+         to -6.7%, PEEK -5.1 to -5.6%) -- PCFF systematics, not equilibration. Chain relaxation
+         bought no accuracy anywhere in the range these campaigns span.
+      3. Its size was set by a backbone taxonomy that does not see the chemistry -- the same
+         limitation CLAUDE.md already documents for polymer_class.
+
+    A gate binds on VALIDITY, not accuracy, so (2) is not a licence to drop the check: it is a
+    reason not to size it from accuracy. The criterion is the textbook convergence statement,
+    and it is per-system because Rg^2 is measured from this run's own chains.
+
+    The trap flag is folded in rather than left beside it: across all 36 round-1 runs every
+    kinetic_trap_flag=True run sits at MSD/Rg^2 <= 0.85 and every False one at >= 1.02, so the
+    two are the same statement arrived at independently. Keeping both binding costs nothing and
+    fails closed if either is missing.
+
+    None (not False) when the trajectory carried no chains or no Rg -- an unmeasured gate is
+    never a failing gate.
+    """
+    msd = chain.get("msd") or {}
+    ratio = msd.get("msd_over_rg2")
+    if not isinstance(ratio, (int, float)):
+        return None
+    if msd.get("kinetic_trap_flag"):
+        return False
+    return bool(ratio >= MSD_OVER_RG2)
 
 
 # Gates that a 300K EXTEND can actually fix (not-yet-converged, not structurally wrong).
@@ -345,7 +473,14 @@ EXTENDABLE_GATES = {"density_drift", "energy_drift", "density_sem", "energy_sem"
                     # more time. They are advisory in every other clause, so they can never
                     # appear in failing_binding there and this addition cannot loosen the
                     # assessment gate.
-                    "ct", "rg", "msid_gaussian", "torsion"}
+                    # msid_gaussian left this set when it became advisory (2026-09-09): it can
+                    # no longer appear in failing_binding under any clause, so listing it here
+                    # would be dead weight that implies a binding role it does not have.
+                    "chain_displacement", "rg", "torsion",
+                    # A term still relaxing is the textbook case for buying more trajectory;
+                    # without this the melt clause's newest gate would fall through to a hard
+                    # FAIL instead of an EXTEND.
+                    "energy_component_drift"}
 # Gates whose failure means the cell is WRONG, not merely unconverged -- extending at the
 # assessment temperature cannot fix these (policy: "a glass cannot densify below Tg").
 #
@@ -409,8 +544,10 @@ def enforce(run_name, repo_root: Path):
     gates = collect_gates(comp)
 
     # --- determine applicable clause ---
-    clause, binding_results, advisory_results = classify(gates, regime, dp_typical, ct_gate_reliable)
-    binding_all_pass = all(binding_results.values()) if binding_results else True
+    clause, binding_results, advisory_results, unmeasured_binding = classify(
+        gates, regime, dp_typical, ct_gate_reliable)
+    binding_all_pass = bool(binding_results) and all(binding_results.values()) \
+        and not unmeasured_binding
 
     # --- density_value_binding: retrospective, read-only re-audit of a cached
     # cooling_contraction.json (this function never re-runs assess_cooling_contraction --
@@ -455,6 +592,7 @@ def enforce(run_name, repo_root: Path):
         "density_value_binding": dvb_status,
         "overall_pass_reported": overall_pass_reported,
         "failing_binding_gates": failing_binding,
+        "unmeasured_binding_gates": unmeasured_binding,
         "verdict": verdict,
     }
 
@@ -483,7 +621,8 @@ def enforce_live(args) -> dict:
     dp_typical = args.dp
     ct_gate_reliable = args.ct_gate_reliable
 
-    clause, binding_results, advisory_results = classify(gates, regime, dp_typical, ct_gate_reliable)
+    clause, binding_results, advisory_results, unmeasured_binding = classify(
+        gates, regime, dp_typical, ct_gate_reliable)
     failing_binding = [k for k, v in binding_results.items() if v is False]
 
     # --- density_value_binding: unconditional self-consistency check (live probe-or-check).
@@ -528,7 +667,14 @@ def enforce_live(args) -> dict:
         # the recovery agent's context; they simply no longer fail the stage.
 
     # --- 4-way verdict mapping ---
-    if not failing_binding:
+    # UNMEASURED comes first and is unconditional: if any gate this clause binds on could not
+    # be evaluated, no evidence exists either way and acceptance is not available. This fails
+    # CLOSED where the old `not failing_binding -> PASS` failed open, and it also catches the
+    # partial case an emptiness check would miss (thermo present and passing, chain section
+    # absent -> failing_binding == [] -> PASS on an unmeasured chain).
+    if not binding_results:
+        verdict = "FAIL"
+    elif not failing_binding:
         verdict = "PASS"
     elif set(failing_binding) <= EXTENDABLE_GATES:
         verdict = "EXTEND"
@@ -593,6 +739,7 @@ def enforce_live(args) -> dict:
         "regime": regime,
         "applicable_clause": clause,
         "binding_gates": binding_results,
+        "unmeasured_binding_gates": unmeasured_binding,
         "advisory_gates": advisory_results,
         "density_value_binding": dvb_status,
         # Structured, not only embedded in the remedy prose: the alpha-based contraction

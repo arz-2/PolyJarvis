@@ -248,7 +248,12 @@ def _run_headless_claude_once(prompt: str, schema: dict, timeout_s: int) -> tupl
     """
     structured, outer = headless_claude.invoke_once_with_meta(
         prompt, schema, timeout_s=timeout_s, allowed_tools=READ_ONLY_TOOLS,
-        max_budget_usd=1.0, cwd=REPO_ROOT)
+        # Same failure as nodes.adjudicate's 1.5 (measured $1.97 for a comparable
+        # prompt+schema, 2026-09-08): too low and `claude` exits 1 with empty stderr.
+        # Worse here -- diagnose() maps a wrapper failure to `retry`, so a budget
+        # exit would be laundered into a considered decision, the exact thing this
+        # module's docstring says it exists to prevent.
+        max_budget_usd=6.0, cwd=REPO_ROOT)
     return structured, _answering_model(outer)
 
 

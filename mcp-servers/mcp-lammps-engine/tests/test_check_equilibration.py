@@ -95,3 +95,69 @@ def test_canceling_component_drift_fails_gate_b_even_when_total_is_flat():
     assert component["pass"] is False  # gate B's per-term check is not fooled
     equilibrated = bool(aggregate["equilibrated"] and component["pass"])
     assert equilibrated is False
+
+
+def test_vdw_is_judged_against_its_own_fluctuation_not_its_mean():
+    """E_vdwl and E_coul are residuals of large opposing contributions, so drift-as-a-percent-
+    of-the-mean measures where the cancellation landed, not how far from equilibrium the cell
+    is. aPS_1 (2026-09-09) is the worked example: vdW read 1.73% of a 1094 kcal/mol mean and
+    was the ONLY failing binding gate, while the same drift is 0.32 of that term's own sigma.
+
+    A bond term with an identical fractional drift must still be judged on drift_pct -- the
+    swap is scoped to the two residual terms, not applied to everything.
+    """
+    rng = np.random.default_rng(11)
+    n = 400
+    # ~1.7% of the mean, but small compared with the term's own fluctuation.
+    trend = np.linspace(0, 18.0, n)
+    prod = pd.DataFrame({
+        "E_vdwl": 1094.0 + trend + rng.normal(0, 40.0, size=n),
+        "E_bond": 1094.0 + trend + rng.normal(0, 0.5, size=n),
+    })
+    res = _analyse_energy_components(prod, DRIFT_PCT, DRIFT_PVALUE)
+    vdw, bond = res["components"]["vdw"], res["components"]["bond"]
+
+    assert vdw["criterion"] == "drift_sigma"
+    assert vdw["drift_sigma"] < 1.0
+    assert vdw["pass"] is True, "vdW failed on a drift smaller than its own thermal noise"
+    assert vdw["drift_pct"] > 1.0, "the fixture must be one the OLD relative test would fail"
+
+    assert bond["criterion"] == "drift_pct"
+    assert bond["pass"] is False, "the swap must not leak onto terms with a physical mean"
+
+
+def test_a_vdw_drift_larger_than_its_fluctuation_still_fails():
+    """The new criterion must remain capable of failing -- a gate that cannot fail is the
+    fail-open shape removed from this pipeline on 2026-09-09. This is also why RadonPy's
+    absolute 30.0 kcal/mol bound was NOT adopted: measured across five melt holds its
+    statistic ran 2.08-11.09, so it could never have bound any of them.
+    """
+    rng = np.random.default_rng(12)
+    n = 400
+    prod = pd.DataFrame({
+        "E_vdwl": 1094.0 + np.linspace(0, 300.0, n) + rng.normal(0, 20.0, size=n),
+    })
+    res = _analyse_energy_components(prod, DRIFT_PCT, DRIFT_PVALUE)
+    vdw = res["components"]["vdw"]
+    assert vdw["drift_sigma"] > 1.0
+    assert vdw["pass"] is False
+    assert res["pass"] is False
+
+
+def test_both_residual_terms_report_the_criterion_they_were_judged_on():
+    """Every component says which test decided it, so a reader never infers it from the
+    numbers -- drift_pct stays reported for continuity with pre-2026-09-09 runs."""
+    rng = np.random.default_rng(13)
+    n = 300
+    prod = pd.DataFrame({
+        "E_vdwl": 1000 + rng.normal(0, 10, size=n),
+        "E_coul": -500 + rng.normal(0, 10, size=n),
+        "E_angle": 300 + rng.normal(0, 1, size=n),
+    })
+    res = _analyse_energy_components(prod, DRIFT_PCT, DRIFT_PVALUE)
+    assert res["components"]["vdw"]["criterion"] == "drift_sigma"
+    assert res["components"]["coul"]["criterion"] == "drift_sigma"
+    assert res["components"]["angle"]["criterion"] == "drift_pct"
+    for label in ("vdw", "coul", "angle"):
+        assert "drift_pct" in res["components"][label]
+        assert "threshold" in res["components"][label]

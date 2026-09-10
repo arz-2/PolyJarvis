@@ -21,3 +21,4 @@ rdkit>=2023.9
 # node-contract tests are part of the default pure-logic suite rather than
 # silently skipping in CI -- the graph's shape is exactly what those tests guard.
 langgraph==1.2.11
+pyflakes            # tests/test_equil_workflow_required_args.py undefined-name guard

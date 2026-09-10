@@ -244,8 +244,26 @@ def cmd_status(js: bool = False) -> int:
     return 0
 
 
-def cmd_claim(run: str, need: int, js: bool = False) -> int:
+def cmd_claim(run: str, need: int, js: bool = False, adopt: str = None) -> int:
     LEDGER.mkdir(parents=True, exist_ok=True)
+    if adopt:
+        # ADOPTION, not allocation. The caller is reattaching to a detached chain that is ALREADY
+        # running on these GPUs -- they are busy precisely because this run's own work is on them,
+        # so free_gpus() correctly refuses to hand them out and would send the reattaching process
+        # to a different GPU while the chain kept using this one. The ledger would then name a GPU
+        # doing nothing and stay silent about the one under load. Recording where the work
+        # actually is is the whole point of the ledger.
+        picked = [int(g) for g in str(adopt).split(",") if str(g).strip() != ""]
+        ts = time.strftime("%Y-%m-%dT%H:%M")
+        for gid in picked:
+            (LEDGER / f"gpu{gid}.lock").write_text(
+                json.dumps({"run": run, "pid": os.getppid(), "ts": ts, "adopted": True}))
+        if js:
+            print(json.dumps({"run": run, "claimed": picked, "need": len(picked),
+                              "adopted": True}))
+        else:
+            print(",".join(map(str, picked)))
+        return 0
     free = free_gpus()
     if len(free) < need:
         if js:
@@ -299,11 +317,14 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
     c = sub.add_parser("claim"); c.add_argument("--run", required=True); c.add_argument("--need", type=int, default=1)
+    c.add_argument("--adopt", default=None,
+                   help="Comma-separated GPU ids a detached chain is already running on. Records "
+                        "the claim on exactly those, bypassing the idle check -- for reattach.")
     r = sub.add_parser("release"); r.add_argument("--run", required=True)
     b = sub.add_parser("budget"); b.add_argument("--mpi", type=int, required=True)
     a = ap.parse_args()
     if a.cmd == "status":  return cmd_status(a.json)
-    if a.cmd == "claim":   return cmd_claim(a.run, a.need, a.json)
+    if a.cmd == "claim":   return cmd_claim(a.run, a.need, a.json, a.adopt)
     if a.cmd == "release": return cmd_release(a.run, a.json)
     if a.cmd == "budget":  return cmd_budget(a.mpi, a.json)
     return 2

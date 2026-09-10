@@ -401,3 +401,27 @@ def test_engine_launch_gpu_flags():
     _, flags = server._engine_launch("gpu", 2)
     assert "-sf gpu" in flags
     assert "-pk gpu 2" in flags
+
+
+def test_a_binary_restart_is_never_classified(tmp_path):
+    """A LAMMPS .restart is binary; read_text(errors="replace") turns it into mojibake that the
+    substring probes match by chance. On 2026-09-09 a PCFF restart was classified
+    {'use_opls': True} -- the opposite of its own sibling .data. It surfaced only because the
+    caller passed an explicit use_pcff and the flag-mismatch guard raised; with no explicit flag
+    it would have silently emitted an OPLS deck for a class2 system.
+    """
+    from script_generator import _detect_ff_from_data_file
+    binary = tmp_path / "npt_melt_hold_out.restart"
+    binary.write_bytes(b"LAMMPS RESTART\x00\x00\x01\x02 pair_style lj/cut/coul/long opls\x00")
+    assert _detect_ff_from_data_file(str(binary)) == {}
+
+
+def test_a_text_data_file_is_still_classified(tmp_path):
+    """The guard must not blind the detector to real data files -- the inline
+    `Pair Coeffs # <style>` comment is how a post-equilibration cell is typed."""
+    from script_generator import _detect_ff_from_data_file
+    data = tmp_path / "npt_melt_hold_out.data"
+    data.write_text(
+        "LAMMPS data file\n\n4 atom types\n2 improper types\n\n"
+        "Masses\n\n1 12.011\n\nPair Coeffs # lj/class2/coul/long\n\n1 0.054 4.01\n")
+    assert _detect_ff_from_data_file(str(data)).get("use_pcff") is True

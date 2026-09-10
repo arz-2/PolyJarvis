@@ -127,6 +127,30 @@ _ENERGY_COMPONENT_COLS = [
     ("E_vdwl", "vdw"), ("E_coul", "coul"), ("E_long", "kspace"),
 ]
 
+# Terms whose MEAN is not a physical scale, so drift-as-a-percentage-of-the-mean is not a
+# meaningful test for them. E_vdwl and E_coul are each a residual of large opposing
+# contributions: the net can sit anywhere relative to its parts, so dividing a drift by it
+# produces a number that depends on where the cancellation happens to land, not on how far
+# from equilibrium the cell is.
+#
+# RadonPy reached the same conclusion independently and by a different route
+# (radonpy/sim/lammps.py check_eq): every other energy term is compared as
+# `sma_sd > abs(mean) * crit`, but evdw alone is compared ABSOLUTELY (`sma_sd > 30.0`) and
+# ecoul is not gated at all. We do not copy the absolute bound -- measured against these
+# systems it never binds (sma_sd 2.08-11.09 against a bound of 30.0 across five melts), and a
+# gate that cannot fail is the fail-open shape this file spent 2026-09-09 removing.
+#
+# Instead these two are scaled by their OWN RMS fluctuation. drift/sigma asks "is the
+# systematic change over this window at least as large as the term's thermal fluctuation",
+# which is dimensionless, well-defined however the cancellation lands, and comparable across
+# terms. Measured across five melt holds it spans 0.02-0.84 for vdw where drift-vs-mean spans
+# 0.24%-14.1% -- the same physics, on a scale that means something.
+_SELF_SCALED_COMPONENTS = {"vdw", "coul"}
+
+# drift >= 1.0 sigma. Not tuned to a pass/fail split: it is the point where the systematic
+# change stops being small compared with the fluctuation it sits on.
+_SELF_SCALED_DRIFT_SIGMA = 1.0
+
 
 def _analyse_energy_components(prod, drift_threshold_pct, drift_pvalue):
     """Per-term drift test folded into gate B, alongside the aggregate TotEng drift.
@@ -154,8 +178,21 @@ def _analyse_energy_components(prod, drift_threshold_pct, drift_pvalue):
         slope, _, _, p_val, _ = sp_stats.linregress(x, values)
         total_drift = abs(slope * n)
         drift_pct = (total_drift / abs(mean_val) * 100) if abs(mean_val) > 1e-12 else 0.0
-        d_pass = not (drift_pct > drift_threshold_pct and p_val < drift_pvalue)
-        components[label] = {"pass": bool(d_pass), "drift_pct": r(drift_pct, 4), "p_value": r(p_val, 4)}
+        entry = {"drift_pct": r(drift_pct, 4), "p_value": r(p_val, 4)}
+        if label in _SELF_SCALED_COMPONENTS:
+            sigma = float(np.std(values))
+            drift_sigma = (total_drift / sigma) if sigma > 1e-12 else 0.0
+            d_pass = not (drift_sigma > _SELF_SCALED_DRIFT_SIGMA and p_val < drift_pvalue)
+            # drift_pct is still reported for continuity with runs graded before 2026-09-09,
+            # but it is NOT what this term is judged on -- `criterion` says which is which so
+            # a reader never has to infer it from the numbers.
+            entry.update({"drift_sigma": r(drift_sigma, 4), "sigma": r(sigma, 4),
+                          "criterion": "drift_sigma", "threshold": _SELF_SCALED_DRIFT_SIGMA})
+        else:
+            d_pass = not (drift_pct > drift_threshold_pct and p_val < drift_pvalue)
+            entry.update({"criterion": "drift_pct", "threshold": drift_threshold_pct})
+        entry["pass"] = bool(d_pass)
+        components[label] = entry
         all_pass = all_pass and d_pass
     return {"components": components, "pass": bool(all_pass)}
 
@@ -811,6 +848,24 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "heterogeneous_flag": heterogeneous_flag,
     }
 
+    # Chain displacement in the system's OWN units -- the per-system melt-equilibration
+    # criterion (Auhl/Kremer): a melt is equilibrated when chain centres of mass have
+    # displaced at least their own size, g3(t) >= Rg^2. Computed here rather than in
+    # enforce_gate.py because both terms are measured in this pass, and reported as a ratio so
+    # the gate needs no table and no per-class constant. Ree^2 is the stricter form of the same
+    # statement and is left to the reader: measured over 36 round-1 campaigns it ranged
+    # 0.017-0.861, i.e. never reached, so gating on it would reject every melt this platform
+    # has ever built.
+    _rg2 = rg_result.get("mean_Rg2_A2")
+    _msd_max = msd_result.get("msd_max_A2")
+    if isinstance(_rg2, (int, float)) and _rg2 > 0 and isinstance(_msd_max, (int, float)):
+        msd_result["msd_over_rg2"] = r(_msd_max / _rg2, 3)
+        _ree = (ree_result or {}).get("mean_R_ee_A")
+        if isinstance(_ree, (int, float)) and _ree > 0:
+            msd_result["msd_over_ree2"] = r(_msd_max / (_ree * _ree), 4)
+    else:
+        msd_result["msd_over_rg2"] = None
+
     return {
         "rg": rg_result,
         "ree": ree_result,
@@ -1297,6 +1352,13 @@ def main():
             "equilibrated": thermo.get("equilibrated"),
             "density_drift": thermo.get("density", {}).get("drift"),
             "energy_drift": thermo.get("energy", {}).get("drift"),
+            # The per-term drift verdict, surfaced at the top level so enforce_gate can bind on
+            # it. It was computed and folded into thermo["energy"]["equilibrated"] from the day
+            # _analyse_energy_components was written, and printed in d05_block.md, but the
+            # aggregate "energy_drift" above is what collect_gates read -- so the one case this
+            # check exists to catch (a canceling drift that nets a flat TotEng) was invisible to
+            # the gate. aPS_1, 2026-09-09: TotEng drift 0.023% PASS while vdW drifted 1.691%.
+            "energy_component_drift": thermo.get("energy", {}).get("component_drift"),
             "density_sem": thermo.get("density", {}).get("block_sem"),
             "energy_sem": thermo.get("energy", {}).get("block_sem"),
             "tau_eff_density_fraction": thermo.get("tau_eff_density_fraction"),

@@ -1,0 +1,56 @@
+{
+  "purpose": "Reviewer comment 3: the benchmark shows orchestration and diagnosis, not resumption to completion. Wants recovery DEFINED as successful completion of the intended simulation and property calculation, tested over repeated trials, preferably on unseen failures, plus an end-to-end deterministic baseline that quantifies the LLM's incremental contribution.",
+  "definition_of_recovered": "The stage the finding fired on subsequently reaches status 'accepted' AND the run yields a gate-passing property value under enforce_gate.py. NOT 'a remedy was applied'. NOT 'no more errors in the log'. NOT a correct diagnosis. Round 1's own artifacts fail this definition and that is the point: manuscript/recovery/results/RECOV_F5_agent.json and RECOV_F6_agent.json record resolved=true with stages_completed=[] and terminal_state='unknown', while their run logs say outright 'Rebuild + equilibration not executed (task scope = diagnose + decide)'. Disclose that gap rather than defend it.",
+  "the_gap_this_fills": {
+    "round_1": "A repeatable, scored fault catalog (F1-F6) driving an architecture that no longer exists. v2's .claude/agents/ holds only literature-grounding-worker.md; the molecule-builder subagent those transcripts capture is gone, and there is no equivalent 'spawn a worker, watch it diagnose and stop' path. The artifacts are historical record, not runnable code.",
+    "v2": "A live, enforced remedy ladder -- workflow_engine.default_remedies(), 12 automatic remedies with per-code caps, MAX_AUTOMATIC_REMEDIES=12, an agent_only catch-all, and MAX_AGENT_DECISIONS=2 -- with NO fault-injection code anywhere (grep inject/fault_catalog/F1_: zero hits). It is validated only against organically occurring failures and unit tests.",
+    "so": "Round 1 had the catalog without the architecture; v2 has the architecture without the catalog. This benchmark supplies the missing half, keyed to v2's own Finding codes rather than to round-1 recover.md line numbers."
+  },
+  "code_surface": "default_remedies() routes 42 codes. 15 have no producer (tests/test_recovery_code_inventory.py owns that map), so a fault designed around one fires nothing. 16 live codes route to the automatic ladder, 11 to agent_only. fault_catalog.validate() refuses any fault outside the live set -- this caught EQUIL_DRIFT, which the first draft of the design targeted.",
+  "components": {
+    "R1": {
+      "what": "Score the recovery events real campaigns have already produced.",
+      "gpu": 0,
+      "script": "harvest.py",
+      "why_it_is_the_strongest_evidence": "These are unplanned failures from production runs -- the strictest reading of 'unseen failure cases', since nobody chose them. One is a genuine harness bug caught in flight (_run_extract_equilibrated_density missing an output_name kwarg).",
+      "status": "RUNNING -- grows as the stereo_r2 campaign proceeds"
+    },
+    "R2": {
+      "what": "Controlled fault catalog, N=3 trials per fault, scored by completion.",
+      "gpu": "low -- every fault in the catalog is gate-level or a replay, none require real MD to fail",
+      "script": "injectors.py, run_trials.py, fault_catalog.py",
+      "status": "TIER 1 WORKING. injectors.py corrupts a real EMC cell four ways and all four fire their target Finding code, with a clean-cell control that produces no error. run_trials.py drives the real WorkflowEngine with those findings, N trials x 2 arms, measuring remedy selection, cap exhaustion and arm divergence. Tier 2 (completion through a real campaign) needs GPU and is not written."
+    },
+    "R3": {
+      "what": "Force an agent_only code so recovery_agent_cli actually fires, N=3.",
+      "gpu": "build-only per trial via fault V1",
+      "measures": [
+        "which of {retry, revise_plan, stop} comes back",
+        "whether the engine then drives the stage to accepted -- resumption to completion, the reviewer's exact ask",
+        "how often the 2-call cap is exhausted and the run lands on escalation_required (exit 2)"
+      ],
+      "status": "PARTLY ANSWERED BY R1, then DESIGNED. Four recovery-agent calls have already been spent by the live campaign and their decisions survive in agent_escalations_retired_by_operator: 3 stop, 1 revise_plan, 0 retry. Notably all three 'stop' rationales conclude the root cause was OUTSIDE the recovery contract (a host-level kill, an environmental failure, and a code defect in the EXTEND continuation path) -- the agent diagnosed correctly and correctly declined to invent a plan-level fix. V1's job is to add controlled repeatable trials to that organic sample."
+    },
+    "R4": {
+      "what": "Three-arm ablation, run FAULTED rather than clean.",
+      "arms": {
+        "A0_stock": "EMC's own FF routing + generic numerics, polymer_rules.json NOT consulted. Port make_stock_plan from `git show 1a6ca54:benchmarks/autonomy/scripted_baseline.py` in the sibling checkout. Round-1 fairness rule preserved: the stock arm keeps EMC's own FF routing, only the curated numerics are dropped. Clean seed only -- it has no recovery, so faulting it measures nothing.",
+        "A1_deterministic": "run_graph.py --no-llm, which as of 2026-09-09 also suppresses the recovery agent. Automatic ladder only; escalation is terminal.",
+        "A2_full": "run_graph.py with critic + adjudicator + the 2-call recovery agent."
+      },
+      "why_faulted": "On a clean PE campaign A1 and A2 would almost certainly return the same number, because the pilot shows the automatic ladder resolving every finding without the agent. The measured LLM contribution would be zero -- not because the LLM is worthless but because nothing in a clean run reaches it. The agent_only faults are the discriminating rows: A1 must halt on escalation_required where A2 may complete, and that difference IS the incremental contribution.",
+      "report_the_null": "If the clean-run arms do come out A1 ~ A2, report it: 'the deterministic core carries this system unaided' is a legitimate finding, but it has to be stated rather than left as an unexplained null.",
+      "system": "PE -- cheapest in the set at 2.25 GPU-h priced, and unlaunched, so it neither disturbs nor waits on the four in-flight pilot runs.",
+      "gpu": "~20 GPU-h",
+      "status": "DESIGNED; A0's stock planner not yet ported"
+    }
+  },
+  "blocking_defect_fixed_2026_09_09": "nodes.execute() passed --recovery-agent-command unconditionally: `no_llm` reached critique() and adjudicate() but never workflow_engine, scientific_control or agent_api (zero grep hits). The 'deterministic arm' therefore still consulted a model up to twice on any escalation, and any incremental-contribution number measured with it would have understated the LLM by exactly the amount the recovery agent supplied. Fixed, with tests/test_langgraph_no_llm_arm.py as the regression. workflow_engine._escalate already had the None branch (returns escalation_required, reason='no_recovery_agent_configured'), distinguishable in the record from a spent cap ('max_agent_decisions_reached') -- so the harvest can tell 'this arm had no agent' from 'the agent ran out'.",
+  "accounting_rule": "Escalations must be read from BOTH agent_escalations AND agent_escalations_retired_by_operator, and the retired entries carry the agent's actual decision, not just a count. Operators retired PLLA_1's and aPS_1's escalations on 2026-09-09; both runs now report agent_escalations=0 having spent two each, so the live counter alone under-reports what the campaign cost in autonomy terms. operator_interventions must be reported alongside, never omitted: an undisclosed manual rescue inside a campaign whose headline claim is autonomous execution is exactly what reviewer comment 3 is about.",
+  "not_ported_from_round_1": "See fault_catalog.NOT_PORTED. In short: F1/F2 surface as generic PROCESS_FAILED and measure nothing specific; F3 is superseded by V5; F4's code path in v2 is unverified so V1 is the reliable agent_only trigger; error_classifier.py keys off recover.md line numbers that no longer exist.",
+  "tiers": {
+    "tier_1_routing": "Real injection into a real cell, classified through run_campaign's own validation call, then driven through the real WorkflowEngine with a scripted executor. Measures routing, caps and arm divergence. Zero GPU, seconds. COMPLETION IS SCRIPTED.",
+    "tier_2_completion": "The same injected cell through a real campaign, scored on stage `accepted` plus a gate-passing property value. The reviewer's definition. Needs GPU.",
+    "why_the_split_is_stated": "Reporting tier 1 as tier 2 would repeat the exact error this benchmark exists to correct: round 1 recorded resolved=true for runs whose stages_completed was []."
+  }
+}

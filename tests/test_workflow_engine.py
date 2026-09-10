@@ -190,6 +190,15 @@ def test_transient_retry_declines_when_the_disk_is_full(tmp_path):
 
 
 def test_transient_retry_still_applies_when_resources_are_fine(tmp_path):
+    """Both halves of the preflight must be stubbed, not just the disk.
+
+    _resource_refusal checks free disk AND hardware_runtime.free_gpus(), and the latter reads
+    the REAL host ledger. Stubbing only disk left this test asserting "resources are fine"
+    while the GPUs were whatever the machine happened to be doing -- so it passed on an idle
+    workstation and failed on a busy one, which is exactly what happened on 2026-09-09 with
+    four campaigns occupying all four GPUs. The name promises a hermetic condition; make it one.
+    """
+    import hardware_runtime
     import workflow_engine
 
     finding = Finding("PROCESS_FAILED", "equilibration")
@@ -197,7 +206,8 @@ def test_transient_retry_still_applies_when_resources_are_fine(tmp_path):
     engine = WorkflowEngine(tmp_path, plan(), fake)
 
     roomy = SimpleNamespace(total=int(1e13), used=0, free=int(9e12))
-    with patch.object(workflow_engine.shutil, "disk_usage", return_value=roomy):
+    with patch.object(workflow_engine.shutil, "disk_usage", return_value=roomy), \
+         patch.object(hardware_runtime, "free_gpus", return_value=[0, 1, 2, 3]):
         result = engine.run()
 
     assert result["status"] == "accepted"
@@ -739,3 +749,371 @@ def test_a_thermal_only_knob_leaves_the_cooldown_accepted(tmp_path):
     resumed = WorkflowEngine(tmp_path, plan(tg_rate_K_per_ns=100, tg_t_step_K=10), FakeExecutor())
     assert resumed.state["stages"]["thermal"]["status"] == "stale"
     assert resumed.state["stages"]["cooling"]["status"] == "accepted"
+
+
+# ─── EXTEND sizing: the tau*20 path is gone, and the right stage gets extended ──
+
+def _extend_finding(**details):
+    return Finding("EXTEND", "equilibration", details=details)
+
+
+def test_a_melt_extend_is_sized_from_the_measured_displacement_not_the_advisory_tau():
+    """The 17,453 ns regression, locked.
+
+    On 2026-09-09 PLLA_1's EXTEND carried relaxation_time_ns=872.66 -- a KWW tau fitted to an
+    11.5%-decayed C(t), an extrapolation 176x beyond its own trajectory. `tau * target_n_eff`
+    turned that into a request for 17.45 MICROseconds of continuation, which validate_overrides
+    rejected as out of range, costing an agent escalation and a full ten-stage replay.
+    C(t) is advisory now and must never size anything.
+    """
+    import workflow_engine
+    finding = _extend_finding(relaxation_time_ns=872.6603,
+                              failing_binding_gates=["chain_displacement"])
+    with pytest.raises(ValueError, match="extension_ns"):
+        workflow_engine._continue_npt({}, finding, 1)
+
+
+def test_a_declining_remedy_records_why(tmp_path):
+    """Declining must leave a named cause in recovery_log.jsonl. Every exception used to return
+    False silently, so the agent inherited the escalation with no trace of what the
+    deterministic remedy had already ruled out."""
+    import workflow_engine
+
+    finding = Finding("EXTEND", "equilibration",
+                      details={"relaxation_time_ns": 872.66,
+                               "failing_binding_gates": ["chain_displacement"]})
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+    roomy = SimpleNamespace(total=int(1e13), used=0, free=int(9e12))
+    with patch.object(workflow_engine.shutil, "disk_usage", return_value=roomy), \
+         patch.object(__import__("hardware_runtime"), "free_gpus", return_value=[0, 1, 2, 3]):
+        engine.run()
+
+    events = [json.loads(l) for l in (tmp_path / "recovery_log.jsonl").read_text().splitlines()]
+    rejected = [e for e in events if e["event"] == "auto_remedy_rejected"]
+    assert rejected, "a remedy that raised must log why it declined"
+    assert "extension_ns" in rejected[-1]["reason"]
+
+
+def test_a_displacement_failure_extends_the_nvt_window_it_was_measured_on():
+    """MSD and C(t) are computed on nvt_melt_hold.dump -- the FIXED-VOLUME window, because a
+    barostatted trajectory affine-scales coordinates every step and would contaminate
+    cumulative CoM displacement. Extending npt_melt_hold for a displacement failure lengthens a
+    trajectory the gate never reads, so MSD/Rg^2 comes back unchanged and the gate re-fails
+    identically. That was the behaviour until 2026-09-09."""
+    import workflow_engine
+    revised = workflow_engine._continue_npt(
+        {}, _extend_finding(extension_ns=12.0,
+                            failing_binding_gates=["chain_displacement"]), 1)
+    assert revised["equilibration_extend_base_stage"] == "nvt_melt_hold"
+    assert revised["equilibration_extend_ensemble"] == "nvt"
+    assert revised["npt_continuation_ns"] == 12.0
+
+
+def test_a_thermo_failure_still_extends_the_npt_cell_its_gates_read():
+    """density/energy drift and SEM are read from npt_melt_hold's own log, so those keep the
+    NPT base stage -- the routing is by which trajectory failed, not a blanket switch."""
+    import workflow_engine
+    revised = workflow_engine._continue_npt(
+        {}, Finding("EQUIL_DRIFT", "equilibration",
+                    details={"extension_ns": 3.0, "failing_binding_gates": ["density_drift"]}), 1)
+    assert revised["equilibration_extend_base_stage"] == "npt_melt_hold"
+    assert revised["equilibration_extend_ensemble"] == "npt"
+
+
+def test_a_thermo_extend_still_sizes_when_displacement_passed():
+    """The near-miss of 2026-09-09: aPS_1's melt failed density_drift + msid_gaussian with
+    chain_displacement PASSING at 2.793x Rg^2. Scoping the "cannot size, decline" branch to the
+    whole EXTEND code (rather than to a displacement failure) made the remedy stand down on a
+    problem that has a perfectly good default, and sent the run to its LAST agent escalation.
+
+    A thermo gate is a sampling-convergence failure: it extends the NPT cell whose log those
+    gates are read from, and it takes the size the GATE measured (`extension_ns`, from
+    _thermo_extension_ns) rather than declining.
+    """
+    import workflow_engine
+    finding = Finding("EXTEND", "equilibration",
+                      details={"failing_binding_gates": ["density_drift", "msid_gaussian"],
+                               "extension_ns": 2.0,
+                               # a huge CHAIN C(t) integral must not leak into a THERMO sizing
+                               "relaxation_time_ns": 872.6603})
+    revised = workflow_engine._continue_npt({}, finding, 1)
+    assert revised["npt_continuation_ns"] == 2.0
+    assert revised["equilibration_extend_base_stage"] == "npt_melt_hold"
+    assert revised["equilibration_extend_ensemble"] == "npt"
+
+
+def test_an_unsized_continuation_declines_instead_of_inventing_a_length():
+    """What stood here read as a formula -- `tau_ns * target_n_eff` -- but nothing in the repo
+    has ever written tau_ns, n_eff or target_n_eff into a finding, so every path through it
+    returned exactly 0.5 * 20 = 10.0 ns regardless of run, stage or gate.
+
+    On 2026-09-09 that gave aPS_1 a 10 ns extension against a 2 ns melt hold, and would have
+    given any cooling EXTEND 10 ns against a 0.5 ns npt_final. Both callers now size from
+    measurement, so an unsized finding is a real gap and must be declined with a named cause --
+    which routes it to the recovery agent -- not papered over with a constant.
+    """
+    import workflow_engine
+    finding = Finding("EXTEND", "equilibration",
+                      details={"failing_binding_gates": ["density_drift"]})
+    with pytest.raises(ValueError, match="cannot size a continuation"):
+        workflow_engine._continue_npt({}, finding, 1)
+
+
+def test_no_default_extension_length_survives_anywhere_in_continue_npt():
+    """Guard against the constant creeping back. 0.5 and 20 are the two halves of the retired
+    default; neither may appear as a literal in _continue_npt's body."""
+    import inspect, workflow_engine
+    src = inspect.getsource(workflow_engine._continue_npt)
+    body = "\n".join(l for l in src.splitlines() if not l.strip().startswith("#"))
+    for literal in ("or 0.5", "or 20", "tau * target"):
+        assert literal not in body, f"retired sizing default reappeared: {literal!r}"
+
+
+def test_the_chain_relaxation_time_can_never_size_any_extension():
+    """relaxation_time_ns is the end-to-end C(t) integral. It sized the 17,453 ns request, and
+    C(t) is advisory now -- no path may consult it, in either branch."""
+    import inspect
+    import workflow_engine
+    src = inspect.getsource(workflow_engine._continue_npt)
+    body = "\n".join(l for l in src.splitlines() if not l.strip().startswith("#"))
+    assert "relaxation_time_ns" not in body, "the chain C(t) tau is back in the sizing path"
+
+
+def test_a_plan_write_outside_decided_params_invalidates_nothing(tmp_path):
+    """The guarantee the backbone_types fix rests on, asserted rather than assumed.
+
+    _reconcile_plan compares plan_hash over the WHOLE plan, so any write to run_plan.json moves
+    it -- but it computes `changed` from decided_params alone. A derived value persisted
+    elsewhere must therefore update plan_hash and invalidate NOTHING. If that ever stops holding,
+    the gate's backbone_types write-back silently starts replaying ten stages again.
+    """
+    import workflow_engine
+    fake = FakeExecutor({})
+    doc = plan()
+    engine = WorkflowEngine(tmp_path, doc, fake)
+    engine.state["stages"]["build"]["status"] = "accepted"
+    engine._save()
+    before_hash = engine.state["plan_hash"]
+
+    doc2 = json.loads(json.dumps(doc))
+    doc2["derived_inputs"] = {"backbone_types": {"value": [1, 2, 3]}}
+    engine2 = WorkflowEngine(tmp_path, doc2, fake)
+
+    assert engine2.state["plan_hash"] != before_hash, "the plan really did change"
+    assert engine2.state["stages"]["build"]["status"] == "accepted"
+    assert not engine2.state["stages"]["build"].get("stale_reason")
+    assert not engine2.state["stages"]["equilibration"].get("stale_reason")
+
+
+def test_the_same_write_inside_decided_params_does_invalidate(tmp_path):
+    """The other half: a genuine parameter change must still invalidate. This is why the fix
+    moves the DERIVED value out rather than exempting the key -- a caller-SUPPLIED
+    backbone_types changes which atoms the assessment treats as backbone, and must re-gate."""
+    import workflow_engine
+    fake = FakeExecutor({})
+    doc = plan()
+    engine = WorkflowEngine(tmp_path, doc, fake)
+    engine.state["stages"]["build"]["status"] = "accepted"
+    engine._save()
+
+    doc2 = json.loads(json.dumps(doc))
+    doc2["decided_params"]["backbone_types"] = [1, 2, 3]
+    engine2 = WorkflowEngine(tmp_path, doc2, fake)
+    assert engine2.state["stages"]["equilibration"].get("stale_reason") == "executable plan changed"
+
+
+# ─── a verdict already on disk is applied, not re-earned ───────────────────────
+
+def _die_after_verdict(tmp_path, finding):
+    """First engine: executor returns remedy_required, then the process 'dies' before the
+    remedy is applied -- reproduced by making _apply_remedy a no-op for that one run."""
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+    with patch.object(WorkflowEngine, "_apply_remedy", return_value=False), \
+         patch.object(WorkflowEngine, "_escalate", return_value="failed"):
+        engine.run()
+    return fake
+
+
+def test_a_resumed_run_applies_the_verdict_it_already_earned(tmp_path):
+    """The aPS_1 replay, locked. The stage must NOT be executed a second time."""
+    import workflow_engine
+    finding = Finding("EXTEND", "equilibration",
+                      details={"extension_ns": 2.0,
+                               "failing_binding_gates": ["density_drift"]})
+    first = _die_after_verdict(tmp_path, finding)
+    assert len([c for c in first.calls if c[0] == "equilibration"]) == 1
+
+    # A fresh engine on the same run_dir -- i.e. `agent_api.py resume`.
+    second = FakeExecutor({"equilibration": [StageResult("accepted", ())]})
+    engine = WorkflowEngine(tmp_path, plan(), second)
+    roomy = SimpleNamespace(total=int(1e13), used=0, free=int(9e12))
+    with patch.object(workflow_engine.shutil, "disk_usage", return_value=roomy), \
+         patch.object(__import__("hardware_runtime"), "free_gpus", return_value=[0, 1, 2, 3]):
+        engine.run()
+
+    events = [json.loads(l) for l in (tmp_path / "recovery_log.jsonl").read_text().splitlines()]
+    assert any(e["event"] == "verdict_resumed" for e in events), \
+        "the persisted verdict must be replayed, not re-earned by re-running the stage"
+    applied = [e for e in events if e["event"] == "auto_remedy"]
+    assert applied and applied[-1]["code"] == "EXTEND"
+    # The remedy revised the parameters, so the stage runs ONCE more -- with the extension.
+    assert engine.state["effective_parameters"]["npt_continuation_ns"] == 2.0
+    assert len([c for c in second.calls if c[0] == "equilibration"]) == 1
+
+
+def test_a_resumed_verdict_is_served_only_once(tmp_path):
+    """Guard against a remedy that revises nothing leaving the input_hash unchanged, so the
+    same verdict would be handed back forever."""
+    finding = Finding("EXTEND", "equilibration", details={"extension_ns": 2.0})
+    _die_after_verdict(tmp_path, finding)
+    engine = WorkflowEngine(tmp_path, plan(), FakeExecutor({}))
+    h = engine._input_hash("equilibration")
+    assert engine._resume_pending_verdict("equilibration", h) is not None
+    assert engine._resume_pending_verdict("equilibration", h) is None
+
+
+def test_a_verdict_from_a_different_protocol_is_not_resumed(tmp_path):
+    """A changed parameter means the verdict was about a different protocol -- re-run it."""
+    finding = Finding("EXTEND", "equilibration", details={"extension_ns": 2.0})
+    _die_after_verdict(tmp_path, finding)
+    engine = WorkflowEngine(tmp_path, plan(), FakeExecutor({}))
+    assert engine._resume_pending_verdict("equilibration", "a-different-hash") is None
+
+
+def test_a_process_death_is_not_a_verdict(tmp_path):
+    """PROCESS_FAILED lands as `failed`, not `remedy_required`: it routes through
+    transient_retry, which re-runs by design. Replaying it would defeat that."""
+    fake = FakeExecutor({"equilibration": [StageResult("failed", (
+        Finding("PROCESS_FAILED", "equilibration"),))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake)
+    with patch.object(WorkflowEngine, "_apply_remedy", return_value=False), \
+         patch.object(WorkflowEngine, "_escalate", return_value="failed"):
+        engine.run()
+    engine2 = WorkflowEngine(tmp_path, plan(), FakeExecutor({}))
+    assert engine2._resume_pending_verdict(
+        "equilibration", engine2._input_hash("equilibration")) is None
+
+
+def test_a_plan_change_does_not_discard_remedy_applied_parameters(tmp_path):
+    """aPS_1 / sPVC_1, 2026-09-09. continue_npt had written npt_continuation_ns=2.0 into
+    effective_parameters; the melt gate then wrote backbone_types back into run_plan.json, and
+    the next resume's _reconcile_plan replaced effective_parameters wholesale with the plan's
+    decided_params. The continuation parameter vanished, so the 'continuation' ran as a fresh
+    ten-stage chain -- with recovery_log.jsonl still showing the remedy as applied.
+    """
+    import workflow_engine
+    fake = FakeExecutor({})
+    doc = plan()
+    engine = WorkflowEngine(tmp_path, doc, fake)
+    engine.state["effective_parameters"]["npt_continuation_ns"] = 2.0
+    engine.state["effective_parameters"]["equilibration_extend_base_stage"] = "npt_melt_hold"
+    engine._save()
+
+    doc2 = json.loads(json.dumps(doc))
+    doc2["decided_params"]["cutoff_A"] = 14.0        # any real plan change
+    engine2 = WorkflowEngine(tmp_path, doc2, fake)
+
+    assert engine2.state["effective_parameters"]["npt_continuation_ns"] == 2.0
+    assert engine2.state["effective_parameters"]["equilibration_extend_base_stage"] == "npt_melt_hold"
+    assert engine2.state["effective_parameters"]["cutoff_A"] == 14.0   # the plan still wins
+
+
+def test_the_plan_still_wins_for_keys_it_defines(tmp_path):
+    """Preservation must not let a stale remedy value shadow the plan -- only keys the plan does
+    not define survive."""
+    import workflow_engine
+    fake = FakeExecutor({})
+    doc = plan()
+    engine = WorkflowEngine(tmp_path, doc, fake)
+    engine.state["effective_parameters"]["cutoff_A"] = 99.0
+    engine._save()
+    doc2 = json.loads(json.dumps(doc))
+    doc2["decided_params"]["cutoff_A"] = 14.0
+    engine2 = WorkflowEngine(tmp_path, doc2, fake)
+    assert engine2.state["effective_parameters"]["cutoff_A"] == 14.0
+    assert engine2.state["stages"]["build"].get("stale_reason") == "executable plan changed"
+
+
+def test_a_remedy_parameter_does_not_invalidate_its_own_stage_forever(tmp_path):
+    """sPVC_1, 2026-09-09. The companion bug to
+    test_a_plan_change_does_not_discard_remedy_applied_parameters: preservation kept the remedy
+    key, but `changed` was computed as effective_parameters vs decided_params, and a remedy key
+    exists ONLY in the former -- so it compared unequal on every reconcile, forever.
+
+    The damage is silent until a fresh process constructs an engine. The melt gate's
+    derived_inputs write-back moved the plan hash at 11:59 while the engine was mid-run; the
+    resume hours later saw the stale hash, recomputed `changed`, found npt_continuation_ns
+    "changed", and invalidated an equilibration that had been ACCEPTED for four hours --
+    re-submitting a 2 ns melt continuation for a stage that was already done.
+    """
+    import workflow_engine
+    fake = FakeExecutor({})
+    doc = plan()
+    engine = WorkflowEngine(tmp_path, doc, fake)
+    engine.state["stages"]["equilibration"]["status"] = "accepted"
+    engine.state["effective_parameters"]["npt_continuation_ns"] = 2.0
+    engine._save()
+
+    # The plan itself is UNCHANGED in every decided_param; only an out-of-contract field moves,
+    # exactly as the backbone_types derivation does.
+    doc2 = json.loads(json.dumps(doc))
+    doc2.setdefault("derived_inputs", {})["backbone_types"] = {"value": [1, 2, 3]}
+    engine2 = WorkflowEngine(tmp_path, doc2, fake)
+
+    assert engine2.state["stages"]["equilibration"]["status"] == "accepted", (
+        "an accepted stage was invalidated by a remedy parameter that no plan edit touched")
+    assert engine2.state["stages"]["equilibration"].get("stale_reason") is None
+    assert engine2.state["effective_parameters"]["npt_continuation_ns"] == 2.0
+
+
+def test_a_real_plan_edit_still_invalidates_after_a_remedy_ran(tmp_path):
+    """The narrowing must not blind the diff: a genuine decided_params change still invalidates,
+    even while a remedy key is being preserved alongside it."""
+    import workflow_engine
+    fake = FakeExecutor({})
+    doc = plan()
+    engine = WorkflowEngine(tmp_path, doc, fake)
+    engine.state["stages"]["equilibration"]["status"] = "accepted"
+    engine.state["effective_parameters"]["npt_continuation_ns"] = 2.0
+    engine._save()
+
+    doc2 = json.loads(json.dumps(doc))
+    doc2["decided_params"]["cutoff_A"] = 14.0
+    engine2 = WorkflowEngine(tmp_path, doc2, fake)
+
+    assert engine2.state["stages"]["equilibration"].get("stale_reason") == (
+        "executable plan changed")
+    assert engine2.state["effective_parameters"]["npt_continuation_ns"] == 2.0
+
+
+def test_revise_plan_moves_the_reconcile_baseline_with_the_plan(tmp_path):
+    """A revised plan must become the baseline the NEXT reconcile diffs against.
+
+    Otherwise the first plan-hash move after a revise_plan (a derived_inputs write will do it)
+    compares the revised decided_params against the pre-revision snapshot and invalidates every
+    stage the revision just settled -- the same trap as
+    test_a_remedy_parameter_does_not_invalidate_its_own_stage_forever, one level up.
+    """
+    import workflow_engine
+    fake = FakeExecutor({})
+    doc = plan()
+    engine = WorkflowEngine(tmp_path, doc, fake)
+    engine.state["stages"]["equilibration"]["status"] = "accepted"
+
+    revised = json.loads(json.dumps(doc))
+    revised["decided_params"]["cutoff_A"] = 14.0
+    engine.plan = revised
+    engine.state["plan_hash"] = workflow_engine._canonical_hash(revised)
+    engine.state["plan_decided_params"] = json.loads(
+        json.dumps(revised.get("decided_params") or {}))
+    engine._save()
+
+    # Now an out-of-contract write moves the hash again. Nothing in decided_params changed.
+    revised2 = json.loads(json.dumps(revised))
+    revised2.setdefault("derived_inputs", {})["backbone_types"] = {"value": [1, 2]}
+    engine2 = WorkflowEngine(tmp_path, revised2, fake)
+
+    assert engine2.state["stages"]["equilibration"]["status"] == "accepted"
+    assert engine2.state["stages"]["equilibration"].get("stale_reason") is None

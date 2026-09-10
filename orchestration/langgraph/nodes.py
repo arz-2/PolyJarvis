@@ -530,7 +530,14 @@ def adjudicate(state: dict) -> dict:
         decision = invoke(prompt, schemas.adjudication_schema(planning_parameter_contract()),
                           allowed_tools=("Read", "Bash(cat:*)", "Bash(jq:*)", "Bash(grep:*)",
                                          "Bash(sed:*)"),
-                          max_budget_usd=1.5, timeout_s=900, cwd=state["repo_root"])
+                          # 1.5 was below the call's real cost and every adjudication on
+                          # this box exited 1 with EMPTY stderr, degrading silently to the
+                          # deterministic baseline -- indistinguishable from --baseline,
+                          # because that is exactly what _fall_back_to_baseline stamps.
+                          # Measured 2026-09-08: this prompt + schema costs $1.97 (a bare
+                          # "say hi" against the same schema is already $0.42 in cache
+                          # creation). The ceiling is a runaway stop, not a tight budget.
+                          max_budget_usd=6.0, timeout_s=900, cwd=state["repo_root"])
     except (HeadlessError, subprocess.TimeoutExpired) as exc:
         # The call itself failed -- no decision was made. Degrade to the deterministic
         # baseline exactly as an invalid decision does, rather than returning quietly: the
@@ -592,6 +599,66 @@ def _fall_back_to_baseline(state: dict, reason: str) -> dict:
                              note="fell back to the deterministic baseline")]}
 
 
+def _apply_field_change(doc: dict, overrides: dict, state: dict) -> list[str]:
+    """Let the critic move the FORCE FIELD, safely. Returns findings to append.
+
+    Until now the adjudicator -- the one component that actually reads force-field
+    literature -- was the one component that could not act on it. Setting
+    overrides.preferred_ff wrote decided_params.preferred_ff while D-01_ff.choice kept the
+    old field, and validate_run_plan.py's `ff_choice_not_applied` then failed the plan as
+    structural. apply_recovery (scientific_control.py) has carried the correct handling for
+    a field move all along; this is that logic on the adjudication path, plus the check
+    recovery does not need.
+
+    Two things happen, in order:
+
+      1. BUILDABILITY IS MEASURED, not assumed. forcefield.select_by_moiety only probes when
+         a moiety rule BLOCKS, so a SMILES that trips no rule reaches adjudication with its
+         admissible set unmeasured -- the critic is reasoning about a field nobody has tried.
+         A real EMC trial build (~5 s, dp=4/nchains=2) decides. Measured 2026-09-08: compass
+         types 2 of this campaign's 7 repeat units, so an unchecked switch would plan a run
+         that dies at the build stage. On failure the FIELD override alone is dropped and the
+         rest of the critique still applies -- a bad field suggestion should not cost the
+         evidence and the uncertainty statement that came with it.
+      2. Everything the field implies moves with it: D-01_ff.choice, charge_method,
+         electrostatics, and the hardware block. Without this the derivation disagrees with
+         the field actually built -- the exact bug apply_recovery's own comment describes.
+    """
+    field = overrides.get("preferred_ff")
+    decided = doc.get("decided_params") or {}
+    if not field or field == decided.get("preferred_ff"):
+        return []
+
+    sys.path.insert(0, str(SCRIPT_DIR))
+    import forcefield  # noqa: PLC0415 -- in-env import, same seam as validate_overrides above
+    from make_deterministic_plan import _derived_from_field  # noqa: PLC0415
+    from rules_common import load_rules  # noqa: PLC0415
+
+    smiles = state.get("smiles") or doc.get("smiles")
+    try:
+        probe = forcefield.check_typing(smiles, field)
+    except Exception as exc:  # noqa: BLE001 -- an unbuildable field is a result, not a crash
+        probe = {"types_smiles": False, "typing_error": f"{type(exc).__name__}: {exc}"}
+    if not probe.get("types_smiles"):
+        overrides.pop("preferred_ff", None)
+        return [f"Critic proposed preferred_ff={field!r}; DECLINED -- a real EMC trial build "
+                f"could not type this repeat unit with it "
+                f"({str(probe.get('typing_error'))[:200]}). The rest of the critique stands."]
+
+    rules = load_rules()
+    derived = _derived_from_field(field, rules)
+    for row in doc.get("decisions") or []:
+        if row.get("id") == "D-01_ff":
+            row["choice"] = field
+    for key in ("charge_method", "electrostatics"):
+        if key not in overrides:
+            overrides[key] = derived[key]
+    doc["hardware"] = {k: derived[k] for k in ("engine", "mpi_ranks", "gpu_per_run", "ff_family")}
+    return [f"Critic moved the force field to {field!r}; a real EMC trial build types this "
+            f"repeat unit with it. D-01_ff.choice, charge_method, electrostatics and the "
+            f"hardware block were re-derived to match."]
+
+
 def apply_adjudication(state: dict, decision: dict) -> dict:
     """Write the adjudicator's decision into run_plan.json — the whole enforcement.
 
@@ -601,6 +668,9 @@ def apply_adjudication(state: dict, decision: dict) -> dict:
       overrides                    replaced (not merged): materialize_plan copies this
                                    wholesale into decided_params, so a merge would silently
                                    keep a superseded key alive.
+      preferred_ff                 if the critic moves the FIELD, the row it critiqued and
+                                   everything the field implies move with it -- see
+                                   _apply_field_change. Gated on a real EMC trial build.
       confidence                   the execution gate.
       dominant_uncertainty         scalar.
       decisions[0].evidence        APPEND ONLY, origin stamped 'critic' here. autofill
@@ -624,6 +694,8 @@ def apply_adjudication(state: dict, decision: dict) -> dict:
     except Exception as exc:  # noqa: BLE001 -- ValueError today, but never worth crashing on
         return _fall_back_to_baseline(state, f"adjudication rejected ({exc})")
 
+    field_findings = _apply_field_change(doc, overrides, state)
+
     confidence = decision.get("confidence")
     if confidence not in VALID_CONFIDENCE:
         confidence = "low"
@@ -645,6 +717,7 @@ def apply_adjudication(state: dict, decision: dict) -> dict:
         row["evidence"] = evidence
         findings = list((row.get("critique") or {}).get("findings") or [])
         findings.extend(decision.get("findings") or [])
+        findings.extend(field_findings)
         row["critique"] = {**(row.get("critique") or {}), "findings": findings}
 
     _write_json(path, doc)
@@ -711,21 +784,33 @@ def execute(state: dict) -> dict:
     WorkflowEngine, which escalates per stage under MAX_AGENT_DECISIONS=2 and records every
     call in workflow_state.agent_escalations. Whatever comes back is terminal; see
     state.EXIT_CODES for why re-entering would only burn GPU time.
+
+    Under --no-llm that command is NOT passed. Until 2026-09-09 it was passed
+    unconditionally, so the "deterministic arm" still consulted a model up to twice on any
+    escalation -- `no_llm` reached critique() and adjudicate() but never workflow_engine,
+    scientific_control or agent_api. That made the arm unusable as a baseline for measuring
+    the LLM's incremental contribution, which is exactly what it exists for. With no command,
+    WorkflowEngine._escalate returns escalation_required (exit 2) instead of calling out, so
+    the arm halts where an LLM would have been consulted and the difference is measurable.
     """
     if state.get("dry_run"):
         return {"workflow_status": "skipped",
                 "events": [event("execute", skipped=True, note="--dry-run")]}
 
     recovery = f"{VENV_PY} {SCRIPT_DIR / 'recovery_agent_cli.py'}"
+    # An empty list, not a None argument: agent_api takes --recovery-agent-command or
+    # nothing, and passing the flag with an empty value would hand WorkflowEngine a command
+    # string that fails at exec time rather than an absent one it routes around.
+    recovery_args = [] if state.get("no_llm") else ["--recovery-agent-command", recovery]
     resuming = (run_dir(state) / "workflow_state.json").is_file()
     if resuming:
         cmd = [VENV_PY, SCRIPT_DIR / "agent_api.py", "resume", state["run_name"],
-               "--recovery-agent-command", recovery]
+               *recovery_args]
     else:
         cmd = [VENV_PY, SCRIPT_DIR / "agent_api.py", "start",
                "--run-name", state["run_name"], "--goal", state["goal"],
                "--smiles", state["smiles"], "--properties", ",".join(state["properties"]),
-               "--plan", state["plan_path"], "--recovery-agent-command", recovery]
+               "--plan", state["plan_path"], *recovery_args]
 
     r = _run(cmd, repo_root=state["repo_root"], timeout=state.get("execute_timeout_s", 604800))
     # Take the LAST JSON value off stdout rather than requiring the whole stream to be JSON,

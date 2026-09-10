@@ -1,0 +1,311 @@
+{
+  "summary": {
+    "agent_decision_actions": {
+      "stop": 3,
+      "revise_plan": 1
+    },
+    "agent_decisions_with_a_plan_change": 1,
+    "runs_with_state": 5,
+    "campaign_runs": 4,
+    "remedy_events_total": 11,
+    "scored": 3,
+    "pending_excluded": 8,
+    "recovered": 3,
+    "completion_rate": 1.0,
+    "by_remedy": {
+      "continue_npt": {
+        "pending": 2,
+        "recovered": 1
+      },
+      "transient_retry": {
+        "pending": 6,
+        "recovered": 2
+      }
+    },
+    "by_code": {
+      "PROCESS_FAILED": 8,
+      "EXTEND": 3
+    },
+    "escalations_total": 4,
+    "escalations_retired_by_operator": 4,
+    "operator_interventions": 4
+  },
+  "runs": [
+    {
+      "agent_decisions": [],
+      "run": "PEG1_gate_validation",
+      "campaign": false,
+      "status": "accepted",
+      "events": [
+        {
+          "run": "PEG1_gate_validation",
+          "at": "2026-08-30T09:14:39.161666+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "generate_equilibration_workflow failed: {'status': 'error', 'error': \"max_temp=580.0 does not meet temp=580.0 plus the required anneal_margin_K=100.0 \u2014 the bloc"
+        },
+        {
+          "run": "PEG1_gate_validation",
+          "at": "2026-08-30T11:23:42.573550+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 2,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "Equilibration chain 1 did not complete: {'run_id': '2e75f9e7', 'status': 'failed', 'stage': 'anneal_hold'}"
+        }
+      ],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "equilibration": "accepted",
+        "summary": "accepted"
+      }
+    },
+    {
+      "agent_decisions": [
+        {
+          "run": "PLLA_1",
+          "at": "2026-09-08T23:39:58.070568+00:00",
+          "retired": true,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Host-level, not plan-level. PLLA_1's equilibration chain was killed mid-npt_densify_hold at step 419000 with healthy physics (T~300K, rho~1.23 g/cm3, no LAMMPS error, empty chain_80f3d1ef.log, no sentinel). Three sibling runs on the same host -- aPS_1, sPVC_1, iPMMA_1 -- all recorded PROCESS_FAILED within the same 19:34-19:36 window"
+        },
+        {
+          "run": "PLLA_1",
+          "at": "2026-09-09T12:24:14.592206+00:00",
+          "retired": true,
+          "action": "revise_plan",
+          "modifications": {
+            "nvt_melt_min_steps": 15000000
+          },
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause: the melt is not chain-relaxed. C(t) on the 5 ns nvt_melt_hold trajectory decayed 11.5% (decay_fraction_at_end=0.115, trajectory_ps=4951) against PEST's curated ct_min_decay_melt=0.15; tau_relax=872660 ps from a KWW fit with beta=0.446. `ct` is the ONLY failing binding gate -- rg, p2, torsion, msid_gaussian, both drifts, "
+        }
+      ],
+      "run": "PLLA_1",
+      "campaign": true,
+      "status": "failed",
+      "events": [
+        {
+          "run": "PLLA_1",
+          "at": "2026-09-09T17:58:03.060970+00:00",
+          "stage": "cooling",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "pending",
+          "detail": "cool-check comprehensive analysis failed: {'run_id': '16cafd04', 'run_type': 'check_equilibration_comprehensive', 'status': 'failed', 'result': None, 'error': \""
+        }
+      ],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 2,
+      "escalations_total": 2,
+      "operator_interventions": 1,
+      "stages": {
+        "build": "accepted",
+        "cooling": "running",
+        "equilibration": "accepted",
+        "mechanical": "pending",
+        "summary": "pending",
+        "thermal": "pending"
+      }
+    },
+    {
+      "agent_decisions": [
+        {
+          "run": "aPS_1",
+          "at": "2026-09-08T23:39:05.015700+00:00",
+          "retired": true,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause is environmental, not a plan defect, and the fix is outside the recovery contract. (1) Not a physics/parameter failure: at death the aPS_1 chain c67eb6a6 was healthy \u2014 step 319000 of npt_densify_hold, T~300 K, rho~0.99, no ERROR in npt_densify_hold_run.log \u2014 yet chain_c67eb6a6_progress.jsonl shows only {\"stage\":\"npt_densi"
+        },
+        {
+          "run": "aPS_1",
+          "at": "2026-09-09T14:21:56.555219+00:00",
+          "retired": true,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause is a code defect in the EXTEND continuation path, not a plan defect, and no key in the override contract reaches it. Evidence: the `continue_npt` remedy (remedy_history application 1, EXTEND with extension_ns=2.0) makes the engine call generate_equilibration_workflow with extend_only=True; `server.py:1524` `_continue_stag"
+        }
+      ],
+      "run": "aPS_1",
+      "campaign": true,
+      "status": "failed",
+      "events": [
+        {
+          "run": "aPS_1",
+          "at": "2026-09-09T14:11:23.459229+00:00",
+          "stage": "equilibration",
+          "code": "EXTEND",
+          "remedy_id": "continue_npt",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "pending",
+          "detail": ""
+        },
+        {
+          "run": "aPS_1",
+          "at": "2026-09-09T14:11:23.931189+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "pending",
+          "detail": "generate_equilibration_workflow failed: {'status': 'error', 'error': 'Pre-flight validation failed \u2014 workflow not generated', 'validation_errors': [\"'Pair Coeff"
+        },
+        {
+          "run": "aPS_1",
+          "at": "2026-09-09T14:11:24.411781+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 2,
+          "severity": "blocking",
+          "outcome": "pending",
+          "detail": "generate_equilibration_workflow failed: {'status': 'error', 'error': 'Pre-flight validation failed \u2014 workflow not generated', 'validation_errors': [\"'Pair Coeff"
+        }
+      ],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 2,
+      "escalations_total": 2,
+      "operator_interventions": 3,
+      "stages": {
+        "build": "accepted",
+        "cooling": "pending",
+        "equilibration": "running",
+        "mechanical": "pending",
+        "summary": "pending",
+        "thermal": "pending"
+      }
+    },
+    {
+      "agent_decisions": [],
+      "run": "iPMMA_1",
+      "campaign": true,
+      "status": null,
+      "events": [
+        {
+          "run": "iPMMA_1",
+          "at": "2026-09-09T00:12:10.838884+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "pending",
+          "detail": "Equilibration chain did not complete: {'status': 'failed', 'reason': 'PROCESS_DEAD_NO_SENTINEL', 'run_id': 'b1d286a6'}"
+        },
+        {
+          "run": "iPMMA_1",
+          "at": "2026-09-09T14:43:05.372113+00:00",
+          "stage": "equilibration",
+          "code": "EXTEND",
+          "remedy_id": "continue_npt",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "pending",
+          "detail": ""
+        }
+      ],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "cooling": "pending",
+        "equilibration": "running",
+        "mechanical": "pending",
+        "summary": "pending",
+        "thermal": "pending"
+      }
+    },
+    {
+      "agent_decisions": [],
+      "run": "sPVC_1",
+      "campaign": true,
+      "status": "running",
+      "events": [
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-09T06:58:49.856880+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "melt gate density analysis failed: {'run_id': '3025c029', 'run_type': 'extract_equilibrated_density', 'status': 'failed', 'result': None, 'error': \"_run_extract"
+        },
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-09T14:10:34.918051+00:00",
+          "stage": "equilibration",
+          "code": "EXTEND",
+          "remedy_id": "continue_npt",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": ""
+        },
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-09T14:10:35.244025+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 2,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "generate_equilibration_workflow failed: {'status': 'error', 'error': 'Pre-flight validation failed \u2014 workflow not generated', 'validation_errors': [\"'Pair Coeff"
+        },
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-09T17:12:20.983271+00:00",
+          "stage": "cooling",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "pending",
+          "detail": "cool-check comprehensive analysis failed: {'run_id': '9455ed71', 'run_type': 'check_equilibration_comprehensive', 'status': 'failed', 'result': None, 'error': \""
+        },
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-09T18:22:27.941228+00:00",
+          "stage": "cooling",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 2,
+          "severity": "blocking",
+          "outcome": "pending",
+          "detail": "cool-check comprehensive analysis failed: {'run_id': '00505588', 'run_type': 'check_equilibration_comprehensive', 'status': 'failed', 'result': None, 'error': \""
+        }
+      ],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "cooling": "pending",
+        "equilibration": "accepted",
+        "mechanical": "pending",
+        "summary": "pending",
+        "thermal": "pending"
+      }
+    }
+  ]
+}

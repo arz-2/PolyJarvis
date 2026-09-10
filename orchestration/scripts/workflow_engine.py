@@ -34,12 +34,24 @@ Bumped deliberately -- implementation_version is inside every stage's _input_has
 this is what makes the invalidation of every resumable run on disk explicit rather than
 an accident of the decision_policy.json hash changing underneath them."""
 MAX_AUTOMATIC_REMEDIES = 12
-MIN_FREE_DISK_GB = 60.0
+MIN_FREE_DISK_GB = 15.0
 """Free disk below which transient_retry refuses to resubmit rather than repeat a crash.
 
-Sized from the largest routine consumer: a Murnaghan bulk-modulus series writes ~790 MB of
-dumps per series, and a full ENOSPC does not merely fail the stage -- it kills the chain and
-truncates the orchestrator's own captured stdout, which is how the failure presents.
+The failure this guards is real and worth restating: a full ENOSPC does not merely fail the
+stage -- it kills the chain and truncates the orchestrator's own captured stdout, which is how
+the failure presents.
+
+Was 60.0, sized from "the largest routine consumer: a Murnaghan bulk-modulus series writes
+~790 MB of dumps per series". That reasoning is sound but the number does not follow from it --
+790 MB is ~1% of 60 GB -- and the gap cost real work on 2026-09-08: three concurrent campaigns
+(aPS_1, sPVC_1, PLLA_1) had a healthy transient_retry declined at 40.8 GB free and each spent
+one of its two agent escalations on a retry that would have succeeded.
+
+Re-derived from measurement the same day. A COMPLETE equilibration attempt with dumps is 3.3 GB
+(data/PEG1_gate_validation/attempts/equilibration/attempt-0003); partial attempts 450-626 MB;
+largest single file 131 MB (npt_densify.dump); a Murnaghan series ~790 MB per the original note.
+Four concurrent runs all resubmitting the largest stage is ~13 GB. 15.0 is that worst case plus
+margin -- ~4.5x a single measured attempt -- so it still catches a genuinely full filesystem.
 """
 MAX_AGENT_DECISIONS = 2
 TRANSIENT_RETRIES = 2
@@ -342,17 +354,87 @@ def _continue_npt(params: dict[str, Any], finding: Finding, attempt: int) -> dic
       cooling       -> extends npt_final, the gated assessment cell
     """
     details = finding.details
+    failing = set(details.get("failing_binding_gates") or ())
     ns = details.get("extension_ns") or details.get("required_extension_ns")
     if ns is None:
-        tau = float(details.get("relaxation_time_ns") or details.get("tau_ns") or 0.5)
-        n_eff = max(float(details.get("n_eff") or 0), 1.0)
-        target = max(float(details.get("target_n_eff") or 20), n_eff)
-        ns = tau * target
+        # The `tau * target_n_eff` fallback that used to live here is gone for melt relaxation.
+        # It sizes for STATISTICAL SAMPLING -- 20 relaxation times, ~20 independent samples --
+        # which is the right rule for a converged n_eff and the wrong one for a convergence
+        # gate. On 2026-09-09 it turned relaxation_time_ns=872.66 (a KWW tau fitted to an
+        # 11.5%-decayed C(t), 176x beyond its own trajectory) into 17,453.2 ns. Nothing caught
+        # it but validate_overrides' range check, and the escalation that followed cost a full
+        # 10-stage replay. A remedy that cannot size itself from a measured quantity must
+        # decline and say so, not guess: returning None here routes the finding to the recovery
+        # agent WITH a named cause, which is what the second rung is for.
+        #
+        # do_equil_and_check supplies `extension_ns` from the g3(t) power law whenever the
+        # displacement gate is what failed; see _displacement_extension_ns.
+        # Only a CHAIN-RELAXATION failure has no fallback. Scoping this to the whole EXTEND
+        # code was wrong and cost aPS_1 a near-miss escalation on 2026-09-09: its melt failed
+        # density_drift + msid_gaussian with chain_displacement PASSING at 2.793x, which is a
+        # sampling-convergence problem with a perfectly good default, not a relaxation one.
+        if "chain_displacement" in failing:
+            raise ValueError(
+                "cannot size a melt extension: chain_displacement failed but the finding "
+                "carries no extension_ns (the g3(t) power law did not fit, or the failure was "
+                "the kinetic-trap flag rather than displacement) -- refusing to size from the "
+                "advisory C(t) tau")
+        # `relaxation_time_ns` is deliberately NOT consulted here. It is the chain end-to-end
+        # C(t) integral -- a CHAIN quantity -- and using it to size a THERMO extension is the
+        # category error that produced the 17,453 ns request.
+        #
+        # There is no numeric fallback left. What stood here was
+        #
+        #     tau    = float(details.get("tau_ns")       or 0.5)
+        #     n_eff  = max(float(details.get("n_eff")    or 0), 1.0)
+        #     target = max(float(details.get("target_n_eff") or 20), n_eff)
+        #     ns     = tau * target
+        #
+        # which reads as a formula but was a constant: nothing in this repo has ever written
+        # tau_ns, n_eff or target_n_eff into a finding's details, so every path through it
+        # returned exactly 0.5 * 20 = 10.0 ns regardless of the run, the stage or the gate. On
+        # 2026-09-09 that handed aPS_1 a 10 ns extension against a 2 ns melt hold (5x) and would
+        # have handed any cooling EXTEND 10 ns against a 0.5 ns npt_final (20x) -- the very
+        # "0.5 ns * 20 from a constant that had never seen the run" that _thermo_extension_ns
+        # was written to remove, still live as the default for anything it did not cover.
+        #
+        # Both callers now size their own extension from measurement (_displacement_extension_ns
+        # and _thermo_extension_ns, for the melt and the assessment cell alike), and
+        # tests/test_run_campaign.py::test_every_extendable_gate_has_a_sizing_rule fails if a
+        # gate is added to EXTENDABLE_GATES without one. So an unsized finding here is a genuine
+        # gap, and the honest response is the one the block above already gives for
+        # chain_displacement: decline with a named cause and let the recovery agent look, rather
+        # than silently buy a number nobody chose.
+        raise ValueError(
+            "cannot size a continuation: the finding carries no extension_ns and there is no "
+            f"default (failing gates: {sorted(failing) or 'none reported'}). A gate that can "
+            "reach continue_npt must be sized by _displacement_extension_ns or "
+            "_thermo_extension_ns -- see test_every_extendable_gate_has_a_sizing_rule.")
     if finding.stage == "cooling":
         return _merge(params, cooling_continuation_ns=float(ns),
                       cooling_continuation_attempt=attempt,
                       cooling_extend_base_stage="npt_final",
                       cooling_extend_ensemble="npt")
+    # WHICH melt stage to extend is decided by WHICH trajectory the failing gate measured.
+    # check_equilibration_comprehensive reads two:
+    #   nvt_melt_hold.dump  -- the fixed-volume window: MSD/kinetic-trap and C(t). A barostatted
+    #                          trajectory affine-scales coordinates every step, which would
+    #                          contaminate cumulative CoM displacement, so this MUST be the NVT one.
+    #   npt_melt_hold.log/.dump -- density/energy drift and SEM, and the ensemble-insensitive
+    #                          geometry (Rg/MSID/R_ee/torsion/P2/homogeneity/finite_size).
+    #
+    # Until 2026-09-09 every equilibration EXTEND extended npt_melt_hold, including a
+    # chain-displacement failure -- which lengthens a trajectory the displacement gate does not
+    # read, leaving MSD/Rg^2 exactly where it was and re-failing the gate identically. The
+    # continuation appends to the same DUMP_FILE/LOG_FILE (dump_append/LOG_APPEND, guarded by
+    # test_continuation_and_fresh_start_use_the_same_dump_and_log_filenames), so extending the
+    # right stage grows the very window the gate re-measures -- and costs one stage instead of
+    # a ten-stage replay from minimize.
+    failing = set(finding.details.get("failing_binding_gates") or ())
+    if "chain_displacement" in failing:
+        return _merge(params, npt_continuation_ns=float(ns), npt_continuation_attempt=attempt,
+                      equilibration_extend_base_stage="nvt_melt_hold",
+                      equilibration_extend_ensemble="nvt")
     return _merge(params, npt_continuation_ns=float(ns), npt_continuation_attempt=attempt,
                   equilibration_extend_base_stage="npt_melt_hold",
                   equilibration_extend_ensemble="npt")
@@ -805,9 +887,40 @@ class WorkflowEngine:
             return
         old = dict(self.state.get("effective_parameters") or {})
         new = dict(self.plan.get("decided_params") or {})
-        changed = {key for key in set(old) | set(new) if old.get(key) != new.get(key)}
+        # Diff the PLAN against the plan, not against effective_parameters. A remedy key lives
+        # only in effective_parameters (see the note below), so against `old` it reads as
+        # different from `new` forever -- and since the comparison runs on every plan-hash change,
+        # any such key permanently re-invalidates its own stage. The trap is silent until some
+        # process constructs a fresh engine: the melt gate's derived_inputs write-back moves the
+        # plan hash at 11:59, the running engine never re-reconciles, and the next resume -- hours
+        # later, for unrelated reasons -- invalidates an ACCEPTED equilibration and starts
+        # re-running it. That is what a resume of sPVC_1 did on 2026-09-09, and aPS_1 carries the
+        # same npt_continuation_ns and was one resume away from the same thing.
+        #
+        # `plan_decided_params` is the snapshot this diff is actually about. The fallback for a
+        # state written before this field existed is `old`, restricted to keys the plan declares
+        # -- which is exactly the set the buggy comparison got right.
+        baseline = self.state.get("plan_decided_params")
+        if baseline is None:
+            baseline = {key: value for key, value in old.items() if key in new}
+        changed = {key for key in set(baseline) | set(new)
+                   if baseline.get(key) != new.get(key)}
         self.state["plan_hash"] = new_hash
-        self.state["effective_parameters"] = new
+        self.state["plan_decided_params"] = json.loads(json.dumps(new, default=str))
+        # Keys a REMEDY introduced live only here -- _auto_remedy writes effective_parameters and
+        # never touches run_plan.json -- so they are exactly the keys absent from decided_params.
+        # Replacing this dict wholesale discarded every one of them on any plan change, and the
+        # plan changes for reasons that have nothing to do with the remedy: the melt gate's own
+        # backbone_types write-back was enough. On 2026-09-09 that silently dropped
+        # npt_continuation_ns from aPS_1 and sPVC_1 between the remedy being applied and the
+        # attempt running, turning a 2 ns restart-continuation into a fresh ten-stage chain --
+        # the remedy was recorded as applied in recovery_log.jsonl while its parameter no longer
+        # existed. A remedy that cannot survive a reconcile is not a remedy.
+        #
+        # `changed` is still computed against the plan alone, so this cannot mask a real
+        # parameter change or suppress an invalidation.
+        preserved = {key: value for key, value in old.items() if key not in new}
+        self.state["effective_parameters"] = {**preserved, **new}
         affected = {stage for key in changed for stage in stages_for(key)}
         if affected:
             enabled = self.enabled_stages()
@@ -992,8 +1105,62 @@ class WorkflowEngine:
         self._save()
         return manifest
 
+    def _resume_pending_verdict(self, stage: str, input_hash: str):
+        """Replay a verdict the executor already returned, instead of re-running the stage.
+
+        run()'s loop executes any stage that is not `accepted`. Nothing consulted the verdict a
+        prior attempt had ALREADY produced -- so if the orchestrator died between the executor
+        returning `remedy_required` and the remedy being applied, the resumed run silently
+        re-executed the stage from scratch. On 2026-09-09 that made aPS_1 replay all ten
+        equilibration stages against a melt whose gate had already spoken, and the replay was
+        futile as well as expensive: the protocol was unchanged, so it would have reached the
+        same 1.14% density drift and raised the same finding.
+
+        Everything needed is already on disk -- _finish_attempt persists status, input_hash and
+        the full findings into executor_state.json -- it was simply never read back.
+
+        Deliberately narrow. It fires only when the LAST attempt of this stage ended in
+        `remedy_required` (a real executor verdict, not a process death, which routes through
+        transient_retry instead), under an input_hash identical to the one now in force (a
+        changed parameter means the verdict was about a different protocol), with at least one
+        blocking finding, and only once per attempt -- `verdict_resumed` guards against a remedy
+        that revises nothing leaving the hash unchanged and re-serving the same verdict forever.
+        """
+        record = self.state["stages"][stage]
+        last = (record.get("attempts") or [None])[-1]
+        if not last or last.get("status") != "remedy_required":
+            return None
+        if last.get("input_hash") != input_hash or last.get("verdict_resumed"):
+            return None
+        manifest_path = last.get("manifest")
+        if not manifest_path or not Path(manifest_path).is_file():
+            return None
+        try:
+            manifest = json.loads(Path(manifest_path).read_text())
+        except (OSError, ValueError):
+            return None
+        findings = tuple(Finding.from_value(item, stage)
+                         for item in (manifest.get("findings") or ()))
+        if not any(item.severity in BLOCKING_SEVERITIES for item in findings):
+            return None
+        last["verdict_resumed"] = True
+        record["status"] = "running"
+        self._save()
+        self._log_recovery_event({
+            "event": "verdict_resumed", "code": findings[0].code, "stage": stage,
+            "attempt_id": last["attempt_id"],
+            "reason": "executor verdict already on disk -- applying its remedy instead of "
+                      "re-running the stage",
+        })
+        return StageResult("remedy_required", findings,
+                           tuple(a["path"] for a in (manifest.get("artifacts") or ())),
+                           manifest.get("outputs") or {}), manifest
+
     def _execute_stage(self, stage: str) -> tuple[StageResult, dict[str, Any]]:
         input_hash = self._input_hash(stage)
+        resumed = self._resume_pending_verdict(stage, input_hash)
+        if resumed is not None:
+            return resumed
         attempt_id, attempt_dir = self._new_attempt(stage, input_hash)
         dependencies = {name: self._accepted_manifest(name) for name in self._dependencies(stage)}
         context = {
@@ -1057,7 +1224,16 @@ class WorkflowEngine:
         params = dict(self.state["effective_parameters"])
         try:
             revised = remedy.action(params, finding, used + 1)
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError) as exc:
+            # A remedy that cannot construct a defensible revision declines HERE, and the
+            # reason has to survive: this is the difference between "the second rung was spent
+            # on a mystery" and "the agent was handed a named cause". Previously every
+            # exception returned False silently, so recovery_log.jsonl recorded the escalation
+            # with no trace of why the deterministic remedy stood down.
+            self._log_recovery_event({
+                "event": "auto_remedy_rejected", "code": finding.code, "stage": finding.stage,
+                "remedy_id": remedy.remedy_id, "reason": f"{type(exc).__name__}: {exc}",
+            })
             return False
         rejection = _validate_revised_parameters(params, revised)
         if rejection is not None:
@@ -1201,6 +1377,11 @@ class WorkflowEngine:
                                    findings=validation_findings)
             self.plan = candidate
             self.state["plan_hash"] = _canonical_hash(candidate)
+            # The reconcile baseline moves with the plan. Without this the next hash change --
+            # any derived_inputs write is enough -- would diff the revised plan against the
+            # PRE-revision snapshot and re-invalidate everything revise_plan just settled.
+            self.state["plan_decided_params"] = json.loads(
+                json.dumps(candidate.get("decided_params") or {}, default=str))
             self.state["effective_parameters"].update(modifications)
             if self.plan_path is not None:
                 atomic_write_json(self.plan_path, candidate)

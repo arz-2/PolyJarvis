@@ -25,16 +25,22 @@ import enforce_gate  # noqa: E402
 
 def test_msd_msid_gates_polarity_trapped():
     chain = {"msd": {"kinetic_trap_flag": True}, "msid": {"available": True, "gaussian_pass": True}}
-    assert enforce_gate.msd_msid_gates(chain) == {"msd_not_trapped": False, "msid_gaussian": True}
+    assert enforce_gate.msd_msid_gates(chain) == {
+        "msd_not_trapped": False, "msid_gaussian": True,
+        # no msd_over_rg2 in this chain block -> unmeasured, and an unmeasured gate is None,
+        # never False. Only a measured ratio can fail a run.
+        "chain_displacement": None}
 
 
 def test_msd_msid_gates_polarity_not_trapped():
     chain = {"msd": {"kinetic_trap_flag": False}, "msid": {"available": False}}
-    assert enforce_gate.msd_msid_gates(chain) == {"msd_not_trapped": True, "msid_gaussian": None}
+    assert enforce_gate.msd_msid_gates(chain) == {
+        "msd_not_trapped": True, "msid_gaussian": None, "chain_displacement": None}
 
 
 def test_msd_msid_gates_missing_data():
-    assert enforce_gate.msd_msid_gates({}) == {"msd_not_trapped": None, "msid_gaussian": None}
+    assert enforce_gate.msd_msid_gates({}) == {
+        "msd_not_trapped": None, "msid_gaussian": None, "chain_displacement": None}
 
 
 # ─── classify(): always advisory, in every clause ──────────────────────────────
@@ -54,7 +60,7 @@ BASE_GATES = {
 def test_classify_msd_msid_always_advisory(regime, dp_typical, ct_gate_reliable, expected_clause):
     for trap_pass in (True, False, None):
         gates = dict(BASE_GATES, msd_not_trapped=trap_pass, msid_gaussian=False)
-        clause, binding_results, advisory_results = enforce_gate.classify(
+        clause, binding_results, advisory_results, _unmeasured = enforce_gate.classify(
             gates, regime, dp_typical, ct_gate_reliable)
         assert clause == expected_clause
         assert "msd_not_trapped" not in binding_results
@@ -473,30 +479,70 @@ def test_live_and_retrospective_regimes_agree():
 
 _ALL_GATES = ["density_drift", "density_sem", "energy_drift", "energy_sem", "n_eff_density",
               "density_homogeneity", "p2", "finite_size", "rg", "ct", "torsion",
-              "msid_gaussian", "msd_not_trapped", "residual_stress"]
+              "msid_gaussian", "msd_not_trapped", "residual_stress", "chain_displacement",
+              "energy_component_drift"]
 
 
 def _binding(regime, ct_reliable=True, dp=50):
-    _, binding, _ = enforce_gate.classify({k: True for k in _ALL_GATES}, regime, dp, ct_reliable)
+    _, binding, _, _ = enforce_gate.classify({k: True for k in _ALL_GATES}, regime, dp, ct_reliable)
     return set(binding)
 
 
 def test_the_melt_clause_binds_every_chain_structure_check():
-    """The point of gating a melt rather than a glass. MSID (ideal-chain statistics) and torsion
-    (Jensen-Shannon convergence of the backbone-dihedral distribution) are the melt-equilibration
-    criteria; rg and ct are the relaxation ones. All four bind here and nowhere else."""
+    """The point of gating a melt rather than a glass. torsion (Jensen-Shannon convergence of
+    the backbone-dihedral distribution) is the melt-equilibration criterion; rg and
+    chain_displacement are the relaxation ones. All three bind here and nowhere else.
+
+    Both of the gates this clause has shed were retired on measurement, not on convenience:
+    `ct` (a per-class decay threshold that failed 35 of 36 round-1 campaigns) and
+    `msid_gaussian` (a whole-range power-law fit that tracks chain stiffness rather than
+    equilibration) -- see chain_displacement_gate and the BINDING_MELT note respectively.
+    """
     melt = _binding("melt")
-    assert {"rg", "ct", "msid_gaussian", "torsion"} <= melt
+    assert {"rg", "chain_displacement", "torsion"} <= melt
+    assert "ct" not in melt
     for regime in ("glassy", "rubbery"):
-        assert not ({"rg", "ct", "msid_gaussian", "torsion"} & _binding(regime)), regime
+        assert not ({"rg", "chain_displacement", "torsion"} & _binding(regime)), regime
 
 
-def test_always_advisory_does_not_silently_unbind_the_melt_clause():
-    """ALWAYS_ADVISORY is subtracted from the assessment clauses only. It contains
-    msid_gaussian, so subtracting it unconditionally would un-bind MSID at the melt the moment
-    it was added -- silently, since classify() would just drop it from both dicts."""
+def test_the_retired_ct_gate_can_never_block_a_run_again():
+    """`ct` stays COLLECTED -- tau/beta/decay_fraction are reported and the manuscript uses
+    them -- but it must not bind in any clause. A per-backbone-class decay threshold failed 35
+    of 36 round-1 campaigns, including every one whose density graded PASS at 0.0% error."""
+    assert "ct" in enforce_gate.ALWAYS_ADVISORY
+    for regime in ("melt", "glassy", "rubbery"):
+        assert "ct" not in _binding(regime), regime
+    assert "ct" in enforce_gate.collect_gates(
+        {"chain": {"ct": {"pass": False}}}), "ct must still be reported"
+
+
+def test_the_retired_msid_gate_can_never_block_a_run_again():
+    """`msid_gaussian` stays COLLECTED -- the slope, r2 and both regime fits are reported, and
+    a non-Gaussian slope is a real finding about the chemistry -- but it must not bind anywhere.
+
+    It bound on a single power-law fit across the whole separation range, which spans the
+    rod-like small-n regime and the Gaussian large-n one. Over the 36 round-1 campaigns all 9
+    failures were HIGH (0.901-1.476, none below 0.80), slope ran r = -0.66 against chain length
+    (shorter chains scored worse) and r = +0.46 against displacement MSD/Rg^2 -- the wrong sign
+    for a convergence gate. It measures stiffness, not equilibration."""
     assert "msid_gaussian" in enforce_gate.ALWAYS_ADVISORY
-    assert "msid_gaussian" in _binding("melt")
+    for regime in ("melt", "glassy", "rubbery"):
+        assert "msid_gaussian" not in _binding(regime), regime
+    assert enforce_gate.collect_gates(
+        {"chain": {"msid": {"available": True, "gaussian_pass": False}}}
+    )["msid_gaussian"] is False, "msid must still be reported"
+
+
+def test_always_advisory_is_not_subtracted_from_the_melt_clause():
+    """ALWAYS_ADVISORY is subtracted from the assessment clauses only, and that asymmetry must
+    survive msid_gaussian's demotion. The melt clause states its own split explicitly, so a gate
+    added to BINDING_MELT that also sits in ALWAYS_ADVISORY must still bind at the melt --
+    otherwise it would be un-bound silently, since classify() drops it from both dicts."""
+    binding, advisory = enforce_gate.BINDING_MELT, enforce_gate.ADVISORY_MELT
+    assert not (binding & enforce_gate.ALWAYS_ADVISORY), (
+        "nothing in BINDING_MELT is currently ALWAYS_ADVISORY; if that changes, this test is "
+        "the guard that it was a deliberate choice")
+    assert enforce_gate.ALWAYS_ADVISORY <= (advisory | {"ct"})
 
 
 def test_msd_and_residual_stress_stay_advisory_even_at_the_melt():
@@ -508,6 +554,7 @@ def test_msd_and_residual_stress_stay_advisory_even_at_the_melt():
     melt = _binding("melt")
     assert "msd_not_trapped" not in melt
     assert "residual_stress" not in melt
+    assert {"msd_not_trapped", "residual_stress"} <= enforce_gate.ADVISORY_MELT
 
 
 def test_torsion_gate_reads_the_stable_verdict_and_is_none_when_unavailable():
@@ -523,3 +570,119 @@ def test_torsion_gate_reads_the_stable_verdict_and_is_none_when_unavailable():
 def test_collect_gates_surfaces_torsion():
     gates = enforce_gate.collect_gates({"chain": {"torsion": {"available": True, "stable": False}}})
     assert gates["torsion"] is False
+
+
+# ─── chain_displacement: the per-system melt-relaxation criterion ──────────────
+
+@pytest.mark.parametrize("ratio,trapped,expected", [
+    (3.088, False, True),    # PLLA_1 attempt-0002, measured 2026-09-09
+    (1.0,   False, True),    # exactly at the bar -- g3 == Rg^2 is the criterion, so it passes
+    (0.999, False, False),
+    (0.12,  True,  False),   # PEG1, the genuinely stuck melt this gate exists to catch
+    (5.0,   True,  False),   # trap flag overrides a healthy-looking ratio: fail closed
+])
+def test_chain_displacement_binds_on_the_systems_own_Rg(ratio, trapped, expected):
+    chain = {"msd": {"msd_over_rg2": ratio, "kinetic_trap_flag": trapped}}
+    assert enforce_gate.chain_displacement_gate(chain) is expected
+
+
+def test_chain_displacement_is_none_when_unmeasured():
+    """An unmeasured gate is dropped, never failed -- classify() must not halt a run because
+    the trajectory carried too few chains to compute Rg."""
+    assert enforce_gate.chain_displacement_gate({}) is None
+    assert enforce_gate.chain_displacement_gate({"msd": {}}) is None
+    assert enforce_gate.chain_displacement_gate(
+        {"msd": {"msd_over_rg2": None, "kinetic_trap_flag": False}}) is None
+
+
+def test_the_pass_bar_is_the_textbook_criterion_not_a_tuned_constant():
+    """1.0 x Rg^2 is Auhl et al.'s statement that chains have displaced their own size. If this
+    ever needs raising, the margin belongs in the EXTENSION sizing (see
+    run_campaign._displacement_extension_ns's sizing_target), not in the pass bar -- raising the
+    bar to make a particular run look better is the failure mode this test exists to flag."""
+    assert enforce_gate.MSD_OVER_RG2 == 1.0
+
+
+# ─── The gate must fail CLOSED when it measured nothing ────────────────────────
+
+def test_a_clause_that_evaluated_no_binding_gate_never_passes(tmp_path):
+    """sPVC_1, 2026-09-09: the comprehensive check crashed on a nonexistent dump path, the
+    caller read the failure dict as data, every gate came back None, classify() dropped them
+    all, and `not failing_binding` adjudicated the empty set to PASS. An unverified melt was
+    accepted and sent to cooling. No evidence is not the same as good evidence."""
+    path = tmp_path / "equilibration.json"
+    path.write_text(json.dumps({"thermo": {}, "chain": {}, "spatial": {}}))
+    result = enforce_gate.enforce_live(
+        _live_args(path, regime="melt", dp=50, ct_gate_reliable=True))
+    assert result["verdict"] == "FAIL"
+    assert result["binding_gates"] == {}
+    assert "chain_displacement" in result["unmeasured_binding_gates"]
+
+
+def test_classify_names_the_binding_gates_it_could_not_evaluate():
+    """Reported, not verdicted on: a single None stays a calibrated drop (see
+    test_finite_size_unavailable_is_dropped_not_failed). The report exists so a human and the
+    recovery agent can see WHICH evidence is missing rather than inferring it from a bare FAIL."""
+    gates = {k: True for k in _ALL_GATES}
+    gates["rg"] = None
+    _clause, binding, _adv, unmeasured = enforce_gate.classify(gates, "melt", 50, True)
+    assert "rg" not in binding
+    assert unmeasured == ["rg"]
+
+
+def test_the_plain_require_clause_declares_no_gate_missing():
+    """Its binding set is whatever the run produced, so it states no requirement that any
+    particular gate be measured -- reporting every None there would be meaningless."""
+    _clause, _binding, _adv, unmeasured = enforce_gate.classify(
+        {"density_drift": True, "rg": None}, "glassy", 10, True)
+    assert unmeasured == []
+
+
+# ─── Per-term energy drift ─────────────────────────────────────────────────────
+
+def test_energy_component_drift_binds_at_the_melt_only():
+    """A canceling drift nets a flat TotEng while neither term has equilibrated, which is why
+    _analyse_energy_components tests each term independently. Binding at the melt and advisory
+    elsewhere follows rg/chain_displacement: below Tg a glass ages indefinitely and its terms
+    drift by construction, so binding it at the assessment temperature would make the clause
+    unsatisfiable."""
+    assert "energy_component_drift" in _binding("melt")
+    for regime in ("glassy", "rubbery"):
+        assert "energy_component_drift" not in _binding(regime), regime
+
+
+def test_energy_component_drift_is_extendable_not_a_hard_fail():
+    """A term still relaxing is the textbook case for buying more trajectory. Without this it
+    would be a binding gate in neither EXTENDABLE_GATES nor STRUCTURAL_GATES, which falls
+    through to a hard FAIL."""
+    assert "energy_component_drift" in enforce_gate.EXTENDABLE_GATES
+
+
+def test_the_aggregate_energy_drift_does_not_stand_in_for_the_per_term_one():
+    """aPS_1, 2026-09-09: aggregate TotEng drift 0.023% (pass) alongside a 1.691% vdW drift.
+    Reading only `energy_drift` made the one case the component check exists to catch invisible
+    to the gate."""
+    gates = enforce_gate.collect_gates({"thermo": {
+        "energy_drift": {"pass": True},
+        "energy_component_drift": {"pass": False,
+                                   "components": {"vdw": {"pass": False, "drift_pct": 1.691}}},
+    }})
+    assert gates["energy_drift"] is True
+    assert gates["energy_component_drift"] is False
+
+
+def test_energy_component_drift_absent_is_dropped_not_failed():
+    """Every comprehensive result written before the field was flattened lacks it; those are
+    unmeasured, not failing."""
+    assert enforce_gate.energy_component_drift_gate({}) is None
+    assert enforce_gate.energy_component_drift_gate({"energy_component_drift": None}) is None
+    assert enforce_gate.energy_component_drift_gate(
+        {"energy_component_drift": {"pass": True}}) is True
+
+
+def test_all_gates_covers_every_key_collect_gates_emits():
+    """_ALL_GATES drives _binding(), so a gate added to collect_gates but not here would be
+    silently absent from every clause-membership assertion in this file -- the exact blind spot
+    that let energy_component_drift look bound when it was not."""
+    emitted = set(enforce_gate.collect_gates({"thermo": {}, "chain": {}, "spatial": {}}))
+    assert emitted == set(_ALL_GATES), emitted.symmetric_difference(_ALL_GATES)

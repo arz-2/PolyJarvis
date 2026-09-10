@@ -120,16 +120,49 @@ class StageHalt(SystemExit):
 
 # ─── GPU claim (A.6 — cross-track rules as code, not convention) ──────────────
 
-def _pick_gpu(action: str, run_name: str, need: int = None) -> dict:
+def _pick_gpu(action: str, run_name: str, need: int = None, adopt: str = None) -> dict:
     cmd = [sys.executable, str(REPO_ROOT / "orchestration" / "scripts" / "hardware_runtime.py"),
            "--json", action, "--run", run_name]
     if need is not None:
         cmd += ["--need", str(need)]
+    if adopt:
+        cmd += ["--adopt", str(adopt)]
     r = subprocess.run(cmd, capture_output=True, text=True)
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError:
         return {"error": f"hardware_runtime.py {action} produced no JSON: {r.stdout!r} {r.stderr!r}"}
+
+
+def _reattach_adopt_gpus(reattaching: bool, pending_path, work_dir):
+    """GPU ids to adopt when reattaching, or None to claim normally."""
+    if not reattaching or pending_path is None:
+        return None
+    try:
+        chain_id = json.loads(Path(pending_path).read_text()).get("chain_id")
+    except (OSError, ValueError):
+        return None
+    return _chain_gpu_ids(work_dir, chain_id)
+
+
+def _chain_gpu_ids(work_dir, chain_id: str):
+    """The GPUs a detached chain is running on, read from the chain script it was launched with.
+
+    The script is generated with `GPU_IDS=<ids>` near the top and lives beside the work dirs
+    until the chain completes -- which is exactly the window in which a reattach happens.
+    Returns None when it cannot be read, and the caller then falls back to a normal claim.
+    """
+    if not work_dir or not chain_id:
+        return None
+    script = Path(work_dir) / f"chain_{chain_id}.sh"
+    try:
+        for line in script.read_text().splitlines():
+            if line.startswith("GPU_IDS="):
+                ids = line.split("=", 1)[1].strip().strip('"').strip("'")
+                return ids or None
+    except OSError:
+        return None
+    return None
 
 
 class gpu_claim:
@@ -143,12 +176,20 @@ class gpu_claim:
     by hand. A SIGTERM handler released for the claim's lifetime closes that gap.
     """
 
-    def __init__(self, run_name: str, need: int):
-        self.run_name, self.need = run_name, need
+    def __init__(self, run_name: str, need: int, adopt: str = None):
+        # `adopt` names the GPUs a detached chain is ALREADY on: a reattaching process must
+        # record the claim there rather than allocate a fresh one. Those GPUs are busy with this
+        # run's own work, so an ordinary claim either lands on a different GPU (leaving the
+        # ledger pointing at an idle card and silent about the loaded one) or fails outright
+        # when nothing else is free -- which is what blocks a fix from reaching a live campaign.
+        self.run_name, self.need, self.adopt = run_name, need, adopt
         self._prev_sigterm = None
 
     def __enter__(self) -> str:
-        result = _pick_gpu("claim", self.run_name, self.need)
+        # `adopt` is passed only when there is one, so the ordinary allocation path keeps the
+        # three-argument call every existing caller and test double already speaks.
+        result = (_pick_gpu("claim", self.run_name, self.need, adopt=self.adopt)
+                  if self.adopt else _pick_gpu("claim", self.run_name, self.need))
         if "claimed" not in result:
             raise RuntimeError(f"GPU claim failed for {self.run_name} (need={self.need}): {result}")
         self.claimed = result["claimed"]
@@ -195,22 +236,51 @@ def wait_for_run(lammps, run_id: str, label: str) -> dict:
         time.sleep(POLL_SECONDS)
 
 
+def _reject_failed_analysis(result: dict, label: str) -> dict:
+    """Refuse a worker result that reports its own failure.
+
+    The analysis workers in mcp-lammps-engine do NOT raise when the CLI script they shell out
+    to exits non-zero -- they `return {"status": "failed", "error": stderr}`. That return value
+    goes through `run_manager.complete()`, so the *run* is "completed" and only the *result*
+    says otherwise. Fourteen workers share that convention, so reading past it here let a
+    crashed analysis look like a successful one with every field missing.
+
+    That is not hypothetical. sPVC_1's melt gate called check_equilibration_comprehensive on a
+    dump path that did not exist; the script exited 1, this function's caller returned the
+    failure dict as data, collect_gates() read all-None off it, classify() dropped every None,
+    and an empty binding set adjudicated to PASS. An unverified melt was accepted and cooled.
+    The sibling extract_equilibrated_density call, whose worker crashed by *raising* a
+    TypeError, correctly produced a PROCESS_FAILED finding from the same call site -- the
+    handling of a failed analysis should not depend on how the worker chose to report it.
+
+    Callers that adjudicate the failure themselves into a structured finding -- the
+    derive_backbone_types call below, whose failure IS the BACKBONE_TYPES_UNRESOLVED halt --
+    pass allow_failure=True and take the dict. That is an explicit opt-out, not the default:
+    every other call site treats a failed analysis as a halt, which is what the gate needed.
+    """
+    if isinstance(result, dict) and result.get("status") in ("failed", "error"):
+        detail = result.get("error") or result.get("stderr") or result
+        raise SystemExit(f"{label} analysis failed: {str(detail)[:2000]}")
+    return result
+
+
 def wait_for_analysis(lammps, submit_result: dict, label: str, poll_seconds: float = 2,
-                       timeout_s: float = 1800) -> dict:
+                       timeout_s: float = 1800, allow_failure: bool = False) -> dict:
     """Poll get_run_status() for a non-chain analysis tool's background thread to finish, then
     return its result dict. check_equilibration_comprehensive/extract_equilibrated_density/
     extract_thermal/extract_bulk_modulus* all launch a background thread and return
     {"status": "submitted", "run_id": ...} immediately -- reading fields off that return value
     directly (as every call site here used to) reads an unfinished result."""
     if submit_result.get("run_id") is None:
-        return submit_result  # already synchronous / an immediate error -- nothing to poll
+        return submit_result if allow_failure else _reject_failed_analysis(submit_result, label)
     run_id = submit_result["run_id"]
     t0 = time.time()
     while True:
         status = lammps.get_run_status(run_id)
         st = status.get("status")
         if st == "completed":
-            return status.get("result", status)
+            result = status.get("result", status)
+            return result if allow_failure else _reject_failed_analysis(result, label)
         if st == "failed":
             raise SystemExit(f"{label} analysis failed: {status}")
         if time.time() - t0 > timeout_s:
@@ -483,6 +553,114 @@ this module's own sizing rule would have turned into a 9.3 MICROSECOND continuat
 Below this threshold the measured tau is discarded and the flat 1.5 ns fallback is used."""
 
 
+# g3(t) power-law quality below which an extension cannot be sized from it.
+MSD_POWER_LAW_MIN_R2 = 0.9
+# Melt gates whose remedy is "run one more window of this stage, then re-measure".
+#
+# None of these carries a fitted decay constant, so no honest extrapolation exists for any of
+# them -- density/energy drift is a systematic approach to equilibrium, and msid_gaussian
+# (ideal-chain statistics) and torsion (dihedral-population convergence) are chain-structure
+# convergence with no closed form either. One more window is bounded, tied to the stage that
+# actually ran, and re-gated afterwards. chain_displacement is deliberately NOT here: it has a
+# measured power law and is sized properly by _displacement_extension_ns.
+#
+# Without this set a pure msid_gaussian failure fell through to `0.5 ns * 20`. On 2026-09-09
+# that would have run sPVC_1 for 10 ns against a 2 ns melt hold -- 5x the stage, ~12 GPU-hours
+# -- on a melt already displaced 4.85x its own Rg with C(t) 46% decayed.
+EXTEND_ONE_MORE_WINDOW = frozenset({
+    "density_drift", "energy_drift", "density_sem", "energy_sem",
+    "msid_gaussian", "torsion", "rg",
+    # Per-term energy drift, for the same reason as the aggregate: a term still moving
+    # systematically has no fitted decay constant to extrapolate from, so the defensible rule is
+    # one more window and re-measure. Omitting it when the gate was added (2026-09-09) meant
+    # _thermo_extension_ns returned None and the remedy fell through to the full
+    # melt_hold_min_steps default -- aPS_1 was handed a 10 ns extension against a 2 ns stage,
+    # which is precisely the "0.5 ns * 20 from a constant that had never seen the run"
+    # pathology this function was written to remove. See the EXTENDABLE_GATES sizing guard in
+    # tests/test_run_campaign.py.
+    "energy_component_drift",
+})
+# Ceiling on a single displacement-sized extension. Anything past this is not a sampling
+# problem -- it is a cell or temperature problem, and belongs with the recovery agent.
+MAX_DISPLACEMENT_EXTENSION_NS = 200.0
+
+
+def _thermo_extension_ns(comp: dict, failing: set, stage_ns: float):
+    """How much longer the melt cell must run when a THERMO gate failed, in the stage's own units.
+
+    Two different failures hide under one verdict, and they want different arithmetic:
+
+      n_eff_density  -- a pure sampling shortfall. n_eff is measured and the target (n_eff_min)
+                        is stated, so the extension is exactly the shortfall:
+                        stage_ns * (n_eff_min / n_eff - 1). Fully determined by measurement.
+
+      density/energy drift or SEM -- the observable is still moving SYSTEMATICALLY (aPS_1:
+                        drift 1.14%, p = 0.0). There is no fitted decay constant for the
+                        approach to equilibrium, so no honest extrapolation exists. The
+                        defensible rule is one more window and re-measure -- bounded, tied to
+                        the stage that actually ran, and re-gated afterwards.
+
+    Both replace a hardcoded `0.5 ns * 20`, which on aPS_1 would have bought 10 ns against a
+    2 ns stage -- 5x the entire melt hold, ~12 GPU-hours, from a constant that had never seen
+    the run. The C(t) chain relaxation time is not consulted here for the reason given in
+    _continue_npt: it is a chain quantity and this is a thermodynamic convergence problem.
+    """
+    if not isinstance(stage_ns, (int, float)) or stage_ns <= 0:
+        return None
+    thermo = (comp or {}).get("thermo") or {}
+    if "n_eff_density" in failing:
+        n = thermo.get("n_eff_density") or {}
+        n_eff, n_min = n.get("n_eff"), n.get("n_eff_min")
+        if isinstance(n_eff, (int, float)) and isinstance(n_min, (int, float)) and n_eff > 0:
+            need = stage_ns * (float(n_min) / float(n_eff) - 1.0)
+            if need > 0:
+                return round(min(need, MAX_DISPLACEMENT_EXTENSION_NS), 3)
+        return None
+    if failing & EXTEND_ONE_MORE_WINDOW:
+        return round(min(stage_ns, MAX_DISPLACEMENT_EXTENSION_NS), 3)
+    return None
+
+
+def _displacement_extension_ns(comp: dict, sizing_target: float = 1.2):
+    """How much longer the melt must run for chain COMs to displace their own size.
+
+    Sizes the EXTEND from the quantity the gate actually failed on. g3(t) follows a power law
+    over the measured window -- MSD = A t^alpha, fitted with its own r^2 -- so
+
+        t_need = t_traj * (target * Rg^2 / MSD_now) ** (1 / alpha)
+
+    is an interpolation-grade extrapolation over data in hand. `sizing_target` overshoots the
+    1.0x pass bar deliberately: an extension that lands exactly on the threshold would be
+    re-failed by the next seed, and replicates 2-3 replay this protocol with NO gating, so the
+    margin has to be built into the number that gets frozen. The bar itself stays at 1.0.
+
+    Returns None when it cannot be sized honestly -- a missing ratio, a power law that does not
+    fit (alpha_r2 < 0.9), or a request beyond MAX_DISPLACEMENT_EXTENSION_NS. None means the
+    remedy declines and the finding escalates WITH a named cause, which is strictly better than
+    a fabricated number: this replaces `tau * 20`, which on 2026-09-09 turned a tau of 872.66 ns
+    -- itself fitted to an 11.5%-decayed C(t), an extrapolation 176x beyond its own trajectory
+    -- into a request for 17,453 ns of continuation. It was rejected by validate_overrides'
+    bounds, but only after it had cost PLLA_1 an agent escalation and a full 10-stage replay.
+    """
+    chain = ((comp or {}).get("chain") or {})
+    msd = chain.get("msd") or {}
+    ratio = msd.get("msd_over_rg2")
+    alpha = msd.get("alpha")
+    alpha_r2 = msd.get("alpha_r2")
+    t_ps = (chain.get("ct") or {}).get("trajectory_ps")
+    if not all(isinstance(v, (int, float)) for v in (ratio, alpha, alpha_r2, t_ps)):
+        return None
+    if ratio <= 0 or alpha <= 0 or t_ps <= 0 or alpha_r2 < MSD_POWER_LAW_MIN_R2:
+        return None
+    if ratio >= sizing_target:
+        return None                       # already there; the failure was the trap flag
+    t_need_ps = t_ps * (sizing_target / ratio) ** (1.0 / alpha)
+    extension_ns = (t_need_ps - t_ps) / 1000.0
+    if extension_ns <= 0 or extension_ns > MAX_DISPLACEMENT_EXTENSION_NS:
+        return None
+    return round(extension_ns, 3)
+
+
 def _tau_is_identifiable(tau_relax_ps, decay_fraction) -> bool:
     """Whether a measured relaxation time carries information -- see TAU_MIN_DECAY_FRACTION."""
     if not isinstance(tau_relax_ps, (int, float)) or tau_relax_ps <= 0:
@@ -527,6 +705,35 @@ def _size_extension(tau_relax_ps, decay_fraction, cumulative: int, cap_steps, dt
             extend_ns = round(max_ns, 2)
             note += f"; clamped to the {max_ns:.2f} ns of cap headroom left"
     return extend_ns, note
+
+
+def _extend_reference_data(restart_path: str, fallback: str) -> str:
+    """The data file a restart-continuation should be VALIDATED and typed against.
+
+    An extend continues a stage LAMMPS itself wrote, so that stage's own `_out.data` is the
+    right reference: LAMMPS emits Coeffs inline (`Pair Coeffs # lj/class2/coul/long/kk`), so it
+    is self-contained. The build cell is not -- an EMC-built cell.data carries ZERO Coeffs
+    sections because its coefficients live in a separate .params file, and the extend branches
+    pass `params_file=""` (correctly: after read_restart the coefficients come from the restart).
+    Preflight only suppresses "Coeffs section missing" when a params file is supplied, so
+    validating the EMC cell with no params file failed 100% of the time:
+
+        'Pre-flight validation failed - workflow not generated',
+        ["'Pair Coeffs' section missing or empty - expected 4 entries", ...]
+
+    Nothing caught this because `continue_npt` had never fired on this checkout -- the engine's
+    own note says transient_retry was the only auto-remedy that ever had. The first two real
+    EXTENDs, aPS_1 and sPVC_1 on 2026-09-09, both died here inside a second and burned both
+    transient_retry applications on a failure no retry could fix.
+
+    Falls back to the caller's data_file when the sibling is absent, so a missing file degrades
+    to the previous behaviour rather than raising.
+    """
+    if restart_path:
+        sibling = re.sub(r"\.restart$", ".data", str(restart_path))
+        if sibling != str(restart_path) and Path(sibling).is_file():
+            return sibling
+    return fallback
 
 
 def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
@@ -605,7 +812,7 @@ def _submit_equil_chain(args, cls: dict, lammps, extend_from_data: str = None,
             "nvt_melt_hold": {"nvt_melt_min_steps": extend_steps_val},
         }.get(base, {"melt_hold_min_steps": extend_steps_val})
         workflow = lammps.generate_equilibration_workflow(
-            data_file=p["data_path"],
+            data_file=_extend_reference_data(extend_from_data, p["data_path"]),
             densify_check_every_steps=override.get("densify_check_every_steps",
                                                    p["densify_check_every_steps"]),
             anneal_check_every_steps=override.get("anneal_check_every_steps",
@@ -670,7 +877,7 @@ def _submit_cool_chain(args, cls: dict, lammps, extend_from_data: str = None,
             "npt_final": {"stage8_min_steps": extend_steps_val},
         }.get(base, {"cool_block_hold_steps": extend_steps_val})
         workflow = lammps.generate_cooling_workflow(
-            data_file=p["data_path"],
+            data_file=_extend_reference_data(extend_from_data, p["data_path"]),
             cool_block_hold_steps=override.get("cool_block_hold_steps",
                                                p["cool_block_hold_steps"]),
             stage8_min_steps=override.get("stage8_min_steps", p["stage8_min_steps"]),
@@ -702,6 +909,26 @@ def _stage_dump_path(stage: dict) -> str:
     return f"{stage['work_dir']}/{stage['params']['DUMP_FILE']}"
 
 
+def _continuation_ns(args, key: str, stage: str) -> float:
+    """The length of a continuation, or a refusal -- never a default.
+
+    A continuation attempt exists because a remedy decided the stage needed more time, and the
+    remedy is what knows how much. `float(getattr(args, key, 1.5))` looked like a fallback but
+    was a constant: nothing else ever wrote the attribute, so an attempt that reached this
+    branch WITHOUT a sized remedy ran 1.5 ns of whatever the base stage was and called it a
+    protocol. sPVC_1's three cooling attempts are what that looks like from the outside -- 1.5 ns
+    at 300 K, exactly 1,500,000 steps, sized by nobody. Same shape as the retired
+    tau_ns/target_n_eff default in workflow_engine._continue_npt; same fix.
+    """
+    ns = getattr(args, key, None)
+    if not ns:
+        raise SystemExit(
+            f"{stage} continuation requested with no {key}: a continuation must be sized by "
+            f"the remedy that asked for it (see workflow_engine._continue_npt, which sizes both stages) "
+            f"-- refusing to invent a length.")
+    return float(ns)
+
+
 def _resolve_backbone_types(args, cls: dict, lammps, build_data_path: str, p: dict):
     """Resolve backbone_types (from decided_params, else auto-derived from bond topology and
     persisted). Returns (backbone_types, backbone_derivation, halt_detail) -- exactly one of
@@ -711,6 +938,24 @@ def _resolve_backbone_types(args, cls: dict, lammps, build_data_path: str, p: di
     backbone_types = p["backbone_types"]
     if backbone_types is not None:
         return backbone_types, None, None
+    # Already derived by an EARLIER stage of this run? The derivation below persists its result
+    # into the plan's `derived_inputs` (never decided_params -- see the long note further down),
+    # and that file is the only carrier that survives both a process restart and a stage
+    # boundary. Reading it back matters most for cool-check: `cooling` depends on
+    # `equilibration` alone, so CampaignStageExecutor never sets args.build_data_path for it,
+    # and until 2026-09-09 do_cool_and_check read an args.backbone_types that NOTHING in this
+    # file ever assigns -- None reached the worker, which does
+    # `" ".join(str(t) for t in backbone_types)` as its first statement (server.py:3061) and
+    # died with "'NoneType' object is not iterable" before it even logged its command line.
+    # That crash took every one of sPVC_1's three cooling attempts and would have taken PLLA_1's.
+    try:
+        persisted = ((load_plan(args.plan).get("derived_inputs") or {})
+                     .get("backbone_types") or {}).get("value")
+    except Exception:  # noqa: BLE001 -- a missing/unreadable plan just means "derive it"
+        persisted = None
+    if persisted:
+        cls["backbone_types"] = persisted
+        return persisted, None, None
     # Atom-name-only lookup can't tell backbone from pendant-branch atoms (confirmed live:
     # PACR/PMMA shares a generic aliphatic carbon type between CH2 backbone atoms and pendant
     # methyl branches) — but bond TOPOLOGY can: derive_backbone_types walks the heavy-atom bond
@@ -718,12 +963,38 @@ def _resolve_backbone_types(args, cls: dict, lammps, build_data_path: str, p: di
     # are shorter than continuing along the main path).
     derived = wait_for_analysis(lammps, lammps.derive_backbone_types(
         data_file=build_data_path,
-    ), "backbone_types derivation")
+    ), "backbone_types derivation", allow_failure=True)
     if derived.get("status") == "success" and derived.get("backbone_types"):
         backbone_types = derived["backbone_types"]
         cls["backbone_types"] = backbone_types
+        # Persisted for provenance under `derived_inputs`, NOT into decided_params.
+        #
+        # decided_params is the protocol contract, and WorkflowEngine._reconcile_plan diffs it
+        # on every construction: a key that appears there after the plan was hashed is a changed
+        # parameter, and PARAMETER_STAGE maps backbone_types -> "equilibration", so the write
+        # invalidated the very stage whose output produced it. The stage's input_hash then moved,
+        # _new_attempt's reattach predicate failed, and a resumed run replayed all ten stages
+        # from minimize. On 2026-09-09 that cost every one of PLLA_1, aPS_1, sPVC_1 and iPMMA_1 a
+        # hand-repair, because it fires precisely when an orchestrator restarts between the gate's
+        # write and the stage being accepted -- which is exactly what recovery does.
+        #
+        # The value does not belong in the contract regardless of the bug: it is a pure function
+        # of the built cell (heavy-atom bond-graph diameter), it is computed AFTER the MD, and it
+        # selects which atoms the ANALYSIS treats as backbone. It cannot change what was
+        # simulated. A caller-SUPPLIED backbone_types is the opposite case -- it changes the
+        # assessment, so it stays in decided_params and stays hashed; this branch is reached only
+        # when none was supplied (see the early return above).
+        #
+        # _reconcile_plan computes `changed` from decided_params alone, so a write outside it
+        # moves plan_hash without invalidating anything -- the reason this location is safe.
         plan_on_disk = load_plan(args.plan)
-        plan_on_disk.setdefault("decided_params", {})["backbone_types"] = backbone_types
+        plan_on_disk.setdefault("derived_inputs", {})["backbone_types"] = {
+            "value": backbone_types,
+            "source": "derive_backbone_types (heavy_atom_graph_diameter)",
+            "data_file": str(build_data_path),
+            "derived_at": datetime.now(timezone.utc).isoformat(),
+        }
+        plan_on_disk.get("decided_params", {}).pop("backbone_types", None)
         atomic_write_json(Path(args.plan), plan_on_disk)
         backbone_derivation = {
             "trigger": "backbone_types unresolved",
@@ -881,7 +1152,9 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
         if pending_path is not None:
             pending_path.unlink(missing_ok=True)
     else:
-        with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
+        with gpu_claim(args.run_name, gpu_per_run,
+                       adopt=_reattach_adopt_gpus(reattaching, pending_path,
+                                                  args.work_dir)) as gpu_ids:
             args.gpu_ids = gpu_ids
             if reattaching:
                 submission = json.loads(pending_path.read_text())
@@ -901,7 +1174,8 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                     submission = _submit_equil_chain(
                         args, cls, lammps, extend_from_data=continuation_path,
                         extend_temp=getattr(args, "continuation_temp_K", None),
-                        extend_ns=float(getattr(args, "npt_continuation_ns", 1.5)),
+                        extend_ns=_continuation_ns(args, "npt_continuation_ns",
+                                                   "equilibration"),
                         extend_base_stage=getattr(args, "equilibration_extend_base_stage", "npt_final"),
                         extend_ensemble=getattr(args, "equilibration_extend_ensemble", "npt"),
                     )
@@ -948,6 +1222,10 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
     nvt_restart_path = _nvt_stage.get("output_restart") if _nvt_stage else None
     if _nvt_stage:
         args.npt_prod_dump = _stage_dump_path(_nvt_stage)
+    elif cls.get("_prior_nvt_melt_hold_dump"):
+        # An npt-only continuation. The nvt window is unchanged, so its dump is still the right
+        # trajectory for every chain observable the melt clause binds on.
+        args.npt_prod_dump = cls["_prior_nvt_melt_hold_dump"]
 
     attempts = 0
     p_equil = resolve_stage_params("equil", args, cls)
@@ -1006,6 +1284,35 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
             failing = set(verdict.get("failing_binding_gates") or ())
             if getattr(args, "engine_owned_recovery", False):
                 detail = dict(verdict)
+                # Size from the gate that actually failed. chain_displacement is the binding
+                # melt-relaxation gate; C(t) is advisory now, so its tau must never size an
+                # extension -- it is recorded for the reader, not for the remedy.
+                extension_ns = _displacement_extension_ns(comp)
+                if extension_ns is None and "chain_displacement" not in failing:
+                    # A thermo gate is what failed. Size it from the melt hold's own length
+                    # rather than a constant.
+                    #
+                    # The `chain_displacement not in failing` guard is load-bearing. A melt that
+                    # fails displacement usually fails the thermo gates too -- iPMMA_1 on
+                    # 2026-09-09 failed density_drift, n_eff_density, msid_gaussian AND
+                    # chain_displacement at once -- and without the guard the thermo branch
+                    # quietly answered a question nobody asked: it saw n_eff 15 against a
+                    # minimum of 20 and sized 0.667 ns to top up the SAMPLING STATISTIC of a
+                    # kinetically trapped melt sitting at 0.493x its own Rg^2, with alpha 0.073
+                    # and C(t) 3.8% decayed. Honest sizing had already declined (alpha_r2 0.825
+                    # below the 0.9 floor; the true figure is ~970,000 ns, a 196,000x longer
+                    # trajectory).
+                    #
+                    # When displacement is the failure and it cannot be sized, the remedy must
+                    # decline so _continue_npt raises and the finding escalates with a named
+                    # cause. A melt this trapped is not an undersampled melt -- extending it at
+                    # all is the wrong move, and that judgement belongs to the agent.
+                    _eq = resolve_stage_params("equil", args, cls)
+                    _stage_ns = ((_eq.get("melt_hold_min_steps") or 0)
+                                 * (_eq.get("dt_fs") or 1.0) / 1.0e6)
+                    extension_ns = _thermo_extension_ns(comp, failing, _stage_ns)
+                if extension_ns is not None:
+                    detail["extension_ns"] = extension_ns
                 if _tau_is_identifiable(tau_relax_ps, ct_decay):
                     detail["relaxation_time_ns"] = tau_relax_ps / 1000.0
                 return {"halted": True, "reason": "EXTEND", "detail": detail,
@@ -1118,6 +1425,15 @@ def _run_equilibration_gate(lammps, p: dict, backbone_types, json_name: str, lab
         struct_dump_file=p["struct_dump_path"], struct_data_file=p["npt_prod_data_path"],
         output_name=json_name,
     ), f"{label} comprehensive")
+    # A comprehensive result missing a whole section is a crashed check that reported success,
+    # not a cell with nothing to say. Both sections are unconditional outputs of
+    # check_equilibration_comprehensive.py, and every clause binds on gates drawn from both, so
+    # continuing without one can only produce a verdict on absent evidence.
+    missing = [k for k in ("thermo", "chain") if not isinstance(comp.get(k), dict) or not comp[k]]
+    if missing:
+        raise SystemExit(
+            f"{label} comprehensive produced no {'/'.join(missing)} section -- refusing to "
+            f"adjudicate a gate on a partial result (keys present: {sorted(comp)})")
     density = wait_for_analysis(lammps, lammps.extract_equilibrated_density(
         log_file=p["npt_prod_log_path"], target_temp=p["npt_prod_temp_K"],
         output_dir=p["output_dir"], output_name=json_name,
@@ -1153,7 +1469,9 @@ def do_cool_and_check(args, cls: dict, lammps) -> dict:
                     if args.work_dir else None)
     reattaching = pending_path is not None and pending_path.is_file()
 
-    with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
+    with gpu_claim(args.run_name, gpu_per_run,
+                   adopt=_reattach_adopt_gpus(reattaching, pending_path,
+                                              args.work_dir)) as gpu_ids:
         args.gpu_ids = gpu_ids
         if reattaching:
             submission = json.loads(pending_path.read_text())
@@ -1161,7 +1479,7 @@ def do_cool_and_check(args, cls: dict, lammps) -> dict:
             if continuation_path:
                 submission = _submit_cool_chain(
                     args, cls, lammps, extend_from_data=continuation_path,
-                    extend_ns=float(getattr(args, "cooling_continuation_ns", 1.5)),
+                    extend_ns=_continuation_ns(args, "cooling_continuation_ns", "cooling"),
                     extend_base_stage=getattr(args, "cooling_extend_base_stage", "npt_final"),
                     extend_ensemble=getattr(args, "cooling_extend_ensemble", "npt"))
             else:
@@ -1180,15 +1498,28 @@ def do_cool_and_check(args, cls: dict, lammps) -> dict:
     npt_prod_dump_path = _stage_dump_path(workflow["stages"][-1])
     npt_prod_restart_path = workflow["stages"][-1].get("output_restart")
     # No fixed-volume window at the assessment temperature: every gate reads npt_final's own
-    # trajectory. args.npt_prod_dump stays unset so the resolver's own default applies.
-    args.npt_prod_dump = None
+    # trajectory, so BOTH dump arguments name that one file. This used to be set to None "so the
+    # resolver's own default applies" -- but that default is the flat pre-attempt-layout path
+    # data/<run>/lammps/cool/npt_final/npt_final.dump, which no run has ever written. It is the
+    # exact twin of the npt_prod_log_path bug annotated in _resolve_cool_check_params ("the bug
+    # that silently disabled this binding gate on every run once"); the dump half was missed.
+    args.npt_prod_dump = npt_prod_dump_path
 
     attempts = 0
     while True:
         args.data_path = npt_prod_data_path
         args.struct_dump_path = npt_prod_dump_path
         p = resolve_stage_params("cool-check", args, cls)
-        backbone_types = args.backbone_types or cls.get("backbone_types")
+        backbone_types, _bt_derivation, _bt_halt = _resolve_backbone_types(
+            args, cls, lammps,
+            # Cooling does not depend on `build`, so args.build_data_path may be unset; the melt
+            # cell this descent started from carries the same bond topology and is always here.
+            (getattr(args, "build_data_path", None)
+             or getattr(args, "melt_start_data_path", None) or npt_prod_data_path),
+            p)
+        if _bt_halt is not None:
+            return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED", "detail": _bt_halt,
+                    "extend_history": extend_history}
         comp, density, verdict, cooling_json = _run_equilibration_gate(
             lammps, p, backbone_types, "cooling.json", "cool-check")
         cool_verdict = verdict.get("verdict")
@@ -1209,6 +1540,18 @@ def do_cool_and_check(args, cls: dict, lammps) -> dict:
                 detail = dict(verdict)
                 if isinstance(tau_relax_ps, (int, float)) and tau_relax_ps > 0:
                     detail["relaxation_time_ns"] = tau_relax_ps / 1000.0
+                # Size the assessment-cell extension the same way the melt gate sizes its own.
+                # The cooling clause binds on the thermo family (density/energy drift and SEM,
+                # n_eff_density) plus structural gates, so _thermo_extension_ns applies verbatim.
+                # Until 2026-09-09 this emitted no extension_ns at all and _continue_npt's
+                # `tau * target` fallback supplied a flat 10 ns -- against an npt_final stage of
+                # 0.5 ns, a 20x overshoot that nothing had chosen.
+                _stage8 = p.get("stage8_min_steps") or int(5.0e5 / (p.get("dt_fs") or 1.0))
+                _cool_stage_ns = _stage8 * (p.get("dt_fs") or 1.0) / 1.0e6
+                _cool_ext = _thermo_extension_ns(
+                    comp, set(verdict.get("failing_binding_gates") or ()), _cool_stage_ns)
+                if _cool_ext is not None:
+                    detail["extension_ns"] = _cool_ext
                 return {"halted": True, "reason": "EXTEND", "detail": detail,
                         "npt_prod_data_path": p["npt_prod_data_path"],
                         "npt_prod_dump_path": npt_prod_dump_path,
@@ -2189,6 +2532,50 @@ class CampaignStageExecutor:
         args = self.args
         cls = {**self.base_cls, **context["parameters"]}
         args.engine_owned_recovery = True
+        # self.args is ONE mutable object shared by every stage this process runs, so an
+        # attribute a previous stage set is still on it. The continuation/resume attributes
+        # below are STAGE-SCOPED -- each is written a few lines further down under an explicit
+        # `stage == ...` guard -- and carrying one across a stage boundary silently rewrites the
+        # next stage's protocol. That is not hypothetical: on 2026-09-09 sPVC_1's equilibration
+        # continuation left pending_continuation_path set, do_cool_and_check reads it
+        # unconditionally, and all three cooling attempts took the extend-only branch. Their
+        # chains were ONE stage -- npt_final alone, read_restart'ing the equilibration melt and
+        # holding 1.5 ns at 300 K. Zero cool_blocks: a 571 K melt direct-quenched to the
+        # assessment temperature, with no descent at all. The keys were already namespaced per
+        # stage ("separate keys, separate stage hash"); the path they share was not.
+        for _scoped in ("pending_continuation_path", "continuation_temp_K",
+                        "npt_continuation_ns", "equilibration_extend_base_stage",
+                        "equilibration_extend_ensemble",
+                        "cooling_continuation_ns", "cooling_extend_base_stage",
+                        "cooling_extend_ensemble",
+                        "equil_resume_from", "equil_resume_data_path",
+                        # do_cool_and_check now SETS npt_prod_dump (it used to null it, which
+                        # doubled as clearing equilibration's nvt dump). Left on the shared
+                        # object it would hand cooling's npt_final.dump to every later stage --
+                        # the same shape as the leak this reset exists to stop.
+                        "npt_prod_dump"):
+            setattr(args, _scoped, None)
+        if stage == "equilibration" and context["parameters"].get("npt_continuation_ns"):
+            # A continuation attempt re-runs ONE stage. The gate still needs the fixed-volume
+            # nvt_melt_hold trajectory (MSD / kinetic trap / C(t)), which this attempt does not
+            # rebuild and must not: extending the npt hold leaves the nvt window untouched, so
+            # carrying its dump forward is the physically correct reading, not a convenience.
+            # Without it stage_params fell through to the pre-v3 data/<run>/lammps/equil/... path,
+            # which does not exist -- the comprehensive check then crashed and the gate
+            # adjudicated on nothing. Same prior_attempts walk mechanical_resample_points uses.
+            for prior in reversed(context.get("prior_attempts") or ()):
+                manifest_path = prior.get("manifest")
+                if not manifest_path or not Path(manifest_path).is_file():
+                    continue
+                checkpoints = ((json.loads(Path(manifest_path).read_text()).get("outputs") or {})
+                               .get("stage_checkpoints") or {})
+                nvt_data = checkpoints.get("nvt_melt_hold")
+                if not nvt_data:
+                    continue
+                nvt_dump = Path(nvt_data).parent / "nvt_melt_hold.dump"
+                if nvt_dump.is_file():
+                    cls["_prior_nvt_melt_hold_dump"] = str(nvt_dump)
+                    break
         if stage == "mechanical" and context["parameters"].get("mechanical_resample_points"):
             for prior in reversed(context.get("prior_attempts") or ()):
                 manifest_path = prior.get("manifest")

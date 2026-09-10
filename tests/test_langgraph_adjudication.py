@@ -114,14 +114,79 @@ def test_evidence_and_findings_are_append_only(plan_file, tmp_path, monkeypatch)
     assert len(doc2["decisions"][0]["evidence"]) == 3  # appended again, never replaced
 
 
-def test_the_force_field_choice_stays_read_only(plan_file, tmp_path, monkeypatch):
-    """materialize_plan reads criteria_evaluated/evidence/alternatives off the row and
-    ignores `choice`, so letting a model edit it would be a silent no-op that looks like a
-    decision. Disagreement travels through `overrides`, which is validated."""
+def _derived(field):
+    """The single source of truth for what a field implies -- asserting against a hardcoded
+    copy would just re-encode the bug this test exists to catch."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(nodes.SCRIPT_DIR)))
+    from make_deterministic_plan import _derived_from_field
+    from rules_common import load_rules
+    return _derived_from_field(field, load_rules())
+
+
+def _stub_typing(monkeypatch, *, types_smiles: bool, error: str = ""):
+    """Pin the EMC trial build both ways so these stay pure-logic tests.
+
+    _apply_field_change imports `forcefield` inside the function and calls
+    forcefield.check_typing, which shells out to a real EMC build. The default suite must not
+    depend on EMC being installed, and it must be able to exercise the DECLINE branch, which
+    no real SMILES would reach on demand.
+    """
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(nodes.SCRIPT_DIR)))
+    import forcefield
+    monkeypatch.setattr(forcefield, "check_typing",
+                        lambda *a, **k: {"types_smiles": types_smiles, "typing_error": error})
+
+
+def test_a_measured_force_field_change_moves_everything_it_implies(plan_file, tmp_path, monkeypatch):
+    """The critic may move the field, and when it does the derivation must follow.
+
+    This test previously asserted the opposite -- that `choice` stayed read-only. That
+    contract was deliberately retired on 2026-09-08: the adjudicator is the one component
+    that reads force-field literature, and it was the one component that could not act on it.
+    Setting overrides.preferred_ff wrote decided_params.preferred_ff while D-01_ff.choice kept
+    the old field, which validate_run_plan.py then failed as `ff_choice_not_applied` -- so the
+    old behaviour was not "read-only", it was "silently unrunnable".
+    """
+    _stub_typing(monkeypatch, types_smiles=True)
     doc, _ = _apply(plan_file, tmp_path,
                     {**GOOD, "overrides": {"preferred_ff": "opls/2024/opls-aa"}}, monkeypatch)
-    assert doc["decisions"][0]["choice"] == "pcff"
+    assert doc["decisions"][0]["choice"] == "opls/2024/opls-aa"
     assert doc["overrides"]["preferred_ff"] == "opls/2024/opls-aa"
+    # Everything the field implies moves with it, or the plan describes a run nobody built.
+    # These land in `overrides` -- materialize_plan copies that wholesale into decided_params.
+    assert doc["overrides"]["charge_method"] == _derived("opls/2024/opls-aa")["charge_method"]
+    assert doc["overrides"]["electrostatics"] == _derived("opls/2024/opls-aa")["electrostatics"]
+    assert doc["hardware"]["ff_family"] == _derived("opls/2024/opls-aa")["ff_family"]
+    findings = doc["decisions"][0]["critique"]["findings"]
+    assert any("moved the force field" in f for f in findings)
+
+
+def test_a_force_field_the_builder_cannot_type_is_declined_without_costing_the_critique(
+        plan_file, tmp_path, monkeypatch):
+    """Buildability is MEASURED, not assumed, and a bad field suggestion is cheap.
+
+    forcefield.select_by_moiety only probes when a moiety rule BLOCKS, so a SMILES that trips
+    no rule reaches adjudication with its admissible set unmeasured -- the critic would be
+    reasoning about a field nobody has tried. Measured 2026-09-08: compass types only 2 of the
+    stereo_r2 campaign's 7 repeat units, so an unchecked switch plans a run that dies at build.
+    On a failed probe the FIELD override alone is dropped; the evidence and the uncertainty
+    statement that came with it still apply.
+    """
+    _stub_typing(monkeypatch, types_smiles=False, error="pcff missing {na,c_2}")
+    # A second override rides along, because the point is that it SURVIVES the decline.
+    doc, _ = _apply(plan_file, tmp_path,
+                    {**GOOD, "overrides": {"preferred_ff": "opls/2024/opls-aa",
+                                           "cutoff_A": 14.0}}, monkeypatch)
+    assert doc["decisions"][0]["choice"] == "pcff"          # unchanged
+    assert "preferred_ff" not in doc["overrides"]           # the field override alone is dropped
+    assert doc["overrides"]["cutoff_A"] == 14.0             # the rest of the critique survives
+    assert doc["confidence"] == "medium"
+    findings = doc["decisions"][0]["critique"]["findings"]
+    assert any("DECLINED" in f and "opls/2024/opls-aa" in f for f in findings)
 
 
 def test_a_force_field_outside_the_measured_set_is_rejected(plan_file, tmp_path, monkeypatch):

@@ -1,0 +1,97 @@
+{
+  "purpose": "Controlled Tg sensitivity legs for reviewer comment 1, second half: cooling rate, temperature grid, equilibration duration and fitting procedure. Round 1 has no data on any of these axes -- tg_t_step_K is 20 K in all 36 round-1 runs and all 21 stereo_r2 plans, and schema 2.0 collapsed the rate to a single scalar.",
+  "method": "Each leg is a thermal-stage-only fork off an anchor's ALREADY-GATED melt cell. track_registry.macro_stages_for(['tg']) is (build, equilibration, thermal, summary) -- no cooling -- and stage_params._resolve_tg_params starts the staircase from the equilibration stage's melt_start_data_path. The leg's workflow_state records build and equilibration as accepted, pointing at the ANCHOR's own executor_state.json; workflow_engine._accepted_manifest re-verifies every artifact's sha256, so a leg cannot silently run against a moved or truncated cell.",
+  "cost_law": "steps_per_T = tg_t_step_K / (rate * dt * 1e-6), floored at tg_min_steps_per_T. Sweep cost is proportional to span/(rate*dt) while the floor is inactive, i.e. for rate <= 5 * tg_t_step_K at dt=1 fs. The floor caps the FAST end; the 1/rate law makes the slow end the entire budget.",
+  "anchors": {
+    "iPMMA_1": {
+      "role": "primary -- glassy, PCFF, the representative system named in manuscript_v2/revision.md section A",
+      "baseline": {
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "dt_fs": 1.0
+      },
+      "priced_baseline_gpu_h": 4.4,
+      "fallback": "PLLA_1",
+      "fallback_reason": "iPMMA carries an unvalidated eq_annealing_cycles 5->10 change. PLLA_1 is the cleanest round-1 family (all four replicates failed only the legitimate glassy C(t) carve-out). Do NOT fall back to aPS_1 -- its MELT_STAGE_DEFICIT is unresolved."
+    },
+    "PE_1": {
+      "role": "secondary -- cheapest system in the set, 12x cheaper per ns than any PCFF member, so it carries the wide-span axes",
+      "baseline": {
+        "tg_rate_K_per_ns": 40,
+        "tg_t_step_K": 20,
+        "dt_fs": 2.0
+      },
+      "priced_baseline_gpu_h": 0.92,
+      "note": "PE is rubbery at 300 K and semicrystalline in practice. It buys rate span cheaply; the glassy PCFF anchor carries the reviewer's 'representative system' weight."
+    }
+  },
+  "legs": [
+    {
+      "id": "L1",
+      "axis": "rate",
+      "anchor": "PE_1",
+      "override": {
+        "tg_rate_K_per_ns": 20
+      },
+      "gpu_h": 1.85
+    },
+    {
+      "id": "L2",
+      "axis": "rate",
+      "anchor": "PE_1",
+      "override": {
+        "tg_rate_K_per_ns": 10
+      },
+      "gpu_h": 3.7,
+      "note": "10 K/ns is PHYC's validated rate floor. Below it a 50+ ns TraPPE-UA descent risks crystallising, and the leg would measure ordering rather than Tg."
+    },
+    {
+      "id": "L3",
+      "axis": "rate",
+      "anchor": "iPMMA_1",
+      "override": {
+        "tg_rate_K_per_ns": 50
+      },
+      "gpu_h": 8.8,
+      "note": "50 K/ns sits inside PACR's validated rate set [40, 80, 100]."
+    },
+    {
+      "id": "L4",
+      "axis": "t_grid",
+      "anchor": "PE_1",
+      "override": {
+        "tg_t_step_K": 10,
+        "tg_rate_K_per_ns": 20
+      },
+      "gpu_h": 1.85
+    },
+    {
+      "id": "L5",
+      "axis": "t_grid",
+      "anchor": "PE_1",
+      "override": {
+        "tg_t_step_K": 40,
+        "tg_rate_K_per_ns": 20
+      },
+      "gpu_h": 1.85
+    },
+    {
+      "id": "L6",
+      "axis": "t_grid",
+      "anchor": "iPMMA_1",
+      "override": {
+        "tg_t_step_K": 40
+      },
+      "gpu_h": 4.6
+    }
+  ],
+  "t_grid_axis_is_exactly_controlled_on_PE": "At rate 20 K/ns and dt 2 fs, tg_t_step_K in {10, 20, 40} gives 250000 / 500000 / 1000000 steps per bin over 48 / 24 / 12 bins = 12 M steps in every case. Identical cost, identical total simulated time; only the staircase resolution differs. dT=10 sits exactly on PHYC's tg_min_steps_per_T floor of 250000. L1 doubles as the dT=20 member of this axis.",
+  "reportable_infeasibility": "tg_t_step_K=10 at the iPMMA baseline rate of 100 K/ns is rejected at plan time by make_deterministic_plan._assert_tg_rate_feasible (100000 steps < the 200000 floor). That is a finding to report -- the temperature grid cannot be refined below 20 K at the production rate without dropping under the per-bin sampling floor. Do NOT override tg_min_steps_per_T to dodge it: that would change the sampling this axis exists to hold fixed.",
+  "production_rate_is_the_ceiling": "Measured across all 21 classes in guides/polymer_rules.json: steps_per_T / tg_min_steps_per_T == exactly 1.00 for every one. The per-class default rate is the FASTEST rate that class's own sampling floor permits at its own tg_t_step_K and dt_fs -- 100 K/ns for the 18 dt=1fs classes, 40 K/ns for PHYC and PDIE (dt=2fs, floor 250000), 50 K/ns for PSIL (dT=10). Two consequences: 100 K/ns needs no leg (it is iPMMA_1's baseline and that of five other stereo_r2 systems, free from the campaign's own thermal stages, making it the most-measured rate in the study); and the ladder can only ever probe SLOWER, so every rate sensitivity reported here is a sensitivity at the production boundary. PE can reach 100 K/ns only at dT=50 (exactly 250000 steps/T), which moves rate and grid together -- a legitimate combined probe, deliberately excluded from the rate ladder.",
+  "deferred": {
+    "equilibration_duration": "t_equil_ns does not exist in v2 (grep returns nothing in orchestration/scripts) and every stereo_r2 plan carries it as null -- the duration is deferred to generate_equilibration_workflow's atom-count-tiered default. The real knobs are melt_hold_min_steps / nvt_melt_min_steps, both stages_for(...) == ('equilibration',). Harvest the pilot's own adaptive EXTEND attempts first: they are a second duration value at zero GPU cost. Fund dedicated legs only if that yields no usable contrast.",
+    "fitting_procedure": "Analysis-only, zero GPU. Re-fit every stereo_r2 run and every leg varying the bilinear breakpoint window and the fit form. Runs whenever."
+  },
+  "comparison_rule": "Predeclared before any leg runs. An axis is SENSITIVE when |Tg(leg) - Tg(anchor baseline)| exceeds the pooled within-system SD across all completed stereo_r2 runs (many degrees of freedom); the anchor's own 3-seed SD is reported as a secondary, system-specific check. The pooled figure is primary because an n=3 SD carries 2 dof and is itself uncertain to roughly +/-50% -- quoting it alone would reproduce the conflation reviewer comment 1 caught the first time.",
+  "seeds": "A leg keeps its anchor's emc_seed and velocity_seed unchanged, deliberately: the axis under test must be the only thing that moves. verify_matrix asserts it."
+}

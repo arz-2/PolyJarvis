@@ -3290,8 +3290,16 @@ def _run_extract_equilibrated_density(
     plateau_shift_sigma: float,
     density_col: str,
     temp_col: str,
+    output_name: str = "equilibration.json",
 ) -> dict:
-    """Background worker — runs extract_equilibrated_density.py via CLI."""
+    """Background worker — runs extract_equilibrated_density.py via CLI.
+
+    output_name selects which cell's file the density is merged into -- equilibration.json for
+    the melt gate, a per-cell name for the assessment gate -- and matches the tool signature
+    above. It was threaded into this worker's call site by 71a6734 and used in the command
+    below without ever being added here, so every call raised TypeError; the melt gate is the
+    first caller to reach it, which is why it stayed latent until 2026-09-09.
+    """
 
     parts = [f"python {MDA_SCRIPTS_DIR}/extract_equilibrated_density.py"]
     parts.append(f"--log_file {log_file}")

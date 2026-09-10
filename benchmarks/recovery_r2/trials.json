@@ -1,0 +1,456 @@
+{
+  "tier": "routing (tier 1) -- COMPLETION IS SCRIPTED, NOT MEASURED",
+  "cell": "/home/arz2/PolyJarvis_v2/data/PEG1_gate_validation/attempts/build/attempt-0001/work/cell/cell.data",
+  "trials_per_arm": 3,
+  "recurrences_injected": 3,
+  "max_agent_decisions": 2,
+  "verification": {
+    "cell": "/home/arz2/PolyJarvis_v2/data/PEG1_gate_validation/attempts/build/attempt-0001/work/cell/cell.data",
+    "control": {
+      "code": null,
+      "errors": [],
+      "ok": true
+    },
+    "injectors": [
+      {
+        "id": "net_charge",
+        "target_code": "BUILD_CELL_INVALID",
+        "got": "BUILD_CELL_INVALID",
+        "fired": true,
+        "knobs": {},
+        "evidence": "Net charge = +0.9000 e (tolerance \u00b10.01 e). PPPM requires a charge-neutral cell. Check RESP convergence or add a neutralising counterion."
+      },
+      {
+        "id": "truncate_atoms",
+        "target_code": "BUILD_CELL_INVALID",
+        "got": "BUILD_CELL_INVALID",
+        "fired": true,
+        "knobs": {},
+        "evidence": "Net charge = +0.0530 e (tolerance \u00b10.01 e). PPPM requires a charge-neutral cell. Check RESP convergence or add a neutralising counterion."
+      },
+      {
+        "id": "collapse_box",
+        "target_code": "BUILD_CELL_INVALID",
+        "got": "BUILD_CELL_INVALID",
+        "fired": true,
+        "knobs": {},
+        "evidence": "Box dimension <= 0 \u2014 file may be truncated"
+      },
+      {
+        "id": "undersized_cell",
+        "target_code": "SIZE_MIN_IMAGE_VIOLATION",
+        "got": "SIZE_MIN_IMAGE_VIOLATION",
+        "fired": true,
+        "knobs": {
+          "lj_cutoff": 40.0
+        },
+        "evidence": "Minimum box side 49.3 \u00c5 < 2\u00d7cutoff (80.0 \u00c5). LAMMPS requires box > 2\u00d7cutoff in all periodic directions."
+      }
+    ],
+    "failures": []
+  },
+  "summary": {
+    "net_charge/A1": {
+      "status": {
+        "escalation_required": 3
+      },
+      "remedies_applied": [
+        0
+      ],
+      "remedy_ids": [],
+      "agent_calls": [
+        0
+      ]
+    },
+    "net_charge/A2": {
+      "status": {
+        "failed": 3
+      },
+      "remedies_applied": [
+        0
+      ],
+      "remedy_ids": [],
+      "agent_calls": [
+        1
+      ]
+    },
+    "truncate_atoms/A1": {
+      "status": {
+        "escalation_required": 3
+      },
+      "remedies_applied": [
+        0
+      ],
+      "remedy_ids": [],
+      "agent_calls": [
+        0
+      ]
+    },
+    "truncate_atoms/A2": {
+      "status": {
+        "failed": 3
+      },
+      "remedies_applied": [
+        0
+      ],
+      "remedy_ids": [],
+      "agent_calls": [
+        1
+      ]
+    },
+    "collapse_box/A1": {
+      "status": {
+        "escalation_required": 3
+      },
+      "remedies_applied": [
+        0
+      ],
+      "remedy_ids": [],
+      "agent_calls": [
+        0
+      ]
+    },
+    "collapse_box/A2": {
+      "status": {
+        "failed": 3
+      },
+      "remedies_applied": [
+        0
+      ],
+      "remedy_ids": [],
+      "agent_calls": [
+        1
+      ]
+    },
+    "undersized_cell/A1": {
+      "status": {
+        "escalation_required": 3
+      },
+      "remedies_applied": [
+        2
+      ],
+      "remedy_ids": [
+        "finite_size_rebuild"
+      ],
+      "agent_calls": [
+        0
+      ]
+    },
+    "undersized_cell/A2": {
+      "status": {
+        "failed": 3
+      },
+      "remedies_applied": [
+        2
+      ],
+      "remedy_ids": [
+        "finite_size_rebuild"
+      ],
+      "agent_calls": [
+        1
+      ]
+    }
+  },
+  "trials": [
+    {
+      "injector": "net_charge",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 0,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "net_charge",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 1,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "net_charge",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 2,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "net_charge",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 0,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "net_charge",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 1,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "net_charge",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 2,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "truncate_atoms",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 0,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "truncate_atoms",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 1,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "truncate_atoms",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 2,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "truncate_atoms",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 0,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "truncate_atoms",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 1,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "truncate_atoms",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 2,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "collapse_box",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 0,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "collapse_box",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 1,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "collapse_box",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 2,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "collapse_box",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 0,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "collapse_box",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 1,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "collapse_box",
+      "code": "BUILD_CELL_INVALID",
+      "trial": 2,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 0,
+      "by_id": {},
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "undersized_cell",
+      "code": "SIZE_MIN_IMAGE_VIOLATION",
+      "trial": 0,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 2,
+      "by_id": {
+        "finite_size_rebuild": 2
+      },
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "undersized_cell",
+      "code": "SIZE_MIN_IMAGE_VIOLATION",
+      "trial": 1,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 2,
+      "by_id": {
+        "finite_size_rebuild": 2
+      },
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "undersized_cell",
+      "code": "SIZE_MIN_IMAGE_VIOLATION",
+      "trial": 2,
+      "arm": "A1",
+      "status": "escalation_required",
+      "stage_status": "escalation_required",
+      "remedies_applied": 2,
+      "by_id": {
+        "finite_size_rebuild": 2
+      },
+      "agent_calls": 0,
+      "escalations": 0
+    },
+    {
+      "injector": "undersized_cell",
+      "code": "SIZE_MIN_IMAGE_VIOLATION",
+      "trial": 0,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 2,
+      "by_id": {
+        "finite_size_rebuild": 2
+      },
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "undersized_cell",
+      "code": "SIZE_MIN_IMAGE_VIOLATION",
+      "trial": 1,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 2,
+      "by_id": {
+        "finite_size_rebuild": 2
+      },
+      "agent_calls": 1,
+      "escalations": 1
+    },
+    {
+      "injector": "undersized_cell",
+      "code": "SIZE_MIN_IMAGE_VIOLATION",
+      "trial": 2,
+      "arm": "A2",
+      "status": "failed",
+      "stage_status": "failed",
+      "remedies_applied": 2,
+      "by_id": {
+        "finite_size_rebuild": 2
+      },
+      "agent_calls": 1,
+      "escalations": 1
+    }
+  ]
+}
