@@ -100,11 +100,11 @@ def detect_phys_cores() -> int:
 
 
 def gpu_status() -> list[dict]:
-    """Return [{index, util, mem_used_mb}] from nvidia-smi, or [] if unavailable."""
+    """Return [{index, util, mem_used_mb, mem_total_mb, mem_free_mb}] from nvidia-smi, or []."""
     try:
         out = subprocess.run(
             ["nvidia-smi",
-             "--query-gpu=index,utilization.gpu,memory.used",
+             "--query-gpu=index,utilization.gpu,memory.used,memory.total",
              "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=15,
         ).stdout
@@ -113,10 +113,11 @@ def gpu_status() -> list[dict]:
     gpus = []
     for line in out.strip().splitlines():
         parts = [p.strip() for p in line.split(",")]
-        if len(parts) >= 3:
-            gpus.append({"index": int(parts[0]),
-                         "util": int(parts[1]),
-                         "mem_used_mb": int(parts[2])})
+        if len(parts) >= 4:
+            used, total = int(parts[2]), int(parts[3])
+            gpus.append({"index": int(parts[0]), "util": int(parts[1]),
+                         "mem_used_mb": used, "mem_total_mb": total,
+                         "mem_free_mb": max(0, total - used)})
     return gpus
 
 
@@ -175,6 +176,23 @@ LEDGER = Path("/tmp/polyjarvis/gpu_locks")
 PHYS_CORES = detect_phys_cores()
 IDLE_UTIL = 5          # %
 IDLE_MEM_MB = 800
+MIN_FREE_MEM_MB = 8000
+"""How much GPU memory a run needs to be able to claim a card.
+
+This replaced an absolute `mem_used_mb <= IDLE_MEM_MB` test, which asked the wrong question.
+800 MB was calibrated on a box where a neighbour's idle CUDA context was ~750 MB, so it read
+as "nobody else is here." On 2026-09-11 a neighbour's 4-GPU training job grew its per-card
+allocation from 754 MB to 5.8 GB and every card crossed the line at once -- on 40 GB A800s
+with 34 GB still free. free_gpus() went empty, and because gpu_claim is scoped to each
+SUBMISSION rather than to a run, PE_1 released its card at the equilibration->cooling boundary
+and then could not reclaim it: "GPU claim failed (insufficient_free_gpus, available: [])" on a
+box that was 85% idle by memory. Every concurrent run was one stage boundary from the same
+failure.
+
+Whether someone else is COMPUTING here is what IDLE_UTIL measures, and it measures it well.
+Whether we can FIT is a question about free memory on this card, not about a constant that
+predates the card. IDLE_MEM_MB is kept for callers that still want the strict "pristine card"
+test (hardware/benchmark_hardware.py's politeness probe is deliberately stricter than this)."""
 STALE_S = 60 * 60 * 36  # prune claims older than 36 h
 
 
@@ -218,7 +236,13 @@ def free_gpus() -> list[int]:
     for g in gpu_status():
         if g["index"] in claimed:
             continue
-        if g["util"] <= IDLE_UTIL and g["mem_used_mb"] <= IDLE_MEM_MB:
+        # Free = nobody is computing here (util) AND our run fits (free memory). See
+        # MIN_FREE_MEM_MB: an absolute cap on USED memory fails on a big card the moment a
+        # neighbour parks a context on it, however much room is actually left.
+        fits = g.get("mem_free_mb")
+        if fits is None:                       # pre-mem_total probe result; fall back
+            fits = max(0, g.get("mem_total_mb", 0) - g["mem_used_mb"])
+        if g["util"] <= IDLE_UTIL and fits >= MIN_FREE_MEM_MB:
             free.append(g["index"])
     return free
 
