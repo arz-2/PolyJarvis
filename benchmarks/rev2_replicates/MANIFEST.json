@@ -1,0 +1,279 @@
+{
+ "campaign": "rev2_replicates",
+ "purpose": "Revision-2 fixed-protocol, independent-seed replicate campaign, run end to end through the deterministic LangGraph control plane (orchestration/langgraph/run_graph.py) rather than the retired multi-agent worker-prompt path. Replicate 1 of each system LOCKS the protocol; replicates 2 and 3 replay it verbatim with different seeds.",
+ "hosts": {
+  "this_box": {
+   "gpus": "4x NVIDIA A800 40GB (GPU 0 held by another user's job; 1-3 in use here)",
+   "phys_cores": 32,
+   "systems": [
+    "PE",
+    "PEEK",
+    "PEG",
+    "PSU"
+   ]
+  },
+  "sibling_box": {
+   "systems": [
+    "PLLA",
+    "PMMA",
+    "PVC",
+    "PS"
+   ],
+   "note": "Run elsewhere by the operator; parameters not defined by this manifest."
+  }
+ },
+ "method": {
+  "driver": "orchestration/langgraph/run_graph.py",
+  "replicate_1": "Full graph: classify -> make_deterministic_plan run-plan --with-ff-probe -> headless literature-grounding critic -> headless adjudicator (SKILL.md step 5) -> materialize_plan -> cost guard -> execute, with the engine's own bounded recovery (MAX_AGENT_DECISIONS=2) inside execute.",
+  "protocol_lock": "On WorkflowEngine status 'accepted', run_campaign calls write_characterization_cache.py, which freezes workflow_state.effective_parameters -- decided_params AS AMENDED BY EVERY MID-RUN REMEDY -- under FREEZE_KEYS into guides/system_characterization_cache.json, keyed by isomeric-canonical SMILES.",
+  "replicates_2_3": "cache_probe hits that entry, make_plan_from_cache writes plan_mode='deterministic'/confidence 'high', and the graph routes past classify, critique, adjudicate AND materialize straight to the cost guard and execute. Skipping materialize is required for correctness: it would re-solve the cell and overwrite the protocol just replayed.",
+  "failure_policy": "A replicate 1 that does not reach 'accepted' STOPS the system's campaign and is reported to the operator. escalation_required and failed are terminal -- both recovery-agent calls are spent by then, so re-entering only re-burns GPU."
+ },
+ "seed_derivation": {
+  "emc_seed": "1 + int(sha256(run_name).hexdigest(), 16) % 999999   [run_campaign.do_build]",
+  "velocity_seed": "10000 + int(sha256(run_name).hexdigest(), 16) % 989999   [stage_params._velocity_seed]",
+  "why_not_pinned": "Neither seed is in write_characterization_cache.FREEZE_KEYS, so a replayed protocol carries no seed and each replicate derives its own from its run_name -- distinct per replicate, stable across retries. That is the mechanism that makes 'same protocol, different seed' structural rather than clerical.",
+  "note": "Both seeds derive from the SAME sha256 digest under different moduli. stereo_r2 pinned independently-derived seeds instead; here the values are whatever the run_name yields, recorded below BEFORE first execution so they can be checked against what actually ran.",
+  "verify_after_run": "emc_seed in data/<RUN>/attempts/build/<id>/executor_state.json; velocity_seed in the equilibration attempt's executor_state.json."
+ },
+ "systems": {
+  "PE": {
+   "polymer": "polyethylene",
+   "cls": "PHYC",
+   "smiles": "*CC*",
+   "ff": "trappe-ua",
+   "replicates": [
+    {
+     "run_name": "PE_1",
+     "emc_seed": 840238,
+     "velocity_seed": 152739
+    },
+    {
+     "run_name": "PE_2",
+     "emc_seed": 783028,
+     "velocity_seed": 904370
+    },
+    {
+     "run_name": "PE_3",
+     "emc_seed": 962891,
+     "velocity_seed": 137395
+    }
+   ],
+   "replicate_1_plan": {
+    "confidence": "high",
+    "plan_mode": "reasoned",
+    "priced_gpu_hours": 1.6988,
+    "unpriced_stages": [
+     "equil"
+    ],
+    "adjudicator_overrides": {
+     "experimental_tg_K": 195,
+     "experimental_density_gcm3": 0.855,
+     "exp_K_min_GPa": 1.5,
+     "exp_K_max_GPa": 2
+    },
+    "cell": {
+     "dp_typical": 179,
+     "nchain": 10
+    },
+    "T_equil_K": 550.0,
+    "T_workflow_K": 300.0,
+    "final_T_K": 300.0,
+    "tg_rate_K_per_ns": 40,
+    "bm_pressures_atm": [
+     1,
+     1000,
+     2500,
+     5000,
+     10000,
+     15000
+    ]
+   },
+   "critic": {
+    "verdict": "agrees",
+    "suggested_override": null,
+    "supporting_dois": [
+     "10.3390/polym16020304",
+     "10.1021/acs.macromol.5b00823",
+     "10.1021/jp972543+"
+    ]
+   }
+  },
+  "PEEK": {
+   "polymer": "poly(ether ether ketone)",
+   "cls": "PKTN",
+   "smiles": "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1",
+   "ff": "pcff",
+   "replicates": [
+    {
+     "run_name": "PEEK_1",
+     "emc_seed": 768489,
+     "velocity_seed": 766602
+    },
+    {
+     "run_name": "PEEK_2",
+     "emc_seed": 791429,
+     "velocity_seed": 898589
+    },
+    {
+     "run_name": "PEEK_3",
+     "emc_seed": 973247,
+     "velocity_seed": 55037
+    }
+   ],
+   "replicate_1_plan": {
+    "confidence": "medium",
+    "plan_mode": "reasoned",
+    "priced_gpu_hours": 5.777,
+    "unpriced_stages": [
+     "equil",
+     "murnaghan"
+    ],
+    "adjudicator_overrides": {},
+    "cell": {
+     "dp_typical": 18,
+     "nchain": 10
+    },
+    "T_equil_K": 770.0,
+    "T_workflow_K": 770.0,
+    "final_T_K": 300.0,
+    "tg_rate_K_per_ns": 100,
+    "bm_pressures_atm": null
+   },
+   "critic": {
+    "verdict": "agrees",
+    "suggested_override": null,
+    "supporting_dois": [
+     "10.1021/acsami.3c01307",
+     "10.3390/polym12051054"
+    ]
+   }
+  },
+  "PSU": {
+   "polymer": "polysulfone (bisphenol-A, Udel)",
+   "cls": "PSFO",
+   "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+   "ff": "pcff",
+   "replicates": [
+    {
+     "run_name": "PSU_1",
+     "emc_seed": 5396,
+     "velocity_seed": 836097
+    },
+    {
+     "run_name": "PSU_2",
+     "emc_seed": 804277,
+     "velocity_seed": 685700
+    },
+    {
+     "run_name": "PSU_3",
+     "emc_seed": 675306,
+     "velocity_seed": 454398
+    }
+   ],
+   "replicate_1_plan": {
+    "confidence": "medium",
+    "plan_mode": "reasoned",
+    "priced_gpu_hours": 5.1215,
+    "unpriced_stages": [
+     "equil",
+     "murnaghan"
+    ],
+    "adjudicator_overrides": {
+     "experimental_density_gcm3": 1.24
+    },
+    "cell": {
+     "dp_typical": 12,
+     "nchain": 10
+    },
+    "T_equil_K": 700.0,
+    "T_workflow_K": 700.0,
+    "final_T_K": 300.0,
+    "tg_rate_K_per_ns": 100,
+    "bm_pressures_atm": null
+   },
+   "critic": {
+    "verdict": "agrees",
+    "suggested_override": null,
+    "supporting_dois": [
+     "10.3390/polym13132199",
+     "10.21203/rs.3.rs-1109742/v1",
+     "10.1016/j.commatsci.2018.05.039"
+    ]
+   }
+  },
+  "PEG": {
+   "polymer": "poly(ethylene oxide) / poly(ethylene glycol)",
+   "cls": "POXI",
+   "smiles": "*CCO*",
+   "ff": "pcff",
+   "replicates": [
+    {
+     "run_name": "PEG_1",
+     "emc_seed": 148731,
+     "velocity_seed": 135693
+    },
+    {
+     "run_name": "PEG_2",
+     "emc_seed": 798838,
+     "velocity_seed": 316927
+    },
+    {
+     "run_name": "PEG_3",
+     "emc_seed": 200187,
+     "velocity_seed": 631302
+    }
+   ],
+   "replicate_1_plan": {
+    "confidence": "medium",
+    "plan_mode": "reasoned",
+    "priced_gpu_hours": 6.0361,
+    "unpriced_stages": [
+     "equil"
+    ],
+    "adjudicator_overrides": {},
+    "cell": {
+     "dp_typical": 114,
+     "nchain": 10
+    },
+    "T_equil_K": 500.0,
+    "T_workflow_K": 300.0,
+    "final_T_K": 300.0,
+    "tg_rate_K_per_ns": 100,
+    "bm_pressures_atm": [
+     -1000,
+     0,
+     3000,
+     7000,
+     15000
+    ]
+   },
+   "critic": {
+    "verdict": "disagrees",
+    "suggested_override": {
+     "preferred_ff": "opls/2024/opls-aa"
+    },
+    "supporting_dois": [
+     "10.3390/polym13224049",
+     "10.1039/d4ra04898a"
+    ]
+   }
+  }
+ },
+ "deviations_from_stereo_r2": [
+  "stereo_r2 pinned bm_pressures_atm [-1000, 0, 1500, 3000, 5000] for PEEK and PSU because PKTN and PSFO declare no ladder. Here nothing is pinned: protocol_policy resolves the ladder at run time from the cell's own measured CED and fluctuation K (unscreened default (-200, 0, 3000, 7000, 15000), tension widened to at most -1000 atm once CED is measured). That is why 'murnaghan' prices as unpriced for both. WATCH: the 15000 atm compression point is ~30% volume strain on a K~5 GPa glass; a kink or a poor Murnaghan fit on PEEK/PSU should be read against this choice first.",
+  "stereo_r2 used the --no-llm/--baseline arm, arguing a fixed-protocol claim should not rest on a critic pass that is not rerun for replicates 2-3. Here replicate 1 runs the critic and the adjudicator, and what they decide is frozen into the cache -- so replicates 2 and 3 inherit the reviewed protocol verbatim without re-running either model.",
+  "stereo_r2 stated polymer_class per system because a PVC dyad misclassifies as PHAL. None of these four has that problem: classify_cli returns PHYC / PKTN / PSFO / POXI for the four SMILES, verified 2026-09-11, so run_graph's own classify node is used."
+ ],
+ "host_calibration": {
+  "date": "2026-09-11",
+  "commit": "c6a9866",
+  "why": "hardware_policy carried a 4x Quadro RTX 6000 / 18-core fingerprint, so host_matches() was false and every cost estimate came off another machine's throughput curve at 'medium' confidence. Revalidated with --size-points before pricing any run in this campaign.",
+  "measured_ns_per_day_base_cell": {
+   "pcff": 53.97,
+   "opls": 62.02,
+   "trappe": 804.31
+  },
+  "parity": "run-0 vs CPU PASS for all three families; values_are_benchmarked=true."
+ }
+}

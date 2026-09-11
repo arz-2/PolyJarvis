@@ -197,8 +197,9 @@ def main() -> int:
                 print(f"      not automatic: {entry['why_not_automatic'][:150]}")
                 if entry.get("class_3_condition"):
                     print(f"      only when: {entry['class_3_condition']}")
-    print(f"\nvalidation: {'FAIL -- ' + '; '.join(failures) if failures else 'PASS -- every '
-          'Class-3 fix is inside ALLOWED_OVERRIDES'}")
+    verdict = ("FAIL -- " + "; ".join(failures) if failures
+               else "PASS -- every Class-3 fix is inside ALLOWED_OVERRIDES")
+    print(f"\nvalidation: {verdict}")
     print("\nHeadline metric: LLM contribution = Class-3 trials A2 resolves / Class-3 trials.")
     print("Report Classes 1 and 2 alongside it, or the denominator is unauditable.")
     return 1 if failures else 0

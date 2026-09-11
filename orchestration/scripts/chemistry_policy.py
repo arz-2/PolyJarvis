@@ -94,11 +94,12 @@ def check_hbond_network(profile: dict, class_entry: dict) -> dict | None:
               if g.get("polarity") == "polar_protic"]
     if not protic:
         return None
+    named = ", ".join(f"{g['id']} ({g['location']})" for g in protic)
     return {
         "code": "CHEM_HBOND_NETWORK", "severity": ADVISORY,
         "detail": (
             f"{donors} hydrogen-bond donor(s) from "
-            f"{', '.join(f'{g['id']} ({g['location']})' for g in protic)}. Inter-chain "
+            f"{named}. Inter-chain "
             "H-bonding raises Tg and modulus and slows equilibration; if any of these sit "
             "off the backbone, the class label was assigned without seeing them."),
         "groups": [g["id"] for g in protic],
