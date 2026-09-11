@@ -298,5 +298,19 @@
    "PEG_1": "pending -- not yet launched"
   },
   "note": "The pre-registered run_name-derived values are what reached the build and the decks, with no pinning in the plan. stereo_r2 records that round 1 never closed this loop; it is closed here per replicate, and must be re-checked for replicates 2 and 3, where it is the ONLY thing that distinguishes them from replicate 1."
- }
+ },
+ "errata": [
+  {
+   "id": "E-01_compass_is_runnable",
+   "raised_by": "operator, 2026-09-11",
+   "affects": "PSU_1 run_plan.json D-01_ff.critique finding 1",
+   "claim_as_written": "\"COMPASS is not a runnable field in this codebase (no 'compass' entry in forcefield.RUNNABLE_FIELDS / ENUM_OVERRIDES['preferred_ff'])\" -- the adjudicator's DECISIVE argument for keeping pcff on PSU.",
+   "status": "FALSE",
+   "evidence": "forcefield.FIELDS['compass'] exists (front_end=emc, styles lj/class2/coul/long + class2 bonded), LINEAGE['compass']='class2' so it IS in RUNNABLE_FIELDS, and scientific_control.FF_OVERRIDE_VALUES (= forcefield.RUNNABLE_FIELDS) admits it as a preferred_ff override. guides/ff_moiety_rules.json screens it, the EMC server accepts it, and rules_common maps it onto the pcff hardware family.",
+   "does_the_conclusion_survive": "Yes, on measured grounds the adjudicator did not have. `forcefield.py capability` (real EMC trial build) on 2026-09-11: compass CANNOT type PSU or PEEK -- EMC aborts with core/fields.c:436 FieldsApply 'Missing rules' -- while pcff types and builds both. EMC ships the PUBLISHED COMPASS subset, not the commercial full parameterisation, and that subset has no rules for an aryl-ether-sulfone or an aryl-ether-ketone. PSU and PEEK stay on pcff because it is the only field that builds them, not because compass is unavailable.",
+   "new_fact_it_exposed": "compass DOES type PEG (*CCO*) and is a genuine buildable alternative there. In the same probe the critic's own recommendation for PEG, opls/2024/opls-aa, FAILS to type it: core/script/field/entry.c:651 'Missing force field parameters'. Had the adjudicator applied the suggested override instead of declining it, PEG_1 would not have built at all.",
+   "lesson": "A capability claim about the codebase is checkable and must be checked, not asserted from memory. `forcefield.py capability <smiles> --fields <a,b>` answers it with a real EMC trial build in seconds, and it is the same probe make_deterministic_plan runs under --with-ff-probe -- but only when a moiety rule matches, which is why none of these four SMILES triggered one.",
+   "action_taken": "Recorded here rather than by editing PSU_1's run_plan.json: that plan is executing and its plan_hash is the stage-state key."
+  }
+ ]
 }
