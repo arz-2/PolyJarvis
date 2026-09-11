@@ -92,9 +92,17 @@ def detect_host() -> dict:
     return hardware_runtime.live_host()
 
 
-def polite_state(phys: int, allow_busy: bool) -> dict:
-    """Snapshot of what we may use right now without contending."""
-    free = bh.idle_gpu_ids()
+def polite_state(phys: int, allow_busy: bool, pin_gpus: list[int] | None = None) -> dict:
+    """Snapshot of what we may use right now without contending.
+
+    `pin_gpus` (--gpu-id) replaces the probe's answer with the operator's. bh.idle_gpu_ids()
+    excludes any GPU hosting a compute process from any user, which is the right default but
+    reports EVERY GPU busy when a neighbour's framework job holds an idle ~750 MB CUDA context
+    on all of them -- and --allow-busy alone would then fall through to GPU 0, typically the
+    one actually under load. Naming the GPUs that are genuinely free is an assertion the probe
+    cannot make; it narrows nothing else, and CPU gating is untouched.
+    """
+    free = list(pin_gpus) if pin_gpus else bh.idle_gpu_ids()
     busy = 0 if allow_busy else bh.busy_cores(phys)
     headroom = 0 if allow_busy else max(1, round(HEADROOM_FRAC * phys))
     cap = phys if allow_busy else max(1, phys - busy - headroom)
@@ -516,7 +524,7 @@ def run_revalidate(args, host: dict) -> int:
         os.nice(19)                       # be polite even on direct (non-subprocess) runs
     except OSError:
         pass
-    st = polite_state(host["phys_cores"], args.allow_busy)
+    st = polite_state(host["phys_cores"], args.allow_busy, args.gpu_id)
     hp = json.loads(RULES.read_text())["hardware_policy"]
     by_ff = hp.get("by_forcefield", {})
 
@@ -596,7 +604,7 @@ def run_revalidate(args, host: dict) -> int:
 # Full sweep — fresh engine×config search per FF (drained-box authoritative mode, --full)
 # --------------------------------------------------------------------------
 def run_full(args, host: dict) -> int:
-    st = polite_state(host["phys_cores"], args.allow_busy)
+    st = polite_state(host["phys_cores"], args.allow_busy, args.gpu_id)
     runnable, skipped = plan_configs(host["phys_cores"], st, args.allow_busy)
     only_names = [c["name"] for c in runnable]
 
@@ -668,6 +676,15 @@ def main() -> int:
                     help="measurement date stamp (default: today)")
     ap.add_argument("--allow-busy", action="store_true",
                     help="DEDICATED/DRAINED BOX ONLY: disable politeness gating")
+    ap.add_argument("--gpu-id", action="append", type=int, default=[],
+                    help="pin GPU configs to these GPU indices instead of the ones the "
+                         "politeness probe found free (repeatable). For a box shared with a "
+                         "neighbour whose job holds an idle CUDA context on every GPU: that "
+                         "makes gpus_with_compute_procs() report every GPU busy, so "
+                         "free_gpus is empty and --allow-busy alone would fall through to "
+                         "GPU 0 -- typically the one actually under load. Naming the GPUs "
+                         "that are genuinely yours is the operator assertion politeness "
+                         "cannot make on its own. Implies nothing about CPU gating.")
     ap.add_argument("--dry-run", action="store_true",
                     help="show the planned polite work; write nothing")
     args = ap.parse_args()
