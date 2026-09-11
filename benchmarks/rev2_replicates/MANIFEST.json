@@ -275,5 +275,28 @@
    "trappe": 804.31
   },
   "parity": "run-0 vs CPU PASS for all three families; values_are_benchmarked=true."
+ },
+ "seed_verification": {
+  "checked_at": "2026-09-11",
+  "method": "emc_seed read from data/<RUN>/attempts/build/<id>/executor_state.json; velocity_seed read from the `velocity all create` lines of the equilibration attempt's generated decks, which is where it actually reaches LAMMPS.",
+  "results": {
+   "PE_1": {
+    "emc_seed": 840238,
+    "velocity_seed": 152739,
+    "matches_manifest": true
+   },
+   "PEEK_1": {
+    "emc_seed": 768489,
+    "velocity_seed": 766602,
+    "matches_manifest": true
+   },
+   "PSU_1": {
+    "emc_seed": 5396,
+    "velocity_seed": 836097,
+    "matches_manifest": true
+   },
+   "PEG_1": "pending -- not yet launched"
+  },
+  "note": "The pre-registered run_name-derived values are what reached the build and the decks, with no pinning in the plan. stereo_r2 records that round 1 never closed this loop; it is closed here per replicate, and must be re-checked for replicates 2 and 3, where it is the ONLY thing that distinguishes them from replicate 1."
  }
 }
