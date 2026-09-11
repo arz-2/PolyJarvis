@@ -310,7 +310,19 @@
    "does_the_conclusion_survive": "Yes, on measured grounds the adjudicator did not have. `forcefield.py capability` (real EMC trial build) on 2026-09-11: compass CANNOT type PSU or PEEK -- EMC aborts with core/fields.c:436 FieldsApply 'Missing rules' -- while pcff types and builds both. EMC ships the PUBLISHED COMPASS subset, not the commercial full parameterisation, and that subset has no rules for an aryl-ether-sulfone or an aryl-ether-ketone. PSU and PEEK stay on pcff because it is the only field that builds them, not because compass is unavailable.",
    "new_fact_it_exposed": "compass DOES type PEG (*CCO*) and is a genuine buildable alternative there. In the same probe the critic's own recommendation for PEG, opls/2024/opls-aa, FAILS to type it: core/script/field/entry.c:651 'Missing force field parameters'. Had the adjudicator applied the suggested override instead of declining it, PEG_1 would not have built at all.",
    "lesson": "A capability claim about the codebase is checkable and must be checked, not asserted from memory. `forcefield.py capability <smiles> --fields <a,b>` answers it with a real EMC trial build in seconds, and it is the same probe make_deterministic_plan runs under --with-ff-probe -- but only when a moiety rule matches, which is why none of these four SMILES triggered one.",
-   "action_taken": "Recorded here rather than by editing PSU_1's run_plan.json: that plan is executing and its plan_hash is the stage-state key."
+   "action_taken": "Recorded here rather than by editing PSU_1's run_plan.json: that plan is executing and its plan_hash is the stage-state key.",
+   "resolution": {
+    "date": "2026-09-11",
+    "process_fix": "The adjudicator could not verify capability claims: it held Read and cat/jq/grep/sed but NOT the probe, and nothing in its prompt told it to check the critic's claims. nodes._VERIFY_FIRST now instructs it to verify every claim it relies on -- the critic's, the plan's autofill evidence, and its own -- and the forcefield.py tool grant lets it actually run the EMC trial build.",
+    "re_adjudication": "PEG_1's adjudication was re-run through the fixed adjudicator with a neutral operator fact-correction (COMPASS is runnable; treat prior capability claims as unverified; no outcome prejudged). It probed pcff, compass, three OPLS variants and gaff2 itself, and kept pcff.",
+    "adjudicator_reasons_against_compass": [
+     "opls/2024/opls-aa DECLINED on measurement, not argument: types_smiles=false, 'Missing force field parameters'. It also noted the driver's own _apply_field_change would have popped the override anyway, so writing it would have been inert.",
+     "compass EVALUATED ON ITS MERITS and declined -- a field neither the plan nor the critic named. Nothing in the repo ranks it above pcff for an aliphatic polyether, and the two places the repo compares them cut against a swap: PVNL's ff_note records a COMPASS PVC study at K=2.947 GPa overlapping PolyJarvis's own PCFF 2.7-2.9 GPa ('two independent Class-II variants converge ... switching to COMPASS would likely not fix it'), and PSTR's ff_note -- the one documented COMPASS advantage, an aromatic-ring density deficit -6.3% -> -1.1% -- is aromatic-specific and PEO is not aromatic.",
+     "It corrected two of its own prior findings: the protocol-coherence argument was sound for OPLS-AA but must not generalise (compass's required_styles are byte-identical to pcff's), and 'NkepsuMbitou2025 has no resolvable DOI' was false -- it resolves in polymer_rules.json _metadata.primary_sources to 10.1016/j.commatsci.2025.113861.",
+     "It UPGRADED the row's parameter_coverage evidence from 'NOT MEASURED for this SMILES' to measured: pcff types and builds *CCO* to a runnable cell."
+    ],
+    "outcome": "PEG_1 runs on pcff -- the adjudicator's judgment, reached with correct facts and its own measurements, and followed. An operator switch to compass was applied and then REVERTED so the decision would be the adjudicator's rather than the operator's."
+   }
   }
  ]
 }

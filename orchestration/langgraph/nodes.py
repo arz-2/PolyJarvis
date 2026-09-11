@@ -525,11 +525,18 @@ def adjudicate(state: dict) -> dict:
         f"  grounding:      {grounding_path or '(none -- the critic returned no usable result)'}\n"
         f"  classification: {state.get('classification_path')}\n"
         f"{_chemistry_brief(state)}"
+        f"{_VERIFY_FIRST}"
+        f"{state.get('operator_note') or ''}"
     )
     try:
         decision = invoke(prompt, schemas.adjudication_schema(planning_parameter_contract()),
                           allowed_tools=("Read", "Bash(cat:*)", "Bash(jq:*)", "Bash(grep:*)",
-                                         "Bash(sed:*)"),
+                                         "Bash(sed:*)",
+                                         # The capability probe. Without it the adjudicator
+                                         # can only ASSERT what a field can do -- see
+                                         # _VERIFY_FIRST.
+                                         "Bash(mcp-servers/.venv/bin/python "
+                                         "orchestration/scripts/forcefield.py:*)"),
                           # 1.5 was below the call's real cost and every adjudication on
                           # this box exited 1 with EMPTY stderr, degrading silently to the
                           # deterministic baseline -- indistinguishable from --baseline,
@@ -547,6 +554,47 @@ def adjudicate(state: dict) -> dict:
         return _fall_back_to_baseline(state, f"adjudication call failed ({exc})")
 
     return apply_adjudication(state, decision)
+
+
+_VERIFY_FIRST = """
+## Verify before you judge
+
+Check every claim you are about to RELY ON -- the critic's, the plan's autofill evidence, and
+any you are about to make yourself. A judgement is only as good as the weakest fact under it,
+and an unverified fact stated confidently is worse than an admitted gap: it ends the argument
+without settling it.
+
+1. **A claim about what this codebase can do is checkable. Never assert it from memory.**
+   Whether a force field is runnable, whether a key is an allowed override, what a class
+   constant says -- all of it is in the source. `grep` it. This rule exists because a previous
+   adjudication rejected a critic's force-field recommendation on the stated ground that
+   "COMPASS is not a runnable field in this codebase," which is false: forcefield.FIELDS
+   carries it, its class2 lineage puts it in RUNNABLE_FIELDS, and
+   scientific_control.FF_OVERRIDE_VALUES admits it as a preferred_ff override. The conclusion
+   happened to survive on other grounds. It might not have.
+
+2. **Whether a field can build THIS repeat unit is decided by a real EMC trial build, not by
+   literature and not by lineage.** Run it before you accept OR reject a force-field
+   recommendation:
+
+       mcp-servers/.venv/bin/python orchestration/scripts/forcefield.py capability '<smiles>' --fields <a,b>
+
+   `candidate: true` means that field typed this monomer here; `types_smiles: false` with a
+   `typing_error` means it cannot build at all, whatever the papers say. A recommendation that
+   fails this probe must be declined ON THAT GROUND and the failure quoted -- it is the
+   strongest reason available and it costs seconds. The same probe is what the driver runs
+   before applying any preferred_ff override, so checking it here only tells you in advance
+   what will happen anyway. It also tells you what the ALTERNATIVES can do, which the critic
+   may not have considered.
+
+3. **A critic claim you cannot verify is unverified, not false, and not true.** Say which
+   claims you checked, what the check returned, and which you could not check. Weigh an
+   unverified claim accordingly instead of silently promoting or dismissing it.
+
+Record the verification in your findings: what you ran, what it returned, and how it moved the
+decision. A finding that asserts a fact without saying how it was established is the failure
+mode this section exists to stop.
+"""
 
 
 def _chemistry_brief(state: dict) -> str:
