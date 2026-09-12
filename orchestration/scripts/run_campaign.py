@@ -120,11 +120,23 @@ class StageHalt(SystemExit):
 
 # ─── GPU claim (A.6 — cross-track rules as code, not convention) ──────────────
 
+#: How long a claim waits for a GPU before reporting failure. A stage boundary re-races for a
+#: card the run itself just released (gpu_claim is per-submission), and losing that race used to
+#: be terminal: _transient_retry_blocked declines when no GPU is free, and declining escalates to
+#: the recovery agent. PE_1 spent both of its agent calls that way on 2026-09-11 and died with
+#: build, equilibration and cooling all accepted. Waiting converts a neighbour's utilisation spike
+#: from a lost campaign into a pause. Still bounded, so a genuinely full box surfaces rather than
+#: hanging forever.
+GPU_CLAIM_WAIT_S = 1800
+
+
 def _pick_gpu(action: str, run_name: str, need: int = None, adopt: str = None) -> dict:
     cmd = [sys.executable, str(REPO_ROOT / "orchestration" / "scripts" / "hardware_runtime.py"),
            "--json", action, "--run", run_name]
     if need is not None:
         cmd += ["--need", str(need)]
+    if action == "claim" and not adopt:
+        cmd += ["--wait-s", str(GPU_CLAIM_WAIT_S)]
     if adopt:
         cmd += ["--adopt", str(adopt)]
     r = subprocess.run(cmd, capture_output=True, text=True)

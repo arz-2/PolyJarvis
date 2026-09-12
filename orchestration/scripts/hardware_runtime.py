@@ -56,6 +56,7 @@ import os
 import subprocess
 import sys
 import time
+from typing import Optional
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -268,7 +269,55 @@ def cmd_status(js: bool = False) -> int:
     return 0
 
 
-def cmd_claim(run: str, need: int, js: bool = False, adopt: str = None) -> int:
+CLAIM_POLL_S = 15.0
+"""How often a waiting claim re-checks. See _claim_free."""
+
+
+def _claim_free(run: str, need: int, wait_s: float) -> tuple[Optional[list[int]], float]:
+    """Claim `need` GPUs atomically, waiting up to `wait_s` for them to come free.
+
+    Two defects this closes, both of which cost a real campaign.
+
+    WAITING. gpu_claim is scoped to each SUBMISSION, so a run releases its GPU at every stage
+    boundary and re-races for one. On a box shared with an un-ledgered tenant that race is
+    lost intermittently -- and a lost race was fatal, because workflow_engine's
+    _transient_retry_blocked declines to retry when no GPU is free and declining ESCALATES to
+    the recovery agent. PE_1 (2026-09-11) spent BOTH of its two agent calls on lost claim
+    races at the cooling and thermal boundaries and terminated escalation_required with its
+    build, equilibration and cooling all accepted. A neighbour's 30-second utilisation spike
+    is a reason to wait, not to burn a scarce decision that a scientific failure will need.
+
+    ATOMICITY. The old path read free_gpus() and then wrote the lock with write_text, so two
+    processes that polled together both "claimed" the same card, last writer winning the
+    ledger and both runs landing on one GPU -- the measured worst case on this hardware
+    (~8x slower aggregate for two PPPM jobs sharing a card). O_EXCL makes the lock file
+    itself the arbiter: whoever creates it owns the GPU, and a loser simply tries the next.
+    """
+    deadline = time.monotonic() + max(0.0, wait_s)
+    started = time.monotonic()
+    while True:
+        got: list[int] = []
+        for gid in free_gpus():
+            try:
+                fd = os.open(str(LEDGER / f"gpu{gid}.lock"),
+                             os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            except FileExistsError:
+                continue                      # someone claimed it between poll and open
+            with os.fdopen(fd, "w") as fh:
+                json.dump({"run": run, "pid": os.getppid(),
+                           "ts": time.strftime("%Y-%m-%dT%H:%M")}, fh)
+            got.append(gid)
+            if len(got) == need:
+                return got, time.monotonic() - started
+        for gid in got:                       # partial set is useless -- give it back
+            (LEDGER / f"gpu{gid}.lock").unlink(missing_ok=True)
+        if time.monotonic() >= deadline:
+            return None, time.monotonic() - started
+        time.sleep(min(CLAIM_POLL_S, max(0.0, deadline - time.monotonic())))
+
+
+def cmd_claim(run: str, need: int, js: bool = False, adopt: str = None,
+              wait_s: float = 0.0) -> int:
     LEDGER.mkdir(parents=True, exist_ok=True)
     if adopt:
         # ADOPTION, not allocation. The caller is reattaching to a detached chain that is ALREADY
@@ -288,19 +337,17 @@ def cmd_claim(run: str, need: int, js: bool = False, adopt: str = None) -> int:
         else:
             print(",".join(map(str, picked)))
         return 0
-    free = free_gpus()
-    if len(free) < need:
+    picked, waited = _claim_free(run, need, wait_s)
+    if picked is None:
+        free = free_gpus()
         if js:
-            print(json.dumps({"error": "insufficient_free_gpus",
-                              "need": need, "available": free}))
+            print(json.dumps({"error": "insufficient_free_gpus", "need": need,
+                              "available": free, "waited_s": waited}))
         else:
-            print(f"ERROR: need {need} free GPU(s), available: {free}", file=sys.stderr)
+            print(f"ERROR: need {need} free GPU(s), available: {free} "
+                  f"(waited {waited:.0f}s)", file=sys.stderr)
         return 1
-    picked = free[:need]
     ts = time.strftime("%Y-%m-%dT%H:%M")
-    for gid in picked:
-        (LEDGER / f"gpu{gid}.lock").write_text(
-            json.dumps({"run": run, "pid": os.getppid(), "ts": ts}))
     if js:
         print(json.dumps({"run": run, "claimed": picked, "need": need}))
     else:
@@ -341,6 +388,11 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
     c = sub.add_parser("claim"); c.add_argument("--run", required=True); c.add_argument("--need", type=int, default=1)
+    c.add_argument("--wait-s", type=float, default=0.0,
+                   help="Wait up to this many seconds for a GPU instead of failing at once. "
+                        "A lost claim race at a stage boundary is transient; treating it as "
+                        "fatal escalates to the recovery agent and spends one of only two "
+                        "calls (see _claim_free).")
     c.add_argument("--adopt", default=None,
                    help="Comma-separated GPU ids a detached chain is already running on. Records "
                         "the claim on exactly those, bypassing the idle check -- for reattach.")
@@ -348,7 +400,7 @@ def main() -> int:
     b = sub.add_parser("budget"); b.add_argument("--mpi", type=int, required=True)
     a = ap.parse_args()
     if a.cmd == "status":  return cmd_status(a.json)
-    if a.cmd == "claim":   return cmd_claim(a.run, a.need, a.json, a.adopt)
+    if a.cmd == "claim":   return cmd_claim(a.run, a.need, a.json, a.adopt, a.wait_s)
     if a.cmd == "release": return cmd_release(a.run, a.json)
     if a.cmd == "budget":  return cmd_budget(a.mpi, a.json)
     return 2
