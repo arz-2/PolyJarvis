@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-08T23:29:55Z",
+  "generated_at": "2026-09-12T12:38:06Z",
   "records": [
     {
       "schema_version": 1,
@@ -3504,6 +3504,226 @@
         "source_run": "PLLA_1",
         "migrated_from": null,
         "added_at": "2026-09-08T23:29:55Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "7dbc4e4a1876",
+      "field": "forcefield",
+      "polymer_class": "PSFO",
+      "polymer_names": [
+        "Polysulfone (PSU / Udel-type bisphenol-A polysulfone, representative member of the PSFO class)"
+      ],
+      "smiles": [
+        "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1"
+      ],
+      "claim": "Employed the COMPASS force field for all interactions among gas molecules, polymer (polysulfone), and silica filler; simulation density was set at 1.20 g/cm3 against a cited experimental PSF density of 1.24 g/cm3.",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "10.3390/polym13132199",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8271399/",
+      "title": "A Molecular Simulation Study of Silica/Polysulfone Mixed Matrix Membrane for Mixed Gas Separation",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PSU_1",
+        "migrated_from": null,
+        "added_at": "2026-09-11T20:50:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "fc73c31bcacd",
+      "field": "electrostatics",
+      "polymer_class": "PSFO",
+      "polymer_names": [
+        "Polysulfone (PSU / Udel-type bisphenol-A polysulfone, representative member of the PSFO class)"
+      ],
+      "smiles": [
+        "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1"
+      ],
+      "claim": "The summation method used to calculate the electrostatic interactions was supported by the Ewald method with an accuracy of 0.001 kcal/mol.",
+      "value": {
+        "recommendation": "pppm"
+      },
+      "doi": "10.3390/polym13132199",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8271399/",
+      "title": "A Molecular Simulation Study of Silica/Polysulfone Mixed Matrix Membrane for Mixed Gas Separation",
+      "year": 2021,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PSU_1",
+        "migrated_from": null,
+        "added_at": "2026-09-11T20:50:48Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "aa64e2df3ed4",
+      "field": "forcefield",
+      "polymer_class": "PSFO",
+      "polymer_names": [],
+      "smiles": [
+        "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PSFO (*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1) in run PSU_1; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:PSU_1",
+      "url": null,
+      "title": "PolyJarvis internal run PSU_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PSU_1",
+        "migrated_from": null,
+        "added_at": "2026-09-12T11:12:28Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "89eed15b5510",
+      "field": "cooling_rate",
+      "polymer_class": "PSFO",
+      "polymer_names": [],
+      "smiles": [
+        "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PSFO (*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1) in run PSU_1.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:PSU_1",
+      "url": null,
+      "title": "PolyJarvis internal run PSU_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PSU_1",
+        "migrated_from": null,
+        "added_at": "2026-09-12T11:12:28Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "b36b4cd3930b",
+      "field": "forcefield",
+      "polymer_class": "PKTN",
+      "polymer_names": [],
+      "smiles": [
+        "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PKTN (*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1) in run PEEK_1; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:PEEK_1",
+      "url": null,
+      "title": "PolyJarvis internal run PEEK_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PEEK_1",
+        "migrated_from": null,
+        "added_at": "2026-09-12T11:34:27Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "9bcce2c00cd9",
+      "field": "cooling_rate",
+      "polymer_class": "PKTN",
+      "polymer_names": [],
+      "smiles": [
+        "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PKTN (*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1) in run PEEK_1.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:PEEK_1",
+      "url": null,
+      "title": "PolyJarvis internal run PEEK_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PEEK_1",
+        "migrated_from": null,
+        "added_at": "2026-09-12T11:34:27Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "1309b4235bdf",
+      "field": "forcefield",
+      "polymer_class": "POXI",
+      "polymer_names": [],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on POXI (*CCO*) in run PEG_1; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:PEG_1",
+      "url": null,
+      "title": "PolyJarvis internal run PEG_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PEG_1",
+        "migrated_from": null,
+        "added_at": "2026-09-12T12:38:06Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "1354339bd929",
+      "field": "cooling_rate",
+      "polymer_class": "POXI",
+      "polymer_names": [],
+      "smiles": [
+        "*CCO*"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for POXI (*CCO*) in run PEG_1.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:PEG_1",
+      "url": null,
+      "title": "PolyJarvis internal run PEG_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PEG_1",
+        "migrated_from": null,
+        "added_at": "2026-09-12T12:38:06Z"
       }
     }
   ],

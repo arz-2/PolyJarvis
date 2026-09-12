@@ -70,7 +70,17 @@ class RunLock:
             return True
         except PermissionError:
             return False       # alive, owned by someone else
-        return False
+        # A ZOMBIE answers signal 0 and is not a driver. Its parent simply has not reaped it --
+        # anything that spawns run_graph with Popen and never waits leaves one behind, which the
+        # campaign queue runner does by design. Without this, killing a driver to pick up a code
+        # fix wedges that run until the unrelated parent exits: observed 2026-09-12 on PEEK_2 and
+        # PSU_2, both refused `locked` by their own dead selves. "A lock whose PID is gone is
+        # stale" has to mean gone, not merely unreaped.
+        try:
+            stat = Path(f"/proc/{pid}/stat").read_text()
+            return stat.rsplit(") ", 1)[-1].split(" ", 1)[0] == "Z"
+        except (OSError, IndexError):
+            return True        # no procfs entry -> gone
 
     def acquire(self) -> bool:
         self.path.parent.mkdir(parents=True, exist_ok=True)

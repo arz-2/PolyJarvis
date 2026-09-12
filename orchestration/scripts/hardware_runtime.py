@@ -272,6 +272,16 @@ def cmd_status(js: bool = False) -> int:
 CLAIM_POLL_S = 15.0
 """How often a waiting claim re-checks. See _claim_free."""
 
+DEFAULT_CLAIM_WAIT_S = 1800.0
+"""Patience belongs to the CLAIM, not to whoever calls it.
+
+run_campaign passes --wait-s explicitly, but a campaign already running has run_campaign.py
+loaded in memory and would keep calling the old argument-free command -- while
+hardware_runtime.py, which _pick_gpu invokes as a FRESH SUBPROCESS every time, is picked up
+immediately. On 2026-09-11 that difference was three live runs, hours of GPU each, still one
+stage boundary from PE_1's fate. Defaulting here fixes them mid-flight. Pass --wait-s 0 to
+check availability by hand without blocking."""
+
 
 def _claim_free(run: str, need: int, wait_s: float) -> tuple[Optional[list[int]], float]:
     """Claim `need` GPUs atomically, waiting up to `wait_s` for them to come free.
@@ -388,11 +398,12 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
     c = sub.add_parser("claim"); c.add_argument("--run", required=True); c.add_argument("--need", type=int, default=1)
-    c.add_argument("--wait-s", type=float, default=0.0,
-                   help="Wait up to this many seconds for a GPU instead of failing at once. "
-                        "A lost claim race at a stage boundary is transient; treating it as "
-                        "fatal escalates to the recovery agent and spends one of only two "
-                        "calls (see _claim_free).")
+    c.add_argument("--wait-s", type=float, default=DEFAULT_CLAIM_WAIT_S,
+                   help="Wait up to this many seconds for a GPU instead of failing at once "
+                        f"(default {DEFAULT_CLAIM_WAIT_S:.0f}s). A lost claim race at a stage "
+                        "boundary is transient; treating it as fatal escalates to the recovery "
+                        "agent and spends one of only two calls (see _claim_free). Pass 0 for "
+                        "the old fail-fast behaviour, e.g. when checking availability by hand.")
     c.add_argument("--adopt", default=None,
                    help="Comma-separated GPU ids a detached chain is already running on. Records "
                         "the claim on exactly those, bypassing the idle check -- for reattach.")

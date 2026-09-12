@@ -11,6 +11,7 @@ is gone is stale and reclaimed.
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -85,3 +86,37 @@ def test_the_lock_lives_under_the_run_directory_not_a_shared_path(tmp_path):
     a, b = RunLock(tmp_path / "runA"), RunLock(tmp_path / "runB")
     assert a.acquire() and b.acquire()
     assert a.path != b.path
+
+
+def test_a_zombie_driver_does_not_wedge_the_run(tmp_path):
+    """A lock whose PID is a ZOMBIE is stale. "Gone" has to mean gone, not merely unreaped.
+
+    os.kill(pid, 0) succeeds on a zombie -- the process table entry survives until the parent
+    reaps it -- so the liveness probe reported a dead driver as alive and RunLock refused the
+    run as `locked`. Anything that spawns run_graph with Popen and never waits leaves zombies
+    behind; the rev2 campaign's queue runner does exactly that. On 2026-09-12, killing the
+    PEEK_2 and PSU_2 drivers to pick up a GPU fix left both runs refused `locked` by their own
+    dead selves, with their equilibration chains still running on the GPUs.
+    """
+    pid = os.fork()
+    if pid == 0:                       # child: exit at once, become a zombie
+        os._exit(0)
+    try:
+        for _ in range(200):           # wait for the child to actually reach Z
+            state = Path(f"/proc/{pid}/stat").read_text().rsplit(") ", 1)[-1].split(" ", 1)[0]
+            if state == "Z":
+                break
+            time.sleep(0.01)
+        assert state == "Z", f"child never became a zombie (state {state!r})"
+        os.kill(pid, 0)                # the probe that used to be the whole test
+
+        (tmp_path / "raw").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "raw" / ".graph.lock").write_text(
+            json.dumps({"pid": pid, "started_at": "2026-09-12T00:00:00+00:00"}))
+
+        assert RunLock(tmp_path)._stale() is True
+        lock = RunLock(tmp_path)
+        assert lock.acquire() is True
+        lock.release()
+    finally:
+        os.waitpid(pid, 0)
