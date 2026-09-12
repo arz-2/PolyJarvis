@@ -546,7 +546,7 @@ def make_plan_from_cache(run_name: str, polymer_class: str, smiles: str, canonic
     if decisions:
         decisions[0].setdefault("critique", {"status": "protocol_validated_replay",
                                              "rounds": 0, "findings": [replay_note]})
-    return ordered_plan(
+    plan = ordered_plan(
         run_name=run_name,
         polymer_class=polymer_class.upper(),
         smiles=smiles,
@@ -565,6 +565,20 @@ def make_plan_from_cache(run_name: str, polymer_class: str, smiles: str, canonic
         decided_params=decided_params,
         planned_stages=list(protocol["planned_stages"]),
     )
+    # Price the replay HERE, because nothing downstream will. materialize_plan is what normally
+    # writes cost_estimate, and the LangGraph driver deliberately skips materialize on a cache
+    # hit -- it would re-solve the cell and overwrite the frozen protocol just replayed. So a
+    # replayed plan reached cost_guard_post carrying no total at all and was refused
+    # `cost_unknown` (exit 5): with a --max-gpu-hours ceiling set, EVERY cache replay was
+    # unrunnable, which is every replicate of every validated system. plan_cost_estimate needs
+    # only decided_params, smiles and polymer_class -- all frozen and all present here -- and it
+    # does not touch solve_system_size, so pricing costs the protocol nothing.
+    try:
+        import select_hardware
+        plan["cost_estimate"] = select_hardware.plan_cost_estimate(plan, rules=rules)
+    except Exception as exc:  # noqa: BLE001 -- an unpriced replay is honest, a crash is not
+        plan["cost_estimate"] = {"error": f"replay pricing failed: {type(exc).__name__}: {exc}"}
+    return plan
 
 
 def _try_cache(run_name: str, polymer_class: str, smiles, properties: set,

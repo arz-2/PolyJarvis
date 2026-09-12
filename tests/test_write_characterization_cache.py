@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import rules_common
+import track_registry
 import write_characterization_cache as wcc  # noqa: E402
 
 
@@ -175,19 +176,31 @@ def test_missing_run_plan_writes_nothing(tmp_path):
     assert entry is None
 
 
-def test_real_cache_file_was_actually_invalidated_by_the_equilibration_redesign():
-    """Eager bulk invalidation. Every equilibration redesign so far has renamed stages and
-    reshaped decided_params, so a pre-redesign cache entry references a protocol that no longer
-    exists -- the 8-stage adaptive protocol did it in 2026-08, and the equilibration/cooling
-    split did it again in 2026-09. A smoke test that the clearing was actually executed, not
-    just planned: the real repo cache file must have zero entries.
+def test_no_live_cache_entry_names_a_stage_the_registry_does_not_know():
+    """Every frozen protocol in the real cache must be replayable by THIS checkout.
 
-    The .pre_redesign.json reference copy this used to also assert on was deleted in d44696e
-    ("committed as found"), which is why this test has been red since; the assertion is dropped
-    rather than the file restored. _try_cache now returns a MISS for any frozen protocol naming
-    a stage the registry does not know, so a stale entry degrades to re-planning instead of a
-    hard PLAN_VALIDATION_FAILED -- which is the real protection, and it is tested directly in
-    test_make_deterministic_plan_from_cache.py."""
+    This used to assert `live_cache == {}` -- a smoke test that a one-off bulk invalidation had
+    been executed after the equilibration redesigns renamed stages and reshaped decided_params.
+    That assertion expired the moment the cache did its job: the rev2 campaign validated PEEK_1,
+    PSU_1 and PEG_1 on 2026-09-12 and froze their protocols, so an empty-file assertion would now
+    fail forever on a system working exactly as designed.
+
+    What actually needed protecting is unchanged, and is asserted directly instead: a frozen
+    protocol naming a stage the registry no longer knows would be replayed into a plan
+    validate_run_plan rejects as STRUCTURAL, and because _try_cache has already committed the run
+    to plan_mode="deterministic" by then, that surfaces as PLAN_VALIDATION_FAILED rather than a
+    graceful fall-through -- a locked SMILES becoming permanently unrunnable. _try_cache treats
+    an unknown stage name as a cache MISS (tested directly in
+    test_make_deterministic_plan_from_cache.py); this is the companion check on the live file.
+    """
     repo_root = Path(__file__).resolve().parent.parent
     live_cache = json.loads((repo_root / "guides" / "system_characterization_cache.json").read_text())
-    assert live_cache == {}
+    known = set(track_registry.STAGE_TRACK)
+    for smiles, entry in live_cache.items():
+        frozen = {st.get("stage") for st in
+                  ((entry.get("protocol") or {}).get("planned_stages") or [])}
+        unknown = frozen - known
+        assert not unknown, (
+            f"cache entry {smiles!r} (from run {entry.get('source_run_name')!r}) names "
+            f"stage(s) {sorted(unknown)} that track_registry no longer knows -- it would "
+            f"replay into a plan validate_run_plan rejects. Invalidate the entry.")
