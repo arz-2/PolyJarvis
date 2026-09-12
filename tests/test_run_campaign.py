@@ -2736,3 +2736,33 @@ def test_gpu_claim_forwards_the_adoption_to_the_ledger(monkeypatch):
     with rc.gpu_claim("PLLA_1", 1):
         pass
     assert ("claim", None) in seen
+
+
+def test_tg_sweep_and_murnaghan_submit_on_the_claimed_gpu_not_the_default(monkeypatch):
+    """Both GPU stages resolve their parameters BEFORE claiming, so the claim must refresh them.
+
+    resolve_stage_params captures args.gpu_ids, which for a campaign that did not pass --gpu_ids
+    is the hardware_policy default "0". do_thermal and do_mechanical then claim a GPU, assign it
+    to args -- too late for the dict they already resolved -- and submitted with p["gpu_ids"].
+    Every Tg sweep and every Murnaghan point therefore ran on GPU 0 whatever the ledger said.
+    Observed on PE_1 (2026-09-12): ledger claim on GPU 1, `export CUDA_VISIBLE_DEVICES=0` in the
+    generated sweep script, GPU 1 idle, GPU 0 shared with another tenant. Under concurrency two
+    runs would both pin to GPU 0 -- the measured ~8x-slower-in-aggregate case for two PPPM jobs
+    on one card.
+
+    Asserted on the source rather than by executing a stage: both submissions sit inside
+    multi-hour chain loops that cannot be driven in a unit test, and what regressed is purely
+    the ORDER of three statements.
+    """
+    import inspect
+    import run_campaign
+
+    for fn, submit in ((run_campaign.do_thermal, "_run_tg_sweep_adaptive"),
+                       (run_campaign.do_mechanical, "run_bulk_modulus_series")):
+        src = inspect.getsource(fn)
+        assert 'p["gpu_ids"] = gpu_ids' in src, (
+            f"{fn.__name__} does not refresh the resolved gpu_ids from its claim; the "
+            f"{submit} submission would pin to the hardware_policy default")
+        refresh = src.index('p["gpu_ids"] = gpu_ids')
+        assert refresh < src.index(submit), (
+            f"{fn.__name__} refreshes gpu_ids after the {submit} submission, which is too late")

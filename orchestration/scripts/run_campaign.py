@@ -1727,6 +1727,15 @@ def do_thermal(args, cls: dict, lammps, melt_density_gcm3=None) -> dict:
         p = resolve_stage_params("tg", args, cls)
         with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
             args.gpu_ids = gpu_ids
+            # resolve_stage_params ran BEFORE this claim, so p["gpu_ids"] still holds the
+            # value args carried in -- the hardware_policy default "0", not the GPU the ledger
+            # just handed us. Every Tg sweep and every Murnaghan point therefore ran on GPU 0
+            # whatever it claimed (PE_1, 2026-09-12: claim on GPU 1, sweep pinned to GPU 0 and
+            # contending with another tenant, while GPU 1 sat idle). Worse under concurrency:
+            # two runs reaching this stage together would BOTH pin to GPU 0, which is the
+            # measured ~8x-slower-in-aggregate case for two PPPM jobs sharing a card. Refresh
+            # the resolved copy from the claim, which is the only authority on where we may run.
+            p["gpu_ids"] = gpu_ids
             # No bracketing, no reheat probe, no waypoint selection: the staircase starts from
             # the cell the melt gate passed, at the temperature that gate certified.
             start_cell = {"outcome": "MELT_HOLD_START",
@@ -2135,6 +2144,8 @@ def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: 
         for point_attempt in range(1, 3):
             with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
                 args.gpu_ids = gpu_ids
+                # Same staleness as the Tg sweep above: p was resolved before this claim.
+                p["gpu_ids"] = gpu_ids
                 series = lammps.run_bulk_modulus_series(
                     data_file=p["equil_data_path"],
                     work_dir=f"{p['work_dir']}/bm_series/p_{pressure:g}/attempt_{point_attempt}",
