@@ -324,5 +324,22 @@
     "outcome": "PEG_1 runs on pcff -- the adjudicator's judgment, reached with correct facts and its own measurements, and followed. An operator switch to compass was applied and then REVERTED so the decision would be the adjudicator's rather than the operator's."
    }
   }
+ ],
+ "incidents": [
+  {
+   "id": "I-01_gpu_claim_races_killed_PE_1",
+   "date": "2026-09-11/12",
+   "what": "PE_1 terminated escalation_required with build, equilibration and cooling all ACCEPTED and thermal never having run a single MD step. Both of its two recovery-agent calls were spent on lost GPU claim races, one at the cooling boundary (21:52Z) and one at thermal (23:02Z). No scientific question was asked by either.",
+   "mechanism": "gpu_claim is scoped to each SUBMISSION, so a run releases its card at every stage boundary and re-races for one. Two independent defects made losing that race fatal: (a) free_gpus() required mem_used_mb <= 800, and a neighbour's 4-GPU training job grew from 754 MB to 5.8 GB per card, disqualifying every GPU at once on 40 GB A800s with 34 GB free; (b) _transient_retry_blocked DECLINED whenever no GPU was free, and declining escalates to the recovery agent.",
+   "fixes": [
+    "bceab9f - free_gpus() asks whether our run FITS (mem_free_mb >= 8 GB), not whether the card is pristine.",
+    "073a06a - claim waits (polling 15 s, bounded) instead of failing at once, and claims atomically via O_EXCL rather than read-then-write, which also closed a last-writer-wins race that could put two PPPM runs on one card (~8x slower aggregate).",
+    "hardware_runtime DEFAULT_CLAIM_WAIT_S - the patience defaults inside the claim itself, because a campaign already running has run_campaign.py in memory but invokes hardware_runtime.py as a fresh subprocess. That is what fixed the three live runs mid-flight.",
+    "2d0d06b - _apply_remedy waits RESOURCE_WAIT_S for a busy resource and escalates only if it is still missing at the deadline. A structurally broken run directory still escalates at once."
+   ],
+   "verification": "PEEK_1 and PSU_1 crossed the identical equilibration->cooling boundary at ~03:10Z with zero escalations and zero remedies, both on accepted_attempt-0001 with 12/12 binding gates evaluated and passing.",
+   "pe_1_disposition": "Operator-approved reset, 2026-09-12: thermal returned to pending and the two infrastructure escalations moved to agent_escalations_archived_infrastructure so the audit trail survives while the MAX_AGENT_DECISIONS budget is restored for science. build/equilibration/cooling remain accepted -- ~2.9 GPU-h preserved, ~1.7 GPU-h left. Requeued behind a lane gate.",
+   "lesson": "An orchestrator's scarcest resource is its agent-decision budget, and nothing in the engine stopped infrastructure from consuming it. Resource unavailability is a reason to WAIT; only a scientific finding should be allowed to spend a decision."
+  }
  ]
 }
