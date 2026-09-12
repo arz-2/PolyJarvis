@@ -46,11 +46,24 @@ CACHE_PATH_DEFAULT = REPO_ROOT / "guides" / "system_characterization_cache.json"
 # contract than "the protocol actually executed." If SNAPSHOT_KEYS gains a future key with a
 # similar computed-after-the-fact sibling, FREEZE_KEYS needs the same treatment -- check both
 # definitions together.
-FREEZE_KEYS = SNAPSHOT_KEYS + ["T_workflow_K", "T_melt_hold_K"]
+FREEZE_KEYS = SNAPSHOT_KEYS + ["T_workflow_K", "T_melt_hold_K", "preferred_ff"]
 """T_melt_hold_K joins T_workflow_K for the same reason: it is resolved by
 temperature_schedule AFTER the SNAPSHOT_KEYS comprehension runs, and it is the
 protocol-defining melt temperature -- a replayed protocol that did not carry it
-would re-derive the melt from whatever the class says today."""
+would re-derive the melt from whatever the class says today.
+
+preferred_ff joined them on 2026-09-12, and its absence was the sharpest bug in the replay
+path. make_plan_from_cache's own comment reads "The field is frozen; everything it implies
+is re-derived" -- but the field was never in SNAPSHOT_KEYS (that constant describes an
+unmodified class scaffold, and D-01 RESOLVES the field rather than copying it), so a frozen
+protocol carried preferred_ff=None. _derived_from_field(None) then resolved an empty family
+and handed the replay charge_method="RESP" -- a QM charge model -- for three PCFF systems
+that require bond-increment, while the replayed D-01 row still read "pcff". The plan was
+internally inconsistent and the most important decision in it, the force field, was the one
+thing NOT being replayed: it fell back to the class ff_accuracy_prior. That is invisible
+while the adjudicated field equals the prior, as it did for all four rev2 systems, and
+silently reverts the decision the moment a run moves the field OFF the prior -- which is
+exactly what the D-01 probe cascade exists to do."""
 
 # property -> the workflow_engine.py stage whose acceptance already proves that property's
 # binding gate (equil_verdict / tg_gate_verdict / bm_gate_verdict|deform_gate_verdict) passed.

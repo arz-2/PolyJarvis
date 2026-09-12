@@ -532,6 +532,15 @@ def make_plan_from_cache(run_name: str, polymer_class: str, smiles: str, canonic
     cls = get_class_entry(rules, polymer_class)
     protocol = cache_entry["protocol"]
     decided_params = dict(protocol["decided_params"])  # literal replay, no recomputation
+    if not decided_params.get("preferred_ff"):
+        # A freeze predating 2026-09-12 carries no preferred_ff (it was missing from
+        # FREEZE_KEYS). Replaying it would derive charge_method/electrostatics from an empty
+        # family -- "RESP" for what are in practice PCFF systems -- and silently fall back to
+        # the class ff_accuracy_prior for the field itself, discarding D-01's resolved choice.
+        # A protocol that cannot say which force field it used is not a protocol. Raise, so
+        # _try_cache turns it into a cache MISS and the run re-plans honestly.
+        raise KeyError("frozen protocol carries no preferred_ff -- pre-2026-09-12 freeze; "
+                       "re-freeze the source run with write_characterization_cache.py")
     # Retired rows are dropped on replay: a pre-2026-09-04 freeze carries five, and honouring a
     # frozen D-02/D-03/D-08 would reinstate exactly the field/charge disagreement the
     # derivation exists to prevent. The field is frozen; everything it implies is re-derived.
@@ -619,7 +628,13 @@ def _try_cache(run_name: str, polymer_class: str, smiles, properties: set,
                      ((entry.get("protocol") or {}).get("planned_stages") or [])}
     if not frozen_stages <= set(track_registry.STAGE_TRACK):
         return None
-    return make_plan_from_cache(run_name, polymer_class, smiles, canonical, properties, entry)
+    try:
+        return make_plan_from_cache(run_name, polymer_class, smiles, canonical, properties, entry)
+    except KeyError:
+        # An unreplayable freeze (e.g. one carrying no preferred_ff) is a MISS, not a crash:
+        # the caller falls through to make_plan() and the run re-plans from the class table
+        # rather than executing a protocol nobody can reconstruct.
+        return None
 
 
 # ---------------------------------------------------------------------------

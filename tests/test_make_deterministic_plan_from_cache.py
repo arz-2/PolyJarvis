@@ -121,3 +121,73 @@ def test_make_plan_unchanged_when_try_cache_misses(tmp_path):
     plan = make_plan("RUN1", CLASS, SMILES, PROPERTIES)
     assert plan["plan_mode"] == "scaffold"
     assert plan["polymer_class"] == CLASS
+
+
+def test_freeze_keys_carry_the_force_field_itself():
+    """The field D-01 resolved must be frozen, not re-derived from the class table.
+
+    write_characterization_cache.FREEZE_KEYS omitted preferred_ff until 2026-09-12, because
+    SNAPSHOT_KEYS describes an unmodified class scaffold and D-01 RESOLVES the field rather
+    than copying it. The consequence was silent and serious: a frozen protocol carried
+    preferred_ff=None, so every replicate fell back to the class ff_accuracy_prior for the
+    single most important decision in the plan -- invisible while the adjudicated field equals
+    the prior, and a silent reversal the moment the D-01 probe cascade moves it off.
+    """
+    import write_characterization_cache as wcc
+    assert "preferred_ff" in wcc.FREEZE_KEYS
+
+
+def test_a_freeze_without_a_force_field_is_a_miss_not_a_wrong_replay(tmp_path):
+    """A pre-2026-09-12 freeze must degrade to re-planning, never to a derived-from-nothing field.
+
+    Replaying one resolved the empty force-field family, which handed the plan
+    charge_method="RESP" -- a QM charge model -- while the replayed D-01 row still read the real
+    field. The plan was internally inconsistent, and it would have built three PCFF systems with
+    the wrong charge scheme. A cache MISS sends the run back to make_plan(), which is honest.
+    """
+    entry = _validated_entry()
+    entry["protocol"]["decided_params"] = {k: v for k, v in
+                                           entry["protocol"]["decided_params"].items()
+                                           if k != "preferred_ff"}
+    cache_path = _write_cache(tmp_path, entry)
+    assert _try_cache("RUN_STALE", CLASS, SMILES, PROPERTIES, cache_path) is None
+
+
+def test_replayed_charge_method_follows_the_frozen_field(tmp_path):
+    """Everything the field implies is re-derived FROM THE FROZEN FIELD, so the two can never
+    disagree -- the property make_plan_from_cache claims and, before preferred_ff was frozen,
+    did not have."""
+    entry = _validated_entry()
+    entry["protocol"]["decided_params"]["preferred_ff"] = "pcff"
+    entry["protocol"]["decisions"] = [{"id": "D-01_ff", "choice": "pcff"}]
+    cache_path = _write_cache(tmp_path, entry)
+    plan = _try_cache("RUN_PCFF", CLASS, SMILES, PROPERTIES, cache_path)
+    assert plan is not None
+    dp = plan["decided_params"]
+    assert dp["preferred_ff"] == "pcff"
+    assert dp["charge_method"] == "bond-increment"
+    assert dp["electrostatics"] == "pppm"
+    assert [d["choice"] for d in plan["decisions"]] == ["pcff"]
+
+
+def test_a_replayed_plan_prices_itself(tmp_path):
+    """materialize is skipped on a cache hit (it would overwrite the replayed protocol), and
+    materialize is what normally writes cost_estimate -- so without this the plan reaches
+    cost_guard_post with no total and is refused `cost_unknown`, making every replicate of every
+    validated system unrunnable under a --max-gpu-hours ceiling."""
+    entry = _validated_entry()
+    # A real freeze always carries the cell (dp_typical/nchain are in SNAPSHOT_KEYS); the
+    # minimal fixture above does not, and plan_cost_estimate correctly refuses to price a
+    # plan with no cell rather than inventing one.
+    entry["protocol"]["decided_params"].update({"dp_typical": 100, "nchain": 10})
+    cache_path = _write_cache(tmp_path, entry)
+    plan = _try_cache("RUN_PRICED", CLASS, SMILES, PROPERTIES, cache_path)
+    assert plan is not None
+    ce = plan["cost_estimate"]
+    assert "error" not in ce, ce
+    # A real priced block, not an error stub. total_gpu_hours is deliberately NOT asserted:
+    # this fixture carries no stage-length knobs, so nothing is priceable and an honest
+    # estimator returns no total. What regressed was cost_estimate being absent ENTIRELY,
+    # which is what cost_guard_post refused on. The end-to-end total is exercised by the real
+    # frozen protocols (PEEK replays at 5.777 GPU-h, identical to its source run).
+    assert "stages" in ce and "unpriced_stages" in ce
