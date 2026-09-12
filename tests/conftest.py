@@ -41,3 +41,18 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "allow_headless_claude: test deliberately exercises the real `claude -p` path")
+
+
+@pytest.fixture(autouse=True)
+def _no_resource_wait(monkeypatch):
+    """Never wait out a real resource deadline inside the test suite.
+
+    workflow_engine._apply_remedy waits RESOURCE_WAIT_S (20 min in production) for a GPU or
+    disk to come free before letting a blocked transient_retry escalate -- because escalating
+    spends one of only two recovery-agent calls, which is what killed PE_1 on 2026-09-11. That
+    wait consults the REAL GPU ledger, so on a busy box the engine tests inherited a 20-minute
+    stall each. The production default stays where it belongs; the suite asks the predicate
+    only for its verdict.
+    """
+    import workflow_engine
+    monkeypatch.setattr(workflow_engine, "RESOURCE_WAIT_S", 0.0, raising=False)

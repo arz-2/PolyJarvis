@@ -14,6 +14,7 @@ import math
 import os
 import shutil
 import sys
+import time
 from types import SimpleNamespace
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -676,37 +677,79 @@ class RemedyRegistry:
             raise AssertionError(f"blocking verdicts lack remedy routes: {sorted(missing)}")
 
 
-def _transient_retry_blocked(run_dir: Path, gpus_needed: int) -> Optional[str]:
+RESOURCE_WAIT_S = 1200.0
+"""How long a blocked retry waits for a resource before giving up and escalating.
+
+The original design declined immediately and escalated "WITH a named cause," on the
+reasoning that an unchanged resubmission into the same contention would just reproduce the
+failure. The premise is right; the conclusion cost a campaign. PE_1 (2026-09-11) lost two
+GPU claim races at two stage boundaries -- a neighbour's utilisation spike, seconds long
+each -- and both declines escalated, spending BOTH of the run's two recovery-agent calls
+without a single scientific question being asked. It terminated escalation_required with
+its build, equilibration and cooling all accepted.
+
+A resource that is "genuinely transient" is a reason to WAIT for it. The two agent calls
+are the scarcest thing the engine has and the only mechanism for a real scientific failure;
+spending one on a thirty-second collision is the worst trade available. So: wait, re-check,
+and escalate only if the resource is still missing when the bound expires -- which then
+means the box really is saturated and a human should see it.
+
+A structurally broken run directory is NOT this, and is never waited on."""
+
+RESOURCE_POLL_S = 30.0
+
+
+def _resource_block(run_dir: Path, gpus_needed: int) -> tuple[Optional[str], bool]:
+    """(reason, is_transient). reason None means nothing is blocking a resubmission."""
+    try:
+        free_gb = shutil.disk_usage(run_dir).free / 1e9
+    except OSError as exc:  # an unreadable run dir is its own, different problem
+        return f"run directory {run_dir} is not stat-able: {exc}", False
+    if free_gb < MIN_FREE_DISK_GB:
+        return (f"only {free_gb:.1f} GB free on the run filesystem, below the "
+                f"{MIN_FREE_DISK_GB:.0f} GB a resubmission needs"), True
+    try:
+        import hardware_runtime
+        free = hardware_runtime.free_gpus()
+    except Exception:
+        return None, True  # no GPU ledger on this host -- not a reason to block a retry
+    if gpus_needed and len(free) < gpus_needed:
+        return (f"{len(free)} GPU(s) free, {gpus_needed} needed"), True
+    return None, True
+
+
+def _transient_retry_blocked(run_dir: Path, gpus_needed: int,
+                             wait_s: float = 0.0) -> Optional[str]:
     """Why an unchanged resubmission would fail again, or None if it is worth trying.
 
     transient_retry is the only auto-remedy that has ever actually fired on this checkout,
     and every application was blind: the same parameters, resubmitted, with nothing checked
     in between. The two causes that make an "unchanged retry" certain to repeat are the two
-    the engine can see for itself -- a full filesystem and no free GPU. Both are genuinely
-    transient (someone else's run ends, a cleanup lands), which is why this declines rather
-    than failing outright: declining escalates to the recovery agent WITH a named cause,
-    instead of spending the second rung reproducing the first.
+    the engine can see for itself -- a full filesystem and no free GPU.
+
+    Both are genuinely transient, so the CALLER waits on them rather than declining
+    outright; see RESOURCE_WAIT_S for what declining immediately cost. Only a resource still
+    missing at the deadline escalates, and a structurally broken run directory escalates at
+    once. `wait_s` defaults to 0 so this stays a pure predicate -- the policy lives at the
+    _apply_remedy call site, and a test can ask "is this blocked right now" without
+    waiting out a real deadline.
 
     Deliberately not a claim check: gpu_claim is a `with` block scoped to each submission,
     so by the time a remedy runs the claim is already released and "do we still hold one"
     is always false. Availability is the question.
     """
-    try:
-        free_gb = shutil.disk_usage(run_dir).free / 1e9
-    except OSError as exc:  # an unreadable run dir is its own, different problem
-        return f"run directory {run_dir} is not stat-able: {exc}"
-    if free_gb < MIN_FREE_DISK_GB:
-        return (f"only {free_gb:.1f} GB free on the run filesystem, below the "
-                f"{MIN_FREE_DISK_GB:.0f} GB a resubmission needs")
-    try:
-        import hardware_runtime
-        free = hardware_runtime.free_gpus()
-    except Exception:
-        return None  # no GPU ledger on this host -- not a reason to block a retry
-    if gpus_needed and len(free) < gpus_needed:
-        return (f"{len(free)} GPU(s) free, {gpus_needed} needed -- a resubmission would "
-                "queue behind the same contention")
-    return None
+    deadline = time.monotonic() + max(0.0, wait_s)
+    while True:
+        reason, transient = _resource_block(run_dir, gpus_needed)
+        if reason is None:
+            return None
+        if not transient:
+            return reason
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return (f"{reason} -- still unavailable after waiting "
+                    f"{wait_s:.0f}s, so the box is saturated rather than momentarily busy")
+        time.sleep(min(RESOURCE_POLL_S, remaining))
 
 
 def _validate_revised_parameters(before: Mapping[str, Any],
@@ -1212,9 +1255,12 @@ class WorkflowEngine:
             # retry for a resource the stage never wanted. gpu_per_run comes from the class
             # entry, NOT from effective_parameters -- it is not in make_deterministic_plan's
             # SNAPSHOT_KEYS, so reading it there always yielded 0 and disabled the check.
+            # RESOURCE_WAIT_S, not 0: a momentary collision must cost a pause, never one of
+            # the two agent calls. See RESOURCE_WAIT_S for the campaign that paid for this.
             blocked = _transient_retry_blocked(
                 self.state_path.parent,
-                self._gpus_needed() if finding.stage in GPU_STAGES else 0)
+                self._gpus_needed() if finding.stage in GPU_STAGES else 0,
+                wait_s=RESOURCE_WAIT_S)
             if blocked is not None:
                 self._log_recovery_event({
                     "event": "auto_remedy_rejected", "code": finding.code,
