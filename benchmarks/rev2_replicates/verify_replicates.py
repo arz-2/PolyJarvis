@@ -101,8 +101,17 @@ def main() -> int:
                 dp = plan.get("decided_params") or {}
                 row["plan_mode"] = plan.get("plan_mode")
                 if frozen:
-                    differing = sorted(k for k in set(frozen) | set(dp)
-                                       if frozen.get(k) != dp.get(k))
+                    # Compare the FROZEN keys only. charge_method and electrostatics are
+                    # deliberately absent from FREEZE_KEYS -- make_plan_from_cache re-derives
+                    # them from the frozen preferred_ff ("the field is frozen; everything it
+                    # implies is re-derived"), so they exist on the plan and not in the freeze.
+                    # Comparing the union reports that design as a protocol difference.
+                    differing = sorted(k for k in frozen if frozen.get(k) != dp.get(k))
+                    row["derived_from_frozen_field"] = {
+                        "preferred_ff": dp.get("preferred_ff"),
+                        "charge_method": dp.get("charge_method"),
+                        "electrostatics": dp.get("electrostatics"),
+                    }
                     row["protocol_matches_frozen"] = not differing
                     if differing:
                         row["differing_keys"] = {k: {"frozen": frozen.get(k), "plan": dp.get(k)}
@@ -114,6 +123,12 @@ def main() -> int:
                                             f"protocol at {differing}")
             else:
                 row["plan_mode"] = "PENDING (not planned yet)"
+            # materialize_plan runs again inside agent_api start (ScientificControl.run), even
+            # for a frozen replay the graph deliberately routed PAST materialize -- so the cell
+            # is re-solved at execute time. solve_system_size is deterministic on the same
+            # inputs, so it reproduces the frozen cell unless the code or the class table has
+            # moved since the freeze, which is exactly when a lock matters. That makes the
+            # comparison above a real check rather than a formality; run it after launch.
             row["executed_seeds"] = {"emc_seed": executed_emc_seed(run),
                                      "velocity_seed": executed_velocity_seed(run)}
             for key, got in row["executed_seeds"].items():
@@ -145,6 +160,10 @@ def main() -> int:
             match = row.get("protocol_matches_frozen")
             flag = {True: "protocol=frozen", False: "PROTOCOL DIFFERS", None: "protocol=n/a"}[match]
             print(f"   {run:8} {str(row['plan_mode']):28} {flag}")
+            d = row.get("derived_from_frozen_field")
+            if d:
+                print(f"            ff={d['preferred_ff']} -> charge={d['charge_method']} "
+                      f"elec={d['electrostatics']}")
             print(f"            seeds expected emc={ex['emc_seed']:<9} vel={ex['velocity_seed']:<9}"
                   f"  executed emc={ran['emc_seed']} vel={ran['velocity_seed']}")
     print()
