@@ -1,4 +1,256 @@
 {
+  "*CC*": {
+    "notes": "Validated properties: ['bulk_modulus', 'density', 'tg']. Frozen decided_params reflect mid-run remedy application(s), not the original plan's decided_params: continue_npt on cooling (application 1). See workflow_state.json.remedy_history on the source run for full detail.",
+    "polymer_class": "PHYC",
+    "protocol": {
+      "decided_params": {
+        "K_deform_rate_inv_s": 100000000.0,
+        "K_deform_rate_slow_inv_s": 10000000.0,
+        "T_equil_K": 550.0,
+        "T_melt_hold_K": 550.0,
+        "T_workflow_K": 300.0,
+        "annealing_T_high_K": 620.0,
+        "bm_pressures_atm": [
+          1,
+          1000,
+          2500,
+          5000,
+          10000,
+          15000
+        ],
+        "bm_temperature_K": 300.0,
+        "ct_min_decay_melt": 0.25,
+        "cutoff_A": 14.0,
+        "density_initial_gcm3": 0.65,
+        "dp_typical": 179,
+        "dt_fs": 2.0,
+        "final_T_K": 300.0,
+        "md_tg_ceiling_K": 450,
+        "nchain": 10,
+        "preferred_builder": "emc",
+        "preferred_ff": "trappe-ua",
+        "stage8_min_steps": 2500000,
+        "tg_min_steps_per_T": 250000,
+        "tg_rate_K_per_ns": 40,
+        "tg_t_low_K": 100,
+        "tg_t_step_K": 20
+      },
+      "decisions": [
+        {
+          "acknowledgements": {},
+          "alternatives": [],
+          "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PHYC has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
+          "choice": "trappe-ua",
+          "confidence": "high",
+          "criteria_evaluated": [
+            "literature_support",
+            "parameter_coverage",
+            "validation_data",
+            "computational_cost"
+          ],
+          "critique": {
+            "findings": [
+              "D-01_ff verdict 'agrees' accepted; no force-field override. The critic adds one source the plan's autofill chain did not have -- an independent 2024 TraPPE PE MD study (10.3390/polym16020304) running LJ-only nonbonded at exactly this class's cutoff_A=14.0 -- which corroborates both preferred_ff=trappe-ua and electrostatics=lj_cut from outside the resolver's own citation set rather than restating it.",
+              "Transcribed the critic's DOI for Martin1998 (10.1021/jp972543+). The plan's autofill entry for that paper carried a citation string but no source_doi, so the charge-free-construction claim underpinning lj_cut was previously unverifiable from the plan alone; the critic's evidence-store record is DOI-verified. Ramos2015 (10.1021/acs.macromol.5b00823) was not transcribed -- it is already an autofill entry with the same DOI, and duplicating it would inflate the critic-contribution count without adding a source.",
+              "Pinned four experimental comparators rather than leaving them to member resolution. SMILES *CC* is an exact match against polymer_rules.json:classes.PHYC.member_smiles.PE, so experimental_tg_K=195 (Boyer1973 Tg_U), experimental_density_gcm3=0.855, and exp_K_GPa=[1.5,2.0] are curated member data, not guesses -- this is the known-member pinning exception, not a fabricated value for a novel polymer. The pins are defensive: the class entry itself warns that the wrong comparators for a fully-amorphous cell are the ones prevalent in the literature (0.95 g/cm3 semicrystalline HDPE density, 2.5-3.5 GPa ultrasonic K_S), and classes.PHYC.notes still repeats the superseded 'Exp. RT density: PE=0.95' in prose even though experimental_density_gcm3.PE was corrected to 0.855. Freezing the amorphous values into the plan removes that grading false-FAIL mode and additionally enables inspect_data_file's pre-build finite-size forecast, which an unset density skips. experimental_tg_K=195 matches what the plan already resolved (planned_stages.tg.t_range_brackets_exp_tg=195), so the pin does not move the glassy/rubbery regime -- T_workflow_K=300 remains correctly above Tg.",
+              "Declined to lower tg_rate_K_per_ns below 40 despite the known Tg overprediction. 40 K/ns is this class's measured ceiling, not an unexamined default: at dt=2 fs with tg_t_step_K=20, rates above it fall below the 250,000-step/plateau floor and produce fit_swapped / inflated Tg (PE3 evidence, commit 6691eb1), and the floor and the rate are one decision. Slower rates would shrink the offset only marginally -- the class overpredicts across the whole 10-40 K/ns band -- while raising Tg-sweep and cooldown cost, since cool_block_hold_steps now derives from the primary sweep rate. The offset is recorded as the dominant uncertainty instead of being spent GPU-hours against.",
+              "Left bm_pressures_atm unchanged. At T_workflow_K=300 with Tg=195 K this is a rubbery cell, where a narrow pressure span under-constrains EOS curvature and lets B0_prime run away; the class series [1,1000,2500,5000,10000,15000] is already the widened, compression-only form, and its 15000 atm ceiling was verified kink-free on PE4. Cross-check Murnaghan K against the NPT fluctuation value at analyze-bm and flag divergence above 15%.",
+              "Rejected the critic's dominant_uncertainty. It named unmeasured parameter coverage -- no EMC trial build has confirmed TraPPE-UA can type this SMILES -- which is literally true but close to the floor of that risk class: the repeat unit is a CH2 n-alkane segment and TraPPE-UA is parameterized on C1-C12 n-alkanes. The moiety screen also matched no rule in ff_moiety_rules.json. The binding gap for all three requested properties is the cooling-rate/force-field offset on Tg, which is measured and expected, not the typing question, which is resolved cheaply at the build stage."
+            ],
+            "rounds": 1,
+            "status": "scientific_agent_decision"
+          },
+          "evidence": [
+            {
+              "claim": "polymer_rules.json:classes.PHYC.ff_note: TraPPE-UA via EMC: purely apolar C/H backbone (charge <0.1 e), which qualifies for the lj/cut-only routing tier -- PCFF/OPLS-AA's PPPM machinery is unnecessary and TraPPE-UA is far cheaper per atom. Ramos2015: PE Tg=187K vs exp 185-195K, density within +/-7% -- directly validated. Branched types (PP, PIB) have UA parameters but no published polymer-Tg validation; treat with medium confidence until confirmed. TraPPE-UA's own founding paper (Martin & Siepmann 1998) validates only C1-C12 n-alkane VLE/critical-point data via Monte Carlo -- PE's confidence rests on the downstream Ramos2015 MD validation, not the 1998 origin paper.",
+              "criterion": "literature_support",
+              "origin": "autofill",
+              "resolver": "polymer_rules.json:classes.PHYC.ff_justification_doi",
+              "source_doi": "10.1021/acs.macromol.5b00823"
+            },
+            {
+              "citation": "The glass transition temperature measurements of polyethylene: determined by using molecular dynamic method. RSC Advances, 2016.",
+              "claim": "PE: 2 chains \u00d7 300 repeat units; COMPASS; NVT 300 K + NPT 300 K; cooling 300\u2192100 K in 10 K/200 ps steps; Tg ~200 K vs literature 195 K.",
+              "criterion": "validation_data",
+              "origin": "autofill",
+              "resolver": "polymer_rules.json:_metadata.primary_sources[PE_RSC2016]",
+              "source_doi": "10.1039/C5RA21115H"
+            },
+            {
+              "citation": "Hayashi, Y. et al. RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics. npj Comput. Mater. 2022, 8, 222.",
+              "claim": "High-throughput GAFF2 polymer MD; 1 ns NVT anneal 300\u2192700 K; 10 chains ~10,000 atoms; LAMMPS; systematic Tg and density for 1070+ polymers. Primary reference for nchain, dp, and forcefield defaults.",
+              "criterion": "validation_data",
+              "origin": "autofill",
+              "resolver": "polymer_rules.json:_metadata.primary_sources[Hayashi2022]",
+              "source_doi": "10.1038/s41524-022-00906-4"
+            },
+            {
+              "citation": "Srivastava, A. et al. On-the-Fly Machine-Learned Force Fields for High-Fidelity Polymer Glass Transition Simulations. arXiv:2601.17137.",
+              "claim": "Tg values for 12 polymers; PE Tg=281\u00b152 K; PDMS Tg ~228 K. Validation data for PHYC and PSIL classes.",
+              "criterion": "validation_data",
+              "origin": "autofill",
+              "resolver": "polymer_rules.json:_metadata.primary_sources[Srivastava2026]"
+            },
+            {
+              "citation": "Afzal, M. A. F. et al. High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications. ACS Appl. Polym. Mater. 2021, 3, 2, 620\u2013630.",
+              "claim": "OPLS3e GPU-based Tg for 315 polymers; validates electrostatics impact on polar vs apolar polymers. lj/cut acceptable only when backbone charge < 0.1 e.",
+              "criterion": "validation_data",
+              "origin": "autofill",
+              "resolver": "polymer_rules.json:_metadata.primary_sources[Afzal2021]",
+              "source_doi": "10.1021/acsapm.0c00524"
+            },
+            {
+              "citation": "Martin, M. G.; Siepmann, J. I. Transferable Potentials for Phase Equilibria. 1. United-Atom Description of n-Alkanes. J. Phys. Chem. B 1998, 102, 2569\u20132577.",
+              "claim": "Original TraPPE-UA force field for n-alkanes (CH3/CH2 united atoms): LJ parameters fitted to vapor\u2013liquid coexistence of C1\u2013C12 alkanes. Foundation for all TraPPE-UA-routed classes (PHYC, PDIE) via EMC.",
+              "criterion": "validation_data",
+              "origin": "autofill",
+              "resolver": "polymer_rules.json:_metadata.primary_sources[Martin1998]"
+            },
+            {
+              "citation": "Ramos, J.; Vega, J. F.; Mart\u00ednez-Salazar, J. Molecular Dynamics Simulations for the Description of Experimental Molecular Conformation, Melt Dynamics, and Phase Transitions in Polyethylene. Macromolecules 2015, 48, 5016\u20135027.",
+              "claim": "PE TraPPE-UA MD: Tg=187 K, excellent agreement with extrapolated experimental Tg(U)~195 K (Boyer 1973). Characteristic ratio C_n=8.2 at 500 K. Justifies ff_accuracy_prior=trappe-ua for PHYC/PDIE and sets ff_justification_doi for those classes.",
+              "criterion": "validation_data",
+              "origin": "autofill",
+              "resolver": "polymer_rules.json:_metadata.primary_sources[Ramos2015]",
+              "source_doi": "10.1021/acs.macromol.5b00823"
+            },
+            {
+              "citation": "Boyer, R. F. Glass Temperatures of Polyethylene. Macromolecules 1973, 6, 288.",
+              "claim": "Experimental review establishing two PE glass transitions: Tg(L)~145 K (dangling cilia/tight folds in crystalline PE) and Tg(U)~195 K (loose loops/tie molecules, amorphous regions). Amorphous-cell simulations target Tg(U)~195 K. Primary experimental reference for PHYC class PE Tg.",
+              "criterion": "validation_data",
+              "origin": "autofill",
+              "resolver": "polymer_rules.json:_metadata.primary_sources[Boyer1973]"
+            },
+            {
+              "claim": "NOT MEASURED for this SMILES. No EMC trial build was run, so coverage is asserted from polymer_rules.json:classes.PHYC.ff_accuracy_prior='trappe-ua' only; whether 'trappe-ua' can type THIS repeat unit is unverified until the build stage runs. The moiety screen ran and matched no rule, so no trial build was triggered. That narrows the risk and measures nothing: the rules cover 77% of the measured failures (guides/ff_moiety_rules.json), so this SMILES is UNSCREENED for the rest, not cleared.",
+              "criterion": "parameter_coverage",
+              "origin": "autofill",
+              "resolver": "polymer_rules.json:classes.PHYC.ff_accuracy_prior"
+            },
+            {
+              "claim": "trappe-family cell of 3580 atoms (50216.7 g/mol): estimate_ns_per_day at this run's 3580-atom estimate: 413.24183567336513 ns/day (high confidence). electrostatics=lj_cut, cutoff_A=14.0.",
+              "criterion": "computational_cost",
+              "origin": "autofill",
+              "resolver": "select_hardware.select_hardware"
+            },
+            {
+              "citation": "Preparation and Characterization of High-Density Polyethylene with Alternating Lamellar Stems Using Molecular Dynamics Simulations",
+              "claim": "Uses TraPPE (Transferable Potential for Phase Equilibria) force field for PE MD; amorphous-region density ~0.85 g/cm3 at 300 K, consistent with experimental values; LJ-only nonbonded treatment with 14.0 A cutoff, no explicit electrostatics method employed.",
+              "origin": "critic",
+              "source_doi": "10.3390/polym16020304"
+            },
+            {
+              "citation": "Transferable Potentials for Phase Equilibria. 1. United-Atom Description of n-Alkanes",
+              "claim": "Founding TraPPE-UA paper: united-atom Lennard-Jones 12-6 parameters for n-alkane pseudo-atoms (CH2/CH3), fit to critical temperature and saturated-liquid density; nonbonded interactions are governed solely by LJ 12-6 potentials with no partial charges, so PPPM/Ewald electrostatics is not needed for a purely aliphatic backbone.",
+              "origin": "critic",
+              "source_doi": "10.1021/jp972543+"
+            }
+          ],
+          "id": "D-01_ff",
+          "resolved_by": "polymer_rules.json:classes.PHYC.ff_accuracy_prior"
+        }
+      ],
+      "planned_stages": [
+        {
+          "stage": "build",
+          "success_criteria": {
+            "data_file_written": true
+          },
+          "track": "foundation"
+        },
+        {
+          "stage": "equil",
+          "success_criteria": {
+            "check_equilibration_comprehensive.overall_pass": true
+          },
+          "track": "foundation"
+        },
+        {
+          "stage": "equil-check",
+          "success_criteria": {
+            "equil_verdict": "PASS"
+          },
+          "track": "foundation"
+        },
+        {
+          "stage": "cool",
+          "success_criteria": {
+            "chain_submitted": true
+          },
+          "track": "cooling"
+        },
+        {
+          "stage": "cool-check",
+          "success_criteria": {
+            "cool_verdict": "PASS"
+          },
+          "track": "cooling"
+        },
+        {
+          "stage": "tg",
+          "success_criteria": {
+            "bilinear_fit_r_squared_min": 0.8,
+            "t_range_brackets_exp_tg": 195
+          },
+          "track": "thermal"
+        },
+        {
+          "stage": "analyze-tg",
+          "success_criteria": {},
+          "track": "thermal"
+        },
+        {
+          "stage": "murnaghan",
+          "success_criteria": {
+            "chain_submitted": true
+          },
+          "track": "mechanical"
+        },
+        {
+          "stage": "analyze-bm",
+          "success_criteria": {},
+          "track": "mechanical"
+        },
+        {
+          "stage": "run-summary",
+          "success_criteria": {},
+          "track": "summary"
+        }
+      ]
+    },
+    "protocol_validated": true,
+    "simulated_properties": {
+      "bulk_modulus": {
+        "method": "murnaghan",
+        "sem_GPa": 0.1198,
+        "temperature_K": 300.04,
+        "value_GPa": 1.8897
+      },
+      "density": {
+        "temperature_K": 300.66,
+        "value_g_cm3": 0.863705
+      },
+      "melt_density": {
+        "temperature_K": 549.72,
+        "value_g_cm3": 0.718891
+      },
+      "tg": {
+        "fit_quality": "EXCELLENT",
+        "grading_basis": "raw_MD",
+        "n_replicates": 1,
+        "primary_fit_invalid": false,
+        "r_squared": 0.9972,
+        "value_K": 234.2
+      }
+    },
+    "source_run_name": "PE_1",
+    "validated_at": "2026-09-12T20:01:44.801186+00:00",
+    "validated_properties": [
+      "bulk_modulus",
+      "density",
+      "tg"
+    ]
+  },
   "*CCO*": {
     "notes": "Validated properties: ['bulk_modulus', 'density', 'tg'].",
     "polymer_class": "POXI",

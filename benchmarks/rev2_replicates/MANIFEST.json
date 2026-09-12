@@ -341,5 +341,91 @@
    "pe_1_disposition": "Operator-approved reset, 2026-09-12: thermal returned to pending and the two infrastructure escalations moved to agent_escalations_archived_infrastructure so the audit trail survives while the MAX_AGENT_DECISIONS budget is restored for science. build/equilibration/cooling remain accepted -- ~2.9 GPU-h preserved, ~1.7 GPU-h left. Requeued behind a lane gate.",
    "lesson": "An orchestrator's scarcest resource is its agent-decision budget, and nothing in the engine stopped infrastructure from consuming it. Resource unavailability is a reason to WAIT; only a scientific finding should be allowed to spend a decision."
   }
- ]
+ ],
+ "operator_decisions": [
+  {
+   "id": "D-01_PE_1_mechanical_accepted_over_convergence_advisory",
+   "date": "2026-09-12",
+   "run": "PE_1",
+   "gate": "BM_LADDER_NOT_CONVERGED (confidence low; sole reason loo_unstable)",
+   "measurement": {
+    "B0_GPa": 1.8897,
+    "B0_sem_GPa": 0.1198,
+    "B0_prime": 8.3843,
+    "r_squared": 0.99987,
+    "n_points": 6,
+    "method": "murnaghan",
+    "bm_gate_verdict": "BM_REPORTABLE",
+    "experimental_band_GPa": [
+     1.5,
+     2.0
+    ],
+    "inside_band": true
+   },
+   "decision": "ACCEPTED by the operator. The measurement passed its own reportability gate and sits inside the experimental band; what failed is a leave-one-out CONVERGENCE advisory that assess_ladder_convergence documents as uncalibrated and meant for review. The recovery agent returned action=stop rather than spend a rung, and recommended acceptance with an annotation by a human.",
+   "annotation_carried": "LOO shift driven by P~0 anchor; K' decreases with P over the 1-15000 atm ladder (rubbery-to-stiffened crossover); Murnaghan B0 likely slightly high vs the low-P secant (1.58 GPa) and fluctuation (1.77 GPa) estimates; do not widen the ladder.",
+   "agent_evidence": "Only the P~0 drop breaks the 10% LOO threshold (+13.65%); the other five stay within 6.2%. That point is not noise: its NPT volumes scatter 96553-97895 A^3 with no trend, SEM 46. Local secant moduli back-projected to P=0 fall from ~1.97 GPa mid-ladder to ~1.5 at 15000 atm, i.e. K' decreases with pressure -- a rubbery PE cell at 300 K (exp Tg 195 K) stiffening toward glass under compression. Dropping the P~0 anchor forces extrapolation to V0 from high-pressure points obeying a different K'.",
+   "declined": "mechanical_resample_points=[500] -- the one rung the agent called reasonable. It stated it could not show the rung clears the 10% gate and that it would not change the best estimate. Raising the compression ceiling was explicitly ruled out: the next ladder point would be 30000 atm, further from the constant-K' regime.",
+   "consequence": "PE_1 reached accepted 6/6, its protocol froze with ff=trappe-ua -- the only non-PCFF system in the set, and therefore the real test of the preferred_ff freeze fix -- and PE_2/PE_3 unblocked."
+  }
+ ],
+ "results_replicate_1": {
+  "PE_1": {
+   "tg_K": 234.2,
+   "tg_r2": 0.9972,
+   "density_gcm3": 0.8637,
+   "K_GPa": 1.8897,
+   "exp": {
+    "tg_K": 195,
+    "density_gcm3": 0.855,
+    "K_GPa": [
+     1.5,
+     2.0
+    ]
+   }
+  },
+  "PEEK_1": {
+   "tg_K": 552.3,
+   "tg_r2": 0.9939,
+   "density_gcm3": 1.2055,
+   "K_GPa": 5.7285,
+   "exp": {
+    "tg_K": 418,
+    "density_gcm3": 1.263,
+    "K_GPa": [
+     4.0,
+     5.8
+    ]
+   }
+  },
+  "PSU_1": {
+   "tg_K": 481.3,
+   "tg_r2": 0.9849,
+   "density_gcm3": 1.184,
+   "K_GPa": 4.48,
+   "exp": {
+    "tg_K": 463,
+    "density_gcm3": 1.24,
+    "K_GPa": [
+     4.0,
+     5.5
+    ]
+   }
+  },
+  "PEG_1": {
+   "tg_K": 259.6,
+   "tg_r2": 0.999,
+   "density_gcm3": 1.058,
+   "K_GPa": 3.3,
+   "exp": {
+    "tg_K": 206,
+    "density_gcm3": 1.12,
+    "K_GPa": [
+     2.0,
+     4.0
+    ]
+   }
+  },
+  "note": "All four replicate-1 runs accepted 6/6. Density: PE +1.0% (TraPPE-UA), the three PCFF systems -4.5 to -5.5% -- the same sign and size across three unrelated chemistries, i.e. a force-field offset rather than a per-system error. Tg: PSU +4.0%; PE +20.1% and PEG +26.0% are the documented cooling-rate limit for rubbery members; PEEK +32.1% is the documented PCFF overprediction for rigid aromatics. Every bulk modulus lands inside its experimental band."
+ }
 }
