@@ -427,5 +427,16 @@
    }
   },
   "note": "All four replicate-1 runs accepted 6/6. Density: PE +1.0% (TraPPE-UA), the three PCFF systems -4.5 to -5.5% -- the same sign and size across three unrelated chemistries, i.e. a force-field offset rather than a per-system error. Tg: PSU +4.0%; PE +20.1% and PEG +26.0% are the documented cooling-rate limit for rubbery members; PEEK +32.1% is the documented PCFF overprediction for rigid aromatics. Every bulk modulus lands inside its experimental band."
- }
+ },
+ "findings": [
+  {
+   "id": "F-01_POXI_anneal_marginally_stable_at_625K",
+   "date": "2026-09-12",
+   "what": "PEG_2 failed its equilibration three times, every time inside the 625 K anneal (anneal_heat ~997k steps, anneal_heat ~952k steps, anneal_hold ~268k steps), while PEG_1 ran the IDENTICAL frozen protocol to completion on a different seed with a clean anneal (T 298-636 K heat, 609-643 K hold, no warnings).",
+   "diagnosis": "Integration instability, not hardware. The three signatures are one cause: 'ERROR: Out of range atoms - cannot compute PPPM' (pppm_kokkos.cpp:1150) is a physics failure -- atoms left the PPPM grid -- and the two cudaErrorIllegalAddress aborts are that same out-of-bounds grid index expressed as a GPU memory fault. Hardware was checked and cleared as far as this host allows: ECC errors 0 on all four A800s, no retired or remapped pages, and GPU 1 (where all three attempts ran) was concurrently running PSU_3 and had earlier run PE_1's equilibration. Xid could not be checked -- dmesg requires privileges -- so that remains the one open gap.",
+   "why_it_matters": "The campaign's claim is that replicates share a protocol and differ only by seed. That assumes the protocol is ROBUST across seeds. POXI's frozen protocol is only marginally stable at its anneal temperature with dt_fs=1.0, so whether a given seed survives is stochastic. That is a property of the protocol worth reporting, not merely an obstacle to running it.",
+   "action": "Retried unchanged, by operator decision. Editing dt_fs or annealing_T_high_K to rescue one seed would mean PEG_1 and PEG_2/3 no longer shared a protocol, which is the one thing the campaign may not trade away. The three failures stopped at very different points (997k / 952k / 268k steps), i.e. large run-to-run variation, which is what makes an unchanged retry worth one attempt.",
+   "if_it_recurs": "Report PEG at whatever n survives, with this instability as the finding. The principled fix -- dt_fs=0.5 for POXI, or a lower annealing_T_high_K -- changes a class-calibrated constant and requires re-running PEG_1 as well."
+  }
+ ]
 }
