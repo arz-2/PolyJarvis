@@ -95,6 +95,43 @@ def r(x, n=4):
 # ─── Section A: Thermo convergence ───────────────────────────────────────────
 
 
+def _drift_significance(values, slope, stderr, n, p_naive):
+    """The slope's p-value corrected for the series' own autocorrelation.
+
+    `linregress` assumes independent samples. An MD thermo series is nothing of the sort: the
+    integrated inefficiency of these melts runs 40-120 frames, so a 1500-row window carries on
+    the order of 20 independent samples, not 1500. The naive p is inflated accordingly -- and
+    not marginally. Measured on the stereo_r2 pilot (2026-09-10):
+
+        iPMMA_1/0005 dihedral   p_naive 1.85e-42   tau  68   n_eff   22/1501   p_eff ~0.10
+        iPMMA_1/0005 density    p_naive 9.22e-32   tau  74   n_eff   20/1501   p_eff ~0.18
+        iPMMA_1/0004 density    p_naive 1.35e-78   tau 120   n_eff    8/1001   p_eff ~0.12
+        aPS_1/0007   density    p_naive 9.22e-05   tau  40   n_eff   25/1001   p_eff ~0.54
+
+    Twenty independent points cannot support p = 1e-42. iPMMA_1's equilibration was failed on
+    exactly that: a single slow excursion filled the graded window, the regression read it as a
+    trend, and the p-value certified it. Successive windows of that same series trend in
+    OPPOSITE directions and its mean moves 0.19 sigma between attempts -- a fluctuation, not a
+    relaxation.
+
+    The correction can only RAISE p, so it can only turn a FAIL into a PASS; it cannot newly
+    fail anything that passed before. What it cannot do is notice a drift that persists ACROSS
+    attempts -- that needs a between-attempt comparison, which no gate here performs.
+
+    Returns (p_effective, tau_frames, n_eff).
+    """
+    tau_frames, _ = compute_tau_eff(values)
+    n_eff = effective_sample_size(n, tau_frames)
+    if stderr is None or not np.isfinite(stderr) or stderr <= 0 or n_eff < 3:
+        return p_naive, tau_frames, n_eff
+    t_naive = abs(slope) / stderr
+    # Scaling t by sqrt(n_eff/n) and re-reading it against n_eff-2 dof is the standard
+    # first-order correction for a trend fitted to autocorrelated data.
+    t_eff = t_naive * math.sqrt(n_eff / n)
+    p_eff = float(2.0 * sp_stats.t.sf(t_eff, max(n_eff - 2, 1)))
+    return p_eff, tau_frames, n_eff
+
+
 def _analyse_property(values, name, drift_threshold_pct, drift_pvalue, block_count):
     """Drift + block-average test for a single thermo property."""
     n = len(values)
@@ -102,11 +139,15 @@ def _analyse_property(values, name, drift_threshold_pct, drift_pvalue, block_cou
     res = {"mean": r(mean_val, 6), "n_points": n}
 
     x = np.arange(n, dtype=float)
-    slope, _, _, p_val, _ = sp_stats.linregress(x, values)
+    slope, _, _, p_val, stderr = sp_stats.linregress(x, values)
     total_drift = abs(slope * n)
     drift_pct = (total_drift / abs(mean_val) * 100) if abs(mean_val) > 1e-12 else 0.0
-    d_pass = not (drift_pct > drift_threshold_pct and p_val < drift_pvalue)
-    res["drift"] = {"pass": bool(d_pass), "drift_pct": r(drift_pct, 4), "p_value": r(p_val, 4)}
+    p_eff, tau_frames, n_eff = _drift_significance(values, slope, stderr, n, p_val)
+    d_pass = not (drift_pct > drift_threshold_pct and p_eff < drift_pvalue)
+    # p_value stays the naive one so a reader can compare against runs graded before
+    # 2026-09-10; p_value_eff is what the verdict is actually made on.
+    res["drift"] = {"pass": bool(d_pass), "drift_pct": r(drift_pct, 4), "p_value": r(p_val, 4),
+                    "p_value_eff": r(p_eff, 4), "tau_frames": r(tau_frames, 2), "n_eff": n_eff}
 
     bs = n // block_count
     if bs >= 2:
@@ -127,25 +168,29 @@ _ENERGY_COMPONENT_COLS = [
     ("E_vdwl", "vdw"), ("E_coul", "coul"), ("E_long", "kspace"),
 ]
 
-# Terms whose MEAN is not a physical scale, so drift-as-a-percentage-of-the-mean is not a
-# meaningful test for them. E_vdwl and E_coul are each a residual of large opposing
-# contributions: the net can sit anywhere relative to its parts, so dividing a drift by it
-# produces a number that depends on where the cancellation happens to land, not on how far
-# from equilibrium the cell is.
+# Every term is judged on its drift relative to its OWN RMS fluctuation, never relative to its
+# mean. drift/sigma asks "is the systematic change over this window at least as large as the
+# term's thermal fluctuation", which is dimensionless, independent of where the term's zero
+# sits, and comparable across terms.
 #
-# RadonPy reached the same conclusion independently and by a different route
-# (radonpy/sim/lammps.py check_eq): every other energy term is compared as
-# `sma_sd > abs(mean) * crit`, but evdw alone is compared ABSOLUTELY (`sma_sd > 30.0`) and
-# ecoul is not gated at all. We do not copy the absolute bound -- measured against these
-# systems it never binds (sma_sd 2.08-11.09 against a bound of 30.0 across five melts), and a
-# gate that cannot fail is the fail-open shape this file spent 2026-09-09 removing.
+# Until 2026-09-13 only vdw and coul were scaled this way, because each is a residual of large
+# opposing contributions: the net can sit anywhere relative to its parts, so a drift divided by
+# it depends on where the cancellation lands, not on how far from equilibrium the cell is.
+# Measured across five melt holds, vdw drift/sigma spans 0.02-0.84 where drift-vs-mean spans
+# 0.24%-14.1%. The same objection holds for the terms that were left on drift_pct: a force
+# field's bonded energies carry an arbitrary reference (PCFF's E_dihed is a signed residual,
+# ~-1500 kcal/mol against a ~41,600 TotEng), so "1% of the mean" is a different physical bar
+# for every term and every force field. Two scales inside one gate also meant the same
+# relaxation could pass as vdw and fail as dihedral. One scale for all six removes both.
 #
-# Instead these two are scaled by their OWN RMS fluctuation. drift/sigma asks "is the
-# systematic change over this window at least as large as the term's thermal fluctuation",
-# which is dimensionless, well-defined however the cancellation lands, and comparable across
-# terms. Measured across five melt holds it spans 0.02-0.84 for vdw where drift-vs-mean spans
-# 0.24%-14.1% -- the same physics, on a scale that means something.
-_SELF_SCALED_COMPONENTS = {"vdw", "coul"}
+# Decided on that argument and frozen before the stereo_r2 regrade, then applied to every run
+# (passing ones included); the regrade reports verdicts under both versions.
+#
+# RadonPy (radonpy/sim/lammps.py check_eq) compares most terms as `sma_sd > abs(mean) * crit`
+# and evdw absolutely (`sma_sd > 30.0`). Neither is copied: the absolute bound never binds on
+# these systems (sma_sd 2.08-11.09 across five melts), and a gate that cannot fail is the
+# fail-open shape this file spent 2026-09-09 removing.
+_SELF_SCALED_COMPONENTS = {label for _, label in _ENERGY_COMPONENT_COLS}
 
 # drift >= 1.0 sigma. Not tuned to a pass/fail split: it is the point where the systematic
 # change stops being small compared with the fluctuation it sits on.
@@ -175,10 +220,14 @@ def _analyse_energy_components(prod, drift_threshold_pct, drift_pvalue):
         n = len(values)
         mean_val = float(np.mean(values))
         x = np.arange(n, dtype=float)
-        slope, _, _, p_val, _ = sp_stats.linregress(x, values)
+        slope, _, _, p_val, stderr = sp_stats.linregress(x, values)
         total_drift = abs(slope * n)
         drift_pct = (total_drift / abs(mean_val) * 100) if abs(mean_val) > 1e-12 else 0.0
-        entry = {"drift_pct": r(drift_pct, 4), "p_value": r(p_val, 4)}
+        p_eff, tau_frames, n_eff = _drift_significance(values, slope, stderr, n, p_val)
+        p_val = p_eff
+        entry = {"drift_pct": r(drift_pct, 4), "p_value": r(p_val, 4),
+                 "p_value_naive": r(sp_stats.linregress(x, values).pvalue, 4),
+                 "tau_frames": r(tau_frames, 2), "n_eff": n_eff}
         if label in _SELF_SCALED_COMPONENTS:
             sigma = float(np.std(values))
             drift_sigma = (total_drift / sigma) if sigma > 1e-12 else 0.0
@@ -1069,6 +1118,37 @@ def collect_warnings(thermo, structural):
 
 # ─── Trajectory loading ───────────────────────────────────────────────────────
 
+def thermo_section(thermo: dict, n_eff_min: int) -> dict:
+    """The `thermo` block of the gate file, flattened the way enforce_gate.collect_gates reads it.
+
+    A function rather than inline in main() so an offline regrade of a stored log builds the
+    gate input with exactly the code the live check uses.
+    """
+    return {
+        "equilibrated": thermo.get("equilibrated"),
+        "density_drift": thermo.get("density", {}).get("drift"),
+        "energy_drift": thermo.get("energy", {}).get("drift"),
+        # The per-term drift verdict, surfaced at the top level so enforce_gate can bind on
+        # it. It was computed and folded into thermo["energy"]["equilibrated"] from the day
+        # _analyse_energy_components was written, and printed in d05_block.md, but the
+        # aggregate "energy_drift" above is what collect_gates read -- so the one case this
+        # check exists to catch (a canceling drift that nets a flat TotEng) was invisible to
+        # the gate. aPS_1, 2026-09-09: TotEng drift 0.023% PASS while vdW drifted 1.691%.
+        "energy_component_drift": thermo.get("energy", {}).get("component_drift"),
+        "density_sem": thermo.get("density", {}).get("block_sem"),
+        "energy_sem": thermo.get("energy", {}).get("block_sem"),
+        "tau_eff_density_fraction": thermo.get("tau_eff_density_fraction"),
+        "n_eff_density": {
+            "pass": (thermo.get("n_eff_density") is None
+                     or thermo["n_eff_density"] >= n_eff_min),
+            "n_eff": thermo.get("n_eff_density"),
+            "n_eff_min": n_eff_min,
+        },
+        "residual_stress": thermo.get("residual_stress"),
+        "meta": thermo.get("meta"),
+    }
+
+
 def _load_and_analyze(data_file, dump_file, atom_style, backbone_set, skip_frames,
                       n_backbone_bonds, bond_length_A, timestep_fs, dump_every_arg,
                       ct_min_decay, graphs_dir, cv_signal_max, msid_s_split,
@@ -1348,29 +1428,7 @@ def main():
     result = to_native({
         "status": "success",
         "overall_pass": overall_pass,
-        "thermo": {
-            "equilibrated": thermo.get("equilibrated"),
-            "density_drift": thermo.get("density", {}).get("drift"),
-            "energy_drift": thermo.get("energy", {}).get("drift"),
-            # The per-term drift verdict, surfaced at the top level so enforce_gate can bind on
-            # it. It was computed and folded into thermo["energy"]["equilibrated"] from the day
-            # _analyse_energy_components was written, and printed in d05_block.md, but the
-            # aggregate "energy_drift" above is what collect_gates read -- so the one case this
-            # check exists to catch (a canceling drift that nets a flat TotEng) was invisible to
-            # the gate. aPS_1, 2026-09-09: TotEng drift 0.023% PASS while vdW drifted 1.691%.
-            "energy_component_drift": thermo.get("energy", {}).get("component_drift"),
-            "density_sem": thermo.get("density", {}).get("block_sem"),
-            "energy_sem": thermo.get("energy", {}).get("block_sem"),
-            "tau_eff_density_fraction": thermo.get("tau_eff_density_fraction"),
-            "n_eff_density": {
-                "pass": (thermo.get("n_eff_density") is None
-                         or thermo["n_eff_density"] >= args.n_eff_min),
-                "n_eff": thermo.get("n_eff_density"),
-                "n_eff_min": args.n_eff_min,
-            },
-            "residual_stress": thermo.get("residual_stress"),
-            "meta": thermo.get("meta"),
-        },
+        "thermo": thermo_section(thermo, args.n_eff_min),
         "chain": {
             "rg": structural["rg"],
             "ree": structural["ree"],

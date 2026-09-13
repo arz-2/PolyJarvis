@@ -1,0 +1,1388 @@
+{
+  "generated_at": "2026-09-13T21:52:50.589350+00:00",
+  "gate_version": {
+    "git_head": "2876fc7",
+    "gate_files_uncommitted": true,
+    "check_equilibration_comprehensive_sha256": "7a7df1a03b46e82d9f868abcac51fccd993f2a7cbc81f63d10a7db1d2eddc700",
+    "enforce_gate_sha256": "71d29766fb2b9f6c50c53f2858006b3f4b4649c1e47c434e5a74926c82db4161",
+    "energy_component_criterion": "drift_sigma for all terms"
+  },
+  "runs": {
+    "aPS_1": {
+      "stages": {
+        "equilibration": {
+          "attempt": "attempt-0007",
+          "gate_file": "data/aPS_1/attempts/equilibration/attempt-0007/raw/equilibration.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/aPS_1/attempts/equilibration/attempt-0007/work/npt_melt_hold/npt_melt_hold.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "EXTEND",
+          "stored_failing_binding_gates": [
+            "energy_component_drift"
+          ],
+          "old_version": {
+            "clause": "require_melt",
+            "verdict": "FAIL",
+            "failing_binding_gates": [
+              "energy_component_drift"
+            ],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian"
+            ]
+          },
+          "new_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.1533,
+              "drift_pct": 0.2237,
+              "p_value": 0.2448,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.0235,
+              "drift_pct": 0.0326,
+              "p_value": 0.8471,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.202,
+              "drift_pct": 1.2198,
+              "p_value": 0.0787,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.3204,
+              "drift_pct": 1.7283,
+              "p_value": 0.5279,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.1764,
+              "drift_pct": 0.0341,
+              "p_value": 0.4548,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.5545,
+              "drift_pct": 0.0665,
+              "p_value": 0.2438,
+              "pass": true
+            }
+          }
+        },
+        "cooling": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/aPS_1/attempts/cooling/attempt-0001/raw/cooling.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/aPS_1/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "msid_gaussian",
+              "residual_stress"
+            ]
+          },
+          "new_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "msid_gaussian",
+              "residual_stress"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.4097,
+              "drift_pct": 0.5942,
+              "p_value": 0.0614,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.4047,
+              "drift_pct": 0.5164,
+              "p_value": 0.1634,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.0265,
+              "drift_pct": 0.0487,
+              "p_value": 0.9039,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.5553,
+              "drift_pct": 9.786,
+              "p_value": 0.2894,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.1477,
+              "drift_pct": 0.0204,
+              "p_value": 0.5416,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.2777,
+              "drift_pct": 0.0159,
+              "p_value": 0.2168,
+              "pass": true
+            }
+          }
+        }
+      },
+      "recorded": {
+        "thermal": {
+          "tg_gate_verdict": "TG_REPORTABLE"
+        },
+        "mechanical": {
+          "bm_gate_verdict": "BM_REPORTABLE",
+          "bm_convergence_verdict": "BM_LADDER_CONVERGED"
+        }
+      }
+    },
+    "aPS_2": {
+      "stages": {
+        "equilibration": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/aPS_2/attempts/equilibration/attempt-0001/raw/equilibration.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian",
+              "residual_stress"
+            ]
+          },
+          "new_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian",
+              "residual_stress"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.0356,
+              "drift_pct": 0.054,
+              "p_value": 0.5984,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.3496,
+              "drift_pct": 0.5013,
+              "p_value": 0.0005,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.0572,
+              "drift_pct": 0.3503,
+              "p_value": 0.366,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.1503,
+              "drift_pct": 0.7758,
+              "p_value": 0.4812,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.1445,
+              "drift_pct": 0.0296,
+              "p_value": 0.5949,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.5786,
+              "drift_pct": 0.0718,
+              "p_value": 0.1673,
+              "pass": true
+            }
+          }
+        },
+        "cooling": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/aPS_2/attempts/cooling/attempt-0001/raw/cooling.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "msid_gaussian",
+              "residual_stress"
+            ]
+          },
+          "new_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "msid_gaussian",
+              "residual_stress"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.0586,
+              "drift_pct": 0.0924,
+              "p_value": 0.8455,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.7896,
+              "drift_pct": 0.9675,
+              "p_value": 0.0079,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.2241,
+              "drift_pct": 0.4186,
+              "p_value": 0.3074,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.3757,
+              "drift_pct": 6.4383,
+              "p_value": 0.0864,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.4284,
+              "drift_pct": 0.0628,
+              "p_value": 0.1161,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.8402,
+              "drift_pct": 0.0513,
+              "p_value": 0.106,
+              "pass": true
+            }
+          }
+        }
+      },
+      "recorded": {
+        "thermal": {
+          "tg_gate_verdict": "TG_REVIEW",
+          "accepted_under_advisory_mode": true
+        },
+        "mechanical": {
+          "bm_gate_verdict": "BM_REPORTABLE",
+          "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+          "accepted_under_advisory_mode": true
+        }
+      }
+    },
+    "aPS_3": {
+      "stages": {
+        "equilibration": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/aPS_3/attempts/equilibration/attempt-0001/raw/equilibration.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/aPS_3/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "EXTEND",
+          "stored_failing_binding_gates": [
+            "energy_component_drift"
+          ],
+          "old_version": {
+            "clause": "require_melt",
+            "verdict": "FAIL",
+            "failing_binding_gates": [
+              "energy_component_drift"
+            ],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian",
+              "residual_stress"
+            ]
+          },
+          "new_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian",
+              "residual_stress"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.0837,
+              "drift_pct": 0.1273,
+              "p_value": 0.2492,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.4401,
+              "drift_pct": 0.6215,
+              "p_value": 0.0011,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.2662,
+              "drift_pct": 1.6412,
+              "p_value": 0.0,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.1299,
+              "drift_pct": 0.6359,
+              "p_value": 0.453,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.2593,
+              "drift_pct": 0.0546,
+              "p_value": 0.4288,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.1716,
+              "drift_pct": 0.0201,
+              "p_value": 0.483,
+              "pass": true
+            }
+          }
+        },
+        "cooling": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/aPS_3/attempts/cooling/attempt-0001/raw/cooling.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/aPS_3/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "msid_gaussian"
+            ]
+          },
+          "new_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "msid_gaussian"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.2527,
+              "drift_pct": 0.3487,
+              "p_value": 0.2495,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.7237,
+              "drift_pct": 0.956,
+              "p_value": 0.0009,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.3848,
+              "drift_pct": 0.7055,
+              "p_value": 0.079,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.0368,
+              "drift_pct": 0.7793,
+              "p_value": 0.908,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.5268,
+              "drift_pct": 0.076,
+              "p_value": 0.0199,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.0171,
+              "drift_pct": 0.0009,
+              "p_value": 0.947,
+              "pass": true
+            }
+          }
+        }
+      },
+      "recorded": {
+        "thermal": {
+          "tg_gate_verdict": "TG_REVIEW",
+          "accepted_under_advisory_mode": true
+        },
+        "mechanical": {
+          "bm_gate_verdict": "BM_REPORTABLE",
+          "bm_convergence_verdict": "BM_LADDER_CONVERGED"
+        }
+      }
+    },
+    "sPVC_1": {
+      "stages": {
+        "equilibration": {
+          "attempt": "attempt-0006",
+          "gate_file": "data/sPVC_1/attempts/equilibration/attempt-0006/raw/equilibration.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0006/work/npt_melt_hold/npt_melt_hold.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "data/sPVC_1/attempts/equilibration/attempt-0006/raw/equilibration_offline_regate.json",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_melt",
+            "verdict": "FAIL",
+            "failing_binding_gates": [
+              "<no binding gate measured>"
+            ],
+            "unmeasured_binding_gates": [
+              "chain_displacement",
+              "density_drift",
+              "density_homogeneity",
+              "density_sem",
+              "energy_component_drift",
+              "energy_drift",
+              "energy_sem",
+              "finite_size",
+              "n_eff_density",
+              "p2",
+              "rg",
+              "torsion"
+            ],
+            "failing_advisory_gates": []
+          },
+          "new_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [
+            "density_drift",
+            "density_sem",
+            "energy_drift",
+            "energy_sem",
+            "n_eff_density"
+          ],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.1266,
+              "drift_pct": 0.2459,
+              "p_value": 0.2479,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.0758,
+              "drift_pct": 0.1138,
+              "p_value": 0.4947,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.1697,
+              "drift_pct": 0.167,
+              "p_value": 0.2937,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.0169,
+              "drift_pct": 0.237,
+              "p_value": 0.9435,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.263,
+              "drift_pct": 0.125,
+              "p_value": 0.4332,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.0407,
+              "drift_pct": 0.0083,
+              "p_value": 0.8874,
+              "pass": true
+            }
+          }
+        },
+        "cooling": {
+          "attempt": "attempt-0004",
+          "gate_file": "data/sPVC_1/attempts/cooling/attempt-0004/raw/cooling.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/cooling/attempt-0004/work/npt_final/npt_final.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "energy_component_drift",
+              "msd_not_trapped"
+            ]
+          },
+          "new_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.3204,
+              "drift_pct": 0.6393,
+              "p_value": 0.144,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.2615,
+              "drift_pct": 0.3454,
+              "p_value": 0.2734,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.6,
+              "drift_pct": 0.3523,
+              "p_value": 0.1417,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 1.3542,
+              "drift_pct": 3.04,
+              "p_value": 0.034,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.3252,
+              "drift_pct": 0.0921,
+              "p_value": 0.1781,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 1.0653,
+              "drift_pct": 0.1206,
+              "p_value": 0.2043,
+              "pass": true
+            }
+          }
+        }
+      },
+      "recorded": {
+        "thermal": {
+          "tg_gate_verdict": "TG_REPORTABLE"
+        },
+        "mechanical": {
+          "bm_gate_verdict": "BM_REPORTABLE",
+          "bm_convergence_verdict": "BM_LADDER_CONVERGED"
+        }
+      }
+    },
+    "sPVC_2": {
+      "stages": {
+        "equilibration": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/sPVC_2/attempts/equilibration/attempt-0001/raw/equilibration.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian"
+            ]
+          },
+          "new_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.1337,
+              "drift_pct": 0.2673,
+              "p_value": 0.0847,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.1042,
+              "drift_pct": 0.1664,
+              "p_value": 0.3845,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.0825,
+              "drift_pct": 0.0834,
+              "p_value": 0.487,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.0157,
+              "drift_pct": 0.236,
+              "p_value": 0.9345,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.1054,
+              "drift_pct": 0.0496,
+              "p_value": 0.6828,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.1461,
+              "drift_pct": 0.0301,
+              "p_value": 0.5407,
+              "pass": true
+            }
+          }
+        },
+        "cooling": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/sPVC_2/attempts/cooling/attempt-0001/raw/cooling.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "EXTEND",
+          "stored_failing_binding_gates": [
+            "energy_sem"
+          ],
+          "old_version": {
+            "clause": "require_glassy",
+            "verdict": "FAIL",
+            "failing_binding_gates": [
+              "energy_sem"
+            ],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "msid_gaussian",
+              "residual_stress"
+            ]
+          },
+          "new_version": {
+            "clause": "require_glassy",
+            "verdict": "FAIL",
+            "failing_binding_gates": [
+              "energy_sem"
+            ],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "msid_gaussian",
+              "residual_stress"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.2117,
+              "drift_pct": 0.4494,
+              "p_value": 0.4445,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.015,
+              "drift_pct": 0.0212,
+              "p_value": 0.9455,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.5747,
+              "drift_pct": 0.3182,
+              "p_value": 0.097,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.9939,
+              "drift_pct": 2.1374,
+              "p_value": 0.1337,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.3578,
+              "drift_pct": 0.0907,
+              "p_value": 0.3518,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.0155,
+              "drift_pct": 0.0016,
+              "p_value": 0.9776,
+              "pass": true
+            }
+          }
+        }
+      },
+      "recorded": {
+        "thermal": {
+          "tg_gate_verdict": "TG_REPORTABLE"
+        },
+        "mechanical": {
+          "bm_gate_verdict": "BM_REPORTABLE",
+          "bm_convergence_verdict": "BM_LADDER_CONVERGED"
+        }
+      }
+    },
+    "sPVC_3": {
+      "stages": {
+        "equilibration": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/sPVC_3/attempts/equilibration/attempt-0001/raw/equilibration.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian"
+            ]
+          },
+          "new_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msid_gaussian"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.0358,
+              "drift_pct": 0.071,
+              "p_value": 0.6683,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.1264,
+              "drift_pct": 0.1911,
+              "p_value": 0.1028,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.1826,
+              "drift_pct": 0.1909,
+              "p_value": 0.1317,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.3246,
+              "drift_pct": 4.8297,
+              "p_value": 0.0277,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.5007,
+              "drift_pct": 0.2335,
+              "p_value": 0.0407,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.2948,
+              "drift_pct": 0.0592,
+              "p_value": 0.0828,
+              "pass": true
+            }
+          }
+        },
+        "cooling": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/sPVC_3/attempts/cooling/attempt-0001/raw/cooling.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "msid_gaussian"
+            ]
+          },
+          "new_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "msid_gaussian"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.0344,
+              "drift_pct": 0.0678,
+              "p_value": 0.8756,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.3214,
+              "drift_pct": 0.4838,
+              "p_value": 0.1597,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.1551,
+              "drift_pct": 0.0855,
+              "p_value": 0.5818,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.3089,
+              "drift_pct": 0.6531,
+              "p_value": 0.2439,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.1479,
+              "drift_pct": 0.0456,
+              "p_value": 0.767,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.1439,
+              "drift_pct": 0.0153,
+              "p_value": 0.8163,
+              "pass": true
+            }
+          }
+        }
+      },
+      "recorded": {
+        "thermal": {
+          "tg_gate_verdict": "TG_REPORTABLE"
+        },
+        "mechanical": {
+          "bm_gate_verdict": "BM_REPORTABLE",
+          "bm_convergence_verdict": "BM_LADDER_CONVERGED"
+        }
+      }
+    },
+    "PLLA_1": {
+      "stages": {
+        "equilibration": {
+          "attempt": "attempt-0002",
+          "gate_file": "data/PLLA_1/attempts/equilibration/attempt-0002/raw/equilibration.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [
+              "energy_component_drift"
+            ],
+            "failing_advisory_gates": []
+          },
+          "new_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": []
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.1351,
+              "drift_pct": 0.2467,
+              "p_value": 0.2177,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.0644,
+              "drift_pct": 0.0746,
+              "p_value": 0.6686,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.634,
+              "drift_pct": 0.8147,
+              "p_value": 0.2352,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.2541,
+              "drift_pct": 0.7627,
+              "p_value": 0.2882,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.5741,
+              "drift_pct": 0.0415,
+              "p_value": 0.1647,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.3263,
+              "drift_pct": 0.0078,
+              "p_value": 0.5202,
+              "pass": true
+            }
+          }
+        },
+        "cooling": {
+          "attempt": "attempt-0002",
+          "gate_file": "data/PLLA_1/attempts/cooling/attempt-0002/raw/cooling.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "residual_stress"
+            ]
+          },
+          "new_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "residual_stress"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.0931,
+              "drift_pct": 0.1729,
+              "p_value": 0.6916,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.1005,
+              "drift_pct": 0.0982,
+              "p_value": 0.6475,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.3586,
+              "drift_pct": 0.2135,
+              "p_value": 0.2062,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.6971,
+              "drift_pct": 0.8274,
+              "p_value": 0.0747,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.1327,
+              "drift_pct": 0.006,
+              "p_value": 0.5734,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.2451,
+              "drift_pct": 0.0028,
+              "p_value": 0.3037,
+              "pass": true
+            }
+          }
+        }
+      },
+      "recorded": {
+        "thermal": {
+          "tg_gate_verdict": "TG_REPORTABLE"
+        },
+        "mechanical": {
+          "bm_gate_verdict": "BM_REPORTABLE",
+          "bm_convergence_verdict": "BM_LADDER_CONVERGED"
+        }
+      }
+    },
+    "PLLA_2": {
+      "stages": {
+        "equilibration": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/PLLA_2/attempts/equilibration/attempt-0001/raw/equilibration.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/PLLA_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": []
+          },
+          "new_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": []
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.2418,
+              "drift_pct": 0.4332,
+              "p_value": 0.043,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.1729,
+              "drift_pct": 0.2067,
+              "p_value": 0.1145,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.9575,
+              "drift_pct": 1.2475,
+              "p_value": 0.2036,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.1689,
+              "drift_pct": 0.4756,
+              "p_value": 0.4431,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.2327,
+              "drift_pct": 0.0159,
+              "p_value": 0.2343,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.0179,
+              "drift_pct": 0.0004,
+              "p_value": 0.9777,
+              "pass": true
+            }
+          }
+        },
+        "cooling": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/PLLA_2/attempts/cooling/attempt-0001/raw/cooling.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/PLLA_2/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "residual_stress"
+            ]
+          },
+          "new_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "residual_stress"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.1745,
+              "drift_pct": 0.2982,
+              "p_value": 0.4334,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.3868,
+              "drift_pct": 0.3587,
+              "p_value": 0.0931,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.1289,
+              "drift_pct": 0.0741,
+              "p_value": 0.5572,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.5595,
+              "drift_pct": 0.6111,
+              "p_value": 0.108,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.4696,
+              "drift_pct": 0.0219,
+              "p_value": 0.0318,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.042,
+              "drift_pct": 0.0005,
+              "p_value": 0.8788,
+              "pass": true
+            }
+          }
+        }
+      },
+      "recorded": {
+        "thermal": {
+          "tg_gate_verdict": "TG_REPORTABLE"
+        },
+        "mechanical": {
+          "bm_gate_verdict": "BM_REPORTABLE",
+          "bm_convergence_verdict": "BM_LADDER_CONVERGED"
+        }
+      }
+    },
+    "PLLA_3": {
+      "stages": {
+        "equilibration": {
+          "attempt": "attempt-0002",
+          "gate_file": "data/PLLA_3/attempts/equilibration/attempt-0002/raw/equilibration.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/PLLA_3/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": []
+          },
+          "new_version": {
+            "clause": "require_melt",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": []
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.113,
+              "drift_pct": 0.1993,
+              "p_value": 0.3352,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.5368,
+              "drift_pct": 0.6315,
+              "p_value": 0.0,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 1.2967,
+              "drift_pct": 1.7694,
+              "p_value": 0.1423,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.4247,
+              "drift_pct": 1.1733,
+              "p_value": 0.2986,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.0325,
+              "drift_pct": 0.0022,
+              "p_value": 0.8097,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.0938,
+              "drift_pct": 0.0021,
+              "p_value": 0.6787,
+              "pass": true
+            }
+          }
+        },
+        "cooling": {
+          "attempt": "attempt-0001",
+          "gate_file": "data/PLLA_3/attempts/cooling/attempt-0001/raw/cooling.json",
+          "log_file": "/home/arz2/PolyJarvis_v2/data/PLLA_3/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+          "log_source": "gate_json.log_file",
+          "trajectory_evidence": "pinned_gate_file",
+          "stored_live_verdict": "PASS",
+          "stored_failing_binding_gates": [],
+          "old_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "residual_stress"
+            ]
+          },
+          "new_version": {
+            "clause": "require_glassy",
+            "verdict": "PASS",
+            "failing_binding_gates": [],
+            "unmeasured_binding_gates": [],
+            "failing_advisory_gates": [
+              "msd_not_trapped",
+              "residual_stress"
+            ]
+          },
+          "clause_matches_stored": true,
+          "thermo_pass_flags_changed_besides_components": [],
+          "energy_components_new": {
+            "bond": {
+              "drift_sigma": 0.1873,
+              "drift_pct": 0.3239,
+              "p_value": 0.4003,
+              "pass": true
+            },
+            "angle": {
+              "drift_sigma": 0.1935,
+              "drift_pct": 0.2088,
+              "p_value": 0.3781,
+              "pass": true
+            },
+            "dihedral": {
+              "drift_sigma": 0.1939,
+              "drift_pct": 0.1097,
+              "p_value": 0.4663,
+              "pass": true
+            },
+            "vdw": {
+              "drift_sigma": 0.0135,
+              "drift_pct": 0.0142,
+              "p_value": 0.9737,
+              "pass": true
+            },
+            "coul": {
+              "drift_sigma": 0.2759,
+              "drift_pct": 0.0127,
+              "p_value": 0.389,
+              "pass": true
+            },
+            "kspace": {
+              "drift_sigma": 0.0236,
+              "drift_pct": 0.0003,
+              "p_value": 0.9392,
+              "pass": true
+            }
+          }
+        }
+      },
+      "recorded": {
+        "thermal": {
+          "tg_gate_verdict": "TG_REPORTABLE"
+        },
+        "mechanical": {
+          "bm_gate_verdict": "BM_REPORTABLE",
+          "bm_convergence_verdict": "BM_LADDER_CONVERGED"
+        }
+      }
+    }
+  }
+}
