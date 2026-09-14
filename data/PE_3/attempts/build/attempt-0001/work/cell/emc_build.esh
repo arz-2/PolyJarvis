@@ -1,0 +1,29 @@
+ITEM OPTIONS
+
+replace         true
+field           trappe-ua
+density         0.650000
+ntotal          3000
+number          true
+
+ITEM END
+
+ITEM GROUPS
+
+repeat   *CC*,1,repeat:2, 1,cap:1, 2,cap:1
+cap      *C
+
+ITEM END
+
+ITEM CLUSTERS
+
+poly    alternate    10
+
+ITEM END
+
+ITEM POLYMERS
+
+poly
+100    repeat,179,cap,2
+
+ITEM END

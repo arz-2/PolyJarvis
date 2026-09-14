@@ -1,0 +1,22 @@
+{"event": "resume", "at": "2026-09-12T21:28:42.465517+00:00", "at_node": "cache_probe", "node": "entry_resolve"}
+{"event": "cache_probe", "at": "2026-09-12T21:28:42.879835+00:00", "hit": true, "canonical_smiles": "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1", "node": "cache_probe"}
+{"event": "plan", "at": "2026-09-12T21:28:44.110261+00:00", "plan_mode": "deterministic", "confidence": "high", "gpu_hours": 5.777, "node": "plan"}
+{"event": "cost_admitted", "at": "2026-09-12T21:28:44.111567+00:00", "gpu_hours": 5.777, "ceiling": 40.0, "unpriced": ["equil", "murnaghan"], "note": "total_gpu_hours is a LOWER bound; unpriced stages are excluded", "node": "cost_guard_pre"}
+{"event": "cost_admitted", "at": "2026-09-12T21:28:44.112294+00:00", "gpu_hours": 5.777, "ceiling": 40.0, "unpriced": ["equil", "murnaghan"], "note": "total_gpu_hours is a LOWER bound; unpriced stages are excluded", "node": "cost_guard_post"}
+{"event": "stage_progress", "stage": "build", "status": "running", "attempts": 1, "at": "2026-09-12T21:29:02.453860+00:00"}
+{"event": "stage_progress", "stage": "cooling", "status": "pending", "attempts": 0, "at": "2026-09-12T21:29:02.453908+00:00"}
+{"event": "stage_progress", "stage": "equilibration", "status": "pending", "attempts": 0, "at": "2026-09-12T21:29:02.453923+00:00"}
+{"event": "stage_progress", "stage": "mechanical", "status": "pending", "attempts": 0, "at": "2026-09-12T21:29:02.453935+00:00"}
+{"event": "stage_progress", "stage": "summary", "status": "pending", "attempts": 0, "at": "2026-09-12T21:29:02.453944+00:00"}
+{"event": "stage_progress", "stage": "thermal", "status": "pending", "attempts": 0, "at": "2026-09-12T21:29:02.453953+00:00"}
+{"event": "stage_progress", "stage": "build", "status": "accepted", "attempts": 1, "at": "2026-09-12T21:30:22.454925+00:00"}
+{"event": "stage_progress", "stage": "equilibration", "status": "running", "attempts": 1, "at": "2026-09-12T21:30:22.454975+00:00"}
+{"event": "stage_progress", "stage": "equilibration", "status": "accepted", "attempts": 1, "at": "2026-09-13T05:25:22.783844+00:00"}
+{"event": "stage_progress", "stage": "cooling", "status": "running", "attempts": 1, "at": "2026-09-13T05:25:42.784131+00:00"}
+{"event": "stage_progress", "stage": "cooling", "status": "accepted", "attempts": 1, "at": "2026-09-13T08:26:02.907618+00:00"}
+{"event": "stage_progress", "stage": "thermal", "status": "running", "attempts": 1, "at": "2026-09-13T08:26:02.907677+00:00"}
+{"event": "stage_progress", "stage": "mechanical", "status": "running", "attempts": 1, "at": "2026-09-13T11:56:43.055170+00:00"}
+{"event": "stage_progress", "stage": "thermal", "status": "accepted", "attempts": 1, "at": "2026-09-13T11:56:43.055216+00:00"}
+{"event": "stage_progress", "stage": "mechanical", "status": "accepted", "attempts": 1, "at": "2026-09-13T13:27:23.119922+00:00"}
+{"event": "execute", "at": "2026-09-13T13:27:34.691672+00:00", "status": "complete", "stage": null, "finding": null, "resumed": false, "node": "execute"}
+{"event": "done", "status": "failed", "exit_code": 3, "run_name": "PEEK_3", "polymer_class": "PKTN", "class_source": "characterization_cache", "plan_path": "/home/alexzhao/PolyJarvis/data/PEEK_3/raw/run_plan.json", "confidence": "high", "plan_mode": "deterministic", "gpu_hours": 5.777, "unpriced": ["equil", "murnaghan"], "critic_verdict": null, "stage": null, "finding": null, "detail": "", "resumable": false}

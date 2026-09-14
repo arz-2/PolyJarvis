@@ -1,0 +1,63 @@
+{
+  "artifacts": [],
+  "attempt_id": "attempt-0001",
+  "findings": [
+    {
+      "code": "PROCESS_FAILED",
+      "confidence": "high",
+      "details": {
+        "error": "GPU claim failed for PE_1 (need=1): {'error': 'insufficient_free_gpus', 'need': 1, 'available': []}"
+      },
+      "remedy_id": null,
+      "severity": "blocking",
+      "stage": "thermal"
+    }
+  ],
+  "finished_at": "2026-09-11T23:02:54.545137+00:00",
+  "input_hash": "86d6f1a252b803f949a7e6c2e6cc8ae55760b3dfaa02628819882414ba5c9056",
+  "outputs": {},
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "cooling_continuation_attempt": 1,
+    "cooling_continuation_ns": 0.5,
+    "cooling_extend_base_stage": "npt_final",
+    "cooling_extend_ensemble": "npt",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "exp_K_max_GPa": 2,
+    "exp_K_min_GPa": 1.5,
+    "experimental_density_gcm3": 0.855,
+    "experimental_tg_K": 195,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 40,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "stage": "thermal",
+  "status": "failed"
+}

@@ -1,0 +1,613 @@
+{
+  "active_finding": null,
+  "agent_escalations": [
+    {
+      "at": "2026-09-12T19:15:17.339000+00:00",
+      "decision": {
+        "action": "stop",
+        "modifications": {},
+        "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] No auto-remedy ran, correctly. The finding is BM_LADDER_NOT_CONVERGED with confidence=low: plateau_confirmed=true, and the only reason is loo_unstable. murnaghan_ladder_extend only fires at high confidence. assess_ladder_convergence (extract_bulk_modulus_murnaghan.py:210-250) marks leave-one-out alone as uncalibrated and meant for review, not for spending wall time. remedy_history holds only continue_npt x1 on cooling, so no mechanical rung has been spent.\n\nRoot cause: Murnaghan's constant K' is a poor fit over this ladder. It is not a ladder that is too narrow, and it is not undersampling.\n(1) Only one LOO drop breaks the 10% threshold. Dropping 1 atm gives +13.65% (B0 2.148 GPa). The other five drops stay within 6.2%: 1000 -2.8%, 2500 +0.1%, 5000 -0.6%, 10000 -3.1%, 15000 -6.2%.\n(2) The 1 atm point is not noise or drift. Its NPT volume samples every 50k steps scatter with no trend (96553-97895 A^3, reported mean 97323, SEM 46).\n(3) Local secant moduli from the measured volumes, back-projected to P=0 with the fitted B0'=8.38, are: 0-1000 atm about 1.58 GPa; 1000-2500 about 1.96; 2500-5000 about 1.97; 5000-10000 about 1.77; 10000-15000 about 1.5. So K' falls with pressure. That fits a rubbery PE cell at 300 K (exp Tg 195 K) stiffening toward glass under compression; tau_frames drops to 1.0 at 10000 and 15000 atm.\nDropping the P~0 anchor forces the fit to extrapolate to V0 from high-pressure points that obey a different K'. That extrapolation is the 13.6% shift.\n\nremedy_economics was not run. Mechanically it would return SPEND with spend_limit \"one rung\", because Class C with fewer than two history points always does. But the only lever it can price, bm_compression_limit_atm higher, points the wrong way here: the ladder-extend formula's next point would be 30000 atm. That adds a stiffer point further from the constant-K' regime and lengthens the extrapolation behind the instability. Densifying the low end with mechanical_resample_points=[500] is cheap (about 265 s of MD per point at 3600 UA atoms, lj_cut). It would only aim at the uncalibrated gate, though: I cannot show it clears 10%, and it would not change the best estimate. So revise_plan does not meet the confidence bar. retry does not apply because nothing here was transient.\n\nThe measured result is sound and should be accepted with an annotation by a human:\n- K = 1.89 +/- 0.12 GPa (Murnaghan, BM_REPORTABLE, r^2=0.99987, 6 points, volume monotonic, B0'=8.38, inside the [4,20] band).\n- Inside the plan's experimental band [1.5, 2.0] GPa.\n- Cross-checked by the independent fluctuation estimator: 1.77 GPa, 6.28% divergence.\n\nCarry this annotation: \"LOO shift driven by P~0 anchor; K' decreases with P over the 1-15000 atm ladder (rubbery-to-stiffened crossover); Murnaghan B0 likely slightly high vs the low-P secant (1.58 GPa) and fluctuation (1.77 GPa) estimates; do not widen the ladder.\"\n\nIf the operator wants the gate cleared anyway, the one reasonable rung is mechanical_resample_points=[500] with mechanical_sampling_factor=1. Never raise the compression ceiling for this finding."
+      },
+      "finding": {
+        "code": "BM_LADDER_NOT_CONVERGED",
+        "confidence": "low",
+        "details": {
+          "gate_output": {
+            "B0_prime": 8.3843,
+            "bm_convergence_confidence": "low",
+            "bm_convergence_reasons": [
+              "loo_unstable"
+            ],
+            "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+            "bm_gate_reasons": [],
+            "bm_gate_verdict": "BM_REPORTABLE",
+            "bulk_modulus_GPa": 1.8897,
+            "mechanical_json_path": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/mechanical/attempt-0001/raw/mechanical.json",
+            "method": "murnaghan",
+            "murnaghan_result": {
+              "B0_GPa": 1.8897,
+              "B0_prime": 8.3843,
+              "B0_sem_GPa": 0.1198,
+              "V0_A3": 96882.59,
+              "all_points_fit": {
+                "B0_GPa": 1.8897,
+                "B0_prime": 8.3843,
+                "V0_A3": 96882.59,
+                "fit_converged": true,
+                "method": "murnaghan",
+                "n_points": 6,
+                "pressures_atm": [
+                  1.0,
+                  1000.0,
+                  2500.0,
+                  5000.0,
+                  10000.0,
+                  15000.0
+                ],
+                "r_squared": 0.99987,
+                "volume_monotonic": true
+              },
+              "anomalous_points": {
+                "0": [
+                  "|dV/dP| between points 0 and 1 is 4.908, >3x the other intervals' median (1.356) -- possible cavitation/discontinuity in this interval."
+                ],
+                "1": [
+                  "|dV/dP| between points 0 and 1 is 4.908, >3x the other intervals' median (1.356) -- possible cavitation/discontinuity in this interval."
+                ]
+              },
+              "bm_convergence_confidence": "low",
+              "bm_convergence_reasons": [
+                "loo_unstable"
+              ],
+              "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+              "bm_gate_reasons": [],
+              "bm_gate_verdict": "BM_REPORTABLE",
+              "bm_reportable": true,
+              "bulk_modulus_GPa": 1.8897,
+              "bulk_modulus_sem_GPa": 0.1198,
+              "eq_fraction": 0.5,
+              "excluded_points": [],
+              "fit_converged": true,
+              "fluctuation_bulk_modulus_GPa": 1.7711,
+              "fluctuation_divergence_pct": 6.28,
+              "log_files": [
+                "/home/alexzhao/PolyJarvis/data/PE_1/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/bm_P1.log",
+                "/home/alexzhao/PolyJarvis/data/PE_1/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/bm_P1000.log",
+                "/home/alexzhao/PolyJarvis/data/PE_1/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/bm_P2500.log",
+                "/home/alexzhao/PolyJarvis/data/PE_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000.log",
+                "/home/alexzhao/PolyJarvis/data/PE_1/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/bm_P10000.log",
+                "/home/alexzhao/PolyJarvis/data/PE_1/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000.log"
+              ],
+              "loo_max_dB0_pct": 13.65,
+              "loo_n_converged": 6,
+              "loo_results": [
+                {
+                  "B0_GPa": 2.1476,
+                  "B0_prime": 8.0288,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": 0.2579,
+                  "dB0_prime_vs_baseline": -0.3555,
+                  "dropped_pressure_atm": 1.0,
+                  "is_tension_point": true,
+                  "r_squared": 0.999989
+                },
+                {
+                  "B0_GPa": 1.8365,
+                  "B0_prime": 8.4211,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": -0.0532,
+                  "dB0_prime_vs_baseline": 0.0368,
+                  "dropped_pressure_atm": 1000.0,
+                  "is_tension_point": false,
+                  "r_squared": 0.999908
+                },
+                {
+                  "B0_GPa": 1.8918,
+                  "B0_prime": 8.3405,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": 0.0021,
+                  "dB0_prime_vs_baseline": -0.0438,
+                  "dropped_pressure_atm": 2500.0,
+                  "is_tension_point": false,
+                  "r_squared": 0.999884
+                },
+                {
+                  "B0_GPa": 1.879,
+                  "B0_prime": 8.4149,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": -0.0108,
+                  "dB0_prime_vs_baseline": 0.0306,
+                  "dropped_pressure_atm": 5000.0,
+                  "is_tension_point": false,
+                  "r_squared": 0.999871
+                },
+                {
+                  "B0_GPa": 1.8306,
+                  "B0_prime": 8.5026,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": -0.0591,
+                  "dB0_prime_vs_baseline": 0.1183,
+                  "dropped_pressure_atm": 10000.0,
+                  "is_tension_point": false,
+                  "r_squared": 0.999905
+                },
+                {
+                  "B0_GPa": 1.7722,
+                  "B0_prime": 8.7995,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": -0.1176,
+                  "dB0_prime_vs_baseline": 0.4152,
+                  "dropped_pressure_atm": 15000.0,
+                  "is_tension_point": false,
+                  "r_squared": 0.999843
+                }
+              ],
+              "method": "murnaghan",
+              "murnaghan_eos_fig": "/home/alexzhao/PolyJarvis/data/PE_1/graphs/murnaghan_eos.png",
+              "n_eff_per_point": [
+                100,
+                53,
+                1831,
+                73,
+                2501,
+                2501
+              ],
+              "n_points": 6,
+              "n_prod_rows": [
+                2501,
+                2501,
+                2501,
+                2501,
+                2501,
+                2501
+              ],
+              "output_dir": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/mechanical/attempt-0001/raw",
+              "pressures_GPa": [
+                0.000101,
+                0.101325,
+                0.253313,
+                0.506625,
+                1.01325,
+                1.519875
+              ],
+              "pressures_atm": [
+                1.0,
+                1000.0,
+                2500.0,
+                5000.0,
+                10000.0,
+                15000.0
+              ],
+              "r_squared": 0.99987,
+              "selected_window": {
+                "n_points": 6,
+                "plateau_confirmed": true,
+                "selection_note": "Untrimmed fit already has r_squared=0.99987 >= 0.999 -- no trimming applied even though point(s) [0, 1] were flagged (a genuinely curved EOS can trip the interval heuristic without a real problem).",
+                "trim_total": 0
+              },
+              "status": "success",
+              "summary_json": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/mechanical/attempt-0001/raw/mechanical.json",
+              "tau_frames_per_point": [
+                24.762,
+                46.504,
+                1.366,
+                33.996,
+                1.0,
+                1.0
+              ],
+              "temperature_K": 300.04,
+              "temperature_spread_K": 0.23,
+              "vol_sem_A3_per_point": [
+                46.0144,
+                50.8579,
+                6.5638,
+                27.3626,
+                3.676,
+                2.9536
+              ],
+              "vol_stds_A3": [
+                460.14,
+                370.25,
+                280.87,
+                233.79,
+                183.83,
+                147.71
+              ],
+              "volume_monotonic": true,
+              "volumes_A3": [
+                97323.03,
+                92420.12,
+                88441.91,
+                84201.45,
+                79118.8,
+                75878.36
+              ],
+              "warnings": [
+                "Leave-one-out refit: dropping one pressure point shifts B0 by up to 13.6% (>10%) \u2014 the fit is not robust to a single point; consider widening the pressure range."
+              ]
+            },
+            "pressure_selection": {
+              "ced_mpa": null,
+              "compression_limit_atm": 15000,
+              "fluctuation_K_GPa": 1.7711333444797568,
+              "ladder_adjustment": null,
+              "pressures_atm": [
+                1,
+                1000,
+                2500,
+                5000,
+                10000,
+                15000
+              ],
+              "reason": "class_protocol",
+              "tension_limit_atm": 1
+            },
+            "velocity_seed": 152739
+          }
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "mechanical"
+      },
+      "manifest": "attempt-0001"
+    }
+  ],
+  "agent_escalations_archived_infrastructure": {
+    "archived_at": "2026-09-12T03:21:00.787150+00:00",
+    "escalations": [
+      {
+        "at": "2026-09-11T21:56:35.477976+00:00",
+        "decision": {
+          "action": "retry",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] Transient GPU claim race, now resolved \u2014 the PROCESS_FAILED row's prescribed check (\"look for a real cause \u2014 disk, GPU claim, host \u2014 before a blind retry\") was done and the cause is identified and cleared. workflow_state.json shows remedy_counters.total=0 and agent_escalations=[], i.e. transient_retry's preflight (_transient_retry_blocked, workflow_engine.py:679) declined on len(free_gpus())<1 without spending either of its two applications. Timing is decisive: equilibration attempt-0001 was ACCEPTED at 21:52:14.963Z (plateau_equilibrated=true, drift 0.28%, n_effective=245) and cooling's claim failed 1.8 s later at 21:52:16.778Z. PE_1's equilibration chain ran on GPU 1 (data/_engine/run_state.json:357, \"gpu_ids\": \"1\"); cmd_release drops the lock instantly but free_gpus() also demands nvidia-smi idleness (util<=5%, mem<=800MB), so PE_1's own just-exited lmp still disqualified GPU 1 during CUDA-context teardown. As of now (21:54Z) pgrep -a lmp returns exactly two processes \u2014 PEEK_1 and PSU_1 \u2014 on GPUs 2 and 3, matching the only two locks in /tmp/polyjarvis/gpu_locks; no PolyJarvis process remains on GPU 0 or 1. Additional pressure came from an un-ledgered external tenant (PID 2231422, `python run.py --devices 0,1,2,3`, elapsed 1-02:30), but its per-GPU residency is intermittent, not permanent: PE_1 claimed GPU 1 successfully at 20:55 while that job was already ~25 h old, so it does not structurally block a claim. No decided_params key addresses GPU contention, so revise_plan has no correct lever; forcing engine=cpu/gpu_per_run=0 (viable at 3600 UA atoms, lj_cut, no PPPM) would rewrite hardware provenance and invalidate the admitted cost estimate mid-run \u2014 a human capacity call, not an auto-remedy. retry is bounded because transient_retry re-runs the disk+free-GPU preflight and declines rather than resubmitting blindly; the engine's own docstring records the 2026-09-08 case where three campaigns each wasted an escalation on a healthy retry wrongly declined. Caveat: GPUs 2-3 stay held by PEEK_1/PSU_1 (mid-equilibration, anneal_heat, stage 6/10) for hours alongside the external tenant, so a second PROCESS_FAILED here is sustained capacity exhaustion rather than a race and warrants stop/human scheduling, not a third attempt."
+        },
+        "finding": {
+          "code": "PROCESS_FAILED",
+          "confidence": "high",
+          "details": {
+            "error": "GPU claim failed for PE_1 (need=1): {'error': 'insufficient_free_gpus', 'need': 1, 'available': []}"
+          },
+          "remedy_id": null,
+          "severity": "blocking",
+          "stage": "cooling"
+        },
+        "manifest": "attempt-0001"
+      },
+      {
+        "at": "2026-09-11T23:06:46.918370+00:00",
+        "decision": {
+          "action": "retry",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] Root cause: a momentary GPU-utilization spike by an un-ledgered external tenant, not capacity exhaustion, and not a defect in any decided_param. Evidence: (1) recovery_log.jsonl shows transient_retry declined at its own preflight at both 21:52:16 and 23:02:54 (\"0 GPU(s) free, 1 needed\"), and workflow_state.json remedy_counters.total=1 is entirely continue_npt:cooling \u2014 transient_retry's two applications are unspent, so this is NOT a third blind attempt. (2) /tmp/polyjarvis/gpu_locks holds only gpu2->PEEK_1 and gpu3->PSU_1; GPUs 0 and 1 are unclaimed, and pgrep -a lmp at 23:03:10 and 23:06 UTC returns only PEEK_1 and PSU_1 \u2014 no PolyJarvis process on 0 or 1. (3) cooling attempt-0003's npt_final_run.log last wrote 23:01:30 UTC and the claim failed at 23:02:54, 83 s later \u2014 too long for PE_1's own CUDA teardown, so the blocker is the neighbour (PID 2231422, `python run.py --devices 0,1,2,3`, 27 h elapsed). (4) The memory half of the claim test was already repaired: MIN_FREE_MEM_MB=8000 replaced the absolute 800 MB cap in commit bceab9f at 21:58:03 UTC, and _pick_gpu (run_campaign.py:124) invokes hardware_runtime.py as a fresh subprocess, so the 23:02:54 claim ran the fixed code; the remaining gate is util<=5% on a 40 GB A800 with ~34 GB free, i.e. a transient compute spike. (5) The neighbour's per-card residency is intermittent, not permanent: PE_1 claimed GPU 1 successfully at 20:55, 21:56 and 22:59 (the last two after that job was >25 h old) \u2014 3 of 5 claims succeeded. Disk is not a co-cause (192 G free on /). This revises the prior escalation's caveat that a second PROCESS_FAILED implies sustained exhaustion: its premise was all four cards structurally occupied, but two successful GPU-1 claims have occurred since and the memory-side false negative was fixed in between; PEEK_1/PSU_1 holding 2 and 3 does not matter because PE_1 needs one of the two unclaimed cards. No decided_params key addresses GPU contention, so revise_plan has no correct lever \u2014 forcing engine=cpu/gpu_per_run=0 (feasible at ~3600 UA atoms, lj_cut, no PPPM) would rewrite hardware provenance and break the protocol lock this rev2 replicate campaign exists to set, a human capacity call. Caveat, stated plainly: nvidia-smi was denied in this headless session, so current util on GPUs 0/1 is inferred from the ledger, process table and log mtimes rather than read directly; the engine's transient_retry preflight re-checks free GPUs and declines rather than resubmitting into contention, and a failed claim costs ~1 s and lands in the same terminal escalation_required state that `stop` would produce immediately \u2014 so retry strictly dominates. Operator note: the claim is scoped per submission, so thermal->mechanical re-enters the same lottery with the escalation budget now spent."
+        },
+        "finding": {
+          "code": "PROCESS_FAILED",
+          "confidence": "high",
+          "details": {
+            "error": "GPU claim failed for PE_1 (need=1): {'error': 'insufficient_free_gpus', 'need': 1, 'available': []}"
+          },
+          "remedy_id": null,
+          "severity": "blocking",
+          "stage": "thermal"
+        },
+        "manifest": "attempt-0001"
+      }
+    ],
+    "why": "Both escalations were lost GPU claim races (cooling 21:52Z, thermal 23:02Z) caused by _transient_retry_blocked declining on resource availability -- fixed in commits bceab9f (free-memory test), 073a06a (claim waits + atomic) and 2d0d06b (wait instead of escalate). No scientific finding was adjudicated by either call, so the MAX_AGENT_DECISIONS budget is restored for the science it exists to serve. Operator-approved reset, 2026-09-12."
+  },
+  "created_at": "2026-09-11T20:55:12.608963+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "cooling_continuation_attempt": 1,
+    "cooling_continuation_ns": 0.5,
+    "cooling_extend_base_stage": "npt_final",
+    "cooling_extend_ensemble": "npt",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "exp_K_max_GPa": 2,
+    "exp_K_min_GPa": 1.5,
+    "experimental_density_gcm3": 0.855,
+    "experimental_tg_K": 195,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 40,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "engine_version": "workflow-engine-v3",
+  "plan_decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "exp_K_max_GPa": 2,
+    "exp_K_min_GPa": 1.5,
+    "experimental_density_gcm3": 0.855,
+    "experimental_tg_K": 195,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 40,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "plan_hash": "cfc9bd5f28cbe6693f3b11279f3931d5b49413467d5e788017c6460ea69fb4ef",
+  "remedy_counters": {
+    "by_id": {
+      "continue_npt": 1
+    },
+    "by_route": {
+      "continue_npt:cooling": 1
+    },
+    "total": 1
+  },
+  "remedy_history": [
+    {
+      "application": 1,
+      "at": "2026-09-11T22:59:12.928713+00:00",
+      "finding": {
+        "code": "EXTEND",
+        "confidence": "high",
+        "details": {
+          "advisory_gates": {
+            "ct": true,
+            "density_drift": true,
+            "energy_component_drift": false,
+            "msd_not_trapped": false,
+            "msid_gaussian": true,
+            "residual_stress": true,
+            "rg": true,
+            "torsion": true
+          },
+          "applicable_clause": "require_rubbery",
+          "binding_gates": {
+            "density_homogeneity": true,
+            "density_sem": true,
+            "energy_drift": false,
+            "energy_sem": true,
+            "finite_size": true,
+            "n_eff_density": true
+          },
+          "cooling_extrapolation_reliable": null,
+          "cooling_verdict": null,
+          "density_value_binding": "n/a",
+          "extension_ns": 0.5,
+          "failing_binding_gates": [
+            "energy_drift"
+          ],
+          "finite_size": {
+            "L_min_A": 46.06,
+            "L_over_2Rg": 0.739,
+            "L_over_2cutoff": 1.645,
+            "L_over_Ree": 0.622,
+            "available": true,
+            "box_A": [
+              46.06,
+              46.06,
+              46.06
+            ],
+            "cutoff_A": 14.0,
+            "graded_box": "actual_equilibrated",
+            "min_image_evaluated": true,
+            "pass": true,
+            "ree_self_image_flag": true,
+            "self_image_advisory": true,
+            "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+          },
+          "finite_size_min_image_unarmed": false,
+          "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+          "homogeneity_verdict": "HOMOG_PASS",
+          "regime": "rubbery",
+          "relaxation_time_ns": 410.21479999999997,
+          "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns = max(1.5, 1.5*ct_tau_relax_ps/1000), else 1.5 ns, via restart-continuation at npt_prod_temp_K (npt_final always runs at final_T_K, default 300 K \u2014 never a re-melt). Cap 2 per gate.",
+          "remedy_confidence": "high",
+          "residual_stress": {
+            "available": true,
+            "dev_atm": {
+              "Pxx": -3.1,
+              "Pyy": -11.8,
+              "Pzz": 14.9
+            },
+            "max_abs_dev_atm": 14.9,
+            "mean_pressure_atm": -1.5,
+            "resolved": false,
+            "von_mises_atm": 23.6,
+            "z_max": 1.35
+          },
+          "saved_to": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/cooling/attempt-0002/raw/cooling.json",
+          "unmeasured_binding_gates": [],
+          "verdict": "EXTEND"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "cooling"
+      },
+      "remedy_id": "continue_npt"
+    }
+  ],
+  "run_name": "PE_1",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-11T20:55:42.727420+00:00",
+          "input_hash": "1a028f41581b5e05bf0746555d82732d947e40fc7ef23b76e2e188a2d2df0d15",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-11T20:55:12.609483+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "1a028f41581b5e05bf0746555d82732d947e40fc7ef23b76e2e188a2d2df0d15",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0003",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-11T21:52:16.778526+00:00",
+          "input_hash": "98d7495b7096af4f6e8aa72203154e315c59c97a97e85dcd9fc6786e8318035e",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-11T21:52:15.837984+00:00",
+          "status": "failed"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-11T22:59:12.927364+00:00",
+          "input_hash": "98d7495b7096af4f6e8aa72203154e315c59c97a97e85dcd9fc6786e8318035e",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/cooling/attempt-0002/executor_state.json",
+          "started_at": "2026-09-11T21:56:37.450274+00:00",
+          "status": "remedy_required"
+        },
+        {
+          "attempt_id": "attempt-0003",
+          "finished_at": "2026-09-11T23:02:52.294073+00:00",
+          "input_hash": "254e322f5f95fcc9ef7da3dd2c94fcfb0dde97b9cfaf067bddcc3d6c83bcaa0e",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/cooling/attempt-0003/executor_state.json",
+          "started_at": "2026-09-11T22:59:13.962991+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "254e322f5f95fcc9ef7da3dd2c94fcfb0dde97b9cfaf067bddcc3d6c83bcaa0e",
+      "stale_reason": "remedy continue_npt",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-11T21:52:14.963071+00:00",
+          "input_hash": "fcf822de1b23ce3fbbe0f9551221ab2b5f363cbb8b3eab6a32ea9fa5cdcc7db4",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-11T20:55:42.729796+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "fcf822de1b23ce3fbbe0f9551221ab2b5f363cbb8b3eab6a32ea9fa5cdcc7db4",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T19:12:21.430152+00:00",
+          "input_hash": "aa8c431d4bfa4aa36e453ce8080af74d5d88d3305e8675335f53822983580df8",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T18:44:24.942899+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "aa8c431d4bfa4aa36e453ce8080af74d5d88d3305e8675335f53822983580df8",
+      "operator_acceptance": {
+        "accepted_by": "operator, 2026-09-12",
+        "annotation": "LOO shift driven by P~0 anchor; K' decreases with P over the 1-15000 atm ladder (rubbery-to-stiffened crossover); Murnaghan B0 likely slightly high vs the low-P secant (1.58 GPa) and fluctuation (1.77 GPa) estimates; do not widen the ladder.",
+        "declined_remedy": "mechanical_resample_points=[500] was the one rung the agent considered reasonable; it stated it could not show the rung clears the 10% gate and that it would not change the best estimate.",
+        "gate_overridden": "BM_LADDER_NOT_CONVERGED (confidence low, reason: loo_unstable only)",
+        "why": "The MEASUREMENT passed its own gate: bm_gate_verdict=BM_REPORTABLE, B0=1.8897 +/- 0.1198 GPa, B0'=8.3843, r^2=0.99987 over 6 monotonic points, inside the plan's experimental band [1.5, 2.0] GPa. What failed is a leave-one-out CONVERGENCE advisory that assess_ladder_convergence itself documents as uncalibrated and meant for review. The recovery agent returned action=stop rather than spend a rung, and recommended exactly this: accept with the annotation, and never widen the ladder for this finding."
+      },
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T20:01:44.381509+00:00",
+          "input_hash": "e7b622e8e703bb7e9a7cc0d29bfe7b37608f58bd4a81e2e2b43c757912d474bd",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T20:01:40.886689+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "e7b622e8e703bb7e9a7cc0d29bfe7b37608f58bd4a81e2e2b43c757912d474bd",
+      "stale_reason": "recovery agent bounded revision",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0003",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-11T23:02:54.545137+00:00",
+          "input_hash": "86d6f1a252b803f949a7e6c2e6cc8ae55760b3dfaa02628819882414ba5c9056",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-11T23:02:53.380385+00:00",
+          "status": "failed"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-11T23:06:50.293401+00:00",
+          "input_hash": "86d6f1a252b803f949a7e6c2e6cc8ae55760b3dfaa02628819882414ba5c9056",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/thermal/attempt-0002/executor_state.json",
+          "started_at": "2026-09-11T23:06:49.120307+00:00",
+          "status": "failed"
+        },
+        {
+          "attempt_id": "attempt-0003",
+          "finished_at": "2026-09-12T18:44:24.880089+00:00",
+          "input_hash": "86d6f1a252b803f949a7e6c2e6cc8ae55760b3dfaa02628819882414ba5c9056",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/thermal/attempt-0003/executor_state.json",
+          "started_at": "2026-09-12T14:09:16.926987+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "86d6f1a252b803f949a7e6c2e6cc8ae55760b3dfaa02628819882414ba5c9056",
+      "stale_reason": "reset by operator after two infrastructure escalations (lost GPU claim races); the stage never ran an MD step. Attempts 1-2 retained so attempt numbering stays consistent with the directories on disk.",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-12T20:01:44.383438+00:00"
+}

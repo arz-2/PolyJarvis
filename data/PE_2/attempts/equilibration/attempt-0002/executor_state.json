@@ -1,0 +1,127 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/raw/d05_block.md",
+      "sha256": "280b389bfc7db18ee7bcf0adb548048fb665220769384f3ecb65c53d6b1d8ae4",
+      "size": 1898
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/raw/equilibration.json",
+      "sha256": "356258cb7e4f23a23b3cdfa4bf371c100d5c18a5f5f61dc20efbbb644e0827f5",
+      "size": 10589
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/log.lammps",
+      "sha256": "d9cab2d6321071112036a31e56eb116075bb84c7d5877790cb03502c36e405f9",
+      "size": 2749
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_1.rst",
+      "sha256": "399aaf3ba59912342fa80f9ede68cb1d73490ca273355395bc6c08c07beb2c4d",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_2.rst",
+      "sha256": "cc65a922ac4e33770d2424ee3e6532c2c568e196b48c2c34c5863d4a25c7c14a",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.dump",
+      "sha256": "24694cf98e8a89419c46ed140b09561d2b04b128f2949799c7a76f90f8630882",
+      "size": 265049002
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.in",
+      "sha256": "0b84dbf6c71d525445bc0ef8f7c73373fd2f40e1c21a64b56c48903938921cce",
+      "size": 4447
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.log",
+      "sha256": "05af7fb745b11eb6d82d3dd75363e1b74b8822f6929a855779e3979c0202ff46",
+      "size": 364346
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_last.dump",
+      "sha256": "f4a8d03032ac4db50ad5d5838065371f2d08d3fc37bd82b54264103512176fc9",
+      "size": 328532
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data",
+      "sha256": "1f810d84f9ec31870236e5ae71f2e30584d79bc70710ed5c510cfb8c59e59de8",
+      "size": 738349
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.restart",
+      "sha256": "161d2161430fcf900995e6bc6c73c3670a3c98c3b466c4dbd0043323e101d20c",
+      "size": 805586
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_run.log",
+      "sha256": "9fc8128c2d84898811d074eebd098a549c0c420df50b325ad0159a47525b3887",
+      "size": 363952
+    }
+  ],
+  "attempt_id": "attempt-0002",
+  "findings": [],
+  "finished_at": "2026-09-13T14:40:31.359100+00:00",
+  "input_hash": "ba1d14d3194557f5de73ab468e733372eab25e97222ad1534032fa393b950d86",
+  "outputs": {
+    "T_melt_hold_K": 550.0,
+    "anneal_hold_convergence": null,
+    "backbone_derivation": null,
+    "equil_verdict": "PASS",
+    "equilibration_json_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/raw/equilibration.json",
+    "extend_history": [],
+    "melt_data_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data",
+    "melt_density_gcm3": 0.717994,
+    "melt_dump_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.dump",
+    "melt_log_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.log",
+    "melt_restart_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.restart",
+    "melt_start_data_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data",
+    "melt_start_restart_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.restart",
+    "stage_checkpoints": {
+      "npt_melt_hold": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data"
+    },
+    "velocity_seed": 904370
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "equilibration_extend_base_stage": "npt_melt_hold",
+    "equilibration_extend_ensemble": "npt",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "npt_continuation_attempt": 1,
+    "npt_continuation_ns": 2.0,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 40,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "stage": "equilibration",
+  "status": "accepted"
+}

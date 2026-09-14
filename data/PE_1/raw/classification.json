@@ -1,0 +1,95 @@
+{
+  "smiles": "*CC*",
+  "class_id": 1,
+  "polyinfo_class": "PHYC",
+  "polymer_class": "PHYC",
+  "class_source": "radonpy_polyinfo",
+  "priority_rank": 20,
+  "flags": {
+    "PURT": false,
+    "PURA": false,
+    "PIMD": false,
+    "PANH": false,
+    "PCBN": false,
+    "PEST": false,
+    "PAMD": false,
+    "PSIL": false,
+    "PPHS": false,
+    "PKTN": false,
+    "PSFO": false,
+    "POXI": false,
+    "PSUL": false,
+    "PIMN": false,
+    "PPNL": false,
+    "PSTR": false,
+    "PACR": false,
+    "PHAL": false,
+    "PDIE": false,
+    "PHYC": true,
+    "PVNL": false
+  },
+  "co_occurring": [],
+  "runner_up": null,
+  "groups": {
+    "PHYC": {
+      "location": "backbone",
+      "source": "polyinfo_flags",
+      "smarts_var": null
+    }
+  },
+  "chemistry": {
+    "screened_on": "2-mer",
+    "functional_groups": [],
+    "backbone_groups": [],
+    "pendant_groups": [],
+    "tm_estimate": {
+      "tm_estimated_K": 386,
+      "tg_K": 193,
+      "tg_source": "group_contribution",
+      "tg_confidence": "low",
+      "backbone_symmetric": true,
+      "boyer_ratio_tg_over_tm": 0.5,
+      "n_asymmetric_backbone_atoms": 0,
+      "method": "boyer_beaman",
+      "mae_vs_experimental_K": 130,
+      "valid_only_if_crystallizable": true,
+      "caution": "+-130 K mean absolute error; meaningless for amorphous polymers, which have no Tm. Evidence only -- not a basis for setting T_equil_K."
+    },
+    "tg_estimate": {
+      "tg_estimated_K": 193,
+      "T_equil_K": 393,
+      "method": "structural_motif_group_contribution",
+      "confidence": "low",
+      "unmatched_heavy_frac": 0.0
+    },
+    "polarity_class": "apolar",
+    "hydrocarbon_only": true,
+    "apolar_aliphatic": true,
+    "implied_electrostatics": "lj_cut",
+    "elements": {
+      "C": 2,
+      "H": 4
+    },
+    "n_heavy_atoms": 2,
+    "heteroatom_fraction": 0.0,
+    "aromatic_atom_fraction": 0.0,
+    "descriptor_basis": "2-mer, divided to one repeat unit",
+    "n_aromatic_rings": 0,
+    "hbond_donors": 0,
+    "hbond_acceptors": 0,
+    "rotatable_bonds": 1,
+    "tpsa": 0.0,
+    "mw_repeat_unit": 28.054,
+    "formal_charge": 0
+  },
+  "chemistry_consistency": {
+    "findings": [],
+    "n_warnings": 0,
+    "verdict": "consistent",
+    "polarity_class": "apolar",
+    "backbone_groups": [],
+    "pendant_groups": []
+  },
+  "generated_at": "2026-09-11T20:41:45.774625+00:00",
+  "run_name": "PE_1"
+}

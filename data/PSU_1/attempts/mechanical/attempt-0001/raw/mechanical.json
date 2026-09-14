@@ -1,0 +1,172 @@
+{
+  "status": "success",
+  "method": "murnaghan",
+  "temperature_K": 299.95,
+  "temperature_spread_K": 0.09,
+  "fit_converged": true,
+  "bm_gate_verdict": "BM_REPORTABLE",
+  "bm_gate_reasons": [],
+  "bm_reportable": true,
+  "B0_GPa": 4.4826,
+  "bulk_modulus_GPa": 4.4826,
+  "B0_sem_GPa": 0.1147,
+  "bulk_modulus_sem_GPa": 0.1147,
+  "B0_prime": 7.7581,
+  "V0_A3": 74483.55,
+  "r_squared": 0.999955,
+  "n_points": 5,
+  "pressures_atm": [
+    -200.0,
+    0.0,
+    3000.0,
+    7000.0,
+    15000.0
+  ],
+  "pressures_GPa": [
+    -0.020265,
+    0.0,
+    0.303975,
+    0.709275,
+    1.519875
+  ],
+  "volumes_A3": [
+    74724.11,
+    74586.36,
+    70532.75,
+    67177.2,
+    63078.73
+  ],
+  "vol_stds_A3": [
+    291.37,
+    274.47,
+    203.7,
+    158.0,
+    129.27
+  ],
+  "n_prod_rows": [
+    2501,
+    2501,
+    2501,
+    2501,
+    2501
+  ],
+  "log_files": [
+    "/home/alexzhao/PolyJarvis/data/PSU_1/attempts/mechanical/attempt-0001/work/bm_series/p_-200/attempt_1/bm_P-200/bm_P-200.log",
+    "/home/alexzhao/PolyJarvis/data/PSU_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/bm_P0/bm_P0.log",
+    "/home/alexzhao/PolyJarvis/data/PSU_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/bm_P3000/bm_P3000.log",
+    "/home/alexzhao/PolyJarvis/data/PSU_1/attempts/mechanical/attempt-0001/work/bm_series/p_7000/attempt_1/bm_P7000/bm_P7000.log",
+    "/home/alexzhao/PolyJarvis/data/PSU_1/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000.log"
+  ],
+  "tau_frames_per_point": [
+    4.544,
+    4.318,
+    3.221,
+    2.465,
+    2.123
+  ],
+  "n_eff_per_point": [
+    550,
+    579,
+    776,
+    1014,
+    1178
+  ],
+  "vol_sem_A3_per_point": [
+    12.4239,
+    11.4068,
+    7.3123,
+    4.9619,
+    3.7663
+  ],
+  "eq_fraction": 0.5,
+  "output_dir": "/home/alexzhao/PolyJarvis/data/PSU_1/attempts/mechanical/attempt-0001/raw",
+  "volume_monotonic": true,
+  "loo_results": [
+    {
+      "dropped_pressure_atm": -200.0,
+      "is_tension_point": true,
+      "converged": true,
+      "B0_GPa": 4.3614,
+      "B0_prime": 7.8989,
+      "r_squared": 0.999997,
+      "dB0_GPa_vs_baseline": -0.1212,
+      "dB0_prime_vs_baseline": 0.1408
+    },
+    {
+      "dropped_pressure_atm": 0.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 4.5947,
+      "B0_prime": 7.6317,
+      "r_squared": 0.999998,
+      "dB0_GPa_vs_baseline": 0.1121,
+      "dB0_prime_vs_baseline": -0.1264
+    },
+    {
+      "dropped_pressure_atm": 3000.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 4.4833,
+      "B0_prime": 7.7558,
+      "r_squared": 0.999954,
+      "dB0_GPa_vs_baseline": 0.0007,
+      "dB0_prime_vs_baseline": -0.0023
+    },
+    {
+      "dropped_pressure_atm": 7000.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 4.4857,
+      "B0_prime": 7.7518,
+      "r_squared": 0.999954,
+      "dB0_GPa_vs_baseline": 0.0031,
+      "dB0_prime_vs_baseline": -0.0063
+    },
+    {
+      "dropped_pressure_atm": 15000.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 4.4909,
+      "B0_prime": 7.7237,
+      "r_squared": 0.999789,
+      "dB0_GPa_vs_baseline": 0.0083,
+      "dB0_prime_vs_baseline": -0.0344
+    }
+  ],
+  "loo_n_converged": 5,
+  "loo_max_dB0_pct": 2.7,
+  "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+  "bm_convergence_reasons": [],
+  "bm_convergence_confidence": "high",
+  "fluctuation_bulk_modulus_GPa": 3.7246,
+  "fluctuation_divergence_pct": 16.91,
+  "anomalous_points": {},
+  "excluded_points": [],
+  "selected_window": {
+    "trim_total": 0,
+    "n_points": 5,
+    "plateau_confirmed": true,
+    "selection_note": "Untrimmed fit already has r_squared=0.99996 >= 0.999 -- no trimming applied even though no points were flagged (a genuinely curved EOS can trip the interval heuristic without a real problem)."
+  },
+  "all_points_fit": {
+    "method": "murnaghan",
+    "fit_converged": true,
+    "B0_GPa": 4.4826,
+    "B0_prime": 7.7581,
+    "V0_A3": 74483.55,
+    "r_squared": 0.999955,
+    "volume_monotonic": true,
+    "n_points": 5,
+    "pressures_atm": [
+      -200.0,
+      0.0,
+      3000.0,
+      7000.0,
+      15000.0
+    ]
+  },
+  "warnings": [
+    "Murnaghan B0=4.483 GPa (selected window) vs fluctuation K=3.725 GPa diverge by 16.9% (>15%). Expected/benign for rubbery classes (fluctuation overestimates rubbery K); investigate for glassy classes."
+  ],
+  "murnaghan_eos_fig": "/home/alexzhao/PolyJarvis/data/PSU_1/graphs/murnaghan_eos.png"
+}

@@ -1,0 +1,283 @@
+{
+  "confidence": "high",
+  "cost_estimate": {
+    "cell_atoms_estimate": 6480,
+    "confidence": "high",
+    "ff_family": "pcff",
+    "note": "Partial/lower-bound total -- see unpriced_stages for what is not included (notably: equil-stage length, and any deform stage beyond a single primary-direction leg).",
+    "stages": {
+      "cool": {
+        "basis": "log-log interpolated between real measured points [(3020, 53.974), (5140, 46.822), (15040, 37.058)] -- 6480 atoms is within the measured [3020,15040] range",
+        "confidence": "high",
+        "gpu_hours": 2.426,
+        "note": "16 cool blocks x 250000 steps (700->300 K at dT=25 K) + npt_final 500000; first blocks only -- adaptive extensions are not priced",
+        "ns_per_day_used": 44.5179,
+        "simulated_ns": 4.5,
+        "steps": 4500000
+      },
+      "deform": {
+        "basis": "log-log interpolated between real measured points [(3020, 53.974), (5140, 46.822), (15040, 37.058)] -- 6480 atoms is within the measured [3020,15040] range",
+        "confidence": "high",
+        "gpu_hours": 0.1078,
+        "note": "single primary-direction leg -- a lower bound, not a full multi-leg total [CONTINGENT: murnaghan's glassy fallback, charged only if BM_INADMISSIBLE routes to it -- included in worst-case, not in the base run]",
+        "ns_per_day_used": 44.5179,
+        "simulated_ns": 0.2,
+        "steps": 200000
+      },
+      "tg": {
+        "basis": "log-log interpolated between real measured points [(3020, 53.974), (5140, 46.822), (15040, 37.058)] -- 6480 atoms is within the measured [3020,15040] range",
+        "confidence": "high",
+        "gpu_hours": 2.5877,
+        "note": "1 rate (100 K/ns) x 24 T-bin(s) x 200000 steps, floor-checked against tg_min_steps_per_T=200000",
+        "ns_per_day_used": 44.5179,
+        "simulated_ns": 4.8,
+        "steps": 4800000
+      }
+    },
+    "total_gpu_hours": 5.1215,
+    "unpriced_stages": [
+      {
+        "reason": "stage-length knobs default to None, deferred to generate_equilibration_workflow's own atom-count-tiered default inside the MCP LAMMPS engine -- not resolvable from decided_params alone; not priced here to avoid guessing",
+        "stage": "equil"
+      },
+      {
+        "reason": "no bm_pressures_atm configured -- cannot size the Murnaghan series",
+        "stage": "murnaghan"
+      }
+    ]
+  },
+  "decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 700.0,
+    "annealing_T_high_K": 780.0,
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.62,
+    "dp_typical": 12,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 750,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20
+  },
+  "decisions": [
+    {
+      "acknowledgements": {},
+      "alternatives": [],
+      "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PSFO has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
+      "choice": "pcff",
+      "confidence": "high",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "critique": {
+        "findings": [
+          "D-01_ff critique accepted as 'agrees' (critic confidence: high); no force-field override applied. The critic's reasoning is sound on the decisive point: COMPASS is not a runnable field in this codebase (no 'compass' entry in forcefield.RUNNABLE_FIELDS / ENUM_OVERRIDES['preferred_ff']), so PCFF is the available implementation of the Class-II lineage all three located studies used. The autofill evidence's own admission -- 'no class-specific PCFF MD validation paper for polysulfone has been located' -- is now partially retired: three independent Class-II precedents exist (one full-text-verified on neat/filled PSU, one peer-reviewed on the chemically adjacent PPESK aryl-sulfone-ether-ketone backbone, one exact-SMILES preprint). What none of them supply is a signed simulated-vs-experimental density or Tg error for this chemistry, so the class's internal -4.0 to -4.3% density and +2-8% Tg offsets stay uncorroborated and drive the dominant_uncertainty.",
+          "Transcribed two of the critic's three force-field sources plus its pppm corroboration. Declined to transcribe 10.21203/rs.3.rs-1109742/v1 (PSU/PSMA blend preprint): it is an exact-SMILES match and does converge on COMPASS, but the critic itself flags that the full text 403'd and the FF claim rests on a Crossref/Semantic Scholar abstract record, so it corroborates the two peer-reviewed entries without independently strengthening them. It remains recorded in literature_grounding.json.",
+          "Pinned overrides.experimental_density_gcm3 = 1.24 under the skill's curated-member exception -- this is not a guess or a WebSearch value. This run's SMILES is a byte-exact match to polymer_rules.json:classes.PSFO.member_smiles.PSU, but PSFO exposes no machine-readable experimental_density_gcm3 (scalar or member-keyed), so stage_params._exp_density_point() returns None and silently disables the pre-build finite-size forecast, assess_cooling_contraction, and final density grading -- for a property that is an explicit target of this run ('properties': density). The value is the repo's own curated figure, carried as prose in two places in the PSFO entry ('Exp. RT density: PSF=1.24 g/cm3'; exp_E_GPa.notes 'amorphous PSU/Udel at RT; density=1.25 g/cm3'), and independently cited as the experimental PSF density by the critic's full-text-verified source 10.3390/polym13132199. Side effect check: 1.24 equals density_initial_gcm3 (0.62) x run_campaign.COMPRESSION_RATIO (2.0) exactly, so the finite-size forecast sees the same target it would have fallen back to -- the pin re-arms the checks without perturbing the build. The follow-up fix belongs in polymer_rules.json as a member-keyed experimental_density_gcm3 block (PSU 1.24), which would make this pin unnecessary on the next PSFO run; the same gap sank PVNL and PHYC runs previously.",
+          "Left exp_K_min_GPa / exp_K_max_GPa unset deliberately. _exp_K_range() is a per-class lookup with a documented multi-member mis-scoping hazard, but PSFO's exp_K_GPa = [4.0, 5.5] note scopes it to glassy PSU at 25 C specifically (Mark 2007 Table 7.6 Tait params, b0=4323 bar, Tg=186 C; Zoller 1978), which is this exact member. Pinning would restate the resolved value. Same for experimental_tg_K: member_smiles resolution already yields PSU=463 K, which is what the tg stage's t_range_brackets_exp_tg success criterion already reads, so no pin is warranted and none is applied.",
+          "Declined to act on the CHEM_BUILD_RISK advisory (sulfone failed 23% of 35 measured EMC trial builds, 1.6x the 15% baseline), and it is not actionable through this interface: its recommendation is 'run make_deterministic_plan run-plan --with-ff-probe', a planning-CLI flag, not a key in OVERRIDE_RANGES / ENUM_OVERRIDES / SEQUENCE_OVERRIDES / BOOLEAN_OVERRIDES, and the plan is already written. The critic correctly separates it from the force-field question -- none of its sources bear on EMC atom-typing coverage. Carrying it forward as a named, anticipated build-stage failure mode rather than a resolved one: D-01's parameter_coverage evidence already states coverage is 'NOT MEASURED for this SMILES' and that the moiety screen matching no rule leaves this SMILES UNSCREENED rather than cleared. If the build fails, the first check is PSFO note #2 -- verify the sulfone S atom types (so2/o_2s) in the EMC PCFF output, where a charge of exactly 0.0000 on S or a sulfone O signals a missing frc increment, not a small native value.",
+          "Left the thermal protocol untouched on purpose, including tg_rate_K_per_ns=100. The PSFO _tg_slope_gate_note records that tg_slope_gate_fallback='slowest_rate' was RETIRED on 2026-09-01 alongside the root fix (the sweep now starts from the cool_block written at tg_t_high_K rather than cold-starting from the 300 K glass), and states explicitly that the next PEEK/PSU run therefore TESTS that fix rather than assuming it -- re-arming the primary/alt Tg method-gap gate. Overriding the rate or the gate here would destroy that test. If a >20 K primary/alt gap or an inverted Tg-vs-rate trend returns on this run, the class note's own instruction applies: the cold-start diagnosis was wrong and slowest_rate should be restored, not the gate widened.",
+          "Confidence is medium, not high, and the gap is the difference between a defensible protocol and a validated one. Supporting high: exact curated-member identification with curated Tg (463 K), a PSU-scoped K band, class-curated thermal expansivities from real density(T) equations, and a now-convergent DOI-verified force-field case. Holding it to medium: (1) no signed PCFF-vs-experiment error exists for any aryl-sulfone polymer, so the class's internal offsets are the only error model and they are untested against literature; (2) parameter coverage for this SMILES is asserted from the class prior and measured by nothing, with an unresolved 1.6x sulfone build-risk signal against it; (3) dp_typical=12 -- the class notes call this 'the shortest chain the mass floor produces anywhere' and flag RIGID_BACKBONE_CHAIN_LENGTH_BIAS as an OPEN QUESTION with no chain-length-convergence study for rigid aromatics. DP@Me is ~5 against entanglement_Me_gmol.PSU=2380, so DP=12 clears entanglement by only ~2.4x, which is thin for a Tg and bulk-modulus run on a stiff backbone. That bias should be read on the run report, not assumed away."
+        ],
+        "rounds": 1,
+        "status": "scientific_agent_decision"
+      },
+      "evidence": [
+        {
+          "citation": "Hayashi, Y. et al. RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics. npj Comput. Mater. 2022, 8, 222.",
+          "claim": "polymer_rules.json:classes.PSFO carries no ff_justification_doi; 'pcff' is the class prior and the strongest support on file is the class's own first cited source. PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF's general origin; no class-specific PCFF MD validation paper for polysulfone has been located. A dedicated literature search found no PCFF- or COMPASS-vs-experiment density/Tg number for polysulfone, polyethersulfone, or a small-molecule diaryl-sulfone analog. PolyJarvis's own measured -4.0% to -4.3% density deficit and +2-8% Tg overestimate are internal measurements only, neither literature-corroborated nor contradicted. No field-override recommended; this is a genuine open validation gap.",
+          "criterion": "literature_support",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PSFO.citations[0]",
+          "source_doi": "10.1038/s41524-022-00906-4"
+        },
+        {
+          "citation": "Hayashi, Y. et al. RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics. npj Comput. Mater. 2022, 8, 222.",
+          "claim": "High-throughput GAFF2 polymer MD; 1 ns NVT anneal 300\u2192700 K; 10 chains ~10,000 atoms; LAMMPS; systematic Tg and density for 1070+ polymers. Primary reference for nchain, dp, and forcefield defaults.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Hayashi2022]",
+          "source_doi": "10.1038/s41524-022-00906-4"
+        },
+        {
+          "citation": "Afzal, M. A. F. et al. High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications. ACS Appl. Polym. Mater. 2021, 3, 2, 620\u2013630.",
+          "claim": "OPLS3e GPU-based Tg for 315 polymers; validates electrostatics impact on polar vs apolar polymers. lj/cut acceptable only when backbone charge < 0.1 e.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Afzal2021]",
+          "source_doi": "10.1021/acsapm.0c00524"
+        },
+        {
+          "claim": "NOT MEASURED for this SMILES. No EMC trial build was run, so coverage is asserted from polymer_rules.json:classes.PSFO.ff_accuracy_prior='pcff' only; whether 'pcff' can type THIS repeat unit is unverified until the build stage runs. The moiety screen ran and matched no rule, so no trial build was triggered. That narrows the risk and measures nothing: the rules cover 77% of the measured failures (guides/ff_moiety_rules.json), so this SMILES is UNSCREENED for the rest, not cleared.",
+          "criterion": "parameter_coverage",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PSFO.ff_accuracy_prior"
+        },
+        {
+          "claim": "pcff-family cell of 6480 atoms (53104.3 g/mol): estimate_ns_per_day at this run's 6480-atom estimate: 44.51786016670654 ns/day (high confidence). electrostatics=pppm, cutoff_A=9.5.",
+          "criterion": "computational_cost",
+          "origin": "autofill",
+          "resolver": "select_hardware.select_hardware"
+        },
+        {
+          "citation": "A Molecular Simulation Study of Silica/Polysulfone Mixed Matrix Membrane for Mixed Gas Separation",
+          "claim": "Employed the COMPASS force field for all interactions among gas molecules, polymer (polysulfone), and silica filler, with Ewald electrostatics at 0.001 kcal/mol accuracy; simulation cell density was set at 1.20 g/cm3 against a cited experimental PSF density of 1.24 g/cm3. Full-text verified via PMC. Closes the 'no class-specific PCFF/COMPASS MD paper for polysulfone located' gap the autofill evidence flagged, and independently corroborates the 1.24 g/cm3 experimental density pinned in overrides.",
+          "origin": "critic",
+          "source_doi": "10.3390/polym13132199"
+        },
+        {
+          "citation": "Molecular dynamics simulation on the physical properties of the novel designed poly-(phthalazinone ether sulfone ketone) (PPESK)",
+          "claim": "MD on five designed poly(phthalazinone ether sulfone ketone) (PPESK) polymers -- an aromatic backbone sharing PSFO's diaryl sulfone and diaryl ether linkages -- used COMPASS, described by the authors as 'a typical PCFF type force field... proved suitable for polymer and energetic materials', to predict Tg, density, cohesive energy density and mechanical moduli (E, K, G). Establishes Class-II/PCFF-type parameterization as accepted practice for this chemistry; validates internal consistency rather than a signed error, since all five variants are novel designs with no prior experimental Tg or density.",
+          "origin": "critic",
+          "source_doi": "10.1016/j.commatsci.2018.05.039"
+        },
+        {
+          "citation": "Long-range Coulombic treatment with a pppm solver and PCFF+ parameters for a PEEK/CNT system (ACS Appl. Mater. Interfaces, 2023)",
+          "claim": "Long-range Coulombic interactions for a PEEK(-CNT) system were computed with a particle-particle particle-mesh (pppm) solver using PCFF+ intramolecular parameters -- confirmed by direct fetch of the PMC full-text mirror. Corroborates this plan's electrostatics=pppm on an aryl-ether backbone with a PCFF-family field, which the class notes justify on accumulated aromatic-ring and ether charge rather than on the small native PCFF sulfone bond-increments.",
+          "origin": "critic",
+          "source_doi": "10.1021/acsami.3c01307"
+        }
+      ],
+      "id": "D-01_ff",
+      "resolved_by": "polymer_rules.json:classes.PSFO.ff_accuracy_prior"
+    }
+  ],
+  "derived_inputs": {
+    "backbone_types": {
+      "data_file": "/home/alexzhao/PolyJarvis/data/PSU_2/attempts/build/attempt-0001/work/cell/cell.data",
+      "derived_at": "2026-09-12T20:23:31.292595+00:00",
+      "source": "derive_backbone_types (heavy_atom_graph_diameter)",
+      "value": [
+        1,
+        2,
+        6,
+        7,
+        8
+      ]
+    }
+  },
+  "dominant_uncertainty": "none_dominant",
+  "goal": "density, Tg and bulk modulus for amorphous bisphenol-A polysulfone (rev2 replicate campaign, replicate 2 replays the locked protocol)",
+  "hardware": {
+    "engine": "kokkos",
+    "ff_family": "pcff",
+    "gpu_per_run": 1,
+    "mpi_ranks": 1
+  },
+  "overrides": {},
+  "plan_mode": "reasoned",
+  "planned_stages": [
+    {
+      "stage": "build",
+      "success_criteria": {
+        "data_file_written": true
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "equil",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "equil-check",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "cool",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "track": "cooling"
+    },
+    {
+      "stage": "cool-check",
+      "success_criteria": {
+        "cool_verdict": "PASS"
+      },
+      "track": "cooling"
+    },
+    {
+      "stage": "tg",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 463
+      },
+      "track": "thermal"
+    },
+    {
+      "stage": "analyze-tg",
+      "success_criteria": {},
+      "track": "thermal"
+    },
+    {
+      "fallback": "deform",
+      "stage": "murnaghan",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "track": "mechanical"
+    },
+    {
+      "stage": "analyze-bm",
+      "success_criteria": {},
+      "track": "mechanical"
+    },
+    {
+      "stage": "run-summary",
+      "success_criteria": {},
+      "track": "summary"
+    }
+  ],
+  "polymer_class": "PSFO",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "run_name": "PSU_2",
+  "schema_version": "2.0",
+  "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+  "system_size": {
+    "acknowledgements": {
+      "RIGID_BACKBONE_CHAIN_LENGTH_BIAS": {
+        "class": "stiff",
+        "detail": "backbone classified stiff (backbone_rotatable_fraction=0.37, backbone_ring_fraction=0.80, longest_rigid_backbone_run=4 atoms -> stiff). The cell is sized by total system mass (Wang 2021), which for this heavy repeat unit (442.5 g/mol) gives DP=12 -- short chains. No chain-length-convergence study exists for rigid aromatic backbones, and no Kuhn-length value was supplied for this SMILES, so the residual chain-length bias on Tg is UNQUANTIFIED. Reported, not gated: a DP floor here would be the retired Fox-Flory rule, whose cited source (Patrone 2016) prescribes no floor and studies crosslinked epoxies with no degree of polymerization at all."
+      },
+      "entanglement_dp_advisory": {
+        "detail": "entanglement MW Me=2380 g/mol for member 'PSU' (Mark 2007 Ch.25) / repeat-unit MW 442.5 g/mol -> DP@Me=5 -- reported for context only, not an acceptance criterion for bulk_modulus: entanglement Me governs shear/viscoelastic properties (plateau modulus, reptation), not the isothermal bulk modulus, which is an EOS/local-packing quantity. Establish chain-length convergence of density/K instead (a small DP sweep confirming both plateau) rather than requiring DP>=DP@Me.",
+        "dp_at_me": 5
+      },
+      "nchain_below_production_minimum": {
+        "current_nchain": 10,
+        "detail": "nchain=10 is below the advisory PCFF production minimum 20. Its source (\"Bejagam 2020\") has no copy in this repo and no verified DOI, so the claim is unchecked; nchain>=10 (Wang 2021, verified) IS met, and Hayashi 2022 (RadonPy) ran nchain=10 across 1,077 polymers. Raising nchain to 20 at a fixed system-mass floor would halve per-chain MW (worse chain-length bias); raising it at fixed DP doubles cost for no criterion this module can state. Reported, not applied -- the L>=2*Rg finite-size gate (a separate, already-mechanized check) is the binding constraint on nchain; supply a nchain is now a pure function of the system-mass floor."
+      }
+    },
+    "dp_typical": 12,
+    "nchain": 10,
+    "reasons": [
+      "system size auto-filled {'dp_typical': 12, 'nchain': 10} via solve_system_size()",
+      "rigidity DP recommendation (backbone_rotatable_fraction=0.37, backbone_ring_fraction=0.80, longest_rigid_backbone_run=4 atoms -> stiff; DP_MW=12) does not exceed the existing recommendation 12"
+    ],
+    "resolved_by": "select_system_size.solve_system_size"
+  }
+}

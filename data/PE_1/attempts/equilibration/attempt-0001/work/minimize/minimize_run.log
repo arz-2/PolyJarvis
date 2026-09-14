@@ -1,0 +1,174 @@
+LAMMPS (22 Jul 2025 - Update 3)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread.
+  using 1 OpenMP thread(s) per MPI task
+Reading data file ...
+  orthogonal box = (0 0 0) to (50.534742 50.534742 50.534742)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  3600 atoms
+  scanning bonds ...
+  2 = max bonds/atom
+  scanning angles ...
+  1 = max angles/atom
+  scanning dihedrals ...
+  2 = max dihedrals/atom
+  orthogonal box = (0 0 0) to (50.534742 50.534742 50.534742)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  3590 bonds
+  reading angles ...
+  3580 angles
+  reading dihedrals ...
+  3570 dihedrals
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0       
+     2 = max # of 1-2 neighbors
+     2 = max # of 1-3 neighbors
+     4 = max # of 1-4 neighbors
+     6 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+  read_data CPU = 0.029 seconds
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0.5     
+     2 = max # of 1-2 neighbors
+     2 = max # of 1-3 neighbors
+     4 = max # of 1-4 neighbors
+     6 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+- GPU package (short-range, long-range and three-body potentials): doi:10.1016/j.cpc.2010.12.021, doi:10.1016/j.cpc.2011.10.012, doi:10.1016/j.cpc.2013.08.002, doi:10.1016/j.commatsci.2014.10.068, doi:10.1016/j.cpc.2016.10.020, doi:10.3233/APC200086
+The log file lists these citations in BibTeX format.
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+
+--------------------------------------------------------------------------
+- Using acceleration for lj/cut:
+-  with 1 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: NVIDIA A800 40GB Active, 108 CUs, 38/39 GB, 1.4 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+
+Generated 1 of 1 mixed pair_coeff terms from arithmetic mixing rule
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 0
+Per MPI rank memory allocation (min/avg/max) = 9.036 | 9.036 | 9.036 Mbytes
+   Step          Time           Temp          Press          TotEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         Volume           Lx             Ly             Lz          Density    
+         0   0              0              10302.04       7301.4643      7301.4643      1458.3242      2263.5178      3740.3521      0             -160.72995      0              0              129053.61      50.534742      50.534742      50.534742      0.64999999   
+       500   500            0             -616.27797     -1773.9104     -1773.9104      6.712787       123.37975      1562.2386      0             -3466.2416      0              0              129053.61      50.534742      50.534742      50.534742      0.64999999   
+      1000   1000           0             -659.70247     -1911.3263     -1911.3263      6.1297956      120.10186      1535.708       0             -3573.266       0              0              129053.61      50.534742      50.534742      50.534742      0.64999999   
+      1500   1500           0             -648.29104     -1971.8091     -1971.8091      5.9872517      119.30888      1532.3661      0             -3629.4714      0              0              129053.61      50.534742      50.534742      50.534742      0.64999999   
+      2000   2000           0             -629.83174     -1997.805      -1997.805       5.8664224      115.71638      1522.8974      0             -3642.2852      0              0              129053.61      50.534742      50.534742      50.534742      0.64999999   
+      2292   2292           0             -656.20568     -2006.9231     -2006.9231      5.8010377      116.17606      1517.5232      0             -3646.4234      0              0              129053.61      50.534742      50.534742      50.534742      0.64999999   
+Loop time of 1.94823 on 1 procs for 2292 steps with 3600 atoms
+
+99.6% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      7301.46426640594  -2006.92283391964  -2006.92312564633
+  Force two-norm initial, final = 1833.5272 1.8403618
+  Force max component initial, final = 78.319166 0.32694523
+  Final line search alpha, max atom move = 0.077007648 0.025177283
+  Iterations, force evaluations = 2292 4563
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.20598    | 0.20598    | 0.20598    |   0.0 | 10.57
+Bond    | 1.4455     | 1.4455     | 1.4455     |   0.0 | 74.19
+Neigh   | 0.014845   | 0.014845   | 0.014845   |   0.0 |  0.76
+Comm    | 0.12762    | 0.12762    | 0.12762    |   0.0 |  6.55
+Output  | 0.0054994  | 0.0054994  | 0.0054994  |   0.0 |  0.28
+Modify  | 0.00028394 | 0.00028394 | 0.00028394 |   0.0 |  0.01
+Other   |            | 0.1485     |            |       |  7.62
+
+Nlocal:           3600 ave        3600 max        3600 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          11036 ave       11036 max       11036 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 0
+Ave neighs/atom = 0
+Ave special neighs/atom = 5.9666667
+Neighbor list builds = 48
+Dangerous builds = 0
+System init for write_data ...
+
+
+---------------------------------------------------------------------
+      Device Time Info (average): 
+---------------------------------------------------------------------
+Data Transfer:   0.1757 s.
+Neighbor copy:   0.0034 s.
+Neighbor build:  0.0304 s.
+Force calc:      0.4904 s.
+Device Overhead: 0.2205 s.
+CPU Neighbor:    0.0046 s.
+CPU Cast/Pack:   0.0788 s.
+CPU Driver_Time: 0.0650 s.
+CPU Idle_Time:   0.0140 s.
+Average split:   1.0000.
+Max Mem / Proc:  29.02 MB.
+Prefetch mode:   None.
+Vector width:    32.
+Lanes / atom:    4.
+Pair block:      256.
+Neigh block:     128.
+Neigh mode:      Hybrid (binning on host) with subgroup support.
+Neigh sorting:   Unavailable or disabled.
+---------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------
+- Using acceleration for lj/cut:
+-  with 1 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: NVIDIA A800 40GB Active, 108 CUs, 38/39 GB, 1.4 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+
+Generated 1 of 1 mixed pair_coeff terms from arithmetic mixing rule
+System init for write_restart ...
+
+--------------------------------------------------------------------------
+- Using acceleration for lj/cut:
+-  with 1 proc(s) per device.
+-  with 1 thread(s) per proc.
+-  Horizontal vector operations: ENABLED
+-  Shared memory system: No
+--------------------------------------------------------------------------
+Device 0: NVIDIA A800 40GB Active, 108 CUs, 38/39 GB, 1.4 GHZ (Mixed Precision)
+--------------------------------------------------------------------------
+
+Initializing Device and compiling on process 0...Done.
+Initializing Device 0 on core 0...Done.
+
+Generated 1 of 1 mixed pair_coeff terms from arithmetic mixing rule
+STAGE COMPLETE: minimization
+Cuda driver error 4 in call at file '/home/alexzhao/lammps/lib/gpu/geryon/nvd_timer.h' in line 98.
+Cuda driver error 4 in call at file '/home/alexzhao/lammps/lib/gpu/geryon/nvd_timer.h' in line 99.
+Cuda driver error 4 in call at file '/home/alexzhao/lammps/lib/gpu/geryon/nvd_timer.h' in line 98.
+Cuda driver error 4 in call at file '/home/alexzhao/lammps/lib/gpu/geryon/nvd_timer.h' in line 99.
+Cuda driver error 4 in call at file '/home/alexzhao/lammps/lib/gpu/geryon/nvd_timer.h' in line 98.
+Cuda driver error 4 in call at file '/home/alexzhao/lammps/lib/gpu/geryon/nvd_timer.h' in line 99.

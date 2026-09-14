@@ -1,0 +1,193 @@
+{
+  "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+  "class_id": 20,
+  "polyinfo_class": "PSFO",
+  "polymer_class": "PSFO",
+  "class_source": "radonpy_polyinfo",
+  "priority_rank": 11,
+  "flags": {
+    "PURT": false,
+    "PURA": false,
+    "PIMD": false,
+    "PANH": false,
+    "PCBN": false,
+    "PEST": false,
+    "PAMD": false,
+    "PSIL": false,
+    "PPHS": false,
+    "PKTN": false,
+    "PSFO": true,
+    "POXI": true,
+    "PSUL": false,
+    "PIMN": false,
+    "PPNL": true,
+    "PSTR": false,
+    "PACR": false,
+    "PHAL": false,
+    "PDIE": false,
+    "PHYC": false,
+    "PVNL": false
+  },
+  "co_occurring": [
+    "POXI",
+    "PPNL"
+  ],
+  "runner_up": "POXI",
+  "groups": {
+    "PSFO": {
+      "location": "backbone",
+      "source": "polyinfo_flags",
+      "smarts_var": "sulfon"
+    },
+    "POXI": {
+      "location": "backbone",
+      "source": "polyinfo_flags",
+      "smarts_var": "ether"
+    },
+    "PPNL": {
+      "location": "backbone",
+      "source": "polyinfo_flags",
+      "smarts_var": "phenylene"
+    }
+  },
+  "chemistry": {
+    "screened_on": "2-mer",
+    "functional_groups": [
+      {
+        "id": "benzene_ring",
+        "label": "benzene ring",
+        "polarity": "apolar",
+        "count": 4,
+        "count_2mer": 8,
+        "location": "backbone",
+        "locations": {
+          "backbone": 8,
+          "pendant": 0
+        },
+        "hbond_donors": 0,
+        "hbond_acceptors": 0,
+        "note": "Quadrupolar, not dipolar. Drives pi-stacking and stiffness, and PCFF's aromatic ring charges are why PSTR prefers it over TraPPE-UA -- but it is not what pppm is for."
+      },
+      {
+        "id": "ether_aryl",
+        "label": "aryl ether",
+        "polarity": "polar_aprotic",
+        "count": 1,
+        "count_2mer": 3,
+        "location": "backbone",
+        "locations": {
+          "backbone": 3,
+          "pendant": 0
+        },
+        "hbond_donors": 0,
+        "hbond_acceptors": 1,
+        "note": null
+      },
+      {
+        "id": "quaternary_carbon",
+        "label": "quaternary carbon",
+        "polarity": "apolar",
+        "count": 1,
+        "count_2mer": 2,
+        "location": "backbone",
+        "locations": {
+          "backbone": 2,
+          "pendant": 0
+        },
+        "hbond_donors": 0,
+        "hbond_acceptors": 0,
+        "note": "Backbone steric hindrance: the alpha-methyl quaternary centre is why PMMA's Tg far exceeds PMA's."
+      },
+      {
+        "id": "sulfone",
+        "label": "sulfone",
+        "polarity": "polar_aprotic",
+        "count": 1,
+        "count_2mer": 2,
+        "location": "backbone",
+        "locations": {
+          "backbone": 2,
+          "pendant": 0
+        },
+        "hbond_donors": 0,
+        "hbond_acceptors": 2,
+        "note": null
+      }
+    ],
+    "backbone_groups": [
+      "ether_aryl",
+      "sulfone",
+      "benzene_ring",
+      "quaternary_carbon"
+    ],
+    "pendant_groups": [],
+    "tm_estimate": {
+      "tm_estimated_K": 718,
+      "tg_K": 359,
+      "tg_source": "group_contribution",
+      "tg_confidence": "very_low",
+      "backbone_symmetric": true,
+      "boyer_ratio_tg_over_tm": 0.5,
+      "n_asymmetric_backbone_atoms": 0,
+      "method": "boyer_beaman",
+      "mae_vs_experimental_K": 130,
+      "valid_only_if_crystallizable": true,
+      "caution": "+-130 K mean absolute error; meaningless for amorphous polymers, which have no Tm. Evidence only -- not a basis for setting T_equil_K."
+    },
+    "tg_estimate": {
+      "tg_estimated_K": 359,
+      "T_equil_K": 559,
+      "method": "structural_motif_group_contribution",
+      "confidence": "very_low",
+      "unmatched_heavy_frac": 0.5
+    },
+    "polarity_class": "polar_aprotic",
+    "hydrocarbon_only": false,
+    "apolar_aliphatic": false,
+    "implied_electrostatics": "pppm",
+    "elements": {
+      "C": 27,
+      "H": 22,
+      "O": 4,
+      "S": 1
+    },
+    "n_heavy_atoms": 32,
+    "heteroatom_fraction": 0.156,
+    "aromatic_atom_fraction": 0.75,
+    "descriptor_basis": "2-mer, divided to one repeat unit",
+    "n_aromatic_rings": 4,
+    "hbond_donors": 0,
+    "hbond_acceptors": 4,
+    "rotatable_bonds": 7,
+    "tpsa": 52.6,
+    "mw_repeat_unit": 442.536,
+    "formal_charge": 0
+  },
+  "chemistry_consistency": {
+    "findings": [
+      {
+        "code": "CHEM_BUILD_RISK",
+        "severity": "advisory",
+        "detail": "sulfone failed 23% of 35 measured EMC trial builds (1.6x the 15% baseline) -- sulfone typing is thinner than the aryl-ether backbone around it.. Correlation over one population, not a per-field blocking measurement, so this recommends running the force-field probe rather than pre-judging it.",
+        "groups": [
+          "sulfone"
+        ],
+        "worst_group": "sulfone",
+        "recommend": "run make_deterministic_plan run-plan --with-ff-probe",
+        "suggested_override": null
+      }
+    ],
+    "n_warnings": 0,
+    "verdict": "consistent",
+    "polarity_class": "polar_aprotic",
+    "backbone_groups": [
+      "benzene_ring",
+      "ether_aryl",
+      "quaternary_carbon",
+      "sulfone"
+    ],
+    "pendant_groups": []
+  },
+  "generated_at": "2026-09-11T20:45:58.105987+00:00",
+  "run_name": "PSU_1"
+}

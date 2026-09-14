@@ -1,0 +1,276 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[trappe] (engine=gpu)
+INFO: gpu_ids not given — derived "0" from hardware_policy[trappe]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+2026-09-13 18:26:09,226 [LAMMPS-ENGINE] INFO Loaded 159 runs from /home/alexzhao/PolyJarvis/data/_engine/run_state.json
+2026-09-13 18:26:13,632 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work && cat > /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+# PolyJarvis chain aaf13044 — auto-generated, do not edit (engine=gpu)
+set -euo pipefail
+
+CHAIN_ID=aaf13044
+LMP=/home/alexzhao/lammps-install/bin/lmp
+OFFLOAD_FLAGS="-sf gpu -pk gpu 1"
+MPI=1
+GPU_IDS=1
+N_GPU=1
+
+# Progress log — one JSON object per line
+PROGRESS=/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl
+
+log_done()  { echo "{\"stage\":\"$1\",\"status\":\"done\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_fail()  { echo "{\"stage\":\"$1\",\"status\":\"failed\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_start() { echo "{\"stage\":\"$1\",\"status\":\"running\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+
+# Completion sentinel — written by THIS nohup'd script so it survives an
+# MCP-server restart (the in-process chain monitor is only a fast-path).
+mkdir -p /tmp/polyjarvis/sentinels
+SENTINEL=/tmp/polyjarvis/sentinels/done_aaf13044.json
+PIDFILE=/tmp/polyjarvis/sentinels/pid_aaf13044
+sentinel_ok()   { echo "{\"run_id\":\"aaf13044\",\"status\":\"completed\"}" > "$SENTINEL"; }
+sentinel_fail() { echo "{\"run_id\":\"aaf13044\",\"status\":\"failed\",\"stage\":\"$1\"}" > "$SENTINEL"; }
+
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).
+echo $$ > "$PIDFILE"
+LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"
+
+# --- Stage 1/11: cool_block_01 ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_01
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_01
+log_start cool_block_01
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_01/cool_block_01.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_01/cool_block_01_run.log 2>&1 \
+  && log_done cool_block_01 \
+  || { log_fail cool_block_01; sentinel_fail cool_block_01; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_01\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 2/11: cool_block_02 ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_02
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_02
+log_start cool_block_02
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_02/cool_block_02.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_02/cool_block_02_run.log 2>&1 \
+  && log_done cool_block_02 \
+  || { log_fail cool_block_02; sentinel_fail cool_block_02; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_02\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 3/11: cool_block_03 ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_03
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_03
+log_start cool_block_03
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_03/cool_block_03.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_03/cool_block_03_run.log 2>&1 \
+  && log_done cool_block_03 \
+  || { log_fail cool_block_03; sentinel_fail cool_block_03; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_03\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 4/11: cool_block_04 ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_04
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_04
+log_start cool_block_04
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_04/cool_block_04.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_04/cool_block_04_run.log 2>&1 \
+  && log_done cool_block_04 \
+  || { log_fail cool_block_04; sentinel_fail cool_block_04; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_04\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 5/11: cool_block_05 ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_05
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_05
+log_start cool_block_05
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_05/cool_block_05.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_05/cool_block_05_run.log 2>&1 \
+  && log_done cool_block_05 \
+  || { log_fail cool_block_05; sentinel_fail cool_block_05; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_05\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 6/11: cool_block_06 ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_06
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_06
+log_start cool_block_06
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_06/cool_block_06.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_06/cool_block_06_run.log 2>&1 \
+  && log_done cool_block_06 \
+  || { log_fail cool_block_06; sentinel_fail cool_block_06; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_06\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 7/11: cool_block_07 ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_07
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_07
+log_start cool_block_07
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_07/cool_block_07.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_07/cool_block_07_run.log 2>&1 \
+  && log_done cool_block_07 \
+  || { log_fail cool_block_07; sentinel_fail cool_block_07; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_07\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 8/11: cool_block_08 ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_08
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_08
+log_start cool_block_08
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_08/cool_block_08.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_08/cool_block_08_run.log 2>&1 \
+  && log_done cool_block_08 \
+  || { log_fail cool_block_08; sentinel_fail cool_block_08; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_08\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 9/11: cool_block_09 ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_09
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_09
+log_start cool_block_09
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_09/cool_block_09.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_09/cool_block_09_run.log 2>&1 \
+  && log_done cool_block_09 \
+  || { log_fail cool_block_09; sentinel_fail cool_block_09; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_09\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 10/11: cool_block_10 ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_10
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_10
+log_start cool_block_10
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_10/cool_block_10.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/cool_block_10/cool_block_10_run.log 2>&1 \
+  && log_done cool_block_10 \
+  || { log_fail cool_block_10; sentinel_fail cool_block_10; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_10\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 11/11: npt_final ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final
+cd /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final
+log_start npt_final
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final.in >> /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final_run.log 2>&1 \
+  && log_done npt_final \
+  || { log_fail npt_final; sentinel_fail npt_final; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_final\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+echo "{\"stage\":\"__chain__\",\"status\":\"completed\",\"n_stages\":11,\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"
+sentinel_ok
+rm -f "$PIDFILE"
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044.sh > /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044.log 2>&1 </dev/null & disown; echo $!
+2026-09-13 18:26:43,690 [LAMMPS-ENGINE] INFO [aaf13044] Chain monitor started (polling every 60s)
+[wait] cooling chain: watching aaf13044
+2026-09-13 18:27:43,690 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:28:43,906 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:29:44,120 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:30:44,339 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:31:44,559 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:32:44,777 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:33:44,992 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:34:45,209 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:35:45,429 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:36:45,645 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:37:45,862 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:38:46,080 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:39:46,304 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:40:46,523 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:41:46,743 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:42:46,964 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:43:47,183 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:44:47,398 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:45:47,615 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:46:47,836 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:47:48,050 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:48:48,266 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:49:48,482 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:50:48,698 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:51:48,914 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:52:49,129 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:53:49,347 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:54:49,565 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:55:49,779 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:56:49,994 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:57:50,208 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:58:50,423 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:59:50,641 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:00:50,856 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:01:51,070 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:02:51,293 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:03:51,510 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:04:51,727 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:05:51,941 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:06:52,156 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:07:52,373 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:08:52,588 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:09:52,809 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:10:53,021 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:11:53,235 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:12:53,450 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:13:53,690 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:14:53,907 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:15:54,121 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/chain_aaf13044_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 19:15:54,340 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_aaf13044.json
+2026-09-13 19:15:54,340 [LAMMPS-ENGINE] INFO [aaf13044] Chain monitor: completed
+2026-09-13 19:15:54,341 [LAMMPS-ENGINE] INFO [aaf13044] Removed chain_aaf13044_progress.jsonl
+2026-09-13 19:15:54,341 [LAMMPS-ENGINE] INFO [aaf13044] Removed chain_aaf13044.sh
+2026-09-13 19:15:54,341 [LAMMPS-ENGINE] INFO [aaf13044] Removed chain_aaf13044.log
+2026-09-13 19:16:13,788 [LAMMPS-ENGINE] INFO Running comprehensive equilibration check: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/check_equilibration_comprehensive.py --log_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final.log --dump_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final.dump --data_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final_out.data --backbone_types 1 2 --output_dir /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/raw --skip_frames 50 --timestep_fs 2.0 --dump_every 1000 --bond_length_A 1.54 --eq_fraction 0.5 --drift_threshold_pct 1.0 --drift_pvalue 0.01 --block_count 10 --temp_col Temp --density_col Density --energy_col TotEng --atom_style "id resid type charge x y z" --cv_signal_max 0.11 --output_name cooling.json --cutoff_A 14.0 --graphs_dir /home/alexzhao/PolyJarvis/data/PE_2/graphs --struct_dump_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final.dump --struct_data_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final_out.data
+2026-09-13 19:16:13,788 [LAMMPS-ENGINE] INFO Running: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/check_equilibration_comprehensive.py --log_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final.log --dump_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final.dump --data_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final_out.data --backbone_types 1 2 --output_dir /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/raw --skip_frames 50 --timestep_fs 2.0 --dump_every 1000 --bond_length_A 1.54 --eq_fraction 0.5 --drift_threshold_pct 1.0 --drift_pvalue 0.01 --block_count 10 --temp_col Temp --density_col Density --energy_col TotEng --atom_style "id resid type charge x y z" --cv_signal_max 0.11 --output_name cooling.json --cutoff_A 14.0 --graphs_dir /home/alexzhao/PolyJarvis/data/PE_2/graphs --struct_dump_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final.dump --struct_data_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final_out.data
+2026-09-13 19:28:11,069 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_bc45f213.json
+2026-09-13 19:28:11,836 [LAMMPS-ENGINE] INFO Running equilibrated density extraction via CLI: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_equilibrated_density.py --log_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final.log --output_dir /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/raw --eq_fraction 0.5 --target_temp 300.0 --temp_tolerance 50.0 --plateau_shift_sigma 1.0 --density_col Density --temp_col Temp --output_name cooling.json
+2026-09-13 19:28:11,836 [LAMMPS-ENGINE] INFO Running: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_equilibrated_density.py --log_file /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final.log --output_dir /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/raw --eq_fraction 0.5 --target_temp 300.0 --temp_tolerance 50.0 --plateau_shift_sigma 1.0 --density_col Density --temp_col Temp --output_name cooling.json
+2026-09-13 19:28:12,797 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_ef72e8a4.json
+{
+  "status": "escalation_required",
+  "stage": "cooling",
+  "finding": {
+    "code": "EXTEND",
+    "stage": "cooling",
+    "severity": "blocking",
+    "confidence": "high",
+    "details": {
+      "regime": "rubbery",
+      "applicable_clause": "require_rubbery",
+      "binding_gates": {
+        "energy_drift": false,
+        "density_sem": true,
+        "energy_sem": true,
+        "n_eff_density": true,
+        "density_homogeneity": true,
+        "finite_size": true
+      },
+      "unmeasured_binding_gates": [],
+      "advisory_gates": {
+        "density_drift": true,
+        "energy_component_drift": false,
+        "residual_stress": true,
+        "rg": true,
+        "ct": true,
+        "torsion": true,
+        "msd_not_trapped": false,
+        "msid_gaussian": true
+      },
+      "density_value_binding": "n/a",
+      "cooling_verdict": null,
+      "cooling_extrapolation_reliable": null,
+      "homogeneity_verdict": "HOMOG_PASS",
+      "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+      "finite_size": {
+        "available": true,
+        "pass": true,
+        "self_image_advisory": true,
+        "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+        "L_min_A": 45.99,
+        "cutoff_A": 14.0,
+        "L_over_2cutoff": 1.643,
+        "L_over_2Rg": 0.695,
+        "L_over_Ree": 0.648,
+        "ree_self_image_flag": true,
+        "min_image_evaluated": true,
+        "box_A": [
+          45.99,
+          45.99,
+          45.99
+        ],
+        "graded_box": "actual_equilibrated"
+      },
+      "finite_size_min_image_unarmed": false,
+      "residual_stress": {
+        "available": true,
+        "dev_atm": {
+          "Pxx": 2.4,
+          "Pyy": -1.3,
+          "Pzz": -1.1
+        },
+        "von_mises_atm": 3.6,
+        "max_abs_dev_atm": 2.4,
+        "z_max": 0.22,
+        "resolved": false,
+        "mean_pressure_atm": -20.2
+      },
+      "failing_binding_gates": [
+        "energy_drift"
+      ],
+      "verdict": "EXTEND",
+      "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns = max(1.5, 1.5*ct_tau_relax_ps/1000), else 1.5 ns, via restart-continuation at npt_prod_temp_K (npt_final always runs at final_T_K, default 300 K \u2014 never a re-melt). Cap 2 per gate.",
+      "remedy_confidence": "high",
+      "saved_to": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/raw/cooling.json",
+      "relaxation_time_ns": 97.7433,
+      "extension_ns": 0.5
+    },
+    "remedy_id": null
+  },
+  "state_path": "/home/alexzhao/PolyJarvis/data/PE_2/workflow_state.json"
+}

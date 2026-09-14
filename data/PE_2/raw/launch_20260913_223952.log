@@ -1,0 +1,29 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[trappe] (engine=gpu)
+INFO: gpu_ids not given — derived "0" from hardware_policy[trappe]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+2026-09-13 22:39:52,785 [LAMMPS-ENGINE] INFO Loaded 195 runs from /home/alexzhao/PolyJarvis/data/_engine/run_state.json
+Traceback (most recent call last):
+  File "/home/alexzhao/PolyJarvis/db/query_best_match.py", line 516, in <module>
+    main()
+  File "/home/alexzhao/PolyJarvis/db/query_best_match.py", line 434, in main
+    polymer_ids, match_method, match_confidence = find_polymer_ids(
+                                                  ^^^^^^^^^^^^^^^^^
+  File "/home/alexzhao/PolyJarvis/db/query_best_match.py", line 128, in find_polymer_ids
+    rows = conn.execute(
+           ^^^^^^^^^^^^^
+sqlite3.OperationalError: no such table: polymers
+2026-09-13 22:39:58,920 [LAMMPS-ENGINE] INFO Running generate_run_summary via CLI: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/generate_run_summary.py --output_dir /home/alexzhao/PolyJarvis/data/PE_2/attempts/summary/attempt-0002/raw --run_name PE_2 --smiles '*CC*' --polymer_class PHYC --ff 'trappe-ua' --charge_method 'embedded' --dp 179 --n_chains 10 --d01 'trappe-ua' --d02 'embedded' --d03 'lj_cut' --d04 'DP=179, 10 chains' --d05 'EXTEND' --d06 'EXCELLENT' --graphs_dir /home/alexzhao/PolyJarvis/data/PE_2/graphs --n_replicates 1 --tg_path /home/alexzhao/PolyJarvis/data/PE_2/attempts/thermal/attempt-0002/raw/thermal.json --equilibration_path /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/raw/cooling.json --melt_equilibration_path /home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0001/raw/equilibration.json --mechanical_path /home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0002/raw/mechanical.json --byproducts_spec /home/alexzhao/PolyJarvis/data/PE_2/attempts/summary/attempt-0002/raw/byproducts_spec.json
+2026-09-13 22:39:58,920 [LAMMPS-ENGINE] INFO Running: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/generate_run_summary.py --output_dir /home/alexzhao/PolyJarvis/data/PE_2/attempts/summary/attempt-0002/raw --run_name PE_2 --smiles '*CC*' --polymer_class PHYC --ff 'trappe-ua' --charge_method 'embedded' --dp 179 --n_chains 10 --d01 'trappe-ua' --d02 'embedded' --d03 'lj_cut' --d04 'DP=179, 10 chains' --d05 'EXTEND' --d06 'EXCELLENT' --graphs_dir /home/alexzhao/PolyJarvis/data/PE_2/graphs --n_replicates 1 --tg_path /home/alexzhao/PolyJarvis/data/PE_2/attempts/thermal/attempt-0002/raw/thermal.json --equilibration_path /home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/raw/cooling.json --melt_equilibration_path /home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0001/raw/equilibration.json --mechanical_path /home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0002/raw/mechanical.json --byproducts_spec /home/alexzhao/PolyJarvis/data/PE_2/attempts/summary/attempt-0002/raw/byproducts_spec.json
+2026-09-13 22:39:59,186 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_917f9c9f.json
+{
+  "status": "accepted",
+  "run_name": "PE_2",
+  "state_path": "/home/alexzhao/PolyJarvis/data/PE_2/workflow_state.json",
+  "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0004",
+    "thermal": "attempt-0002",
+    "mechanical": "attempt-0002",
+    "summary": "attempt-0002"
+  }
+}

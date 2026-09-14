@@ -1,0 +1,125 @@
+{
+  "run": {
+    "name": "PEG_2",
+    "smiles": "*CCO*",
+    "polymer_class": "POXI",
+    "ff": "pcff",
+    "charge_method": "bond-increment",
+    "dp": 114,
+    "n_chains": 10,
+    "n_atoms": null,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": "pcff",
+    "D-02_charges": "bond-increment",
+    "D-03_electrostatics": "pppm",
+    "D-04_system_size": "DP=114, 10 chains",
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "EXCELLENT"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 268.4,
+      "grading_basis": "raw_MD",
+      "r_squared": 0.9991,
+      "fit_quality": "EXCELLENT",
+      "primary_fit_invalid": false,
+      "n_replicates": 1
+    },
+    "density": {
+      "value_g_cm3": 1.060025,
+      "temperature_K": 300.04
+    },
+    "melt_density": {
+      "value_g_cm3": 0.937757,
+      "temperature_K": 500.05
+    },
+    "bulk_modulus": {
+      "value_GPa": 3.3683,
+      "sem_GPa": 0.0661,
+      "method": "murnaghan",
+      "temperature_K": 300.03
+    }
+  },
+  "byproducts": {
+    "cte_glass": {
+      "value": 0.000233294,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_glassy_per_K",
+      "gate": {
+        "field": "slope_signs_valid",
+        "verdict": true
+      },
+      "blocking": false
+    },
+    "cte_rubber": {
+      "value": 0.00063513,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_rubbery_per_K",
+      "gate": {
+        "field": "slope_ordering_valid",
+        "verdict": true
+      },
+      "blocking": false
+    },
+    "tg_transition_width": {
+      "value": 58.7,
+      "unit": "K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:transition_width_c_K",
+      "gate": {
+        "field": "fit_quality",
+        "verdict": "EXCELLENT"
+      },
+      "blocking": false
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.0962,
+    "caveats": [
+      "kinetic_trap_flag=True (strongly sub-diffusive (see kinetic_trap_flag for trap verdict)) in a rubbery/melt run -- chains have not displaced their own size (MSD_max < Rg^2). density/Tg/bulk_modulus were measured on a structure whose chain-scale conformation may not represent true equilibrium.",
+      "C(t) only 0% decayed by end of trajectory (tau_relax=3.09e+09 ps vs trajectory=451 ps) -- whole-chain conformational relaxation is far from complete.",
+      "GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED: large-s MSID slope=0.796 (s=58-171), expected 1.0 +/-20% for melt-screened (ideal-chain) statistics -- long-wavelength chain shape has not relaxed to equilibrium. Local packing/short-range structure can still be sound; whole-chain conformation may not represent true equilibrium."
+    ]
+  },
+  "structural_checks": {
+    "rg_cv": 0.1604,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": true,
+    "diffusion_regime": "strongly sub-diffusive (see kinetic_trap_flag for trap verdict)",
+    "msid_slope": 1.047,
+    "msid_large_s_slope": 0.796,
+    "msid_large_s_gaussian_pass": false,
+    "ordered_flag": false,
+    "p2_mean": 0.0192,
+    "heterogeneous_flag": false,
+    "density_cv_mean": 0.2031
+  },
+  "artifacts": {
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "artifacts_missing": [
+    {
+      "file": "bulk_modulus_deform.json",
+      "found_in": null
+    }
+  ],
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "baa71cd",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-09-13T17:15:31.530617+00:00"
+  }
+}

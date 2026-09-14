@@ -1,0 +1,885 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/raw/mechanical.json",
+      "sha256": "b2fea158c93aacdbacfc26b47550bd5743469a568b367127ccd3b4a6fb56d6b3",
+      "size": 5318
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/bm_P1.dump",
+      "sha256": "6106ff8b8796fb2d7114ed49053857cd6a0df5f050d9a6494a890cda22e39f12",
+      "size": 133138695
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/bm_P1.in",
+      "sha256": "cac50de52cd88f63ebc9e130792ca93e54144ca41c39ec5ec482607749acb574",
+      "size": 4579
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/bm_P1.log",
+      "sha256": "a6e74927f9e894dfb199103d8662cfac76569bf688ae2e2ae77c7bd8544a5be2",
+      "size": 1792475
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/bm_P1_last.dump",
+      "sha256": "c0343fe90841643a8d889472c5999b970bcb7698781c5489172bb8b40ec9f3c0",
+      "size": 329387
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/bm_P1_out.data",
+      "sha256": "6192dd430c4c91d8275b6a8015df2508de369a7a2c3a77282466f7f143742434",
+      "size": 739451
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/bm_P1_stdout.log",
+      "sha256": "0ce9f5b367a09a004a57cc2e8c400e2354e0bc985c4388ca58e19c0736775ece",
+      "size": 1792028
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/log.lammps",
+      "sha256": "6f0d23202881c1177c1e63d71a40aec2ade6b60360e8a29f3cbf95e8324d4378",
+      "size": 2838
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/npt_1.rst",
+      "sha256": "26e0e0aec5a12dccbb048469cf391c3ffd462f130ff07958cc1a8634502868f5",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/npt_2.rst",
+      "sha256": "873bcec42c27e5bf6f02f63a7b03a39e3b1ce4d1c8bc16765b10548546a45c0a",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/npt_out.restart",
+      "sha256": "7514bd2345c7db066024630a7e0b206df84c2b1e77b6ce08cc71e72718fb762b",
+      "size": 805586
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_series_manifest.json",
+      "sha256": "7838b1c13fe0e5c4bb03518493d3587232d6b048498ac25b132c5ca94c014584",
+      "size": 218
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/bm_P1000.dump",
+      "sha256": "46b4584e3c7e6c9545dccc2248a160087efb5e7dfe5ff5bc91cb604f6444067b",
+      "size": 133149939
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/bm_P1000.in",
+      "sha256": "cb0a97a0f8f8d43bcdf2719411ea5b29236a2a0b307f9d75db49ee2790c6e29a",
+      "size": 4633
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/bm_P1000.log",
+      "sha256": "740ec48bf200b911276c9e17bbdd990fb0c5c453fe318ac066b630d27b13da7e",
+      "size": 1792525
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/bm_P1000_last.dump",
+      "sha256": "d7b18ba26128e9b83bad5e59e8d9c252b87b4edab2990d415e39418774acc513",
+      "size": 329397
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/bm_P1000_out.data",
+      "sha256": "462235fcd3c977eac0b823296e78c4936f2ed4e9dd2a3df513054871094fdb99",
+      "size": 739478
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/bm_P1000_stdout.log",
+      "sha256": "bff93a0fc14902ad741ab144ce4cf2dfe8fa0705c04f6a101e5e9d56ee6f153b",
+      "size": 1792033
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/log.lammps",
+      "sha256": "cc285de115c7ed7386da14d704985162ceaa5acfefb7d1d15d5dc2b842b5930c",
+      "size": 2847
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/npt_1.rst",
+      "sha256": "9acca83c2a6dbe8894011ab298bd80edbee7b58fb2d276201bff0dddf69baa65",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/npt_2.rst",
+      "sha256": "7c30ba7ee7464957f7b96e6105b0d0107c667c8a4f0560c10c2df5fd4407b37f",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/npt_out.restart",
+      "sha256": "94d794568a8424fd5941118f77954e465d733effde9d9a30a246bd96c0154f94",
+      "size": 805586
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_series_manifest.json",
+      "sha256": "cdad9863afb5cd26c1f9dbda7a3300b936a6808f30f1dbf8af5470db4d74dc5b",
+      "size": 230
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/bm_P10000.dump",
+      "sha256": "674d8cadcda1b5058989ed2395634e3dcd8c9c3d33996113c89794bf208dd7f1",
+      "size": 133153478
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/bm_P10000.in",
+      "sha256": "4e6b272e9aeef2e986c9e5d0be4c86baab7f91d55b0289b1626bc25e6d19f87b",
+      "size": 4651
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/bm_P10000.log",
+      "sha256": "25d6c03f5b7097701e0a2218a4d3def2f75116388d849c894da2614af76c77a2",
+      "size": 1792543
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/bm_P10000_last.dump",
+      "sha256": "2c429a7f24868505fc8045c35ff63d3717d56c26847f2220b1b618f84740ab1c",
+      "size": 329300
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/bm_P10000_out.data",
+      "sha256": "33642fb0763a9a85f3e79bf443f5da2e62ccd5b86c41d68a1a75628e76d65665",
+      "size": 739470
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/bm_P10000_stdout.log",
+      "sha256": "191f799de70cb053a58f734fc2e92ed351bda0c9f7b18e8887c655b33c171489",
+      "size": 1792036
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/log.lammps",
+      "sha256": "3709705680004b9bbf9a01dba0412bf4ea3ddc93ab1d6ad7c4d26c315deec1d3",
+      "size": 2850
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/npt_1.rst",
+      "sha256": "1d4ebfeb6a8a6602141c1d9776410627c7826f869d6b8f43361d34d0aa88ff86",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/npt_2.rst",
+      "sha256": "cc96461af8a611ec60876b00ae3b1eee5c932d431cc9edb3849926d85b499703",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/npt_out.restart",
+      "sha256": "e6434bff6081af78232eb654a9cb5cf1238b6c70a9be6e54ce3e79d43b8bc0f7",
+      "size": 805586
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_series_manifest.json",
+      "sha256": "d34cc07167fbd8a640e96f4c26f6a4b8369c74b146ed31b0bce01aefea66d8fb",
+      "size": 234
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000.dump",
+      "sha256": "549b4b0d87791befb30a71a16faf0efb41faf97e476de72d30e8f975aef772ef",
+      "size": 133158371
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000.in",
+      "sha256": "1575527a816fda2b57d9bdfb998699f1536561b25a1730a33121690236386eff",
+      "size": 4651
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000.log",
+      "sha256": "74d109af2fa84f3147cab15d4d9a82ce27cbb72d00c196efd385a2b0c9611122",
+      "size": 1792543
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000_last.dump",
+      "sha256": "18e28afbf3f514918e4d77a3b6961b11e178d882d48c276d0aaf08e50192ed9d",
+      "size": 329256
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000_out.data",
+      "sha256": "a217ffc35e939f84f6dbddbe8fec1894768cad1ca3e378d7b484c98ff173b15b",
+      "size": 739465
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000_stdout.log",
+      "sha256": "3cbec01204f41b25bfea057d02d1fe0ca3ecdc95f61a328fbbd706ed537f4214",
+      "size": 1792037
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/log.lammps",
+      "sha256": "ac3c64ef86e2a22e3ff039c1b61fcd5e9ff8805d0368297a6f394b128a3f6fbf",
+      "size": 2850
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/npt_1.rst",
+      "sha256": "a3ded5212287563e257ec1b8645646a1e28891a8cb87b79b69435495c5f9431c",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/npt_2.rst",
+      "sha256": "e0553a242e8ab466db9cc119249207a9dccc9171b9d478a0588fe149223830ec",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/npt_out.restart",
+      "sha256": "7ff1d473f15a0ad36fb44e4c5118d5343c3ab9f3d2b15232ab76c0c9b13f3125",
+      "size": 805586
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_series_manifest.json",
+      "sha256": "b8e0dbdcb99f29a8a7fe91726e448ebc07f35ef9427cce9fc278b68cab9430c3",
+      "size": 234
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/bm_P2500.dump",
+      "sha256": "ff607a20b63e251a38a57d567b767fdaa703c1e7cd3effaf27566a6f2c4f310a",
+      "size": 133152148
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/bm_P2500.in",
+      "sha256": "257a7a30ee9becd7d9406d206c6679e3bc97a77935d93ec40c2b74f12e7dfb0a",
+      "size": 4633
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/bm_P2500.log",
+      "sha256": "f3c196924af84d851fc87373b9a4abacb3dcb0efb288b8c12b2d8aaf42039dff",
+      "size": 1792526
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/bm_P2500_last.dump",
+      "sha256": "dfe869155fa866be4f1013b0a5a81a47ed37b47f60b0e968d6e6b58d791428dc",
+      "size": 329221
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/bm_P2500_out.data",
+      "sha256": "c2ab58044d2b69542038724ead06cf7ce1f5d23cf385237e446befc32f6a13e3",
+      "size": 739474
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/bm_P2500_stdout.log",
+      "sha256": "57477f70cc230814b4ff142e7eb5aba0cd861f6430925bb96a1edc2225d96130",
+      "size": 1792034
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/log.lammps",
+      "sha256": "5e4560326885f8e2ae6fa9b955c9d325b0eeb48b6b25c341982200b092c85db6",
+      "size": 2847
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/npt_1.rst",
+      "sha256": "8a7b81be5bc0243596bb371f4eab0122b6fbe76ea1a7e31d79fb5095ba23febd",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/npt_2.rst",
+      "sha256": "ec419deb03ac43ae7c64cea00e6a298b789ee9629c84dcdadd31fc5afa5871a5",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/npt_out.restart",
+      "sha256": "d88f0f9f66c763662b7af45d0ae13d6d5eed2199e74667b66ff85209b677dba0",
+      "size": 805586
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_series_manifest.json",
+      "sha256": "2daaabb04ceada7dd24e4b2a8a34fc3c940d207566cc760b8470e270ca3736bb",
+      "size": 230
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000.dump",
+      "sha256": "04180389bc7c47369b67087da22439c00719892c6fa886a2e5d94d8189f51397",
+      "size": 133159220
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000.in",
+      "sha256": "ed24a0bd3564b732887a1d2bb25d506b31afe1177144c20fbf2efeb38a7ed4cd",
+      "size": 4633
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000.log",
+      "sha256": "26a29930d069a8f9dc5ae7f799fd57f478264a2af7044ae74053549b1a5b1526",
+      "size": 1792526
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000_last.dump",
+      "sha256": "cd3444eac0c5900e4e83e8fb6ace6e54d4c55538094119176b7146e99e0a2419",
+      "size": 329305
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000_out.data",
+      "sha256": "8002e477b9980eea8577e5d5c2833e5bba3b32d84578371146723de9b7e6fb13",
+      "size": 739469
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000_stdout.log",
+      "sha256": "2238e365afe20b25ca979c58bdd35a39b9c83b92e09625b0ae29d4c4d647d188",
+      "size": 1792034
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/log.lammps",
+      "sha256": "7e73621ffcd80b8e8e4d666a622f8fa5549e4624c1d29a869275684f9822ca37",
+      "size": 2847
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/npt_1.rst",
+      "sha256": "b2a1651bc8be6dcd2723a3a2e309e6ed7be38fa2d45614fe9d40a7a07945cdff",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/npt_2.rst",
+      "sha256": "06f49b1d4c785d3f8af8e1944a45d72238f55ff8a1851e9a1c772ac704c3202f",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/npt_out.restart",
+      "sha256": "c73df0dd64bd70ee2d98ae862482f9c8683d41154cf036479674e3db11acdf1f",
+      "size": 805586
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_series_manifest.json",
+      "sha256": "960259dee4ba646f74056374d46ae24670914611e4d8c82a22ce70b05ea02d94",
+      "size": 230
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/pressure_points.json",
+      "sha256": "2af4466c85c8fc7d13856378c384a6f03415820c74d65dd83700605c351f1e48",
+      "size": 4350
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [
+    {
+      "code": "BM_LADDER_NOT_CONVERGED",
+      "confidence": "low",
+      "details": {
+        "gate_output": {
+          "B0_prime": 8.1848,
+          "bm_convergence_confidence": "low",
+          "bm_convergence_reasons": [
+            "loo_unstable"
+          ],
+          "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+          "bm_gate_reasons": [],
+          "bm_gate_verdict": "BM_REPORTABLE",
+          "bulk_modulus_GPa": 1.9296,
+          "mechanical_json_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/raw/mechanical.json",
+          "method": "murnaghan",
+          "murnaghan_result": {
+            "B0_GPa": 1.9296,
+            "B0_prime": 8.1848,
+            "B0_sem_GPa": 0.1454,
+            "V0_A3": 96892.14,
+            "all_points_fit": {
+              "B0_GPa": 1.9296,
+              "B0_prime": 8.1848,
+              "V0_A3": 96892.14,
+              "fit_converged": true,
+              "method": "murnaghan",
+              "n_points": 6,
+              "pressures_atm": [
+                1.0,
+                1000.0,
+                2500.0,
+                5000.0,
+                10000.0,
+                15000.0
+              ],
+              "r_squared": 0.999804,
+              "volume_monotonic": true
+            },
+            "anomalous_points": {
+              "0": [
+                "|dV/dP| between points 0 and 1 is 4.614, >3x the other intervals' median (1.35) -- possible cavitation/discontinuity in this interval."
+              ],
+              "1": [
+                "|dV/dP| between points 0 and 1 is 4.614, >3x the other intervals' median (1.35) -- possible cavitation/discontinuity in this interval."
+              ]
+            },
+            "bm_convergence_confidence": "low",
+            "bm_convergence_reasons": [
+              "loo_unstable"
+            ],
+            "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+            "bm_gate_reasons": [],
+            "bm_gate_verdict": "BM_REPORTABLE",
+            "bm_reportable": true,
+            "bulk_modulus_GPa": 1.9296,
+            "bulk_modulus_sem_GPa": 0.1454,
+            "eq_fraction": 0.5,
+            "excluded_points": [],
+            "fit_converged": true,
+            "fluctuation_bulk_modulus_GPa": 1.6722,
+            "fluctuation_divergence_pct": 13.34,
+            "log_files": [
+              "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/bm_P1.log",
+              "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/bm_P1000.log",
+              "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/bm_P2500.log",
+              "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000.log",
+              "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/bm_P10000.log",
+              "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000.log"
+            ],
+            "loo_max_dB0_pct": 11.18,
+            "loo_n_converged": 6,
+            "loo_results": [
+              {
+                "B0_GPa": 2.1454,
+                "B0_prime": 7.8909,
+                "converged": true,
+                "dB0_GPa_vs_baseline": 0.2158,
+                "dB0_prime_vs_baseline": -0.2939,
+                "dropped_pressure_atm": 1.0,
+                "is_tension_point": true,
+                "r_squared": 0.999869
+              },
+              {
+                "B0_GPa": 1.912,
+                "B0_prime": 8.1978,
+                "converged": true,
+                "dB0_GPa_vs_baseline": -0.0176,
+                "dB0_prime_vs_baseline": 0.013,
+                "dropped_pressure_atm": 1000.0,
+                "is_tension_point": false,
+                "r_squared": 0.999776
+              },
+              {
+                "B0_GPa": 1.9352,
+                "B0_prime": 8.102,
+                "converged": true,
+                "dB0_GPa_vs_baseline": 0.0056,
+                "dB0_prime_vs_baseline": -0.0827,
+                "dropped_pressure_atm": 2500.0,
+                "is_tension_point": false,
+                "r_squared": 0.999873
+              },
+              {
+                "B0_GPa": 1.9449,
+                "B0_prime": 8.142,
+                "converged": true,
+                "dB0_GPa_vs_baseline": 0.0153,
+                "dB0_prime_vs_baseline": -0.0428,
+                "dropped_pressure_atm": 5000.0,
+                "is_tension_point": false,
+                "r_squared": 0.999807
+              },
+              {
+                "B0_GPa": 1.8273,
+                "B0_prime": 8.3891,
+                "converged": true,
+                "dB0_GPa_vs_baseline": -0.1023,
+                "dB0_prime_vs_baseline": 0.2043,
+                "dropped_pressure_atm": 10000.0,
+                "is_tension_point": false,
+                "r_squared": 0.999941
+              },
+              {
+                "B0_GPa": 1.743,
+                "B0_prime": 8.8415,
+                "converged": true,
+                "dB0_GPa_vs_baseline": -0.1866,
+                "dB0_prime_vs_baseline": 0.6567,
+                "dropped_pressure_atm": 15000.0,
+                "is_tension_point": false,
+                "r_squared": 0.999941
+              }
+            ],
+            "method": "murnaghan",
+            "murnaghan_eos_fig": "/home/alexzhao/PolyJarvis/data/PE_2/graphs/murnaghan_eos.png",
+            "n_eff_per_point": [
+              29,
+              1392,
+              39,
+              53,
+              2501,
+              2501
+            ],
+            "n_points": 6,
+            "n_prod_rows": [
+              2501,
+              2501,
+              2501,
+              2501,
+              2501,
+              2501
+            ],
+            "output_dir": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/raw",
+            "pressures_GPa": [
+              0.000101,
+              0.101325,
+              0.253313,
+              0.506625,
+              1.01325,
+              1.519875
+            ],
+            "pressures_atm": [
+              1.0,
+              1000.0,
+              2500.0,
+              5000.0,
+              10000.0,
+              15000.0
+            ],
+            "r_squared": 0.999804,
+            "selected_window": {
+              "n_points": 6,
+              "plateau_confirmed": true,
+              "selection_note": "Untrimmed fit already has r_squared=0.99980 >= 0.999 -- no trimming applied even though point(s) [0, 1] were flagged (a genuinely curved EOS can trip the interval heuristic without a real problem).",
+              "trim_total": 0
+            },
+            "status": "success",
+            "summary_json": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/raw/mechanical.json",
+            "tau_frames_per_point": [
+              85.718,
+              1.796,
+              63.771,
+              47.106,
+              1.0,
+              1.0
+            ],
+            "temperature_K": 299.93,
+            "temperature_spread_K": 0.19,
+            "vol_sem_A3_per_point": [
+              95.325,
+              9.7248,
+              49.0155,
+              32.5043,
+              3.5181,
+              2.955
+            ],
+            "vol_stds_A3": [
+              513.34,
+              362.83,
+              306.1,
+              236.63,
+              175.94,
+              147.78
+            ],
+            "volume_monotonic": true,
+            "volumes_A3": [
+              97275.29,
+              92665.83,
+              88410.56,
+              84196.13,
+              79129.1,
+              75785.99
+            ],
+            "warnings": [
+              "Leave-one-out refit: dropping one pressure point shifts B0 by up to 11.2% (>10%) \u2014 the fit is not robust to a single point; consider widening the pressure range."
+            ]
+          },
+          "pressure_selection": {
+            "ced_mpa": null,
+            "compression_limit_atm": 15000,
+            "fluctuation_K_GPa": 1.6722076302915672,
+            "ladder_adjustment": null,
+            "pressures_atm": [
+              1,
+              1000,
+              2500,
+              5000,
+              10000,
+              15000
+            ],
+            "reason": "class_protocol",
+            "tension_limit_atm": 1
+          },
+          "velocity_seed": 904370
+        }
+      },
+      "remedy_id": null,
+      "severity": "blocking",
+      "stage": "mechanical"
+    }
+  ],
+  "finished_at": "2026-09-13T17:14:28.134064+00:00",
+  "input_hash": "9701945834db40cd0d3d401a4bb0fb211ad2af81f983e5bacac26fdb6085d244",
+  "outputs": {
+    "B0_prime": 8.1848,
+    "bm_convergence_confidence": "low",
+    "bm_convergence_reasons": [
+      "loo_unstable"
+    ],
+    "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+    "bm_gate_reasons": [],
+    "bm_gate_verdict": "BM_REPORTABLE",
+    "bulk_modulus_GPa": 1.9296,
+    "mechanical_json_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/raw/mechanical.json",
+    "method": "murnaghan",
+    "murnaghan_result": {
+      "B0_GPa": 1.9296,
+      "B0_prime": 8.1848,
+      "B0_sem_GPa": 0.1454,
+      "V0_A3": 96892.14,
+      "all_points_fit": {
+        "B0_GPa": 1.9296,
+        "B0_prime": 8.1848,
+        "V0_A3": 96892.14,
+        "fit_converged": true,
+        "method": "murnaghan",
+        "n_points": 6,
+        "pressures_atm": [
+          1.0,
+          1000.0,
+          2500.0,
+          5000.0,
+          10000.0,
+          15000.0
+        ],
+        "r_squared": 0.999804,
+        "volume_monotonic": true
+      },
+      "anomalous_points": {
+        "0": [
+          "|dV/dP| between points 0 and 1 is 4.614, >3x the other intervals' median (1.35) -- possible cavitation/discontinuity in this interval."
+        ],
+        "1": [
+          "|dV/dP| between points 0 and 1 is 4.614, >3x the other intervals' median (1.35) -- possible cavitation/discontinuity in this interval."
+        ]
+      },
+      "bm_convergence_confidence": "low",
+      "bm_convergence_reasons": [
+        "loo_unstable"
+      ],
+      "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+      "bm_gate_reasons": [],
+      "bm_gate_verdict": "BM_REPORTABLE",
+      "bm_reportable": true,
+      "bulk_modulus_GPa": 1.9296,
+      "bulk_modulus_sem_GPa": 0.1454,
+      "eq_fraction": 0.5,
+      "excluded_points": [],
+      "fit_converged": true,
+      "fluctuation_bulk_modulus_GPa": 1.6722,
+      "fluctuation_divergence_pct": 13.34,
+      "log_files": [
+        "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/bm_P1.log",
+        "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/bm_P1000.log",
+        "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/bm_P2500.log",
+        "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000.log",
+        "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/bm_P10000.log",
+        "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000.log"
+      ],
+      "loo_max_dB0_pct": 11.18,
+      "loo_n_converged": 6,
+      "loo_results": [
+        {
+          "B0_GPa": 2.1454,
+          "B0_prime": 7.8909,
+          "converged": true,
+          "dB0_GPa_vs_baseline": 0.2158,
+          "dB0_prime_vs_baseline": -0.2939,
+          "dropped_pressure_atm": 1.0,
+          "is_tension_point": true,
+          "r_squared": 0.999869
+        },
+        {
+          "B0_GPa": 1.912,
+          "B0_prime": 8.1978,
+          "converged": true,
+          "dB0_GPa_vs_baseline": -0.0176,
+          "dB0_prime_vs_baseline": 0.013,
+          "dropped_pressure_atm": 1000.0,
+          "is_tension_point": false,
+          "r_squared": 0.999776
+        },
+        {
+          "B0_GPa": 1.9352,
+          "B0_prime": 8.102,
+          "converged": true,
+          "dB0_GPa_vs_baseline": 0.0056,
+          "dB0_prime_vs_baseline": -0.0827,
+          "dropped_pressure_atm": 2500.0,
+          "is_tension_point": false,
+          "r_squared": 0.999873
+        },
+        {
+          "B0_GPa": 1.9449,
+          "B0_prime": 8.142,
+          "converged": true,
+          "dB0_GPa_vs_baseline": 0.0153,
+          "dB0_prime_vs_baseline": -0.0428,
+          "dropped_pressure_atm": 5000.0,
+          "is_tension_point": false,
+          "r_squared": 0.999807
+        },
+        {
+          "B0_GPa": 1.8273,
+          "B0_prime": 8.3891,
+          "converged": true,
+          "dB0_GPa_vs_baseline": -0.1023,
+          "dB0_prime_vs_baseline": 0.2043,
+          "dropped_pressure_atm": 10000.0,
+          "is_tension_point": false,
+          "r_squared": 0.999941
+        },
+        {
+          "B0_GPa": 1.743,
+          "B0_prime": 8.8415,
+          "converged": true,
+          "dB0_GPa_vs_baseline": -0.1866,
+          "dB0_prime_vs_baseline": 0.6567,
+          "dropped_pressure_atm": 15000.0,
+          "is_tension_point": false,
+          "r_squared": 0.999941
+        }
+      ],
+      "method": "murnaghan",
+      "murnaghan_eos_fig": "/home/alexzhao/PolyJarvis/data/PE_2/graphs/murnaghan_eos.png",
+      "n_eff_per_point": [
+        29,
+        1392,
+        39,
+        53,
+        2501,
+        2501
+      ],
+      "n_points": 6,
+      "n_prod_rows": [
+        2501,
+        2501,
+        2501,
+        2501,
+        2501,
+        2501
+      ],
+      "output_dir": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/raw",
+      "pressures_GPa": [
+        0.000101,
+        0.101325,
+        0.253313,
+        0.506625,
+        1.01325,
+        1.519875
+      ],
+      "pressures_atm": [
+        1.0,
+        1000.0,
+        2500.0,
+        5000.0,
+        10000.0,
+        15000.0
+      ],
+      "r_squared": 0.999804,
+      "selected_window": {
+        "n_points": 6,
+        "plateau_confirmed": true,
+        "selection_note": "Untrimmed fit already has r_squared=0.99980 >= 0.999 -- no trimming applied even though point(s) [0, 1] were flagged (a genuinely curved EOS can trip the interval heuristic without a real problem).",
+        "trim_total": 0
+      },
+      "status": "success",
+      "summary_json": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/raw/mechanical.json",
+      "tau_frames_per_point": [
+        85.718,
+        1.796,
+        63.771,
+        47.106,
+        1.0,
+        1.0
+      ],
+      "temperature_K": 299.93,
+      "temperature_spread_K": 0.19,
+      "vol_sem_A3_per_point": [
+        95.325,
+        9.7248,
+        49.0155,
+        32.5043,
+        3.5181,
+        2.955
+      ],
+      "vol_stds_A3": [
+        513.34,
+        362.83,
+        306.1,
+        236.63,
+        175.94,
+        147.78
+      ],
+      "volume_monotonic": true,
+      "volumes_A3": [
+        97275.29,
+        92665.83,
+        88410.56,
+        84196.13,
+        79129.1,
+        75785.99
+      ],
+      "warnings": [
+        "Leave-one-out refit: dropping one pressure point shifts B0 by up to 11.2% (>10%) \u2014 the fit is not robust to a single point; consider widening the pressure range."
+      ]
+    },
+    "pressure_selection": {
+      "ced_mpa": null,
+      "compression_limit_atm": 15000,
+      "fluctuation_K_GPa": 1.6722076302915672,
+      "ladder_adjustment": null,
+      "pressures_atm": [
+        1,
+        1000,
+        2500,
+        5000,
+        10000,
+        15000
+      ],
+      "reason": "class_protocol",
+      "tension_limit_atm": 1
+    },
+    "velocity_seed": 904370
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "cooling_continuation_attempt": 1,
+    "cooling_continuation_ns": 0.5,
+    "cooling_extend_base_stage": "npt_final",
+    "cooling_extend_ensemble": "npt",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "equilibration_extend_base_stage": "npt_melt_hold",
+    "equilibration_extend_ensemble": "npt",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "npt_continuation_attempt": 1,
+    "npt_continuation_ns": 2.0,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 40,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "stage": "mechanical",
+  "status": "accepted",
+  "operator_acceptance": {
+    "accepted_by": "operator, 2026-09-13 (same decision as PE_1, operator_decisions D-01)",
+    "gate_overridden": "BM_LADDER_NOT_CONVERGED (confidence low; sole reason loo_unstable)",
+    "measurement": {
+      "B0_GPa": 1.9296,
+      "B0_sem_GPa": 0.1454,
+      "B0_prime": 8.1848,
+      "r_squared": 0.9998,
+      "n_points": 6,
+      "bm_gate_verdict": "BM_REPORTABLE",
+      "fluctuation_crosscheck_GPa": 1.67,
+      "experimental_band_GPa": [
+        1.5,
+        2.0
+      ]
+    },
+    "annotation": "LOO shift driven by the P~0 anchor; K' decreases with P over the 1-15000 atm ladder (rubbery-to-stiffened crossover); Murnaghan B0 likely slightly high against the low-P secant (~2.1 GPa) and fluctuation (1.67 GPa) estimates; do not widen the ladder.",
+    "why": "Model bias, not noise: dropping 1 atm gives +11.18%, dropping 15000 atm gives -9.67%, the other four stay within 5.3% -- the two ends pull B0 in opposite directions, so a single-K' Murnaghan cannot span a rubbery cell stiffening under compression (secant moduli 2.14 -> 12.0 GPa, local K' ~9.5 -> ~7.0). Reproduces PE_1 (B0 1.8897) to 2%, which supports the value as reproducible. Widening the ceiling worsens the bias; resampling reduces variance, which is not what fails."
+  }
+}

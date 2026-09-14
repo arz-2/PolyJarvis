@@ -1,0 +1,87 @@
+# ============================================================
+# PolyJarvis LAMMPS Engine - Tg Sweep Single Step Template
+# ============================================================
+# Stage: One NPT temperature step in a glass transition sweep
+# Purpose: Run short NPT at a single T, extract equilibrium density
+#          Caller chains many of these for the full T sweep.
+#
+# Design: No restart files (each step is short and independent).
+#         GPU-safe when restart is disabled.
+#         Reads from previous step's WRITE_DATA_FILE.
+#
+# Tunable parameters:
+#   DATA_FILE        - equilibrated cell from previous step
+#   READ_COMMAND     - "read_data" or "read_restart"
+#   LOG_FILE, LOG_APPEND
+#   DUMP_FILE, LAST_DUMP_FILE, WRITE_DATA_FILE
+#   PAIR_STYLE_BLOCK
+#   BOND_STYLE, ANGLE_STYLE, DIHEDRAL_STYLE, IMPROPER_STYLE
+#   GPU_PACKAGE
+#   T_TARGET         - target temperature for this step (K)
+#   T_DAMP           - thermostat damping (fs)
+#   P_TARGET         - target pressure (atm), typically 1
+#   P_DAMP           - barostat damping (fs)
+#   TIMESTEP, N_STEPS
+#   THERMO_FREQ, DUMP_FREQ
+#   SHAKE_BLOCK, UNSHAKE_BLOCK
+#   INIT_VELOCITY_BLOCK - rescale velocities to T_TARGET
+#   WRITE_PER_T_DUMP / PER_T_DUMP_FILE - optional one-frame snapshot appended to a shared
+#       multi-frame dump (one frame per temperature across the whole sweep's chained calls)
+# ============================================================
+
+log tg_sweep.log append
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/cut 14.0
+dielectric 1.000000
+bond_style harmonic
+angle_style harmonic
+dihedral_style multi/harmonic
+improper_style none
+special_bonds lj 0 0 0
+pair_modify mix arithmetic tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+package gpu 1 neigh yes
+
+read_data /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L4_dT10/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T190_e0_out.data
+
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo 500
+
+# --- Trajectory ---
+# # Dump disabled (thermo-only run) is empty when DUMP_FREQ=0 or DUMP_FILE="" (thermo-only run)
+# Dump disabled (thermo-only run)
+
+# --- Velocity rescaling to target T before run ---
+# Velocities read from data file
+
+# SHAKE disabled (TraPPE-UA united-atom)
+
+# --- NPT at T_TARGET ---
+# Fixed T and P: collect density for Tg analysis
+timestep 2.0
+fix npt_tg all npt temp 180.0 180.0 100.0 iso 1.0 1.0 1000.0
+
+run 250000
+
+unfix npt_tg
+
+
+
+
+dump per_t_snap all atom 1 per_t_structs.dump
+dump_modify per_t_snap append yes
+run 0
+undump per_t_snap
+write_data /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L4_dT10/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T180_e0_out.data
+
+print "STAGE COMPLETE: Tg step T=180.0K P=1.0atm steps=250000"
+quit

@@ -1,0 +1,15 @@
+{"event": "resume", "at": "2026-09-12T19:52:29.609610+00:00", "at_node": "cache_probe", "node": "entry_resolve"}
+{"event": "cache_probe", "at": "2026-09-12T19:52:30.025128+00:00", "hit": true, "canonical_smiles": "*CCO*", "node": "cache_probe"}
+{"event": "plan", "at": "2026-09-12T19:52:31.264532+00:00", "plan_mode": "deterministic", "confidence": "high", "gpu_hours": 6.0361, "node": "plan"}
+{"event": "cost_admitted", "at": "2026-09-12T19:52:31.265617+00:00", "gpu_hours": 6.0361, "ceiling": 40.0, "unpriced": ["equil"], "note": "total_gpu_hours is a LOWER bound; unpriced stages are excluded", "node": "cost_guard_pre"}
+{"event": "cost_admitted", "at": "2026-09-12T19:52:31.266080+00:00", "gpu_hours": 6.0361, "ceiling": 40.0, "unpriced": ["equil"], "note": "total_gpu_hours is a LOWER bound; unpriced stages are excluded", "node": "cost_guard_post"}
+{"event": "stage_progress", "stage": "build", "status": "running", "attempts": 1, "at": "2026-09-12T19:52:49.597424+00:00"}
+{"event": "stage_progress", "stage": "cooling", "status": "pending", "attempts": 0, "at": "2026-09-12T19:52:49.597470+00:00"}
+{"event": "stage_progress", "stage": "equilibration", "status": "pending", "attempts": 0, "at": "2026-09-12T19:52:49.597485+00:00"}
+{"event": "stage_progress", "stage": "mechanical", "status": "pending", "attempts": 0, "at": "2026-09-12T19:52:49.597497+00:00"}
+{"event": "stage_progress", "stage": "summary", "status": "pending", "attempts": 0, "at": "2026-09-12T19:52:49.597506+00:00"}
+{"event": "stage_progress", "stage": "thermal", "status": "pending", "attempts": 0, "at": "2026-09-12T19:52:49.597515+00:00"}
+{"event": "stage_progress", "stage": "build", "status": "accepted", "attempts": 1, "at": "2026-09-12T19:55:09.599133+00:00"}
+{"event": "stage_progress", "stage": "equilibration", "status": "running", "attempts": 1, "at": "2026-09-12T19:55:09.599183+00:00"}
+{"event": "execute", "at": "2026-09-12T23:00:25.003388+00:00", "status": "unresolved", "stage": null, "finding": null, "resumed": false, "node": "execute"}
+{"event": "done", "status": "failed", "exit_code": 3, "run_name": "PEG_2", "polymer_class": "POXI", "class_source": "characterization_cache", "plan_path": "/home/alexzhao/PolyJarvis/data/PEG_2/raw/run_plan.json", "confidence": "high", "plan_mode": "deterministic", "gpu_hours": 6.0361, "unpriced": ["equil"], "critic_verdict": null, "stage": null, "finding": null, "detail": "", "resumable": false}

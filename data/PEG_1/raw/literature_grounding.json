@@ -1,0 +1,141 @@
+{
+  "critique": {
+    "D-01_ff": {
+      "autofilled_choice": "pcff",
+      "verdict": "disagrees",
+      "confidence": "medium",
+      "reason": "Both verified peer-reviewed MD studies found on this exact repeat unit (PEO/PEG, *CCO*) use non-PCFF fields: OPLS-AA (10.3390/polym13224049, bulk neat PEO melt, exact-SMILES) and GAFF (10.1039/d4ra04898a, PEG oligomers, exact-SMILES). No verified paper in this search validates PCFF/Class-II specifically on POXI. The plan's own D-01_ff evidence leans on Klajmon2023, which is a protocol/equilibration-error benchmark across PLA/PEG/PVP, not a PCFF-vs-alternative accuracy comparison, plus an uncited 'NkepsuMbitou2025' claim ('PCFF outperforms GAFF2') that has no resolvable DOI anywhere in the plan -- it cannot be verified as literature support. Countervailing: the evidence store also holds two internal_validated_run records showing PCFF already built and passed density/Tg/bulk_modulus gates on this exact SMILES in prior PolyJarvis runs (PEG1, PEG1_gate_validation) -- real in-pipeline precedent the external OPLS-AA/GAFF papers do not have. That tempers this to a flagged literature disagreement for the adjudicating critic to weigh, not grounds for an automatic override.",
+      "supporting_dois": [
+        "10.3390/polym13224049",
+        "10.1039/d4ra04898a"
+      ],
+      "suggested_override": {
+        "preferred_ff": "opls/2024/opls-aa"
+      }
+    }
+  },
+  "dominant_uncertainty": "Whether PCFF vs. OPLS-AA/GAFF materially changes PEO/PEG density-Tg-K accuracy for this exact SMILES: published MD literature validates OPLS-AA/GAFF on this polymer, PolyJarvis's own gate-passing history validates PCFF in-pipeline, and no head-to-head PCFF-vs-OPLS-AA benchmark for POXI exists to resolve the two.",
+  "polymer_class": "POXI",
+  "polymer_name": "poly(ethylene glycol) / poly(ethylene oxide) (PEG/PEO)",
+  "smiles": "*CCO*",
+  "notes": "D-01_ff (pcff) disagrees with the two verified peer-reviewed MD studies found on this exact repeat unit (both non-PCFF: OPLS-AA and GAFF), but PCFF already has internal_validated_run precedent for the same SMILES in this pipeline, so this is reported as a literature gap for the adjudicating critic to weigh -- not a forced override. Electrostatics (pppm) and the experimental Tg band (158-233 K, bracketing the plan's own 206 K target) are both independently corroborated by the same literature and require no change.",
+  "forcefield": {
+    "recommendation": "opls/2024/opls-aa",
+    "confidence": "medium",
+    "sources": [
+      {
+        "doi": "10.3390/polym13224049",
+        "claim": "All-atom PEO melt MD study (up to 300 ns production per temperature) uses the OPLS-AA force field throughout; simulated density at 300 K (1.071 g/cm3) is stated by the authors as consistent with experimental data (1.112 g/cm3, and a 1.07-1.27 g/cm3 literature range), and the study's own MD Tg (249 K) is consistent with prior MD studies (Tg~251 K) and within the cited experimental Tg range (158-233 K).",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "120becde67bf"
+      },
+      {
+        "doi": "10.1039/d4ra04898a",
+        "claim": "PEG oligomer (n=2-7) MD study uses the General AMBER Force Field (GAFF); for the tetramer at 328 K, GAFF reproduces the experimental density (1096.0 +/- 0.1 kg/m3 exp vs 1143.3 +/- 0.1 kg/m3 sim) within ~5%.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "e4793dc8803b"
+      }
+    ]
+  },
+  "electrostatics": {
+    "recommendation": "pppm",
+    "confidence": "high",
+    "sources": [
+      {
+        "doi": "10.3390/polym13224049",
+        "claim": "\"The long-range electrostatic contributions are calculated by using the Ewald summation.\" (mesh-Ewald/PPPM class method for all-atom PEO melt MD).",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "c69e09be0f5e"
+      },
+      {
+        "doi": "10.1039/d4ra04898a",
+        "claim": "\"For the treatment of long-range electrostatic interactions, the Ewald summation method was employed.\"",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "384f251d716b"
+      }
+    ]
+  },
+  "tg_target_K": {
+    "range": [
+      158,
+      233
+    ],
+    "confidence": "medium",
+    "sources": [
+      {
+        "doi": "10.3390/polym13224049",
+        "claim": "Reports own MD Tg (OPLS-AA, stepwise cooling, 4x10^9 K/s) of 249 K; cites the experimental literature Tg range for PEO as 158-233 K and a prior MD study giving Tg~251 K, calling its own result consistent with both.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "10925a652ae6"
+      }
+    ]
+  },
+  "md_studies": [
+    {
+      "doi": "10.3390/polym13224049",
+      "url": "https://doi.org/10.3390/polym13224049",
+      "title": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+      "year": 2021,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "OPLS-AA",
+      "force_field_type": "All Atom",
+      "electrostatics": "pppm",
+      "ensemble": "stepwise-cooling all-atom MD melt, up to 300 ns production per temperature (NPT/NVT split not captured in the stored claim text)",
+      "T_K": 300,
+      "P_atm": null,
+      "system_type": "neat_polymer",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [
+        {
+          "property": "density",
+          "value": 1.071,
+          "unit": "g/cm3"
+        },
+        {
+          "property": "glass_transition_temp",
+          "value": 249,
+          "unit": "K"
+        }
+      ],
+      "note": "Exact-SMILES, bulk neat PEO melt MD study directly comparable to this run's cell. Simulated Tg (249 K) exceeds the paper's own cited experimental range (158-233 K) and instead tracks a separately cited prior-MD value (~251 K) -- read as MD-vs-MD consistency, not tight agreement with experiment."
+    },
+    {
+      "doi": "10.1039/d4ra04898a",
+      "url": "https://doi.org/10.1039/d4ra04898a",
+      "title": "Thermophysical properties of polyethylene glycol oligomers via molecular dynamics simulations",
+      "year": 2024,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "GAFF",
+      "force_field_type": "All Atom",
+      "electrostatics": "pppm",
+      "ensemble": null,
+      "T_K": 328,
+      "P_atm": null,
+      "system_type": null,
+      "material_morphology": null,
+      "chain_length_or_mw": "oligomers n=2-7 (tetramer reported)",
+      "number_of_chains": null,
+      "reported_properties": [
+        {
+          "property": "density",
+          "value": 1143.3,
+          "unit": "kg/m3"
+        }
+      ],
+      "note": "This evidence-store record's stored claim text explicitly names GAFF as the force field used, but the same record's value.recommendation field says 'OPLS-AA' -- an internal data-quality inconsistency in the store, flagged here rather than silently propagated; the claim text is treated as authoritative. Short-chain oligomer study (n=2-7), not a bulk polymer melt at this run's DP=114 -- directionally informative only, not a tight morphology match."
+    }
+  ],
+  "generated_at": "2026-09-11T20:48:42.072661+00:00",
+  "plan_reviewed": "/home/alexzhao/PolyJarvis/data/PEG_1/raw/run_plan.json"
+}
