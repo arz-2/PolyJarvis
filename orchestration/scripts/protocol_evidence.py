@@ -632,6 +632,11 @@ def ingest_from_completed_run(run_name: str, *, repo_root: Path = REPO_ROOT,
     except (OSError, json.JSONDecodeError) as e:
         return {"status": "skipped", "reason": f"could not read run_plan.json: {e}"}
 
+    if plan.get("tg_sensitivity"):
+        # Its anchor's validated cache entry still exists, so without this a perturbed leg
+        # would be ingested as evidence for that entry under the leg's own run name.
+        return {"status": "skipped", "reason": "tg_sensitivity leg -- a perturbed protocol, not evidence"}
+
     smiles_raw = plan.get("smiles")
     if not smiles_raw:
         return {"status": "skipped", "reason": "no smiles in run_plan.json"}

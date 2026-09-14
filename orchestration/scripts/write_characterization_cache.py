@@ -65,13 +65,54 @@ def _canonicalize_or_none(smiles: str) -> Optional[str]:
         return None
 
 
-def _validated_properties(plan: dict, workflow_state: dict) -> set:
+REPORTABLE_VERDICTS = {
+    "tg_gate_verdict": {"TG_REPORTABLE"},
+    "bm_gate_verdict": {"BM_REPORTABLE", "BM_FALLBACK_DEFORM"},
+    "deform_gate_verdict": {"DEFORM_REPORTABLE"},
+}
+# Markers an accepted stage carries when it was accepted WITHOUT its binding gate passing:
+# an advisory-gate replicate, an operator unblocking a downstream track, or the recovery
+# agent's accept_with_caveat. Acceptance alone therefore does not prove the gate passed.
+NOT_REPORTABLE_MARKERS = ("gate_verdict_advisory", "tg_not_reportable", "recovery_caveat")
+
+
+def _accepted_outputs(run_dir: Optional[Path], record: dict) -> Optional[dict]:
+    attempt_id = record.get("accepted_attempt")
+    if run_dir is None or not attempt_id:
+        return None
+    stored = next((a.get("manifest") for a in record.get("attempts", ())
+                   if a.get("attempt_id") == attempt_id and a.get("manifest")), None)
+    try:
+        return json.loads(Path(stored).read_text()).get("outputs") or {}
+    except (OSError, TypeError, json.JSONDecodeError):
+        return None
+
+
+def _gate_passed(outputs: Optional[dict]) -> bool:
+    if outputs is None:
+        # No readable manifest: nothing proves the gate passed, and freezing is irreversible
+        # in effect (the next same-SMILES plan replays it), so fail closed.
+        return False
+    if any(outputs.get(marker) for marker in NOT_REPORTABLE_MARKERS):
+        return False
+    bm = outputs.get("bm_gate_verdict")
+    if bm == "BM_FALLBACK_DEFORM" and outputs.get("deform_gate_verdict") != "DEFORM_REPORTABLE":
+        return False
+    return all(outputs[key] in ok for key, ok in REPORTABLE_VERDICTS.items() if key in outputs)
+
+
+def _validated_properties(plan: dict, workflow_state: dict, run_dir: Optional[Path] = None) -> set:
     requested = set(plan.get("properties") or ())
     stages = workflow_state.get("stages", {})
-    return {
-        prop for prop, stage in STAGE_FOR_PROPERTY.items()
-        if prop in requested and stages.get(stage, {}).get("status") == "accepted"
-    }
+    validated = set()
+    for prop, stage in STAGE_FOR_PROPERTY.items():
+        record = stages.get(stage, {})
+        if prop not in requested or record.get("status") != "accepted":
+            continue
+        if run_dir is not None and not _gate_passed(_accepted_outputs(run_dir, record)):
+            continue
+        validated.add(prop)
+    return validated
 
 
 def _accepted_run_summary_results(run_dir: Path, workflow_state: dict) -> dict:
@@ -162,6 +203,12 @@ def write_characterization_cache(
     except (OSError, json.JSONDecodeError):
         return None
 
+    if plan.get("tg_sensitivity"):
+        # A benchmarks/tg_sensitivity leg is its anchor's protocol with one knob deliberately
+        # moved. Freezing it would overwrite the anchor SMILES' validated protocol with the
+        # perturbed one, and the next same-SMILES plan would replay the perturbation.
+        return None
+
     smiles = plan.get("smiles")
     if not smiles:
         return None
@@ -169,7 +216,7 @@ def write_characterization_cache(
     if canonical is None:
         return None
 
-    validated_properties = _validated_properties(plan, workflow_state)
+    validated_properties = _validated_properties(plan, workflow_state, run_dir)
     if not validated_properties:
         # WorkflowEngine.run() only returns status=="accepted" once every stage
         # enabled_stages() derives from plan["properties"] is itself accepted, so this branch

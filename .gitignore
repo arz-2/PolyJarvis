@@ -95,3 +95,6 @@ benchmarks/*/data/
 
 # Launcher PID files written by background campaign runs
 *.pid
+
+# Runtime lock files (filelock on the characterization cache)
+*.json.lock

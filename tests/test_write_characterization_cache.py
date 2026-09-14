@@ -30,7 +30,8 @@ def _write(path: Path, obj):
 
 def _make_run(tmp_path, run_name="RUN1", *, properties=("density", "tg", "bulk_modulus"),
               stage_status=None, effective_parameters=None, remedy_history=None,
-              accepted_attempt="attempt-0001", write_summary=True, smiles="*CC*"):
+              accepted_attempt="attempt-0001", write_summary=True, smiles="*CC*",
+              stage_outputs=None):
     run_dir = tmp_path / "data" / run_name
     plan = {
         "smiles": smiles,
@@ -51,7 +52,18 @@ def _make_run(tmp_path, run_name="RUN1", *, properties=("density", "tg", "bulk_m
     if stage_status:
         default_status.update(stage_status)
     stages = {name: {"status": status} for name, status in default_status.items()}
-    stages["summary"]["accepted_attempt"] = accepted_attempt
+    # Every accepted stage gets a real manifest, as WorkflowEngine._finish_attempt writes one:
+    # the writer reads the accepted attempt's gate verdict, not just the stage status.
+    outputs_by_stage = {"thermal": {"tg_gate_verdict": "TG_REPORTABLE"},
+                        "mechanical": {"bm_gate_verdict": "BM_REPORTABLE"}}
+    outputs_by_stage.update(stage_outputs or {})
+    for name, record in stages.items():
+        if record["status"] != "accepted":
+            continue
+        manifest = run_dir / "attempts" / name / accepted_attempt / "executor_state.json"
+        _write(manifest, {"status": "accepted", "outputs": outputs_by_stage.get(name, {})})
+        record["accepted_attempt"] = accepted_attempt
+        record["attempts"] = [{"attempt_id": accepted_attempt, "manifest": str(manifest)}]
 
     workflow_state = {
         "stages": stages,
@@ -89,6 +101,39 @@ def test_partial_stage_acceptance_excludes_unaccepted_property(tmp_path):
     entry = wcc.write_characterization_cache("RUN2", repo_root=tmp_path, cache_path=cache_path)
     assert entry["protocol_validated"] is True
     assert entry["validated_properties"] == ["bulk_modulus", "density"]
+    assert "tg" not in entry["validated_properties"]
+
+
+@pytest.mark.parametrize("thermal_outputs", [
+    {"tg_gate_verdict": "TG_REVIEW"},
+    {"tg_gate_verdict": "TG_REVIEW",
+     "gate_verdict_advisory": {"code": "TG_REVIEW", "would_have_blocked": True}},
+    {"tg_gate_verdict": "TG_REVIEW", "tg_not_reportable": {"verdict": "TG_REVIEW"}},
+    {"tg_gate_verdict": "TG_NOT_REPORTABLE",
+     "recovery_caveat": {"code": "TG_NOT_REPORTABLE", "reportable": False}},
+])
+def test_an_accepted_stage_whose_gate_did_not_pass_is_not_validated(tmp_path, thermal_outputs):
+    """aPS_3 and iPMMA_1 (2026-09-11/13) froze tg as validated with TG_REVIEW: the stage was
+    accepted -- by the advisory switch, and by an operator -- without its gate passing."""
+    _make_run(tmp_path, "RUNV", stage_outputs={"thermal": thermal_outputs})
+    entry = wcc.write_characterization_cache("RUNV", repo_root=tmp_path,
+                                             cache_path=tmp_path / "cache.json")
+    assert entry["validated_properties"] == ["bulk_modulus", "density"]
+
+
+def test_a_bm_fallback_needs_its_deform_verdict_to_pass(tmp_path):
+    _make_run(tmp_path, "RUNB", stage_outputs={"mechanical": {
+        "bm_gate_verdict": "BM_FALLBACK_DEFORM", "deform_gate_verdict": "DEFORM_INADMISSIBLE"}})
+    entry = wcc.write_characterization_cache("RUNB", repo_root=tmp_path,
+                                             cache_path=tmp_path / "cache.json")
+    assert "bulk_modulus" not in entry["validated_properties"]
+
+
+def test_an_unreadable_accepted_manifest_fails_closed(tmp_path):
+    run_dir, _, _ = _make_run(tmp_path, "RUNM")
+    (run_dir / "attempts" / "thermal" / "attempt-0001" / "executor_state.json").unlink()
+    entry = wcc.write_characterization_cache("RUNM", repo_root=tmp_path,
+                                             cache_path=tmp_path / "cache.json")
     assert "tg" not in entry["validated_properties"]
 
 
@@ -173,6 +218,19 @@ def test_missing_run_plan_writes_nothing(tmp_path):
     cache_path = tmp_path / "cache.json"
     entry = wcc.write_characterization_cache("NEVER_RAN", repo_root=tmp_path, cache_path=cache_path)
     assert entry is None
+
+
+def test_a_tg_sensitivity_leg_never_freezes_its_perturbed_protocol(tmp_path):
+    run_dir, plan, _ = _make_run(tmp_path, "tg_sensitivity/TGS_PLLA_1_L3_r50", properties=("tg",))
+    plan["tg_sensitivity"] = {"leg": "L3", "anchor": "PLLA_1"}
+    _write(run_dir / "raw" / "run_plan.json", plan)
+    cache_path = tmp_path / "cache.json"
+
+    entry = wcc.write_characterization_cache("tg_sensitivity/TGS_PLLA_1_L3_r50",
+                                             repo_root=tmp_path, cache_path=cache_path)
+
+    assert entry is None
+    assert not cache_path.exists()
 
 
 def test_real_cache_file_was_actually_invalidated_by_the_equilibration_redesign():
