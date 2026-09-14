@@ -304,7 +304,7 @@ def detect_anomalous_points(volumes_sorted, pressures_atm_sorted, vol_stds_sorte
 
 
 def select_stable_window(volumes_sorted, pressures_sorted_GPa, pressures_atm_sorted,
-                          anomalous_flags, min_points=5, b0_plateau_pct=5.0,
+                          anomalous_flags, min_points=4, b0_plateau_pct=5.0,
                           r2_acceptable=0.999, r2_improvement_eps=1e-4):
     """Search trimmed sub-windows of the full sorted ladder (dropping points from
     the tension/low-pressure end first, then the compression/high-pressure end --
@@ -338,6 +338,21 @@ def select_stable_window(volumes_sorted, pressures_sorted_GPa, pressures_atm_sor
     genuinely good points should barely move the answer).
     """
     n = len(volumes_sorted)
+    # min_points is the FLOOR on a fitted window, and Murnaghan has three free
+    # parameters (B0, B0_prime, V0), so 4 points is the smallest window carrying any
+    # residual degree of freedom -- the same floor detect_anomalous_points uses for its
+    # dV/dP heuristic (`if n >= 4` above).
+    #
+    # It was 5 until 2026-09-10, which silently disabled this entire function for the
+    # ladder size every run in the benchmark uses: with n=5, max_trim = n - min_points = 0,
+    # so the untrimmed window was the ONLY candidate ever fitted and both "no trim improved
+    # r_squared" and plateau_confirmed=True were vacuous. sPVC_1 is what that cost -- its
+    # -1000 atm point had cavitated (relaxation 169 frames vs 2.9-4.9, n_eff 29 vs 510-869,
+    # |dV/dP| 3.97 vs a 1.17 median) and the untrimmed r_squared of 0.998617 sits BELOW
+    # r2_acceptable, so the search below would have run and found the trim -- it just had
+    # nothing to search. Dropping that point moves B0 2.5446 -> 3.1975 GPa and brings the
+    # Murnaghan fit within 3% of the independent fluctuation K, against 22% untrimmed.
+    #
     # Never require more points than exist -- with only 3-4 points to begin with
     # (the script's own minimum), the full window is the only option and must
     # still be evaluated on its own already-known fit, not marked unconverged.
@@ -415,11 +430,22 @@ def select_stable_window(volumes_sorted, pressures_sorted_GPa, pressures_atm_sor
     if not improved:
         selected = dict(full_window) if full_window is not None else dict(
             sorted(good, key=lambda c: -(c["r_squared"] if c["r_squared"] is not None else -1))[0])
-        selected["plateau_confirmed"] = True
-        selected["selection_note"] = (
-            f"No trim improved r_squared over the untrimmed fit (r_squared={baseline_r2:.5f}) "
-            "-- keeping all points."
-        )
+        if max_trim == 0:
+            # No trimmed window EXISTS at this ladder size, so nothing was searched. Saying
+            # "no trim improved the fit" here would report a search that never ran, and
+            # plateau_confirmed would assert a stability nothing tested. Report unknown.
+            selected["plateau_confirmed"] = None
+            selected["selection_note"] = (
+                f"Ladder has {n} points and min_points={min_points}, so no trimmed window "
+                "exists -- the untrimmed fit is the only candidate. This is NOT evidence of "
+                "a stable window; plateau_confirmed is unknown, not True."
+            )
+        else:
+            selected["plateau_confirmed"] = True
+            selected["selection_note"] = (
+                f"No trim improved r_squared over the untrimmed fit "
+                f"(r_squared={baseline_r2:.5f}) -- keeping all points."
+            )
         return selected
 
     improved_excluding_flags = [c for c in improved if flagged_idx <= c["excluded_idx"]]
@@ -705,6 +731,34 @@ def main():
             "excluded_points and the murnaghan_eos.png plot."
         )
 
+    # Leave-one-out, re-scoped to the points the REPORTED fit actually uses.
+    #
+    # LOO above runs on the untrimmed ladder, and that is what lets it FIND a contaminated
+    # point at all -- keep it. But the convergence verdict below is a statement about the fit
+    # being reported, and that fit has already had the bad point removed. Counting the excluded
+    # point's own dB0 against it reports the screening's SUCCESS as the fit's instability.
+    #
+    # sPVC_1 (2026-09-10) is the worked example: its -1000 atm point had cavitated (relaxation
+    # 169 frames against 2.9-4.9, n_eff 29 against 510-869). Dropping it moved B0 by 25.7%,
+    # raised r_squared 0.998617 -> 0.999887, and brought the Murnaghan fit within 2.9% of the
+    # independent fluctuation modulus instead of 22% out. The screening correctly excluded it --
+    # and the ladder was still stamped BM_LADDER_NOT_CONVERGED / loo_unstable on the strength of
+    # that same 25.7%, i.e. on the evidence that justified the trim.
+    #
+    # Caveat kept explicit rather than papered over: each retained-point refit still CONTAINS the
+    # excluded point, and the baseline is the untrimmed B0, so this is not a clean LOO of the
+    # trimmed window (with 3 free parameters, a 4-point window's LOO has no residual degrees of
+    # freedom at all). It answers the weaker but well-posed question actually being asked: among
+    # the points the reported fit keeps, does any single one dominate the answer.
+    excluded_pressures = {pressures_atm_sorted[i] for i in excluded_idx}
+    loo_max_dB0_pct_retained = None
+    if loo_results and B0_GPa:
+        retained_deltas = [abs(r["dB0_GPa_vs_baseline"]) for r in loo_results
+                           if r.get("dB0_GPa_vs_baseline") is not None
+                           and r.get("dropped_pressure_atm") not in excluded_pressures]
+        if retained_deltas:
+            loo_max_dB0_pct_retained = max(retained_deltas) / abs(B0_GPa) * 100
+
     # Primary (screened) fit values -- these become the top-level result.
     primary_converged = window["converged"]
     primary_B0_GPa = window["B0_GPa"]
@@ -716,7 +770,9 @@ def main():
 
     if primary_converged:
         convergence = assess_ladder_convergence(
-            window.get("plateau_confirmed"), loo_max_dB0_pct, primary_B0_prime
+            window.get("plateau_confirmed"),
+            loo_max_dB0_pct if loo_max_dB0_pct_retained is None else loo_max_dB0_pct_retained,
+            primary_B0_prime
         )
     else:
         convergence = {"bm_convergence_verdict": None, "bm_convergence_reasons": [],
@@ -835,6 +891,9 @@ def main():
         "loo_results": loo_results,
         "loo_n_converged": loo_n_converged,
         "loo_max_dB0_pct": round(loo_max_dB0_pct, 2) if loo_max_dB0_pct is not None else None,
+        # What the convergence verdict is actually computed on when screening trimmed a point.
+        "loo_max_dB0_pct_retained": (round(loo_max_dB0_pct_retained, 2)
+                                     if loo_max_dB0_pct_retained is not None else None),
         "bm_convergence_verdict": convergence["bm_convergence_verdict"],
         "bm_convergence_reasons": convergence["bm_convergence_reasons"],
         "bm_convergence_confidence": convergence["bm_convergence_confidence"],

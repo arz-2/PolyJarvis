@@ -367,6 +367,30 @@ def main():
         K_val = K_sem = K_method = None
     K_temp = bulk_murnaghan.get("temperature_K") if K_method == "murnaghan" else None
 
+    # A stage can be ACCEPTED while its property is not reportable: an advisory-gate replicate,
+    # an operator unblocking a downstream track, or the recovery agent's accept_with_caveat.
+    # value_K / value_GPa are read by path (track_registry summary_path, the characterization
+    # cache, the radonpy accuracy scorer) and none of them checks a verdict, so the number is
+    # withheld from the value field itself and carried under `withheld`. A missing verdict key
+    # is a pre-gate artifact and keeps its value.
+    tg_verdict = tg.get("tg_gate_verdict")
+    tg_withheld = None
+    if tg_verdict is not None and tg_verdict != "TG_REPORTABLE" and Tg_val is not None:
+        tg_withheld = {"value_K": Tg_val, "gate_verdict": tg_verdict}
+        Tg_val = None
+    if K_method == "murnaghan":
+        K_verdict = bulk_murnaghan.get("bm_gate_verdict")
+        K_ok = K_verdict in (None, "BM_REPORTABLE")
+    elif K_method == "deformation":
+        K_verdict = bulk_deform.get("deform_gate_verdict")
+        K_ok = K_verdict in (None, "DEFORM_REPORTABLE")
+    else:
+        K_verdict, K_ok = None, True
+    K_withheld = None
+    if not K_ok:
+        K_withheld = {"value_GPa": K_val, "gate_verdict": K_verdict}
+        K_val = None
+
     # -----------------------------------------------------------------------
     # Artifact pointers (relative to data/[RUN]/)
     # -----------------------------------------------------------------------
@@ -472,6 +496,16 @@ def main():
                 # headline Tg is not graded silently — treat the value as unreliable when set.
                 "primary_fit_invalid": tg.get("primary_fit_invalid", False),
                 "n_replicates":        args.n_replicates,
+                # Half-width of the fitted transition. A Tg quoted without this is missing its
+                # own resolution: the hyperbola model smears the transition over roughly +/- c,
+                # and when c is comparable to the Tg itself the single number is a crossover
+                # point on a broad curve rather than a sharp transition. iPMMA_1 (2026-09-11)
+                # fits c = 113.8 K, which is also why its two estimators disagree by 44 K and
+                # trip the fixed 20 K method_gap bar.
+                "transition_width_c_K": tg.get("transition_width_c_K"),
+                "tg_uncertainty_K":     tg.get("tg_uncertainty_K"),
+                "gate_verdict":         tg_verdict,
+                "withheld":             tg_withheld,
             },
             "density": {
                 "value_g_cm3":    rho_val,
@@ -501,6 +535,8 @@ def main():
                 # at. Only the Murnaghan extractor records it; the deform path has no
                 # equivalent yet, so this is None there.
                 "temperature_K":  K_temp,
+                "gate_verdict":   K_verdict,
+                "withheld":       K_withheld,
             },
         },
         # Measurements this run produced without being asked for -- a Tg request already computes
