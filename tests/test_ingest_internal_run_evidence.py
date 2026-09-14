@@ -210,17 +210,29 @@ def test_ingest_skips_when_run_plan_missing(tmp_path):
     assert result["status"] == "skipped"
 
 
-def test_ingest_skips_a_tg_sensitivity_leg_even_with_a_validated_anchor_entry(tmp_path):
-    run_dir = tmp_path / "data" / "tg_sensitivity" / "TGS_PLLA_1_L3_r50"
+def test_a_tg_sensitivity_leg_is_not_ingested_as_protocol_evidence(tmp_path):
+    """A leg's perturbed protocol is not evidence for the anchor's validated entry.
+
+    The leg shares its anchor's SMILES, so the anchor's validated cache entry is present and
+    the ingest would otherwise happily attribute the leg's deliberately-moved cooling rate to
+    it -- under the leg's own run name, which reads like an independent internal validation.
+    That is the opposite of what the sensitivity legs are for.
+    """
+    run_name = "tg_sensitivity/TGS_PLLA_1_L3_r50"
+    run_dir = tmp_path / "data" / run_name
     (run_dir / "raw").mkdir(parents=True)
-    (run_dir / "raw" / "run_plan.json").write_text(json.dumps(
-        {"smiles": PMMA_SMILES, "tg_sensitivity": {"leg": "L3", "anchor": "PLLA_1"}}))
+    (run_dir / "raw" / "run_plan.json").write_text(json.dumps({
+        "smiles": PMMA_SMILES,
+        "tg_sensitivity": {"leg": "L3", "anchor": "PLLA_1",
+                           "override": {"tg_rate_K_per_ns": 50}},
+    }))
     cache_path = tmp_path / "system_characterization_cache.json"
     cache_path.write_text(json.dumps({PMMA_SMILES: VALIDATED_ENTRY}))
     ff_store = tmp_path / "protocol_evidence_ff.json"
 
-    result = pe.ingest_from_completed_run("tg_sensitivity/TGS_PLLA_1_L3_r50", repo_root=tmp_path,
-                                          cache_path=cache_path, ff_store_path=ff_store)
+    result = pe.ingest_from_completed_run(
+        run_name, repo_root=tmp_path, cache_path=cache_path, ff_store_path=ff_store)
 
     assert result["status"] == "skipped"
-    assert not ff_store.exists()
+    assert "tg_sensitivity" in result["reason"]
+    assert not ff_store.exists(), "a sensitivity leg must not create the ff evidence store"

@@ -200,6 +200,40 @@ def _atomic_write(path: Path, value: dict) -> None:
     tmp.replace(path)
 
 
+def _already_validated_by_another_run(run_name: str, plan: dict,
+                                      cache_path: Optional[Path]) -> bool:
+    """True when this SMILES already carries a validated entry from a DIFFERENT run.
+
+    First writer wins. A replicate replays its anchor's frozen protocol, so re-freezing it
+    cannot improve the protocol -- it is identical by construction -- but it DOES overwrite
+    source_run_name, validated_at and simulated_properties with whichever replicate happened
+    to finish last. On 2026-09-13 that replaced PSU_1's validated Tg (481.3 K, GOOD) with
+    PSU_2's 401.1 K, a value the operator had explicitly annotated NOT REPORTABLE, and
+    replaced PEEK_1's with PEEK_3's. The entry is supposed to record the run that validated
+    it; per-replicate measurements live in each run's own run_summary.json and in the
+    campaign manifest, which is where replicate statistics belong.
+
+    Returns False when the existing entry names THIS run, so a re-freeze of the same run
+    (e.g. after a repair) still works.
+    """
+    path = Path(cache_path) if cache_path else CACHE_PATH_DEFAULT
+    if not path.exists():
+        return False
+    smiles = plan.get("smiles")
+    if not smiles:
+        return False
+    canonical = _canonicalize_or_none(smiles)
+    if canonical is None:
+        return False
+    try:
+        entry = (json.loads(path.read_text()) or {}).get(canonical) or {}
+    except (OSError, json.JSONDecodeError):
+        return False
+    return bool(entry.get("protocol_validated")
+                and entry.get("source_run_name")
+                and entry["source_run_name"] != run_name)
+
+
 def write_characterization_cache(
     run_name: str, *, repo_root: Path = REPO_ROOT, cache_path: Optional[Path] = None,
 ) -> Optional[dict]:
@@ -214,6 +248,9 @@ def write_characterization_cache(
         plan = json.loads((run_dir / "raw" / "run_plan.json").read_text())
         workflow_state = json.loads((run_dir / "workflow_state.json").read_text())
     except (OSError, json.JSONDecodeError):
+        return None
+
+    if _already_validated_by_another_run(run_name, plan, cache_path):
         return None
 
     if plan.get("tg_sensitivity"):

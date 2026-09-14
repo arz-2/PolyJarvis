@@ -262,3 +262,40 @@ def test_no_live_cache_entry_names_a_stage_the_registry_does_not_know():
             f"cache entry {smiles!r} (from run {entry.get('source_run_name')!r}) names "
             f"stage(s) {sorted(unknown)} that track_registry no longer knows -- it would "
             f"replay into a plan validate_run_plan rejects. Invalidate the entry.")
+
+
+def test_a_replicate_does_not_overwrite_the_run_that_validated_the_entry(tmp_path):
+    """First writer wins. A replicate replays the frozen protocol, so re-freezing cannot improve
+    it -- but it does overwrite source_run_name, validated_at and simulated_properties with
+    whichever replicate finished last. On 2026-09-13 that put PSU_2's Tg of 401.1 K, explicitly
+    annotated NOT REPORTABLE, into the entry PSU_1 had validated at 481.3 K."""
+    cache_path = tmp_path / "cache.json"
+    cache_path.write_text(json.dumps({"*CC*": {
+        "protocol_validated": True, "source_run_name": "PE_1",
+        "validated_properties": ["density", "tg", "bulk_modulus"],
+        "polymer_class": "PHYC",
+        "simulated_properties": {"tg": {"value_K": 234.2}},
+        "protocol": {"decided_params": {"preferred_ff": "trappe-ua"}, "decisions": [],
+                     "planned_stages": []},
+    }}))
+    _make_run(tmp_path, "PE_2", smiles="*CC*")
+
+    assert wcc.write_characterization_cache("PE_2", repo_root=tmp_path,
+                                            cache_path=cache_path) is None
+    entry = json.loads(cache_path.read_text())["*CC*"]
+    assert entry["source_run_name"] == "PE_1"
+    assert entry["simulated_properties"]["tg"]["value_K"] == 234.2
+
+
+def test_the_validating_run_can_still_refreeze_its_own_entry(tmp_path):
+    """The guard is first-writer-wins, not write-once: a repair or re-run of the SAME run must
+    still be able to update its own entry."""
+    cache_path = tmp_path / "cache.json"
+    cache_path.write_text(json.dumps({"*CC*": {
+        "protocol_validated": True, "source_run_name": "PE_1",
+        "validated_properties": ["density"], "polymer_class": "PHYC",
+        "protocol": {"decided_params": {}, "decisions": [], "planned_stages": []},
+    }}))
+    _make_run(tmp_path, "PE_1", smiles="*CC*")
+    assert wcc.write_characterization_cache("PE_1", repo_root=tmp_path,
+                                            cache_path=cache_path) is not None

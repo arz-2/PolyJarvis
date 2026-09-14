@@ -2644,6 +2644,13 @@ class CampaignStageExecutor:
             # which does not exist -- the comprehensive check then crashed and the gate
             # adjudicated on nothing. Same prior_attempts walk mechanical_resample_points uses.
             for prior in reversed(context.get("prior_attempts") or ()):
+                # An attempt the operator superseded (a branch-rerun re-pointed this stage at an
+                # earlier attempt) is history, not a carry-forward source: without this skip a
+                # continuation chains from the NEWEST prior restart, i.e. from the very segment
+                # being discarded. PE_3 (2026-09-13) had to branch its 0.5 ns continuation from
+                # cooling attempt-0001 past five superseded attempts.
+                if prior.get("superseded"):
+                    continue
                 manifest_path = prior.get("manifest")
                 if not manifest_path or not Path(manifest_path).is_file():
                     continue
@@ -2658,6 +2665,8 @@ class CampaignStageExecutor:
                     break
         if stage == "mechanical" and context["parameters"].get("mechanical_resample_points"):
             for prior in reversed(context.get("prior_attempts") or ()):
+                if prior.get("superseded"):
+                    continue
                 manifest_path = prior.get("manifest")
                 if not manifest_path or not Path(manifest_path).is_file():
                     continue
@@ -2701,6 +2710,8 @@ class CampaignStageExecutor:
                 args.npt_prod_log = cool.get("npt_prod_log_path")
         if stage == "equilibration" and context["parameters"].get("npt_continuation_ns"):
             for prior in reversed(context.get("prior_attempts") or ()):
+                if prior.get("superseded"):
+                    continue
                 manifest_path = prior.get("manifest")
                 if not manifest_path or not Path(manifest_path).is_file():
                     continue
@@ -2719,6 +2730,8 @@ class CampaignStageExecutor:
             # The cooling twin of the walk above. Separate keys, separate stage hash: a cooling
             # drift must not write equilibration-scoped parameters and re-melt on resume.
             for prior in reversed(context.get("prior_attempts") or ()):
+                if prior.get("superseded"):
+                    continue
                 manifest_path = prior.get("manifest")
                 if not manifest_path or not Path(manifest_path).is_file():
                     continue
@@ -2743,6 +2756,8 @@ class CampaignStageExecutor:
         resume_kind = cls.get("equilibration_resume_from")
         if stage == "equilibration" and resume_kind:
             for prior in reversed(context.get("prior_attempts") or ()):
+                if prior.get("superseded"):
+                    continue
                 manifest_path = prior.get("manifest")
                 if not manifest_path or not Path(manifest_path).is_file():
                     continue

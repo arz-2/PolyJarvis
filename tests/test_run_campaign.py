@@ -2888,3 +2888,31 @@ def test_the_gpu_claim_reaches_the_deck_not_the_resolver_default():
         assert 'p["gpu_ids"] = gpu_ids' in src, (
             f"{fn.__name__} resolves stage params before claiming, so p['gpu_ids'] is the "
             "hardware_policy default; the claimed ids must overwrite it inside the claim")
+
+
+def test_every_prior_attempts_walk_skips_superseded_attempts():
+    """A branch-rerun re-points a stage at an EARLIER attempt and marks the later ones superseded.
+
+    Every carry-forward in the executor -- the equilibration and cooling continuation restarts,
+    the prior nvt_melt_hold dump, the prior Murnaghan result -- walks prior_attempts newest-first
+    and takes the first match. Without a skip, a continuation launched after a branch chains from
+    the newest prior restart, which is precisely the segment the branch exists to discard. PE_3
+    (2026-09-13) had to take its 0.5 ns cooling continuation from attempt-0001 past five
+    superseded attempts, the newest of which carried a 0.6 ns agent-revised continuation.
+    Asserted on source order: the walks sit inside executor branches that need live MCP servers.
+    """
+    import inspect
+    import run_campaign
+
+    src = inspect.getsource(run_campaign.CampaignStageExecutor.execute)
+    loop = 'for prior in reversed(context.get("prior_attempts") or ()):'
+    walks = src.count(loop)
+    assert walks >= 4, f"expected the four prior_attempts walks, found {walks}"
+    at = 0
+    for _ in range(walks):
+        at = src.index(loop, at) + len(loop)
+        nxt = src.index("\n", src.index("\n", at) + 1)
+        window = src[at:src.index("\n", src.index('if prior.get("superseded"):', at)) + 1] \
+            if 'if prior.get("superseded"):' in src[at:at + 600] else ""
+        assert 'if prior.get("superseded"):' in src[at:at + 600], \
+            "a prior_attempts walk does not skip superseded attempts"
