@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-PolyJarvis is a deterministic polymer-simulation platform: scientific intent -> planning agent -> validated `run_plan.json` -> deterministic stage scripts (build, equilibration, thermal, mechanical, summary) -> recovery agent, invoked only on structured issues and capped at two calls. Code — not agent prompts — owns simulation files, parameter resolution, job submission, validation, recovery limits, and provenance. `orchestration/README.md` lists what each script in `orchestration/scripts/` owns. Entry points: `orchestration/scripts/agent_api.py` (contract), `orchestration/scripts/scientific_control.py` (plan -> execute -> conditional recovery), `orchestration/scripts/run_campaign.py` (resumable single-stage or full execution).
+PolyJarvis is a deterministic polymer-simulation platform: scientific intent -> planning agent -> validated `run_plan.json` -> deterministic stage scripts (build, equilibration, thermal, mechanical, summary) -> recovery agent, invoked only on structured issues, deciding autonomously within a fixed budget (`MAX_AGENT_DECISIONS`, per-stage cap; exhaustion ends the run with `terminated_by`). Code — not agent prompts — owns simulation files, parameter resolution, job submission, validation, recovery limits, and provenance. `orchestration/README.md` lists what each script in `orchestration/scripts/` owns. Entry points: `orchestration/scripts/agent_api.py` (contract), `orchestration/scripts/scientific_control.py` (plan -> execute -> conditional recovery), `orchestration/scripts/run_campaign.py` (resumable single-stage or full execution).
 
 This is a from-scratch rewrite (branch `refactor/deterministic-control-plane`). The prior multi-agent worker-prompt implementation and the manuscript archive exist only in Git history on `main` and in the sibling worktree — do not assume `.claude/agents/`, stage-worker markdown files, or agent-owned run state from that era apply here.
 
@@ -26,12 +26,13 @@ adjudicates via two headless `claude -p` calls that reuse `.claude/agents/litera
 and `SKILL.md` step 5 verbatim, materializes, and executes through `agent_api.py` with the
 usual inner recovery. Add `--no-llm` for the deterministic arm, `--dry-run` to stop before
 execution, `--resume` to pick up (also automatic). Exit codes are in
-`orchestration/langgraph/state.py`; `escalation_required` (2) and `failed` (3) are terminal
-and need a human, `deadline_exceeded` (4) is resumable.
+`orchestration/langgraph/state.py`; `escalation_required` (2, the no-agent arm) and `failed`
+(3; `workflow_state.json.terminated_by` says whether the agent or its spent budget closed it) are
+terminal, `deadline_exceeded` (4) is resumable.
 
-Three things worth knowing before changing it: the graph is a DAG and must stay one (both
-recovery-agent calls are already spent when `escalation_required` comes back, so re-entering
-only re-burns GPU time); every path into execution — resume and cache-hit included — must pass
+Three things worth knowing before changing it: the graph is a DAG and must stay one (the engine's
+agent budget is already spent when a terminal status comes back, so re-entering only re-burns
+GPU time); every path into execution — resume and cache-hit included — must pass
 the cost guard, and `cost_estimate.total_gpu_hours` is a documented *lower* bound; and a cache
 hit skips `materialize` for correctness, not speed, because `materialize_plan` would re-solve
 the cell and overwrite the frozen protocol it just replayed.

@@ -35,7 +35,8 @@ from analysis_utils import estimate_fluctuation_K_GPa  # noqa: E402
 from rules_common import load_rules, get_class_entry, resolve_member_value  # noqa: E402
 from protocol_policy import select_pressure_ladder  # noqa: E402
 from workflow_engine import (  # noqa: E402
-    Finding, StageResult, WorkflowEngine, atomic_write_json, pressure_point_drop_allowed,
+    Finding, StageResult, WorkflowEngine, atomic_write_json, gates_advisory,
+    pressure_point_drop_allowed,
 )
 from validate_run_plan import validate_plan  # noqa: E402
 from scientific_control import validate_overrides  # noqa: E402
@@ -1454,6 +1455,24 @@ def _run_equilibration_gate(lammps, p: dict, backbone_types, json_name: str, lab
     return comp, density, verdict, comprehensive_json
 
 
+def _cool_measurements(p: dict, density: dict, cooling_json, cool_verdict) -> dict:
+    """The assessment-cell measurements, carried on every exit from the cooling gate.
+
+    The PASS branch returned density_gcm3/cooling_json_path/npt_prod_log_path and the EXTEND
+    and terminal-FAIL branches did not -- harmless while a halt ended the run, and wrong the
+    moment POLYJARVIS_GATES_ADVISORY=1 let a halted stage be ACCEPTED. do_summary then found
+    no cooling_json_path, fell through `cooling_path or melt_equilibration_path`, and recorded
+    the MELT density as the run's density: sPVC_2 reported 1.171 g/cm3 at 571 K where every
+    other run reports the 300 K glass. The cell was assessed either way -- cooling.json was
+    written and the plateau density measured before the verdict was read -- so the measurement
+    is real regardless of the verdict, and cool_verdict rides along telling the truth about it.
+    """
+    return {"cool_verdict": cool_verdict,
+            "npt_prod_log_path": p["npt_prod_log_path"],
+            "density_gcm3": (density or {}).get("plateau_density_mean"),
+            "cooling_json_path": cooling_json}
+
+
 def do_cool_and_check(args, cls: dict, lammps) -> dict:
     """Cool the gated melt to final_T_K and adjudicate the assessment cell.
 
@@ -1556,7 +1575,8 @@ def do_cool_and_check(args, cls: dict, lammps) -> dict:
                         "npt_prod_data_path": p["npt_prod_data_path"],
                         "npt_prod_dump_path": npt_prod_dump_path,
                         "npt_prod_restart_path": npt_prod_restart_path,
-                        "stage_checkpoints": stage_checkpoints}
+                        "stage_checkpoints": stage_checkpoints,
+                        **_cool_measurements(p, density, cooling_json, cool_verdict)}
             attempts += 1
             if attempts > EXTEND_MAX_ATTEMPTS:
                 return {"halted": True, "reason": "EXTEND_EXHAUSTED",
@@ -1585,7 +1605,11 @@ def do_cool_and_check(args, cls: dict, lammps) -> dict:
             continue
 
         return {"halted": True, "reason": cool_verdict, "detail": verdict,
-                "stage_checkpoints": stage_checkpoints}
+                "npt_prod_data_path": p["npt_prod_data_path"],
+                "npt_prod_dump_path": npt_prod_dump_path,
+                "npt_prod_restart_path": npt_prod_restart_path,
+                "stage_checkpoints": stage_checkpoints,
+                **_cool_measurements(p, density, cooling_json, cool_verdict)}
 
 
 # ─── Stage: thermal track ──────────────────────────────────────────────────
@@ -1715,6 +1739,13 @@ def do_thermal(args, cls: dict, lammps, melt_density_gcm3=None) -> dict:
         p = resolve_stage_params("tg", args, cls)
         with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
             args.gpu_ids = gpu_ids
+            # The claim is the authority on which card this stage runs on. `p` was resolved
+            # BEFORE the claim, so p["gpu_ids"] is either the hardware_policy default ("0" for
+            # a 1-GPU class) on a process that starts at this stage, or the PREVIOUS stage's
+            # claim leaking through the shared args object. Both reached the deck ahead of the
+            # ledger: iPMMA_1's mechanical resume on 2026-09-11 held GPU 1 and ran on GPU 0,
+            # on top of PLLA_2, while GPU 1 sat idle.
+            p["gpu_ids"] = gpu_ids
             # No bracketing, no reheat probe, no waypoint selection: the staircase starts from
             # the cell the melt gate passed, at the temperature that gate certified.
             start_cell = {"outcome": "MELT_HOLD_START",
@@ -2123,6 +2154,7 @@ def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: 
         for point_attempt in range(1, 3):
             with gpu_claim(args.run_name, gpu_per_run) as gpu_ids:
                 args.gpu_ids = gpu_ids
+                p["gpu_ids"] = gpu_ids   # see _run_tg_sweep_adaptive's claim: the ledger wins
                 series = lammps.run_bulk_modulus_series(
                     data_file=p["equil_data_path"],
                     work_dir=f"{p['work_dir']}/bm_series/p_{pressure:g}/attempt_{point_attempt}",
@@ -2509,6 +2541,42 @@ def _print_dry_run(args, cls: dict, properties: set):
 
 # ─── In-process engine adapter and CLI ──────────────────────────────────────
 
+# Halt reasons that are a GATE'S VERDICT about the cell, not a failure of execution. Only
+# these are demotable to advisory; everything else (MINIMIZE_NOT_CONVERGED, BUILD_CELL_INVALID,
+# BACKBONE_TYPES_UNRESOLVED, PROCESS_DEAD_NO_SENTINEL, FF_PROVENANCE_ZERO_SUBSTITUTED) reports
+# that the stage could not be executed, and no campaign mode makes it sensible to continue past
+# one.
+_ADVISORY_HALT_REASONS = frozenset({
+    "EXTEND", "EXTEND_EXHAUSTED", "FAIL", "STRUCTURAL_FAIL",
+})
+
+
+def _demote_gate_halt(outputs: dict) -> dict:
+    """Turn a gate's halt into a recorded verdict the run carries on past.
+
+    Returns outputs unchanged unless advisory mode is on AND the halt is a gate verdict rather
+    than a failure to execute the stage.
+    """
+    if not outputs or not outputs.get("halted"):
+        return outputs
+    reason = outputs.get("reason") or "STRUCTURAL_FAIL"
+    if not (_gates_advisory() and reason in _ADVISORY_HALT_REASONS):
+        return outputs
+    return {**outputs, "halted": False,
+            "gate_verdict_advisory": {
+                "reason": reason,
+                "would_have_halted": True,
+                "detail": outputs.get("detail") or {},
+                "note": ("POLYJARVIS_GATES_ADVISORY=1: verdict recorded, stage accepted, "
+                         "protocol unchanged"),
+            }}
+
+
+# One definition, shared with the engine layer -- see workflow_engine.gates_advisory for why
+# both layers must read it.
+_gates_advisory = gates_advisory
+
+
 class CampaignStageExecutor:
     """Adapt the deterministic simulation functions to :class:`WorkflowEngine`.
 
@@ -2676,7 +2744,7 @@ class CampaignStageExecutor:
             if stage == "build":
                 outputs = do_build(args, cls, self.emc, self.lammps)
             elif stage == "equilibration":
-                outputs = do_equil_and_check(args, cls, self.lammps)
+                outputs = _demote_gate_halt(do_equil_and_check(args, cls, self.lammps))
                 if outputs.get("halted"):
                     code = outputs.get("reason") or "STRUCTURAL_FAIL"
                     detail = outputs.get("detail") or {}
@@ -2709,7 +2777,7 @@ class CampaignStageExecutor:
                                                 details=detail),),
                                        self._artifacts(attempt_dir), outputs)
             elif stage == "cooling":
-                outputs = do_cool_and_check(args, cls, self.lammps)
+                outputs = _demote_gate_halt(do_cool_and_check(args, cls, self.lammps))
                 if outputs.get("halted"):
                     code = outputs.get("reason") or "STRUCTURAL_FAIL"
                     detail = outputs.get("detail") or {}
@@ -2776,9 +2844,11 @@ class CampaignStageExecutor:
                 details["nchain"] = cls.get("nchain")
             return StageResult("failed", (Finding(code, stage, details=details),),
                                self._artifacts(attempt_dir))
+        outputs = _demote_gate_halt(outputs) if outputs else outputs
         if outputs and outputs.get("halted"):
             details = outputs.get("detail") or {}
-            finding = Finding(outputs.get("reason") or "STAGE_HALTED", stage,
+            reason = outputs.get("reason") or "STAGE_HALTED"
+            finding = Finding(reason, stage,
                               confidence=details.get("remedy_confidence", "high"),
                               details=details)
             return StageResult("escalation_required", (finding,),

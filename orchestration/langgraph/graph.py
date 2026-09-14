@@ -4,13 +4,13 @@
 That is the single most important structural fact here, so it is worth stating plainly.
 It is tempting to loop execute -> recover -> execute, and it would be wrong.
 `agent_escalations` is a RUN-GLOBAL list in workflow_state.json, and
-WorkflowEngine._escalate returns early the moment it reaches MAX_AGENT_DECISIONS. So by
-the time WorkflowEngine.run() hands back `escalation_required`, both agent calls are
-already spent and recorded. Re-entering resume_campaign would re-execute the failing stage
+WorkflowEngine._escalate consults the agent inside its own budget and, with an agent
+configured, ends the run itself (`failed` + terminated_by) when that budget is spent. So by
+the time WorkflowEngine.run() hands back a terminal status, every agent call it was going to
+make is already spent and recorded. Re-entering resume_campaign would re-execute the failing stage
 -- real GPU hours -- and then escalate-fail again against the same exhausted cap. The
 engine's own `while True` IS the retry/remedy loop; a second loop around it buys nothing
-and costs hardware. `escalation_required` and `failed` are terminal, and a run that reaches
-them needs a human.
+and costs hardware. `escalation_required` (no agent) and `failed` are terminal.
 
 Every node is wrapped by @_node, which short-circuits once a terminal status is set and
 checks the deadline first. That means each conditional edge is the same one-liner rather

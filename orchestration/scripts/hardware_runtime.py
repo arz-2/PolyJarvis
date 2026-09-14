@@ -99,24 +99,62 @@ def detect_phys_cores() -> int:
     return _phys_cores_probe()
 
 
+def _compute_mem_by_uuid() -> dict[str, int]:
+    """MiB held by CUDA *compute* processes, per GPU uuid.
+
+    memory.used counts the desktop too. On this workstation GPU 3 drives the display: Xorg
+    (64 MiB) plus gnome-shell (711 MiB) = 802 MiB against an IDLE_MEM_MB of 800, so the only
+    card with no compute work on it was the one card free_gpus() would never return -- PLLA_3's
+    first equilibration claim failed with `available: []` while GPU 3 sat at 0% utilisation.
+    Graphics memory is not contention for a LAMMPS run; a resident compute process is.
+    """
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-compute-apps=gpu_uuid,used_memory",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=15,
+        ).stdout
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return {}
+    per: dict[str, int] = {}
+    for line in out.strip().splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) >= 2:
+            try: per[parts[0]] = per.get(parts[0], 0) + int(parts[1])
+            except ValueError: continue
+    return per
+
+
 def gpu_status() -> list[dict]:
-    """Return [{index, util, mem_used_mb}] from nvidia-smi, or [] if unavailable."""
+    """Return [{index, util, mem_used_mb, compute_mem_mb}] from nvidia-smi, or [] if unavailable.
+
+    mem_used_mb is the card total (what a human wants to see); compute_mem_mb excludes the
+    desktop and is what free_gpus() gates on -- see _compute_mem_by_uuid.
+    """
     try:
         out = subprocess.run(
             ["nvidia-smi",
-             "--query-gpu=index,utilization.gpu,memory.used",
+             "--query-gpu=index,utilization.gpu,memory.used,uuid",
              "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=15,
         ).stdout
     except (FileNotFoundError, subprocess.SubprocessError):
         return []
+    compute = _compute_mem_by_uuid()
     gpus = []
     for line in out.strip().splitlines():
         parts = [p.strip() for p in line.split(",")]
-        if len(parts) >= 3:
+        if len(parts) >= 4:
+            uuid = parts[3]
             gpus.append({"index": int(parts[0]),
                          "util": int(parts[1]),
-                         "mem_used_mb": int(parts[2])})
+                         "mem_used_mb": int(parts[2]),
+                         "uuid": uuid,
+                         # No compute-apps line for this card => no compute process => 0.
+                         # If the query itself failed, `compute` is empty and every card reads
+                         # 0 -- so fall back to the card total rather than call them all free.
+                         "compute_mem_mb": (compute.get(uuid, 0) if compute
+                                            else int(parts[2]))})
     return gpus
 
 
@@ -218,7 +256,7 @@ def free_gpus() -> list[int]:
     for g in gpu_status():
         if g["index"] in claimed:
             continue
-        if g["util"] <= IDLE_UTIL and g["mem_used_mb"] <= IDLE_MEM_MB:
+        if g["util"] <= IDLE_UTIL and g.get("compute_mem_mb", g["mem_used_mb"]) <= IDLE_MEM_MB:
             free.append(g["index"])
     return free
 

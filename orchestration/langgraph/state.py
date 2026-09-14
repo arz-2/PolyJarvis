@@ -69,8 +69,10 @@ class RunState(TypedDict, total=False):
 # `escalation_required` and `failed` are TERMINAL, not retryable, and that is the single
 # most important fact about this graph. agent_escalations is a run-global list in
 # workflow_state.json and WorkflowEngine._escalate returns early once it reaches
-# MAX_AGENT_DECISIONS, so by the time run() hands back `escalation_required` both agent
-# calls are already spent. Re-entering resume_campaign would re-execute the failing stage --
+# its budget (MAX_AGENT_DECISIONS, MAX_AGENT_DECISIONS_PER_STAGE). With an agent configured
+# the engine never returns `escalation_required` -- it re-asks on a refused decision and ends
+# the run as `failed` (+ terminated_by) when the budget is spent; without one (the --no-llm
+# arm) `escalation_required` means no agent was there to ask. Re-entering resume_campaign would re-execute the failing stage --
 # real GPU time -- and then escalate-fail again against the same exhausted cap. The engine's
 # own loop is the retry loop; wrapping a second one around it only burns hardware.
 EXIT_CODES: dict[str, int] = {

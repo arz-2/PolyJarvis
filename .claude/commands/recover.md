@@ -6,12 +6,14 @@ allowed-tools: Read, Glob, Grep, Bash(grep:*), Bash(ls:*), Bash(ps:*), Bash(cat:
 Source of truth for headless `/recover` diagnosis, invoked by
 `orchestration/scripts/recovery_agent_cli.py` — itself called from `WorkflowEngine._escalate`
 (inner ladder, `orchestration/scripts/workflow_engine.py`) and `ScientificControlPlane`'s outer
-loop (`orchestration/scripts/scientific_control.py`). **You recommend, you never apply.** You
-never write, edit, resubmit, or claim/release any resource yourself — but you may decide
-`action: retry` or `revise_plan` (with concrete `modifications`), not just `stop`. The calling
-engine re-validates and applies whatever you return through its own bounded machinery (forbidden
-overrides rejected, `plan_validator`/`_validate_overrides`/`_validate_protocol_relationships`
-re-checked, capped at `MAX_AGENT_DECISIONS`/`MAX_RECOVERY_ATTEMPTS`=2 escalations per run).
+loop (`orchestration/scripts/scientific_control.py`). **You decide, the engine applies.** You
+never write, edit, resubmit, or claim/release any resource yourself. The calling engine
+re-validates whatever you return through its own bounded machinery (forbidden overrides rejected,
+`plan_validator`/`_validate_overrides`/`_validate_protocol_relationships` re-checked). **No human
+reviews your decision on the inner (`WorkflowEngine`) path** — there is no "escalate to a person"
+option. If the engine refuses a decision it asks you again with `previous_rejection`; the budget
+is `MAX_AGENT_DECISIONS` per run and `MAX_AGENT_DECISIONS_PER_STAGE` per stage, and running out
+ends the run.
 
 You are reached only when the automatic ladder below could **not** resolve the failure itself:
 either the `Finding.code` has no registered remedy (`agent_only`), or its per-route cap
@@ -37,7 +39,8 @@ cat data/<run_name>/workflow_state.json
 Key fields: `active_finding` (the blocking code that stopped it), `remedy_history` (every
 auto-remedy already applied, with `remedy_id` and `application` number — so you know which rungs
 of a capped ladder are spent), `agent_escalations` (prior calls to you this run, if any —
-`MAX_AGENT_DECISIONS=2` per workflow, `MAX_RECOVERY_ATTEMPTS=2` in the outer loop). Cross-check
+`escalation_attempt`/`max_agent_decisions` in your prompt say how much budget is left, and a
+`rejected` entry says why the engine refused an earlier decision). Cross-check
 `stages.<stage>.attempts[-1].manifest` for the failing attempt's own `findings`/`outputs`.
 
 ## 2. What auto-remedied and what didn't
@@ -119,26 +122,34 @@ the arithmetic:
 Thresholds live in `decision_policy.json`'s `policies.equilibration.remedy_economics` — the script
 reads them; this file doesn't restate them.
 
-## 4. Required output
+## 4. Required output — make the call
 
-Return exactly one JSON object matching `recovery_agent_cli.py`'s schema — no free text:
+Return exactly one JSON object matching `recovery_agent_cli.py`'s schema — no free text. The
+`action` must be one of the `valid_actions` in your prompt; the engine computes that menu per
+failure, so an action missing from it is not available for this failure.
 
 ```json
-{"action": "retry | revise_plan | stop",
- "modifications": {"decided_params key": "value, ... — only when action is revise_plan, else {}"},
- "rationale": "root cause and why this action, citing the workflow_state.json evidence or remedy_economics verdict"}
+{"action": "retry | wait_and_retry | revise_plan | accept_with_caveat | end_run",
+ "modifications": {"decided_params key": "value — only when action is revise_plan, else {}"},
+ "rationale": "root cause, the evidence you read, and why this action beats the alternatives"}
 ```
 
-Choose `revise_plan` only when you're confident of both the root cause and the fix, and the
-modification is a single, well-evidenced `decided_params` override — e.g.
-`FF_PROVENANCE_ZERO_SUBSTITUTED` → `{"preferred_ff": "<a field that types this chemistry>"}`.
-(The example named `FORCE_FIELD_TYPING_AMBIGUOUS` until 2026-09-07; nothing emits that code,
-so the playbook's one worked example was for a failure that cannot occur.) Choose `retry` only when you've
-confirmed the cause was transient (stale process, disk, GPU claim) and is now resolved — never as
-a third blind attempt. Choose `stop` for anything genuinely novel or ambiguous, or any row above
-marked `agent_only` with no clear single fix (`DEFORM_ANISOTROPIC`/`DEFORM_INADMISSIBLE`,
-the cross-cutting rows). The engine re-validates `modifications` against
-its own parameter whitelist and rejects unsafe keys regardless of what you send.
+Pick the action the evidence supports; nobody will second-guess it, so the rationale is the
+record. Weigh GPU time: the run's `cost_estimate` and each attempt's wall time are on disk.
+
+| Action | Choose it when |
+|---|---|
+| `retry` | The cause is transient and already gone (stale process, a one-off I/O error). Re-runs the stage unchanged. Never as a blind repeat of a deterministic failure — a pinned seed reproduces the same result |
+| `wait_and_retry` | The cause is transient but still present (disk full, no free GPU). The engine polls its own resource preflight for up to `MAX_WAIT_S`, then re-runs; if it never clears you are asked again |
+| `revise_plan` | You know the root cause and one well-evidenced `decided_params` change fixes it — e.g. `FF_PROVENANCE_ZERO_SUBSTITUTED` → `{"preferred_ff": "<a field that types this chemistry>"}` |
+| `accept_with_caveat` | Offered only for a property gate (thermal/mechanical) whose verdict is already non-reportable. The stage is accepted so the run's OTHER properties can finish; this property is withheld from `results` and never frozen into the characterization cache. Choose it when no lever is likely to make this property reportable at a cost worth paying (e.g. `TG_REVIEW method_gap` on a broad transition, `remedy_economics` → `STOP_ANNOTATE`) |
+| `end_run` | Nothing available can produce a valid result, or every remaining option costs more GPU time than its chance of success justifies (a chemistry-level defect, a rung the remedy history already spent without effect). Records `terminated_by` and your rationale |
+
+Never use `retry` or `wait_and_retry` to buy time on a failure you have not diagnosed, and never
+`accept_with_caveat` to make a run look complete — it withholds a number, it does not validate one.
+The engine re-validates `modifications` against its own parameter whitelist regardless of what
+you send. On the OUTER control-plane loop the menu is `retry | revise_plan | stop`; there `stop`
+is the closing action.
 
 ## Session reattach
 

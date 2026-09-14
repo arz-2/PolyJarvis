@@ -2736,3 +2736,125 @@ def test_gpu_claim_forwards_the_adoption_to_the_ledger(monkeypatch):
     with rc.gpu_claim("PLLA_1", 1):
         pass
     assert ("claim", None) in seen
+
+
+def _halted_executor(tmp_path, monkeypatch, reason, stage="equilibration"):
+    import run_campaign as rc
+    from run_campaign import CampaignStageExecutor
+    monkeypatch.setattr(rc, "do_equil_and_check", lambda args, cls, lammps: {
+        "halted": True, "reason": reason, "detail": {"verdict": reason},
+        "stage_checkpoints": {},
+    })
+    monkeypatch.setattr(rc, "do_cool_and_check", lambda args, cls, lammps: {
+        "halted": True, "reason": reason, "detail": {"verdict": reason},
+    })
+    executor = CampaignStageExecutor(SimpleNamespace(engine_owned_recovery=False),
+                                     {}, emc=None, lammps=None, plan_path="unused")
+    attempt_dir = tmp_path / f"attempt-{reason}"
+    attempt_dir.mkdir(exist_ok=True)
+    return executor.execute(stage, {"attempt_dir": str(attempt_dir), "parameters": {},
+                                    "dependencies": {}, "prior_attempts": []})
+
+
+def test_a_gate_verdict_records_and_continues_when_gates_are_advisory(tmp_path, monkeypatch):
+    """Fixed-protocol replicate mode: a failing gate must neither halt the run nor adapt it.
+
+    Both would make replicates differ from each other by something other than their seeds --
+    the round-1 defect the stereo_r2 campaign exists to remove. Whether a given replicate's
+    melt passed is a RESULT of the campaign, not a branch in its execution.
+    """
+    monkeypatch.setenv("POLYJARVIS_GATES_ADVISORY", "1")
+    for reason in ("EXTEND", "EXTEND_EXHAUSTED", "FAIL", "STRUCTURAL_FAIL"):
+        result = _halted_executor(tmp_path, monkeypatch, reason)
+        assert result.status == "accepted", f"{reason} still halted the run"
+        rec = result.outputs["gate_verdict_advisory"]
+        assert rec["reason"] == reason
+        assert rec["would_have_halted"] is True
+        assert result.outputs["halted"] is False
+        assert result.findings == (), "an advisory verdict must not raise a blocking finding"
+
+
+def test_a_process_failure_still_halts_even_when_gates_are_advisory(tmp_path, monkeypatch):
+    """The demotion is scoped to gate VERDICTS. A stage that could not execute -- minimize not
+    converging, an invalid build cell, unresolved backbone types -- leaves nothing to carry on
+    with, and no campaign mode makes continuing past it sensible."""
+    monkeypatch.setenv("POLYJARVIS_GATES_ADVISORY", "1")
+    for reason in ("MINIMIZE_NOT_CONVERGED", "BUILD_CELL_INVALID",
+                   "BACKBONE_TYPES_UNRESOLVED", "PROCESS_DEAD_NO_SENTINEL"):
+        result = _halted_executor(tmp_path, monkeypatch, reason)
+        assert result.status != "accepted", f"{reason} was wrongly demoted to a pass"
+        assert result.findings and result.findings[0].code == reason
+        assert "gate_verdict_advisory" not in (result.outputs or {})
+
+
+def test_gates_bind_normally_when_the_switch_is_unset(tmp_path, monkeypatch):
+    """Default behaviour is unchanged -- this cannot silently weaken an ordinary campaign."""
+    monkeypatch.delenv("POLYJARVIS_GATES_ADVISORY", raising=False)
+    result = _halted_executor(tmp_path, monkeypatch, "EXTEND")
+    assert result.status == "remedy_required"
+    assert result.findings[0].code == "EXTEND"
+
+
+def test_the_advisory_switch_is_not_a_decided_param():
+    """Whether a verdict is enforced is a property of the CAMPAIGN, not of the simulation.
+    In decided_params it would change the plan hash and make a replicate differ from its
+    predecessor by a key that describes nothing about what was simulated."""
+    # The predicate itself lives in workflow_engine (both layers read it -- see
+    # workflow_engine.gates_advisory); run_campaign shares that one definition.
+    engine = pathlib.Path(REPO_ROOT, "orchestration/scripts/workflow_engine.py").read_text()
+    campaign = pathlib.Path(REPO_ROOT, "orchestration/scripts/run_campaign.py").read_text()
+    assert 'os.environ.get("POLYJARVIS_GATES_ADVISORY"' in engine
+    assert "_gates_advisory = gates_advisory" in campaign, "the two layers must not diverge"
+    for source in (engine, campaign):
+        assert 'cls.get("gates_advisory' not in source
+        assert 'parameters"].get("gates_advisory' not in source
+
+
+def test_a_demoted_cooling_halt_still_carries_the_assessment_density():
+    """Defect 9: EXTEND/FAIL exits from the cooling gate dropped the measurement.
+
+    Under POLYJARVIS_GATES_ADVISORY=1 a halted cooling stage is ACCEPTED, so its outputs are
+    what do_summary reads. Without cooling_json_path the summary falls through
+    `cooling_path or melt_equilibration_path` and records the MELT density as the run's
+    density -- sPVC_2 reported 1.171 g/cm3 at 571 K where sPVC_1 reports 1.346 at 300 K.
+    """
+    import inspect
+    from orchestration.scripts import run_campaign
+
+    src = inspect.getsource(run_campaign.do_cool_and_check)
+    halts = [block for block in src.split('return {"halted": True')[1:]
+             if '"reason": "EXTEND"' in block.split("}")[0] + block[:400]
+             or '"reason": cool_verdict' in block[:400]]
+    assert halts, "expected the EXTEND and terminal-verdict halt returns"
+    for block in halts:
+        assert "_cool_measurements(" in block[:600], (
+            "a cooling-gate halt that advisory mode may accept must still carry "
+            "density_gcm3/cooling_json_path/cool_verdict")
+
+    carried = inspect.getsource(run_campaign._cool_measurements)
+    for key in ("cool_verdict", "npt_prod_log_path", "density_gcm3", "cooling_json_path"):
+        assert f'"{key}"' in carried, f"{key} must survive a demoted cooling halt"
+
+
+def test_the_gpu_claim_reaches_the_deck_not_the_resolver_default():
+    """Defect 10: stages that resolve params BEFORE claiming must overwrite p["gpu_ids"].
+
+    resolve_stage_params reads args.gpu_ids, which on a process starting at this stage is
+    None -> hardware_policy's default "0". do_thermal and do_mechanical both resolve first
+    and claim second, so the default reached the deck while the ledger held a different card:
+    iPMMA_1's mechanical resume on 2026-09-11 was granted GPU 1 and ran on GPU 0, on top of
+    PLLA_2, with GPU 1 idle. On a full run the bug hid behind the shared args object still
+    carrying the PREVIOUS stage's claim.
+    """
+    import inspect
+    from orchestration.scripts import run_campaign
+
+    for fn in (run_campaign.do_thermal, run_campaign.do_mechanical):
+        src = inspect.getsource(fn)
+        resolve_at = src.find("resolve_stage_params(")
+        claim_at = src.find("gpu_claim(")
+        if resolve_at == -1 or claim_at == -1 or resolve_at > claim_at:
+            continue                      # claims before resolving: the claim is already in p
+        assert 'p["gpu_ids"] = gpu_ids' in src, (
+            f"{fn.__name__} resolves stage params before claiming, so p['gpu_ids'] is the "
+            "hardware_policy default; the claimed ids must overwrite it inside the claim")

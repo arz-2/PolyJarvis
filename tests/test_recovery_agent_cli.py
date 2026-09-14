@@ -299,3 +299,62 @@ def test_an_unreported_model_degrades_to_unknown_rather_than_asserting_one():
     assert rac._answering_model({}) == "unknown model"
     assert rac._answering_model({"model": "claude-opus-5"}) == "claude-opus-5"
     assert rac._answering_model({"modelUsage": {"sonnet": {}}}) == "sonnet"
+
+
+ENGINE_MENU = ["retry", "wait_and_retry", "revise_plan", "accept_with_caveat", "end_run"]
+
+
+def _engine_payload(**context):
+    return {
+        "plan_summary": {"run_name": "RECOV_PTFE"},
+        "issue": {"code": "TG_REVIEW", "stage": "thermal", "severity": "blocking",
+                  "engine_context": {"valid_actions": ENGINE_MENU, "autonomous": True, **context}},
+        "output_contract": {"action": ENGINE_MENU, "modifications": {}},
+    }
+
+
+def test_the_schema_enumerates_and_describes_the_engine_menu():
+    schema = rac._output_schema(ENGINE_MENU)["properties"]["action"]
+    assert schema["enum"] == sorted(ENGINE_MENU)
+    for action in ENGINE_MENU:
+        assert action in schema["description"]
+
+
+def test_an_autonomous_prompt_says_no_human_and_carries_the_rejection():
+    problem = rac._trim_payload(_engine_payload(
+        previous_rejection={"action": "revise_plan", "reason": "override_validation_failed"}))
+    prompt = rac._build_prompt(problem)
+    assert "No human will review" in prompt
+    assert "REFUSED your previous decision" in prompt
+    assert "override_validation_failed" in prompt
+    assert "accept_with_caveat" in prompt
+
+
+def test_an_invalid_action_closes_with_end_run_when_the_engine_offers_it():
+    with patch.object(rac, "_run_headless_claude", return_value=(
+            {"action": "stop", "modifications": {}, "rationale": "x"}, "claude-opus-5")):
+        decision = rac.diagnose(_engine_payload())
+    assert decision["action"] == "end_run"
+
+
+def test_subprocess_agent_uses_the_engine_menu_and_the_outer_loop_keeps_its_own():
+    import scientific_control as sc
+
+    class Backend:
+        def __init__(self):
+            self.payloads = []
+
+        def invoke(self, payload):
+            self.payloads.append(payload)
+            return {"action": "end_run", "rationale": "x", "modifications": {}}
+
+    backend = Backend()
+    agent = sc.SubprocessRecoveryAgent(backend)
+    intent = type("I", (), {"to_dict": lambda self: {}})()
+    engine_issue = type("E", (), {"to_dict": lambda self: {
+        "engine_context": {"valid_actions": ENGINE_MENU}}})()
+    outer_issue = sc.WorkflowIssue(stage="thermal", code="X", detail={}, attempt=1)
+    agent.diagnose(intent, {}, engine_issue)
+    agent.diagnose(intent, {}, outer_issue)
+    assert backend.payloads[0]["output_contract"]["action"] == sorted(ENGINE_MENU)
+    assert backend.payloads[1]["output_contract"]["action"] == sorted(sc.VALID_RECOVERY_ACTIONS)

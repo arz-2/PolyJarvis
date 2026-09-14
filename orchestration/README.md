@@ -40,8 +40,8 @@ It is topology only. It decides *when* the scripts above run and never what they
 durable state of its own (the resume point is derived from `data/<run>/`, so there is no
 checkpointer to drift), and reaches execution through `agent_api.py` exactly as a human would.
 Two properties are load-bearing and easy to break: the graph is a **DAG** — `escalation_required`
-and `failed` are terminal, because `MAX_AGENT_DECISIONS` is already spent by the time they are
-returned — and **every** path into execution passes the cost guard, including resume.
+and `failed` are terminal, because the engine's own loop has already spent its agent budget
+(or had no agent) by the time they are returned — and **every** path into execution passes the cost guard, including resume.
 
 `data/<run>/raw/control_state.json` is a thin session record -- which session is on this run
 and whether it is over -- written by the control plane AND by the resume path, so it is not

@@ -12,6 +12,7 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 from workflow_engine import (  # noqa: E402
     ACTIVE_BLOCKING_CODES,
     MAX_AGENT_DECISIONS,
+    MAX_AGENT_DECISIONS_PER_STAGE,
     MAX_AUTOMATIC_REMEDIES,
     Finding,
     RemedyRegistry,
@@ -121,22 +122,33 @@ def test_escalation_rejects_out_of_range_modification(tmp_path):
 
     result = engine.run()
 
-    assert result["status"] == "escalation_required"
+    # A refused decision goes back to the agent, never to a human; an agent that keeps
+    # proposing the same out-of-range value spends the stage budget and the engine ends the run.
+    assert result["status"] == "failed"
+    assert result["terminated_by"]["by"] == "engine"
+    assert result["terminated_by"]["reason"] == "agent_decision_budget_exhausted"
+    assert len(recovery.calls) == MAX_AGENT_DECISIONS_PER_STAGE
     assert engine.state["effective_parameters"]["tg_t_step_K"] == 20
     assert "validation_error" in engine.state["agent_escalations"][0]
+    assert engine.state["agent_escalations"][0]["rejected"]["reason"] == "override_validation_failed"
+    second_issue = recovery.calls[1][2].to_dict()
+    assert second_issue["engine_context"]["previous_rejection"]["reason"] == \
+        "override_validation_failed"
 
 
 def test_escalation_stops_after_max_agent_decisions(tmp_path):
     finding = Finding("TG_NOT_REPORTABLE", "thermal", confidence="low")
-    fake = FakeExecutor({"thermal": [StageResult("remedy_required", (finding,))] * 3})
+    fake = FakeExecutor({"thermal": [StageResult("remedy_required", (finding,))] * 10})
     recovery = RevisePlanRecovery({"tg_t_step_K": 10})
     engine = WorkflowEngine(tmp_path, plan(tg_t_step_K=20), fake,
                             recovery_agent=recovery, override_validator=validate_overrides)
 
     result = engine.run()
 
-    assert result["status"] == "escalation_required"
-    assert len(recovery.calls) == MAX_AGENT_DECISIONS
+    assert result["status"] == "failed"
+    assert result["terminated_by"]["reason"] == "agent_decision_budget_exhausted"
+    assert len(recovery.calls) == MAX_AGENT_DECISIONS_PER_STAGE
+    assert MAX_AGENT_DECISIONS_PER_STAGE <= MAX_AGENT_DECISIONS
 
 
 def test_retry_ignores_any_attached_modifications(tmp_path):
@@ -463,8 +475,10 @@ def test_registered_remedy_action_rejects_mismatched_remedy_id(tmp_path):
 
     result = engine.run()
 
-    assert result["status"] == "escalation_required"
+    assert result["status"] == "failed"
     assert engine.state["remedy_counters"]["total"] == 0
+    assert all(e["rejected"]["reason"] == "remedy_id_mismatch"
+               for e in engine.state["agent_escalations"])
 
 
 def test_route_local_cap_exhaustion_escalates_after_automatic_retries(tmp_path):
@@ -1117,3 +1131,182 @@ def test_revise_plan_moves_the_reconcile_baseline_with_the_plan(tmp_path):
 
     assert engine2.state["stages"]["equilibration"]["status"] == "accepted"
     assert engine2.state["stages"]["equilibration"].get("stale_reason") is None
+
+
+def test_a_tg_verdict_records_and_continues_when_gates_are_advisory(tmp_path, monkeypatch):
+    """sPVC_2, 2026-09-11. It was launched with POLYJARVIS_GATES_ADVISORY=1 and still halted at
+    thermal on TG_REVIEW.
+
+    A gate verdict reaches a blocking finding by two independent routes: the executor's own
+    halt path (the melt and cooling gates return {"halted": True, "reason": <verdict>}), and
+    binding_gate_failure(), which runs in the ENGINE on an already-ACCEPTED StageResult and
+    converts tg_gate_verdict/bm_gate_verdict/deform_gate_verdict into a finding. Only the first
+    was covered, which is worse than covering neither -- it looks safe and is not.
+    """
+    import workflow_engine
+    monkeypatch.setenv("POLYJARVIS_GATES_ADVISORY", "1")
+    outputs = {"tg_gate_verdict": "TG_REVIEW", "Tg_K": 511.4}
+
+    # the verdict is still DETECTED -- the demotion happens at the call site, not by blinding it
+    assert workflow_engine.binding_gate_failure("thermal", outputs).code == "TG_REVIEW"
+    assert workflow_engine.gates_advisory() is True
+
+    monkeypatch.delenv("POLYJARVIS_GATES_ADVISORY", raising=False)
+    assert workflow_engine.gates_advisory() is False
+
+
+def test_every_verdict_binding_gate_failure_can_raise_is_a_verdict_not_a_crash():
+    """The engine-layer demotion covers whatever binding_gate_failure returns, so that set must
+    contain only gate VERDICTS -- never a failure to execute the stage, which must always bind
+    however the switch is set."""
+    import re as _re, inspect
+    import workflow_engine
+    body = inspect.getsource(workflow_engine.binding_gate_failure)
+    codes = set(_re.findall(r'"([A-Z][A-Z_]{3,})"', body))
+    codes -= {"TG_REPORTABLE", "BM_REPORTABLE", "DEFORM_REPORTABLE", "WARNING"}
+    assert codes, "could not extract any verdict codes from binding_gate_failure"
+    for c in codes:
+        assert c.startswith(("TG_", "BM_", "DEFORM_")), (
+            f"{c} is not a gate verdict -- advisory mode would wrongly demote it")
+
+
+def test_gates_still_bind_by_default_in_the_engine(tmp_path, monkeypatch):
+    """Default behaviour unchanged: a TG verdict is still a blocking finding."""
+    import workflow_engine
+    monkeypatch.delenv("POLYJARVIS_GATES_ADVISORY", raising=False)
+    f = workflow_engine.binding_gate_failure("thermal", {"tg_gate_verdict": "TG_REVIEW"})
+    assert f is not None and f.code == "TG_REVIEW"
+    assert workflow_engine.gates_advisory() is False
+
+
+# --- Autonomous recovery: with an agent configured, no decision waits on a human ----------
+
+class ScriptedRecovery:
+    """3-arg diagnose like the production adapter; returns queued decisions in order."""
+
+    def __init__(self, *decisions):
+        self.decisions = list(decisions)
+        self.calls = []
+
+    def diagnose(self, intent, plan, issue):
+        self.calls.append(issue.to_dict())
+        action = self.decisions.pop(0) if self.decisions else "end_run"
+        return {"action": action, "modifications": {}, "rationale": f"chose {action}"}
+
+
+def _tg_review_outputs():
+    return {"Tg_K": 348.6, "tg_gate_verdict": "TG_REVIEW", "tg_gate_cause": "method_gap"}
+
+
+def test_accept_with_caveat_finishes_the_run_and_marks_the_property_unreportable(tmp_path):
+    fake = FakeExecutor({"thermal": [StageResult("accepted", outputs=_tg_review_outputs())] * 3})
+    recovery = ScriptedRecovery("accept_with_caveat")
+    engine = WorkflowEngine(tmp_path, plan(tg_t_step_K=10), fake, recovery_agent=recovery)
+
+    result = engine.run()
+
+    assert result["status"] == "accepted"
+    assert "accept_with_caveat" in recovery.calls[0]["engine_context"]["valid_actions"]
+    thermal = engine.state["stages"]["thermal"]
+    manifest = json.loads((tmp_path / "attempts" / "thermal" / thermal["accepted_attempt"]
+                           / "executor_state.json").read_text())
+    assert manifest["status"] == "accepted"
+    # The verdict is never upgraded -- that is what withholds the value downstream.
+    assert manifest["outputs"]["tg_gate_verdict"] == "TG_REVIEW"
+    assert manifest["outputs"]["recovery_caveat"]["reportable"] is False
+    assert manifest["findings"] == [] and manifest["findings_retired_by_recovery_agent"]
+    assert engine.state["caveats"][0]["stage"] == "thermal"
+    # Accepting did not break integrity: a resumed engine keeps the stage accepted.
+    again = WorkflowEngine(tmp_path, plan(tg_t_step_K=10), FakeExecutor(), recovery_agent=recovery)
+    again.reconcile_inputs()
+    assert again.state["stages"]["thermal"]["status"] == "accepted"
+
+
+def test_accept_with_caveat_is_never_offered_for_a_melt_failure(tmp_path):
+    finding = Finding("BACKBONE_TYPES_UNRESOLVED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))] * 5})
+    recovery = ScriptedRecovery("accept_with_caveat", "end_run")
+    engine = WorkflowEngine(tmp_path, plan(), fake, recovery_agent=recovery)
+
+    result = engine.run()
+
+    assert "accept_with_caveat" not in recovery.calls[0]["engine_context"]["valid_actions"]
+    assert engine.state["agent_escalations"][0]["rejected"]["reason"] == "action_not_offered"
+    assert result["status"] == "failed"
+    assert result["terminated_by"] == {**result["terminated_by"], "by": "recovery_agent",
+                                       "reason": "agent_decision"}
+    assert engine.state["stages"]["equilibration"]["status"] == "failed"
+
+
+def test_end_run_records_who_closed_the_run(tmp_path):
+    finding = Finding("BACKBONE_TYPES_UNRESOLVED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    engine = WorkflowEngine(tmp_path, plan(), fake, recovery_agent=ScriptedRecovery("stop"))
+
+    result = engine.run()
+
+    assert result["status"] == "failed"
+    state = json.loads((tmp_path / "workflow_state.json").read_text())
+    assert state["terminated_by"]["by"] == "recovery_agent"
+    assert state["terminated_by"]["rationale"] == "chose stop"
+
+
+def test_wait_and_retry_polls_until_resources_clear_then_reruns(tmp_path, monkeypatch):
+    import workflow_engine as we
+    finding = Finding("BACKBONE_TYPES_UNRESOLVED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    answers = iter(["disk full", "disk full", None])
+    monkeypatch.setattr(we, "_transient_retry_blocked", lambda *_a: next(answers))
+    sleeps = []
+    engine = WorkflowEngine(tmp_path, plan(), fake, recovery_agent=ScriptedRecovery("wait_and_retry"))
+    engine._sleep = sleeps.append
+    engine._clock = lambda: 0.0
+
+    assert engine.run()["status"] == "accepted"
+    assert sleeps == [we.WAIT_POLL_S, we.WAIT_POLL_S]
+
+
+def test_wait_and_retry_gives_up_at_its_ceiling_and_asks_again(tmp_path, monkeypatch):
+    import workflow_engine as we
+    finding = Finding("BACKBONE_TYPES_UNRESOLVED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+    monkeypatch.setattr(we, "_transient_retry_blocked", lambda *_a: "no GPU free")
+    clock = iter([0.0, we.MAX_WAIT_S + 1.0])
+    recovery = ScriptedRecovery("wait_and_retry", "end_run")
+    engine = WorkflowEngine(tmp_path, plan(), fake, recovery_agent=recovery)
+    engine._sleep = lambda _s: None
+    engine._clock = lambda: next(clock)
+
+    result = engine.run()
+
+    assert result["status"] == "failed"
+    assert engine.state["agent_escalations"][0]["rejected"]["reason"] == "resources_still_blocked"
+    assert recovery.calls[1]["engine_context"]["previous_rejection"]["blocked"] == "no GPU free"
+
+
+def test_without_an_agent_the_run_still_halts_for_a_human(tmp_path):
+    fake = FakeExecutor({"thermal": [StageResult("accepted", outputs=_tg_review_outputs())] * 3})
+    result = WorkflowEngine(tmp_path, plan(tg_t_step_K=10), fake).run()
+    assert result["status"] == "escalation_required"
+    assert "terminated_by" not in result
+
+
+def test_a_wrapper_failure_retry_asks_again_instead_of_rerunning_the_stage(tmp_path):
+    finding = Finding("BACKBONE_TYPES_UNRESOLVED", "equilibration")
+    fake = FakeExecutor({"equilibration": [StageResult("remedy_required", (finding,))]})
+
+    class Flaky:
+        calls = 0
+
+        def diagnose(self, intent, plan, issue):
+            Flaky.calls += 1
+            if Flaky.calls == 1:
+                return {"action": "retry", "modifications": {},
+                        "rationale": "[recovery-agent invocation failed, retrying the stage] boom"}
+            return {"action": "retry", "modifications": {}, "rationale": "stale process, gone"}
+
+    engine = WorkflowEngine(tmp_path, plan(), fake, recovery_agent=Flaky())
+
+    assert engine.run()["status"] == "accepted"
+    assert engine.state["agent_escalations"][0]["rejected"]["reason"] == "agent_invocation_failed"
+    assert len([c for c in fake.calls if c[0] == "equilibration"]) == 2
