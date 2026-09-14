@@ -54,7 +54,15 @@ largest single file 131 MB (npt_densify.dump); a Murnaghan series ~790 MB per th
 Four concurrent runs all resubmitting the largest stage is ~13 GB. 15.0 is that worst case plus
 margin -- ~4.5x a single measured attempt -- so it still catches a genuinely full filesystem.
 """
-MAX_AGENT_DECISIONS = 2
+MAX_AGENT_DECISIONS = 6
+"""Recovery-agent consultations per run. With an agent configured the run never halts for a
+human: a decision the engine refuses goes back to the agent with the reason, and exhausting
+this budget (or the per-stage one) ends the run as `failed` with `terminated_by` recorded."""
+MAX_AGENT_DECISIONS_PER_STAGE = 3
+CAVEAT_STAGES = frozenset({"thermal", "mechanical"})
+"""Stages accept_with_caveat may accept: a property gate, where accepting withdraws one number."""
+MAX_WAIT_S = 7200
+WAIT_POLL_S = 60
 TRANSIENT_RETRIES = 2
 STAGE_ORDER = ("build", "equilibration", "cooling", "thermal", "mechanical",
                "structure", "cohesive", "summary")
@@ -787,6 +795,26 @@ def _validate_revised_parameters(before: Mapping[str, Any],
     return None
 
 
+def gates_advisory() -> bool:
+    """True when gate VERDICTS must be recorded without blocking or adapting the run.
+
+    Runtime-only, deliberately NOT a decided_param: whether a verdict is enforced is a property
+    of the campaign, not of the simulation, and putting it in the plan would change the plan
+    hash and make a fixed-protocol replicate differ from its predecessor by a key describing
+    nothing that was simulated.
+
+    Read in BOTH layers, because a gate verdict can reach a blocking finding by two independent
+    routes and covering only one is worse than covering neither -- it looks safe and is not:
+      - the executor's own halt path (run_campaign._demote_gate_halt), for the melt and cooling
+        gates, which return {"halted": True, "reason": <verdict>}; and
+      - binding_gate_failure() below, which runs HERE on an already-ACCEPTED StageResult and
+        converts tg_gate_verdict / bm_gate_verdict / deform_gate_verdict into a finding.
+    sPVC_2 found that the hard way on 2026-09-11: launched with the switch on, it still halted
+    at thermal on TG_REVIEW, because only the first route was covered.
+    """
+    return os.environ.get("POLYJARVIS_GATES_ADVISORY", "").strip().lower() in {"1", "true", "yes"}
+
+
 def binding_gate_failure(stage: str, outputs: Mapping[str, Any]) -> Optional[Finding]:
     """Return a normalized failure when an output's binding gate is not reportable."""
     if stage == "thermal":
@@ -844,6 +872,10 @@ def pressure_point_drop_allowed(point_status: Mapping[float, str]) -> bool:
 
 class WorkflowEngine:
     """Execute, remedy, invalidate, and resume one campaign."""
+
+    # Injectable so wait_and_retry is testable without real sleeping.
+    _sleep = staticmethod(time.sleep)
+    _clock = staticmethod(time.monotonic)
 
     def __init__(self, run_dir: Path, plan: Mapping[str, Any], executor: StageExecutor,
                  *, registry: Optional[RemedyRegistry] = None,
@@ -1216,6 +1248,22 @@ class WorkflowEngine:
         try:
             result = StageResult.from_value(self.executor.execute(stage, context), stage)
             gate_failure = binding_gate_failure(stage, result.outputs) if result.status == "accepted" else None
+            if gate_failure and gates_advisory():
+                # Fixed-protocol replicate: the verdict is a RESULT of the campaign, recorded
+                # against the attempt, not a branch in its execution. Everything
+                # binding_gate_failure can return is a gate verdict (TG_*/BM_*/DEFORM_*), never
+                # a failure to execute the stage, so demoting the whole set is sound here.
+                result = StageResult(
+                    result.status, result.findings, result.artifacts,
+                    {**(result.outputs or {}),
+                     "gate_verdict_advisory": {
+                         "code": gate_failure.code,
+                         "stage": stage,
+                         "would_have_blocked": True,
+                         "note": ("POLYJARVIS_GATES_ADVISORY=1: verdict recorded, stage "
+                                  "accepted, protocol unchanged"),
+                     }})
+                gate_failure = None
             if gate_failure:
                 result = StageResult("remedy_required", result.findings + (gate_failure,),
                                      result.artifacts, result.outputs)
@@ -1304,25 +1352,39 @@ class WorkflowEngine:
         })
         return True
 
-    def _escalate(self, finding: Finding, manifest: Mapping[str, Any]) -> str:
-        def _finish(outcome: str, **extra: Any) -> str:
-            self._log_recovery_event({"event": "escalation", "code": finding.code,
-                                      "stage": finding.stage, "outcome": outcome, **extra})
-            return outcome
+    def _offered_actions(self, finding: Finding, manifest: Mapping[str, Any]) -> tuple[str, ...]:
+        """What the agent may choose for THIS failure. Code decides the menu, not the prompt.
 
+        accept_with_caveat is offered only where it withdraws a number and nothing else: a
+        property gate (thermal/mechanical) whose own artifact already records a non-reportable
+        verdict, so generate_run_summary withholds the value and the characterization cache
+        refuses to freeze it. An equilibration or cooling failure is never caveatable -- every
+        downstream property would inherit the unconverged cell (iPMMA_1's hand-accepted melt is
+        why its Tg is not reportable). BM_LADDER_NOT_CONVERGED and DEFORM_RATE_SENSITIVE are
+        excluded because their artifact verdict still reads reportable, so accepting them would
+        publish the very number the finding doubts.
+        """
+        actions = ["retry", "wait_and_retry", "revise_plan"]
+        outputs = manifest.get("outputs") or {}
+        gate = binding_gate_failure(finding.stage, outputs) if finding.stage in CAVEAT_STAGES else None
+        if (gate is not None and gate.code not in {"BM_LADDER_NOT_CONVERGED", "DEFORM_RATE_SENSITIVE"}
+                and manifest.get("artifacts") and manifest.get("attempt_id")):
+            actions.append("accept_with_caveat")
+        actions.append("end_run")
+        return tuple(actions)
+
+    def _consult_agent(self, finding: Finding, manifest: Mapping[str, Any],
+                       offered: tuple[str, ...], rejection: Optional[dict]) -> dict:
         escalations = self.state["agent_escalations"]
-        if self.recovery_agent is None:
-            return _finish("escalation_required", reason="no_recovery_agent_configured")
-        if len(escalations) >= MAX_AGENT_DECISIONS:
-            return _finish("escalation_required", reason="max_agent_decisions_reached")
         payload = {
             "finding": finding.to_dict(),
             "remedy_history": list(self.state.get("remedy_history", [])),
             "attempt_manifests": [entry.get("manifest") for record in self.state["stages"].values()
                                   for entry in record.get("attempts", []) if entry.get("manifest")],
             "current_plan": json.loads(json.dumps(self.plan)),
-            "valid_actions": ["registered_remedy", "revise_plan", "stop"],
+            "valid_actions": ["registered_remedy", *offered],
             "valid_predefined_remedies": [self.registry.route(finding).remedy_id],
+            "previous_rejection": rejection,
         }
         if hasattr(self.recovery_agent, "decide"):
             decision = self.recovery_agent.decide(payload)
@@ -1353,6 +1415,13 @@ class WorkflowEngine:
                     "confidence": finding.confidence,
                     "escalation_attempt": len(escalations) + 1,
                     "max_agent_decisions": MAX_AGENT_DECISIONS,
+                    "max_agent_decisions_per_stage": MAX_AGENT_DECISIONS_PER_STAGE,
+                    # The engine's menu for this failure. SubprocessRecoveryAgent turns it into
+                    # the output contract, so the outer control-plane loop's own action set
+                    # (VALID_RECOVERY_ACTIONS) is untouched.
+                    "valid_actions": list(offered),
+                    "autonomous": True,
+                    "previous_rejection": rejection,
                     "run_dir": str(self.state_path.parent.resolve()),
                     "failed_attempt_manifest": manifest.get("attempt_id"),
                     # Trimmed: this rides into a one-line prompt, and the full records carry
@@ -1374,72 +1443,205 @@ class WorkflowEngine:
             decision = self.recovery_agent(payload)
         if hasattr(decision, "__dict__"):
             decision = vars(decision)
-        decision = dict(decision)
-        escalations.append({"finding": finding.to_dict(), "decision": decision,
-                            "manifest": manifest.get("attempt_id"), "at": _now()})
+        return dict(decision)
+
+    def _wait_for_resources(self, finding: Finding) -> Optional[str]:
+        """Poll the same preflight transient_retry uses until it clears or MAX_WAIT_S passes.
+
+        Bounded in wall-clock, not GPU-hours: nothing is claimed while waiting (claims are per
+        submission), so the only cost of a wait is time. Returns None once clear, else the
+        last blocking reason.
+        """
+        gpus = self._gpus_needed() if finding.stage in GPU_STAGES else 0
+        deadline = self._clock() + MAX_WAIT_S
+        while True:
+            blocked = _transient_retry_blocked(self.state_path.parent, gpus)
+            if blocked is None or self._clock() >= deadline:
+                return blocked
+            self._sleep(WAIT_POLL_S)
+
+    def _accept_with_caveat(self, finding: Finding, manifest: Mapping[str, Any],
+                            decision: Mapping[str, Any]) -> None:
+        """Accept the failing attempt as-is so the run can finish its other properties.
+
+        The same edit an operator makes by hand (aPS_2 thermal, 2026-09-13): manifest status to
+        accepted, findings archived rather than deleted, stage points at the attempt, input_hash
+        untouched. It never rewrites a gate verdict -- the artifact keeps its non-reportable
+        verdict, which is what withholds the value downstream -- and recovery_caveat marks the
+        acceptance for every reader that checks markers rather than verdicts.
+        """
+        attempt_id = manifest["attempt_id"]
+        record = self.state["stages"][finding.stage]
+        stored_path = next((Path(entry["manifest"]) for entry in record.get("attempts", ())
+                            if entry.get("attempt_id") == attempt_id and entry.get("manifest")),
+                           self.attempts_dir / finding.stage / attempt_id / "executor_state.json")
+        stored = json.loads(stored_path.read_text())
+        caveat = {
+            "code": finding.code, "reportable": False, "decided_by": "recovery_agent",
+            "rationale": decision.get("rationale"), "at": _now(),
+            "note": ("stage accepted so the run can finish; its gate verdict stands and the "
+                     "property is withheld from results and from the characterization cache"),
+        }
+        stored["status"] = "accepted"
+        stored["outputs"] = {**(stored.get("outputs") or {}), "recovery_caveat": caveat}
+        stored["findings_retired_by_recovery_agent"] = stored.get("findings") or []
+        stored["findings"] = []
+        atomic_write_json(stored_path, stored)
+        for entry in record.get("attempts", ()):
+            if entry.get("attempt_id") == attempt_id:
+                entry["status"] = "accepted"
+        record.update({"status": "accepted", "accepted_attempt": attempt_id,
+                       "input_hash": stored.get("input_hash", manifest.get("input_hash"))})
+        self.state.setdefault("caveats", []).append(
+            {"stage": finding.stage, "attempt_id": attempt_id, **caveat})
         self._save()
-        action = decision.get("action", "stop")
+
+    def _end_run(self, finding: Finding, finish: Callable[..., str], *, decided_by: str,
+                 reason: str, rationale: Optional[str] = None) -> str:
+        """Close the run without a human. Status is `failed`; `terminated_by` says who decided
+        and why, so a deliberate close is never confused with a harness crash."""
+        self.state["terminated_by"] = {
+            "by": decided_by, "reason": reason, "stage": finding.stage, "code": finding.code,
+            "rationale": rationale, "at": _now(),
+        }
+        self._save()
+        return finish("failed", action="end_run", decided_by=decided_by, reason=reason,
+                      rationale=rationale)
+
+    def _escalate(self, finding: Finding, manifest: Mapping[str, Any]) -> str:
+        def _finish(outcome: str, **extra: Any) -> str:
+            self._log_recovery_event({"event": "escalation", "code": finding.code,
+                                      "stage": finding.stage, "outcome": outcome, **extra})
+            return outcome
+
+        escalations = self.state["agent_escalations"]
+        if self.recovery_agent is None:
+            # The deterministic arm: no agent, so the run halts for a human exactly as before.
+            return _finish("escalation_required", reason="no_recovery_agent_configured")
+        # With an agent configured the run never waits on a human. Every decision the engine
+        # cannot apply is handed back to the agent with the reason, inside a fixed budget; the
+        # budget running out ends the run.
+        offered = self._offered_actions(finding, manifest)
+        rejection: Optional[dict] = None
+        while True:
+            spent_here = sum(1 for entry in escalations
+                             if (entry.get("finding") or {}).get("stage") == finding.stage)
+            if len(escalations) >= MAX_AGENT_DECISIONS or spent_here >= MAX_AGENT_DECISIONS_PER_STAGE:
+                return self._end_run(finding, _finish, decided_by="engine",
+                                     reason="agent_decision_budget_exhausted",
+                                     rationale=(rejection or {}).get("reason"))
+            decision = self._consult_agent(finding, manifest, offered, rejection)
+            escalations.append({"finding": finding.to_dict(), "decision": decision,
+                                "manifest": manifest.get("attempt_id"),
+                                "offered_actions": list(offered), "at": _now()})
+            self._save()
+            outcome, rejection = self._apply_agent_decision(finding, manifest, decision, offered,
+                                                            _finish)
+            if outcome is not None:
+                return outcome
+            escalations[-1]["rejected"] = rejection
+            self._save()
+            self._log_recovery_event({"event": "agent_decision_rejected", "code": finding.code,
+                                      "stage": finding.stage, **rejection})
+
+    def _apply_agent_decision(self, finding: Finding, manifest: Mapping[str, Any],
+                              decision: dict, offered: tuple[str, ...],
+                              _finish: Callable[..., str]) -> tuple[Optional[str], Optional[dict]]:
+        """(outcome, None) when the decision was carried out; (None, rejection) when the engine
+        refused it -- the rejection goes back to the agent, never to a human."""
+        escalations = self.state["agent_escalations"]
+        action = str(decision.get("action") or "end_run").lower()
+        if action == "stop":
+            action = "end_run"   # the pre-autonomy name for the same decision
         if action == "registered_remedy":
             selected = decision.get("remedy_id")
             expected = self.registry.route(finding).remedy_id
             if selected != expected:
-                return _finish("escalation_required", action=action,
-                               reason="remedy_id_mismatch", selected=selected, expected=expected)
+                return None, {"action": action, "reason": "remedy_id_mismatch",
+                              "selected": selected, "expected": expected}
             # Agent selection does not override scientific bounds or caps.
             revised_finding = Finding(finding.code, finding.stage, finding.severity, "high",
                                       finding.details, selected)
-            applied = self._apply_remedy(revised_finding)
-            return _finish("resume" if applied else "escalation_required", action=action,
-                           remedy_id=selected,
-                           reason=None if applied else "remedy_rejected_by_apply_remedy")
-        if action in {"revise_plan", "retry"}:
-            # retry means unchanged params by definition; ignore any modifications a
-            # non-conforming agent attaches to it rather than reject the whole decision.
-            modifications = dict(decision.get("modifications") or {}) if action == "revise_plan" else {}
-            forbidden = {"path", "dir", "command", "script", "state", "artifact", "file"}
-            unsafe = [key for key in modifications
-                      if any(token in key.lower() for token in forbidden)]
-            if unsafe:
-                return _finish("escalation_required", action=action,
-                               reason="forbidden_modification_key", modifications=modifications)
-            if self.override_validator is not None:
-                try:
-                    self.override_validator(modifications)
-                except ValueError as exc:
-                    escalations[-1]["validation_error"] = str(exc)
-                    self._save()
-                    return _finish("escalation_required", action=action,
-                                   reason="override_validation_failed", error=str(exc))
-            candidate = json.loads(json.dumps(self.plan))
-            candidate.setdefault("decided_params", {}).update(modifications)
-            if self.plan_validator is not None:
-                validation_findings = list(self.plan_validator(candidate))
-                if any(item.get("severity") in {"structural", "blocking", "error", "fatal"}
-                       for item in validation_findings):
-                    escalations[-1]["validation_findings"] = validation_findings
-                    self._save()
-                    return _finish("escalation_required", action=action,
-                                   reason="plan_validation_failed",
-                                   findings=validation_findings)
-            self.plan = candidate
-            self.state["plan_hash"] = _canonical_hash(candidate)
-            # The reconcile baseline moves with the plan. Without this the next hash change --
-            # any derived_inputs write is enough -- would diff the revised plan against the
-            # PRE-revision snapshot and re-invalidate everything revise_plan just settled.
-            self.state["plan_decided_params"] = json.loads(
-                json.dumps(candidate.get("decided_params") or {}, default=str))
-            self.state["effective_parameters"].update(modifications)
-            if self.plan_path is not None:
-                atomic_write_json(self.plan_path, candidate)
-            earliest = decision.get("invalidate_from") or finding.stage
-            if earliest not in self.enabled_stages():
-                return _finish("escalation_required", action=action,
-                               reason="invalidate_from_not_enabled", invalidate_from=earliest)
-            self.invalidate_from(earliest, "recovery agent bounded revision")
-            return _finish("resume", action=action, modifications=modifications)
-        return _finish("failed", action=action, rationale=decision.get("rationale"))
+            if not self._apply_remedy(revised_finding):
+                return None, {"action": action, "reason": "remedy_rejected_by_apply_remedy"}
+            return _finish("resume", action=action, remedy_id=selected), None
+        if action not in offered:
+            return None, {"action": action, "reason": "action_not_offered",
+                          "offered": list(offered)}
+        if action == "end_run":
+            return self._end_run(finding, _finish, decided_by="recovery_agent",
+                                 reason="agent_decision",
+                                 rationale=decision.get("rationale")), None
+        if action == "accept_with_caveat":
+            try:
+                self._accept_with_caveat(finding, manifest, decision)
+            except (OSError, KeyError, ValueError) as exc:
+                return None, {"action": action, "reason": f"caveat_failed: {exc}"}
+            return _finish("resume", action=action, caveat=True), None
+        if action == "retry" and str(decision.get("rationale") or "").startswith(
+                "[recovery-agent invocation failed"):
+            # recovery_agent_cli maps a crashed/timed-out headless session to `retry`. That is
+            # not a diagnosis, and re-running a GPU stage on it costs hours; ask again instead
+            # (spends decision budget, not hardware).
+            return None, {"action": action, "reason": "agent_invocation_failed"}
+        if action == "wait_and_retry":
+            blocked = self._wait_for_resources(finding)
+            if blocked is not None:
+                return None, {"action": action, "reason": "resources_still_blocked",
+                              "blocked": blocked, "waited_s": MAX_WAIT_S}
+        # retry / wait_and_retry / revise_plan
+        # retry means unchanged params by definition; ignore any modifications a
+        # non-conforming agent attaches to it rather than reject the whole decision.
+        modifications = dict(decision.get("modifications") or {}) if action == "revise_plan" else {}
+        forbidden = {"path", "dir", "command", "script", "state", "artifact", "file"}
+        unsafe = [key for key in modifications
+                  if any(token in key.lower() for token in forbidden)]
+        if unsafe:
+            return None, {"action": action, "reason": "forbidden_modification_key",
+                          "keys": unsafe}
+        if self.override_validator is not None:
+            try:
+                self.override_validator(modifications)
+            except ValueError as exc:
+                escalations[-1]["validation_error"] = str(exc)
+                return None, {"action": action, "reason": "override_validation_failed",
+                              "error": str(exc)}
+        candidate = json.loads(json.dumps(self.plan))
+        candidate.setdefault("decided_params", {}).update(modifications)
+        if self.plan_validator is not None:
+            validation_findings = list(self.plan_validator(candidate))
+            if any(item.get("severity") in {"structural", "blocking", "error", "fatal"}
+                   for item in validation_findings):
+                escalations[-1]["validation_findings"] = validation_findings
+                return None, {"action": action, "reason": "plan_validation_failed",
+                              "findings": validation_findings}
+        earliest = decision.get("invalidate_from") or finding.stage
+        if earliest not in self.enabled_stages():
+            return None, {"action": action, "reason": "invalidate_from_not_enabled",
+                          "invalidate_from": earliest}
+        self.plan = candidate
+        self.state["plan_hash"] = _canonical_hash(candidate)
+        # The reconcile baseline moves with the plan. Without this the next hash change --
+        # any derived_inputs write is enough -- would diff the revised plan against the
+        # PRE-revision snapshot and re-invalidate everything revise_plan just settled.
+        self.state["plan_decided_params"] = json.loads(
+            json.dumps(candidate.get("decided_params") or {}, default=str))
+        self.state["effective_parameters"].update(modifications)
+        if self.plan_path is not None:
+            atomic_write_json(self.plan_path, candidate)
+        # A decision to re-run supersedes the verdict on disk. Without this mark,
+        # _resume_pending_verdict replays that verdict under the unchanged input_hash of a
+        # retry and the stage is never actually re-attempted.
+        attempts = self.state["stages"][finding.stage].get("attempts") or []
+        if attempts:
+            attempts[-1]["verdict_resumed"] = True
+        self.invalidate_from(earliest, f"recovery agent {action}")
+        return _finish("resume", action=action, modifications=modifications), None
 
     def run(self) -> dict[str, Any]:
+        # A resumed run is a new decision; the previous close no longer describes it.
+        if self.state.pop("terminated_by", None) is not None:
+            self._save()
         self.reconcile_inputs()
         while True:
             progressed = False
@@ -1471,8 +1673,11 @@ class WorkflowEngine:
                 self.state["status"] = outcome
                 self.state["active_finding"] = finding.to_dict()
                 self._save()
-                return {"status": outcome, "stage": stage, "finding": finding.to_dict(),
-                        "state_path": str(self.state_path)}
+                returned = {"status": outcome, "stage": stage, "finding": finding.to_dict(),
+                            "state_path": str(self.state_path)}
+                if self.state.get("terminated_by"):
+                    returned["terminated_by"] = self.state["terminated_by"]
+                return returned
             else:
                 if all(self.state["stages"][stage].get("status") == "accepted"
                        for stage in self.enabled_stages()):

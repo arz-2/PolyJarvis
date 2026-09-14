@@ -191,6 +191,11 @@ def classify(run_dir: Path, ps_output: Optional[str] = None,
     if status == "accepted":
         return {"run_name": run_name, "action": "skip", "reason": "already_accepted"}
     if status == "failed":
+        closed = state.get("terminated_by") or {}
+        if closed:
+            # Closed deliberately by the autonomous recovery path -- a decision, not a crash.
+            return {"run_name": run_name, "action": "skip",
+                    "reason": f"terminated_by_{closed.get('by')}", "terminated_by": closed}
         return {"run_name": run_name, "action": "skip",
                 "reason": "agent_returned_stop_needs_human"}
     if status in ("escalation_required", "unresolved"):

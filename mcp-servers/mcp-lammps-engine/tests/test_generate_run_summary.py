@@ -355,3 +355,33 @@ def test_density_temperature_falls_back_to_the_setpoint_and_tolerates_absence(tm
     assert results["density"]["temperature_K"] == 300.0      # setpoint fallback
     assert results["melt_density"]["temperature_K"] is None  # no melt gate passed
     assert results["bulk_modulus"]["temperature_K"] is None  # no mechanical run
+
+
+def test_a_non_reportable_verdict_withholds_the_value_but_keeps_it_on_record(tmp_path):
+    """An accepted stage is not a reportable property: advisory replicates, operator unblocks and
+    the recovery agent's accept_with_caveat all accept a stage whose gate did not pass. Readers
+    of value_K / value_GPa check no verdict, so the value field itself must go null."""
+    (tmp_path / "thermal.json").write_text(json.dumps(
+        {"Tg_K": 348.6, "tg_gate_verdict": "TG_REVIEW", "tg_reportable": False}))
+    (tmp_path / "mechanical.json").write_text(json.dumps(
+        {"B0_GPa": 2.6, "B0_sem_GPa": 0.1, "bm_gate_verdict": "BM_INADMISSIBLE"}))
+    subprocess.run([sys.executable, str(SCRIPT), "--output_dir", str(tmp_path),
+                    "--run_name", "TWH", "--tg_path", str(tmp_path / "thermal.json"),
+                    "--mechanical_path", str(tmp_path / "mechanical.json")],
+                   check=True, capture_output=True)
+    results = json.loads((tmp_path / "run_summary.json").read_text())["results"]
+    assert results["tg"]["value_K"] is None
+    assert results["tg"]["withheld"] == {"value_K": 348.6, "gate_verdict": "TG_REVIEW"}
+    assert results["bulk_modulus"]["value_GPa"] is None
+    assert results["bulk_modulus"]["withheld"]["gate_verdict"] == "BM_INADMISSIBLE"
+
+
+def test_a_reportable_verdict_publishes_the_value(tmp_path):
+    (tmp_path / "thermal.json").write_text(json.dumps(
+        {"Tg_K": 317.4, "tg_gate_verdict": "TG_REPORTABLE"}))
+    subprocess.run([sys.executable, str(SCRIPT), "--output_dir", str(tmp_path),
+                    "--run_name", "TRP", "--tg_path", str(tmp_path / "thermal.json")],
+                   check=True, capture_output=True)
+    results = json.loads((tmp_path / "run_summary.json").read_text())["results"]
+    assert results["tg"]["value_K"] == 317.4
+    assert results["tg"]["withheld"] is None

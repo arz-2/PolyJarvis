@@ -827,6 +827,8 @@ class ScriptGenerator:
         charge_parse_ok = False
         type_counts: dict = {}
         masses_by_type: dict = {}
+        atom_ids: set = set()
+        n_atom_rows = 0
 
         # Build mass lookup from Masses section
         in_masses_sec = False
@@ -865,6 +867,8 @@ class ScriptGenerator:
                         charge = float(parts[3])
                         net_charge += charge
                         type_counts[atype] = type_counts.get(atype, 0) + 1
+                        atom_ids.add(int(parts[0]))
+                        n_atom_rows += 1
                         atoms_seen_data = True
                         charge_parse_ok = True
                     except (ValueError, IndexError):
@@ -881,6 +885,65 @@ class ScriptGenerator:
                 f"PPPM requires a charge-neutral cell. "
                 f"Check RESP convergence or add a neutralising counterion."
             )
+
+        # ── 3b. Structural integrity: header count vs rows, dangling topology ──
+        # A truncated data file is round-1's F6 fault and the shape a half-written EMC or
+        # restart write leaves behind. Until 2026-09-13 nothing here detected it: dropping
+        # atom rows was caught only INCIDENTALLY, by the charge sum above, because the
+        # deleted atoms happened to carry charge. Measured by injecting the same fault into
+        # three chemistries -- PLLA (PEST/PCFF) and PTFE (PHAL/OPLS-AA) reported a net-charge
+        # error, the right verdict for the wrong reason, while PE (PHYC/TraPPE-UA, uncharged)
+        # reported NO error at all and the truncated cell validated clean. The bond/atom
+        # ratio warning above does not cover it either: three atoms out of thousands does
+        # not move the ratio past its 0.5/3.0 bounds.
+        if charge_parse_ok and n_atoms > 0 and n_atom_rows != n_atoms:
+            errors.append(
+                f"Atoms section has {n_atom_rows} rows but the header declares {n_atoms} "
+                f"— data file is truncated or the header over-counts."
+            )
+        stats["n_atom_rows"] = n_atom_rows
+
+        # Referenced-atom columns per section: id type a1 a2 [a3 [a4]]
+        topology_widths = {"Bonds": 2, "Angles": 3, "Dihedrals": 4, "Impropers": 4}
+        dangling: list = []
+        current_topo = None
+        topo_seen_data = False
+        for line in lines:
+            stripped = line.strip()
+            head = stripped.split("#")[0].strip()
+            if head in topology_widths:
+                current_topo, topo_seen_data = head, False
+                continue
+            if current_topo is None:
+                continue
+            if stripped == "":
+                if topo_seen_data:
+                    current_topo = None
+                continue
+            if stripped.startswith("#"):
+                continue
+            parts = stripped.split()
+            width = topology_widths[current_topo]
+            if len(parts) < 2 + width:
+                continue
+            try:
+                refs = [int(x) for x in parts[2:2 + width]]
+            except ValueError:
+                continue
+            topo_seen_data = True
+            missing = [r for r in refs if r not in atom_ids]
+            if missing:
+                dangling.append(f"{current_topo} {parts[0]} -> atom {missing[0]}")
+            if len(dangling) >= 8:
+                break
+
+        if atom_ids and dangling:
+            errors.append(
+                f"Topology references atom id(s) absent from the Atoms section "
+                f"({'; '.join(dangling[:3])}"
+                f"{', ...' if len(dangling) > 3 else ''}) — data file is truncated or corrupt."
+            )
+        stats["dangling_topology_refs"] = len(dangling)
 
         # ── 4. Density plausibility ───────────────────────────────────────────
         if type_counts and masses_by_type:

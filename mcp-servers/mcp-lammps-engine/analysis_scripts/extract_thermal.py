@@ -348,6 +348,11 @@ def curvefit_bilinear(T, rho, tg_hint=None, ssr_tol=1.10):
     }
 
 
+# Lower bound on the hyperbola's width parameter in curvefit_hyperbola's `bounds`. A fit that
+# lands here has an unidentifiable width -- see the note at that return.
+C_LOWER_BOUND_K = 1e-3
+
+
 def hyperbola_indep(T, rho0, m_bar, delta, Tg, c):
     """Smoothed-bilinear (hyperbola) model: two linear asymptotes joined by a
     crossover of half-width c.  Low-T (glassy) slope = m_bar - delta, high-T
@@ -390,7 +395,7 @@ def curvefit_hyperbola(T, rho, seed=None):
     try:
         popt, pcov = optimize.curve_fit(
             hyperbola_indep, T, rho, p0=p0,
-            bounds=([-np.inf, -np.inf, -np.inf, T_min + 5, 1e-3],
+            bounds=([-np.inf, -np.inf, -np.inf, T_min + 5, C_LOWER_BOUND_K],
                     [ np.inf,  np.inf,  np.inf, T_max - 5, T_span]),
             maxfev=40000,
         )
@@ -414,6 +419,14 @@ def curvefit_hyperbola(T, rho, seed=None):
     except Exception:
         tg_sigma = None
 
+    # c is bounded below at C_LOWER_BOUND_K. Landing on that bound means the width is
+    # UNIDENTIFIABLE from this data, not that it was measured as zero -- and the two must not be
+    # reported the same way. A sweep stepping tg_t_step_K cannot resolve any width below roughly
+    # one step, so a fit that runs to the bound is the expected outcome for a transition sharper
+    # than the sampling, and says nothing about how well the crossover itself is located.
+    c_abs = float(abs(c))
+    width_resolved = c_abs > C_LOWER_BOUND_K * 10.0
+
     return {
         "Tg_K":                 float(Tg),
         "Tg_alt_K":             float(Tg),   # asymptotes meet at Tg by construction
@@ -422,7 +435,10 @@ def curvefit_hyperbola(T, rho, seed=None):
         "a_rubbery":            a_rubbery,
         "b_rubbery":            float(rho0 - a_rubbery * Tg),
         "r_squared":            float(r2),
-        "transition_width_c_K": float(abs(c)),
+        # None, not 0.0, when the optimiser ran to the bound: a number here would be read as a
+        # measurement. transition_width_resolved carries the distinction explicitly.
+        "transition_width_c_K": c_abs if width_resolved else None,
+        "transition_width_resolved": width_resolved,
         "tg_uncertainty_K":     tg_sigma,
     }
 
@@ -537,20 +553,54 @@ def _parse_system_mass_from_data_file(data_file_path):
 # ---------------------------------------------------------------------------
 
 def plot_tg_fit(temps, densities, cf_result, Tg_K, r2, fit_quality, graphs_dir):
+    """Plot the model that was actually FITTED, not its asymptotes.
+
+    Until 2026-09-11 this drew the two straight asymptotes and labelled them "Bilinear fit"
+    even when fit_method was hyperbola_curvefit. For a hyperbola the asymptotes are not the
+    fit: the curve sits delta*c below their intersection at Tg and only approaches them for
+    |T - Tg| >> c. iPMMA_1 has c = 113.8 K, wider than most of its measured range, so the
+    plotted lines lay ABOVE every point from 180 K to 600 K -- reading as a fit that had
+    missed the data, when the hyperbola itself has R^2 = 0.9937 and a mean signed residual of
+    -5e-6. The asymptotes score R^2 = 0.859 against the same points with every residual the
+    same sign, which is the tell: a least-squares fit cannot do that.
+
+    The asymptotes stay on the plot as thin dotted guides -- they are what the reported
+    glassy/rubbery CTEs are taken from, so hiding them would lose real information.
+    """
     apply_style()
     fig, ax = plt.subplots()
     T_plot = np.linspace(temps.min(), temps.max(), 300)
-    pred = np.where(
-        T_plot < Tg_K,
-        cf_result["a_glassy"] * T_plot + cf_result["b_glassy"],
-        cf_result["a_rubbery"] * T_plot + cf_result["b_rubbery"],
-    )
+    a_g, b_g = cf_result["a_glassy"], cf_result["b_glassy"]
+    a_r, b_r = cf_result["a_rubbery"], cf_result["b_rubbery"]
+    asymptotes = np.where(T_plot < Tg_K, a_g * T_plot + b_g, a_r * T_plot + b_r)
+    c = cf_result.get("transition_width_c_K")
+    if c:
+        # Reconstruct the fitted hyperbola from the stored asymptote form. Both asymptotes
+        # pass through (Tg, rho0) by construction, and c enters squared so its sign is moot.
+        m_bar = (a_g + a_r) / 2.0
+        delta = (a_r - a_g) / 2.0
+        rho0 = a_g * Tg_K + b_g
+        pred = hyperbola_indep(T_plot, rho0, m_bar, delta, Tg_K, float(c))
+        fit_label = f'Hyperbola fit (c = {float(c):.0f} K)'
+        ax.plot(T_plot, asymptotes, color='tomato', lw=1.0, ls=':', alpha=0.65,
+                label='Asymptotes (CTE slopes)')
+    else:
+        pred = asymptotes            # curvefit_bilinear: the asymptotes ARE the model
+        fit_label = 'Bilinear fit'
     ax.scatter(temps, densities, color='steelblue', s=40, zorder=3, label='Binned data')
-    ax.plot(T_plot, pred, color='tomato', lw=2, label='Bilinear fit')
+    ax.plot(T_plot, pred, color='tomato', lw=2, label=fit_label)
     ax.axvline(Tg_K, color='gray', ls='--', lw=1.5, label=f'Tg = {Tg_K:.0f} K')
+    if c:
+        # The transition is smeared over roughly +/- c; show it, because a width comparable to
+        # the fitted Tg is the real caveat on that number.
+        ax.axvspan(Tg_K - float(c), Tg_K + float(c), color='gray', alpha=0.10, zorder=0,
+                   label=f'transition width +/- c')
     ax.set_xlabel('Temperature (K)')
     ax.set_ylabel('Density (g/cm³)')
-    ax.set_title(f'Tg fit — R² = {r2:.4f} ({fit_quality})')
+    _title = f'Tg fit — R² = {r2:.4f} ({fit_quality})'
+    if c:
+        _title += f' — transition width c = {float(c):.0f} K'
+    ax.set_title(_title)
     ax.legend()
     save_fig(fig, str(graphs_dir / 'tg_fit.png'))
 
@@ -859,9 +909,8 @@ def main():
         ag, ar = cf.get("a_glassy"), cf.get("a_rubbery")
         if not (isinstance(ag, (int, float)) and isinstance(ar, (int, float)) and ag < 0 and ar < 0):
             v.append("slope_sign_invalid")
-        cw = cf.get("transition_width_c_K")
-        if cw is not None and cw < 5.0:
-            v.append("transition_width_degenerate")
+        if cf.get("transition_width_resolved") is False:
+            v.append("transition_width_unresolved")
         tgk = cf.get("Tg_K")
         if _span > 0 and isinstance(tgk, (int, float)) and (
                 tgk <= float(temps.min()) + 0.05 * _span
@@ -870,8 +919,24 @@ def main():
         return v
 
     primary_violations = _hard_violations(cf_result)
+
+    # An unidentifiable WIDTH is not grounds to change ESTIMATOR. With c -> 0 the hyperbola is
+    # mathematically the bilinear, so swapping picks a different parameterisation of the same
+    # model and files the run under a different fit_method than its siblings.
+    #
+    # That is data-driven, and it broke a replicate comparison: sPVC_1 and sPVC_2 are seed-only
+    # replicates of one protocol, and on 2026-09-11 they landed under DIFFERENT estimators purely
+    # because replicate 2's width fitted below the sweep resolution and replicate 1's did not
+    # (c = 42.5 K). Their Tg gap then mixed seed variance with estimator variance -- 10.7 K as
+    # reported, 7.2 K comparing like with like. The data must not choose the estimator.
+    #
+    # Inverted slopes and an endpoint-pinned Tg are different: there the alternative fit is a
+    # genuinely better answer, so those still swap.
+    _ESTIMATOR_PRESERVING = {"transition_width_unresolved"}
+    _swap_worthy = [v for v in primary_violations if v not in _ESTIMATOR_PRESERVING]
+
     fit_swap_note = None
-    if primary_violations and alt_result is not None and not _hard_violations(alt_result):
+    if _swap_worthy and alt_result is not None and not _hard_violations(alt_result):
         invalid_method = fit_method_used
         invalid_tg = Tg_primary
         invalid_reasons = ",".join(primary_violations)
@@ -884,7 +949,10 @@ def main():
             f"primary_fit_swapped: {invalid_method} (Tg={invalid_tg:.1f} K) was physically "
             f"invalid [{invalid_reasons}]; swapped to bilinear_curvefit (Tg={Tg_primary:.1f} K)"
         )
-    primary_fit_invalid = bool(primary_violations)
+    # An unresolved width does not invalidate the fit -- 4c decides, on the Tg's own
+    # uncertainty, whether the crossover is trustworthy.
+    primary_fit_invalid = bool([v for v in primary_violations
+                                if v not in _ESTIMATOR_PRESERVING])
 
     # Quality rating based on bilinear R²
     fit_quality = (
@@ -918,6 +986,12 @@ def main():
     # Transition-width sanity (hyperbola only): a crossover wider than half the
     # sweep span means the transition is not well localised — sweep too narrow or
     # data too noisy.  Cap quality at ACCEPTABLE and warn.
+    # The sweep's own temperature resolution, taken from the binned data rather than a CLI
+    # argument so the floor is always the one this fit actually had: a width finer than the
+    # spacing between temperature points cannot be measured, whatever the plan requested.
+    _uniq_T = np.unique(np.asarray(temps, dtype=float))
+    tg_t_step_K = float(np.median(np.diff(_uniq_T))) if _uniq_T.size >= 2 else 0.0
+
     c_width = cf_result.get("transition_width_c_K")
     if c_width is not None:
         half_span = 0.5 * (float(temps.max()) - float(temps.min()))
@@ -929,16 +1003,43 @@ def main():
                 f"transition_width_too_broad: c={c_width:.1f} K exceeds half the sweep "
                 f"span ({half_span:.0f} K) — transition poorly localised"
             )
-        # Too-narrow / degenerate transition: a near-zero crossover width is a fit artifact
-        # (a sharp kink fit to noise), not a physical Tg. It can score high R² yet return an
-        # outlier Tg — this is the PSU1 160 K/ns "width≈0 → Tg=565 K" failure that poisoned the
-        # multi-rate extrapolation. A real glass transition spans ≳5–10 K; below that the
-        # crossover is unresolved. Demote to POOR so the aggregation filter (>= ACCEPTABLE) drops it.
-        elif c_width < 5.0:
+        # Narrow but resolved: report it, do not demote. The sweep steps tg_t_step_K, so no
+        # width below roughly one step is measurable -- a bar under that can only ever fire on
+        # a fit that ran to its bound, which curvefit_hyperbola now reports as None instead.
+        elif c_width < max(5.0, float(tg_t_step_K or 0.0)):
+            fit_warnings.append(
+                f"transition_width_below_sweep_resolution: c={c_width:.2f} K is under the "
+                f"{max(5.0, float(tg_t_step_K or 0.0)):.0f} K floor set by this sweep's "
+                f"{tg_t_step_K} K step — read the transition as sharp, not as this number"
+            )
+
+    # Unidentifiable width (the optimiser ran to c's lower bound). This is NOT a reason to
+    # discard the Tg: with c -> 0 the hyperbola degenerates to a bilinear, which is a valid
+    # four-parameter model with a valid crossover, and the crossover's own uncertainty says so
+    # independently. Measured on sPVC_2, forced onto the hyperbola: sigma(Tg) = 16.8 K, better
+    # determined than sPVC_1's 42.5 K-wide fit (20.6 K) at a comparable R^2.
+    #
+    # The old c<5 rule demoted these to POOR "excluded from multi-rate aggregation". That filter
+    # no longer exists -- the multi-rate protocol was retired and do_thermal sweeps exactly one
+    # rate (stage_params.tg_rate) -- so the demotion's stated purpose is gone. The failure it
+    # really guarded, PSU1's "width~0 WITH an outlier Tg", is re-aimed here at the Tg: an
+    # unresolved width is only disqualifying when the crossover is ALSO poorly located.
+    if cf_result is not None and cf_result.get("transition_width_resolved") is False:
+        _sig = cf_result.get("tg_uncertainty_K")
+        _span_w = float(temps.max()) - float(temps.min())
+        if _sig is None or (_span_w > 0 and _sig > 0.10 * _span_w):
             fit_quality = "POOR"
             fit_warnings.append(
-                f"transition_width_degenerate: c={c_width:.2f} K (< 5 K) — unresolved kink "
-                "artifact, Tg unreliable; excluded from multi-rate aggregation"
+                f"transition_width_unresolved_and_tg_ill_located: width ran to its bound AND "
+                f"sigma(Tg)={'unknown' if _sig is None else f'{_sig:.1f} K'} exceeds 10% of the "
+                f"{_span_w:.0f} K sweep — this is the width~0-with-outlier-Tg failure mode"
+            )
+        else:
+            fit_warnings.append(
+                f"transition_width_unresolved: the fitted width ran to its lower bound, so it is "
+                f"unidentifiable from a sweep stepping {tg_t_step_K} K. Tg is retained -- "
+                f"sigma(Tg)={_sig:.1f} K on a {_span_w:.0f} K sweep -- and the transition should "
+                f"be reported as sharp with no width."
             )
 
     # Endpoint-pinned Tg: a transition fit whose Tg sits within ~5% of the sweep span from either

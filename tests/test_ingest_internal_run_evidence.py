@@ -208,3 +208,19 @@ def test_ingest_skips_blocked_cache_entry(tmp_path):
 def test_ingest_skips_when_run_plan_missing(tmp_path):
     result = pe.ingest_from_completed_run("NoSuchRun", repo_root=tmp_path)
     assert result["status"] == "skipped"
+
+
+def test_ingest_skips_a_tg_sensitivity_leg_even_with_a_validated_anchor_entry(tmp_path):
+    run_dir = tmp_path / "data" / "tg_sensitivity" / "TGS_PLLA_1_L3_r50"
+    (run_dir / "raw").mkdir(parents=True)
+    (run_dir / "raw" / "run_plan.json").write_text(json.dumps(
+        {"smiles": PMMA_SMILES, "tg_sensitivity": {"leg": "L3", "anchor": "PLLA_1"}}))
+    cache_path = tmp_path / "system_characterization_cache.json"
+    cache_path.write_text(json.dumps({PMMA_SMILES: VALIDATED_ENTRY}))
+    ff_store = tmp_path / "protocol_evidence_ff.json"
+
+    result = pe.ingest_from_completed_run("tg_sensitivity/TGS_PLLA_1_L3_r50", repo_root=tmp_path,
+                                          cache_path=cache_path, ff_store_path=ff_store)
+
+    assert result["status"] == "skipped"
+    assert not ff_store.exists()

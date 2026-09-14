@@ -81,4 +81,5 @@ def test_engine_halts_rather_than_calling_out_when_no_agent_is_configured():
     """
     source = (REPO_ROOT / "orchestration" / "scripts" / "workflow_engine.py").read_text()
     assert "no_recovery_agent_configured" in source
-    assert "max_agent_decisions_reached" in source
+    # With an agent, a spent budget closes the run under its own, different reason.
+    assert "agent_decision_budget_exhausted" in source

@@ -97,33 +97,47 @@ def test_canceling_component_drift_fails_gate_b_even_when_total_is_flat():
     assert equilibrated is False
 
 
-def test_vdw_is_judged_against_its_own_fluctuation_not_its_mean():
-    """E_vdwl and E_coul are residuals of large opposing contributions, so drift-as-a-percent-
-    of-the-mean measures where the cancellation landed, not how far from equilibrium the cell
-    is. aPS_1 (2026-09-09) is the worked example: vdW read 1.73% of a 1094 kcal/mol mean and
-    was the ONLY failing binding gate, while the same drift is 0.32 of that term's own sigma.
+def test_every_term_is_judged_against_its_own_fluctuation_not_its_mean():
+    """An energy term's mean carries an arbitrary force-field reference, so drift-as-a-percent-
+    of-the-mean is a different bar for every term. aPS_1 (2026-09-09) is the worked example: vdW
+    read 1.73% of a 1094 kcal/mol mean while the same drift is 0.32 of that term's own sigma.
 
-    A bond term with an identical fractional drift must still be judged on drift_pct -- the
-    swap is scoped to the two residual terms, not applied to everything.
+    The same fractional drift must therefore get the same verdict whatever the term is called:
+    both terms below drift ~1.7% of their mean, and each is decided by drift against its OWN
+    fluctuation -- the noisy one passes, the quiet one fails.
     """
     rng = np.random.default_rng(11)
     n = 400
-    # ~1.7% of the mean, but small compared with the term's own fluctuation.
     trend = np.linspace(0, 18.0, n)
     prod = pd.DataFrame({
         "E_vdwl": 1094.0 + trend + rng.normal(0, 40.0, size=n),
-        "E_bond": 1094.0 + trend + rng.normal(0, 0.5, size=n),
+        "E_dihed": 1094.0 + trend + rng.normal(0, 0.5, size=n),
     })
     res = _analyse_energy_components(prod, DRIFT_PCT, DRIFT_PVALUE)
-    vdw, bond = res["components"]["vdw"], res["components"]["bond"]
+    vdw, dihed = res["components"]["vdw"], res["components"]["dihedral"]
 
-    assert vdw["criterion"] == "drift_sigma"
+    for term in (vdw, dihed):
+        assert term["criterion"] == "drift_sigma"
+        assert term["drift_pct"] > 1.0, "the fixture must be one the OLD relative test would fail"
+
     assert vdw["drift_sigma"] < 1.0
-    assert vdw["pass"] is True, "vdW failed on a drift smaller than its own thermal noise"
-    assert vdw["drift_pct"] > 1.0, "the fixture must be one the OLD relative test would fail"
+    assert vdw["pass"] is True, "failed on a drift smaller than the term's own thermal noise"
+    assert dihed["drift_sigma"] > 1.0
+    assert dihed["pass"] is False, "a drift larger than the term's own noise must still fail"
 
-    assert bond["criterion"] == "drift_pct"
-    assert bond["pass"] is False, "the swap must not leak onto terms with a physical mean"
+
+def test_a_large_fractional_drift_passes_when_it_sits_inside_the_fluctuation():
+    """The case the old per-term drift_pct test got wrong for bonded terms: a signed dihedral
+    residual whose mean sits near zero turns a tiny absolute drift into a large percentage."""
+    rng = np.random.default_rng(14)
+    n = 400
+    prod = pd.DataFrame({
+        "E_dihed": -20.0 + np.linspace(0, 2.0, n) + rng.normal(0, 30.0, size=n),
+    })
+    dihed = _analyse_energy_components(prod, DRIFT_PCT, DRIFT_PVALUE)["components"]["dihedral"]
+    assert dihed["drift_pct"] > 1.0
+    assert dihed["drift_sigma"] < 1.0
+    assert dihed["pass"] is True
 
 
 def test_a_vdw_drift_larger_than_its_fluctuation_still_fails():
@@ -144,9 +158,9 @@ def test_a_vdw_drift_larger_than_its_fluctuation_still_fails():
     assert res["pass"] is False
 
 
-def test_both_residual_terms_report_the_criterion_they_were_judged_on():
+def test_every_term_reports_the_criterion_it_was_judged_on():
     """Every component says which test decided it, so a reader never infers it from the
-    numbers -- drift_pct stays reported for continuity with pre-2026-09-09 runs."""
+    numbers -- drift_pct stays reported for continuity with runs graded before 2026-09-13."""
     rng = np.random.default_rng(13)
     n = 300
     prod = pd.DataFrame({
@@ -155,9 +169,71 @@ def test_both_residual_terms_report_the_criterion_they_were_judged_on():
         "E_angle": 300 + rng.normal(0, 1, size=n),
     })
     res = _analyse_energy_components(prod, DRIFT_PCT, DRIFT_PVALUE)
-    assert res["components"]["vdw"]["criterion"] == "drift_sigma"
-    assert res["components"]["coul"]["criterion"] == "drift_sigma"
-    assert res["components"]["angle"]["criterion"] == "drift_pct"
+    for label in ("vdw", "coul", "angle"):
+        assert res["components"][label]["criterion"] == "drift_sigma"
     for label in ("vdw", "coul", "angle"):
         assert "drift_pct" in res["components"][label]
         assert "threshold" in res["components"][label]
+
+
+# --- drift significance must account for the series' own autocorrelation --------------------
+from check_equilibration_comprehensive import _drift_significance  # noqa: E402
+from scipy import stats as _sp  # noqa: E402
+
+
+def _ar1(n, phi, sigma, seed):
+    """An AR(1) series: correlated noise with NO trend at all."""
+    rng = np.random.default_rng(seed)
+    x = np.zeros(n)
+    for i in range(1, n):
+        x[i] = phi * x[i - 1] + rng.normal(0, sigma)
+    return x
+
+
+def test_correlated_noise_is_not_certified_as_a_trend():
+    """iPMMA_1, 2026-09-10. A slow excursion filled the graded window, the regression read it
+    as a trend, and the naive p-value certified it at 1.85e-42 off ~22 independent samples.
+    Strongly autocorrelated noise carries no trend; the corrected p must not claim one.
+    """
+    n = 1500
+    values = 100.0 + _ar1(n, phi=0.99, sigma=0.05, seed=7)
+    x = np.arange(n, dtype=float)
+    slope, _, _, p_naive, stderr = _sp.linregress(x, values)
+    p_eff, tau, n_eff = _drift_significance(values, slope, stderr, n, p_naive)
+
+    assert n_eff < n / 10, f"autocorrelation not detected (n_eff={n_eff} of {n})"
+    assert p_eff > p_naive, "the correction must never make a p-value smaller"
+    assert p_eff > 0.01, f"correlated noise still certified as a trend (p_eff={p_eff})"
+
+
+def test_a_real_trend_well_above_the_noise_still_registers():
+    """The correction must not silence everything -- a trend large against the fluctuation,
+    with enough independent samples behind it, has to stay significant."""
+    n = 1500
+    values = 100.0 + np.linspace(0, 20.0, n) + _ar1(n, phi=0.5, sigma=0.05, seed=8)
+    x = np.arange(n, dtype=float)
+    slope, _, _, p_naive, stderr = _sp.linregress(x, values)
+    p_eff, tau, n_eff = _drift_significance(values, slope, stderr, n, p_naive)
+    assert p_eff < 0.01, f"a genuine strong trend was silenced (p_eff={p_eff}, n_eff={n_eff})"
+
+
+def test_the_correction_only_ever_loosens():
+    """The property that makes this safe to ship onto already-graded runs: it can turn a FAIL
+    into a PASS and never the reverse, so no previously passing run can newly fail."""
+    for phi, seed in ((0.0, 1), (0.5, 2), (0.9, 3), (0.99, 4)):
+        n = 800
+        values = 50.0 + np.linspace(0, 1.0, n) + _ar1(n, phi=phi, sigma=0.02, seed=seed)
+        x = np.arange(n, dtype=float)
+        slope, _, _, p_naive, stderr = _sp.linregress(x, values)
+        p_eff, _, _ = _drift_significance(values, slope, stderr, n, p_naive)
+        assert p_eff >= p_naive - 1e-12, f"phi={phi}: correction tightened the test"
+
+
+def test_the_gated_fields_record_both_p_values():
+    """p_value stays the naive one for comparability with runs graded before 2026-09-10;
+    p_value_eff is what the verdict is made on."""
+    rng = np.random.default_rng(21)
+    values = 100.0 + rng.normal(0, 0.1, size=400)
+    res = _analyse_property(values, "density", DRIFT_PCT, DRIFT_PVALUE, 10)
+    for key in ("p_value", "p_value_eff", "tau_frames", "n_eff"):
+        assert key in res["drift"], f"{key} missing from the drift record"

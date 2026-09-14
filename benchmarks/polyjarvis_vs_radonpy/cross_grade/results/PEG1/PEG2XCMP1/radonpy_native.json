@@ -1,0 +1,183 @@
+{
+  "log": "/home/arz2/PolyJarvis/data/PEG2XCMP1/lammps/equil/npt_production/npt_production.log",
+  "units": "real",
+  "rows_in_log": 2001,
+  "rows_graded": 2001,
+  "tail_rows": null,
+  "width": 2000,
+  "window_fully_defined": false,
+  "criteria": {
+    "totene": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "TotEng",
+      "mean": 71277.96618106001,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "kinene": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "KinEng",
+      "mean": 52523.45571643201,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "ebond": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "E_bond",
+      "mean": 19338.7752122304,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "eangle": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "E_angle",
+      "mean": 41359.2833165568,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "edihed": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "E_dihed",
+      "mean": -51223.182850508005,
+      "crit": 0.002,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "evdw": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "E_vdwl",
+      "mean": -26543.671872150404,
+      "crit": 30.0,
+      "rule": "sma_sd > crit"
+    },
+    "ecoul": {
+      "status": "NOT_GATED",
+      "value": null,
+      "threshold": null,
+      "column": "E_coul",
+      "mean": 94579.149137992,
+      "crit": null,
+      "rule": "sma_sd > crit"
+    },
+    "elong": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "E_long",
+      "mean": -58310.170892604,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "dens": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "Density",
+      "mean": 1.12540948785,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "rg": {
+      "status": "FAIL",
+      "value": 0.4440615411449509,
+      "threshold": 0.19084589069133998,
+      "source": "calc_rg on rg.profile",
+      "n_profile_outputs": 2001,
+      "per_chain_sd": [
+        0.1973195570063242,
+        0.23137383403426404,
+        0.37445676385520105,
+        0.27593714992418805,
+        0.37607668439831354,
+        0.23424911878628105,
+        0.35853701385569,
+        0.20427523552936744,
+        0.375531144387464,
+        0.266407986957135,
+        0.4440615411449509,
+        0.18031035999820075,
+        0.2643432112428049,
+        0.286046054136658,
+        0.30618624150622603,
+        0.2876101831775642,
+        0.15048545295492638,
+        0.24533703253857822,
+        0.18510918804394416,
+        0.24099949135766754
+      ],
+      "per_chain_mean": [
+        17.40255444488996,
+        22.589407873440035,
+        28.627936085154985,
+        17.233247663319986,
+        17.91096299511001,
+        24.905027139080012,
+        22.495268118499986,
+        17.288256368935016,
+        21.762843186864952,
+        14.166387814429992,
+        18.123392708515013,
+        13.58601876240999,
+        20.28730693343504,
+        26.366758366659997,
+        18.47204923325,
+        17.95711072866497,
+        13.958267029340025,
+        16.94495555084998,
+        12.514319446645018,
+        19.099710933185012
+      ],
+      "crit": 0.01,
+      "rule": "sd_max > mean_mean*crit",
+      "sd_max_over_mean_pct": 2.3268069306409283
+    }
+  },
+  "verdict": "FAIL",
+  "failing": [
+    "rg"
+  ],
+  "not_evaluated": [
+    "dens",
+    "eangle",
+    "ebond",
+    "edihed",
+    "elong",
+    "evdw",
+    "kinene",
+    "totene"
+  ],
+  "radonpy_check_eq_returned": false,
+  "radonpy_check_eq_passes_an_unevaluable_window": false,
+  "radonpy_check_eq_agrees": true,
+  "radonpy_check_eq_skipped_rg": false,
+  "radonpy_warnings": [
+    "RadonPy warning: Radius of gyration does not converge. mean = 19.084589, sd = 0.444062"
+  ],
+  "rg_roundtrip": {
+    "numpy": {
+      "sd_max": 0.44406154123183206,
+      "mean_mean": 19.084589069119353,
+      "n_frames": 2000
+    },
+    "abs_diff_A": 8.68811689258564e-11
+  }
+}

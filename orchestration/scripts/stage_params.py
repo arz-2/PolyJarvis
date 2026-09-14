@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from functools import lru_cache
 from pathlib import Path
@@ -800,6 +801,28 @@ def _rate_suffix(rate) -> str:
     """
     return f'_r{int(rate)}' if rate else ''
 
+def _dump_path(path):
+    """Resolve a trajectory path to whichever of `.dump` / `.dump.gz` is actually on disk.
+
+    Completed runs' trajectories are stored gzipped (2.5x; 45.7 -> 19 GB on 2026-09-12) and the
+    manifests name the `.gz`. MDAnalysis's DumpReader goes through util.anyopen, so a gzipped
+    dump parses identically -- the only thing that breaks is a hardcoded `.dump` fallback in
+    this module, which would hand an analysis script a path that no longer exists.
+
+    Deliberately returns `path` UNCHANGED when neither file exists: these call sites also run
+    under --dry-run, where the path is a convention-based guess for a file nothing has written
+    yet, and rewriting it there would make the resolver's output depend on disk state.
+    """
+    if path is None:
+        return None
+    text = str(path)
+    if os.path.exists(text):
+        return text
+    if not text.endswith('.gz') and os.path.exists(text + '.gz'):
+        return text + '.gz'
+    return text
+
+
 def _melt_start_data_path(args) -> str:
     """The cell the core equilibration chain ends on: nvt_melt_hold_out.data.
 
@@ -872,7 +895,7 @@ def _resolve_analyze_tg_params(args, cls: dict) -> dict:
     # hold -- not the assessment cell. args.equil_data_path holds the real accepted output
     # during execution; the flat-convention guess is a --dry-run-only fallback.
     equil_data = args.equil_data_path or _melt_start_data_path(args)
-    per_t_dump = f'{tg_sweep_dir}/per_t_structs.dump'
+    per_t_dump = _dump_path(f'{tg_sweep_dir}/per_t_structs.dump')
     return {'tg_rate_K_per_ns': rate, 'tg_log_path': tg_log, 'tg_data_file': equil_data, 'per_t_dump_file': per_t_dump, 'enthalpy_col': getattr(args, 'enthalpy_col', None) or 'Enthalpy', 'backbone_types': args.backbone_types or cls.get('backbone_types'), 'output_dir': output_dir, 'graphs_dir': graphs_dir, 'method_gap_exempt': False,
             'fit_t_max_K': temperature_schedule(args, cls)['tg_fit_top_K']}
 
@@ -933,9 +956,9 @@ def _resolve_equil_check_params(args, cls: dict) -> dict:
             'cutoff_A': cls.get('cutoff_A'),
             'npt_prod_log_path': npt_prod_log_path,
             'npt_prod_data_path': npt_prod_data_path,
-            'melt_dump_path': (args.npt_prod_dump
+            'melt_dump_path': _dump_path(args.npt_prod_dump
                                or f'{lammps_base}/equil/nvt_melt_hold/nvt_melt_hold.dump'),
-            'struct_dump_path': (getattr(args, 'struct_dump_path', None)
+            'struct_dump_path': _dump_path(getattr(args, 'struct_dump_path', None)
                                  or f'{lammps_base}/equil/{hold}/{hold}.dump'),
             'melt_data_path': None,
             'npt_prod_temp_K': sched['T_melt_hold_K'],
@@ -977,9 +1000,9 @@ def _resolve_cool_check_params(args, cls: dict) -> dict:
             # every gate it fed is advisory in both regimes, so it cost 3-20 ns and could not
             # fail a run). Both dump arguments therefore name the SAME file, which makes
             # check_equilibration_comprehensive's struct/melt split a no-op here.
-            'melt_dump_path': (args.npt_prod_dump
+            'melt_dump_path': _dump_path(args.npt_prod_dump
                                or f'{lammps_base}/cool/{prod}/{prod}.dump'),
-            'struct_dump_path': (getattr(args, 'struct_dump_path', None)
+            'struct_dump_path': _dump_path(getattr(args, 'struct_dump_path', None)
                                  or f'{lammps_base}/cool/{prod}/{prod}.dump'),
             # C(t) is NOT adjudicated here, and passing None is what says so: on a barostatted
             # trajectory the coordinates are affine-rescaled every step, so a decay measured on
@@ -1095,7 +1118,8 @@ def _melt_cell(args, cls: dict) -> tuple[str, str]:
     base = f'{REPO_ROOT}/data/{args.run_name}/lammps'
     data = (getattr(args, 'melt_start_data_path', None) or args.data_path
             or f'{base}/equil/nvt_melt_hold/nvt_melt_hold_out.data')
-    dump = getattr(args, 'melt_dump_path', None) or f'{base}/equil/nvt_melt_hold/nvt_melt_hold.dump'
+    dump = _dump_path(getattr(args, 'melt_dump_path', None)
+                      or f'{base}/equil/nvt_melt_hold/nvt_melt_hold.dump')
     return data, dump
 
 

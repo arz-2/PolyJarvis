@@ -348,13 +348,18 @@ class SubprocessRecoveryAgent:
         self.backend = backend
 
     def diagnose(self, intent: ScientificIntent, plan: dict, issue: WorkflowIssue) -> RecoveryDecision:
+        issue_payload = issue.to_dict()
+        # WorkflowEngine states its own per-failure menu (accept_with_caveat, wait_and_retry,
+        # end_run ...) in engine_context; the outer control-plane loop sends none and keeps
+        # VALID_RECOVERY_ACTIONS, which apply_recovery validates against.
+        engine_actions = (issue_payload.get("engine_context") or {}).get("valid_actions")
         result = self.backend.invoke({
             "task": "diagnose_polymer_simulation_issue",
             "intent": intent.to_dict(),
             "plan_summary": _plan_summary(plan),
-            "issue": issue.to_dict(),
+            "issue": issue_payload,
             "output_contract": {
-                "action": sorted(VALID_RECOVERY_ACTIONS),
+                "action": sorted(engine_actions or VALID_RECOVERY_ACTIONS),
                 "rationale": "diagnosis and justification",
                 "modifications": planning_parameter_contract(),
             },

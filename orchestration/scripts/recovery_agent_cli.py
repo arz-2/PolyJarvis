@@ -87,15 +87,30 @@ READ_ONLY_TOOLS = [
 
 DEFAULT_ACTIONS = ("retry", "revise_plan", "stop")
 
+#: One line per action the engine or the outer loop can offer. The enum is always the caller's
+#: menu; this only describes it.
+ACTION_DESCRIPTIONS = {
+    "retry": "re-run the stage unchanged (transient cause, already gone)",
+    "wait_and_retry": "engine waits for disk/GPU to clear (bounded), then re-runs the stage",
+    "revise_plan": "apply modifications (decided_params overrides)",
+    "accept_with_caveat": "accept this property stage as non-reportable so the rest of the "
+                          "run finishes; the value is withheld",
+    "end_run": "close the run; nothing available can produce a valid result worth its cost",
+    "stop": "close the run (outer control-plane loop)",
+}
+
+
+def _closing_action(actions) -> str:
+    return "end_run" if "end_run" in actions else "stop"
+
 
 def _output_schema(actions) -> dict:
     return {
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": sorted(actions),
-                       "description": "retry = re-attempt with unchanged params (confirmed "
-                                      "transient cause); revise_plan = apply modifications; "
-                                      "stop = no safe automatic fix, needs human review"},
+                       "description": "; ".join(f"{a} = {ACTION_DESCRIPTIONS.get(a, a)}"
+                                                for a in sorted(actions))},
             "modifications": {"type": "object",
                               "description": "decided_params overrides; only when action=="
                                              "revise_plan, else {}"},
@@ -137,6 +152,8 @@ def _trim_payload(payload: dict) -> dict:
         "failed_attempt_manifest": context.get("failed_attempt_manifest"),
         "escalation_attempt": context.get("escalation_attempt"),
         "max_agent_decisions": context.get("max_agent_decisions"),
+        "previous_rejection": context.get("previous_rejection"),
+        "autonomous": context.get("autonomous"),
         "valid_actions": contract.get("action"),
         "modification_contract": contract.get("modifications"),
     }
@@ -145,7 +162,8 @@ def _trim_payload(payload: dict) -> dict:
 
 _PROMPT_HEADER_KEYS = ("run_name", "run_dir", "stage", "valid_actions",
                        "modification_contract", "recovery_history",
-                       "escalation_attempt", "max_agent_decisions")
+                       "escalation_attempt", "max_agent_decisions",
+                       "previous_rejection", "autonomous")
 
 
 def _render_history_entry(entry) -> str:
@@ -189,6 +207,10 @@ def _spent_rungs(problem: dict) -> str:
     manifest = problem.get("failed_attempt_manifest")
     if manifest:
         parts.append(f"Failing attempt id: {manifest}.")
+    rejection = problem.get("previous_rejection")
+    if rejection:
+        parts.append("The engine REFUSED your previous decision for this failure: "
+                     + json.dumps(rejection, default=str) + ". Choose differently.")
     return " ".join(parts)
 
 
@@ -209,13 +231,16 @@ def _build_prompt(problem: dict) -> str:
         "return and would spend your whole timeout). You never write, edit, resubmit, or "
         "claim/release any "
         "resource yourself -- the calling engine re-validates and applies whatever you "
-        f"decide. Choose one action from {valid_actions}: `retry` re-attempts with "
-        "unchanged params (only when you've confirmed the cause was transient and is now "
-        "resolved); `revise_plan` applies `modifications` (decided_params overrides "
-        f"constrained to this contract: {json.dumps(modification_contract, default=str)}) "
-        "-- only when you're confident of both the root cause and the fix; `stop` when the "
-        "failure is novel, ambiguous, or needs a human judgment call recover.md's ladder "
-        "doesn't cover. Conclude with exactly one JSON object matching the required schema."
+        f"decide. Choose one action from {valid_actions}: "
+        + "; ".join(f"`{a}` {ACTION_DESCRIPTIONS.get(a, a)}" for a in valid_actions)
+        + ". `revise_plan` modifications are constrained to this contract: "
+        f"{json.dumps(modification_contract, default=str)}. "
+        + ("No human will review this decision or unblock the run: make the call recover.md "
+           "section 4 supports, weighing GPU time, and put the evidence in the rationale. "
+           if problem.get("autonomous") else
+           "`stop` when the failure is novel, ambiguous, or needs a human judgment call "
+           "recover.md's ladder doesn't cover. ")
+        + "Conclude with exactly one JSON object matching the required schema."
     )
 
 
@@ -279,7 +304,7 @@ def diagnose(payload: dict) -> dict:
                                                  _output_schema(valid_actions))
         action = structured.get("action")
         if action not in valid_actions:
-            action = "stop"
+            action = _closing_action(valid_actions)
         modifications = dict(structured.get("modifications") or {}) if action == "revise_plan" else {}
         # The model goes in the rationale rather than a fourth key because RecoveryDecision
         # (scientific_control.py:225) is a three-field frozen dataclass whose from_dict drops
@@ -297,7 +322,7 @@ def diagnose(payload: dict) -> dict:
         # escalation_required/unresolved for a human -- this only spares a human from
         # unsticking a one-off invocation blip. Falls back to "stop" if the caller's own
         # contract doesn't offer "retry" as a valid action.
-        action = "retry" if "retry" in valid_actions else "stop"
+        action = "retry" if "retry" in valid_actions else _closing_action(valid_actions)
         modifications = {}
         rationale = f"[recovery-agent invocation failed, retrying the stage] {exc}"
     return {"action": action, "rationale": rationale, "modifications": modifications}

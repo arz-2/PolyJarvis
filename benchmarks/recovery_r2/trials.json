@@ -1,11 +1,11 @@
 {
   "tier": "routing (tier 1) -- COMPLETION IS SCRIPTED, NOT MEASURED",
-  "cell": "/home/arz2/PolyJarvis_v2/data/PEG1_gate_validation/attempts/build/attempt-0001/work/cell/cell.data",
+  "cell": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/build/attempt-0001/work/cell/cell.data",
   "trials_per_arm": 3,
   "recurrences_injected": 3,
   "max_agent_decisions": 2,
   "verification": {
-    "cell": "/home/arz2/PolyJarvis_v2/data/PEG1_gate_validation/attempts/build/attempt-0001/work/cell/cell.data",
+    "cell": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/build/attempt-0001/work/cell/cell.data",
     "control": {
       "code": null,
       "errors": [],
@@ -26,7 +26,7 @@
         "got": "BUILD_CELL_INVALID",
         "fired": true,
         "knobs": {},
-        "evidence": "Net charge = +0.0530 e (tolerance \u00b10.01 e). PPPM requires a charge-neutral cell. Check RESP convergence or add a neutralising counterion."
+        "evidence": "Net charge = +0.2120 e (tolerance \u00b10.01 e). PPPM requires a charge-neutral cell. Check RESP convergence or add a neutralising counterion."
       },
       {
         "id": "collapse_box",
@@ -44,7 +44,7 @@
         "knobs": {
           "lj_cutoff": 40.0
         },
-        "evidence": "Minimum box side 49.3 \u00c5 < 2\u00d7cutoff (80.0 \u00c5). LAMMPS requires box > 2\u00d7cutoff in all periodic directions."
+        "evidence": "Minimum box side 51.0 \u00c5 < 2\u00d7cutoff (80.0 \u00c5). LAMMPS requires box > 2\u00d7cutoff in all periodic directions."
       }
     ],
     "failures": []

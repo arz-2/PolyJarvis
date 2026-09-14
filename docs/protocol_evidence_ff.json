@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-12T12:38:06Z",
+  "generated_at": "2026-09-14T01:49:31Z",
   "records": [
     {
       "schema_version": 1,
@@ -3504,6 +3504,604 @@
         "source_run": "PLLA_1",
         "migrated_from": null,
         "added_at": "2026-09-08T23:29:55Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "0cca5614f384",
+      "field": "forcefield",
+      "polymer_class": "PEST",
+      "polymer_names": [],
+      "smiles": [
+        "*OC(=O)C(*)C"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PEST (*OC(=O)C(*)C) in run PLLA_1; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:PLLA_1",
+      "url": null,
+      "title": "PolyJarvis internal run PLLA_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PLLA_1",
+        "migrated_from": null,
+        "added_at": "2026-09-10T08:32:34Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "d301b0c9cbf3",
+      "field": "cooling_rate",
+      "polymer_class": "PEST",
+      "polymer_names": [],
+      "smiles": [
+        "*OC(=O)C(*)C"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PEST (*OC(=O)C(*)C) in run PLLA_1.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:PLLA_1",
+      "url": null,
+      "title": "PolyJarvis internal run PLLA_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PLLA_1",
+        "migrated_from": null,
+        "added_at": "2026-09-10T08:32:34Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "e97951c04435",
+      "field": "forcefield",
+      "polymer_class": "PSTR",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PSTR (*CC(*)c1ccccc1) in run aPS_1; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:aPS_1",
+      "url": null,
+      "title": "PolyJarvis internal run aPS_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "aPS_1",
+        "migrated_from": null,
+        "added_at": "2026-09-10T12:07:28Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "840f6b384b27",
+      "field": "cooling_rate",
+      "polymer_class": "PSTR",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PSTR (*CC(*)c1ccccc1) in run aPS_1.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:aPS_1",
+      "url": null,
+      "title": "PolyJarvis internal run aPS_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "aPS_1",
+        "migrated_from": null,
+        "added_at": "2026-09-10T12:07:28Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "63d560434bbf",
+      "field": "forcefield",
+      "polymer_class": "PVNL",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(Cl)CC(*)Cl"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PVNL (*CC(Cl)CC(*)Cl) in run sPVC_1; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:sPVC_1",
+      "url": null,
+      "title": "PolyJarvis internal run sPVC_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "sPVC_1",
+        "migrated_from": null,
+        "added_at": "2026-09-10T17:55:35Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "1fd665cdf277",
+      "field": "cooling_rate",
+      "polymer_class": "PVNL",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(Cl)CC(*)Cl"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PVNL (*CC(Cl)CC(*)Cl) in run sPVC_1.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:sPVC_1",
+      "url": null,
+      "title": "PolyJarvis internal run sPVC_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "sPVC_1",
+        "migrated_from": null,
+        "added_at": "2026-09-10T17:55:35Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "29d9fb8c5989",
+      "field": "forcefield",
+      "polymer_class": "PVNL",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(Cl)CC(*)Cl"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PVNL (*CC(Cl)CC(*)Cl) in run sPVC_2; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:sPVC_2",
+      "url": null,
+      "title": "PolyJarvis internal run sPVC_2 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "sPVC_2",
+        "migrated_from": null,
+        "added_at": "2026-09-11T17:12:50Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "76b257c99f4b",
+      "field": "cooling_rate",
+      "polymer_class": "PVNL",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(Cl)CC(*)Cl"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PVNL (*CC(Cl)CC(*)Cl) in run sPVC_2.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:sPVC_2",
+      "url": null,
+      "title": "PolyJarvis internal run sPVC_2 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "sPVC_2",
+        "migrated_from": null,
+        "added_at": "2026-09-11T17:12:50Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "7e8466101870",
+      "field": "forcefield",
+      "polymer_class": "PEST",
+      "polymer_names": [],
+      "smiles": [
+        "*OC(=O)C(*)C"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PEST (*OC(=O)C(*)C) in run PLLA_2; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:PLLA_2",
+      "url": null,
+      "title": "PolyJarvis internal run PLLA_2 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PLLA_2",
+        "migrated_from": null,
+        "added_at": "2026-09-11T21:04:25Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "fee12c74dc82",
+      "field": "cooling_rate",
+      "polymer_class": "PEST",
+      "polymer_names": [],
+      "smiles": [
+        "*OC(=O)C(*)C"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PEST (*OC(=O)C(*)C) in run PLLA_2.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:PLLA_2",
+      "url": null,
+      "title": "PolyJarvis internal run PLLA_2 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PLLA_2",
+        "migrated_from": null,
+        "added_at": "2026-09-11T21:04:25Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "c7d5a9ce5c3e",
+      "field": "forcefield",
+      "polymer_class": "PACR",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PACR (*CC(*)(C)C(=O)OC) in run iPMMA_1; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:iPMMA_1",
+      "url": null,
+      "title": "PolyJarvis internal run iPMMA_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "iPMMA_1",
+        "migrated_from": null,
+        "added_at": "2026-09-11T22:36:44Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "be576ffc5c34",
+      "field": "cooling_rate",
+      "polymer_class": "PACR",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(*)(C)C(=O)OC"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PACR (*CC(*)(C)C(=O)OC) in run iPMMA_1.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:iPMMA_1",
+      "url": null,
+      "title": "PolyJarvis internal run iPMMA_1 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "iPMMA_1",
+        "migrated_from": null,
+        "added_at": "2026-09-11T22:36:44Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "cea6e719a933",
+      "field": "forcefield",
+      "polymer_class": "PSTR",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PSTR (*CC(*)c1ccccc1) in run aPS_2; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:aPS_2",
+      "url": null,
+      "title": "PolyJarvis internal run aPS_2 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "aPS_2",
+        "migrated_from": null,
+        "added_at": "2026-09-12T07:23:17Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "2c5a99f8cc84",
+      "field": "cooling_rate",
+      "polymer_class": "PSTR",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PSTR (*CC(*)c1ccccc1) in run aPS_2.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:aPS_2",
+      "url": null,
+      "title": "PolyJarvis internal run aPS_2 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "aPS_2",
+        "migrated_from": null,
+        "added_at": "2026-09-12T07:23:17Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "959bea3fc2bc",
+      "field": "forcefield",
+      "polymer_class": "PVNL",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(Cl)CC(*)Cl"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PVNL (*CC(Cl)CC(*)Cl) in run sPVC_3; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:sPVC_3",
+      "url": null,
+      "title": "PolyJarvis internal run sPVC_3 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "sPVC_3",
+        "migrated_from": null,
+        "added_at": "2026-09-12T14:07:24Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a0a5fe0cac23",
+      "field": "cooling_rate",
+      "polymer_class": "PVNL",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(Cl)CC(*)Cl"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PVNL (*CC(Cl)CC(*)Cl) in run sPVC_3.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:sPVC_3",
+      "url": null,
+      "title": "PolyJarvis internal run sPVC_3 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "sPVC_3",
+        "migrated_from": null,
+        "added_at": "2026-09-12T14:07:24Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a60dae88e5cc",
+      "field": "forcefield",
+      "polymer_class": "PEST",
+      "polymer_names": [],
+      "smiles": [
+        "*OC(=O)C(*)C"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PEST (*OC(=O)C(*)C) in run PLLA_3; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:PLLA_3",
+      "url": null,
+      "title": "PolyJarvis internal run PLLA_3 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PLLA_3",
+        "migrated_from": null,
+        "added_at": "2026-09-12T21:50:39Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "4f55d4c906e2",
+      "field": "cooling_rate",
+      "polymer_class": "PEST",
+      "polymer_names": [],
+      "smiles": [
+        "*OC(=O)C(*)C"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PEST (*OC(=O)C(*)C) in run PLLA_3.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:PLLA_3",
+      "url": null,
+      "title": "PolyJarvis internal run PLLA_3 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "PLLA_3",
+        "migrated_from": null,
+        "added_at": "2026-09-12T21:50:39Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "59769ff6e241",
+      "field": "forcefield",
+      "polymer_class": "PSTR",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "PolyJarvis validated pcff for forcefield on PSTR (*CC(*)c1ccccc1) in run aPS_3; validated properties: ['bulk_modulus', 'density', 'tg'].",
+      "value": {
+        "recommendation": "pcff"
+      },
+      "doi": "internal-run:aPS_3",
+      "url": null,
+      "title": "PolyJarvis internal run aPS_3 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "aPS_3",
+        "migrated_from": null,
+        "added_at": "2026-09-13T11:19:54Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "75f7eb12c19e",
+      "field": "cooling_rate",
+      "polymer_class": "PSTR",
+      "polymer_names": [],
+      "smiles": [
+        "*CC(*)c1ccccc1"
+      ],
+      "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for PSTR (*CC(*)c1ccccc1) in run aPS_3.",
+      "value": {
+        "rate_K_per_ns": 100
+      },
+      "doi": "internal-run:aPS_3",
+      "url": null,
+      "title": "PolyJarvis internal run aPS_3 (in-pipeline validation)",
+      "year": 2026,
+      "doi_verified": true,
+      "trust_tier": "internal_validated_run",
+      "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+      "provenance": {
+        "origin": "internal_run",
+        "source_run": "aPS_3",
+        "migrated_from": null,
+        "added_at": "2026-09-13T11:19:54Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "19dcf05b25a7",
+      "field": "forcefield",
+      "polymer_class": "PHAL",
+      "polymer_names": [
+        "polytetrafluoroethylene (PTFE)"
+      ],
+      "smiles": [
+        "*C(F)(F)C(*)(F)F"
+      ],
+      "claim": "Borodin, Smith & Bedrov (2002), 'A Quantum Chemistry Based Force Field for Perfluoroalkanes and Poly(tetrafluoroethylene)', J. Phys. Chem. B -- develops a dedicated quantum-chemistry-based force field for perfluoroalkanes and PTFE specifically. DOI resolves to the correct ACS article and title/authors/year confirmed via Semantic Scholar; full text is paywalled so no quantitative density/Tg comparison against OPLS-AA could be verified.",
+      "value": {
+        "recommendation": null
+      },
+      "doi": "10.1021/jp026158i",
+      "url": "https://doi.org/10.1021/jp026158i",
+      "title": "A Quantum Chemistry Based Force Field for Perfluoroalkanes and Poly(tetrafluoroethylene)",
+      "year": 2002,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PTFE_AI",
+        "migrated_from": null,
+        "added_at": "2026-09-14T01:49:31Z"
+      }
+    },
+    {
+      "schema_version": 1,
+      "record_id": "a445fa96d310",
+      "field": "forcefield",
+      "polymer_class": "PHAL",
+      "polymer_names": [
+        "polytetrafluoroethylene (PTFE)"
+      ],
+      "smiles": [
+        "*C(F)(F)C(*)(F)F"
+      ],
+      "claim": "2024 study developing new transferable force-field parameters for PTFE compatible with the AMBER force field, derived from quantum-mechanical reference data, reported (per abstract) to achieve high accuracy in predicting density, vibrational spectra, and specific heat capacity. Abstract does not state a comparison against OPLS-AA or GAFF2; full text was not accessible to verify numeric error figures or amorphous vs. crystalline system.",
+      "value": {
+        "recommendation": null
+      },
+      "doi": "10.1515/chem-2024-0072",
+      "url": "https://doi.org/10.1515/chem-2024-0072",
+      "title": "Development of AMBER-compliant transferable force field parameters for polytetrafluoroethylene",
+      "year": 2024,
+      "doi_verified": true,
+      "trust_tier": "peer_reviewed_doi",
+      "relevance": null,
+      "provenance": {
+        "origin": "worker_run",
+        "source_run": "PTFE_AI",
+        "migrated_from": null,
+        "added_at": "2026-09-14T01:49:31Z"
       }
     },
     {

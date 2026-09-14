@@ -51,11 +51,16 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+LEG_DIR = "tg_sensitivity"
+"""Legs live under data/tg_sensitivity/, apart from the campaign runs. The engine resolves a run
+as data/<run_name>, so the subdirectory is part of the run name itself."""
+
+
 def leg_name(leg: dict, anchor: str) -> str:
     """Anchor-qualified, so swapping iPMMA_1 -> PLLA_1 does not collide with an earlier build."""
     key, value = next(iter(leg["override"].items()))
     tag = "r" if key == "tg_rate_K_per_ns" else "dT"
-    return f"TGS_{anchor}_{leg['id']}_{tag}{value}"
+    return f"{LEG_DIR}/TGS_{anchor}_{leg['id']}_{tag}{value}"
 
 
 def inherited_stage_record(anchor_state: dict, stage: str) -> dict:

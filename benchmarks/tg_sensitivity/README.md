@@ -11,6 +11,15 @@ necessary for representative systems."*
 `MANIFEST.json` is the definition — anchors, the six legs, the cost law, the predeclared
 comparison rule. `matrix.json` is generated.
 
+Legs live in `data/tg_sensitivity/`, apart from the campaign runs; the subdirectory is part of
+the run name (`tg_sensitivity/TGS_...`) because the engine resolves a run as `data/<run_name>`.
+An accepted leg is never frozen into `guides/system_characterization_cache.json` or ingested into
+`docs/protocol_evidence_ff.json` — both writers skip any plan carrying `tg_sensitivity`, since a
+leg is its anchor's protocol with one knob moved and would otherwise overwrite the anchor's entry.
+
+Launched 2026-09-12 on this machine: L3 and L6 on **PLLA_1** (`--anchor-override
+iPMMA_1=PLLA_1`). The PE legs (L1, L2, L4, L5) run on the other machine.
+
 ## Why there is no data on these axes today
 
 `tg_t_step_K` is **20 K in all 36 round-1 runs and all 21 stereo_r2 plans**, without exception,
