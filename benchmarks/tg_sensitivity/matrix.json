@@ -1,0 +1,29 @@
+{
+  "built_at": "2026-09-13T03:13:19.032441+00:00",
+  "legs": [
+    {
+      "leg": "L3",
+      "axis": "rate",
+      "run_name": "tg_sensitivity/TGS_PLLA_1_L3_r50",
+      "anchor": "PLLA_1",
+      "override": {
+        "tg_rate_K_per_ns": 50
+      },
+      "gpu_h": 8.8,
+      "melt_cell": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data",
+      "run_plan": "data/tg_sensitivity/TGS_PLLA_1_L3_r50/raw/run_plan.json"
+    },
+    {
+      "leg": "L6",
+      "axis": "t_grid",
+      "run_name": "tg_sensitivity/TGS_PLLA_1_L6_dT40",
+      "anchor": "PLLA_1",
+      "override": {
+        "tg_t_step_K": 40
+      },
+      "gpu_h": 4.6,
+      "melt_cell": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data",
+      "run_plan": "data/tg_sensitivity/TGS_PLLA_1_L6_dT40/raw/run_plan.json"
+    }
+  ]
+}

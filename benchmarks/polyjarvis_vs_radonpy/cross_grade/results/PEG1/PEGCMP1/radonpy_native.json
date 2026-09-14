@@ -1,0 +1,163 @@
+{
+  "log": "/home/arz2/PolyJarvis/data/PEGCMP1/lammps/equil/npt_production/npt_production.log",
+  "units": "real",
+  "rows_in_log": 2001,
+  "rows_graded": 2001,
+  "tail_rows": null,
+  "width": 2000,
+  "window_fully_defined": false,
+  "criteria": {
+    "totene": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "TotEng",
+      "mean": 35670.0365895796,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "kinene": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "KinEng",
+      "mean": 26271.093990118,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "ebond": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "E_bond",
+      "mean": 9672.0960009448,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "eangle": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "E_angle",
+      "mean": 20645.8507611204,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "edihed": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "E_dihed",
+      "mean": -25554.036041135198,
+      "crit": 0.002,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "evdw": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "E_vdwl",
+      "mean": -13248.417166758401,
+      "crit": 30.0,
+      "rule": "sma_sd > crit"
+    },
+    "ecoul": {
+      "status": "NOT_GATED",
+      "value": null,
+      "threshold": null,
+      "column": "E_coul",
+      "mean": 47330.186993856,
+      "crit": null,
+      "rule": "sma_sd > crit"
+    },
+    "elong": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "E_long",
+      "mean": -29223.930258631204,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "dens": {
+      "status": "UNEVALUABLE",
+      "value": null,
+      "threshold": null,
+      "reason": "2001 rows < 2*width=4000; the rolling window is undefined",
+      "column": "Density",
+      "mean": 1.12459980705,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "rg": {
+      "status": "FAIL",
+      "value": 0.59004527708481,
+      "threshold": 0.17771411732735012,
+      "source": "calc_rg on rg.profile",
+      "n_profile_outputs": 2001,
+      "per_chain_sd": [
+        0.59004527708481,
+        0.2225956867932259,
+        0.17631261456695568,
+        0.1704387715539661,
+        0.32219295145180793,
+        0.21170561604385998,
+        0.37223524270356695,
+        0.351588942033169,
+        0.22061979786715644,
+        0.368609111834325
+      ],
+      "per_chain_mean": [
+        17.733800990065024,
+        17.633981413085007,
+        15.222750237894981,
+        13.205395016005006,
+        21.83639548550002,
+        20.448857546779987,
+        15.662252583389991,
+        19.762984488190042,
+        21.291654665135002,
+        14.916044901305
+      ],
+      "crit": 0.01,
+      "rule": "sd_max > mean_mean*crit",
+      "sd_max_over_mean_pct": 3.3201936118442648
+    }
+  },
+  "verdict": "FAIL",
+  "failing": [
+    "rg"
+  ],
+  "not_evaluated": [
+    "dens",
+    "eangle",
+    "ebond",
+    "edihed",
+    "elong",
+    "evdw",
+    "kinene",
+    "totene"
+  ],
+  "radonpy_check_eq_returned": false,
+  "radonpy_check_eq_passes_an_unevaluable_window": false,
+  "radonpy_check_eq_agrees": true,
+  "radonpy_check_eq_skipped_rg": false,
+  "radonpy_warnings": [
+    "RadonPy warning: Radius of gyration does not converge. mean = 17.771412, sd = 0.590045"
+  ],
+  "rg_roundtrip": {
+    "numpy": {
+      "sd_max": 0.5900452769957837,
+      "mean_mean": 17.77141173271824,
+      "n_frames": 2000
+    },
+    "abs_diff_A": 8.902634185403713e-11
+  }
+}

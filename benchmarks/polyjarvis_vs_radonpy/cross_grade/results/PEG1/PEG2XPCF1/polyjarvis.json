@@ -1,0 +1,129 @@
+{
+  "mode": "trajectory",
+  "log": "/home/arz2/PolyJarvis/data/PEG2XPCF1/lammps/equil/npt_production/npt_production.log",
+  "clause": "require_rubbery",
+  "verdict": "PASS",
+  "binding": {
+    "energy_drift": true,
+    "density_sem": true,
+    "energy_sem": true,
+    "n_eff_density": true,
+    "density_homogeneity": true,
+    "finite_size": true
+  },
+  "failing_binding": [],
+  "unmeasured_binding": [],
+  "advisory": {
+    "density_drift": true,
+    "energy_component_drift": true,
+    "residual_stress": false,
+    "rg": true,
+    "ct": true,
+    "torsion": true,
+    "msd_not_trapped": false,
+    "msid_gaussian": true
+  },
+  "failing_advisory": [
+    "msd_not_trapped",
+    "residual_stress"
+  ],
+  "energy_component_drift": {
+    "bond": {
+      "drift_pct": 0.1853,
+      "p_value": 0.3373,
+      "p_value_naive": 0.1693,
+      "tau_frames": 2.05,
+      "n_eff": 488,
+      "criterion": "drift_pct",
+      "threshold": 1.0,
+      "pass": true
+    },
+    "angle": {
+      "drift_pct": 0.0548,
+      "p_value": 0.6699,
+      "p_value_naive": 0.572,
+      "tau_frames": 1.75,
+      "n_eff": 570,
+      "criterion": "drift_pct",
+      "threshold": 1.0,
+      "pass": true
+    },
+    "dihedral": {
+      "drift_pct": 0.0037,
+      "p_value": 0.9635,
+      "p_value_naive": 0.9188,
+      "tau_frames": 4.94,
+      "n_eff": 202,
+      "criterion": "drift_pct",
+      "threshold": 1.0,
+      "pass": true
+    },
+    "vdw": {
+      "drift_pct": 0.0448,
+      "p_value": 0.7917,
+      "p_value_naive": 0.6298,
+      "tau_frames": 3.32,
+      "n_eff": 301,
+      "drift_sigma": 0.0528,
+      "sigma": 50.5427,
+      "criterion": "drift_sigma",
+      "threshold": 1.0,
+      "pass": true
+    },
+    "coul": {
+      "drift_pct": 0.3082,
+      "p_value": 0.1743,
+      "p_value_naive": 0.0,
+      "tau_frames": 167.27,
+      "n_eff": 5,
+      "drift_sigma": 2.1537,
+      "sigma": 19.736,
+      "criterion": "drift_sigma",
+      "threshold": 1.0,
+      "pass": true
+    },
+    "kspace": {
+      "drift_pct": 0.0916,
+      "p_value": 0.0802,
+      "p_value_naive": 0.0,
+      "tau_frames": 82.9,
+      "n_eff": 12,
+      "criterion": "drift_pct",
+      "threshold": 1.0,
+      "pass": true
+    }
+  },
+  "component_drift_failing_under_naive_p": [
+    "coul"
+  ],
+  "rg": {
+    "pass": true,
+    "cv": 0.1877,
+    "mean_Rg_A": 22.225,
+    "mean_Rg2_A2": 511.381,
+    "rg_spread_flag": false,
+    "C_inf": null,
+    "n_chains": 20,
+    "frames_analysed": 1951
+  },
+  "finite_size": {
+    "available": true,
+    "pass": true,
+    "self_image_advisory": false,
+    "verdict": "SIZE_PASS",
+    "L_min_A": 51.71,
+    "cutoff_A": 9.5,
+    "L_over_2cutoff": 2.722,
+    "L_over_2Rg": 1.163,
+    "L_over_Ree": 1.019,
+    "ree_self_image_flag": false,
+    "min_image_evaluated": true,
+    "box_A": [
+      51.71,
+      51.71,
+      51.71
+    ],
+    "graded_box": "actual_equilibrated"
+  },
+  "density_mean": null
+}

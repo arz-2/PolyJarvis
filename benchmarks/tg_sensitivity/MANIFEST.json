@@ -82,7 +82,8 @@
       "override": {
         "tg_t_step_K": 40
       },
-      "gpu_h": 4.6
+      "gpu_h": 4.6,
+      "note": ""
     }
   ],
   "t_grid_axis_is_exactly_controlled_on_PE": "At rate 20 K/ns and dt 2 fs, tg_t_step_K in {10, 20, 40} gives 250000 / 500000 / 1000000 steps per bin over 48 / 24 / 12 bins = 12 M steps in every case. Identical cost, identical total simulated time; only the staircase resolution differs. dT=10 sits exactly on PHYC's tg_min_steps_per_T floor of 250000. L1 doubles as the dT=20 member of this axis.",
@@ -93,5 +94,56 @@
     "fitting_procedure": "Analysis-only, zero GPU. Re-fit every stereo_r2 run and every leg varying the bilinear breakpoint window and the fit form. Runs whenever."
   },
   "comparison_rule": "Predeclared before any leg runs. An axis is SENSITIVE when |Tg(leg) - Tg(anchor baseline)| exceeds the pooled within-system SD across all completed stereo_r2 runs (many degrees of freedom); the anchor's own 3-seed SD is reported as a secondary, system-specific check. The pooled figure is primary because an n=3 SD carries 2 dof and is itself uncertain to roughly +/-50% -- quoting it alone would reproduce the conflation reviewer comment 1 caught the first time.",
-  "seeds": "A leg keeps its anchor's emc_seed and velocity_seed unchanged, deliberately: the axis under test must be the only thing that moves. verify_matrix asserts it."
+  "seeds": "A leg keeps its anchor's emc_seed and velocity_seed unchanged, deliberately: the axis under test must be the only thing that moves. verify_matrix asserts it.",
+  "anchor_status_20260910": {
+    "iPMMA_1": {
+      "state": "equilibration ACCEPTED at attempt-0005 (18:24Z), after being `failed` earlier the same day",
+      "how": "NOT by re-running. workflow_state.json was hand-edited (equilibration failed->accepted, accepted_attempt None->attempt-0005); backup at workflow_state.pre_neff_regate_20260910.json. The justification is a NEW autocorrelation correction to the drift p-value in check_equilibration_comprehensive.py (_drift_significance), re-graded into attempts/equilibration/attempt-0005/raw/equilibration_regate_neff_20260910.json.",
+      "what_the_correction_does": "linregress assumes independent samples; an MD thermo series is not. Scaling t by sqrt(n_eff/n) against n_eff-2 dof flips dihedral p 0.0 -> 0.1034 at tau=68, n_eff=22. drift_pct is UNCHANGED at 4.14% -- only the significance moved. By construction the correction can only turn FAIL into PASS.",
+      "disclosure_debt": [
+        "The sha256-pinned artifact raw/equilibration.json still records dihedral pass=False, and attempt-0005's own executor_state findings still carry EXTEND with energy_component_drift=false. The regate file is NOT among the pinned artifacts, so enforce_gate.py and the reviewer-comment-2 per-run gate table will read FAIL for a stage recorded as accepted.",
+        "operator_interventions is null on iPMMA_1 -- the hand promotion is unrecorded, unlike PLLA_1's and sPVC_1's. Reviewer comment 3 is about autonomy claims; an unlogged manual promotion is the exact thing the intervention count exists to catch.",
+        "The gate change is UNCOMMITTED (working tree only), so it is not in the commit the manuscript would cite under reviewer comment 6."
+      ],
+      "cross_attempt_check_20260910": {
+        "why": "_drift_significance's own docstring states it cannot notice drift persisting ACROSS attempts, and no gate performs that comparison. Attempts 0004 and 0005 both ran at 600 K, so they are directly comparable (0003 ran at 550 K and is not).",
+        "result": {
+          "density": "+0.41 combined SEM_eff -- not significant",
+          "E_vdwl": "-1.01 combined SEM_eff -- not significant",
+          "E_dihed": "-1.92 combined SEM_eff -- borderline, ~p=0.055, in the direction of continued relaxation"
+        },
+        "reading": "Density -- the property the melt gate actually binds and the one Tg descends from -- shows no significant between-attempt movement, which supports the fluctuation reading. The dihedral energy carries a ~1.9 sigma hint of ongoing relaxation. Disclose it; it does not disqualify the cell.",
+        "caveat": "One pair of attempts, one comparison at ~2 sigma. This is a check, not a proof of equilibration."
+      }
+    },
+    "PLLA_1": {
+      "state": "accepted through summary; melt cell at attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data",
+      "role_now": "verified fallback anchor -- dry-run confirmed forkable. Not in use now that iPMMA_1 is accepted, but its bin arithmetic is recorded below.",
+      "chemistry_caveat": "PEST, not PACR. Round-1 PLA multirate returned slope b<0 (wrong Tg-vs-rate sign) and PLA1's single-rate Tg was a FAIL. A null or wrong-sign L3 result REPRODUCES a known round-1 finding rather than discovering one -- report it as such.",
+      "bin_counts": {
+        "dT20_baseline": 27,
+        "dT40_L6": 14,
+        "note": "620 K -> 100 K span. dT=40 lands exactly on the tg_t_low bound (140 -> 100), so L6 carries NO partial final bin -- the non-integer trap flagged for iPMMA (11.5 bins) does not arise on PLLA."
+      }
+    },
+    "PE_1": {
+      "state": "raw/run_plan.json only -- never built",
+      "affects": [
+        "L1",
+        "L2",
+        "L4",
+        "L5"
+      ],
+      "consequence": "four of six legs are blocked on a base-campaign run that must happen anyway; the legs are not extra cost, they are downstream of it"
+    },
+    "aPS_1": {
+      "state": "accepted through summary, but equilibration took 7 attempts; MELT_STAGE_DEFICIT resolution unconfirmed -- do NOT use as a fallback anchor without checking it"
+    },
+    "measured_costs": {
+      "thermal_attempt_disk": "61 MB (PLLA_1 attempt-0001) -- legs are disk-free in practice",
+      "L3_on_PLLA_gpu_h": 9.4,
+      "L6_on_PLLA_gpu_h": 4.9
+    }
+  },
+  "denominator_availability_20260910": "The comparison_rule's pooled within-system SD is NOT YET AVAILABLE: it needs replicates 2-3, and only replicate 1 exists for 4 of 7 systems. Legs run now produce a delta with no denominator -- the sensitivity VERDICT waits on the base campaign. The legs themselves do not change."
 }
