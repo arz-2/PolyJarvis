@@ -367,6 +367,76 @@
    "agent_evidence": "Only the P~0 drop breaks the 10% LOO threshold (+13.65%); the other five stay within 6.2%. That point is not noise: its NPT volumes scatter 96553-97895 A^3 with no trend, SEM 46. Local secant moduli back-projected to P=0 fall from ~1.97 GPa mid-ladder to ~1.5 at 15000 atm, i.e. K' decreases with pressure -- a rubbery PE cell at 300 K (exp Tg 195 K) stiffening toward glass under compression. Dropping the P~0 anchor forces extrapolation to V0 from high-pressure points obeying a different K'.",
    "declined": "mechanical_resample_points=[500] -- the one rung the agent called reasonable. It stated it could not show the rung clears the 10% gate and that it would not change the best estimate. Raising the compression ceiling was explicitly ruled out: the next ladder point would be 30000 atm, further from the constant-K' regime.",
    "consequence": "PE_1 reached accepted 6/6, its protocol froze with ff=trappe-ua -- the only non-PCFF system in the set, and therefore the real test of the preferred_ff freeze fix -- and PE_2/PE_3 unblocked."
+  },
+  {
+   "id": "D-02_branch_rerun_instead_of_full_redo",
+   "date": "2026-09-13",
+   "decision": "Branch each deviating replicate back to the cell before its extra segment and re-run only what descended from it, instead of redoing the runs.",
+   "per_run": {
+    "PEG_2": "cooling attempt-0001 accepted (attempt-0002's 0.5 ns continuation superseded); mechanical + summary re-run. PEG_2's Tg already valid -- its staircase read equilibration attempt-0004, reached by identical-parameter retries.",
+    "PE_3": "one 0.5 ns continuation (PE_1's exact parameters) from cooling attempt-0001, past five superseded attempts; agent-revised 0.6 ns removed from the plan; then thermal, mechanical, summary.",
+    "PE_2": "equilibration attempt-0001 accepted (2.0 ns continuation superseded); cooling run fresh (npt_final, then PE_1's exact 0.5 ns continuation), then thermal, mechanical, summary."
+   },
+   "caveat": "Every branch cell is the one that FAILED a gate (that is why the extra segment ran): PEG_2 cooling energy_drift; PE_3 cooling energy_drift + n_eff_density; PE_2 equilibration energy_component_drift. The gate verdict is recorded honestly (EXTEND), not as PASS. This is what strict replay would have produced anyway.",
+   "method": [
+    "Accepted the earlier attempt under ITS OWN input_hash, which predates the remedy keys, and stripped those keys -- so reconcile_inputs does not invalidate it and re-run the stage.",
+    "Promoted the accept-path outputs a halted attempt never recorded (cool_verdict/equil_verdict, density from its own gate JSON, log/json paths) from what that attempt actually measured; originals kept under outputs_before_promotion.",
+    "Superseded later attempts rather than deleting them: _new_attempt numbers from len(attempts), so the list must keep matching the directories.",
+    "Executor prior_attempts walks now skip superseded attempts, so a continuation cannot chain from a discarded segment.",
+    "Pinned every parameter-changing remedy route at its cap; identical-parameter transient_retry left available (operator decision). Re-runs launched with NO recovery agent, so a gate failure stops for the operator instead of invoking an agent.",
+    "Each surgery rehearsed first on a scratch copy against a stub executor with real policy hashes: confirmed no reconcile invalidation, the exact cell each downstream stage reads, and zero remedies/escalations on a forced failure."
+   ],
+   "declined_now": [
+    "Engine-level strict-replay enforcement for future campaigns",
+    "Re-running PSU_2/PSU_3 summaries against PSU_1's comparator"
+   ],
+   "pre_authorizations": [
+    {
+     "run": "PE_2",
+     "stage": "mechanical",
+     "date": "2026-09-13",
+     "condition": "fails ONLY on loo_unstable, bm_gate_verdict BM_REPORTABLE, B0 inside [1.5, 2.0] GPa",
+     "action": "accept with the PE_1 annotation without asking; anything else returns to the operator"
+    }
+   ]
+  },
+  {
+   "id": "D-03_replicates_replay_R1_schedule_not_R1_gate_logic",
+   "date": "2026-09-13",
+   "decision": "PE_2's re-run replays PE_1's executed cooling SCHEDULE -- npt_final 5 ns then exactly one 0.5 ns continuation, density and bulk modulus measured on the continuation cell -- regardless of what PE_2's own gate returns. If PE_2's 5 ns gate passes, the continuation is still applied before mechanical runs. PE_3 already follows the same schedule.",
+   "why": "F-03: PE_1's pass on its 0.5 ns continuation was a loss of statistical power on a short standalone window (energy drift rose 1.24% -> 2.02%), not a convergence signal, so replaying the gate's decision would replay noise rather than protocol."
+  },
+  {
+   "id": "D-04_accept_replayed_continuation_despite_short_window_gate",
+   "date": "2026-09-13",
+   "PE_3": {
+    "decision": "cooling attempt-0007 (the replayed 0.5 ns continuation from attempt-0001) accepted with annotation",
+    "failing_binding_gates": [
+     "energy_drift",
+     "n_eff_density"
+    ],
+    "measured": {
+     "energy_drift_pct": 2.4614,
+     "p": 0.0003,
+     "n_eff_density": 15,
+     "density_drift_pct": 0.4648,
+     "density_plateau_gcm3": 0.866135
+    },
+    "pe_1_same_schedule": {
+     "energy_drift_pct": 2.0218,
+     "p": 0.0116,
+     "n_eff_density": 25,
+     "verdict": "PASS"
+    },
+    "why": "Same schedule as PE_1 and comparable drift (2.46% vs 2.02%); the verdicts differ only by which side of a significance threshold a 0.5 ns window lands (F-03). Recorded as a new decision -- the earlier n_eff-only authorization did not cover energy_drift."
+   },
+   "PE_2": {
+    "pre_authorization": "if the replayed 0.5 ns continuation fails only energy_drift and/or n_eff_density, accept with the same annotation and continue; any other gate returns to the operator"
+   },
+   "PE_3_mechanical": {
+    "pre_authorization": "fails ONLY on loo_unstable, bm_gate_verdict BM_REPORTABLE, B0 inside [1.5, 2.0] GPa -> accept with the PE_1 annotation"
+   },
+   "execution": "Both runs' authorized stops are acted on by a handler that accepts exactly those conditions, backs up state before each edit, relaunches with no recovery agent, and exits to the operator on anything else."
   }
  ],
  "results_replicate_1": {
@@ -437,6 +507,569 @@
    "why_it_matters": "The campaign's claim is that replicates share a protocol and differ only by seed. That assumes the protocol is ROBUST across seeds. POXI's frozen protocol is only marginally stable at its anneal temperature with dt_fs=1.0, so whether a given seed survives is stochastic. That is a property of the protocol worth reporting, not merely an obstacle to running it.",
    "action": "Retried unchanged, by operator decision. Editing dt_fs or annealing_T_high_K to rescue one seed would mean PEG_1 and PEG_2/3 no longer shared a protocol, which is the one thing the campaign may not trade away. The three failures stopped at very different points (997k / 952k / 268k steps), i.e. large run-to-run variation, which is what makes an unchanged retry worth one attempt.",
    "if_it_recurs": "Report PEG at whatever n survives, with this instability as the finding. The principled fix -- dt_fs=0.5 for POXI, or a lower annealing_T_high_K -- changes a class-calibrated constant and requires re-running PEG_1 as well."
+  },
+  {
+   "id": "F-02_replicates_did_not_strictly_replay_replicate_1",
+   "date": "2026-09-13",
+   "claim_tested": "Replicates 2 and 3 follow every protocol choice of replicate 1 except seeds, with no escalations.",
+   "result": "FALSE as run.",
+   "escalations": {
+    "PE_2": 1,
+    "PE_3": 2,
+    "PEG_2": 1,
+    "PEEK_2": 1,
+    "PSU_2": 1,
+    "PE_3_note": "one was an agent revise_plan setting cooling_continuation_ns=0.6",
+    "clean": [
+     "PEEK_3",
+     "PSU_3",
+     "PEG_3"
+    ]
+   },
+   "executed_protocol_vs_replicate_1": {
+    "identical": [
+     "PEEK_2",
+     "PEEK_3",
+     "PSU_2",
+     "PSU_3",
+     "PEG_3"
+    ],
+    "PEEK_2_PSU_2_note": "escalated at the Tg reporting gate; agent chose stop, nothing changed; operator annotated Tg not reportable",
+    "PE_2": "ran a +2.0 ns npt_melt_hold equilibration continuation PE_1 never ran",
+    "PE_3": "cooling continuations of 0.333 ns, 3x0.088 ns (crashed) and an agent-revised 0.6 ns, vs PE_1's single 0.5 ns",
+    "PEG_2": "ran a 0.5 ns cooling continuation PEG_1 never ran",
+    "excluded_from_comparison": [
+     "emc_seed",
+     "velocity_seed",
+     "charge_method/electrostatics (re-derived from the frozen field, identical by construction)"
+    ]
+   },
+   "causes": [
+    "The replay path runs the full recovery ladder: remedies and agent escalations are enabled for replicates, so a replicate failing a gate is extended, retried or revised exactly as replicate 1 was.",
+    "FREEZE_KEYS omit replicate 1's remedy-driven executed choices: PE_1 itself ran a 0.5 ns cooling continuation, but cooling_continuation_* are not frozen, so no PE replicate could replay PE_1 even with zero escalations.",
+    "Grading comparators are not frozen: PSU_2 and PSU_3 lack PSU_1's experimental_density_gcm3=1.24 (no trajectory affected; grading only).",
+    "verify_replicates.py compared PLAN decided_params, not executed effective_parameters, remedies or escalations -- so its earlier PASS did not establish this claim."
+   ],
+   "topology_fact_used": "The Tg staircase branches from the EQUILIBRATION melt cell; bulk modulus and 300 K density branch from the COOLING cell (confirmed on PE_1, PE_2, PEG_1, PEG_2). So an extra cooling segment contaminates K and density only; an extra equilibration segment contaminates everything downstream."
+  },
+  {
+   "id": "F-03_PE_1_cooling_pass_was_a_short_window_artifact",
+   "date": "2026-09-13",
+   "question": "Why did PE_1's cooling stop after one 0.5 ns continuation?",
+   "answer": "Its gate passed on the continuation -- but on a window with a tenth of the statistical power, while the drift itself grew.",
+   "measured": {
+    "attempt-0002_npt_final_5ns": {
+     "thermo_rows": 2501,
+     "energy_drift_pct": 1.2409,
+     "p": 0.0,
+     "density_drift_pct": 0.2962,
+     "n_eff_density": 122,
+     "verdict": "EXTEND"
+    },
+    "attempt-0003_continuation_0.5ns": {
+     "thermo_rows": 251,
+     "energy_drift_pct": 2.0218,
+     "p": 0.0116,
+     "density_drift_pct": 0.5955,
+     "n_eff_density": 25,
+     "verdict": "PASS"
+    }
+   },
+   "defects": [
+    "Continuations are measured standalone: LAMMPS continues the trajectory (steps 2500000 -> 2750000, 'log npt_final.log append'), but the log appends into a fresh file in the new attempt's directory, so the gate analyses only the continuation's 251 rows.",
+    "The 'one more window' extension resolved to 0.5 ns, not npt_final's 5 ns: PE_1's stage8_min_steps is 2500000 (5 ns at 2 fs) and the executed 0.5 ns equals the cooling call site's 0.5 ns fallback exactly. The remedy text recorded in remedy_history (max(1.5, ...)) does not describe what ran."
+   ],
+   "consequence": "PE_1's executed cooling is effectively a fixed schedule -- 5 ns at 300 K plus 0.5 ns, with density and K measured on the continuation cell -- and the PASS verdict on the 0.5 ns window is not a convergence signal. Replicates replay that schedule; the defects are deliberately NOT fixed mid-campaign, since fixing them would give PE_2/PE_3 a different continuation from PE_1."
+  },
+  {
+   "id": "F-04_executed_protocol_audit_after_branch_reruns",
+   "date": "2026-09-14",
+   "method": "For every replicate 2/3 vs replicate 1, per stage: the accepted attempt's executor_state parameters (seeds excluded), the accepted chain length including continuation sources, the multiset of LAMMPS `run N` lines across the chain, the upstream stages its decks read from, plus remedy_history and live agent_escalations.",
+   "result": "No executed simulation parameter, schedule, upstream cell or gate input differs from replicate 1 except seeds. 30 raw differences, all classified:",
+   "classified_differences": [
+    {
+     "what": "experimental_tg_K / experimental_density_gcm3 / exp_K_min_GPa / exp_K_max_GPa present in PE_1 and PSU_1 params, absent in PE_2/PE_3/PSU_2/PSU_3",
+     "why": "R1's adjudicator pinned them as plan overrides; the cache replay does not freeze overrides.",
+     "impact": "none on execution: experimental_tg_K resolves from the class table to the same value (PE 195 K), experimental_density_gcm3 has no consumer (workflow_engine PARAMETER_STAGE comment), exp_K_range has no consumer anywhere in mcp-servers, run_summary does no experimental grading; mechanical outputs have identical key sets and gate fields."
+    },
+    {
+     "what": "Tg sweep: PEEK_2 ran one extra 200 000-step hold at 690 K (tg_step_T690_e1); PSU_1 ran one at 600 K that PSU_2/PSU_3 did not",
+     "why": "_run_tg_sweep_adaptive extends a single temperature point when its density window is unstable or n_eff is below tg_per_t_min_n_eff; thresholds identical across replicates, triggered by each run's own data. Both extended points ended PASS (n_eff 56 and 103) and lie in the melt, >100 K above Tg.",
+     "impact": "in-stage adaptive sampling, not a remedy or protocol choice; recorded so a strict step-for-step reading of 'identical protocol' is not claimed."
+    },
+    {
+     "what": "PE remedy_history: PE_1 ['continue_npt'], PE_2/PE_3 []",
+     "why": "PE_1's 0.5 ns cooling continuation came from the remedy ladder; PE_2/PE_3 received the identical continuation through the operator branch replay (D-02/D-03).",
+     "impact": "bookkeeping only; cooling chain length and LAMMPS run lines match PE_1."
+    },
+    {
+     "what": "PEG_2 thermal params carry cooling_continuation_* keys absent in PEG_1",
+     "why": "PEG_2's accepted thermal attempt ran before the branch rerun removed the extra cooling extension.",
+     "impact": "none: thermal reads the equilibration melt cell, and its LAMMPS run lines match PEG_1's."
+    }
+   ]
+  },
+  {
+   "id": "F-05_regrade_under_per_term_energy_drift_gate",
+   "date": "2026-09-14",
+   "gate_version": {
+    "git_head": "f3ddc4b",
+    "gate_files_uncommitted": false,
+    "check_equilibration_comprehensive_sha256": "7a7df1a03b46e82d9f868abcac51fccd993f2a7cbc81f63d10a7db1d2eddc700",
+    "enforce_gate_sha256": "71d29766fb2b9f6c50c53f2858006b3f4b4649c1e47c434e5a74926c82db4161",
+    "energy_component_criterion": "drift_sigma for all terms"
+   },
+   "files": [
+    "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+    "benchmarks/rev2_replicates/regrade/regrade_20260914.md"
+   ],
+   "method": "benchmarks/stereo_r2/regrade_gates.py re-applied to every accepted equilibration and cooling attempt of the 12 runs; thermo recomputed from the log the live gate read, chain/spatial sections reused; data/ untouched.",
+   "result": "20 of 24 stage gates PASS under both versions. Differences and remaining failures:",
+   "non_pass_or_changed": {
+    "PE_2/equilibration": {
+     "live_recorded": "EXTEND",
+     "old_gate": [
+      "FAIL",
+      [
+       "energy_component_drift"
+      ]
+     ],
+     "new_gate": [
+      "PASS",
+      []
+     ]
+    },
+    "PE_2/cooling": {
+     "live_recorded": "EXTEND",
+     "old_gate": [
+      "FAIL",
+      [
+       "energy_drift",
+       "n_eff_density"
+      ]
+     ],
+     "new_gate": [
+      "FAIL",
+      [
+       "n_eff_density"
+      ]
+     ]
+    },
+    "PE_3/cooling": {
+     "live_recorded": "EXTEND",
+     "old_gate": [
+      "FAIL",
+      [
+       "energy_drift",
+       "n_eff_density"
+      ]
+     ],
+     "new_gate": [
+      "FAIL",
+      [
+       "n_eff_density"
+      ]
+     ]
+    },
+    "PEG_2/cooling": {
+     "live_recorded": "EXTEND",
+     "old_gate": [
+      "FAIL",
+      [
+       "energy_drift"
+      ]
+     ],
+     "new_gate": [
+      "FAIL",
+      [
+       "energy_drift"
+      ]
+     ]
+    }
+   },
+   "reading": "The new per-term criterion clears energy drift on PE_2 equilibration and on PE_2/PE_3 cooling; PE_2/PE_3 cooling still fail n_eff_density alone (window-invariant, F-03) and PEG_2 cooling still fails energy_drift. All four were accepted by recorded operator decisions; no run state was changed."
   }
- ]
+ ],
+ "deferred_fixes": [
+  {
+   "scheduled": "after this campaign and the tg_sensitivity legs, before the next campaign",
+   "decided": "2026-09-13",
+   "not_now_because": "fixing either mid-campaign would give PE_2/PE_3 a different continuation from PE_1 and break the replay",
+   "defects": [
+    "Continuations measured standalone: the gate analyses only the continuation's own log/dump in its new attempt directory, not the appended trajectory (run_campaign cooling/equilibration continuation paths; check_equilibration_comprehensive).",
+    "Cooling extension sizing falls back to 0.5 ns instead of reading stage8_min_steps (run_campaign._cool_stage_ns at the EXTEND call site), and _thermo_extension_ns's n_eff formula assumes the window grows.",
+    "check_equilibration_comprehensive._load_and_analyze: n_frames_used = n_frames_total - skip_frames goes negative on a short continuation dump (PE_3: 44 frames vs skip 50) and fails PROCESS_FAILED deterministically.",
+    "n_eff_density can be window-invariant for slowly relaxing cells (ACF summed to first zero crossing); EXTEND cannot clear it and should detect that across rungs.",
+    "remedy_history records a continue_npt remedy text (max(1.5, ...)) that does not describe the extension actually executed."
+   ]
+  }
+ ],
+ "results_replicates_2_3": {
+  "PE_2": {
+   "tg_K": 243.7,
+   "tg_uncertainty_K": 5.4,
+   "tg_r2": 0.9966,
+   "fit_quality": "EXCELLENT",
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "density_gcm3": 0.8592,
+   "K_GPa": 1.83,
+   "K_sem_GPa": 0.1565,
+   "B0_prime": 8.2691,
+   "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+   "fluctuation_K_GPa": 1.4682,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0004",
+    "thermal": "attempt-0002",
+    "mechanical": "attempt-0002",
+    "summary": "attempt-0002"
+   }
+  },
+  "PE_3": {
+   "tg_K": 223.5,
+   "tg_uncertainty_K": 21.2,
+   "tg_r2": 0.9966,
+   "fit_quality": "EXCELLENT",
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "density_gcm3": 0.8661,
+   "K_GPa": 1.9327,
+   "K_sem_GPa": 0.1366,
+   "B0_prime": 8.2535,
+   "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+   "fluctuation_K_GPa": 1.6882,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0007",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+   }
+  },
+  "PEEK_2": {
+   "tg_K": 572.4,
+   "tg_uncertainty_K": 19.6,
+   "tg_r2": 0.9841,
+   "fit_quality": "GOOD",
+   "tg_gate_verdict": "TG_REVIEW",
+   "density_gcm3": 1.2017,
+   "K_GPa": 5.3834,
+   "K_sem_GPa": 0.0586,
+   "B0_prime": 8.282,
+   "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+   "fluctuation_K_GPa": 5.519,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0001",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+   }
+  },
+  "PEEK_3": {
+   "tg_K": 507.3,
+   "tg_uncertainty_K": 6.9,
+   "tg_r2": 0.9966,
+   "fit_quality": "EXCELLENT",
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "density_gcm3": 1.2038,
+   "K_GPa": 5.4017,
+   "K_sem_GPa": 0.1183,
+   "B0_prime": 8.0901,
+   "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+   "fluctuation_K_GPa": 5.6321,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0001",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+   }
+  },
+  "PSU_2": {
+   "tg_K": 401.1,
+   "tg_uncertainty_K": 90.5,
+   "tg_r2": 0.9596,
+   "fit_quality": "ACCEPTABLE",
+   "tg_gate_verdict": "TG_REVIEW",
+   "density_gcm3": 1.1877,
+   "K_GPa": 4.0376,
+   "K_sem_GPa": 0.1208,
+   "B0_prime": 8.8593,
+   "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+   "fluctuation_K_GPa": 3.7702,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0001",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+   }
+  },
+  "PSU_3": {
+   "tg_K": 479.8,
+   "tg_uncertainty_K": 7.2,
+   "tg_r2": 0.9942,
+   "fit_quality": "GOOD",
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "density_gcm3": 1.1846,
+   "K_GPa": 4.5112,
+   "K_sem_GPa": 0.0409,
+   "B0_prime": 8.2433,
+   "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+   "fluctuation_K_GPa": 4.7082,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0001",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+   }
+  },
+  "PEG_2": {
+   "tg_K": 268.4,
+   "tg_uncertainty_K": 12.1,
+   "tg_r2": 0.9991,
+   "fit_quality": "EXCELLENT",
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "density_gcm3": 1.06,
+   "K_GPa": 3.5336,
+   "K_sem_GPa": 0.1132,
+   "B0_prime": 8.9859,
+   "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+   "fluctuation_K_GPa": 3.632,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0004",
+    "cooling": "attempt-0001",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0002",
+    "summary": "attempt-0002"
+   }
+  },
+  "PEG_3": {
+   "tg_K": 243.8,
+   "tg_uncertainty_K": 9.3,
+   "tg_r2": 0.9997,
+   "fit_quality": "EXCELLENT",
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "density_gcm3": 1.0631,
+   "K_GPa": 3.2957,
+   "K_sem_GPa": 0.1231,
+   "B0_prime": 9.5759,
+   "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+   "fluctuation_K_GPa": 3.8203,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0001",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+   }
+  }
+ },
+ "results_replicate_1_detail": {
+  "PE_1": {
+   "tg_K": 234.2,
+   "tg_uncertainty_K": 13.3,
+   "tg_r2": 0.9972,
+   "fit_quality": "EXCELLENT",
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "density_gcm3": 0.8637,
+   "K_GPa": 1.8897,
+   "K_sem_GPa": 0.1198,
+   "B0_prime": 8.3843,
+   "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+   "fluctuation_K_GPa": 1.7711,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0003",
+    "thermal": "attempt-0003",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+   }
+  },
+  "PEEK_1": {
+   "tg_K": 552.3,
+   "tg_uncertainty_K": 8.3,
+   "tg_r2": 0.9939,
+   "fit_quality": "GOOD",
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "density_gcm3": 1.2055,
+   "K_GPa": 5.7285,
+   "K_sem_GPa": 0.2323,
+   "B0_prime": 7.3819,
+   "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+   "fluctuation_K_GPa": 5.0637,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0001",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+   }
+  },
+  "PSU_1": {
+   "tg_K": 481.3,
+   "tg_uncertainty_K": 14.7,
+   "tg_r2": 0.9849,
+   "fit_quality": "GOOD",
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "density_gcm3": 1.1843,
+   "K_GPa": 4.4826,
+   "K_sem_GPa": 0.1147,
+   "B0_prime": 7.7581,
+   "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+   "fluctuation_K_GPa": 3.7246,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0001",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+   }
+  },
+  "PEG_1": {
+   "tg_K": 259.6,
+   "tg_uncertainty_K": 9.9,
+   "tg_r2": 0.999,
+   "fit_quality": "EXCELLENT",
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "density_gcm3": 1.0579,
+   "K_GPa": 3.2968,
+   "K_sem_GPa": 0.1205,
+   "B0_prime": 9.4172,
+   "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+   "fluctuation_K_GPa": 3.2824,
+   "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "cooling": "attempt-0001",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+   }
+  }
+ },
+ "replicate_statistics": {
+  "recorded": "2026-09-14",
+  "per_system": {
+   "PE": {
+    "tg_K_all": {
+     "mean": 233.8,
+     "sd": 10.1059,
+     "n": 3
+    },
+    "tg_K_reportable_only": {
+     "mean": 233.8,
+     "sd": 10.1059,
+     "n": 3
+    },
+    "tg_reportable_runs": [
+     "PE_1",
+     "PE_2",
+     "PE_3"
+    ],
+    "density_gcm3": {
+     "mean": 0.863,
+     "sd": 0.0035,
+     "n": 3
+    },
+    "K_GPa": {
+     "mean": 1.8841,
+     "sd": 0.0516,
+     "n": 3
+    }
+   },
+   "PEEK": {
+    "tg_K_all": {
+     "mean": 544.0,
+     "sd": 33.3342,
+     "n": 3
+    },
+    "tg_K_reportable_only": {
+     "mean": 529.8,
+     "sd": 31.8198,
+     "n": 2
+    },
+    "tg_reportable_runs": [
+     "PEEK_1",
+     "PEEK_3"
+    ],
+    "density_gcm3": {
+     "mean": 1.2037,
+     "sd": 0.0019,
+     "n": 3
+    },
+    "K_GPa": {
+     "mean": 5.5045,
+     "sd": 0.1942,
+     "n": 3
+    }
+   },
+   "PSU": {
+    "tg_K_all": {
+     "mean": 454.0667,
+     "sd": 45.8766,
+     "n": 3
+    },
+    "tg_K_reportable_only": {
+     "mean": 480.55,
+     "sd": 1.0607,
+     "n": 2
+    },
+    "tg_reportable_runs": [
+     "PSU_1",
+     "PSU_3"
+    ],
+    "density_gcm3": {
+     "mean": 1.1855,
+     "sd": 0.0019,
+     "n": 3
+    },
+    "K_GPa": {
+     "mean": 4.3438,
+     "sd": 0.2656,
+     "n": 3
+    }
+   },
+   "PEG": {
+    "tg_K_all": {
+     "mean": 257.2667,
+     "sd": 12.4649,
+     "n": 3
+    },
+    "tg_K_reportable_only": {
+     "mean": 257.2667,
+     "sd": 12.4649,
+     "n": 3
+    },
+    "tg_reportable_runs": [
+     "PEG_1",
+     "PEG_2",
+     "PEG_3"
+    ],
+    "density_gcm3": {
+     "mean": 1.0603,
+     "sd": 0.0026,
+     "n": 3
+    },
+    "K_GPa": {
+     "mean": 3.3754,
+     "sd": 0.137,
+     "n": 3
+    }
+   }
+  },
+  "note": "Sample SD over 3 replicates of the same frozen protocol, seeds only differing. PSU_2 and PEEK_2 Tg are TG_REVIEW (operator accepted as not reportable, 2026-09-13); both 'all' and 'reportable_only' are given and neither is preferred here. No experimental grading is applied."
+ }
 }

@@ -523,7 +523,7 @@
           "alternatives": [],
           "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PKTN has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
           "choice": "pcff",
-          "confidence": "medium",
+          "confidence": "high",
           "criteria_evaluated": [
             "literature_support",
             "parameter_coverage",
@@ -667,36 +667,37 @@
     },
     "protocol_validated": true,
     "simulated_properties": {
-      "bulk_modulus": {
-        "method": "murnaghan",
-        "sem_GPa": 0.2323,
-        "temperature_K": 299.98,
-        "value_GPa": 5.7285
+      "tg": {
+        "value_K": 552.3,
+        "grading_basis": "raw_MD",
+        "r_squared": 0.9939,
+        "fit_quality": "GOOD",
+        "primary_fit_invalid": false,
+        "n_replicates": 1
       },
       "density": {
-        "temperature_K": 299.79,
-        "value_g_cm3": 1.205488
+        "value_g_cm3": 1.205488,
+        "temperature_K": 299.79
       },
       "melt_density": {
-        "temperature_K": 770.1,
-        "value_g_cm3": 1.039862
+        "value_g_cm3": 1.039862,
+        "temperature_K": 770.1
       },
-      "tg": {
-        "fit_quality": "GOOD",
-        "grading_basis": "raw_MD",
-        "n_replicates": 1,
-        "primary_fit_invalid": false,
-        "r_squared": 0.9939,
-        "value_K": 552.3
+      "bulk_modulus": {
+        "value_GPa": 5.7285,
+        "sem_GPa": 0.2323,
+        "method": "murnaghan",
+        "temperature_K": 299.98
       }
     },
     "source_run_name": "PEEK_1",
-    "validated_at": "2026-09-12T14:14:58.841134+00:00",
+    "validated_at": "2026-09-13T13:27:33.696616+00:00",
     "validated_properties": [
       "bulk_modulus",
       "density",
       "tg"
-    ]
+    ],
+    "provenance_repair": "2026-09-13: a later replicate (PEEK_3) reached accepted and write_characterization_cache re-keyed this SMILES, replacing PEEK_1's measurements with its own. The frozen protocol was unaffected (identical by construction -- the replicate replays it), but simulated_properties and source_run_name drifted to whichever replicate finished last. For PSU that wrote a Tg the operator had explicitly annotated NOT REPORTABLE. Restored to PEEK_1, the run that validated this entry."
   },
   "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1": {
     "notes": "Validated properties: ['bulk_modulus', 'density', 'tg'].",
@@ -730,7 +731,7 @@
           "alternatives": [],
           "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PSFO has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
           "choice": "pcff",
-          "confidence": "medium",
+          "confidence": "high",
           "criteria_evaluated": [
             "literature_support",
             "parameter_coverage",
@@ -881,35 +882,36 @@
     },
     "protocol_validated": true,
     "simulated_properties": {
-      "bulk_modulus": {
-        "method": "murnaghan",
-        "sem_GPa": 0.1147,
-        "temperature_K": 299.95,
-        "value_GPa": 4.4826
+      "tg": {
+        "value_K": 481.3,
+        "grading_basis": "raw_MD",
+        "r_squared": 0.9849,
+        "fit_quality": "GOOD",
+        "primary_fit_invalid": false,
+        "n_replicates": 1
       },
       "density": {
-        "temperature_K": 299.86,
-        "value_g_cm3": 1.184279
+        "value_g_cm3": 1.184279,
+        "temperature_K": 299.86
       },
       "melt_density": {
-        "temperature_K": 700.22,
-        "value_g_cm3": 1.040867
+        "value_g_cm3": 1.040867,
+        "temperature_K": 700.22
       },
-      "tg": {
-        "fit_quality": "GOOD",
-        "grading_basis": "raw_MD",
-        "n_replicates": 1,
-        "primary_fit_invalid": false,
-        "r_squared": 0.9849,
-        "value_K": 481.3
+      "bulk_modulus": {
+        "value_GPa": 4.4826,
+        "sem_GPa": 0.1147,
+        "method": "murnaghan",
+        "temperature_K": 299.95
       }
     },
     "source_run_name": "PSU_1",
-    "validated_at": "2026-09-12T14:14:59.340879+00:00",
+    "validated_at": "2026-09-13T14:29:29.773270+00:00",
     "validated_properties": [
       "bulk_modulus",
       "density",
       "tg"
-    ]
+    ],
+    "provenance_repair": "2026-09-13: a later replicate (PSU_2) reached accepted and write_characterization_cache re-keyed this SMILES, replacing PSU_1's measurements with its own. The frozen protocol was unaffected (identical by construction -- the replicate replays it), but simulated_properties and source_run_name drifted to whichever replicate finished last. For PSU that wrote a Tg the operator had explicitly annotated NOT REPORTABLE. Restored to PSU_1, the run that validated this entry."
   }
 }

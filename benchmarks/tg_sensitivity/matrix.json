@@ -1,6 +1,34 @@
 {
-  "built_at": "2026-09-13T03:13:19.032441+00:00",
+  "built_at": "2026-09-13T03:43:03.490974+00:00",
+  "built_at_by_machine": {
+    "PLLA_1 legs (L3, L6)": "2026-09-13T03:13:19.032441+00:00",
+    "PE_1 legs (L1, L2, L4, L5)": "2026-09-13T03:43:03.490974+00:00"
+  },
   "legs": [
+    {
+      "leg": "L1",
+      "axis": "rate",
+      "run_name": "tg_sensitivity/TGS_PE_1_L1_r20",
+      "anchor": "PE_1",
+      "override": {
+        "tg_rate_K_per_ns": 20
+      },
+      "gpu_h": 1.85,
+      "melt_cell": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data",
+      "run_plan": "data/tg_sensitivity/TGS_PE_1_L1_r20/raw/run_plan.json"
+    },
+    {
+      "leg": "L2",
+      "axis": "rate",
+      "run_name": "tg_sensitivity/TGS_PE_1_L2_r10",
+      "anchor": "PE_1",
+      "override": {
+        "tg_rate_K_per_ns": 10
+      },
+      "gpu_h": 3.7,
+      "melt_cell": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data",
+      "run_plan": "data/tg_sensitivity/TGS_PE_1_L2_r10/raw/run_plan.json"
+    },
     {
       "leg": "L3",
       "axis": "rate",
@@ -12,6 +40,32 @@
       "gpu_h": 8.8,
       "melt_cell": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data",
       "run_plan": "data/tg_sensitivity/TGS_PLLA_1_L3_r50/raw/run_plan.json"
+    },
+    {
+      "leg": "L4",
+      "axis": "t_grid",
+      "run_name": "tg_sensitivity/TGS_PE_1_L4_dT10",
+      "anchor": "PE_1",
+      "override": {
+        "tg_t_step_K": 10,
+        "tg_rate_K_per_ns": 20
+      },
+      "gpu_h": 1.85,
+      "melt_cell": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data",
+      "run_plan": "data/tg_sensitivity/TGS_PE_1_L4_dT10/raw/run_plan.json"
+    },
+    {
+      "leg": "L5",
+      "axis": "t_grid",
+      "run_name": "tg_sensitivity/TGS_PE_1_L5_dT40",
+      "anchor": "PE_1",
+      "override": {
+        "tg_t_step_K": 40,
+        "tg_rate_K_per_ns": 20
+      },
+      "gpu_h": 1.85,
+      "melt_cell": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data",
+      "run_plan": "data/tg_sensitivity/TGS_PE_1_L5_dT40/raw/run_plan.json"
     },
     {
       "leg": "L6",
