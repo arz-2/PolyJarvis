@@ -1,0 +1,137 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/build.emc",
+      "sha256": "50abec3ce9a8528563921827a60a45bc95b8bdc1b775862f4d2b3beac26d4a19",
+      "size": 4414
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/cell.data",
+      "sha256": "b49d0efd376a41767f62e71e1f13d4f9d9cdf2e3b7fcbbd7491084129849e84d",
+      "size": 3555926
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.emc.gz",
+      "sha256": "e212c2de6f53c9503a98a705d096df2769702e6180d07544a43c9dd7cc6bb996",
+      "size": 321605
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.esh",
+      "sha256": "e9ecfa8be01fd4dae33d27f2f6c5e3c9326bfb0277183b8e93b581845cf725f1",
+      "size": 327
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.in",
+      "sha256": "52878042653e37d83dfaf5678328864a22dff87cc65b2184f88ef56994ff0eee",
+      "size": 2932
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.log",
+      "sha256": "0d65b665d3836f02409353a04f737cb7bd9c7bbe40edd0b0dab46dec73bef63d",
+      "size": 11957
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.params",
+      "sha256": "7c5c65e4e63c883af8fd8a94ef470650e6d8c1032e2c9369c5c3fbbe96595f63",
+      "size": 14965
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.pdb.gz",
+      "sha256": "87c1811ccdd31b51944a791ef08133c15a890b3ffd869d5579c54a8279b7160d",
+      "size": 144638
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.psf.gz",
+      "sha256": "228c0c845c3060b61c0fc71cfc45772e5984b84fd651ca61db035c95a4871e67",
+      "size": 208856
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.vmd",
+      "sha256": "5889fcb2638208184bc0064ce86d06bdbca63f519e7456092998dcba2a4ba9a0",
+      "size": 1296
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_metadata.json",
+      "sha256": "13116adf0d427e1279c5fc3cc395f27c138635c126e9616e2a7f7a642850f99d",
+      "size": 132
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-15T01:10:00.336780+00:00",
+  "input_hash": "f7c6c67fe588976b0d32eedea9ad140f5b2114990cf87a1bc10f2fe565dd231f",
+  "outputs": {
+    "data_path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/cell.data",
+    "emc_inputs": {
+      "build.emc": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/build.emc",
+      "emc_build.esh": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.esh",
+      "emc_build.in": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.in",
+      "emc_build.log": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.log",
+      "emc_metadata.json": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_metadata.json"
+    },
+    "emc_params_path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/emc_build.params",
+    "emc_seed": 798838,
+    "ff_provenance": {
+      "available": true,
+      "counts": {
+        "ZERO_SUBSTITUTED": 10
+      },
+      "field": "compass",
+      "field_file": "/home/alexzhao/emc/field/compass/compass.frc",
+      "local_patch_increments": [],
+      "rows_checked": 47,
+      "unchecked_cross_terms": {
+        "AngleAngle": 10,
+        "AngleAngleTorsion": 12,
+        "AngleTorsion": 12,
+        "BondAngle": 12,
+        "BondBond": 12,
+        "BondBond13": 12,
+        "EndBondTorsion": 12,
+        "MiddleBondTorsion": 12
+      },
+      "zero_substituted": []
+    },
+    "lammps_flags": {
+      "use_opls": false,
+      "use_pcff": true
+    },
+    "n_atoms": 8000
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 500.0,
+    "T_melt_hold_K": 500.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 625.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      3000,
+      7000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.61,
+    "dp_typical": 114,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 798838,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "compass",
+    "stage8_min_steps": 2000000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 316927
+  },
+  "stage": "build",
+  "status": "accepted"
+}

@@ -1,0 +1,557 @@
+[
+ {
+  "pair": "PEG_1 (pcff) vs PEG_COMPASS_1 (compass)",
+  "pcff_cell": "/home/alexzhao/PolyJarvis/data/PEG_1/attempts/build/attempt-0001/work/cell/cell.data",
+  "compass_cell": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_1/attempts/build/attempt-0001/work/cell/cell.data",
+  "counts": {
+   "atoms": [
+    8000,
+    8000
+   ],
+   "bonds": [
+    7990,
+    7990
+   ],
+   "angles": [
+    14820,
+    14820
+   ],
+   "dihedrals": [
+    17070,
+    17070
+   ],
+   "impropers": [
+    9120,
+    9120
+   ]
+  },
+  "type_counts": {
+   "atom types": [
+    5,
+    6
+   ],
+   "bond types": [
+    5,
+    7
+   ],
+   "angle types": [
+    8,
+    12
+   ],
+   "dihedral types": [
+    9,
+    12
+   ],
+   "improper types": [
+    7,
+    10
+   ]
+  },
+  "box": {
+   "xlo xhi": [
+    [
+     0.0,
+     51.52205724
+    ],
+    [
+     0.0,
+     51.52205724
+    ]
+   ],
+   "ylo yhi": [
+    [
+     0.0,
+     51.52205724
+    ],
+    [
+     0.0,
+     51.52205724
+    ]
+   ],
+   "zlo zhi": [
+    [
+     0.0,
+     51.52205724
+    ],
+    [
+     0.0,
+     51.52205724
+    ]
+   ]
+  },
+  "same_atoms_bonds_box": true,
+  "emc_seed": [
+   148731,
+   148731
+  ],
+  "same_seed": true,
+  "emc_field": [
+   "pcff",
+   "compass"
+  ],
+  "coordinates": {
+   "common_ids": 8000,
+   "max_abs_diff_A": 133.9022547682,
+   "same_molecule_ids": true,
+   "identical": false
+  },
+  "pairing": "paired by seed only (coordinates differ)",
+  "type_map_pcff_to_compass": {
+   "hc->h1": {
+    "n": 4570,
+    "mean_q_pcff": 0.053,
+    "mean_q_compass": 0.053
+   },
+   "c->c4o": {
+    "n": 2270,
+    "mean_q_pcff": 0.027,
+    "mean_q_compass": 0.054
+   },
+   "oc->o2e": {
+    "n": 1130,
+    "mean_q_pcff": -0.266,
+    "mean_q_compass": -0.32
+   },
+   "c->c4": {
+    "n": 10,
+    "mean_q_pcff": -0.159,
+    "mean_q_compass": -0.159
+   },
+   "oh->o2h": {
+    "n": 10,
+    "mean_q_pcff": -0.5571,
+    "mean_q_compass": -0.58
+   },
+   "ho->h1o": {
+    "n": 10,
+    "mean_q_pcff": 0.4241,
+    "mean_q_compass": 0.42
+   }
+  },
+  "masses_names": {
+   "pcff": [
+    "c",
+    "hc",
+    "ho",
+    "oc",
+    "oh"
+   ],
+   "compass": [
+    "c4",
+    "c4o",
+    "h1",
+    "h1o",
+    "o2e",
+    "o2h"
+   ]
+  },
+  "net_charge": [
+   -0.0,
+   -0.0
+  ],
+  "params_pcff": {
+   "exists": true,
+   "mentions_compass": false,
+   "mentions_pcff": true,
+   "head": [
+    "# LAMMPS parameters created by EMC v9.4.4, build Jul 21 2026 07:58:38",
+    "# Variables",
+    "variable\tseed\t\tindex\t148731",
+    "variable\tntotal\t\tindex\t8000",
+    "variable\tfshape\t\tindex\t1",
+    "variable\toutput\t\tindex\temc_build",
+    "variable\tfield\t\tindex\tpcff/pcff",
+    "variable\tlocation1\tindex\t~/emc/field/",
+    "variable\tnav\t\tindex\t0.6022141179",
+    "variable\ttemperature\tindex\t300"
+   ]
+  },
+  "params_compass": {
+   "exists": true,
+   "mentions_compass": true,
+   "mentions_pcff": false,
+   "head": [
+    "# LAMMPS parameters created by EMC v9.4.4, build Jul 21 2026 07:58:38",
+    "# Variables",
+    "variable\tseed\t\tindex\t148731",
+    "variable\tntotal\t\tindex\t8000",
+    "variable\tfshape\t\tindex\t1",
+    "variable\toutput\t\tindex\temc_build",
+    "variable\tfield\t\tindex\tcompass/compass",
+    "variable\tlocation1\tindex\t~/emc/field/",
+    "variable\tnav\t\tindex\t0.6022141179",
+    "variable\ttemperature\tindex\t300"
+   ]
+  }
+ },
+ {
+  "pair": "PEG_2 (pcff) vs PEG_COMPASS_2 (compass)",
+  "pcff_cell": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/build/attempt-0001/work/cell/cell.data",
+  "compass_cell": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/work/cell/cell.data",
+  "counts": {
+   "atoms": [
+    8000,
+    8000
+   ],
+   "bonds": [
+    7990,
+    7990
+   ],
+   "angles": [
+    14820,
+    14820
+   ],
+   "dihedrals": [
+    17070,
+    17070
+   ],
+   "impropers": [
+    9120,
+    9120
+   ]
+  },
+  "type_counts": {
+   "atom types": [
+    5,
+    6
+   ],
+   "bond types": [
+    5,
+    7
+   ],
+   "angle types": [
+    8,
+    12
+   ],
+   "dihedral types": [
+    9,
+    12
+   ],
+   "improper types": [
+    7,
+    10
+   ]
+  },
+  "box": {
+   "xlo xhi": [
+    [
+     0.0,
+     51.52205724
+    ],
+    [
+     0.0,
+     51.52205724
+    ]
+   ],
+   "ylo yhi": [
+    [
+     0.0,
+     51.52205724
+    ],
+    [
+     0.0,
+     51.52205724
+    ]
+   ],
+   "zlo zhi": [
+    [
+     0.0,
+     51.52205724
+    ],
+    [
+     0.0,
+     51.52205724
+    ]
+   ]
+  },
+  "same_atoms_bonds_box": true,
+  "emc_seed": [
+   798838,
+   798838
+  ],
+  "same_seed": true,
+  "emc_field": [
+   "pcff",
+   "compass"
+  ],
+  "coordinates": {
+   "common_ids": 8000,
+   "max_abs_diff_A": 90.3427210461,
+   "same_molecule_ids": true,
+   "identical": false
+  },
+  "pairing": "paired by seed only (coordinates differ)",
+  "type_map_pcff_to_compass": {
+   "hc->h1": {
+    "n": 4570,
+    "mean_q_pcff": 0.053,
+    "mean_q_compass": 0.053
+   },
+   "c->c4o": {
+    "n": 2270,
+    "mean_q_pcff": 0.027,
+    "mean_q_compass": 0.054
+   },
+   "oc->o2e": {
+    "n": 1130,
+    "mean_q_pcff": -0.266,
+    "mean_q_compass": -0.32
+   },
+   "c->c4": {
+    "n": 10,
+    "mean_q_pcff": -0.159,
+    "mean_q_compass": -0.159
+   },
+   "oh->o2h": {
+    "n": 10,
+    "mean_q_pcff": -0.5571,
+    "mean_q_compass": -0.58
+   },
+   "ho->h1o": {
+    "n": 10,
+    "mean_q_pcff": 0.4241,
+    "mean_q_compass": 0.42
+   }
+  },
+  "masses_names": {
+   "pcff": [
+    "c",
+    "hc",
+    "ho",
+    "oc",
+    "oh"
+   ],
+   "compass": [
+    "c4",
+    "c4o",
+    "h1",
+    "h1o",
+    "o2e",
+    "o2h"
+   ]
+  },
+  "net_charge": [
+   -0.0,
+   -0.0
+  ],
+  "params_pcff": {
+   "exists": true,
+   "mentions_compass": false,
+   "mentions_pcff": true,
+   "head": [
+    "# LAMMPS parameters created by EMC v9.4.4, build Jul 21 2026 07:58:38",
+    "# Variables",
+    "variable\tseed\t\tindex\t798838",
+    "variable\tntotal\t\tindex\t8000",
+    "variable\tfshape\t\tindex\t1",
+    "variable\toutput\t\tindex\temc_build",
+    "variable\tfield\t\tindex\tpcff/pcff",
+    "variable\tlocation1\tindex\t~/emc/field/",
+    "variable\tnav\t\tindex\t0.6022141179",
+    "variable\ttemperature\tindex\t300"
+   ]
+  },
+  "params_compass": {
+   "exists": true,
+   "mentions_compass": true,
+   "mentions_pcff": false,
+   "head": [
+    "# LAMMPS parameters created by EMC v9.4.4, build Jul 21 2026 07:58:38",
+    "# Variables",
+    "variable\tseed\t\tindex\t798838",
+    "variable\tntotal\t\tindex\t8000",
+    "variable\tfshape\t\tindex\t1",
+    "variable\toutput\t\tindex\temc_build",
+    "variable\tfield\t\tindex\tcompass/compass",
+    "variable\tlocation1\tindex\t~/emc/field/",
+    "variable\tnav\t\tindex\t0.6022141179",
+    "variable\ttemperature\tindex\t300"
+   ]
+  }
+ },
+ {
+  "pair": "PEG_3 (pcff) vs PEG_COMPASS_3 (compass)",
+  "pcff_cell": "/home/alexzhao/PolyJarvis/data/PEG_3/attempts/build/attempt-0001/work/cell/cell.data",
+  "compass_cell": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/build/attempt-0001/work/cell/cell.data",
+  "counts": {
+   "atoms": [
+    8000,
+    8000
+   ],
+   "bonds": [
+    7990,
+    7990
+   ],
+   "angles": [
+    14820,
+    14820
+   ],
+   "dihedrals": [
+    17070,
+    17070
+   ],
+   "impropers": [
+    9120,
+    9120
+   ]
+  },
+  "type_counts": {
+   "atom types": [
+    5,
+    6
+   ],
+   "bond types": [
+    5,
+    7
+   ],
+   "angle types": [
+    8,
+    12
+   ],
+   "dihedral types": [
+    9,
+    12
+   ],
+   "improper types": [
+    7,
+    10
+   ]
+  },
+  "box": {
+   "xlo xhi": [
+    [
+     0.0,
+     51.52205724
+    ],
+    [
+     0.0,
+     51.52205724
+    ]
+   ],
+   "ylo yhi": [
+    [
+     0.0,
+     51.52205724
+    ],
+    [
+     0.0,
+     51.52205724
+    ]
+   ],
+   "zlo zhi": [
+    [
+     0.0,
+     51.52205724
+    ],
+    [
+     0.0,
+     51.52205724
+    ]
+   ]
+  },
+  "same_atoms_bonds_box": true,
+  "emc_seed": [
+   200187,
+   200187
+  ],
+  "same_seed": true,
+  "emc_field": [
+   "pcff",
+   "compass"
+  ],
+  "coordinates": {
+   "common_ids": 8000,
+   "max_abs_diff_A": 106.9565956238,
+   "same_molecule_ids": true,
+   "identical": false
+  },
+  "pairing": "paired by seed only (coordinates differ)",
+  "type_map_pcff_to_compass": {
+   "hc->h1": {
+    "n": 4570,
+    "mean_q_pcff": 0.053,
+    "mean_q_compass": 0.053
+   },
+   "c->c4o": {
+    "n": 2270,
+    "mean_q_pcff": 0.027,
+    "mean_q_compass": 0.054
+   },
+   "oc->o2e": {
+    "n": 1130,
+    "mean_q_pcff": -0.266,
+    "mean_q_compass": -0.32
+   },
+   "c->c4": {
+    "n": 10,
+    "mean_q_pcff": -0.159,
+    "mean_q_compass": -0.159
+   },
+   "oh->o2h": {
+    "n": 10,
+    "mean_q_pcff": -0.5571,
+    "mean_q_compass": -0.58
+   },
+   "ho->h1o": {
+    "n": 10,
+    "mean_q_pcff": 0.4241,
+    "mean_q_compass": 0.42
+   }
+  },
+  "masses_names": {
+   "pcff": [
+    "c",
+    "hc",
+    "ho",
+    "oc",
+    "oh"
+   ],
+   "compass": [
+    "c4",
+    "c4o",
+    "h1",
+    "h1o",
+    "o2e",
+    "o2h"
+   ]
+  },
+  "net_charge": [
+   -0.0,
+   -0.0
+  ],
+  "params_pcff": {
+   "exists": true,
+   "mentions_compass": false,
+   "mentions_pcff": true,
+   "head": [
+    "# LAMMPS parameters created by EMC v9.4.4, build Jul 21 2026 07:58:38",
+    "# Variables",
+    "variable\tseed\t\tindex\t200187",
+    "variable\tntotal\t\tindex\t8000",
+    "variable\tfshape\t\tindex\t1",
+    "variable\toutput\t\tindex\temc_build",
+    "variable\tfield\t\tindex\tpcff/pcff",
+    "variable\tlocation1\tindex\t~/emc/field/",
+    "variable\tnav\t\tindex\t0.6022141179",
+    "variable\ttemperature\tindex\t300"
+   ]
+  },
+  "params_compass": {
+   "exists": true,
+   "mentions_compass": true,
+   "mentions_pcff": false,
+   "head": [
+    "# LAMMPS parameters created by EMC v9.4.4, build Jul 21 2026 07:58:38",
+    "# Variables",
+    "variable\tseed\t\tindex\t200187",
+    "variable\tntotal\t\tindex\t8000",
+    "variable\tfshape\t\tindex\t1",
+    "variable\toutput\t\tindex\temc_build",
+    "variable\tfield\t\tindex\tcompass/compass",
+    "variable\tlocation1\tindex\t~/emc/field/",
+    "variable\tnav\t\tindex\t0.6022141179",
+    "variable\ttemperature\tindex\t300"
+   ]
+  }
+ }
+]

@@ -1,0 +1,96 @@
+{
+  "run": {
+    "name": "PEG_COMPASS_2",
+    "smiles": "*CCO*",
+    "polymer_class": "POXI",
+    "ff": "compass",
+    "charge_method": "bond-increment",
+    "dp": 114,
+    "n_chains": 10,
+    "n_atoms": null,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": "compass",
+    "D-02_charges": "bond-increment",
+    "D-03_electrostatics": "pppm",
+    "D-04_system_size": "DP=114, 10 chains",
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "N/A (not requested)"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": null,
+      "grading_basis": null,
+      "r_squared": null,
+      "fit_quality": null,
+      "primary_fit_invalid": false,
+      "n_replicates": 1,
+      "transition_width_c_K": null,
+      "tg_uncertainty_K": null,
+      "gate_verdict": null,
+      "withheld": null
+    },
+    "density": {
+      "value_g_cm3": 1.127829,
+      "temperature_K": 299.99
+    },
+    "melt_density": {
+      "value_g_cm3": 0.960564,
+      "temperature_K": 499.78
+    },
+    "bulk_modulus": {
+      "value_GPa": 2.762,
+      "sem_GPa": 0.0721,
+      "method": "murnaghan",
+      "temperature_K": 299.94,
+      "gate_verdict": "BM_REPORTABLE",
+      "withheld": null
+    }
+  },
+  "byproducts": {},
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.183,
+    "caveats": [
+      "kinetic_trap_flag=True (strongly sub-diffusive (see kinetic_trap_flag for trap verdict)) in a rubbery/melt run -- chains have not displaced their own size (MSD_max < Rg^2). density/Tg/bulk_modulus were measured on a structure whose chain-scale conformation may not represent true equilibrium.",
+      "C(t) only 2% decayed by end of trajectory (tau_relax=3.03e+05 ps vs trajectory=1951 ps) -- whole-chain conformational relaxation is far from complete."
+    ]
+  },
+  "structural_checks": {
+    "rg_cv": 0.1513,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": true,
+    "diffusion_regime": "strongly sub-diffusive (see kinetic_trap_flag for trap verdict)",
+    "msid_slope": 1.09,
+    "msid_large_s_slope": 0.924,
+    "msid_large_s_gaussian_pass": true,
+    "ordered_flag": false,
+    "p2_mean": 0.0128,
+    "heterogeneous_flag": false,
+    "density_cv_mean": 0.2049
+  },
+  "artifacts": {
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "artifacts_missing": [
+    {
+      "file": "thermal.json",
+      "found_in": null
+    },
+    {
+      "file": "bulk_modulus_deform.json",
+      "found_in": null
+    }
+  ],
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "7ca21b8",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-09-15T11:20:57.213085+00:00"
+  }
+}

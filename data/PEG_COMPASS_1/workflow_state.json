@@ -1,0 +1,157 @@
+{
+  "active_finding": {
+    "code": "PROCESS_FAILED",
+    "confidence": "high",
+    "details": {
+      "error": "Equilibration chain did not complete: {'run_id': '675d6d75', 'status': 'failed', 'stage': 'npt_melt_ramp'}"
+    },
+    "remedy_id": null,
+    "severity": "blocking",
+    "stage": "equilibration"
+  },
+  "agent_escalations": [],
+  "created_at": "2026-09-15T01:06:49.186969+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 500.0,
+    "T_melt_hold_K": 500.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 625.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      3000,
+      7000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.61,
+    "dp_typical": 114,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 148731,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "compass",
+    "stage8_min_steps": 2000000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 135693
+  },
+  "engine_version": "workflow-engine-v3",
+  "operator_resets": [
+    {
+      "at": "2026-09-15T02:12:06.089444+00:00",
+      "restored_from": {
+        "active_finding": {
+          "code": "PROCESS_FAILED",
+          "confidence": "high",
+          "details": {
+            "error": "Equilibration chain did not complete: {'run_id': '1d121951', 'status': 'failed', 'timestamp': '2026-09-14T22:05:23.538962', 'stage': 'unknown'}"
+          },
+          "remedy_id": null,
+          "severity": "blocking",
+          "stage": "equilibration"
+        },
+        "equilibration_status": "escalation_required",
+        "status": "escalation_required"
+      },
+      "what": "equilibration -> pending; top-level status/active_finding cleared; attempt-0001 kept as failed; remedy_counters.total left at 12 (lock intact, no automatic retry)",
+      "why": "Operator decision 2026-09-15 (user chose 'retry once, unchanged'): attempt-0001 failed in anneal_heat (NVT 300->625 K) at step ~926k with 'ERROR on proc 0: Out of range atoms - cannot compute PPPM', no thermo precursor at 1000-step resolution, density 1.126 g/cm3 fixed (NVT). Same signature as PEG_2's three PCFF anneal failures; PEG_COMPASS_2 passed the same anneal_heat cleanly. GPU 0 uncorrected ECC 0 (Xid unchecked: dmesg needs privileges). Retried once with plan, seeds and protocol unchanged so the pairing with PEG_1 holds; KOKKOS execution is not bit-reproducible, so it is a new trajectory. If it fails again it stops."
+    }
+  ],
+  "plan_hash": "4a555b912d3aa6d3e1e8079cfad818be758275442d5dd6153fccc87d99cc0404",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 12
+  },
+  "replicate_protocol_lock": {
+    "at": "2026-09-15T01:06:49.187413+00:00",
+    "consequence": "A process failure is not retried: _apply_remedy declines at the total cap and _escalate returns escalation_required (no_recovery_agent_configured).",
+    "mechanism": {
+      "MAX_AUTOMATIC_REMEDIES": 12,
+      "env": {
+        "POLYJARVIS_GATES_ADVISORY": "1"
+      },
+      "launch": "agent_api.py resume PEG_COMPASS_1 (no --recovery-agent-command)",
+      "recovery_agent": null,
+      "remedy_counters.total": 12
+    },
+    "only_change": {
+      "preferred_ff": [
+        "pcff",
+        "compass"
+      ]
+    },
+    "paired_with": "PEG_1",
+    "pinned_seeds": {
+      "emc_seed": 148731,
+      "source": "PEG_1 emc_build.log -seed= and equilibration 'velocity all create'",
+      "velocity_seed": 135693
+    },
+    "why": "Controlled force-field comparison (reviewer comment 4): PEG_COMPASS_1 must execute PEG_1's frozen PCFF protocol with preferred_ff=compass as the ONLY change. Any automatic remedy or agent decision would alter the executed protocol (extra continuations, changed parameters) and break the pairing, so the run is locked exactly like the rev2 replicates: every automatic remedy is refused and gate verdicts are recorded, not acted on."
+  },
+  "run_name": "PEG_COMPASS_1",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T01:09:40.135529+00:00",
+          "input_hash": "1275052bb6aaa6c6cbcdfb57d28e03a380935fa01bffffa96c4e238d17e8e5e5",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_1/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T01:07:09.424035+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "1275052bb6aaa6c6cbcdfb57d28e03a380935fa01bffffa96c4e238d17e8e5e5",
+      "status": "accepted"
+    },
+    "cooling": {
+      "attempts": [],
+      "status": "pending"
+    },
+    "equilibration": {
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T02:05:42.381955+00:00",
+          "input_hash": "bfadce75fa32a16e09a07630cf3298d483e36adaddc07c3ed7f8100e422262e0",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_1/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T01:09:40.139344+00:00",
+          "status": "failed"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-15T03:50:13.423890+00:00",
+          "input_hash": "bfadce75fa32a16e09a07630cf3298d483e36adaddc07c3ed7f8100e422262e0",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_1/attempts/equilibration/attempt-0002/executor_state.json",
+          "started_at": "2026-09-15T02:12:40.284686+00:00",
+          "status": "failed"
+        }
+      ],
+      "input_hash": "bfadce75fa32a16e09a07630cf3298d483e36adaddc07c3ed7f8100e422262e0",
+      "status": "escalation_required"
+    },
+    "mechanical": {
+      "attempts": [],
+      "status": "pending"
+    },
+    "summary": {
+      "attempts": [],
+      "status": "pending"
+    }
+  },
+  "status": "escalation_required",
+  "updated_at": "2026-09-15T03:50:13.424901+00:00"
+}

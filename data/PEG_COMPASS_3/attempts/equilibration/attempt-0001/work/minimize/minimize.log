@@ -1,0 +1,450 @@
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+# KOKKOS: package loaded via -pk kokkos on the command line
+
+read_data /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/build/attempt-0001/work/cell/cell.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (51.522057 51.522057 51.522057)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  8000 atoms
+  scanning bonds ...
+  4 = max bonds/atom
+  scanning angles ...
+  10 = max angles/atom
+  scanning dihedrals ...
+  16 = max dihedrals/atom
+  scanning impropers ...
+  7 = max impropers/atom
+  orthogonal box = (0 0 0) to (51.522057 51.522057 51.522057)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  7990 bonds
+  reading angles ...
+  14820 angles
+  reading dihedrals ...
+  17070 dihedrals
+  reading impropers ...
+  9120 impropers
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        1       
+  special bond factors coul:  0        0        1       
+     4 = max # of 1-2 neighbors
+     6 = max # of 1-3 neighbors
+     8 = max # of special neighbors
+  special bonds CPU = 0.003 seconds
+  read_data CPU = 0.132 seconds
+include /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/build/attempt-0001/work/cell/emc_build.params
+# LAMMPS parameters created by EMC v9.4.4, build Jul 21 2026 07:58:38
+
+# Variables
+
+variable	seed		index	200187
+variable	ntotal		index	8000
+variable	fshape		index	1
+variable	output		index	emc_build
+variable	field		index	compass/compass
+variable	location1	index	~/emc/field/
+variable	nav		index	0.6022141179
+variable	temperature	index	300
+variable	radius		index	5
+variable	nrelax		index	100
+variable	weight_nonbond	index	0.0001
+variable	weight_bond	index	0.0001
+variable	weight_focus	index	1
+variable	cutoff		index	9.5
+variable	charge_cutoff	index	9.5
+variable	kappa		index	4
+variable	density1	index	0.61
+variable	lprevious	index	0
+variable	lphase		index	51.5220572359
+variable	f_poly		index	10
+variable	chem_repeat	index	*CCO*
+variable	chem_cap	index	*[H]
+variable	lg_repeat	index	7
+variable	lg_cap		index	1
+variable	norm_poly	index	100
+variable	l_poly		index	800
+variable	mg_repeat	index	16.04303
+variable	mg_cap		index	0
+variable	m_poly		index	1828.90542
+variable	n_poly		index	10
+variable	mtotal		index	50241.2406
+variable	nphase1		index	8000
+variable	mphase1		index	50241.2406
+variable	vphase1		index	136766.45409
+variable	lbox		index	51.5220572359
+variable	lphase1		index	51.5220572359
+variable	lxx		index	51.5220572359
+variable	lyy		index	51.5220572359
+variable	lzz		index	51.5220572359
+variable	lzy		index	0
+variable	lzx		index	0
+variable	lyx		index	0
+variable	vtotal		index	136766.45409
+variable	nl_poly		index	10
+
+# Types
+
+variable	type_c4		index	1
+variable	type_c4o	index	2
+variable	type_h1		index	3
+variable	type_h1o	index	4
+variable	type_o2e	index	5
+variable	type_o2h	index	6
+
+variable	type_bond_c4_c4o index	1
+variable	type_bond_c4_h1	index	2
+variable	type_bond_c4o_c4o index	3
+variable	type_bond_c4o_h1 index	4
+variable	type_bond_c4o_o2e index	5
+variable	type_bond_c4o_o2h index	6
+variable	type_bond_h1o_o2h index	7
+
+variable	type_angle_c4_c4o_h1 index	1
+variable	type_angle_c4_c4o_o2e index	2
+variable	type_angle_c4o_c4_h1 index	3
+variable	type_angle_c4o_c4o_h1 index	4
+variable	type_angle_c4o_c4o_o2e index	5
+variable	type_angle_c4o_c4o_o2h index	6
+variable	type_angle_c4o_o2e_c4o index	7
+variable	type_angle_c4o_o2h_h1o index	8
+variable	type_angle_h1_c4_h1 index	9
+variable	type_angle_h1_c4o_h1 index	10
+variable	type_angle_h1_c4o_o2e index	11
+variable	type_angle_h1_c4o_o2h index	12
+
+# Clusters
+
+variable	n0_poly		index	1
+variable	n1_poly		index	10
+variable	nl_poly		index	10
+
+# Flags
+
+variable	flag_charged	index	1
+
+# Masses
+
+mass		1    12.01115  # c4
+mass		2    12.01115  # c4o
+mass		3     1.00797  # h1
+mass		4     1.00797  # h1o
+mass		5    15.99940  # o2e
+mass		6    15.99940  # o2h
+
+# Potentials
+
+pair_modify	mix sixthpower tail yes
+special_bonds	lj/coul 0 0 1
+
+# Pair Coeffs
+
+pair_coeff	 1  1    0.06200    3.85400  # c4,c4
+pair_coeff	 2  2    0.06800    3.81500  # c4o,c4o
+pair_coeff	 3  3    0.02300    2.87800  # h1,h1
+pair_coeff	 4  4    0.00800    1.08700  # h1o,h1o
+pair_coeff	 5  5    0.12000    3.30000  # o2e,o2e
+pair_coeff	 6  6    0.09600    3.58000  # o2h,o2h
+
+# Bond Coeffs
+
+bond_coeff	1    1.53000  299.67000 -501.77000  679.81000  # c4,c4o
+bond_coeff	2    1.10100  345.00000 -691.89000  844.60000  # c4,h1
+bond_coeff	3    1.53000  299.67000 -501.77000  679.81000  # c4o,c4o
+bond_coeff	4    1.10100  345.00000 -691.89000  844.60000  # c4o,h1
+bond_coeff	5    1.42000  400.39540 -835.19510 1313.01420  # c4o,o2e
+bond_coeff	6    1.42000  400.39540 -835.19510 1313.01420  # c4o,o2h
+bond_coeff	7    0.94940  540.36330 -1311.86630 2132.44460  # h1o,o2h
+
+# Angle Coeffs
+
+angle_coeff	 1  110.77000   41.45300  -10.60400    5.12900  # c4,c4o,h1
+angle_coeff	 2  111.27000   54.53810   -8.36420  -13.08380  # c4,c4o,o2e
+angle_coeff	 3  110.77000   41.45300  -10.60400    5.12900  # c4o,c4,h1
+angle_coeff	 4  110.77000   41.45300  -10.60400    5.12900  # c4o,c4o,h1
+angle_coeff	 5  111.27000   54.53810   -8.36420  -13.08380  # c4o,c4o,o2e
+angle_coeff	 6  111.27000   54.53810   -8.36420  -13.08380  # c4o,c4o,o2h
+angle_coeff	 7  104.50000   35.74540  -10.00670   -6.27290  # c4o,o2e,c4o
+angle_coeff	 8  105.80000   52.70610  -12.10900   -9.86810  # c4o,o2h,h1o
+angle_coeff	 9  107.66000   39.64100  -12.92100   -2.43180  # h1,c4,h1
+angle_coeff	10  107.66000   39.64100  -12.92100   -2.43180  # h1,c4o,h1
+angle_coeff	11  108.72800   58.54460  -10.80880  -12.40060  # h1,c4o,o2e
+angle_coeff	12  108.72800   58.54460  -10.80880  -12.40060  # h1,c4o,o2h
+
+# BondBond Coeffs
+
+angle_coeff	 1 bb    3.38720    1.53000    1.10100  # c4,c4o,h1
+angle_coeff	 2 bb   11.43180    1.53000    1.42000  # c4,c4o,o2e
+angle_coeff	 3 bb    3.38720    1.53000    1.10100  # c4o,c4,h1
+angle_coeff	 4 bb    3.38720    1.53000    1.10100  # c4o,c4o,h1
+angle_coeff	 5 bb   11.43180    1.53000    1.42000  # c4o,c4o,o2e
+angle_coeff	 6 bb   11.43180    1.53000    1.42000  # c4o,c4o,o2h
+angle_coeff	 7 bb   -7.11310    1.42000    1.42000  # c4o,o2e,c4o
+angle_coeff	 8 bb   -9.68790    1.42000    0.94940  # c4o,o2h,h1o
+angle_coeff	 9 bb    5.33160    1.10100    1.10100  # h1,c4,h1
+angle_coeff	10 bb    5.33160    1.10100    1.10100  # h1,c4o,h1
+angle_coeff	11 bb   23.19790    1.10100    1.42000  # h1,c4o,o2e
+angle_coeff	12 bb   23.19790    1.10100    1.42000  # h1,c4o,o2h
+
+# BondAngle Coeffs
+
+angle_coeff	 1 ba   20.75400   11.42100    1.53000    1.10100  # c4,c4o,h1
+angle_coeff	 2 ba    2.68680   20.40330    1.53000    1.42000  # c4,c4o,o2e
+angle_coeff	 3 ba   20.75400   11.42100    1.53000    1.10100  # c4o,c4,h1
+angle_coeff	 4 ba   20.75400   11.42100    1.53000    1.10100  # c4o,c4o,h1
+angle_coeff	 5 ba    2.68680   20.40330    1.53000    1.42000  # c4o,c4o,o2e
+angle_coeff	 6 ba    2.68680   20.40330    1.53000    1.42000  # c4o,c4o,o2h
+angle_coeff	 7 ba   -2.81120   -2.81120    1.42000    1.42000  # c4o,o2e,c4o
+angle_coeff	 8 ba   28.58000   18.92770    1.42000    0.94940  # c4o,o2h,h1o
+angle_coeff	 9 ba   18.10300   18.10300    1.10100    1.10100  # h1,c4,h1
+angle_coeff	10 ba   18.10300   18.10300    1.10100    1.10100  # h1,c4o,h1
+angle_coeff	11 ba    4.61890   55.32700    1.10100    1.42000  # h1,c4o,o2e
+angle_coeff	12 ba    4.61890   55.32700    1.10100    1.42000  # h1,c4o,o2h
+
+# Dihedral Coeffs
+
+dihedral_coeff	 1   -0.40000    0.00000   -0.40280    0.00000   -0.24500    0.00000  # c4,c4o,o2e,c4o
+dihedral_coeff	 2   -0.40000    0.00000   -0.40280    0.00000   -0.24500    0.00000  # c4o,c4o,o2e,c4o
+dihedral_coeff	 3   -0.67320    0.00000   -0.47780    0.00000   -0.16700    0.00000  # c4o,c4o,o2h,h1o
+dihedral_coeff	 4    0.53020    0.00000    0.00000    0.00000   -0.39660    0.00000  # c4o,o2e,c4o,h1
+dihedral_coeff	 5   -0.14320    0.00000    0.06170    0.00000   -0.15300    0.00000  # h1,c4,c4o,h1
+dihedral_coeff	 6   -0.14350    0.00000    0.25300    0.00000   -0.09050    0.00000  # h1,c4,c4o,o2e
+dihedral_coeff	 7   -0.14320    0.00000    0.06170    0.00000   -0.15300    0.00000  # h1,c4o,c4o,h1
+dihedral_coeff	 8   -0.14350    0.00000    0.25300    0.00000   -0.09050    0.00000  # h1,c4o,c4o,o2e
+dihedral_coeff	 9   -0.14350    0.00000    0.25300    0.00000   -0.09050    0.00000  # h1,c4o,c4o,o2h
+dihedral_coeff	10    0.18630    0.00000   -0.43380    0.00000   -0.21210    0.00000  # h1,c4o,o2h,h1o
+dihedral_coeff	11    1.10000    0.00000   -0.05000    0.00000   -0.14410    0.00000  # o2e,c4o,c4o,o2e
+dihedral_coeff	12    1.10000    0.00000   -0.05000    0.00000   -0.14410    0.00000  # o2e,c4o,c4o,o2h
+
+# MiddleBondTorsion Coeffs
+
+dihedral_coeff	 1 mbt   -5.92880   -2.70070   -0.31750    1.42000  # c4,c4o,o2e,c4o
+dihedral_coeff	 2 mbt   -5.92880   -2.70070   -0.31750    1.42000  # c4o,c4o,o2e,c4o
+dihedral_coeff	 3 mbt    1.24720    0.00000    0.74850    1.42000  # c4o,c4o,o2h,h1o
+dihedral_coeff	 4 mbt   -6.80070   -4.65460   -1.41010    1.42000  # c4o,o2e,c4o,h1
+dihedral_coeff	 5 mbt  -14.26100   -0.53220   -0.48640    1.53000  # h1,c4,c4o,h1
+dihedral_coeff	 6 mbt  -16.79750   -1.22960   -0.27500    1.53000  # h1,c4,c4o,o2e
+dihedral_coeff	 7 mbt  -14.26100   -0.53220   -0.48640    1.53000  # h1,c4o,c4o,h1
+dihedral_coeff	 8 mbt  -16.79750   -1.22960   -0.27500    1.53000  # h1,c4o,c4o,o2e
+dihedral_coeff	 9 mbt  -16.79750   -1.22960   -0.27500    1.53000  # h1,c4o,c4o,o2h
+dihedral_coeff	10 mbt    0.00000    0.92410   -0.58890    1.42000  # h1,c4o,o2h,h1o
+dihedral_coeff	11 mbt  -17.25850   -3.61570   -0.83640    1.53000  # o2e,c4o,c4o,o2e
+dihedral_coeff	12 mbt  -17.25850   -3.61570   -0.83640    1.53000  # o2e,c4o,c4o,o2h
+
+# EndBondTorsion Coeffs
+
+dihedral_coeff	 1 ebt   -0.24560    1.05170   -0.77950    0.47410    1.26350    0.55760    1.53000    1.42000  # c4,c4o,o2e,c4o
+dihedral_coeff	 2 ebt   -0.24560    1.05170   -0.77950    0.47410    1.26350    0.55760    1.53000    1.42000  # c4o,c4o,o2e,c4o
+dihedral_coeff	 3 ebt   -0.58000    0.90040    0.00000    0.00000    0.53430    0.90250    1.53000    0.94940  # c4o,c4o,o2h,h1o
+dihedral_coeff	 4 ebt   -0.16200    0.15640   -1.14080   -0.60540    1.33390    0.96480    1.42000    1.10100  # c4o,o2e,c4o,h1
+dihedral_coeff	 5 ebt    0.21300    0.31200    0.07770    0.21300    0.31200    0.07770    1.10100    1.10100  # h1,c4,c4o,h1
+dihedral_coeff	 6 ebt    0.96810    0.95510    0.04360    0.59030    0.66690    0.85840    1.10100    1.42000  # h1,c4,c4o,o2e
+dihedral_coeff	 7 ebt    0.21300    0.31200    0.07770    0.21300    0.31200    0.07770    1.10100    1.10100  # h1,c4o,c4o,h1
+dihedral_coeff	 8 ebt    0.96810    0.95510    0.04360    0.59030    0.66690    0.85840    1.10100    1.42000  # h1,c4o,c4o,o2e
+dihedral_coeff	 9 ebt    0.96810    0.95510    0.04360    0.59030    0.66690    0.85840    1.10100    1.42000  # h1,c4o,c4o,o2h
+dihedral_coeff	10 ebt   -1.75540    1.31450    0.22630    0.24930    0.68030    0.00000    1.10100    0.94940  # h1,c4o,o2h,h1o
+dihedral_coeff	11 ebt    1.01650    0.75530   -0.46090    1.01650    0.75530   -0.46090    1.42000    1.42000  # o2e,c4o,c4o,o2e
+dihedral_coeff	12 ebt    1.01650    0.75530   -0.46090    1.01650    0.75530   -0.46090    1.42000    1.42000  # o2e,c4o,c4o,o2h
+
+# AngleTorsion Coeffs
+
+dihedral_coeff	 1 at   -2.74660    1.48770   -0.89550    0.56760    0.94500    0.07030  111.27000  104.50000  # c4,c4o,o2e,c4o
+dihedral_coeff	 2 at   -2.74660    1.48770   -0.89550    0.56760    0.94500    0.07030  111.27000  104.50000  # c4o,c4o,o2e,c4o
+dihedral_coeff	 3 at   -3.59030    2.52250    0.48880    0.87260   -0.35770    0.38880  111.27000  105.80000  # c4o,c4o,o2h,h1o
+dihedral_coeff	 4 at   -0.77770    0.43400   -0.66530   -1.82340    1.63930    0.51440  104.50000  108.72800  # c4o,o2e,c4o,h1
+dihedral_coeff	 5 at   -0.80850    0.55690   -0.24660   -0.80850    0.55690   -0.24660  110.77000  110.77000  # h1,c4,c4o,h1
+dihedral_coeff	 6 at    2.36680    2.49200   -1.01220   -0.18920    0.49180    0.72730  110.77000  111.27000  # h1,c4,c4o,o2e
+dihedral_coeff	 7 at   -0.80850    0.55690   -0.24660   -0.80850    0.55690   -0.24660  110.77000  110.77000  # h1,c4o,c4o,h1
+dihedral_coeff	 8 at    2.36680    2.49200   -1.01220   -0.18920    0.49180    0.72730  110.77000  111.27000  # h1,c4o,c4o,o2e
+dihedral_coeff	 9 at    2.36680    2.49200   -1.01220   -0.18920    0.49180    0.72730  110.77000  111.27000  # h1,c4o,c4o,o2h
+dihedral_coeff	10 at   -3.40600    1.63960    0.07370    0.00000   -0.28100   -0.59440  108.72800  105.80000  # h1,c4o,o2h,h1o
+dihedral_coeff	11 at    0.55110    0.97370   -0.66730    0.55110    0.97370   -0.66730  111.27000  111.27000  # o2e,c4o,c4o,o2e
+dihedral_coeff	12 at    0.55110    0.97370   -0.66730    0.55110    0.97370   -0.66730  111.27000  111.27000  # o2e,c4o,c4o,o2h
+
+# AngleAngleTorsion Coeffs
+
+dihedral_coeff	 1 aat  -19.00590  111.27000  104.50000  # c4,c4o,o2e,c4o
+dihedral_coeff	 2 aat  -19.00590  111.27000  104.50000  # c4o,c4o,o2e,c4o
+dihedral_coeff	 3 aat  -12.10380  111.27000  105.80000  # c4o,c4o,o2h,h1o
+dihedral_coeff	 4 aat  -16.44380  104.50000  108.72800  # c4o,o2e,c4o,h1
+dihedral_coeff	 5 aat  -12.56400  110.77000  110.77000  # h1,c4,c4o,h1
+dihedral_coeff	 6 aat  -20.20060  110.77000  111.27000  # h1,c4,c4o,o2e
+dihedral_coeff	 7 aat  -12.56400  110.77000  110.77000  # h1,c4o,c4o,h1
+dihedral_coeff	 8 aat  -20.20060  110.77000  111.27000  # h1,c4o,c4o,o2e
+dihedral_coeff	 9 aat  -20.20060  110.77000  111.27000  # h1,c4o,c4o,o2h
+dihedral_coeff	10 aat  -10.50930  108.72800  105.80000  # h1,c4o,o2h,h1o
+dihedral_coeff	11 aat  -14.04840  111.27000  111.27000  # o2e,c4o,c4o,o2e
+dihedral_coeff	12 aat  -14.04840  111.27000  111.27000  # o2e,c4o,c4o,o2h
+
+# BondBond13 Coeffs
+
+dihedral_coeff	 1 bb13    0.00000    1.53000    1.42000  # c4,c4o,o2e,c4o
+dihedral_coeff	 2 bb13    0.00000    1.53000    1.42000  # c4o,c4o,o2e,c4o
+dihedral_coeff	 3 bb13    0.00000    1.53000    0.94940  # c4o,c4o,o2h,h1o
+dihedral_coeff	 4 bb13    0.00000    1.42000    1.10100  # c4o,o2e,c4o,h1
+dihedral_coeff	 5 bb13    0.00000    1.10100    1.10100  # h1,c4,c4o,h1
+dihedral_coeff	 6 bb13    0.00000    1.10100    1.42000  # h1,c4,c4o,o2e
+dihedral_coeff	 7 bb13    0.00000    1.10100    1.10100  # h1,c4o,c4o,h1
+dihedral_coeff	 8 bb13    0.00000    1.10100    1.42000  # h1,c4o,c4o,o2e
+dihedral_coeff	 9 bb13    0.00000    1.10100    1.42000  # h1,c4o,c4o,o2h
+dihedral_coeff	10 bb13    0.00000    1.10100    0.94940  # h1,c4o,o2h,h1o
+dihedral_coeff	11 bb13    0.00000    1.42000    1.42000  # o2e,c4o,c4o,o2e
+dihedral_coeff	12 bb13    0.00000    1.42000    1.42000  # o2e,c4o,c4o,o2h
+
+# Improper Coeffs
+
+improper_coeff	 1    0.00000    0.00000  # c4,c4o,h1,h1
+improper_coeff	 2    0.00000    0.00000  # c4,h1,h1,h1
+improper_coeff	 3    0.00000    0.00000  # c4o,c4,h1,h1
+improper_coeff	 4    0.00000    0.00000  # c4o,c4,o2e,h1
+improper_coeff	 5    0.00000    0.00000  # c4o,c4o,h1,h1
+improper_coeff	 6    0.00000    0.00000  # c4o,c4o,h1,o2e
+improper_coeff	 7    0.00000    0.00000  # c4o,c4o,o2e,h1
+improper_coeff	 8    0.00000    0.00000  # c4o,c4o,o2h,h1
+improper_coeff	 9    0.00000    0.00000  # c4o,h1,h1,o2e
+improper_coeff	10    0.00000    0.00000  # c4o,h1,h1,o2h
+
+# AngleAngle Coeffs
+
+improper_coeff	 1 aa    0.27380   -0.48250    0.27380  110.77000  110.77000  107.66000  # c4,c4o,h1,h1
+improper_coeff	 2 aa   -0.31570   -0.31570   -0.31570  107.66000  107.66000  107.66000  # c4,h1,h1,h1
+improper_coeff	 3 aa    0.27380   -0.48250    0.27380  110.77000  110.77000  107.66000  # c4o,c4,h1,h1
+improper_coeff	 4 aa    0.16890    2.59260    3.91770  111.27000  110.77000  108.72800  # c4o,c4,o2e,h1
+improper_coeff	 5 aa    0.27380   -0.48250    0.27380  110.77000  110.77000  107.66000  # c4o,c4o,h1,h1
+improper_coeff	 6 aa    3.91770    2.59260    0.16890  110.77000  111.27000  108.72800  # c4o,c4o,h1,o2e
+improper_coeff	 7 aa    0.16890    2.59260    3.91770  111.27000  110.77000  108.72800  # c4o,c4o,o2e,h1
+improper_coeff	 8 aa    0.16890    2.59260    3.91770  111.27000  110.77000  108.72800  # c4o,c4o,o2h,h1
+improper_coeff	 9 aa    2.42590    2.42590    2.12830  107.66000  108.72800  108.72800  # c4o,h1,h1,o2e
+improper_coeff	10 aa    2.42590    2.42590    2.12830  107.66000  108.72800  108.72800  # c4o,h1,h1,o2h
+
+
+# --- Thermo Output ---
+thermo_style custom step time temp press etotal pe ebond eangle edihed eimp evdwl ecoul elong vol lx ly lz density
+thermo_modify flush yes
+thermo 500
+
+# --- Trajectory ---
+dump dump_min all custom 1000 minimize.dump id type mol x y z ix iy iz
+
+# --- Minimization ---
+min_style cg
+minimize 1e-06 1e-06 50000 100000
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.29918779
+  grid = 36 36 36
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00039937676
+  estimated relative force accuracy = 1.2027113e-06
+  using double precision cuFFT
+  3d grid and FFT values/proc = 79507 46656
+Generated 15 of 15 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 4000, page size: 100000
+  master list distance cutoff = 11.5
+  ghost atom cutoff = 11.5
+  binsize = 11.5, bins = 5 5 5
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/class2/coul/long/kk, perpetual
+      attributes: full, newton off, kokkos_device
+      pair build: full/bin/kk/device
+      stencil: full/bin/3d
+      bin: kk/device
+WARNING: Fix MINIMIZE/kk not compatible with sending data in Kokkos communication (src/KOKKOS/comm_kokkos.cpp:767)
+WARNING: Fix with atom-based arrays not compatible with sending data in Kokkos communication, switching to classic exchange/border communication (src/KOKKOS/comm_kokkos.cpp:780)
+WARNING: Fix MINIMIZE/kk not compatible with Kokkos sorting on device (src/KOKKOS/atom_kokkos.cpp:212)
+WARNING: Fix with atom-based arrays not compatible with Kokkos sorting on device, switching to classic host sorting (src/KOKKOS/atom_kokkos.cpp:218)
+Per MPI rank memory allocation (min/avg/max) = 31.49 | 31.49 | 31.49 Mbytes
+   Step          Time           Temp          Press          TotEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         Volume           Lx             Ly             Lz          Density    
+         0   0              0              9623.2818      12925.282      12925.282      2869.2463      8330.9512     -4835.3693     -80.128066      1197.6829      12907.486     -7464.5873      136766.45      51.522057      51.522057      51.522057      0.60999999   
+        70   70             0              4969.7111      3195.7873      3195.7873      206.00014      3836.1351     -5307.673      -22.315325     -769.6478       12751.938     -7498.6493      136766.45      51.522057      51.522057      51.522057      0.60999999   
+Loop time of 0.356256 on 1 procs for 70 steps with 8000 atoms
+
+96.8% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+       12925.281821611   3195.78988943802   3195.78733351148
+  Force two-norm initial, final = 3057.3442 322.44097
+  Force max component initial, final = 239.61323 164.42027
+  Final line search alpha, max atom move = 2.876522e-07 4.7295852e-05
+  Iterations, force evaluations = 70 176
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.054004   | 0.054004   | 0.054004   |   0.0 | 15.16
+Bond    | 0.043246   | 0.043246   | 0.043246   |   0.0 | 12.14
+Kspace  | 0.19881    | 0.19881    | 0.19881    |   0.0 | 55.80
+Neigh   | 0.0057269  | 0.0057269  | 0.0057269  |   0.0 |  1.61
+Comm    | 0.018105   | 0.018105   | 0.018105   |   0.0 |  5.08
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.03637    |            |       | 10.21
+
+Nlocal:           8000 ave        8000 max        8000 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          13451 ave       13451 max       13451 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:  3.45205e+06 ave 3.45205e+06 max 3.45205e+06 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 3452054
+Ave neighs/atom = 431.50675
+Ave special neighs/atom = 5.7025
+Neighbor list builds = 1
+Dangerous builds = 0
+
+undump dump_min
+reset_timestep 0
+
+# --- Write Output ---
+write_dump all custom minimize_last.dump id type mol x y z xu yu zu vx vy vz modify sort id
+write_data /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/minimize/minimize_out.data
+System init for write_data ...
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.29918779
+  grid = 36 36 36
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00039937676
+  estimated relative force accuracy = 1.2027113e-06
+  using double precision cuFFT
+  3d grid and FFT values/proc = 79507 46656
+Generated 15 of 15 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+write_restart /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/minimize/minimize_out.restart
+System init for write_restart ...
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.29918779
+  grid = 36 36 36
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00039937676
+  estimated relative force accuracy = 1.2027113e-06
+  using double precision cuFFT
+  3d grid and FFT values/proc = 79507 46656
+Generated 15 of 15 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+
+print "STAGE COMPLETE: minimization"
+STAGE COMPLETE: minimization
+quit

@@ -1,0 +1,64 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/summary/attempt-0001/raw/run_summary.json",
+      "sha256": "c0b243c35e6bc5252041304e7dbb04b2cbb4adade3c6a636636f9e5d55fa3a8d",
+      "size": 2697
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-15T11:20:58.952203+00:00",
+  "input_hash": "f7b5f7b52c549a46f984a277f1422453ee40bde873b28b25a61491d5f4f58704",
+  "outputs": {
+    "artifacts_missing": [
+      {
+        "file": "thermal.json",
+        "found_in": null
+      },
+      {
+        "file": "bulk_modulus_deform.json",
+        "found_in": null
+      }
+    ],
+    "run_summary_path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/summary/attempt-0001/raw/run_summary.json",
+    "status": "success",
+    "summary_json": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/summary/attempt-0001/raw/run_summary.json"
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 500.0,
+    "T_melt_hold_K": 500.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 625.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      3000,
+      7000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.61,
+    "dp_typical": 114,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 798838,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "compass",
+    "stage8_min_steps": 2000000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 316927
+  },
+  "stage": "summary",
+  "status": "accepted"
+}

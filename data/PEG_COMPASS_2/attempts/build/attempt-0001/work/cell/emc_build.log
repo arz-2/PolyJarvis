@@ -1,0 +1,289 @@
+$ perl /home/alexzhao/emc/scripts/emc_setup.pl -field=compass -seed=798838 -temperature=300.0 -replace emc_build.esh
+# exit 0
+EMC Setup v4.1.5 (March 30, 2024), (c) 2004-2024 Pieter J. in 't Veld
+
+Info: reading script from "./emc_build.esh"
+Info: phase1 = {poly}
+Info: project = emc_build
+Info: direction = x
+Info: shape = 1
+Info: force field type = "cff"
+Info: force field name = "compass/compass"
+Info: force field location = "~/emc/field"
+Info: build for LAMMPS script in "../build"
+Info: creating LAMMPS run script "emc_build.in"
+Info: adding pressure sampling
+Info: creating EMC build script "build.emc"
+
+$ /home/alexzhao/emc/bin/emc_linux_x86_64 build.emc
+# exit 0
+(* EMC: Enhanced Monte Carlo simulations *)
+
+version 9.4.4, build Jul 21 2026 07:58:38, date Mon Sep 14 21:07:29 2026
+
+valid until Jun 30, 2027
+
+Info: script v1.0 started at Mon Sep 14 21:07:29 2026
+Info: variables = {seed -> 798838, ntotal -> 3000, fshape -> 1, output ->
+        "emc_build", field -> "compass/compass", location1 -> "~/emc/field/", 
+        nav -> 0.6022141179, temperature -> 300, radius -> 5, nrelax -> 100, 
+        weight_nonbond -> 0.0001, weight_bond -> 0.0001, weight_focus -> 1, 
+        cutoff -> 9.5, charge_cutoff -> 9.5, kappa -> 4, density1 -> 0.61, 
+        lprevious -> 0, lphase -> 0, f_poly -> 10, chem_repeat -> "*CCO*", 
+        chem_cap -> "*[H]"}
+Info: output = 
+      {detail -> 3, wide -> false, expand -> false, math -> true, reduced ->
+        false, info -> true, strict -> true, warning -> true, message -> true,
+        debug -> false, exit -> true, ignore -> false}
+Info: field = {id -> compass, mode -> cff, style -> none, name ->
+        {"~/emc/field/compass/compass.frc", 
+          "~/emc/field/compass/compass_templates.dat"}, compress -> false, 
+        error -> true, debug -> false, check -> {atomistic -> true, charge ->
+          true}}
+Info: importing '~/emc/field/compass/compass.frc'
+Info: groups = {ngroups -> 2, group -> {
+          {id -> repeat, chemistry -> "*CCO*", depth -> 8, charges -> field, 
+            charge -> 0, terminator -> false, nconnects -> 4, connects -> {
+              {source -> $end1, destination -> {index -> cap, site -> $end1}}, 
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end2}}, 
+              {source -> $end2, destination -> {index -> cap, site -> $end1}}, 
+              {source -> $end2, destination -> {index -> repeat, site ->
+                  $end1}}}}, 
+          {id -> cap, chemistry -> "*[H]", depth -> 8, charges -> field, 
+            charge -> 0, terminator -> false, nconnects -> 2, connects -> {
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end2}}, 
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end1}}}}}, ndeletes -> 0, npolymers -> 0}
+Info: field = {mode -> apply, style -> none, error -> true, debug -> false, 
+        check -> {atomistic -> true, charge -> true}}
+Info: applying '~/emc/field/compass/compass.frc'
+Warning: core/field/apply/increments.c:648 FieldApplyIncrements:
+         Ambiguous charge assignments for group {repeat, 3}.
+Warning: core/field/apply/increments.c:648 FieldApplyIncrements:
+         Ambiguous charge assignments for group {repeat, 3}.
+Info: variables = {lg_repeat -> 7, lg_cap -> 1, norm_poly -> 100, l_poly ->
+        800, mg_repeat -> 16.04303, mg_cap -> 0, m_poly -> 1828.90542, n_poly
+        -> 10, ntotal -> 0, mtotal -> 0}
+Info: simulation = {units -> {permittivity -> 1, seed -> seed}, types -> {
+          coulomb -> {pair -> {active -> true, cutoff -> charge_cutoff}}}}
+Info: clusters = {progress -> none, nbodys -> 0, nclusters -> 0, ngrafts -> 0,
+        npolymers -> 1, 
+        polymer -> 
+        {id -> poly, system -> main, type -> alternate, niterations -> 1000, n
+          -> 10, groups -> {repeat, cap}, weights -> {1, 1}, nrepeat -> {114, 
+            0}}}
+      delta = {systems -> 1, bodies -> 0, clusters -> 10, sites -> 8000}
+Info: field = {mode -> apply, style -> none, error -> true, debug -> false, 
+        check -> {atomistic -> true, charge -> true}}
+Info: applying '~/emc/field/compass/compass.frc'
+Warning: core/field/apply/increments.c:648 FieldApplyIncrements:
+         Ambiguous charge assignments for group {repeat, 3}.
+Warning: core/field/apply/increments.c:648 FieldApplyIncrements:
+         Ambiguous charge assignments for group {repeat, 3}.
+Info: types = {cff -> {pair -> {active -> true, mode -> repulsive}}}
+Info: variables = {nphase1 -> 8000, mphase1 -> 50241.2406, vphase1 ->
+        136766.45409, lbox -> 51.5220572359, lphase1 -> 51.5220572359, lxx ->
+        51.5220572359, lyy -> 51.5220572359, lzz -> 51.5220572359, lzy -> 0, 
+        lzx -> 0, lyx -> 0, lphase -> 51.5220572359, ntotal -> 8000, mtotal ->
+        50241.2406, vtotal -> 136766.45409}
+Info: build = {
+        system -> {id -> main, temperature -> 300, density -> 0.61, split ->
+          false, flag -> {charge -> true, map -> true, pbc -> true, geometry
+            -> true}, periodic -> {x -> true, y -> true, z -> true}, geometry
+          -> {xx -> 51.5220572359, yy -> 51.5220572359, zz -> 51.5220572359, 
+            zy -> 0, zx -> 0, yx -> 0}, deform -> {xx -> 1, yy -> 1, zz -> 1, 
+            zy -> 0, zx -> 0, yx -> 0}}, 
+        select -> {progress -> list, frequency -> 1, message -> nkt, center ->
+          false, origin -> {x -> 0, y -> 0, z -> 0}, order -> random, check ->
+          true, nclusters -> 1, cluster -> poly, 
+          relax -> {ncycles -> 100, radius -> 5}, name -> "error", type ->
+          xyz, compress -> false, 
+          grow -> {check -> all, method -> energetic, cutoff -> 0, focus ->
+            all, 
+            weight -> {nonbonded -> 0.0001, bonded -> 0.0001, focus -> 1}, 
+            theta -> 0, dphi -> 1, nbonded -> 20, ntrials -> 20, niterations
+            -> 1000}}}
+Info: building 8000 sites.
+
+   progress/%      E[0]/nkT
+---------------------------
+            0             0
+            1      1.361927
+            2      1.590434
+            3       1.75437
+            4      1.830998
+            5      1.921376
+            6      1.979381
+            7      2.179865
+            8      2.242201
+            9      2.262192
+           10      2.226002
+           11      2.271308
+           12      2.241685
+           13      2.229192
+           14      2.245161
+           15      2.291637
+           16      2.299211
+           17      2.406857
+           18      2.347037
+           19      2.317341
+           20      2.352096
+           21      2.305355
+           22      2.285365
+           23      2.281093
+           24      2.312907
+           25      2.310409
+           26      2.329623
+           27      2.349851
+           28      2.348875
+           29      2.343608
+           30      2.337587
+           31      2.335113
+           32      2.325726
+           33      2.315076
+           34      2.343644
+           35      2.324402
+           36      2.349383
+           37       2.34288
+           38      2.339652
+           39      2.329421
+           40      2.324169
+           41      2.317889
+           42      2.325159
+           43      2.332165
+           44       2.35114
+           45      2.397051
+           46      2.410108
+           47      2.414859
+           48      2.449056
+           49      2.479874
+           50       2.48174
+           51      2.479715
+           52      2.476919
+           53      2.470747
+           54      2.483528
+           55      2.532435
+           56      2.557653
+           57      2.556208
+           58      2.578419
+           59      2.585605
+           60      2.585024
+           61      2.608993
+           62      2.618449
+           63      2.610387
+           64      2.605149
+           65      2.600331
+           66      2.614501
+           67      2.599519
+           68      2.608801
+           69      2.606059
+           70       2.61039
+           71      2.587175
+           72      2.638935
+           73      2.647051
+           74      2.637553
+           75      2.653493
+           76      2.633002
+           77       2.64819
+           78      2.669346
+           79      2.710285
+           80      2.745966
+           81       2.76433
+           82      2.792181
+           83      2.815895
+           84      2.817378
+           85      2.845704
+           86      2.872393
+           87      2.895552
+           88      2.925279
+           89      2.951968
+           90      2.943909
+           91      2.949337
+           92      2.962802
+           93      2.964354
+           94      2.959434
+           95       2.95021
+           96      2.962215
+           97      2.960634
+           98      2.964895
+           99      2.976288
+          100       2.96643
+---------------------------
+      average      2.465787
+
+      niterations = 8000, <niterations> = 1
+Info: force = {style -> none, message -> nkt}
+
+(* Energy *)
+
+                         E[0]/nkT 
+---------------------------------
+cff.angle_angle_tor    -0.2566582 
+cff.angle_angle       -0.01594035 
+cff.angle_torsion      -0.2122086 
+cff.angle                1.667524 
+cff.bond_angle        -0.02763047 
+cff.bond_bond_13                0 
+cff.bond_bond       -2.632692e-05 
+cff.bond                0.5715546 
+cff.end_bond_torsio  -0.006833842 
+cff.improper                    0 
+cff.middle_bond_tor   -0.01146385 
+cff.pair                 1.258113 
+cff.torsion                     0 
+---------------------------------
+total                     2.96643 
+
+Info: force = {style -> init, message -> nkt}
+
+(* Energy *)
+
+                         E[0]/nkT 
+---------------------------------
+cff.angle_angle_tor    -0.2566582 
+cff.angle_angle       -0.01594035 
+cff.angle_torsion      -0.2122086 
+cff.angle                1.667524 
+cff.bond_angle        -0.02763047 
+cff.bond_bond_13                0 
+cff.bond_bond       -2.632692e-05 
+cff.bond                0.5715546 
+cff.end_bond_torsio  -0.006833842 
+cff.improper                    0 
+cff.middle_bond_tor   -0.01146385 
+cff.pair                 1.258113 
+cff.torsion                     0 
+---------------------------------
+total                     2.96643 
+
+Info: variables = {nl_poly -> 10}
+Info: put = {name -> "emc_build", compress -> true, detail -> 3}
+Info: pdb = {name -> "emc_build", compress -> true, extend -> false, mode ->
+        put, system -> main, length -> auto, forcefield -> cff, atomistic ->
+        full, depth -> auto, charges -> false, detect -> false, atom -> index,
+        residue -> index, segment -> index, rank -> false, hexadecimal ->
+        false, cut -> false, pbc -> true, map -> false, unwrap -> clusters, 
+        rigid -> true, fixed -> true, licorice -> false, vdw -> false, 
+        connectivity -> false, crystal -> false, element -> auto, parameters
+        -> false, flag -> {charge -> true, map -> true, pbc -> true, geometry
+          -> true}}
+Info: lammps = {name -> "emc_build", compress -> false, system -> main, mode
+        -> put, length -> auto, units -> none, forcefield -> cff, shake ->
+        auto, atomistic -> none, detect -> true, cutoff -> false, charges ->
+        true, ewald -> true, ellipsoid -> false, sphere -> false, bonds ->
+        false, types -> false, data -> true, parameters -> true, cross ->
+        false, variables -> true, coefficients -> true, comment -> true, map
+        -> true, unwrap -> true, flag -> {charge -> true, map -> true, pbc ->
+          true, geometry -> true}}
+Info: tsc: bonded = {53.57, 16.3, 8.562, 25.55, 0.1082, 0.1031} s
+Info: tsc: simulation = 146.5 s, threads = 82.87 s
+Info: tsc: thread = 78.93 s
+Info: script v1.0 finished at Mon Sep 14 21:09:56 2026
+
+Info: Thank you for using EMC v9.4.4
+Info: In any publication of scientific results based in part or
+Info: completely on the use of EMC, please include this reference:
+Info: P.J. in 't Veld and G.C. Rutledge, Macromolecules 2003, 36, 7358
+
