@@ -1422,13 +1422,47 @@ def do_equil_and_check(args, cls: dict, lammps) -> dict:
                 "stage_checkpoints": stage_checkpoints}
 
 
-def _run_equilibration_gate(lammps, p: dict, backbone_types, json_name: str, label: str):
+def _melt_homogeneity_floor(args):
+    """The melt's own per-frame voxel mass CV, for the glass gate's measured_floor method.
+
+    Only a melt that PASSED the split_half homogeneity test supplies one: that test is what
+    shows the melt's per-frame spread is counting noise rather than structure, which is the
+    whole claim the floor rests on. Anything else returns None, and the checker falls back to
+    its per-frame formula and says so.
+
+    Mean plus two standard deviations, not the mean: the glass is one frozen configuration, a
+    single draw from the melt's frame-to-frame spread (~0.013 on a 125-343 voxel grid), and the
+    mean alone would fail a sound glass on an unlucky draw.
+    """
+    path = getattr(args, "melt_equilibration_json_path", None)
+    if not path:
+        return None
+    try:
+        dh = (json.loads(Path(path).read_text()).get("spatial") or {}).get("density_homogeneity") or {}
+    except (OSError, ValueError):
+        return None
+    # time_averaged: the retired first form of the melt method, written by runs gated before the
+    # split_half change and equally a statement that the melt's per-frame spread is noise.
+    if dh.get("decided_by") not in ("split_half", "time_averaged") or not dh.get("pass"):
+        return None
+    if dh.get("cv_mean") is None:
+        return None
+    return float(dh["cv_mean"]) + 2.0 * float(dh.get("cv_std") or 0.0)
+
+
+def _run_equilibration_gate(lammps, p: dict, backbone_types, json_name: str, label: str,
+                            homog_method: str = "split_half", homog_melt_cv_floor=None):
     """The gate itself: comprehensive check -> density -> verdict, on whatever cell `p` names.
 
     Shared verbatim by the melt gate (equilibration stage, on npt_melt_hold) and the assessment
     gate (cooling stage, on npt_final). The two differ only in the cell they point at, the
     regime they declare, and the file they write -- never in what is computed or how it is
     adjudicated, which is what keeps one D-05 policy honest across both.
+
+    The one deliberate asymmetry is density homogeneity's noise model: a melt compares the
+    time-averaged maps of the two halves of its hold (atoms move, so noise is not shared), a
+    glass cannot (nothing moves, both halves are the same cell), so it subtracts the melt's own
+    measured noise instead -- see homogeneity_verdict.
     """
     comp = wait_for_analysis(lammps, lammps.check_equilibration_comprehensive(
         log_file=p["npt_prod_log_path"], dump_file=p["melt_dump_path"],
@@ -1437,6 +1471,7 @@ def _run_equilibration_gate(lammps, p: dict, backbone_types, json_name: str, lab
         graphs_dir=p["graphs_dir"], cutoff_A=p["cutoff_A"], timestep_fs=p["dt_fs"],
         struct_dump_file=p["struct_dump_path"], struct_data_file=p["npt_prod_data_path"],
         output_name=json_name,
+        homog_method=homog_method, homog_melt_cv_floor=homog_melt_cv_floor,
     ), f"{label} comprehensive")
     # A comprehensive result missing a whole section is a crashed check that reported success,
     # not a cell with nothing to say. Both sections are unconditional outputs of
@@ -1552,7 +1587,8 @@ def do_cool_and_check(args, cls: dict, lammps) -> dict:
             return {"halted": True, "reason": "BACKBONE_TYPES_UNRESOLVED", "detail": _bt_halt,
                     "extend_history": extend_history}
         comp, density, verdict, cooling_json = _run_equilibration_gate(
-            lammps, p, backbone_types, "cooling.json", "cool-check")
+            lammps, p, backbone_types, "cooling.json", "cool-check",
+            homog_method="measured_floor", homog_melt_cv_floor=_melt_homogeneity_floor(args))
         cool_verdict = verdict.get("verdict")
 
         if cool_verdict == "PASS":
@@ -2696,6 +2732,9 @@ class CampaignStageExecutor:
         if equil:
             args.melt_start_data_path = equil.get("melt_start_data_path")
             args.melt_data_path = equil.get("melt_data_path")
+            # The melt gate's own result file: the cooling gate reads its measured homogeneity
+            # noise from it (_melt_homogeneity_floor).
+            args.melt_equilibration_json_path = equil.get("equilibration_json_path")
             # structure joins them: it describes the MELT cell's chains, so it reads the same
             # handoff, not the assessment cell.
             if stage in ("cooling", "thermal", "structure"):

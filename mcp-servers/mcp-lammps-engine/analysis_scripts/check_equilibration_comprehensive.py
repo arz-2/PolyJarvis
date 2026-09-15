@@ -422,6 +422,138 @@ def _compute_density_cv(positions, masses, box_lengths, grid_n):
     return float(occ.std() / occ.mean()) if occ.mean() > 0 else 0.0, len(occ)
 
 
+def _voxel_mass_map(positions, masses, box_lengths, grid_n):
+    """Mass per voxel for one frame -- the quantity _compute_density_cv takes the CV of."""
+    pos = positions % box_lengths[np.newaxis, :]
+    idx = np.floor(pos / box_lengths[np.newaxis, :] * grid_n).astype(int)
+    idx = np.clip(idx, 0, grid_n - 1)
+    flat_idx = idx[:, 0] * grid_n * grid_n + idx[:, 1] * grid_n + idx[:, 2]
+    return np.bincount(flat_idx, weights=masses, minlength=grid_n ** 3)
+
+
+HOMOG_METHODS = ("formula", "split_half", "measured_floor")
+HOMOG_METHOD_ALIASES = {"time_averaged": "split_half"}
+"""time_averaged was the first form of the melt method (2026-09-14): CV of the time-averaged map
+minus cv_mean/sqrt(n_eff). Retired the same day because its noise correction depends on
+trajectory length -- aPS_2/aPS_3 pass it on their 6 ns holds (0.058/0.062) and fail it on every
+2 ns window of the same holds (0.081-0.104). Accepted as an alias so a campaign process started
+before the change still gets a valid invocation."""
+
+
+def homogeneity_verdict(maps, cv_per_frame, masses_all, n_atoms, grid_n, *, method="formula",
+                        cv_signal_max=0.11, persist_max=0.11, min_frames=100,
+                        melt_cv_floor=None):
+    """Density-homogeneity verdict from per-frame voxel mass maps (frames x voxels).
+
+    Three ways to separate real heterogeneity from counting noise, chosen by the caller:
+
+    formula         per-frame mass CV minus a compound-Poisson floor that assumes atoms occupy
+                    voxels independently. Wrong when atoms move as bonded groups carrying most of
+                    the mass: PTFE (76% F on C, no H) gets a 0.208 floor against a real one near
+                    0.35 and fails a well-mixed melt (PTFE_AI/noAI, 2026-09-14).
+    split_half      MELT ONLY. Average the voxel map over the first and over the second half of
+                    the trajectory and take the covariance of the two averages. Counting noise is
+                    independent between halves and drops out of the covariance in expectation;
+                    what the two halves share is structure that persisted across the hold -- a
+                    void, an unmixed region, phase separation. persistent_cv = sqrt(cov) / mean.
+                    No model of atoms or groups and no autocorrelation time, so neither the
+                    chemistry nor the trajectory length enters the noise correction.
+                    Calibrated on the gate's own npt_melt_hold trajectories: real melts 0.000-0.050
+                    on full holds and at most 0.096 on 2 ns windows (polystyrene's density pattern
+                    relaxes over nanoseconds, so a short aPS hold reads higher -- aPS_1's 2 ns
+                    continuation is 0.087); a fixed 5% void reads 0.179-0.214 in every system, a
+                    2% void 0.089-0.148. persist_max 0.11 passes every real melt and catches a 5%
+                    void everywhere; a 2% void is caught only in aPS (0.113-0.136) -- PLLA reads
+                    0.107-0.110, sPVC 0.103-0.105 and PTFE 0.089-0.090, all just under. The one
+                    melt it fails is iPMMA_1 (0.147, half-map r 0.72 -- as persistent as its own
+                    2% void), the melt already recorded as hand-accepted while unconverged.
+                    A glass fails it by construction (nothing moves, so both halves are the same
+                    configuration) -- never use it on a glass.
+    measured_floor  for a glass: per-frame CV minus the SAME run's melt per-frame CV on the same
+                    grid, which is that chemistry's noise measured directly. Used only when the
+                    melt itself passed split_half. The caller passes the melt mean plus two
+                    standard deviations of its per-frame CV: a glass is one frozen configuration,
+                    i.e. a single draw from that spread, and the mean alone would fail a sound
+                    glass on an unlucky draw.
+
+    Either non-formula method falls back to the formula when its precondition is missing, and
+    says so in `fallback_reason`.
+    """
+    method = HOMOG_METHOD_ALIASES.get(method, method)
+    if method not in HOMOG_METHODS:
+        raise ValueError(f"unknown homogeneity method {method!r}; expected one of {HOMOG_METHODS}")
+    cv_arr = np.asarray(cv_per_frame, dtype=float)
+    cv_mean = float(cv_arr.mean()) if len(cv_arr) else 0.0
+    atoms_per_voxel = n_atoms / grid_n ** 3
+    # cv_mean is a MASS-density CV (_compute_density_cv bins by mass), so the shot-noise floor
+    # must be the compound-Poisson one: voxel mass is a random sum of atom masses, giving
+    # sqrt(<m^2>)/<m> / sqrt(atoms_per_voxel).  The count floor 1/sqrt(N) is only the special
+    # case of equal masses; on an H-rich cell it sits ~1.3x too low (PS: <m>=6.51,
+    # sqrt(<m^2>)=8.52), so subtracting it from a mass CV manufactured phantom signal.
+    m1 = float(np.mean(masses_all)) if len(masses_all) else 0.0
+    m2 = float(np.mean(np.square(masses_all))) if len(masses_all) else 0.0
+    mass_dispersion = (math.sqrt(m2) / m1) if m1 > 0 else 1.0
+    poisson_cv = (mass_dispersion / math.sqrt(atoms_per_voxel)) if atoms_per_voxel > 0 else 1.0
+    cv_signal = math.sqrt(max(cv_mean ** 2 - poisson_cv ** 2, 0.0))
+    legacy_verdict = "HOMOG_HETEROGENEOUS" if cv_signal > cv_signal_max else "HOMOG_PASS"
+
+    signal, limit, decided_by, fallback_reason = cv_signal, cv_signal_max, "formula", None
+    split_half = None
+    cv_signal_measured = None
+    if method == "split_half":
+        M = np.asarray(maps, dtype=float)
+        nf = len(M)
+        if nf >= min_frames:
+            h = nf // 2
+            first, second = M[:h].mean(axis=0), M[h:2 * h].mean(axis=0)
+            mu = float(M.mean())
+            da, db = first - first.mean(), second - second.mean()
+            cov = float(np.mean(da * db))
+            persistent_cv = math.sqrt(max(cov, 0.0)) / mu if mu > 0 else 0.0
+            denom = float(np.sqrt(np.mean(da * da) * np.mean(db * db)))
+            split_half = {"frames": nf, "persistent_cv": round(persistent_cv, 4),
+                          "persist_max": persist_max,
+                          "half_map_corr": round(cov / denom, 3) if denom > 0 else None,
+                          "min_frames": min_frames}
+            signal, limit, decided_by = persistent_cv, persist_max, "split_half"
+        else:
+            fallback_reason = f"split_half needs >= {min_frames} frames; trajectory has {nf}"
+    elif method == "measured_floor":
+        if melt_cv_floor is not None and melt_cv_floor > 0:
+            cv_signal_measured = math.sqrt(max(cv_mean ** 2 - float(melt_cv_floor) ** 2, 0.0))
+            signal, limit, decided_by = cv_signal_measured, cv_signal_max, "measured_floor"
+        else:
+            fallback_reason = "measured_floor needs the melt's per-frame CV; none supplied"
+
+    verdict = "HOMOG_HETEROGENEOUS" if signal > limit else "HOMOG_PASS"
+    return {
+        "pass": verdict == "HOMOG_PASS",
+        "verdict": verdict,
+        "method_requested": method,
+        "decided_by": decided_by,
+        "fallback_reason": fallback_reason,
+        "signal": round(signal, 4),
+        "signal_max": limit,
+        "cv_mean": round(cv_mean, 4),
+        "cv_max": round(float(cv_arr.max()), 4) if len(cv_arr) else None,
+        # Frame-to-frame scatter of the per-frame CV. A glass is one frozen configuration, so
+        # its CV is a single draw from this spread; the glass gate's floor needs it.
+        "cv_std": round(float(cv_arr.std()), 4) if len(cv_arr) else None,
+        "cv_signal": round(cv_signal, 4),
+        "cv_signal_max": cv_signal_max,
+        "legacy_formula_verdict": legacy_verdict,
+        "grid_n": grid_n,
+        "atoms_per_voxel": round(atoms_per_voxel, 1),
+        "poisson_cv": round(poisson_cv, 3),
+        "mass_dispersion": round(mass_dispersion, 3),
+        "split_half": split_half,
+        "melt_cv_floor": melt_cv_floor,
+        "cv_signal_measured": (round(cv_signal_measured, 4)
+                               if cv_signal_measured is not None else None),
+        "heterogeneous_flag": verdict == "HOMOG_HETEROGENEOUS",
+    }
+
+
 def _fit_power_law(x, y, min_pts=5):
     mask = (x > 0) & (y > 0)
     if mask.sum() < min_pts:
@@ -568,7 +700,9 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
                             n_backbone_bonds, bond_length_A, timestep_fs, dump_every,
                             grid_n, trajectory_slice, ct_min_decay=None, graphs_dir=None,
                             cv_signal_max=0.11, msid_s_split=None, torsion_block_count=6,
-                            torsion_js_threshold=0.05):
+                            torsion_js_threshold=0.05, homog_method="formula",
+                            homog_persist_max=0.11, homog_min_frames=100,
+                            homog_melt_cv_floor=None):
     """Single-pass over dump frames. Returns raw per-frame arrays for all checks."""
     # Storage
     rg_sq_per_frame = []   # (n_frames, n_chains)
@@ -576,6 +710,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     com_per_frame = []     # (n_frames, n_chains, 3)  — CoMs for MSD
     p2_per_frame = []
     cv_per_frame = []
+    voxel_maps = []        # (n_frames, grid_n**3) voxel mass, for the time-averaged verdict
     torsion_per_frame = []  # list of 1-D arrays (backbone dihedral angles, all chains flattened)
     msid_accum = None      # shape (n_backbone_per_chain - 1,)
     msid_n = None
@@ -684,8 +819,11 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
             p2_per_frame.append(0.0)
 
         # Density homogeneity
-        cv_val, _ = _compute_density_cv(u.atoms.positions.copy(), masses_all, box, grid_n)
-        cv_per_frame.append(cv_val)
+        vmap = _voxel_mass_map(u.atoms.positions.copy(), masses_all, box, grid_n)
+        occ = vmap[vmap > 0]
+        # Same number _compute_density_cv returns: voxel volume is constant within a frame.
+        cv_per_frame.append(float(occ.std() / occ.mean()) if len(occ) and occ.mean() > 0 else 0.0)
+        voxel_maps.append(vmap)
 
         torsion_per_frame.append(np.array(torsion_row) if torsion_row else np.array([]))
 
@@ -856,46 +994,17 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     }
 
     # ── Density homogeneity ──
-    # The raw voxel CV mixes real heterogeneity with counting shot noise, and the
-    # noise floor moves with cell size (integer rounding of the adaptive grid leaves
-    # 20-33 atoms/voxel, i.e. poisson_cv 0.17-0.22).  Gate on the noise-subtracted
-    # signal CV so the criterion means the same thing at every cell size.
-    cv_mean = float(cv_arr.mean())
-    atoms_per_voxel = n_atoms / grid_n ** 3
-    # cv_mean is a MASS-density CV (_compute_density_cv bins by mass), so the shot-noise floor
-    # must be the compound-Poisson one: voxel mass is a random sum of atom masses, giving
-    # sqrt(<m^2>)/<m> / sqrt(atoms_per_voxel).  The count floor 1/sqrt(N) is only the special
-    # case of equal masses; on an H-rich cell it sits ~1.3x too low (PS: <m>=6.51,
-    # sqrt(<m^2>)=8.52), so subtracting it from a mass CV manufactured phantom signal.
-    m1 = float(np.mean(masses_all)) if len(masses_all) else 0.0
-    m2 = float(np.mean(np.square(masses_all))) if len(masses_all) else 0.0
-    mass_dispersion = (math.sqrt(m2) / m1) if m1 > 0 else 1.0
-    poisson_cv = (mass_dispersion / math.sqrt(atoms_per_voxel)) if atoms_per_voxel > 0 else 1.0
-    cv_signal = math.sqrt(max(cv_mean ** 2 - poisson_cv ** 2, 0.0))
-    # The adaptive grid targets ~25 atoms/voxel and is clamped to [3,10], so occupancy
-    # never drops far below that -- poisson_cv only exceeds 0.30 below ~300 atoms, which
-    # no buildable polymer cell reaches. Cell-size adequacy is therefore NOT expressed
-    # here; it is a physics question answered by check_finite_size() (minimum image and
-    # chain self-imaging), which does fire on real cells.
-    if cv_signal > cv_signal_max:
-        verdict = "HOMOG_HETEROGENEOUS"
-        heterogeneous_flag = True
-    else:
-        verdict = "HOMOG_PASS"
-        heterogeneous_flag = False
-    dh_result = {
-        "pass": verdict == "HOMOG_PASS",
-        "verdict": verdict,
-        "cv_mean": r(cv_mean, 4),
-        "cv_max": r(float(cv_arr.max()), 4),
-        "cv_signal": r(cv_signal, 4),
-        "cv_signal_max": cv_signal_max,
-        "grid_n": grid_n,
-        "atoms_per_voxel": r(atoms_per_voxel, 1),
-        "poisson_cv": r(poisson_cv, 3),
-        "mass_dispersion": r(mass_dispersion, 3),
-        "heterogeneous_flag": heterogeneous_flag,
-    }
+    # See homogeneity_verdict for the three methods and why the per-frame formula alone is not
+    # enough. The caller picks the method: the melt gate compares the two halves of its hold,
+    # the glass gate subtracts the melt's own measured noise, anything else keeps the formula.
+    dh_result = homogeneity_verdict(
+        voxel_maps, cv_arr, masses_all, n_atoms, grid_n, method=homog_method,
+        cv_signal_max=cv_signal_max, persist_max=homog_persist_max,
+        min_frames=homog_min_frames, melt_cv_floor=homog_melt_cv_floor)
+    cv_mean = dh_result["cv_mean"]
+    cv_signal = dh_result["cv_signal"]
+    verdict = dh_result["verdict"]
+    heterogeneous_flag = dh_result["heterogeneous_flag"]
 
     # Chain displacement in the system's OWN units -- the per-system melt-equilibration
     # criterion (Auhl/Kremer): a melt is equilibrated when chain centres of mass have
@@ -1056,8 +1165,9 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
     grid_n = dh.get("grid_n")
     cv = dh.get("cv_mean")
     apv = dh.get("atoms_per_voxel")
-    sig = dh.get("cv_signal")
-    sig_max = dh.get("cv_signal_max")
+    sig = dh.get("signal", dh.get("cv_signal"))
+    sig_max = dh.get("signal_max", dh.get("cv_signal_max"))
+    decided_by = dh.get("decided_by", "formula")
     label = _gate(dh.get("pass", False))
     fs = finite_size or {}
     if fs.get("available"):
@@ -1073,9 +1183,15 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
         )
 
     lines.append(
-        f"| Density homogeneity CV (signal) | {sig:.1%} "
-        f"(raw {cv:.1%} − Poisson {dh.get('poisson_cv', 0):.1%}; {grid_n}³ grid, {apv} atoms/voxel) "
-        f"| <{sig_max:.0%} | {label} |"
+        f"| Density homogeneity CV (signal, {decided_by}) | {sig:.1%} "
+        + (f"(structure shared by both halves of the hold, half-map r="
+           f"{(dh.get('split_half') or {}).get('half_map_corr')}; "
+           if decided_by == "split_half" else
+           f"(raw {cv:.1%} − melt floor {dh.get('melt_cv_floor') or 0:.1%}; "
+           if decided_by == "measured_floor" else
+           f"(raw {cv:.1%} − Poisson {dh.get('poisson_cv', 0):.1%}; ")
+        + f"{grid_n}³ grid, {apv} atoms/voxel) | <{sig_max:.0%} | {label} |"
+        + (f" fallback: {dh['fallback_reason']}" if dh.get("fallback_reason") else "")
     )
 
     if warnings_list:
@@ -1152,7 +1268,7 @@ def thermo_section(thermo: dict, n_eff_min: int) -> dict:
 def _load_and_analyze(data_file, dump_file, atom_style, backbone_set, skip_frames,
                       n_backbone_bonds, bond_length_A, timestep_fs, dump_every_arg,
                       ct_min_decay, graphs_dir, cv_signal_max, msid_s_split,
-                      torsion_block_count, torsion_js_threshold, label):
+                      torsion_block_count, torsion_js_threshold, label, homog_kwargs=None):
     """Load one LAMMPS trajectory (data_file for topology, dump_file for frames) and run
     run_structural_analysis's single-pass checks over it. Returns (structural, n_frames_used);
     structural is None (n_frames_used still reported) when fewer than 10 frames remain after
@@ -1213,6 +1329,7 @@ def _load_and_analyze(data_file, dump_file, atom_style, backbone_set, skip_frame
         msid_s_split=msid_s_split,
         torsion_block_count=torsion_block_count,
         torsion_js_threshold=torsion_js_threshold,
+        **(homog_kwargs or {}),
     )
     return structural, n_frames_used
 
@@ -1296,6 +1413,25 @@ def main():
                         help="Max Poisson-corrected density-homogeneity CV. Calibrated on the "
                              "36-run archive: heterogeneous-underpack families span 0.120-0.192, "
                              "all others 0.000-0.094.")
+    parser.add_argument("--homog_method",
+                        choices=HOMOG_METHODS + tuple(HOMOG_METHOD_ALIASES), default="formula",
+                        help="How density homogeneity separates heterogeneity from counting "
+                             "noise: formula (per-frame compound-Poisson floor), split_half "
+                             "(melt only: structure shared by the two halves of the hold), "
+                             "measured_floor (glass: minus --homog_melt_cv_floor). "
+                             "time_averaged is a retired alias of split_half. "
+                             "See homogeneity_verdict().")
+    parser.add_argument("--homog_persist_max", type=float, default=0.11,
+                        help="split_half threshold on persistent_cv.")
+    parser.add_argument("--homog_min_frames",  type=int, default=100,
+                        help="split_half needs this many frames, else it falls back to the "
+                             "formula.")
+    # Retired with time_averaged. Still accepted so a campaign process that loaded the previous
+    # server module can invoke this script; the values are ignored.
+    parser.add_argument("--homog_signal_ta_max", type=float, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--homog_min_n_eff",   type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--homog_melt_cv_floor", type=float, default=None,
+                        help="measured_floor: the melt's per-frame mass CV on the same grid.")
     parser.add_argument("--ct_min_decay",      type=float, default=None,
                         help="Minimum C(t) decay fraction to pass hard gate (0–1). "
                              "Omit for soft-warning-only behaviour (backwards compat). "
@@ -1344,6 +1480,10 @@ def main():
         sys.exit(0)
     use_split = bool(args.struct_dump_file)
 
+    homog_kwargs = {"homog_method": args.homog_method,
+                    "homog_persist_max": args.homog_persist_max,
+                    "homog_min_frames": args.homog_min_frames,
+                    "homog_melt_cv_floor": args.homog_melt_cv_floor}
     structural_primary, n_frames_primary = _load_and_analyze(
         data_file=args.data_file, dump_file=args.dump_file, atom_style=args.atom_style,
         backbone_set=backbone_set, skip_frames=args.skip_frames,
@@ -1358,6 +1498,7 @@ def main():
         torsion_block_count=args.torsion_block_count,
         torsion_js_threshold=args.torsion_js_threshold,
         label="primary (MSD/C(t))" if use_split else "primary",
+        homog_kwargs=homog_kwargs,
     )
     if structural_primary is None:
         print(json.dumps({"status": "failed",
@@ -1375,6 +1516,7 @@ def main():
             msid_s_split=args.msid_s_split, torsion_block_count=args.torsion_block_count,
             torsion_js_threshold=args.torsion_js_threshold,
             label="struct (Rg/MSID/packing)",
+            homog_kwargs=homog_kwargs,
         )
         if structural_struct is None:
             print(json.dumps({"status": "failed",

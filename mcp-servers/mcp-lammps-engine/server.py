@@ -3056,6 +3056,10 @@ def _run_check_equilibration_comprehensive(
     struct_dump_file: Optional[str] = None,
     struct_data_file: Optional[str] = None,
     output_name: str = "equilibration.json",
+    homog_method: str = "formula",
+    homog_persist_max: float = 0.11,
+    homog_min_frames: int = 100,
+    homog_melt_cv_floor: Optional[float] = None,
 ) -> dict:
     """Background worker — runs check_equilibration_comprehensive.py via CLI."""
     bt_str = " ".join(str(t) for t in backbone_types)
@@ -3080,7 +3084,12 @@ def _run_check_equilibration_comprehensive(
         f'--atom_style "{atom_style}"',
         f"--cv_signal_max {cv_signal_max}",
         f"--output_name {output_name}",
+        f"--homog_method {homog_method}",
+        f"--homog_persist_max {homog_persist_max}",
+        f"--homog_min_frames {homog_min_frames}",
     ]
+    if homog_melt_cv_floor is not None:
+        parts.append(f"--homog_melt_cv_floor {homog_melt_cv_floor}")
     if cutoff_A is not None:
         parts.append(f"--cutoff_A {cutoff_A}")
     if n_backbone_bonds is not None:
@@ -3141,6 +3150,10 @@ def check_equilibration_comprehensive(
     struct_dump_file: Optional[str] = None,
     struct_data_file: Optional[str] = None,
     output_name: str = "equilibration.json",
+    homog_method: str = "formula",
+    homog_persist_max: float = 0.11,
+    homog_min_frames: int = 100,
+    homog_melt_cv_floor: Optional[float] = None,
 ) -> dict:
     """
     Comprehensive polymer equilibration validator — thermo + structural checks in
@@ -3155,8 +3168,11 @@ def check_equilibration_comprehensive(
       D. Energy block-SEM < 1% of mean
       E. Rg CV across chains < 30%  (unequal conformation flag)
       F. P2 nematic order < 0.10    (residual backbone alignment)
-      G. Poisson-corrected density homogeneity CV < cv_signal_max (default 0.11; the raw
-         voxel CV's noise floor moves with cell size, so the signal CV is gated instead).
+      G. Density homogeneity, by homog_method: formula (per-frame CV minus a compound-Poisson
+         floor, < cv_signal_max); split_half (melt only: structure shared by the time-averaged
+         maps of the two halves of the hold, < homog_persist_max); measured_floor (glass:
+         per-frame CV minus the run's own melt CV homog_melt_cv_floor, < cv_signal_max). The formula floor assumes atoms
+         occupy voxels independently and fails well-mixed H-free melts such as PTFE.
       H. Finite size (spatial.finite_size), when cutoff_A is supplied: minimum image
          L >= 2*cutoff_A (below it the pair potential itself is wrong) and chain
          self-imaging L >= 2*Rg. L >= R_ee is reported but advisory.
@@ -3264,6 +3280,10 @@ def check_equilibration_comprehensive(
             struct_dump_file    = struct_dump_file,
             struct_data_file    = struct_data_file,
             output_name         = output_name,
+            homog_method        = homog_method,
+            homog_persist_max   = homog_persist_max,
+            homog_min_frames    = homog_min_frames,
+            homog_melt_cv_floor = homog_melt_cv_floor,
         )),
         daemon=True,
     )
