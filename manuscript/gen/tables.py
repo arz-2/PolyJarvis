@@ -17,11 +17,6 @@ from pathlib import Path
 from statistics import mean, stdev
 
 OUT = Path(__file__).resolve().parent / "out"
-PEG_FF = {  # PEGCMP1 / PEGORE1 run_log.md "verdict" blocks (v1 checkout), density only
-    "PEGCMP1": {"ff": "COMPASS", "rho": 1.1241, "vs_exp_pct": 0.42},
-    "PEGORE1": {"ff": "pcff_ore", "rho": 1.0557, "vs_exp_pct": -5.69},
-    "exp_rho_300K": 1.1194,
-}
 
 
 def ms(xs, nd=1):
@@ -131,14 +126,14 @@ def main() -> None:
             w(f"| {r['run']} | {fmt(r['density']['rho_melt'], 4)} ({fmt(r['density']['T_melt_K'], 0)} K) | "
               f"{fmt(r['density']['rho_300K'], 4)} | {c['expected_contraction']} | {c['actual_contraction']} | "
               f"{c['contraction_shortfall']} | {c['verdict']} |")
-    w("\nPEG force-field arms (round-1 v1 cells, same SMILES/10 chains/300 K; density only — no K was run):\n")
-    peg_all = ms([r["density"]["rho_300K"] for r in by["PEG"]], 4)
-    w("| Arm | Field | ρ (g/cm³) | Δ% vs exp ρ(300 K)=1.1194 |")
-    w("|---|---|---|---|")
-    w(f"| PEG_1–3 (this campaign) | PCFF | {peg_all[0]} | {fmt(pct(peg_all[2], PEG_FF['exp_rho_300K']), 2, True)} |")
-    for k in ("PEGORE1", "PEGCMP1"):
-        v = PEG_FF[k]
-        w(f"| {k} | {v['ff']} | {v['rho']} | {v['vs_exp_pct']:+.2f} |")
+    pair = D.get("peg_size_pair") or []
+    if len(pair) == 2 and all(p["B0_GPa"] for p in pair):
+        w("\nPEG system size (earlier-protocol COMPASS cells, DP 100; data/peg_size_v1):\n")
+        w("| Run | Chains | B0 (GPa) | R² |")
+        w("|---|---|---|---|")
+        for p in pair:
+            w(f"| {p['run']} | {p['n_chains']} | {p['B0_GPa']:.4f} ± {p['B0_sem_GPa']:.4f} | {p['r_squared']} |")
+        w(f"\nB0 change on doubling chain count: {100 * (pair[1]['B0_GPa'] / pair[0]['B0_GPa'] - 1):+.1f}%")
 
     # ---------------- Tg
     w("\n## §3.2 — Glass transition temperature\n")

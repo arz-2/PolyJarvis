@@ -86,8 +86,8 @@
     },
     {
       "run": "aPS_1",
-      "stored_Tg_K": 421.5,
-      "live_Tg_K": 421.5,
+      "stored_Tg_K": 422.4,
+      "live_Tg_K": 422.4,
       "stored_verdict": "TG_REPORTABLE",
       "live_verdict": "TG_REPORTABLE",
       "reproduced": true
@@ -109,7 +109,7 @@
       "reproduced": true
     },
     {
-      "run": "sPVC_1_rerun",
+      "run": "sPVC_1",
       "stored_Tg_K": 293.9,
       "live_Tg_K": 293.9,
       "stored_verdict": "TG_REPORTABLE",
@@ -280,8 +280,8 @@
         },
         "aPS": {
           "n": 1,
-          "mean_dTg_K": 6.0,
-          "max_abs_dTg_K": 6.0,
+          "mean_dTg_K": -8.0,
+          "max_abs_dTg_K": 8.0,
           "n_both_reportable": 0,
           "mean_dTg_both_reportable_K": null,
           "max_abs_dTg_both_reportable_K": null,
@@ -297,7 +297,7 @@
           "mean_dTg_both_reportable_K": null,
           "max_abs_dTg_both_reportable_K": null,
           "became_unreportable": [
-            "sPVC_1_rerun",
+            "sPVC_1",
             "sPVC_2",
             "sPVC_3"
           ]
@@ -443,11 +443,11 @@
         },
         {
           "run": "aPS_1",
-          "live_Tg_K": 421.5,
-          "Tg_K": 427.5,
-          "dTg_K": 6.0,
-          "live_n_bins": 32,
-          "n_bins": 32,
+          "live_Tg_K": 422.4,
+          "Tg_K": 414.4,
+          "dTg_K": -8.0,
+          "live_n_bins": 33,
+          "n_bins": 33,
           "live_reportable": true,
           "verdict": "TG_REVIEW",
           "cause": "breakpoint_ambiguity",
@@ -481,7 +481,7 @@
           "error": null
         },
         {
-          "run": "sPVC_1_rerun",
+          "run": "sPVC_1",
           "live_Tg_K": 293.9,
           "Tg_K": 296.2,
           "dTg_K": 2.3,
@@ -792,11 +792,11 @@
         },
         {
           "run": "aPS_1",
-          "live_Tg_K": 421.5,
-          "Tg_K": 421.5,
+          "live_Tg_K": 422.4,
+          "Tg_K": 422.4,
           "dTg_K": 0.0,
-          "live_n_bins": 32,
-          "n_bins": 32,
+          "live_n_bins": 33,
+          "n_bins": 33,
           "live_reportable": true,
           "verdict": "TG_REPORTABLE",
           "cause": null,
@@ -830,7 +830,7 @@
           "error": null
         },
         {
-          "run": "sPVC_1_rerun",
+          "run": "sPVC_1",
           "live_Tg_K": 293.9,
           "Tg_K": 293.9,
           "dTg_K": 0.0,
@@ -986,11 +986,11 @@
         },
         "aPS": {
           "n": 1,
-          "mean_dTg_K": 8.3,
-          "max_abs_dTg_K": 8.3,
+          "mean_dTg_K": -26.4,
+          "max_abs_dTg_K": 26.4,
           "n_both_reportable": 1,
-          "mean_dTg_both_reportable_K": 8.3,
-          "max_abs_dTg_both_reportable_K": 8.3,
+          "mean_dTg_both_reportable_K": -26.4,
+          "max_abs_dTg_both_reportable_K": 26.4,
           "became_unreportable": []
         },
         "sPVC": {
@@ -1143,11 +1143,11 @@
         },
         {
           "run": "aPS_1",
-          "live_Tg_K": 421.5,
-          "Tg_K": 429.8,
-          "dTg_K": 8.3,
-          "live_n_bins": 32,
-          "n_bins": 33,
+          "live_Tg_K": 422.4,
+          "Tg_K": 396.0,
+          "dTg_K": -26.4,
+          "live_n_bins": 33,
+          "n_bins": 32,
           "live_reportable": true,
           "verdict": "TG_REPORTABLE",
           "cause": null,
@@ -1181,7 +1181,7 @@
           "error": null
         },
         {
-          "run": "sPVC_1_rerun",
+          "run": "sPVC_1",
           "live_Tg_K": 293.9,
           "Tg_K": 282.1,
           "dTg_K": -11.8,
@@ -1298,12 +1298,14 @@
           "error": null
         }
       ],
-      "max_abs_system_effect_both_reportable_K": 12.0,
-      "sensitive_both_reportable": false,
+      "max_abs_system_effect_both_reportable_K": 26.4,
+      "sensitive_both_reportable": true,
       "runs_became_unreportable": 1,
-      "max_abs_system_effect_K": 18.1,
-      "sensitive": false,
-      "systems_over_threshold": [],
+      "max_abs_system_effect_K": 26.4,
+      "sensitive": true,
+      "systems_over_threshold": [
+        "aPS"
+      ],
       "verdict_changes": 1
     },
     "eqf_0.75": {
@@ -1340,11 +1342,11 @@
         },
         "aPS": {
           "n": 1,
-          "mean_dTg_K": 13.0,
-          "max_abs_dTg_K": 13.0,
+          "mean_dTg_K": -17.0,
+          "max_abs_dTg_K": 17.0,
           "n_both_reportable": 1,
-          "mean_dTg_both_reportable_K": 13.0,
-          "max_abs_dTg_both_reportable_K": 13.0,
+          "mean_dTg_both_reportable_K": -17.0,
+          "max_abs_dTg_both_reportable_K": 17.0,
           "became_unreportable": []
         },
         "sPVC": {
@@ -1497,11 +1499,11 @@
         },
         {
           "run": "aPS_1",
-          "live_Tg_K": 421.5,
-          "Tg_K": 434.5,
-          "dTg_K": 13.0,
-          "live_n_bins": 32,
-          "n_bins": 31,
+          "live_Tg_K": 422.4,
+          "Tg_K": 405.4,
+          "dTg_K": -17.0,
+          "live_n_bins": 33,
+          "n_bins": 30,
           "live_reportable": true,
           "verdict": "TG_REPORTABLE",
           "cause": null,
@@ -1535,7 +1537,7 @@
           "error": null
         },
         {
-          "run": "sPVC_1_rerun",
+          "run": "sPVC_1",
           "live_Tg_K": 293.9,
           "Tg_K": 296.9,
           "dTg_K": 3.0,
@@ -1652,10 +1654,10 @@
           "error": null
         }
       ],
-      "max_abs_system_effect_both_reportable_K": 13.0,
+      "max_abs_system_effect_both_reportable_K": 17.0,
       "sensitive_both_reportable": false,
       "runs_became_unreportable": 3,
-      "max_abs_system_effect_K": 13.0,
+      "max_abs_system_effect_K": 17.0,
       "sensitive": false,
       "systems_over_threshold": [],
       "verdict_changes": 3
@@ -1694,14 +1696,12 @@
         },
         "aPS": {
           "n": 1,
-          "mean_dTg_K": 69.1,
-          "max_abs_dTg_K": 69.1,
-          "n_both_reportable": 0,
-          "mean_dTg_both_reportable_K": null,
-          "max_abs_dTg_both_reportable_K": null,
-          "became_unreportable": [
-            "aPS_1"
-          ]
+          "mean_dTg_K": -12.8,
+          "max_abs_dTg_K": 12.8,
+          "n_both_reportable": 1,
+          "mean_dTg_both_reportable_K": -12.8,
+          "max_abs_dTg_both_reportable_K": 12.8,
+          "became_unreportable": []
         },
         "sPVC": {
           "n": 3,
@@ -1851,14 +1851,14 @@
         },
         {
           "run": "aPS_1",
-          "live_Tg_K": 421.5,
-          "Tg_K": 490.6,
-          "dTg_K": 69.1,
-          "live_n_bins": 32,
-          "n_bins": 30,
+          "live_Tg_K": 422.4,
+          "Tg_K": 409.6,
+          "dTg_K": -12.8,
+          "live_n_bins": 33,
+          "n_bins": 31,
           "live_reportable": true,
-          "verdict": "TG_REVIEW",
-          "cause": "method_gap",
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
           "fit_method": "hyperbola_curvefit",
           "error": null
         },
@@ -1889,7 +1889,7 @@
           "error": null
         },
         {
-          "run": "sPVC_1_rerun",
+          "run": "sPVC_1",
           "live_Tg_K": 293.9,
           "Tg_K": 294.1,
           "dTg_K": 0.2,
@@ -2008,14 +2008,13 @@
       ],
       "max_abs_system_effect_both_reportable_K": 14.3,
       "sensitive_both_reportable": false,
-      "runs_became_unreportable": 3,
-      "max_abs_system_effect_K": 69.1,
+      "runs_became_unreportable": 2,
+      "max_abs_system_effect_K": 53.7,
       "sensitive": true,
       "systems_over_threshold": [
-        "PLLA",
-        "aPS"
+        "PLLA"
       ],
-      "verdict_changes": 3
+      "verdict_changes": 2
     },
     "trim_bottom2": {
       "per_system": {
@@ -2050,12 +2049,14 @@
         },
         "aPS": {
           "n": 1,
-          "mean_dTg_K": 4.3,
-          "max_abs_dTg_K": 4.3,
-          "n_both_reportable": 1,
-          "mean_dTg_both_reportable_K": 4.3,
-          "max_abs_dTg_both_reportable_K": 4.3,
-          "became_unreportable": []
+          "mean_dTg_K": 43.6,
+          "max_abs_dTg_K": 43.6,
+          "n_both_reportable": 0,
+          "mean_dTg_both_reportable_K": null,
+          "max_abs_dTg_both_reportable_K": null,
+          "became_unreportable": [
+            "aPS_1"
+          ]
         },
         "sPVC": {
           "n": 3,
@@ -2207,14 +2208,14 @@
         },
         {
           "run": "aPS_1",
-          "live_Tg_K": 421.5,
-          "Tg_K": 425.8,
-          "dTg_K": 4.3,
-          "live_n_bins": 32,
-          "n_bins": 30,
+          "live_Tg_K": 422.4,
+          "Tg_K": 466.0,
+          "dTg_K": 43.6,
+          "live_n_bins": 33,
+          "n_bins": 31,
           "live_reportable": true,
-          "verdict": "TG_REPORTABLE",
-          "cause": null,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
           "fit_method": "hyperbola_curvefit",
           "error": null
         },
@@ -2245,7 +2246,7 @@
           "error": null
         },
         {
-          "run": "sPVC_1_rerun",
+          "run": "sPVC_1",
           "live_Tg_K": 293.9,
           "Tg_K": 295.2,
           "dTg_K": 1.3,
@@ -2364,11 +2365,13 @@
       ],
       "max_abs_system_effect_both_reportable_K": 12.2,
       "sensitive_both_reportable": false,
-      "runs_became_unreportable": 2,
-      "max_abs_system_effect_K": 7.6,
-      "sensitive": false,
-      "systems_over_threshold": [],
-      "verdict_changes": 3
+      "runs_became_unreportable": 3,
+      "max_abs_system_effect_K": 43.6,
+      "sensitive": true,
+      "systems_over_threshold": [
+        "aPS"
+      ],
+      "verdict_changes": 4
     },
     "reported_code_vs_current": {
       "per_system": {
@@ -2492,8 +2495,8 @@
         },
         {
           "run": "aPS_1",
-          "live_Tg_K": 421.5,
-          "Tg_K": 421.5,
+          "live_Tg_K": 422.4,
+          "Tg_K": 422.4,
           "dTg_K": 0.0,
           "live_reportable": true,
           "verdict": "TG_REPORTABLE",
@@ -2518,7 +2521,7 @@
           "fit_method": "bilinear_curvefit"
         },
         {
-          "run": "sPVC_1_rerun",
+          "run": "sPVC_1",
           "live_Tg_K": 293.9,
           "Tg_K": 293.9,
           "dTg_K": 0.0,

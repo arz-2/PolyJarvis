@@ -17,13 +17,8 @@ def esc(s):
     return str(s).replace("_", r"\_")
 
 
-# The locked-protocol reruns are the reported replicate 1 of their system; the tables carry the
-# replicate name, not the run directory name (author decision 2026-09-16).
-DISPLAY = {"aPS_1_rerun": "aPS_1", "sPVC_1_rerun": "sPVC_1"}
-
-
 def name(run):
-    return esc(DISPLAY.get(run, run))
+    return esc(run)
 
 
 def f(x, nd=1):

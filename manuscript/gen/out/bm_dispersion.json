@@ -2427,8 +2427,8 @@
         }
       }
     },
-    "aPS_1_rerun": {
-      "run": "aPS_1_rerun",
+    "aPS_1": {
+      "run": "aPS_1",
       "stored_B0_GPa": 2.7903,
       "stored_all_points_B0_GPa": 2.8795,
       "stored_B0_sem_GPa": 0.0032,
@@ -3030,8 +3030,8 @@
         }
       }
     },
-    "sPVC_1_rerun": {
-      "run": "sPVC_1_rerun",
+    "sPVC_1": {
+      "run": "sPVC_1",
       "stored_B0_GPa": 2.7501,
       "stored_all_points_B0_GPa": 2.7501,
       "stored_B0_sem_GPa": 0.0938,
@@ -5144,7 +5144,7 @@
     },
     "aPS": {
       "runs": [
-        "aPS_1_rerun",
+        "aPS_1",
         "aPS_2",
         "aPS_3"
       ],
@@ -5168,7 +5168,7 @@
     },
     "sPVC": {
       "runs": [
-        "sPVC_1_rerun",
+        "sPVC_1",
         "sPVC_3"
       ],
       "K_mean_GPa": 2.819,

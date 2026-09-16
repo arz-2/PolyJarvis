@@ -21,7 +21,7 @@ from replicates import k_basis, reported_runs  # noqa: E402
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "data"
 OUT = Path(__file__).resolve().parent / "out"
-V1_DATA = Path.home() / "PolyJarvis" / "data"
+PEG_SIZE_PAIR = DATA / "peg_size_v1"  # earlier-checkout COMPASS PEG cells, 10 vs 20 chains
 
 SYSTEMS = ["PE", "PEG", "PLLA", "aPS", "sPVC", "PEEK", "PSU"]
 REPLICATES = (1, 2, 3)
@@ -90,11 +90,19 @@ def attempt_dir(run_dir: Path, ws: dict, stage: str) -> Path | None:
     return run_dir / "attempts" / stage / acc if acc else None
 
 
+# The 2026-09-13 regrade graded the original aPS_1 and sPVC_1, which were deleted when the
+# locked-protocol reruns took their names; the reruns were never in a frozen regrade.
+RETIRED_REGRADE_RECORDS = {("benchmarks/stereo_r2/regrade/regrade_20260913.json", "aPS_1"),
+                           ("benchmarks/stereo_r2/regrade/regrade_20260913.json", "sPVC_1")}
+
+
 def regrade_index() -> dict:
     idx = {}
     for f in REGRADES:
+        rel = str(f.relative_to(REPO))
         for run, rec in (load(f) or {}).get("runs", {}).items():
-            idx[run] = {"file": str(f.relative_to(REPO)), **rec}
+            if (rel, run) not in RETIRED_REGRADE_RECORDS:
+                idx[run] = {"file": rel, **rec}
     return idx
 
 
@@ -293,13 +301,14 @@ def collect_leg(name: str) -> dict:
             "method_gap_K": th.get("tg_method_gap_K"), "reportable": th.get("tg_reportable")}
 
 
-def collect_peg_ff_arms() -> list[dict]:
-    """Round-1 (v1 checkout) controlled force-field pair; values as recorded in each run_log.md."""
-    arms = []
-    for run, ff in (("PEGCMP1", "compass"), ("PEGORE1", "pcff_ore")):
-        log = V1_DATA / run / "run_log.md"
-        arms.append({"run": run, "ff": ff, "source": str(log), "exists": log.exists()})
-    return arms
+def collect_peg_size_pair() -> list[dict]:
+    """Chain-count pair (SI bulk-modulus robustness): emc_build.esh differs only in chain count."""
+    pair = []
+    for run, nchain in (("PEGCMP1", 10), ("PEG2XCMP1", 20)):
+        bm = load(PEG_SIZE_PAIR / run / "raw" / "bulk_modulus_murnaghan.json") or {}
+        pair.append({"run": run, "ff": "compass", "n_chains": nchain, "B0_GPa": bm.get("B0_GPa"),
+                     "B0_sem_GPa": bm.get("B0_sem_GPa"), "r_squared": bm.get("r_squared")})
+    return pair
 
 
 def main() -> None:
@@ -308,7 +317,7 @@ def main() -> None:
     legs = [collect_leg(n) for n in TG_LEGS]
     out = {"generated_at": datetime.now().isoformat(timespec="seconds"),
            "references": REFERENCES, "runs": runs, "tg_legs": legs,
-           "peg_ff_arms": collect_peg_ff_arms()}
+           "peg_size_pair": collect_peg_size_pair()}
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "runs.json").write_text(json.dumps(out, indent=2) + "\n")
     print(f"wrote {OUT / 'runs.json'}: {len(runs)} runs, {len(legs)} legs")

@@ -33,10 +33,10 @@ Melt-vs-glass decomposition (glassy runs with cooling_contraction.json):
 | PLLA_1 | 1.1022 (620 K) | 1.2341 | 1.1811 | 1.1197 | 0.9479 | UNDER_ANNEALED_COOLING |
 | PLLA_2 | 1.1018 (620 K) | 1.2270 | 1.1811 | 1.1137 | 0.9429 | UNDER_ANNEALED_COOLING |
 | PLLA_3 | 1.1034 (620 K) | 1.2289 | 1.1811 | 1.1137 | 0.9429 | UNDER_ANNEALED_COOLING |
-| aPS_1_rerun | 0.8859 (573 K) | 0.9854 | 1.1383 | 1.1123 | 0.9772 | OK |
+| aPS_1 | 0.8859 (573 K) | 0.9854 | 1.1383 | 1.1123 | 0.9772 | OK |
 | aPS_2 | 0.8856 (573 K) | 0.9882 | 1.1383 | 1.116 | 0.9804 | OK |
 | aPS_3 | — (— K) | 0.9891 | 1.1383 | 1.1165 | 0.9808 | OK |
-| sPVC_1_rerun | 1.1714 (571 K) | 1.3452 | 1.1378 | 1.1484 | 1.0094 | OK |
+| sPVC_1 | 1.1714 (571 K) | 1.3452 | 1.1378 | 1.1484 | 1.0094 | OK |
 | sPVC_2 | 1.1713 (571 K) | 1.3413 | 1.1378 | 1.1452 | 1.0065 | OK |
 | sPVC_3 | 1.1716 (571 K) | 1.3472 | 1.1378 | 1.1499 | 1.0107 | OK |
 | PEEK_1 | 1.0399 (770 K) | 1.2055 | 1.2407 | 1.1593 | 0.9344 | UNDER_ANNEALED_COOLING |
@@ -46,13 +46,14 @@ Melt-vs-glass decomposition (glassy runs with cooling_contraction.json):
 | PSU_2 | 1.0428 (700 K) | 1.1877 | 1.1829 | 1.139 | 0.9628 | UNDER_ANNEALED_COOLING |
 | PSU_3 | 1.0415 (700 K) | 1.1846 | 1.1829 | 1.1374 | 0.9615 | UNDER_ANNEALED_COOLING |
 
-PEG force-field arms (round-1 v1 cells, same SMILES/10 chains/300 K; density only — no K was run):
+PEG system size (earlier-protocol COMPASS cells, DP 100; data/peg_size_v1):
 
-| Arm | Field | ρ (g/cm³) | Δ% vs exp ρ(300 K)=1.1194 |
+| Run | Chains | B0 (GPa) | R² |
 |---|---|---|---|
-| PEG_1–3 (this campaign) | PCFF | 1.0603 ± 0.0026 | -5.28 |
-| PEGORE1 | pcff_ore | 1.0557 | -5.69 |
-| PEGCMP1 | COMPASS | 1.1241 | +0.42 |
+| PEGCMP1 | 10 | 2.7402 ± 0.1839 | 0.999728 |
+| PEG2XCMP1 | 20 | 2.7528 ± 0.0939 | 0.99993 |
+
+B0 change on doubling chain count: +0.5%
 
 ## §3.2 — Glass transition temperature
 
@@ -152,10 +153,10 @@ A800: 152 GPU-stage h; RTX6000: 230 GPU-stage h (hosts not pooled: RTX 6000 vs A
 | PLLA_1 | pcff | 6320 | 70 | 10 | 1.0 | 9.5 | 620.0 | 100 / 20 | -1000 / 0 / 1500 / 3000 / 5000 | 686928993 / 561359054 |
 | PLLA_2 | pcff | 6320 | 70 | 10 | 1.0 | 9.5 | 620.0 | 100 / 20 | -1000 / 0 / 1500 / 3000 / 5000 | 412260453 / 328430378 |
 | PLLA_3 | pcff | 6320 | 70 | 10 | 1.0 | 9.5 | 620.0 | 100 / 20 | -1000 / 0 / 1500 / 3000 / 5000 | 967838819 / 25364483 |
-| aPS_1_rerun | pcff | 7860 | 49 | 10 | 1.0 | 9.5 | 550.0 | 100 / 20 | -1000 / 0 / 1500 / 3000 | 120191275 / 979826601 |
+| aPS_1 | pcff | 7860 | 49 | 10 | 1.0 | 9.5 | 550.0 | 100 / 20 | -1000 / 0 / 1500 / 3000 | 120191275 / 979826601 |
 | aPS_2 | pcff | 7860 | 49 | 10 | 1.0 | 9.5 | 550.0 | 100 / 20 | -1000 / 0 / 1500 / 3000 | 211721699 / 422597568 |
 | aPS_3 | pcff | 7860 | 49 | 10 | 1.0 | 9.5 | 550.0 | 100 / 20 | -1000 / 0 / 1500 / 3000 / 5000 | 796234216 / 992835374 |
-| sPVC_1_rerun | pcff | 4940 | 41 | 10 | 1.0 | 9.5 | 530.0 | 100 / 20 | -1000 / 0 / 1500 / 3000 / 5000 | 414243003 / 405550636 |
+| sPVC_1 | pcff | 4940 | 41 | 10 | 1.0 | 9.5 | 530.0 | 100 / 20 | -1000 / 0 / 1500 / 3000 / 5000 | 414243003 / 405550636 |
 | sPVC_2 | pcff | 4940 | 41 | 10 | 1.0 | 9.5 | 530.0 | 100 / 20 | 0 / 1500 / 3000 / 5000 | 604339280 / 438801734 |
 | sPVC_3 | pcff | 4940 | 41 | 10 | 1.0 | 9.5 | 530.0 | 100 / 20 | 0 / 1500 / 3000 / 5000 | 492680472 / 585758416 |
 | PEEK_1 | pcff | 6140 | 18 | 10 | 1.0 | 9.5 | 770.0 | 100 / 20 | -200 / 0 / 3000 / 7000 / 15000 | 768489 / 766602 |
@@ -178,10 +179,10 @@ A800: 152 GPU-stage h; RTX6000: 230 GPU-stage h (hosts not pooled: RTX 6000 vs A
 | PLLA_1 | 483.6 | 21.5 | 0.9974 | EXCELLENT | 82.9 | TG_REPORTABLE | True |
 | PLLA_2 | 421.0 | 26.3 | 0.9933 | GOOD | 84.2 | TG_REPORTABLE | True |
 | PLLA_3 | 443.2 | 19.9 | 0.9955 | EXCELLENT | 84.5 | TG_REPORTABLE | True |
-| aPS_1_rerun | 422.4 | 56.2 | 0.9938 | GOOD | 128.2 | TG_REPORTABLE | True |
+| aPS_1 | 422.4 | 56.2 | 0.9938 | GOOD | 128.2 | TG_REPORTABLE | True |
 | aPS_2 | 348.6 | 16.5 | 0.9966 | EXCELLENT | — | TG_REVIEW (breakpoint_ambiguity) | True |
 | aPS_3 | 346.7 | 9.4 | 0.9949 | GOOD | — | TG_REVIEW (breakpoint_ambiguity) | True |
-| sPVC_1_rerun | 293.9 | 21.2 | 0.9931 | GOOD | 17.5 | TG_REPORTABLE | False |
+| sPVC_1 | 293.9 | 21.2 | 0.9931 | GOOD | 17.5 | TG_REPORTABLE | False |
 | sPVC_2 | 314.3 | 16.8 | 0.9937 | GOOD | — | TG_REPORTABLE | True |
 | sPVC_3 | 316.4 | 41.6 | 0.9945 | GOOD | 98.0 | TG_REPORTABLE | True |
 | PEEK_1 | 551.9 | 9.0 | 0.9939 | GOOD | 4.8 | TG_REPORTABLE | True |
@@ -204,10 +205,10 @@ A800: 152 GPU-stage h; RTX6000: 230 GPU-stage h (hosts not pooled: RTX 6000 vs A
 | PLLA_1 | 1.2341 | 1.1022 | 4.621 ± 0.167 | 9.78 | 0.9996 | 5 | 5.84 | 7.6 | BM_LADDER_CONVERGED |
 | PLLA_2 | 1.2270 | 1.1018 | 4.717 ± 0.059 | 11.40 | 1.0000 | 5 | 4.60 | 3.6 | BM_LADDER_CONVERGED |
 | PLLA_3 | 1.2289 | 1.1034 | 5.048 ± 0.172 | 8.54 | 0.9997 | 5 | 5.15 | 5.7 | BM_LADDER_CONVERGED |
-| aPS_1_rerun | 0.9854 | 0.8859 | 2.880 ± 0.181 | 7.90 | 0.9988 | 5 | 3.03 | 15.0 | BM_LADDER_NOT_CONVERGED |
+| aPS_1 | 0.9854 | 0.8859 | 2.880 ± 0.181 | 7.90 | 0.9988 | 5 | 3.03 | 15.0 | BM_LADDER_NOT_CONVERGED |
 | aPS_2 | 0.9882 | 0.8856 | 2.669 ± 0.198 | 9.22 | 0.9984 | 5 | 2.50 | 20.6 | BM_LADDER_NOT_CONVERGED |
 | aPS_3 | 0.9891 | — | 2.740 ± 0.094 | 9.70 | 0.9997 | 5 | 3.44 | 9.5 | BM_LADDER_CONVERGED |
-| sPVC_1_rerun | 1.3452 | 1.1714 | 2.750 ± 0.094 | 10.01 | 0.9997 | 5 | 3.26 | 10.6 | BM_LADDER_NOT_CONVERGED |
+| sPVC_1 | 1.3452 | 1.1714 | 2.750 ± 0.094 | 10.01 | 0.9997 | 5 | 3.26 | 10.6 | BM_LADDER_NOT_CONVERGED |
 | sPVC_2 | 1.3413 | 1.1713 | 2.627 ± 0.198 | 10.24 | 0.9984 | 5 | 3.36 | 28.1 | BM_LADDER_CONVERGED |
 | sPVC_3 | 1.3472 | 1.1716 | 2.888 ± 0.245 | 9.81 | 0.9980 | 5 | 3.27 | 30.2 | BM_LADDER_CONVERGED |
 | PEEK_1 | 1.2055 | 1.0399 | 5.729 ± 0.232 | 7.38 | 0.9999 | 5 | 5.06 | 9.1 | BM_LADDER_CONVERGED |
@@ -230,10 +231,10 @@ A800: 152 GPU-stage h; RTX6000: 230 GPU-stage h (hosts not pooled: RTX 6000 vs A
 | PLLA_1 | PASS → PASS → **PASS** | PASS → PASS → **PASS** | TG_REPORTABLE | BM_LADDER_CONVERGED | 1 | 0 +2 archived | 1 repair(s) | yes | include | include |
 | PLLA_2 | PASS → PASS → **PASS** | PASS → PASS → **PASS** | TG_REPORTABLE | BM_LADDER_CONVERGED | 0 | 0 | — | no | include | include |
 | PLLA_3 | PASS → PASS → **PASS** | PASS → PASS → **PASS** | TG_REPORTABLE | BM_LADDER_CONVERGED | 0 | 0 | — | no | include | include |
-| aPS_1_rerun | None → None → **None** | None → None → **None** | TG_REPORTABLE | BM_LADDER_NOT_CONVERGED | 0 | 0 | — | no | include | include |
+| aPS_1 | None → None → **None** | None → None → **None** | TG_REPORTABLE | BM_LADDER_NOT_CONVERGED | 0 | 0 | — | no | include | include |
 | aPS_2 | PASS → PASS → **PASS** | PASS → PASS → **PASS** | TG_REVIEW | BM_LADDER_NOT_CONVERGED | 0 | 0 | 1 repair(s) | no | include | EXCLUDE |
 | aPS_3 | EXTEND → FAIL → **PASS** | PASS → PASS → **PASS** | TG_REVIEW | BM_LADDER_CONVERGED | 0 | 0 | — | no | include | EXCLUDE |
-| sPVC_1_rerun | None → None → **None** | None → None → **None** | TG_REPORTABLE | BM_LADDER_NOT_CONVERGED | 0 | 0 | — | no | include | include |
+| sPVC_1 | None → None → **None** | None → None → **None** | TG_REPORTABLE | BM_LADDER_NOT_CONVERGED | 0 | 0 | — | no | include | include |
 | sPVC_2 | PASS → PASS → **PASS** | EXTEND → FAIL → **FAIL** (energy_sem) | TG_REPORTABLE | BM_LADDER_CONVERGED | 0 | 0 | — | no | EXCLUDE | include |
 | sPVC_3 | PASS → PASS → **PASS** | PASS → PASS → **PASS** | TG_REPORTABLE | BM_LADDER_CONVERGED | 0 | 0 | — | no | include | include |
 | PEEK_1 | PASS → PASS → **PASS** | PASS → PASS → **PASS** | TG_REPORTABLE | BM_LADDER_CONVERGED | 0 | 0 | — | yes | include | include |

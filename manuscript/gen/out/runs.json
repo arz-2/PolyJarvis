@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T00:43:38",
+  "generated_at": "2026-09-16T18:14:52",
   "references": {
     "PE": {
       "tg_K": 195,
@@ -1300,7 +1300,7 @@
       }
     },
     {
-      "run": "aPS_1_rerun",
+      "run": "aPS_1",
       "system": "aPS",
       "replicate": 1,
       "host": "RTX6000",
@@ -1725,7 +1725,7 @@
       }
     },
     {
-      "run": "sPVC_1_rerun",
+      "run": "sPVC_1",
       "system": "sPVC",
       "replicate": 1,
       "host": "RTX6000",
@@ -3046,18 +3046,22 @@
       "reportable": true
     }
   ],
-  "peg_ff_arms": [
+  "peg_size_pair": [
     {
       "run": "PEGCMP1",
       "ff": "compass",
-      "source": "/home/arz2/PolyJarvis/data/PEGCMP1/run_log.md",
-      "exists": true
+      "n_chains": 10,
+      "B0_GPa": 2.7402,
+      "B0_sem_GPa": 0.1839,
+      "r_squared": 0.999728
     },
     {
-      "run": "PEGORE1",
-      "ff": "pcff_ore",
-      "source": "/home/arz2/PolyJarvis/data/PEGORE1/run_log.md",
-      "exists": true
+      "run": "PEG2XCMP1",
+      "ff": "compass",
+      "n_chains": 20,
+      "B0_GPa": 2.7528,
+      "B0_sem_GPa": 0.0939,
+      "r_squared": 0.99993
     }
   ]
 }

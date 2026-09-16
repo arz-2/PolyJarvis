@@ -7,10 +7,10 @@ Pooled within-system s.d. (live, reportable fits): 19.5 K
 |---|---|---|---|---|---|
 | bilinear | 8.7 | — | 7.6 | 9 | no / no |
 | hyperbola | 0.0 | — | 0.0 | 0 | no / no |
-| eqf_0.25 | 18.1 | — | 12.0 | 1 | no / no |
-| eqf_0.75 | 13.0 | — | 13.0 | 3 | no / no |
-| trim_top2 | 69.1 | PLLA, aPS | 14.3 | 3 | yes / no |
-| trim_bottom2 | 7.6 | — | 12.2 | 2 | no / no |
+| eqf_0.25 | 26.4 | aPS | 26.4 | 1 | yes / yes |
+| eqf_0.75 | 17.0 | — | 17.0 | 3 | no / no |
+| trim_top2 | 53.7 | PLLA | 14.3 | 2 | yes / no |
+| trim_bottom2 | 43.6 | aPS | 12.2 | 3 | yes / no |
 | reported_code_vs_current | 3.2 | — | 3.2 | 0 | no / no |
 
 ## Per-run Tg (K) by procedure
@@ -26,10 +26,10 @@ Pooled within-system s.d. (live, reportable fits): 19.5 K
 | PLLA_1 | 483.6 | 482.7* | 483.6 | 483.8 | 471.8 | 497.9 | 483.0 | TG_REPORTABLE |
 | PLLA_2 | 421.0 | 408.9* | 421.0 | 414.7 | 433.7* | 497.1* | 420.5 | TG_REPORTABLE |
 | PLLA_3 | 443.2 | 430.2* | 443.2 | 413.4 | 451.8* | 513.8* | 443.2 | TG_REPORTABLE |
-| aPS_1 | 421.5 | 427.5* | 421.5 | 429.8 | 434.5 | 490.6* | 425.8 | TG_REPORTABLE |
+| aPS_1 | 422.4 | 414.4* | 422.4 | 396.0 | 405.4 | 409.6 | 466.0* | TG_REPORTABLE |
 | aPS_2 | 348.6* | 348.6* | 348.6* | 258.3* | 304.7* | 349.3* | 356.9 | TG_REVIEW |
 | aPS_3 | 346.7* | 346.7* | 346.7* | 400.5* | 268.6* | 321.6* | 402.3* | TG_REVIEW |
-| sPVC_1_rerun | 293.9 | 296.2* | 293.9 | 282.1 | 296.9 | 294.1 | 295.2 | TG_REPORTABLE |
+| sPVC_1 | 293.9 | 296.2* | 293.9 | 282.1 | 296.9 | 294.1 | 295.2 | TG_REPORTABLE |
 | sPVC_2 | 314.3 | 310.8* | 314.3 | 323.2 | 318.6 | 313.7 | 318.0 | TG_REPORTABLE |
 | sPVC_3 | 316.4 | 319.7* | 316.4 | 373.7* | 322.6* | 309.8 | 288.6* | TG_REPORTABLE |
 | PEEK_1 | 551.9 | 552.3 | 551.9 | 552.2 | 573.4 | 555.0 | 553.8 | TG_REPORTABLE |

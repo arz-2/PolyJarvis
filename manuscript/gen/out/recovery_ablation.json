@@ -75,9 +75,9 @@
    },
    {
     "run": "aPS_1",
-    "attempt": "attempt-0007",
-    "decided_by": "formula",
-    "formula_signal": 0.0548,
+    "attempt": "attempt-0001",
+    "decided_by": "split_half",
+    "formula_signal": 0.0704,
     "formula_limit": 0.11,
     "formula_verdict": "HOMOG_PASS"
    },
@@ -98,7 +98,7 @@
     "formula_verdict": "HOMOG_PASS"
    },
    {
-    "run": "sPVC_1_rerun",
+    "run": "sPVC_1",
     "attempt": "attempt-0001",
     "decided_by": "split_half",
     "formula_signal": 0.0,
@@ -443,24 +443,24 @@
     "phases": [
      {
       "phase": "eq",
-      "started_at": "2026-09-14T04:24:53.110345+00:00",
-      "finished_at": "2026-09-14T04:26:22.648550+00:00",
-      "returncode": 1,
+      "started_at": "2026-09-14T17:29:22.223405+00:00",
+      "finished_at": "2026-09-16T03:17:53.759617+00:00",
+      "returncode": -15,
       "log": "/home/arz2/PolyJarvis_v2/benchmarks/polyjarvis_vs_radonpy/data/PTFE/radonpy/eq.log"
      }
     ],
     "deviations_from_stock": {
      "PYTHONPATH": "/home/arz2/RadonPy",
-     "RadonPy_MPI": 14,
-     "RadonPy_GPU": 1
+     "RadonPy_MPI": 10,
+     "RadonPy_GPU": 0
     }
    }
   },
   "eq_log_last_info": [
-   "RadonPy info: Complete packing simulation (eq1). Elapsed time = 0:18:25.917538",
    "RadonPy info: Larsen's 21 step compression/decompression equilibration (eq2) by LAMMPS is running...",
    "RadonPy info: Complete Larsen 21 step compression/decompression equilibration (eq2). Elapsed time = 8:17:05.575919",
-   "RadonPy info: Sampling simulation (eq3) by LAMMPS is running..."
+   "RadonPy info: Sampling simulation (eq3) by LAMMPS is running...",
+   "RadonPy info: Complete sampling simulation (eq3). Elapsed time = 19:44:10.204106"
   ]
  }
 }

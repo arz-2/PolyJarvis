@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T04:43:39.550721+00:00",
+  "generated_at": "2026-09-16T22:12:58.548877+00:00",
   "gate": {
     "thermo_args": {
       "eq_fraction": 0.5,
@@ -1109,13 +1109,13 @@
         "n_production_rows": 251
       }
     },
-    "aPS_1_rerun": {
+    "aPS_1": {
       "equilibration": {
         "accepted_attempt": "attempt-0001",
         "segments": [
           {
             "attempt": "attempt-0001",
-            "log": "data/aPS_1_rerun/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log": "data/aPS_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
             "log_exists": true
           }
         ],
@@ -1174,7 +1174,7 @@
         "segments": [
           {
             "attempt": "attempt-0001",
-            "log": "data/aPS_1_rerun/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log": "data/aPS_1/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
             "log_exists": true
           }
         ],
@@ -1476,13 +1476,13 @@
         "n_production_rows": 251
       }
     },
-    "sPVC_1_rerun": {
+    "sPVC_1": {
       "equilibration": {
         "accepted_attempt": "attempt-0001",
         "segments": [
           {
             "attempt": "attempt-0001",
-            "log": "data/sPVC_1_rerun/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log": "data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
             "log_exists": true
           }
         ],
@@ -1541,7 +1541,7 @@
         "segments": [
           {
             "attempt": "attempt-0001",
-            "log": "data/sPVC_1_rerun/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log": "data/sPVC_1/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
             "log_exists": true
           }
         ],

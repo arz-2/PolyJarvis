@@ -35,7 +35,6 @@ def local(p: str) -> Path:
 
 def targets() -> list[dict]:
     runs = [f"{s}_{i}" for s in SYSTEMS for i in (1, 2, 3)]
-    runs += [r for r in ("aPS_1_rerun", "sPVC_1_rerun") if (REPO / "data" / r / "workflow_state.json").exists()]
     runs += ["tg_sensitivity/" + os.path.basename(d) for d in sorted(glob.glob(str(REPO / "data/tg_sensitivity/TGS_*")))]
     out = []
     for r in runs:
