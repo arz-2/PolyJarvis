@@ -1,10 +1,15 @@
 # Run data
 
 This folder holds the run workspaces behind every number in the manuscript and SI. `data/*` is
-gitignored, and the folders below were force-added. Files not included: trajectories
-(`.dump`, `.dump.gz`), LAMMPS data files (`.data`, including final structures), binary restarts
-(`.rst`, `.restart`) and launcher PID files. The final structures and trajectories are deposited
-on Zenodo (see the manuscript's Data and Software Availability statement).
+gitignored, and the folders below were force-added. Trajectories (`.dump`, `.dump.gz`), binary
+restarts (`.rst`, `.restart`) and launcher PID files are not included.
+
+Of the LAMMPS structure files (`.data`), only the cells that reported numbers come from are
+included; `tools/key_structures.py` lists them. They are the built cell, the melt-hold output
+that cooling and the Tg staircase start from, the 300 K cell that density and the bulk-modulus
+series start from, and the output of each bulk-modulus pressure point. For a run that ended in
+equilibration, the melt-hold output of its last attempt is included. Tg legs start from their
+anchor run's melt cell and have no structures of their own.
 
 ## What is here
 

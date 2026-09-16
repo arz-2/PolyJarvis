@@ -1,0 +1,32 @@
+log radon_md.log append
+units real
+atom_style full
+boundary f f f
+
+pair_style lj/charmm/coul/charmm 8.0 12.0
+dielectric 1.000000
+bond_style harmonic
+angle_style harmonic
+dihedral_style fourier
+improper_style cvff
+special_bonds amber
+pair_modify mix arithmetic
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+read_data radon_md_lmp.data
+
+
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+thermo 1000
+
+min_style cg
+minimize 0.000100 0.000001 10000 100000
+reset_timestep 0
+
+write_dump all custom radon_md_last.dump id x y z xu yu zu vx vy vz fx fy fz modify sort id
+
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+write_data radon_md_last.data
+quit

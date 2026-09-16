@@ -1,0 +1,242 @@
+
+*** tstart() called on MAIL-30
+*** at Mon Sep 14 00:22:46 2026
+
+   => Libint2 <=
+
+    Primary   basis highest AM E, G, H:  7, 6, 3
+    Auxiliary basis highest AM E, G, H:  7, 7, 4
+    Onebody   basis highest AM E, G, H:  -, -, -
+    Solid Harmonics ordering:            Gaussian
+   => Loading Basis Set <=
+
+    Name: RADONPY_BASIS
+    Role: ORBITAL
+    Keyword: BASIS
+    atoms 1, 6     entry H          line    44 file /home/arz2/miniforge3/envs/radonpy/share/psi4/basis/6-31g_d_.gbs 
+    atoms 2, 5     entry C          line   111 file /home/arz2/miniforge3/envs/radonpy/share/psi4/basis/6-31g_d_.gbs 
+    atoms 3-4, 7-8 entry F          line   162 file /home/arz2/miniforge3/envs/radonpy/share/psi4/basis/6-31g_d_.gbs 
+
+
+         ---------------------------------------------------------
+                                   SCF
+               by Justin Turney, Rob Parrish, Andy Simmonett
+                          and Daniel G. A. Smith
+                              RHF Reference
+                        4 Threads,    953 MiB Core
+         ---------------------------------------------------------
+
+  ==> Geometry <==
+
+    Molecular point group: c1
+    Full point group: C1
+
+    Geometry (in Angstrom), charge = 0, multiplicity = 1:
+
+       Center              X                  Y                   Z               Mass       
+    ------------   -----------------  -----------------  -----------------  -----------------
+         H           -1.003920410873    -0.064826727336     1.172666640981     1.007825032230
+         C           -0.751236280873     0.002127482664     0.110631650981    12.000000000000
+         F           -1.256668160873     1.148210262664    -0.409309419019    18.998403162730
+         F           -1.284423690873    -1.052506637336    -0.554626289019    18.998403162730
+         C            0.751240419127    -0.002088487336    -0.110635879019    12.000000000000
+         H            1.003952639127     0.065233692664    -1.172639559019     1.007825032230
+         F            1.284299559127     1.052460802664     0.555008800981    18.998403162730
+         F            1.256787969127    -1.148210647336     0.408928140981    18.998403162730
+
+  Running in c1 symmetry.
+
+  Rotational constants: A =      0.16924  B =      0.10592  C =      0.06898 [cm^-1]
+  Rotational constants: A =   5073.68310  B =   3175.43873  C =   2067.82866 [MHz]
+  Nuclear repulsion =  266.333609957061356
+
+  Charge       = 0
+  Multiplicity = 1
+  Electrons    = 50
+  Nalpha       = 25
+  Nbeta        = 25
+
+  ==> Algorithm <==
+
+  SCF Algorithm Type is DF.
+  DIIS enabled.
+  MOM disabled.
+  Fractional occupation disabled.
+  Guess Type is SAD.
+  Energy threshold   = 1.00e-06
+  Density threshold  = 1.00e-06
+  Integral threshold = 1.00e-12
+
+  ==> Primary Basis <==
+
+  Basis Set: RADONPY_BASIS
+    Blend: 6-31G_D_
+    Number of shells: 40
+    Number of basis functions: 94
+    Number of Cartesian functions: 94
+    Spherical Harmonics?: false
+    Max angular momentum: 2
+
+   => Loading Basis Set <=
+
+    Name: (RADONPY_BASIS AUX)
+    Role: JKFIT
+    Keyword: DF_BASIS_SCF
+    atoms 1, 6     entry H          line    51 file /home/arz2/miniforge3/envs/radonpy/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 2, 5     entry C          line   121 file /home/arz2/miniforge3/envs/radonpy/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 3-4, 7-8 entry F          line   271 file /home/arz2/miniforge3/envs/radonpy/share/psi4/basis/cc-pvdz-jkfit.gbs 
+
+  ==> Integral Setup <==
+
+  DFHelper Memory: AOs need 0.039 GiB; user supplied 0.698 GiB. 
+  SCF_SUBTYPE=INCORE selected. In-core MEM_DF algorithm will be used.
+  Using in-core AOs.
+
+  ==> MemDFJK: Density-Fitted J/K Matrices <==
+
+    J tasked:                   Yes
+    K tasked:                   Yes
+    wK tasked:                   No
+    OpenMP threads:               4
+    Memory [MiB]:               715
+    Algorithm:                 Core
+    Schwarz Cutoff:           1E-12
+    Mask sparsity (%):       1.6523
+    Fitting Condition:        1E-10
+
+   => Auxiliary Basis Set <=
+
+  Basis Set: (RADONPY_BASIS AUX)
+    Blend: CC-PVDZ-JKFIT
+    Number of shells: 162
+    Number of basis functions: 536
+    Number of Cartesian functions: 536
+    Spherical Harmonics?: false
+    Max angular momentum: 3
+
+  Minimum eigenvalue in the overlap matrix is 2.4211263600E-03.
+  Reciprocal condition number of the overlap matrix is 3.7088267217E-04.
+    Using symmetric orthogonalization.
+
+  ==> Pre-Iterations <==
+
+  SCF Guess: Superposition of Atomic Densities via on-the-fly atomic UHF (no occupation information).
+
+   -------------------------
+    Irrep   Nso     Nmo    
+   -------------------------
+     A         94      94 
+   -------------------------
+    Total      94      94
+   -------------------------
+
+  ==> Iterations <==
+
+                           Total Energy        Delta E     RMS |[F,P]|
+
+   @DF-RHF iter SAD:  -475.27152016387657   -4.75272e+02   0.00000e+00 
+   @DF-RHF iter   1:  -473.09345210539243    2.17807e+00   1.91886e-02 DIIS/ADIIS
+   @DF-RHF iter   2:  -474.38185789850746   -1.28841e+00   8.67612e-03 DIIS/ADIIS
+   @DF-RHF iter   3:  -474.63410719453395   -2.52249e-01   1.84116e-03 DIIS/ADIIS
+   @DF-RHF iter   4:  -474.64363832537379   -9.53113e-03   4.91876e-04 DIIS/ADIIS
+   @DF-RHF iter   5:  -474.64464937294207   -1.01105e-03   5.92015e-05 DIIS
+   @DF-RHF iter   6:  -474.64468283022222   -3.34573e-05   1.01904e-05 DIIS
+   @DF-RHF iter   7:  -474.64468379167710   -9.61455e-07   1.97908e-06 DIIS
+   @DF-RHF iter   8:  -474.64468382981346   -3.81364e-08   5.15438e-07 DIIS
+  Energy and wave function converged.
+
+
+  ==> Post-Iterations <==
+
+    Orbital Energies [Eh]
+    ---------------------
+
+    Doubly Occupied:                                                      
+
+       1A    -26.335115     2A    -26.335111     3A    -26.335090  
+       4A    -26.335088     5A    -11.433454     6A    -11.432807  
+       7A     -1.688769     8A     -1.670642     9A     -1.623591  
+      10A     -1.613136    11A     -1.061895    12A     -0.924794  
+      13A     -0.819214    14A     -0.808834    15A     -0.793930  
+      16A     -0.766967    17A     -0.752626    18A     -0.698373  
+      19A     -0.682747    20A     -0.678917    21A     -0.650990  
+      22A     -0.637894    23A     -0.627710    24A     -0.606202  
+      25A     -0.522785  
+
+    Virtual:                                                              
+
+      26A      0.239072    27A      0.269624    28A      0.271369  
+      29A      0.313503    30A      0.401104    31A      0.449947  
+      32A      0.460625    33A      0.714876    34A      0.733270  
+      35A      0.736355    36A      0.769696    37A      0.804489  
+      38A      0.820936    39A      0.991081    40A      1.061900  
+      41A      1.078035    42A      1.164455    43A      1.293088  
+      44A      1.324602    45A      1.399217    46A      1.411635  
+      47A      1.440379    48A      1.500866    49A      1.621477  
+      50A      1.630475    51A      1.632369    52A      1.656189  
+      53A      1.667292    54A      1.670084    55A      1.676491  
+      56A      1.720420    57A      1.815517    58A      1.876705  
+      59A      1.906642    60A      1.969044    61A      2.032530  
+      62A      2.053800    63A      2.067970    64A      2.071492  
+      65A      2.116903    66A      2.173558    67A      2.190455  
+      68A      2.198315    69A      2.201821    70A      2.312067  
+      71A      2.350497    72A      2.367828    73A      2.407879  
+      74A      2.458061    75A      2.473613    76A      2.507931  
+      77A      2.514257    78A      2.530750    79A      2.693540  
+      80A      2.815667    81A      2.960260    82A      2.986384  
+      83A      3.090913    84A      3.130141    85A      3.379662  
+      86A      3.393592    87A      3.398627    88A      3.413561  
+      89A      4.373889    90A      4.544272    91A      4.882894  
+      92A      4.886038    93A      4.957567    94A      5.140508  
+
+    Final Occupation by Irrep:
+              A 
+    DOCC [    25 ]
+    NA   [    25 ]
+    NB   [    25 ]
+
+  @DF-RHF Final Energy:  -474.64468382981346
+
+   => Energetics <=
+
+    Nuclear Repulsion Energy =            266.3336099570613555
+    One-Electron Energy =               -1190.2831041993536019
+    Two-Electron Energy =                 449.3048104124788438
+    Total Energy =                       -474.6446838298134594
+
+Computation Completed
+
+
+Properties will be evaluated at   0.000000,   0.000000,   0.000000 [a0]
+
+Properties computed using the HF density matrix
+
+
+ Multipole Moments:
+
+ ------------------------------------------------------------------------------------
+     Multipole            Electronic (a.u.)      Nuclear  (a.u.)        Total (a.u.)
+ ------------------------------------------------------------------------------------
+
+ L = 1.  Multiply by 2.5417464519 to convert [e a0] to [Debye]
+ Dipole X            :         -0.0000323            0.0000343            0.0000020
+ Dipole Y            :         -0.0005147            0.0004251           -0.0000895
+ Dipole Z            :         -0.0000424            0.0000242           -0.0000182
+ Magnitude           :                                                    0.0000914
+
+ ------------------------------------------------------------------------------------
+
+ Electrostatic potential to be computed on the grid and written to grid_esp.dat
+
+*** tstop() called on MAIL-30 at Mon Sep 14 00:22:51 2026
+Module time:
+	user time   =      16.51 seconds =       0.28 minutes
+	system time =       0.90 seconds =       0.01 minutes
+	total time  =          5 seconds =       0.08 minutes
+Total time:
+	user time   =     483.96 seconds =       8.07 minutes
+	system time =       4.47 seconds =       0.07 minutes
+	total time  =        124 seconds =       2.07 minutes
+  Threads set to 4 by Python driver.
+
+  Memory set to 953.674 MiB by Python driver.

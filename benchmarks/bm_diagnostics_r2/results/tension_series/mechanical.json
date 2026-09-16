@@ -1,0 +1,156 @@
+{
+  "status": "success",
+  "method": "murnaghan",
+  "temperature_K": 299.98,
+  "temperature_spread_K": 0.09,
+  "fit_converged": true,
+  "bm_gate_verdict": "BM_REPORTABLE",
+  "bm_gate_reasons": [],
+  "bm_reportable": true,
+  "B0_GPa": 2.6937,
+  "bulk_modulus_GPa": 2.6937,
+  "B0_sem_GPa": 0.4679,
+  "bulk_modulus_sem_GPa": 0.4679,
+  "B0_prime": 13.2557,
+  "V0_A3": 63125.41,
+  "r_squared": 0.996524,
+  "n_points": 4,
+  "pressures_atm": [
+    -1000.0,
+    -500.0,
+    -250.0,
+    0.0
+  ],
+  "pressures_GPa": [
+    -0.101325,
+    -0.050663,
+    -0.025331,
+    0.0
+  ],
+  "volumes_A3": [
+    66514.92,
+    64421.69,
+    63854.59,
+    63102.04
+  ],
+  "vol_stds_A3": [
+    436.3,
+    378.54,
+    315.97,
+    277.04
+  ],
+  "n_prod_rows": [
+    2501,
+    2501,
+    2501,
+    2501
+  ],
+  "log_files": [
+    "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/bm_P-1000/bm_P-1000.log",
+    "/home/arz2/PolyJarvis_v2/data/bm_diagnostics_r2/points/P-500_damp1000_steps500000/bm_P-500/bm_P-500.log",
+    "/home/arz2/PolyJarvis_v2/data/bm_diagnostics_r2/points/P-250_damp1000_steps500000/bm_P-250/bm_P-250.log",
+    "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/bm_P0/bm_P0.log"
+  ],
+  "tau_frames_per_point": [
+    126.796,
+    294.629,
+    5.572,
+    4.575
+  ],
+  "n_eff_per_point": [
+    19,
+    8,
+    448,
+    546
+  ],
+  "vol_sem_A3_per_point": [
+    100.0941,
+    133.8358,
+    14.9282,
+    11.8563
+  ],
+  "eq_fraction": 0.5,
+  "output_dir": "/home/arz2/PolyJarvis_v2/benchmarks/bm_diagnostics_r2/results/tension_series",
+  "volume_monotonic": true,
+  "loo_results": [
+    {
+      "dropped_pressure_atm": -1000.0,
+      "is_tension_point": true,
+      "converged": true,
+      "B0_GPa": 2.4536,
+      "B0_prime": 1.0,
+      "r_squared": 0.992492,
+      "dB0_GPa_vs_baseline": -0.2402,
+      "dB0_prime_vs_baseline": -12.2557
+    },
+    {
+      "dropped_pressure_atm": -500.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 2.2045,
+      "B0_prime": 5.2976,
+      "r_squared": 1.0,
+      "dB0_GPa_vs_baseline": -0.4892,
+      "dB0_prime_vs_baseline": -7.9581
+    },
+    {
+      "dropped_pressure_atm": -250.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 2.8974,
+      "B0_prime": 16.7801,
+      "r_squared": 1.0,
+      "dB0_GPa_vs_baseline": 0.2037,
+      "dB0_prime_vs_baseline": 3.5244
+    },
+    {
+      "dropped_pressure_atm": 0.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 3.9896,
+      "B0_prime": 30.0,
+      "r_squared": 0.999986,
+      "dB0_GPa_vs_baseline": 1.2959,
+      "dB0_prime_vs_baseline": 16.7443
+    }
+  ],
+  "loo_n_converged": 4,
+  "loo_max_dB0_pct": 48.11,
+  "loo_max_dB0_pct_retained": 48.11,
+  "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+  "bm_convergence_reasons": [
+    "loo_unstable"
+  ],
+  "bm_convergence_confidence": "low",
+  "fluctuation_bulk_modulus_GPa": null,
+  "fluctuation_divergence_pct": null,
+  "anomalous_points": {},
+  "excluded_points": [],
+  "selected_window": {
+    "trim_total": 0,
+    "n_points": 4,
+    "plateau_confirmed": null,
+    "selection_note": "Ladder has 4 points and min_points=4, so no trimmed window exists -- the untrimmed fit is the only candidate. This is NOT evidence of a stable window; plateau_confirmed is unknown, not True."
+  },
+  "all_points_fit": {
+    "method": "murnaghan",
+    "fit_converged": true,
+    "B0_GPa": 2.6937,
+    "B0_prime": 13.2557,
+    "V0_A3": 63125.41,
+    "r_squared": 0.996524,
+    "volume_monotonic": true,
+    "n_points": 4,
+    "pressures_atm": [
+      -1000.0,
+      -500.0,
+      -250.0,
+      0.0
+    ]
+  },
+  "warnings": [
+    "Murnaghan fit R\u00b2=0.99652 < 0.999. Check that NPT runs are fully equilibrated (increase --eq_fraction or NPT steps) and that the pressure range is appropriate for this polymer.",
+    "Leave-one-out refit: dropping one pressure point shifts B0 by up to 48.1% (>10%) \u2014 the fit is not robust to a single point; consider widening the pressure range."
+  ],
+  "murnaghan_eos_fig": "/home/arz2/PolyJarvis_v2/benchmarks/bm_diagnostics_r2/results/tension_series/figures/murnaghan_eos.png"
+}

@@ -1,0 +1,92 @@
+log eq1.log append
+units real
+atom_style full
+boundary p p p
+
+pair_style lj/cut 3.0 
+kspace_style none 
+dielectric 1.000000
+bond_style harmonic
+angle_style harmonic
+dihedral_style fourier
+improper_style cvff
+special_bonds amber
+pair_modify mix arithmetic
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+read_data eq1.data
+
+
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+thermo 1000
+
+comm_modify cutoff 8.000000
+
+dump dump0 all custom 1000 eq1.dump id type mol x y z ix iy iz vx vy vz
+dump xtc0 all xtc 1000 eq1.xtc
+dump_modify xtc0 unwrap yes
+restart 10000 radon_md_1.rst radon_md_2.rst
+
+undump dump0
+undump xtc0
+min_style cg
+minimize 0.000100 0.000001 10000 100000
+reset_timestep 0
+dump dump0 all custom 1000 eq1.dump id type mol x y z ix iy iz vx vy vz
+dump xtc0 all xtc 1000 eq1.xtc
+dump_modify xtc0 unwrap yes
+
+timestep 0.100000
+
+# nvt
+fix md2 all nvt temp 300.000000 300.000000 100.000000
+
+# Update thermo_style
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+thermo 1000
+
+run 20000
+unfix md2
+
+timestep 1.000000
+fix shake3 all shake 1e-4 1000 0 m 1.0
+
+# nvt
+fix md3 all nvt temp 300.000000 700.000000 100.000000
+
+# Update thermo_style
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+thermo 1000
+
+run 1000000
+unfix md3
+unfix shake3
+
+timestep 1.000000
+fix shake4 all shake 1e-4 1000 0 m 1.0
+
+# deform
+fix DEF4 all deform 1 x final -35.005383 35.005383 y final -35.005383 35.005383 z final -35.005383 35.005383 remap v
+
+# nvt
+fix md4 all nvt temp 700.000000 700.000000 100.000000
+
+# Update thermo_style
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+thermo 1000
+
+run 1000000
+unfix md4
+unfix shake4
+unfix DEF4
+
+write_dump all custom eq1_last.dump id x y z xu yu zu vx vy vz fx fy fz modify sort id
+
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+write_data eq2.data
+quit
