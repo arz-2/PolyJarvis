@@ -1,0 +1,94 @@
+{
+  "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+  "fields": {
+    "pcff": {
+      "integrates": true,
+      "missing_styles": [],
+      "gpu_accelerated": true,
+      "styles_without_kokkos": [],
+      "required_styles": {
+        "pair": "lj/class2/coul/long",
+        "bond": "class2",
+        "angle": "class2",
+        "dihedral": "class2",
+        "improper": "class2"
+      },
+      "types_smiles": true,
+      "front_end": "emc",
+      "typing_error": "",
+      "typing_evidence": "built_cell",
+      "cell_dir": null,
+      "further_steps_required": [],
+      "candidate": true
+    },
+    "opls/2024/opls-aa": {
+      "integrates": true,
+      "missing_styles": [],
+      "gpu_accelerated": false,
+      "styles_without_kokkos": [
+        "improper_style cvff"
+      ],
+      "required_styles": {
+        "pair": "lj/cut/coul/long",
+        "bond": "harmonic",
+        "angle": "harmonic",
+        "dihedral": "opls",
+        "improper": "cvff"
+      },
+      "types_smiles": false,
+      "front_end": "emc",
+      "typing_error": "Error: core/fields.c:436 FieldsApply: |        Missing rules. |        Program aborted.",
+      "typing_evidence": null,
+      "cell_dir": null,
+      "further_steps_required": [],
+      "candidate": false
+    },
+    "trappe-ua": {
+      "integrates": true,
+      "missing_styles": [],
+      "gpu_accelerated": true,
+      "styles_without_kokkos": [],
+      "required_styles": {
+        "pair": "lj/cut/coul/long",
+        "bond": "harmonic",
+        "angle": "harmonic",
+        "dihedral": "opls"
+      },
+      "types_smiles": false,
+      "front_end": "emc",
+      "typing_error": "Error: core/fields.c:436 FieldsApply: |        Missing rules. |        Program aborted.",
+      "typing_evidence": null,
+      "cell_dir": null,
+      "further_steps_required": [],
+      "candidate": false
+    },
+    "compass": {
+      "integrates": true,
+      "missing_styles": [],
+      "gpu_accelerated": true,
+      "styles_without_kokkos": [],
+      "required_styles": {
+        "pair": "lj/class2/coul/long",
+        "bond": "class2",
+        "angle": "class2",
+        "dihedral": "class2",
+        "improper": "class2"
+      },
+      "types_smiles": false,
+      "front_end": "emc",
+      "typing_error": "Error: core/fields.c:436 FieldsApply: |        Missing rules. |        Program aborted.",
+      "typing_evidence": null,
+      "cell_dir": null,
+      "further_steps_required": [],
+      "candidate": false
+    }
+  },
+  "candidates": [
+    "pcff"
+  ],
+  "candidates_built_cell": [
+    "pcff"
+  ],
+  "candidates_typed_only": [],
+  "note": "A candidate is a field this installation can integrate AND whose front end accepted this SMILES. Evidence differs: candidates_built_cell were built to a runnable cell; candidates_typed_only were only typed, and still need the steps in further_steps_required. It is NOT a claim about accuracy \u2014 rank candidates by the archive prior and the reference-free comparators, never by this verdict."
+}

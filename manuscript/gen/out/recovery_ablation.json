@@ -1,0 +1,466 @@
+{
+ "formula_sweep": {
+  "campaign": [
+   {
+    "run": "PE_1",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PE_2",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PE_3",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PEG_1",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PEG_2",
+    "attempt": "attempt-0004",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PEG_3",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PLLA_1",
+    "attempt": "attempt-0002",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PLLA_2",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PLLA_3",
+    "attempt": "attempt-0002",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "aPS_1",
+    "attempt": "attempt-0007",
+    "decided_by": "formula",
+    "formula_signal": 0.0548,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "aPS_2",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.071,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "aPS_3",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0691,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "sPVC_1_rerun",
+    "attempt": "attempt-0001",
+    "decided_by": "split_half",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "sPVC_2",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "sPVC_3",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PEEK_1",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PEEK_2",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PEEK_3",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PSU_1",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PSU_2",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   },
+   {
+    "run": "PSU_3",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.0,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_PASS"
+   }
+  ],
+  "ptfe": [
+   {
+    "run": "PTFE_noAI",
+    "attempt": "attempt-0001",
+    "decided_by": "formula",
+    "formula_signal": 0.1933,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_HETEROGENEOUS"
+   },
+   {
+    "run": "PTFE_AI",
+    "attempt": "attempt-0001",
+    "decided_by": "time_averaged",
+    "formula_signal": 0.1854,
+    "formula_limit": 0.11,
+    "formula_verdict": "HOMOG_HETEROGENEOUS"
+   }
+  ],
+  "campaign_max_signal": 0.071,
+  "campaign_n_pass": 21,
+  "campaign_n": 21
+ },
+ "split_half_regrade": [
+  {
+   "run": "PTFE_noAI",
+   "method": "split_half",
+   "persistent_cv": 0.0,
+   "limit": 0.11,
+   "frames": 1951,
+   "homogeneity_pass": true,
+   "overall_pass": true,
+   "formula_signal_same_trajectory": 0.1933
+  },
+  {
+   "run": "PTFE_AI",
+   "method": "split_half",
+   "persistent_cv": 0.0273,
+   "limit": 0.11,
+   "frames": 1951,
+   "homogeneity_pass": true,
+   "overall_pass": true,
+   "formula_signal_same_trajectory": 0.1854
+  }
+ ],
+ "arms": [
+  {
+   "run": "PTFE_noAI",
+   "arm": "no agent",
+   "stages": {
+    "build": "accepted",
+    "cooling": "pending",
+    "equilibration": "escalation_required",
+    "mechanical": "pending",
+    "summary": "pending",
+    "thermal": "pending"
+   },
+   "terminated_by": null,
+   "operator_interventions": [],
+   "agent_decisions": [],
+   "run_summary": null
+  },
+  {
+   "run": "PTFE_AI",
+   "arm": "agent",
+   "stages": {
+    "build": "accepted",
+    "cooling": "accepted",
+    "equilibration": "accepted",
+    "mechanical": "accepted",
+    "summary": "accepted",
+    "thermal": "accepted"
+   },
+   "terminated_by": null,
+   "operator_interventions": [
+    {
+     "action": "regrade_via_reattach",
+     "at": "2026-09-14T17:17:22.544781+00:00",
+     "arm_note": "applied to the AI arm only; PTFE_noAI left at escalation_required"
+    }
+   ],
+   "agent_decisions": [
+    {
+     "at": "2026-09-14T06:45:18.298161+00:00",
+     "stage": "equilibration",
+     "code": "DENSITY_HETEROGENEITY",
+     "action": "end_run",
+     "outcome": "failed"
+    },
+    {
+     "at": "2026-09-15T01:16:07.614684+00:00",
+     "stage": "thermal",
+     "code": "TG_REVIEW",
+     "action": "accept_with_caveat",
+     "outcome": "resume"
+    }
+   ],
+   "run_summary": {
+    "run": {
+     "name": "PTFE_AI",
+     "smiles": "*C(F)(F)C(*)(F)F",
+     "polymer_class": "PHAL",
+     "ff": "opls/2024/opls-aa",
+     "charge_method": "opls-library",
+     "dp": 50,
+     "n_chains": 10,
+     "n_atoms": null,
+     "date_start": "",
+     "date_end": ""
+    },
+    "decisions": {
+     "D-01_ff": "opls/2024/opls-aa",
+     "D-02_charges": "opls-library",
+     "D-03_electrostatics": "pppm",
+     "D-04_system_size": "DP=50, 10 chains",
+     "D-05_convergence": "PASS",
+     "D-06_tg_fit_quality": "GOOD"
+    },
+    "plan": null,
+    "results": {
+     "tg": {
+      "value_K": null,
+      "grading_basis": "raw_MD",
+      "r_squared": 0.9889,
+      "fit_quality": "GOOD",
+      "primary_fit_invalid": false,
+      "n_replicates": 1,
+      "transition_width_c_K": 248.2,
+      "tg_uncertainty_K": 66.8,
+      "gate_verdict": "TG_REVIEW",
+      "withheld": {
+       "value_K": 525.0,
+       "gate_verdict": "TG_REVIEW"
+      }
+     },
+     "density": {
+      "value_g_cm3": 1.930482,
+      "temperature_K": 299.98
+     },
+     "melt_density": {
+      "value_g_cm3": 1.449958,
+      "temperature_K": 700.02
+     },
+     "bulk_modulus": {
+      "value_GPa": 2.0664,
+      "sem_GPa": 0.0475,
+      "method": "murnaghan",
+      "temperature_K": 299.96,
+      "gate_verdict": "BM_REPORTABLE",
+      "withheld": null
+     }
+    },
+    "byproducts": {
+     "cte_glass": {
+      "value": 7.9123e-05,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_glassy_per_K",
+      "gate": {
+       "field": "slope_signs_valid",
+       "verdict": true
+      },
+      "blocking": false
+     },
+     "cte_rubber": {
+      "value": 0.001483864,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_rubbery_per_K",
+      "gate": {
+       "field": "slope_ordering_valid",
+       "verdict": true
+      },
+      "blocking": false
+     },
+     "tg_transition_width": {
+      "value": 248.2,
+      "unit": "K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:transition_width_c_K",
+      "gate": {
+       "field": "fit_quality",
+       "verdict": "GOOD"
+      },
+      "blocking": false
+     }
+    },
+    "convergence": {
+     "verdict": "PASS",
+     "density_equilibrated": true,
+     "energy_equilibrated": true,
+     "density_drift_pct": 0.1923,
+     "caveats": [
+      "kinetic_trap_flag=True (strongly sub-diffusive (see kinetic_trap_flag for trap verdict)) in a rubbery/melt run -- chains have not displaced their own size (MSD_max < Rg^2). density/Tg/bulk_modulus were measured on a structure whose chain-scale conformation may not represent true equilibrium.",
+      "C(t) only 0% decayed by end of trajectory (tau_relax=4.62e+09 ps vs trajectory=451 ps) -- whole-chain conformational relaxation is far from complete.",
+      "GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED: large-s MSID slope=1.253 (s=18-51), expected 1.0 +/-20% for melt-screened (ideal-chain) statistics -- long-wavelength chain shape has not relaxed to equilibrium. Local packing/short-range structure can still be sound; whole-chain conformation may not represent true equilibrium."
+     ]
+    },
+    "structural_checks": {
+     "rg_cv": 0.1882,
+     "rg_spread_flag": false,
+     "kinetic_trap_flag": true,
+     "diffusion_regime": "strongly sub-diffusive (see kinetic_trap_flag for trap verdict)",
+     "msid_slope": 1.499,
+     "msid_large_s_slope": 1.253,
+     "msid_large_s_gaussian_pass": false,
+     "ordered_flag": false,
+     "p2_mean": 0.0251,
+     "heterogeneous_flag": false,
+     "density_cv_mean": 0.1581
+    },
+    "artifacts": {
+     "tg_fit_fig": "graphs/tg_fit.png",
+     "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+    },
+    "artifacts_missing": [
+     {
+      "file": "bulk_modulus_deform.json",
+      "found_in": null
+     }
+    ],
+    "provenance": {
+     "simulation_dir": "",
+     "git_commit": "7ca21b8",
+     "mdanalysis_version": "unknown",
+     "generated_at": "2026-09-15T02:57:44.792656+00:00"
+    }
+   }
+  }
+ ],
+ "radonpy_stock": {
+  "records": {
+   "timestamps_qm.json": {
+    "status": "complete",
+    "phases": [
+     {
+      "phase": "qm",
+      "started_at": "2026-09-14T04:20:40.902130+00:00",
+      "finished_at": "2026-09-14T04:24:37.289351+00:00",
+      "returncode": 0,
+      "log": "/home/arz2/PolyJarvis_v2/benchmarks/polyjarvis_vs_radonpy/data/PTFE/radonpy/qm.log"
+     }
+    ],
+    "deviations_from_stock": {
+     "PYTHONPATH": "/home/arz2/RadonPy",
+     "RadonPy_MPI": 14,
+     "RadonPy_GPU": 1
+    }
+   },
+   "timestamps_gpu_crash_20260914.json": {
+    "status": "failed",
+    "phases": [
+     {
+      "phase": "eq",
+      "started_at": "2026-09-14T04:24:53.110345+00:00",
+      "finished_at": "2026-09-14T04:26:22.648550+00:00",
+      "returncode": 1,
+      "log": "/home/arz2/PolyJarvis_v2/benchmarks/polyjarvis_vs_radonpy/data/PTFE/radonpy/eq.log"
+     }
+    ],
+    "deviations_from_stock": {
+     "PYTHONPATH": "/home/arz2/RadonPy",
+     "RadonPy_MPI": 14,
+     "RadonPy_GPU": 1
+    }
+   },
+   "timestamps.json": {
+    "status": "failed",
+    "phases": [
+     {
+      "phase": "eq",
+      "started_at": "2026-09-14T04:24:53.110345+00:00",
+      "finished_at": "2026-09-14T04:26:22.648550+00:00",
+      "returncode": 1,
+      "log": "/home/arz2/PolyJarvis_v2/benchmarks/polyjarvis_vs_radonpy/data/PTFE/radonpy/eq.log"
+     }
+    ],
+    "deviations_from_stock": {
+     "PYTHONPATH": "/home/arz2/RadonPy",
+     "RadonPy_MPI": 14,
+     "RadonPy_GPU": 1
+    }
+   }
+  },
+  "eq_log_last_info": [
+   "RadonPy info: Complete packing simulation (eq1). Elapsed time = 0:18:25.917538",
+   "RadonPy info: Larsen's 21 step compression/decompression equilibration (eq2) by LAMMPS is running...",
+   "RadonPy info: Complete Larsen 21 step compression/decompression equilibration (eq2). Elapsed time = 8:17:05.575919",
+   "RadonPy info: Sampling simulation (eq3) by LAMMPS is running..."
+  ]
+ }
+}

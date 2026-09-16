@@ -1,0 +1,701 @@
+{
+ "_rule": "Grading (user rule 2026-09-14): one admissible experimental value -> pass iff |sim - v| within tolerance of v. More than one -> band [min, max]; pass iff sim lies inside the band or within tolerance of the nearer edge. Tolerances in native units: tg_K +/-50 K absolute; density and K +/-5% / +/-30% of the edge value.",
+ "_admissibility": [
+  "Same homopolymer, bulk and unmodified: no blends, IPNs, plasticizers, crosslinked, substituted, chlorinated, deuterated or copolymer entries.",
+  "Phase and stereo matched to the simulated cell: amorphous (or an explicit amorphous extrapolation); tacticity as built (aPS atactic, PLLA L, sPVC syndiotactic).",
+  "Tg: the glass transition itself (not a labelled sub-Tg relaxation or softening point); chains above oligomer length (Mn > 1000).",
+  "Density: at 293-303 K, or a published equation evaluated at 300 K (value and equation recorded).",
+  "K: isothermal (Tait/PVT/compressibility) at or near 300 K; ultrasonic K_S excluded.",
+  "Every value traceable to a source row or a read text; DB = db/experimental_db.sqlite table:id; Mark = Mark 2007 Physical Properties of Polymers Handbook; PDH = Polymer Data Handbook 1999; PH4 = Polymer Handbook 4th ed."
+ ],
+ "tolerance": {
+  "tg_K": {
+   "abs": 50
+  },
+  "density": {
+   "rel": 0.05
+  },
+  "K_GPa": {
+   "rel": 0.3
+  }
+ },
+ "systems": {
+  "PE": {
+   "tg_K": {
+    "include": [
+     {
+      "v": 195,
+      "src": "Boyer 1973 Macromolecules (read): amorphous PE Tg 195 +/- 10 K (low edge of the disputed assignment)"
+     },
+     {
+      "v": 237,
+      "src": "Gaur & Wunderlich 1981 J Phys Chem Ref Data 10, 119 (read): heat-capacity analysis of 46 datasets; 'agree only with a glass transition of 237 K', region 200-252 K; corroborated by Chang 1974 J Res NBS 78A, 387 (235-240 K enthalpy relaxation)"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 243.15,
+      "src": "DB tg:2394 PH4",
+      "why": "labelled alpha-relaxation"
+     },
+     {
+      "v": 193.15,
+      "src": "DB tg:2395 PH4",
+      "why": "labelled beta-relaxation"
+     },
+     {
+      "v": 145.15,
+      "src": "DB tg:2396 PH4",
+      "why": "labelled gamma-relaxation (Boyer: T < Tg process)"
+     },
+     {
+      "v": 140,
+      "src": "DB tg:2280 PDH LDPE 140-170",
+      "why": "semicrystalline LDPE Tg(L), DMA/TMA"
+     },
+     {
+      "v": 221,
+      "src": "DB tg:2277 PDH",
+      "why": "elastomeric PE (copolymer)"
+     }
+    ],
+    "_note": "Band spans the two principal calorimetric assignments (user decision 2026-09-15); PE Tg remains disputed (140-250 K in the literature)."
+   },
+   "density": {
+    "include": [
+     {
+      "v": 0.855,
+      "src": "DB density:211 PH4 (read, Brandrup PE constants): amorphous, extrapolated from above Tm"
+     },
+     {
+      "v": 0.855,
+      "src": "DB density:137 PDH: amorphous at 298 K, extrapolated"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 0.953,
+      "src": "DB density:212",
+      "why": "crystalline HDPE"
+     },
+     {
+      "v": 0.91,
+      "src": "DB density:136/138/139/140 PDH",
+      "why": "commercial semicrystalline resins"
+     },
+     {
+      "v": 0.8525,
+      "src": "Mark Table 7.1 branched 0.868 exp(-6.73e-4 t) at 26.85 C (melt eq. extrapolated)",
+      "why": "tier D: melt equation extrapolated far below its measured range; tier A value exists"
+     },
+     {
+      "v": 0.8611,
+      "src": "Mark Table 7.1 branched 0.882 - 7.97e-4 t + 0.74e-6 t^2 at 26.85 C (extrapolated)",
+      "why": "tier D: melt equation extrapolated far below its measured range; tier A value exists"
+     },
+     {
+      "v": 0.8507,
+      "src": "Mark Table 7.1 linear 0.8674 - 6.313e-4 t + 0.367e-6 t^2 - 0.055e-8 t^3 at 26.85 C (extrapolated)",
+      "why": "tier D: melt equation extrapolated far below its measured range; tier A value exists"
+     },
+     {
+      "v": 0.85,
+      "src": "Mark Table 7.1 linear 0.863 - 4.73e-4 t - 0.38e-6 t^2 at 26.85 C (extrapolated)",
+      "why": "tier D: melt equation extrapolated far below its measured range; tier A value exists"
+     }
+    ]
+   },
+   "K_GPa": {
+    "include": [
+     {
+      "v": 1.78,
+      "src": "Hellwege, Knappe & Lehmann 1962 Kolloid-Z 183, 110 (read), Tables 4-5: zero-pressure compressibility of HDPE (rho 0.973) and LDPE (rho 0.918) at 19.4-20 C from quadratic fit of relative volume change 1-400 kp/cm2; linear compressibility-density relation stated by the authors (Abb. 11) extrapolated to amorphous density 0.852-0.855 gives 1.78-1.81 GPa (20 C)"
+     },
+     {
+      "v": 1.83,
+      "src": "Olabisi & Simha 1975 Macromolecules 8, 206 (read), Table XII: semicrystalline Tait B = B0 - B1 t for five PE (rho20 0.918-0.979), C = 0.0894; K = B/C at 26.85 C regressed as 1/K vs density and extrapolated to 0.852-0.855 gives 1.80-1.83 GPa"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 2.27,
+      "src": "DB mechanical:96 Morikami 1996",
+      "why": "at 243 K, not 300 K"
+     },
+     {
+      "v": 1.744,
+      "src": "Mark Table 7.5 PE linear Tait b0=1767 bar, b1=0.00466/C at 26.85 C (melt fit extrapolated)",
+      "why": "replaced 2026-09-15: melt Tait fit extrapolated far below Tm; amorphous-phase extrapolations of measured room-temperature compressibility now available"
+     },
+     {
+      "v": 1.856,
+      "src": "Mark Table 7.5 PE branched Tait b0=1867 bar, b1=0.00439/C at 26.85 C (melt fit extrapolated)",
+      "why": "replaced 2026-09-15: melt Tait fit extrapolated far below Tm; amorphous-phase extrapolations of measured room-temperature compressibility now available"
+     }
+    ],
+    "_tier": "D: two independent extrapolations of measured semicrystalline compressibility to amorphous density (two-phase additivity assumed)"
+   }
+  },
+  "PEG": {
+   "tg_K": {
+    "include": [
+     {
+      "v": 213.15,
+      "src": "Tormala 1974 Eur Polym J (read): -60 C for Mw 3000-22000, independent of M"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 232.15,
+      "src": "DB tg:1281 PH4",
+      "why": "row flagged conflicting data (158-223 K)"
+     },
+     {
+      "v": 340.15,
+      "src": "DB tg:1283 PH4",
+      "why": "outside PH4's stated Tg range; not a glass transition of amorphous PEO"
+     },
+     {
+      "v": 373.15,
+      "src": "DB tg:1285 PH4",
+      "why": "outside PH4's stated Tg range"
+     },
+     {
+      "v": 209.15,
+      "src": "DB tg:1242-1244 PH4 PEO 1000/400/600",
+      "why": "oligomers, Mn <= 1000"
+     },
+     {
+      "v": 223.0,
+      "src": "DB tg:2282 PDH polymer 2061",
+      "why": "row is poly(ethylene sulfide) data mislabelled as PEO"
+     },
+     {
+      "v": 256,
+      "src": "Faucher 1966 J Appl Phys",
+      "why": "semicrystalline samples; Tg vs M non-monotonic from crystallinity"
+     },
+     {
+      "v": 206.15,
+      "src": "DB tg:1282 PH4 poly(oxyethylene)",
+      "why": "tier C: handbook value without method or conditions"
+     },
+     {
+      "v": 220.15,
+      "src": "DB tg:1286 PH4 poly(oxyethylene)",
+      "why": "tier C: handbook value without method or conditions"
+     },
+     {
+      "v": 165.15,
+      "src": "DB tg:1284 PH4 poly(oxyethylene); inside PH4's own stated range 158-223 K",
+      "why": "tier C: handbook value without method or conditions"
+     }
+    ]
+   },
+   "density": {
+    "include": [
+     {
+      "v": 1.1205,
+      "src": "DB eq:36 Mark Table 7.1 1.142 exp(-7.09e-4 t) at 26.85 C (melt, extrapolated)"
+     },
+     {
+      "v": 1.1183,
+      "src": "DB eq:37 Mark Table 7.1 1.140 - 8.08e-4 t at 26.85 C (range 30-90 C)"
+     },
+     {
+      "v": 1.1194,
+      "src": "DB eq:38 Mark Table 7.1 1.139 - 7.31e-4 t at 26.85 C (extrapolated)"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 1.295,
+      "src": "DB density:142 PDH polymer 2061",
+      "why": "poly(ethylene sulfide) data mislabelled"
+     },
+     {
+      "v": 1.41,
+      "src": "DB density:141",
+      "why": "crystalline"
+     }
+    ],
+    "_tier": "D only: Mark melt equations evaluated at 26.85 C (one within 3 K of its range)",
+    "_corroboration": [
+     "Becht 1967 Table 3: 1.120-1.123 g/cm3 at 26.85 C from the melt Tait zero-pressure isobar (linear PEO Mn 2000-16250), extrapolated",
+     "Schmidt & Maurer 1998 Table IV: 1.119-1.121 g/cm3 at 26.85 C from PEO melt zero-pressure isobar, extrapolated",
+     "Tsujita 1973 PEG 6000 melt line and liquid oligoethylene glycol densities (Crespo 2017) level at 1.120-1.122 g/cm3"
+    ]
+   },
+   "K_GPa": {
+    "include": [
+     {
+      "v": 2.26,
+      "src": "Tsujita, Nose & Hata 1973 Polym J 5, 201 (read), Fig. 4: isothermal compressibility of liquid PEG 600 (Mn 605) at 30.8 C, P = 0, 4.35e-5 (kg/cm2)^-1 read from the figure (+/- 0.03 GPa); authors: liquid compressibility does not depend strongly on molecular weight"
+     },
+     {
+      "v": 2.42,
+      "src": "Becht, Hellwege & Knappe 1967 Kolloid-Z 216-217, 150 (read), Table 3: extended Tait constants for linear PEO Mn 2000, 9500, 16250 (kappa0 = 56e-6 cm2/kp at 80 C, kappa' = 2.9e-7 cm2/(kp K)), linear kappa(T) extrapolated from the 60-100 C melt to 26.85 C; authors: melt compressibility nearly independent of molecular weight"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 4.0,
+      "src": "polymer_rules.json POXI exp_K_GPa max",
+      "why": "widened for semicrystalline samples; not a measured value"
+     },
+     {
+      "v": 2.09,
+      "src": "Mark Table 7.5 polyoxyethylene Tait b0=2077 bar, b1=0.00395/C at 26.85 C (melt fit 88-224 C extrapolated)",
+      "why": "replaced 2026-09-15: melt Tait fit (88-224 C) extrapolated ~60 K below range; direct measurements now available"
+     },
+     {
+      "v": 2.61,
+      "src": "Becht 1967 Table 3 sample 10, Polyox WSR-301 (Mw 2.9e6)",
+      "why": "branched PEO; simulated chains are linear (user decision 2026-09-15)"
+     },
+     {
+      "v": 2.83,
+      "src": "Schmidt & Maurer 1998 J Polym Sci B 36, 1061 (read), Table IV PEO (Mw 200k) melt Tait B0 = 287.0 MPa, B1 = 4.733e-3/C, C = 0.0894, extrapolated from 75-136 C to 26.85 C",
+      "why": "inconsistent with Becht 1967 and Tsujita 1973 inside its own measured range (2.20 GPa at 80 C vs 1.74-1.75 GPa); zero-pressure data extrapolated from 10-30 MPa"
+     }
+    ],
+    "_tier": "A/D: direct liquid PEG 600 measurement at 30.8 C (figure read) and linear-PEO melt extrapolation to 300 K"
+   }
+  },
+  "PLLA": {
+   "tg_K": {
+    "include": [
+     {
+      "v": 326,
+      "src": "DB tg:2305 PDH (read): L-PLA of various molecular weights 326-337 K (low end)"
+     },
+     {
+      "v": 337,
+      "src": "PDH (read): L-PLA 326-337 K (high end)"
+     },
+     {
+      "v": 331.15,
+      "src": "Garlotta 2001 (read): Tg-infinity 58 C for PLLA (Jamshidi 1988)"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 323,
+      "src": "PDH D,L-PLA 323-330",
+      "why": "racemic D,L-PLA, not L"
+     },
+     {
+      "v": 327.15,
+      "src": "DB tg:1076 PH4 poly(lactic acid)",
+      "why": "tier C: handbook value without method or conditions"
+     }
+    ]
+   },
+   "density": {
+    "include": [
+     {
+      "v": 1.248,
+      "src": "DB density:221 Garlotta 2001 citing Mikos 1994; PDH (read) amorphous 1.248"
+     }
+    ],
+    "exclude": []
+   },
+   "K_GPa": {
+    "ungraded": "no experimental bulk-modulus measurement located; polymer_rules PEST band has unverified provenance"
+   }
+  },
+  "aPS": {
+   "tg_K": {
+    "include": [
+     {
+      "v": 368.15,
+      "src": "DB tg:658 PH4: dilatometer, 2.5 K/min cooling"
+     },
+     {
+      "v": 371.15,
+      "src": "DB tg:659 PH4: DSC onset, 32 K/min, quenched"
+     },
+     {
+      "v": 371.15,
+      "src": "DB tg:660 PH4: DTA/DSC onset, 1 K/min"
+     },
+     {
+      "v": 371.15,
+      "src": "DB tg:661 PH4: DSC penetration onset, zero rate"
+     },
+     {
+      "v": 373.15,
+      "src": "DB tg:662 PH4: DSC, 10 K/min cooling"
+     },
+     {
+      "v": 376.15,
+      "src": "DB tg:663 PH4: DSC midpoint, 1 K/min"
+     },
+     {
+      "v": 377.15,
+      "src": "DB tg:664 PH4: DSC onset, 20 K/min"
+     },
+     {
+      "v": 382.15,
+      "src": "DB tg:665 PH4: DSC onset, 20 K/min"
+     },
+     {
+      "v": 377.2,
+      "src": "Wall, Roestamsjah & Aldridge 1974 J Res NBS (read): 104 C at M = 170,000, DTA 20 K/min"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 401.15,
+      "src": "DB tg:673 PH4",
+      "why": "'DSC' with no conditions, 19 K above every conditioned value"
+     },
+     {
+      "v": 400.15,
+      "src": "DB tg:672 PH4",
+      "why": "no method or conditions"
+     },
+     {
+      "v": 353.15,
+      "src": "PH4 Brandrup PS constants Tg 80 C",
+      "why": "no molecular weight or method; Brandrup's own relation gives 373 K at M-infinity"
+     },
+     {
+      "v": 363.15,
+      "src": "PH4 Brandrup PS constants Tg 90 C",
+      "why": "same as above"
+     },
+     {
+      "v": 364.15,
+      "src": "DB tg:666/667/668/669/670/671 PH4 without a thermal method",
+      "why": "no thermal method stated (GPC/PCS/NR annotate M characterisation)"
+     },
+     {
+      "v": 356.15,
+      "src": "DB tg:653/675/676/677/656 PH4",
+      "why": "alkylated, substituted, sulfonated or deuterated PS"
+     },
+     {
+      "v": 73.15,
+      "src": "DB tg:674 PH4",
+      "why": "transcription error"
+     },
+     {
+      "v": 373.0,
+      "src": "DB tg:2362 PDH: 373 K",
+      "why": "tier C: handbook value without method or conditions"
+     }
+    ]
+   },
+   "density": {
+    "include": [
+     {
+      "v": 1.04,
+      "src": "DB density:178 PDH / PH4 Brandrup (read): amorphous 1.04-1.065 (low end)"
+     },
+     {
+      "v": 1.065,
+      "src": "PH4 Brandrup (read): amorphous 1.04-1.065 (high end)"
+     },
+     {
+      "v": 1.0425,
+      "src": "DB eq:66 Mark Table 7.2 glass 1.048 - 1.88e-4 t - 0.608e-6 t^2 at 26.85 C"
+     },
+     {
+      "v": 1.044,
+      "src": "DB eq:67 Mark Table 7.2 glass 1.052 exp(-2.86e-4 t) at 26.85 C (range 30-79 C)"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 1.12,
+      "src": "PH4 Brandrup",
+      "why": "crystalline"
+     }
+    ]
+   },
+   "K_GPa": {
+    "include": [
+     {
+      "v": 3.587,
+      "src": "Mark Table 7.6 polystyrene glass Tait b0=3449 bar, b1=0.00271/C at 26.85 C (fit 8-75 C)"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 3.0,
+      "src": "DB mechanical:74 PDH 'bulk modulus 3,000 MPa'",
+      "why": "method and temperature not stated"
+     },
+     {
+      "v": 2.63,
+      "src": "DB mechanical:87 PDH compressibility",
+      "why": "source compressibility row not verified as glassy 298 K K_T"
+     }
+    ]
+   }
+  },
+  "sPVC": {
+   "_tacticity_basis": "No experimental value exists for fully syndiotactic PVC (it crystallizes); the most syndiotactic measured samples reach r = 0.66-0.77 syndiotactic dyads. Tg uses the highest-syndiotacticity measurements; density uses the amorphous-phase constant; K has no tacticity-resolved measurement and uses commercial glassy PVC. Search record 2026-09-14.",
+   "tg_K": {
+    "include": [
+     {
+      "v": 378,
+      "src": "PDH p.930 (read) ref 36 Ceccorulli, Pizzoli & Pezzin 1977 J Macromol Sci Phys B14:499: DSC 32 K/min, polymerized at -50 C (r ~ 0.66 from PDH ref 4 tacticity table; pairing inferred across papers)"
+     },
+     {
+      "v": 380,
+      "src": "PDH p.930 (read) ref 36: DSC 32 K/min, polymerized at -60 C (r ~ 0.67, inferred)"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 371.15,
+      "src": "DB tg:850 PH4 / PDH ref 35",
+      "why": "commercial PVC (r ~ 0.55), DSC 20 K/min"
+     },
+     {
+      "v": 344,
+      "src": "PDH ref 34",
+      "why": "commercial PVC, dilatometry"
+     },
+     {
+      "v": 353,
+      "src": "PDH ref 36 polymerized 90/50/0/-20/-30 C (353, 358, 370, 373, 373 K)",
+      "why": "lower syndiotacticity (r <= 0.64) than the -50/-60 C samples"
+     },
+     {
+      "v": 383,
+      "src": "US Patent 4,004,405 (1977)",
+      "why": "claim ('about 110 C and even higher'), no measurement"
+     },
+     {
+      "v": 373,
+      "src": "Reding, Walter & Welch 1962 J Polym Sci 56:225 (Crossref abstract): 'about 100 C for polymer prepared at -80 C'; tacticity not quantified",
+      "why": "tier C: approximate abstract statement ('about 100 C'), tacticity not quantified"
+     }
+    ]
+   },
+   "density": {
+    "include": [
+     {
+      "v": 1.385,
+      "src": "PDH p.930 (read) ref 4 Pham, Millan & Madruga 1974: amorphous-phase density at 20 C implied by the table's density-crystallinity rows (rho_a = 1.385, rho_c = 1.440 reproduce all six crystallinities); tacticity-independent by construction"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 1.391,
+      "src": "DB density:213 PDH ref 4",
+      "why": "11.3% crystalline commercial PVC"
+     },
+     {
+      "v": 1.431,
+      "src": "PDH ref 4 polymerized -75 C",
+      "why": "84.2% crystalline"
+     },
+     {
+      "v": 1.416,
+      "src": "PDH ref 4 polymerized -15 C",
+      "why": "57.3% crystalline"
+     }
+    ],
+    "_tier": "D only: amorphous-phase constant derived from the density-crystallinity rows"
+   },
+   "K_GPa": {
+    "include": [
+     {
+      "v": 3.86,
+      "src": "Hellwege, Knappe & Lehmann 1962 Kolloid-Z 183, 110 (read), Table 3: rigid PVC (Vestolit), zero-pressure K from quadratic fit of relative volume change 1-400 kp/cm2: 3.96 GPa at 20 C, 3.53 GPa at 51 C; compressibility interpolated linearly to 26.85 C. Commercial PVC, tacticity not stated"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 5.5,
+      "src": "DB mechanical:100 Van Krevelen",
+      "why": "ultrasonic K_S"
+     },
+     {
+      "v": 5.41,
+      "src": "Mark Table 60.1 Phillips, North & Pethrick",
+      "why": "ultrasonic K_S"
+     },
+     {
+      "v": 3.933,
+      "src": "Mark Table 7.6 PVC glass Tait b0=3751 bar, b1=0.00241/C at 26.85 C (commercial PVC; no tacticity-resolved K_T exists)",
+      "why": "replaced 2026-09-15 by the primary compression data (Mark Table 7.6 Tait fit reproduces them within 2%)"
+     }
+    ],
+    "_corroboration": [
+     "Sasabe & Saito 1972 Polym J 3, 631 glass Tait fit of the Hellwege data: 3.86-4.02 GPa at 298 K",
+     "Naoki & Owada 1984 Polymer 25, 75: liquid PVC P-V-T only (355-385 K), no glassy compressibility"
+    ]
+   }
+  },
+  "PEEK": {
+   "tg_K": {
+    "include": [
+     {
+      "v": 418,
+      "src": "Blundell & Osborn 1983 Polymer (read): amorphous quenched PEEK Tg step at 145 C, DSC 20 K/min"
+     },
+     {
+      "v": 410,
+      "src": "DB tg:2264 PDH (read): quenched, DSC"
+     },
+     {
+      "v": 415,
+      "src": "DB tg:2265 PDH (read): annealed, DSC"
+     },
+     {
+      "v": 425,
+      "src": "DB tg:2263 PDH (read): PVT data"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 418.15,
+      "src": "DB tg:1231 PH4",
+      "why": "DSC on 10% crystalline sample"
+     },
+     {
+      "v": 430.15,
+      "src": "DB tg:1232 PH4",
+      "why": "DSC on 28% crystalline sample"
+     },
+     {
+      "v": 423.15,
+      "src": "DB tg:1223/1224/1225/1236",
+      "why": "methyl-substituted or poly(aryl/phenylene ether ether ketone) variants"
+     },
+     {
+      "v": 420.15,
+      "src": "DB tg:1229 PH4 poly(ether ether ketone)",
+      "why": "tier C: handbook value without method or conditions"
+     },
+     {
+      "v": 425.15,
+      "src": "DB tg:1230 PH4 poly(ether ether ketone)",
+      "why": "tier C: handbook value without method or conditions"
+     },
+     {
+      "v": 405.15,
+      "src": "DB tg:1233 PH4 poly(ether ether ketone)",
+      "why": "tier C: handbook value without method or conditions"
+     },
+     {
+      "v": 431.15,
+      "src": "DB tg:1234 PH4 poly(ether ether ketone)",
+      "why": "tier C: handbook value without method or conditions"
+     }
+    ]
+   },
+   "density": {
+    "include": [
+     {
+      "v": 1.263,
+      "src": "DB density:131 PDH (read): amorphous 1.263-1.265 (low end)"
+     },
+     {
+      "v": 1.265,
+      "src": "PDH (read): amorphous 1.263-1.265 (high end)"
+     }
+    ],
+    "exclude": []
+   },
+   "K_GPa": {
+    "ungraded": "user decision 2026-09-14; only high-pressure DAC fits exist (Chen 2025 K0 = 2.5 +/- 0.5 GPa; Dattelbaum cited at 3.82 GPa)"
+   }
+  },
+  "PSU": {
+   "tg_K": {
+    "include": [
+     {
+      "v": 459.0,
+      "src": "DB tg:2193 PDH bisphenol-A polysulfone, forced-oscillation dynamic"
+     },
+     {
+      "v": 458.15,
+      "src": "Zoller 1978 (read): transition between 185 and 186 C (low end)"
+     },
+     {
+      "v": 459.15,
+      "src": "Zoller 1978 (read): 186 C (high end); Mark Table 7.2 Tg 186 C"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 458.15,
+      "src": "DB tg:1529",
+      "why": "camphorquinone-doped PSU"
+     },
+     {
+      "v": 498.0,
+      "src": "DB tg:1534/2268",
+      "why": "poly(ether sulfone), a different polymer"
+     },
+     {
+      "v": 459.15,
+      "src": "DB tg:1565 PH4 poly(sulfone)",
+      "why": "tier C: handbook value without method or conditions"
+     },
+     {
+      "v": 460.15,
+      "src": "DB tg:1566 PH4 poly(sulfone)",
+      "why": "tier C: handbook value without method or conditions"
+     },
+     {
+      "v": 459.15,
+      "src": "DB tg:1567 PH4 polysulfone of bisphenol A and diphenylene sulfone",
+      "why": "tier C: handbook value without method or conditions"
+     }
+    ]
+   },
+   "density": {
+    "include": [
+     {
+      "v": 1.234,
+      "src": "DB density:220 Zoller 1978 (read): annealed glass at 27 C"
+     },
+     {
+      "v": 1.235,
+      "src": "DB eq:68 Mark Table 7.2 glass 1.242 - 2.59e-4 t at 26.85 C"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 1.37,
+      "src": "DB density:134",
+      "why": "poly(ether sulfone)"
+     },
+     {
+      "v": 1.24,
+      "src": "DB density:72 PDH bisphenol-A polysulfone",
+      "why": "tier C: handbook value without method or conditions (PDH '—'; Mark Table 24.4 engineering-plastics typical value)"
+     },
+     {
+      "v": 1.25,
+      "src": "DB density:217 Mark Table 24.4 engineering plastics",
+      "why": "tier C: handbook value without method or conditions (PDH '—'; Mark Table 24.4 engineering-plastics typical value)"
+     }
+    ]
+   },
+   "K_GPa": {
+    "include": [
+     {
+      "v": 4.64,
+      "src": "Mark Table 7.6 polysulfone (bisphenol A) glass Tait b0=4323 bar, b1=0.00154/C at 26.85 C (Zoller data)"
+     }
+    ],
+    "exclude": [
+     {
+      "v": 5.3,
+      "src": "DB mechanical:102 Van Krevelen",
+      "why": "ultrasonic K_S"
+     }
+    ]
+   }
+  }
+ },
+ "_credibility": "Band members restricted to tier A (number read with method in the primary source or handbook page) and tier B (handbook value whose method/conditions are recorded). Tier C (handbook value without method or conditions, or an approximate abstract statement) is excluded. Tier D (derived, or an equation extrapolated outside its measured range) is used only where no A/B value exists, and is flagged."
+}

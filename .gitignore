@@ -48,26 +48,14 @@ db/polydatabase_md.sqlite
 
 # ── Manuscript & internal planning docs (not for public repo) ─
 literature/
-# manuscript/ stays local EXCEPT the published subset below: benchmark provenance (data/),
-# analysis data (csv/), figure/table generators, the two manuscript figures, the recovery
-# benchmark, and the release rebuilder. New files under manuscript/data/ are ignored like the
-# old data/* — collect_data.sh stages the provenance subset with `git add -f`.
+# manuscript/: the paper sources stay local until acceptance. The generators and the small
+# processed-data outputs are tracked, because every reported number derives from them. Bulk
+# regenerable intermediates are not -- gen/out/chains/ and gen/out/tg_reextract/ rebuild from data/.
 manuscript/*
-!manuscript/csv/
-!manuscript/recovery/
-!manuscript/collect_data.sh
-!manuscript/figures/
-manuscript/figures/*
-!manuscript/figures/figure1_architecture.png
-!manuscript/figures/figure2_conversation.png
-!manuscript/gen_figure3_density_parity.py
-!manuscript/gen_figure4_tg_curves.py
-!manuscript/gen_figure5_bulk_modulus.py
-!manuscript/gen_figure6_rdf.py
-!manuscript/gen_table_bulk_modulus_robustness.py
-!manuscript/gen_table_compute_cost.py
-!manuscript/gen_table_structure_diagnostics.py
-!manuscript/plot_rdf.py
+!manuscript/gen/
+manuscript/gen/out/chains/
+manuscript/gen/out/tg_reextract/
+manuscript/**/__pycache__/
 !manuscript/replot_from_tool.py
 docs/LLM_CONTRIBUTION_PLAN.md
 docs/UI_PLAN.md
@@ -98,3 +86,11 @@ benchmarks/*/data/
 
 # Runtime lock files (filelock on the characterization cache)
 *.json.lock
+
+# Superseded RadonPy PEG comparison runs (40 MB); the reported external reference is the PTFE arm.
+benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/
+# Controlled bulk-modulus legs: the code is tracked, its run outputs and logs are not.
+benchmarks/bm_diagnostics_r2/results/
+benchmarks/bm_diagnostics_r2/__pycache__/
+benchmarks/bm_diagnostics_r2/*.log
+benchmarks/bm_diagnostics_r2/*.pid

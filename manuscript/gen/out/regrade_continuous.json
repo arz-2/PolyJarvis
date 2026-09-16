@@ -1,0 +1,2575 @@
+{
+  "generated_at": "2026-09-16T04:43:39.550721+00:00",
+  "gate": {
+    "thermo_args": {
+      "eq_fraction": 0.5,
+      "drift_threshold_pct": 1.0,
+      "drift_pvalue": 0.01,
+      "block_count": 10,
+      "temp_col": "Temp",
+      "density_col": "Density",
+      "energy_col": "TotEng",
+      "pressure_cols": [
+        "Pxx",
+        "Pyy",
+        "Pzz"
+      ]
+    },
+    "n_eff_min": 20,
+    "checker_sha256": "09b41f4073a103e2beb9122e681fea6656fd09d92e5068cb15c6de837cc5879a",
+    "enforce_gate_sha256": "71d29766fb2b9f6c50c53f2858006b3f4b4649c1e47c434e5a74926c82db4161"
+  },
+  "runs": {
+    "PE_1": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PE_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.292,
+            "sem_pct": null,
+            "n_eff": 395,
+            "p_value": 0.115,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0588,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.2812,
+            "sem_pct": null,
+            "n_eff": 245,
+            "p_value": 0.114,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0762,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 245,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 501
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0003",
+        "segments": [
+          {
+            "attempt": "attempt-0002",
+            "log": "data/PE_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log",
+            "log_exists": true
+          },
+          {
+            "attempt": "attempt-0003",
+            "log": "data/PE_1/attempts/cooling/attempt-0003/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 2,
+        "basis": "continuous_chain",
+        "verdict": {
+          "clause": "require_rubbery",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 2.2602,
+            "sem_pct": null,
+            "n_eff": 53,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.2504,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.5016,
+            "sem_pct": null,
+            "n_eff": 92,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0616,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 92,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1376
+      }
+    },
+    "PE_2": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PE_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": []
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1397,
+            "sem_pct": null,
+            "n_eff": 463,
+            "p_value": 0.4738,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0545,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.695,
+            "sem_pct": null,
+            "n_eff": 214,
+            "p_value": 0.0002,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.1186,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 214,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 501
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0004",
+        "segments": [
+          {
+            "attempt": "attempt-0003",
+            "log": "data/PE_2/attempts/cooling/attempt-0003/work/npt_final/npt_final.log",
+            "log_exists": true
+          },
+          {
+            "attempt": "attempt-0004",
+            "log": "data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 2,
+        "basis": "continuous_chain",
+        "verdict": {
+          "clause": "require_rubbery",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 1.3709,
+            "sem_pct": null,
+            "n_eff": 116,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.2256,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.152,
+            "sem_pct": null,
+            "n_eff": 151,
+            "p_value": 0.0024,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.041,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 151,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1376
+      }
+    },
+    "PE_3": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PE_3/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": []
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.192,
+            "sem_pct": null,
+            "n_eff": 446,
+            "p_value": 0.2997,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0691,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0275,
+            "sem_pct": null,
+            "n_eff": 264,
+            "p_value": 0.8758,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0489,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 264,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 501
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0007",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PE_3/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          },
+          {
+            "attempt": "attempt-0007",
+            "log": "data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 2,
+        "basis": "continuous_chain",
+        "verdict": {
+          "clause": "require_rubbery",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 2.1959,
+            "sem_pct": null,
+            "n_eff": 33,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.3428,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.4693,
+            "sem_pct": null,
+            "n_eff": 37,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0913,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 37,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1376
+      }
+    },
+    "PEG_1": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEG_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": []
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.324,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.0049,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0728,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.1435,
+            "sem_pct": null,
+            "n_eff": 170,
+            "p_value": 0.0655,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0602,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 170,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEG_1/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_rubbery",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.7495,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.0011,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.187,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.1252,
+            "sem_pct": null,
+            "n_eff": 74,
+            "p_value": 0.0042,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0496,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 74,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      }
+    },
+    "PEG_2": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0004",
+        "segments": [
+          {
+            "attempt": "attempt-0004",
+            "log": "data/PEG_2/attempts/equilibration/attempt-0004/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": []
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0405,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.7179,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0413,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.1138,
+            "sem_pct": null,
+            "n_eff": 321,
+            "p_value": 0.1383,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.037,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 321,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEG_2/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_rubbery",
+          "verdict": "FAIL",
+          "failing_binding_gates": [
+            "energy_drift"
+          ],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 1.9748,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.0,
+            "pass": false
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.2248,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.3364,
+            "sem_pct": null,
+            "n_eff": 112,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0348,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 112,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      }
+    },
+    "PEG_3": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEG_3/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1792,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.1283,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0311,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.066,
+            "sem_pct": null,
+            "n_eff": 297,
+            "p_value": 0.386,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.028,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 297,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEG_3/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_rubbery",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.5885,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.0093,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0876,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0447,
+            "sem_pct": null,
+            "n_eff": 142,
+            "p_value": 0.2721,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0226,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 142,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      }
+    },
+    "PLLA_1": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0002",
+        "segments": [
+          {
+            "attempt": "attempt-0002",
+            "log": "data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": []
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.227,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0329,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.7811,
+            "sem_pct": null,
+            "n_eff": 87,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.1194,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 87,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0002",
+        "segments": [
+          {
+            "attempt": "attempt-0002",
+            "log": "data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0335,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.6674,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0169,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.3078,
+            "sem_pct": null,
+            "n_eff": 96,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0441,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 96,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "PLLA_2": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PLLA_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": []
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0992,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.0642,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.035,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.2087,
+            "sem_pct": null,
+            "n_eff": 131,
+            "p_value": 0.0156,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0808,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 131,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PLLA_2/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0457,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.5649,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.022,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.3903,
+            "sem_pct": null,
+            "n_eff": 58,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0504,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 58,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "PLLA_3": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0002",
+        "segments": [
+          {
+            "attempt": "attempt-0002",
+            "log": "data/PLLA_3/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": []
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1972,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.0003,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0366,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0559,
+            "sem_pct": null,
+            "n_eff": 60,
+            "p_value": 0.5063,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0827,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 60,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PLLA_3/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0348,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.6756,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0149,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.116,
+            "sem_pct": null,
+            "n_eff": 33,
+            "p_value": 0.1223,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0444,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 33,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "aPS_1_rerun": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/aPS_1_rerun/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msid_gaussian"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0504,
+            "sem_pct": null,
+            "n_eff": 3001,
+            "p_value": 0.2835,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0287,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.3397,
+            "sem_pct": null,
+            "n_eff": 146,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0982,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 146,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 3001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/aPS_1_rerun/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "msid_gaussian",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1811,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.3108,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0446,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0955,
+            "sem_pct": null,
+            "n_eff": 212,
+            "p_value": 0.2744,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0172,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 212,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "aPS_2": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/aPS_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msid_gaussian",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1596,
+            "sem_pct": null,
+            "n_eff": 3001,
+            "p_value": 0.0006,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0419,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0766,
+            "sem_pct": null,
+            "n_eff": 157,
+            "p_value": 0.1874,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0778,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 157,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 3001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/aPS_2/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "msid_gaussian",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0282,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.8708,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0457,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0007,
+            "sem_pct": null,
+            "n_eff": 54,
+            "p_value": 0.9945,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0437,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 54,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "aPS_3": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/aPS_3/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msid_gaussian",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.2607,
+            "sem_pct": null,
+            "n_eff": 3001,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0356,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.1129,
+            "sem_pct": null,
+            "n_eff": 304,
+            "p_value": 0.0407,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.06,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 304,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 3001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/aPS_3/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "msid_gaussian"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1958,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.2455,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0333,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.059,
+            "sem_pct": null,
+            "n_eff": 239,
+            "p_value": 0.4731,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0349,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 239,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "sPVC_1_rerun": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/sPVC_1_rerun/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msid_gaussian"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.3003,
+            "sem_pct": null,
+            "n_eff": 2001,
+            "p_value": 0.0255,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0688,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.4974,
+            "sem_pct": null,
+            "n_eff": 271,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0807,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 271,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 2001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/sPVC_1_rerun/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "msid_gaussian",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 2.7714,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.2355,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.9503,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.4382,
+            "sem_pct": null,
+            "n_eff": 35,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0699,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 35,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "sPVC_2": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/sPVC_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msid_gaussian"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1345,
+            "sem_pct": null,
+            "n_eff": 2001,
+            "p_value": 0.3302,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0654,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0603,
+            "sem_pct": null,
+            "n_eff": 265,
+            "p_value": 0.4599,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0744,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 265,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 2001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/sPVC_2/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "FAIL",
+          "failing_binding_gates": [
+            "energy_sem"
+          ],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "msid_gaussian",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 3.6947,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.1558,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 1.1185,
+            "n_eff": null,
+            "p_value": null,
+            "pass": false
+          },
+          "density_drift": {
+            "drift_pct": 0.3108,
+            "sem_pct": null,
+            "n_eff": 103,
+            "p_value": 0.0011,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0539,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 103,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "sPVC_3": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/sPVC_3/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msid_gaussian"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.3047,
+            "sem_pct": null,
+            "n_eff": 2001,
+            "p_value": 0.0231,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0482,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.2588,
+            "sem_pct": null,
+            "n_eff": 377,
+            "p_value": 0.0012,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0473,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 377,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 2001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/sPVC_3/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "msid_gaussian"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 1.7762,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.4862,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.653,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.1345,
+            "sem_pct": null,
+            "n_eff": 184,
+            "p_value": 0.1696,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0395,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 184,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "PEEK_1": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEEK_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msid_gaussian"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0102,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.8773,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0248,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.453,
+            "sem_pct": null,
+            "n_eff": 52,
+            "p_value": 0.0001,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.1364,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 52,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEEK_1/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "msid_gaussian",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1298,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.1659,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0345,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0327,
+            "sem_pct": null,
+            "n_eff": 166,
+            "p_value": 0.6586,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0349,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 166,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "PEEK_2": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEEK_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msid_gaussian"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0428,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.479,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0177,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.1103,
+            "sem_pct": null,
+            "n_eff": 117,
+            "p_value": 0.3106,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0803,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 117,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEEK_2/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "msid_gaussian"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0316,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.7365,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0287,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0269,
+            "sem_pct": null,
+            "n_eff": 146,
+            "p_value": 0.7043,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0218,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 146,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "PEEK_3": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEEK_3/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msid_gaussian"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0085,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.8929,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.026,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0706,
+            "sem_pct": null,
+            "n_eff": 23,
+            "p_value": 0.5395,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.1737,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 23,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PEEK_3/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "msid_gaussian",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.0702,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.4316,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.023,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.2371,
+            "sem_pct": null,
+            "n_eff": 135,
+            "p_value": 0.0006,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0361,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 135,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "PSU_1": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PSU_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msid_gaussian",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1034,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.149,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0282,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.2514,
+            "sem_pct": null,
+            "n_eff": 66,
+            "p_value": 0.0208,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.139,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 66,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PSU_1/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "msid_gaussian",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.048,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.7126,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0423,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.3913,
+            "sem_pct": null,
+            "n_eff": 57,
+            "p_value": 0.0,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.051,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 57,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "PSU_2": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PSU_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1279,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.0659,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0194,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.1006,
+            "sem_pct": null,
+            "n_eff": 136,
+            "p_value": 0.2842,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0795,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 136,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PSU_2/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1282,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.3281,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0509,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0233,
+            "sem_pct": null,
+            "n_eff": 50,
+            "p_value": 0.7822,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0436,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 50,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    },
+    "PSU_3": {
+      "equilibration": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PSU_3/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_melt",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": []
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1105,
+            "sem_pct": null,
+            "n_eff": 1001,
+            "p_value": 0.1154,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0224,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.2644,
+            "sem_pct": null,
+            "n_eff": 86,
+            "p_value": 0.0137,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0914,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 86,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 1001
+      },
+      "cooling": {
+        "accepted_attempt": "attempt-0001",
+        "segments": [
+          {
+            "attempt": "attempt-0001",
+            "log": "data/PSU_3/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+            "log_exists": true
+          }
+        ],
+        "n_segments": 1,
+        "basis": "single_segment",
+        "verdict": {
+          "clause": "require_glassy",
+          "verdict": "PASS",
+          "failing_binding_gates": [],
+          "unmeasured_binding_gates": [],
+          "failing_advisory_gates": [
+            "msd_not_trapped",
+            "residual_stress"
+          ]
+        },
+        "thermo": {
+          "energy_drift": {
+            "drift_pct": 0.1684,
+            "sem_pct": null,
+            "n_eff": 251,
+            "p_value": 0.2161,
+            "pass": true
+          },
+          "energy_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0508,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "density_drift": {
+            "drift_pct": 0.0076,
+            "sem_pct": null,
+            "n_eff": 117,
+            "p_value": 0.92,
+            "pass": true
+          },
+          "density_sem": {
+            "drift_pct": null,
+            "sem_pct": 0.0444,
+            "n_eff": null,
+            "p_value": null,
+            "pass": true
+          },
+          "n_eff_density": {
+            "drift_pct": null,
+            "sem_pct": null,
+            "n_eff": 117,
+            "p_value": null,
+            "pass": true
+          }
+        },
+        "n_production_rows": 251
+      }
+    }
+  }
+}

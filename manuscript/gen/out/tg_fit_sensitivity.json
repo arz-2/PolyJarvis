@@ -1,0 +1,2677 @@
+{
+  "procedures": [
+    "live",
+    "bilinear",
+    "hyperbola",
+    "eqf_0.25",
+    "eqf_0.75",
+    "trim_top2",
+    "trim_bottom2"
+  ],
+  "reproduction": [
+    {
+      "run": "PE_1",
+      "stored_Tg_K": 234.2,
+      "live_Tg_K": 234.2,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "PE_2",
+      "stored_Tg_K": 243.7,
+      "live_Tg_K": 239.8,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": false,
+      "pre_d76babf_Tg_K": 243.7,
+      "pre_d76babf_verdict": "TG_REPORTABLE",
+      "reproduced_by_pre_d76babf_code": true
+    },
+    {
+      "run": "PE_3",
+      "stored_Tg_K": 223.5,
+      "live_Tg_K": 223.5,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "PEG_1",
+      "stored_Tg_K": 259.6,
+      "live_Tg_K": 259.6,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "PEG_2",
+      "stored_Tg_K": 268.4,
+      "live_Tg_K": 268.4,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "PEG_3",
+      "stored_Tg_K": 243.8,
+      "live_Tg_K": 243.8,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "PLLA_1",
+      "stored_Tg_K": 483.6,
+      "live_Tg_K": 483.6,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "PLLA_2",
+      "stored_Tg_K": 421.0,
+      "live_Tg_K": 421.0,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "PLLA_3",
+      "stored_Tg_K": 443.2,
+      "live_Tg_K": 443.2,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "aPS_1",
+      "stored_Tg_K": 421.5,
+      "live_Tg_K": 421.5,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "aPS_2",
+      "stored_Tg_K": 348.6,
+      "live_Tg_K": 348.6,
+      "stored_verdict": "TG_REVIEW",
+      "live_verdict": "TG_REVIEW",
+      "reproduced": true
+    },
+    {
+      "run": "aPS_3",
+      "stored_Tg_K": 346.7,
+      "live_Tg_K": 346.7,
+      "stored_verdict": "TG_REVIEW",
+      "live_verdict": "TG_REVIEW",
+      "reproduced": true
+    },
+    {
+      "run": "sPVC_1_rerun",
+      "stored_Tg_K": 293.9,
+      "live_Tg_K": 293.9,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "sPVC_2",
+      "stored_Tg_K": 314.3,
+      "live_Tg_K": 314.3,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "sPVC_3",
+      "stored_Tg_K": 316.4,
+      "live_Tg_K": 316.4,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "PEEK_1",
+      "stored_Tg_K": 552.3,
+      "live_Tg_K": 551.9,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": false,
+      "pre_d76babf_Tg_K": 552.3,
+      "pre_d76babf_verdict": "TG_REPORTABLE",
+      "reproduced_by_pre_d76babf_code": true
+    },
+    {
+      "run": "PEEK_2",
+      "stored_Tg_K": 572.4,
+      "live_Tg_K": 572.4,
+      "stored_verdict": "TG_REVIEW",
+      "live_verdict": "TG_REVIEW",
+      "reproduced": true
+    },
+    {
+      "run": "PEEK_3",
+      "stored_Tg_K": 507.3,
+      "live_Tg_K": 507.6,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": false,
+      "pre_d76babf_Tg_K": 507.3,
+      "pre_d76babf_verdict": "TG_REPORTABLE",
+      "reproduced_by_pre_d76babf_code": true
+    },
+    {
+      "run": "PSU_1",
+      "stored_Tg_K": 481.3,
+      "live_Tg_K": 481.3,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "PSU_2",
+      "stored_Tg_K": 401.1,
+      "live_Tg_K": 525.0,
+      "stored_verdict": "TG_REVIEW",
+      "live_verdict": "TG_REVIEW",
+      "reproduced": false,
+      "pre_d76babf_Tg_K": 401.1,
+      "pre_d76babf_verdict": "TG_REVIEW",
+      "reproduced_by_pre_d76babf_code": true
+    },
+    {
+      "run": "PSU_3",
+      "stored_Tg_K": 479.8,
+      "live_Tg_K": 473.4,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": false,
+      "pre_d76babf_Tg_K": 479.8,
+      "pre_d76babf_verdict": "TG_REPORTABLE",
+      "reproduced_by_pre_d76babf_code": true
+    },
+    {
+      "run": "tg_sensitivity/TGS_PE_1_L1_r20",
+      "stored_Tg_K": 213.4,
+      "live_Tg_K": 213.4,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "tg_sensitivity/TGS_PE_1_L2_r10",
+      "stored_Tg_K": 223.1,
+      "live_Tg_K": 223.1,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "tg_sensitivity/TGS_PE_1_L4_dT10",
+      "stored_Tg_K": 253.0,
+      "live_Tg_K": 253.0,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "tg_sensitivity/TGS_PE_1_L5_dT40",
+      "stored_Tg_K": 208.4,
+      "live_Tg_K": 208.4,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    },
+    {
+      "run": "tg_sensitivity/TGS_PLLA_1_L3_r50",
+      "stored_Tg_K": 490.0,
+      "live_Tg_K": 490.0,
+      "stored_verdict": "TG_REVIEW",
+      "live_verdict": "TG_REVIEW",
+      "reproduced": true
+    },
+    {
+      "run": "tg_sensitivity/TGS_PLLA_1_L6_dT40",
+      "stored_Tg_K": 382.1,
+      "live_Tg_K": 382.1,
+      "stored_verdict": "TG_REPORTABLE",
+      "live_verdict": "TG_REPORTABLE",
+      "reproduced": true
+    }
+  ],
+  "pooled_sd_reportable_K": 19.5,
+  "axes": {
+    "bilinear": {
+      "per_system": {
+        "PE": {
+          "n": 3,
+          "mean_dTg_K": 8.0,
+          "max_abs_dTg_K": 14.8,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 4.5,
+          "max_abs_dTg_both_reportable_K": 5.2,
+          "became_unreportable": [
+            "PE_3"
+          ]
+        },
+        "PEG": {
+          "n": 3,
+          "mean_dTg_K": 7.6,
+          "max_abs_dTg_K": 9.7,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": 7.6,
+          "max_abs_dTg_both_reportable_K": 9.7,
+          "became_unreportable": []
+        },
+        "PLLA": {
+          "n": 3,
+          "mean_dTg_K": -8.7,
+          "max_abs_dTg_K": 13.0,
+          "n_both_reportable": 0,
+          "mean_dTg_both_reportable_K": null,
+          "max_abs_dTg_both_reportable_K": null,
+          "became_unreportable": [
+            "PLLA_1",
+            "PLLA_2",
+            "PLLA_3"
+          ]
+        },
+        "aPS": {
+          "n": 1,
+          "mean_dTg_K": 6.0,
+          "max_abs_dTg_K": 6.0,
+          "n_both_reportable": 0,
+          "mean_dTg_both_reportable_K": null,
+          "max_abs_dTg_both_reportable_K": null,
+          "became_unreportable": [
+            "aPS_1"
+          ]
+        },
+        "sPVC": {
+          "n": 3,
+          "mean_dTg_K": 0.7,
+          "max_abs_dTg_K": 3.5,
+          "n_both_reportable": 0,
+          "mean_dTg_both_reportable_K": null,
+          "max_abs_dTg_both_reportable_K": null,
+          "became_unreportable": [
+            "sPVC_1_rerun",
+            "sPVC_2",
+            "sPVC_3"
+          ]
+        },
+        "PEEK": {
+          "n": 2,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.4,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 0.0,
+          "max_abs_dTg_both_reportable_K": 0.4,
+          "became_unreportable": []
+        },
+        "PSU": {
+          "n": 2,
+          "mean_dTg_K": 5.9,
+          "max_abs_dTg_K": 6.4,
+          "n_both_reportable": 1,
+          "mean_dTg_both_reportable_K": 6.4,
+          "max_abs_dTg_both_reportable_K": 6.4,
+          "became_unreportable": [
+            "PSU_1"
+          ]
+        }
+      },
+      "per_run": [
+        {
+          "run": "PE_1",
+          "live_Tg_K": 234.2,
+          "Tg_K": 239.4,
+          "dTg_K": 5.2,
+          "live_n_bins": 47,
+          "n_bins": 47,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_2",
+          "live_Tg_K": 239.8,
+          "Tg_K": 243.7,
+          "dTg_K": 3.9,
+          "live_n_bins": 49,
+          "n_bins": 49,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_3",
+          "live_Tg_K": 223.5,
+          "Tg_K": 238.3,
+          "dTg_K": 14.8,
+          "live_n_bins": 47,
+          "n_bins": 47,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_1",
+          "live_Tg_K": 259.6,
+          "Tg_K": 265.8,
+          "dTg_K": 6.2,
+          "live_n_bins": 25,
+          "n_bins": 25,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_2",
+          "live_Tg_K": 268.4,
+          "Tg_K": 275.2,
+          "dTg_K": 6.8,
+          "live_n_bins": 24,
+          "n_bins": 24,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_3",
+          "live_Tg_K": 243.8,
+          "Tg_K": 253.5,
+          "dTg_K": 9.7,
+          "live_n_bins": 23,
+          "n_bins": 23,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_1",
+          "live_Tg_K": 483.6,
+          "Tg_K": 482.7,
+          "dTg_K": -0.9,
+          "live_n_bins": 42,
+          "n_bins": 42,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_2",
+          "live_Tg_K": 421.0,
+          "Tg_K": 408.9,
+          "dTg_K": -12.1,
+          "live_n_bins": 47,
+          "n_bins": 47,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_3",
+          "live_Tg_K": 443.2,
+          "Tg_K": 430.2,
+          "dTg_K": -13.0,
+          "live_n_bins": 48,
+          "n_bins": 48,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_1",
+          "live_Tg_K": 421.5,
+          "Tg_K": 427.5,
+          "dTg_K": 6.0,
+          "live_n_bins": 32,
+          "n_bins": 32,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_2",
+          "live_Tg_K": 348.6,
+          "Tg_K": 348.6,
+          "dTg_K": 0.0,
+          "live_n_bins": 32,
+          "n_bins": 32,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_3",
+          "live_Tg_K": 346.7,
+          "Tg_K": 346.7,
+          "dTg_K": 0.0,
+          "live_n_bins": 33,
+          "n_bins": 33,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_1_rerun",
+          "live_Tg_K": 293.9,
+          "Tg_K": 296.2,
+          "dTg_K": 2.3,
+          "live_n_bins": 41,
+          "n_bins": 41,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_2",
+          "live_Tg_K": 314.3,
+          "Tg_K": 310.8,
+          "dTg_K": -3.5,
+          "live_n_bins": 43,
+          "n_bins": 43,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_3",
+          "live_Tg_K": 316.4,
+          "Tg_K": 319.7,
+          "dTg_K": 3.3,
+          "live_n_bins": 43,
+          "n_bins": 43,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_1",
+          "live_Tg_K": 551.9,
+          "Tg_K": 552.3,
+          "dTg_K": 0.4,
+          "live_n_bins": 64,
+          "n_bins": 64,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_2",
+          "live_Tg_K": 572.4,
+          "Tg_K": 572.4,
+          "dTg_K": 0.0,
+          "live_n_bins": 69,
+          "n_bins": 69,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_3",
+          "live_Tg_K": 507.6,
+          "Tg_K": 507.3,
+          "dTg_K": -0.3,
+          "live_n_bins": 66,
+          "n_bins": 66,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_1",
+          "live_Tg_K": 481.3,
+          "Tg_K": 486.7,
+          "dTg_K": 5.4,
+          "live_n_bins": 58,
+          "n_bins": 58,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_2",
+          "live_Tg_K": 525.0,
+          "Tg_K": 401.1,
+          "dTg_K": -123.9,
+          "live_n_bins": 54,
+          "n_bins": 54,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_3",
+          "live_Tg_K": 473.4,
+          "Tg_K": 479.8,
+          "dTg_K": 6.4,
+          "live_n_bins": 53,
+          "n_bins": 53,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        }
+      ],
+      "max_abs_system_effect_both_reportable_K": 7.6,
+      "sensitive_both_reportable": false,
+      "runs_became_unreportable": 9,
+      "max_abs_system_effect_K": 8.7,
+      "sensitive": false,
+      "systems_over_threshold": [],
+      "verdict_changes": 9
+    },
+    "hyperbola": {
+      "per_system": {
+        "PE": {
+          "n": 3,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": 0.0,
+          "max_abs_dTg_both_reportable_K": 0.0,
+          "became_unreportable": []
+        },
+        "PEG": {
+          "n": 3,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": 0.0,
+          "max_abs_dTg_both_reportable_K": 0.0,
+          "became_unreportable": []
+        },
+        "PLLA": {
+          "n": 3,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": 0.0,
+          "max_abs_dTg_both_reportable_K": 0.0,
+          "became_unreportable": []
+        },
+        "aPS": {
+          "n": 1,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0,
+          "n_both_reportable": 1,
+          "mean_dTg_both_reportable_K": 0.0,
+          "max_abs_dTg_both_reportable_K": 0.0,
+          "became_unreportable": []
+        },
+        "sPVC": {
+          "n": 3,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": 0.0,
+          "max_abs_dTg_both_reportable_K": 0.0,
+          "became_unreportable": []
+        },
+        "PEEK": {
+          "n": 2,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 0.0,
+          "max_abs_dTg_both_reportable_K": 0.0,
+          "became_unreportable": []
+        },
+        "PSU": {
+          "n": 2,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 0.0,
+          "max_abs_dTg_both_reportable_K": 0.0,
+          "became_unreportable": []
+        }
+      },
+      "per_run": [
+        {
+          "run": "PE_1",
+          "live_Tg_K": 234.2,
+          "Tg_K": 234.2,
+          "dTg_K": 0.0,
+          "live_n_bins": 47,
+          "n_bins": 47,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_2",
+          "live_Tg_K": 239.8,
+          "Tg_K": 239.8,
+          "dTg_K": 0.0,
+          "live_n_bins": 49,
+          "n_bins": 49,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_3",
+          "live_Tg_K": 223.5,
+          "Tg_K": 223.5,
+          "dTg_K": 0.0,
+          "live_n_bins": 47,
+          "n_bins": 47,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_1",
+          "live_Tg_K": 259.6,
+          "Tg_K": 259.6,
+          "dTg_K": 0.0,
+          "live_n_bins": 25,
+          "n_bins": 25,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_2",
+          "live_Tg_K": 268.4,
+          "Tg_K": 268.4,
+          "dTg_K": 0.0,
+          "live_n_bins": 24,
+          "n_bins": 24,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_3",
+          "live_Tg_K": 243.8,
+          "Tg_K": 243.8,
+          "dTg_K": 0.0,
+          "live_n_bins": 23,
+          "n_bins": 23,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_1",
+          "live_Tg_K": 483.6,
+          "Tg_K": 483.6,
+          "dTg_K": 0.0,
+          "live_n_bins": 42,
+          "n_bins": 42,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_2",
+          "live_Tg_K": 421.0,
+          "Tg_K": 421.0,
+          "dTg_K": 0.0,
+          "live_n_bins": 47,
+          "n_bins": 47,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_3",
+          "live_Tg_K": 443.2,
+          "Tg_K": 443.2,
+          "dTg_K": 0.0,
+          "live_n_bins": 48,
+          "n_bins": 48,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_1",
+          "live_Tg_K": 421.5,
+          "Tg_K": 421.5,
+          "dTg_K": 0.0,
+          "live_n_bins": 32,
+          "n_bins": 32,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_2",
+          "live_Tg_K": 348.6,
+          "Tg_K": 348.6,
+          "dTg_K": 0.0,
+          "live_n_bins": 32,
+          "n_bins": 32,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_3",
+          "live_Tg_K": 346.7,
+          "Tg_K": 346.7,
+          "dTg_K": 0.0,
+          "live_n_bins": 33,
+          "n_bins": 33,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_1_rerun",
+          "live_Tg_K": 293.9,
+          "Tg_K": 293.9,
+          "dTg_K": 0.0,
+          "live_n_bins": 41,
+          "n_bins": 41,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_2",
+          "live_Tg_K": 314.3,
+          "Tg_K": 314.3,
+          "dTg_K": 0.0,
+          "live_n_bins": 43,
+          "n_bins": 43,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_3",
+          "live_Tg_K": 316.4,
+          "Tg_K": 316.4,
+          "dTg_K": 0.0,
+          "live_n_bins": 43,
+          "n_bins": 43,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_1",
+          "live_Tg_K": 551.9,
+          "Tg_K": 551.9,
+          "dTg_K": 0.0,
+          "live_n_bins": 64,
+          "n_bins": 64,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_2",
+          "live_Tg_K": 572.4,
+          "Tg_K": 572.4,
+          "dTg_K": 0.0,
+          "live_n_bins": 69,
+          "n_bins": 69,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_3",
+          "live_Tg_K": 507.6,
+          "Tg_K": 507.6,
+          "dTg_K": 0.0,
+          "live_n_bins": 66,
+          "n_bins": 66,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_1",
+          "live_Tg_K": 481.3,
+          "Tg_K": 481.3,
+          "dTg_K": 0.0,
+          "live_n_bins": 58,
+          "n_bins": 58,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_2",
+          "live_Tg_K": 525.0,
+          "Tg_K": 525.0,
+          "dTg_K": 0.0,
+          "live_n_bins": 54,
+          "n_bins": 54,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_3",
+          "live_Tg_K": 473.4,
+          "Tg_K": 473.4,
+          "dTg_K": 0.0,
+          "live_n_bins": 53,
+          "n_bins": 53,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        }
+      ],
+      "max_abs_system_effect_both_reportable_K": 0.0,
+      "sensitive_both_reportable": false,
+      "runs_became_unreportable": 0,
+      "max_abs_system_effect_K": 0.0,
+      "sensitive": false,
+      "systems_over_threshold": [],
+      "verdict_changes": 0
+    },
+    "eqf_0.25": {
+      "per_system": {
+        "PE": {
+          "n": 3,
+          "mean_dTg_K": -1.1,
+          "max_abs_dTg_K": 11.3,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": -1.1,
+          "max_abs_dTg_both_reportable_K": 11.3,
+          "became_unreportable": []
+        },
+        "PEG": {
+          "n": 3,
+          "mean_dTg_K": 0.9,
+          "max_abs_dTg_K": 1.8,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": 0.9,
+          "max_abs_dTg_both_reportable_K": 1.8,
+          "became_unreportable": []
+        },
+        "PLLA": {
+          "n": 3,
+          "mean_dTg_K": -12.0,
+          "max_abs_dTg_K": 29.8,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": -12.0,
+          "max_abs_dTg_both_reportable_K": 29.8,
+          "became_unreportable": []
+        },
+        "aPS": {
+          "n": 1,
+          "mean_dTg_K": 8.3,
+          "max_abs_dTg_K": 8.3,
+          "n_both_reportable": 1,
+          "mean_dTg_both_reportable_K": 8.3,
+          "max_abs_dTg_both_reportable_K": 8.3,
+          "became_unreportable": []
+        },
+        "sPVC": {
+          "n": 3,
+          "mean_dTg_K": 18.1,
+          "max_abs_dTg_K": 57.3,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": -1.4,
+          "max_abs_dTg_both_reportable_K": 11.8,
+          "became_unreportable": [
+            "sPVC_3"
+          ]
+        },
+        "PEEK": {
+          "n": 2,
+          "mean_dTg_K": -1.1,
+          "max_abs_dTg_K": 2.5,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": -1.1,
+          "max_abs_dTg_both_reportable_K": 2.5,
+          "became_unreportable": []
+        },
+        "PSU": {
+          "n": 2,
+          "mean_dTg_K": 0.5,
+          "max_abs_dTg_K": 9.4,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 0.5,
+          "max_abs_dTg_both_reportable_K": 9.4,
+          "became_unreportable": []
+        }
+      },
+      "per_run": [
+        {
+          "run": "PE_1",
+          "live_Tg_K": 234.2,
+          "Tg_K": 222.9,
+          "dTg_K": -11.3,
+          "live_n_bins": 47,
+          "n_bins": 48,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_2",
+          "live_Tg_K": 239.8,
+          "Tg_K": 244.2,
+          "dTg_K": 4.4,
+          "live_n_bins": 49,
+          "n_bins": 51,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_3",
+          "live_Tg_K": 223.5,
+          "Tg_K": 227.1,
+          "dTg_K": 3.6,
+          "live_n_bins": 47,
+          "n_bins": 43,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_1",
+          "live_Tg_K": 259.6,
+          "Tg_K": 261.4,
+          "dTg_K": 1.8,
+          "live_n_bins": 25,
+          "n_bins": 25,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_2",
+          "live_Tg_K": 268.4,
+          "Tg_K": 268.6,
+          "dTg_K": 0.2,
+          "live_n_bins": 24,
+          "n_bins": 25,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_3",
+          "live_Tg_K": 243.8,
+          "Tg_K": 244.5,
+          "dTg_K": 0.7,
+          "live_n_bins": 23,
+          "n_bins": 23,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_1",
+          "live_Tg_K": 483.6,
+          "Tg_K": 483.8,
+          "dTg_K": 0.2,
+          "live_n_bins": 42,
+          "n_bins": 50,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_2",
+          "live_Tg_K": 421.0,
+          "Tg_K": 414.7,
+          "dTg_K": -6.3,
+          "live_n_bins": 47,
+          "n_bins": 50,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_3",
+          "live_Tg_K": 443.2,
+          "Tg_K": 413.4,
+          "dTg_K": -29.8,
+          "live_n_bins": 48,
+          "n_bins": 48,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_1",
+          "live_Tg_K": 421.5,
+          "Tg_K": 429.8,
+          "dTg_K": 8.3,
+          "live_n_bins": 32,
+          "n_bins": 33,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_2",
+          "live_Tg_K": 348.6,
+          "Tg_K": 258.3,
+          "dTg_K": -90.3,
+          "live_n_bins": 32,
+          "n_bins": 32,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_3",
+          "live_Tg_K": 346.7,
+          "Tg_K": 400.5,
+          "dTg_K": 53.8,
+          "live_n_bins": 33,
+          "n_bins": 34,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_1_rerun",
+          "live_Tg_K": 293.9,
+          "Tg_K": 282.1,
+          "dTg_K": -11.8,
+          "live_n_bins": 41,
+          "n_bins": 42,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_2",
+          "live_Tg_K": 314.3,
+          "Tg_K": 323.2,
+          "dTg_K": 8.9,
+          "live_n_bins": 43,
+          "n_bins": 44,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_3",
+          "live_Tg_K": 316.4,
+          "Tg_K": 373.7,
+          "dTg_K": 57.3,
+          "live_n_bins": 43,
+          "n_bins": 41,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_1",
+          "live_Tg_K": 551.9,
+          "Tg_K": 552.2,
+          "dTg_K": 0.3,
+          "live_n_bins": 64,
+          "n_bins": 62,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_2",
+          "live_Tg_K": 572.4,
+          "Tg_K": 584.6,
+          "dTg_K": 12.2,
+          "live_n_bins": 69,
+          "n_bins": 67,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_3",
+          "live_Tg_K": 507.6,
+          "Tg_K": 505.1,
+          "dTg_K": -2.5,
+          "live_n_bins": 66,
+          "n_bins": 68,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_1",
+          "live_Tg_K": 481.3,
+          "Tg_K": 490.7,
+          "dTg_K": 9.4,
+          "live_n_bins": 58,
+          "n_bins": 56,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_2",
+          "live_Tg_K": 525.0,
+          "Tg_K": 526.0,
+          "dTg_K": 1.0,
+          "live_n_bins": 54,
+          "n_bins": 52,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_3",
+          "live_Tg_K": 473.4,
+          "Tg_K": 465.0,
+          "dTg_K": -8.4,
+          "live_n_bins": 53,
+          "n_bins": 56,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        }
+      ],
+      "max_abs_system_effect_both_reportable_K": 12.0,
+      "sensitive_both_reportable": false,
+      "runs_became_unreportable": 1,
+      "max_abs_system_effect_K": 18.1,
+      "sensitive": false,
+      "systems_over_threshold": [],
+      "verdict_changes": 1
+    },
+    "eqf_0.75": {
+      "per_system": {
+        "PE": {
+          "n": 3,
+          "mean_dTg_K": -2.4,
+          "max_abs_dTg_K": 5.0,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": -2.4,
+          "max_abs_dTg_both_reportable_K": 5.0,
+          "became_unreportable": []
+        },
+        "PEG": {
+          "n": 3,
+          "mean_dTg_K": -6.5,
+          "max_abs_dTg_K": 12.0,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": -6.5,
+          "max_abs_dTg_both_reportable_K": 12.0,
+          "became_unreportable": []
+        },
+        "PLLA": {
+          "n": 3,
+          "mean_dTg_K": 3.2,
+          "max_abs_dTg_K": 12.7,
+          "n_both_reportable": 1,
+          "mean_dTg_both_reportable_K": -11.8,
+          "max_abs_dTg_both_reportable_K": 11.8,
+          "became_unreportable": [
+            "PLLA_2",
+            "PLLA_3"
+          ]
+        },
+        "aPS": {
+          "n": 1,
+          "mean_dTg_K": 13.0,
+          "max_abs_dTg_K": 13.0,
+          "n_both_reportable": 1,
+          "mean_dTg_both_reportable_K": 13.0,
+          "max_abs_dTg_both_reportable_K": 13.0,
+          "became_unreportable": []
+        },
+        "sPVC": {
+          "n": 3,
+          "mean_dTg_K": 4.5,
+          "max_abs_dTg_K": 6.2,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 3.7,
+          "max_abs_dTg_both_reportable_K": 4.3,
+          "became_unreportable": [
+            "sPVC_3"
+          ]
+        },
+        "PEEK": {
+          "n": 2,
+          "mean_dTg_K": 9.4,
+          "max_abs_dTg_K": 21.5,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 9.4,
+          "max_abs_dTg_both_reportable_K": 21.5,
+          "became_unreportable": []
+        },
+        "PSU": {
+          "n": 2,
+          "mean_dTg_K": 4.3,
+          "max_abs_dTg_K": 5.5,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 4.3,
+          "max_abs_dTg_both_reportable_K": 5.5,
+          "became_unreportable": []
+        }
+      },
+      "per_run": [
+        {
+          "run": "PE_1",
+          "live_Tg_K": 234.2,
+          "Tg_K": 229.2,
+          "dTg_K": -5.0,
+          "live_n_bins": 47,
+          "n_bins": 44,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_2",
+          "live_Tg_K": 239.8,
+          "Tg_K": 239.1,
+          "dTg_K": -0.7,
+          "live_n_bins": 49,
+          "n_bins": 41,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_3",
+          "live_Tg_K": 223.5,
+          "Tg_K": 222.0,
+          "dTg_K": -1.5,
+          "live_n_bins": 47,
+          "n_bins": 44,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_1",
+          "live_Tg_K": 259.6,
+          "Tg_K": 247.6,
+          "dTg_K": -12.0,
+          "live_n_bins": 25,
+          "n_bins": 26,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_2",
+          "live_Tg_K": 268.4,
+          "Tg_K": 262.6,
+          "dTg_K": -5.8,
+          "live_n_bins": 24,
+          "n_bins": 24,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_3",
+          "live_Tg_K": 243.8,
+          "Tg_K": 242.2,
+          "dTg_K": -1.6,
+          "live_n_bins": 23,
+          "n_bins": 22,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_1",
+          "live_Tg_K": 483.6,
+          "Tg_K": 471.8,
+          "dTg_K": -11.8,
+          "live_n_bins": 42,
+          "n_bins": 41,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_2",
+          "live_Tg_K": 421.0,
+          "Tg_K": 433.7,
+          "dTg_K": 12.7,
+          "live_n_bins": 47,
+          "n_bins": 44,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_3",
+          "live_Tg_K": 443.2,
+          "Tg_K": 451.8,
+          "dTg_K": 8.6,
+          "live_n_bins": 48,
+          "n_bins": 44,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_1",
+          "live_Tg_K": 421.5,
+          "Tg_K": 434.5,
+          "dTg_K": 13.0,
+          "live_n_bins": 32,
+          "n_bins": 31,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_2",
+          "live_Tg_K": 348.6,
+          "Tg_K": 304.7,
+          "dTg_K": -43.9,
+          "live_n_bins": 32,
+          "n_bins": 29,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_3",
+          "live_Tg_K": 346.7,
+          "Tg_K": 268.6,
+          "dTg_K": -78.1,
+          "live_n_bins": 33,
+          "n_bins": 32,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_1_rerun",
+          "live_Tg_K": 293.9,
+          "Tg_K": 296.9,
+          "dTg_K": 3.0,
+          "live_n_bins": 41,
+          "n_bins": 36,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_2",
+          "live_Tg_K": 314.3,
+          "Tg_K": 318.6,
+          "dTg_K": 4.3,
+          "live_n_bins": 43,
+          "n_bins": 40,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_3",
+          "live_Tg_K": 316.4,
+          "Tg_K": 322.6,
+          "dTg_K": 6.2,
+          "live_n_bins": 43,
+          "n_bins": 43,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_1",
+          "live_Tg_K": 551.9,
+          "Tg_K": 573.4,
+          "dTg_K": 21.5,
+          "live_n_bins": 64,
+          "n_bins": 60,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_2",
+          "live_Tg_K": 572.4,
+          "Tg_K": 515.3,
+          "dTg_K": -57.1,
+          "live_n_bins": 69,
+          "n_bins": 64,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_3",
+          "live_Tg_K": 507.6,
+          "Tg_K": 504.9,
+          "dTg_K": -2.7,
+          "live_n_bins": 66,
+          "n_bins": 60,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_1",
+          "live_Tg_K": 481.3,
+          "Tg_K": 484.5,
+          "dTg_K": 3.2,
+          "live_n_bins": 58,
+          "n_bins": 51,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_2",
+          "live_Tg_K": 525.0,
+          "Tg_K": 526.0,
+          "dTg_K": 1.0,
+          "live_n_bins": 54,
+          "n_bins": 43,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_3",
+          "live_Tg_K": 473.4,
+          "Tg_K": 478.9,
+          "dTg_K": 5.5,
+          "live_n_bins": 53,
+          "n_bins": 51,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        }
+      ],
+      "max_abs_system_effect_both_reportable_K": 13.0,
+      "sensitive_both_reportable": false,
+      "runs_became_unreportable": 3,
+      "max_abs_system_effect_K": 13.0,
+      "sensitive": false,
+      "systems_over_threshold": [],
+      "verdict_changes": 3
+    },
+    "trim_top2": {
+      "per_system": {
+        "PE": {
+          "n": 3,
+          "mean_dTg_K": 0.6,
+          "max_abs_dTg_K": 2.3,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": 0.6,
+          "max_abs_dTg_both_reportable_K": 2.3,
+          "became_unreportable": []
+        },
+        "PEG": {
+          "n": 3,
+          "mean_dTg_K": 2.7,
+          "max_abs_dTg_K": 6.2,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": 2.7,
+          "max_abs_dTg_both_reportable_K": 6.2,
+          "became_unreportable": []
+        },
+        "PLLA": {
+          "n": 3,
+          "mean_dTg_K": 53.7,
+          "max_abs_dTg_K": 76.1,
+          "n_both_reportable": 1,
+          "mean_dTg_both_reportable_K": 14.3,
+          "max_abs_dTg_both_reportable_K": 14.3,
+          "became_unreportable": [
+            "PLLA_2",
+            "PLLA_3"
+          ]
+        },
+        "aPS": {
+          "n": 1,
+          "mean_dTg_K": 69.1,
+          "max_abs_dTg_K": 69.1,
+          "n_both_reportable": 0,
+          "mean_dTg_both_reportable_K": null,
+          "max_abs_dTg_both_reportable_K": null,
+          "became_unreportable": [
+            "aPS_1"
+          ]
+        },
+        "sPVC": {
+          "n": 3,
+          "mean_dTg_K": -2.3,
+          "max_abs_dTg_K": 6.6,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": -2.3,
+          "max_abs_dTg_both_reportable_K": 6.6,
+          "became_unreportable": []
+        },
+        "PEEK": {
+          "n": 2,
+          "mean_dTg_K": 2.1,
+          "max_abs_dTg_K": 3.1,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 2.1,
+          "max_abs_dTg_both_reportable_K": 3.1,
+          "became_unreportable": []
+        },
+        "PSU": {
+          "n": 2,
+          "mean_dTg_K": -0.5,
+          "max_abs_dTg_K": 1.6,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": -0.5,
+          "max_abs_dTg_both_reportable_K": 1.6,
+          "became_unreportable": []
+        }
+      },
+      "per_run": [
+        {
+          "run": "PE_1",
+          "live_Tg_K": 234.2,
+          "Tg_K": 234.2,
+          "dTg_K": 0.0,
+          "live_n_bins": 47,
+          "n_bins": 45,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_2",
+          "live_Tg_K": 239.8,
+          "Tg_K": 242.1,
+          "dTg_K": 2.3,
+          "live_n_bins": 49,
+          "n_bins": 47,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_3",
+          "live_Tg_K": 223.5,
+          "Tg_K": 222.9,
+          "dTg_K": -0.6,
+          "live_n_bins": 47,
+          "n_bins": 45,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_1",
+          "live_Tg_K": 259.6,
+          "Tg_K": 262.7,
+          "dTg_K": 3.1,
+          "live_n_bins": 25,
+          "n_bins": 23,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_2",
+          "live_Tg_K": 268.4,
+          "Tg_K": 274.6,
+          "dTg_K": 6.2,
+          "live_n_bins": 24,
+          "n_bins": 21,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_3",
+          "live_Tg_K": 243.8,
+          "Tg_K": 242.6,
+          "dTg_K": -1.2,
+          "live_n_bins": 23,
+          "n_bins": 21,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_1",
+          "live_Tg_K": 483.6,
+          "Tg_K": 497.9,
+          "dTg_K": 14.3,
+          "live_n_bins": 42,
+          "n_bins": 40,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_2",
+          "live_Tg_K": 421.0,
+          "Tg_K": 497.1,
+          "dTg_K": 76.1,
+          "live_n_bins": 47,
+          "n_bins": 45,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_3",
+          "live_Tg_K": 443.2,
+          "Tg_K": 513.8,
+          "dTg_K": 70.6,
+          "live_n_bins": 48,
+          "n_bins": 44,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_1",
+          "live_Tg_K": 421.5,
+          "Tg_K": 490.6,
+          "dTg_K": 69.1,
+          "live_n_bins": 32,
+          "n_bins": 30,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_2",
+          "live_Tg_K": 348.6,
+          "Tg_K": 349.3,
+          "dTg_K": 0.7,
+          "live_n_bins": 32,
+          "n_bins": 30,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_3",
+          "live_Tg_K": 346.7,
+          "Tg_K": 321.6,
+          "dTg_K": -25.1,
+          "live_n_bins": 33,
+          "n_bins": 31,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_1_rerun",
+          "live_Tg_K": 293.9,
+          "Tg_K": 294.1,
+          "dTg_K": 0.2,
+          "live_n_bins": 41,
+          "n_bins": 38,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_2",
+          "live_Tg_K": 314.3,
+          "Tg_K": 313.7,
+          "dTg_K": -0.6,
+          "live_n_bins": 43,
+          "n_bins": 40,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_3",
+          "live_Tg_K": 316.4,
+          "Tg_K": 309.8,
+          "dTg_K": -6.6,
+          "live_n_bins": 43,
+          "n_bins": 40,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_1",
+          "live_Tg_K": 551.9,
+          "Tg_K": 555.0,
+          "dTg_K": 3.1,
+          "live_n_bins": 64,
+          "n_bins": 61,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_2",
+          "live_Tg_K": 572.4,
+          "Tg_K": 562.6,
+          "dTg_K": -9.8,
+          "live_n_bins": 69,
+          "n_bins": 67,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_3",
+          "live_Tg_K": 507.6,
+          "Tg_K": 508.7,
+          "dTg_K": 1.1,
+          "live_n_bins": 66,
+          "n_bins": 63,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_1",
+          "live_Tg_K": 481.3,
+          "Tg_K": 481.8,
+          "dTg_K": 0.5,
+          "live_n_bins": 58,
+          "n_bins": 55,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_2",
+          "live_Tg_K": 525.0,
+          "Tg_K": 525.0,
+          "dTg_K": 0.0,
+          "live_n_bins": 54,
+          "n_bins": 50,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_3",
+          "live_Tg_K": 473.4,
+          "Tg_K": 471.8,
+          "dTg_K": -1.6,
+          "live_n_bins": 53,
+          "n_bins": 50,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        }
+      ],
+      "max_abs_system_effect_both_reportable_K": 14.3,
+      "sensitive_both_reportable": false,
+      "runs_became_unreportable": 3,
+      "max_abs_system_effect_K": 69.1,
+      "sensitive": true,
+      "systems_over_threshold": [
+        "PLLA",
+        "aPS"
+      ],
+      "verdict_changes": 3
+    },
+    "trim_bottom2": {
+      "per_system": {
+        "PE": {
+          "n": 3,
+          "mean_dTg_K": 7.2,
+          "max_abs_dTg_K": 12.7,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": 7.2,
+          "max_abs_dTg_both_reportable_K": 12.7,
+          "became_unreportable": []
+        },
+        "PEG": {
+          "n": 3,
+          "mean_dTg_K": 6.3,
+          "max_abs_dTg_K": 14.2,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 12.2,
+          "max_abs_dTg_both_reportable_K": 14.2,
+          "became_unreportable": [
+            "PEG_3"
+          ]
+        },
+        "PLLA": {
+          "n": 3,
+          "mean_dTg_K": -0.4,
+          "max_abs_dTg_K": 0.6,
+          "n_both_reportable": 3,
+          "mean_dTg_both_reportable_K": -0.4,
+          "max_abs_dTg_both_reportable_K": 0.6,
+          "became_unreportable": []
+        },
+        "aPS": {
+          "n": 1,
+          "mean_dTg_K": 4.3,
+          "max_abs_dTg_K": 4.3,
+          "n_both_reportable": 1,
+          "mean_dTg_both_reportable_K": 4.3,
+          "max_abs_dTg_both_reportable_K": 4.3,
+          "became_unreportable": []
+        },
+        "sPVC": {
+          "n": 3,
+          "mean_dTg_K": -7.6,
+          "max_abs_dTg_K": 27.8,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 2.5,
+          "max_abs_dTg_both_reportable_K": 3.7,
+          "became_unreportable": [
+            "sPVC_3"
+          ]
+        },
+        "PEEK": {
+          "n": 2,
+          "mean_dTg_K": 2.4,
+          "max_abs_dTg_K": 2.9,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 2.4,
+          "max_abs_dTg_both_reportable_K": 2.9,
+          "became_unreportable": []
+        },
+        "PSU": {
+          "n": 2,
+          "mean_dTg_K": 0.6,
+          "max_abs_dTg_K": 1.3,
+          "n_both_reportable": 2,
+          "mean_dTg_both_reportable_K": 0.6,
+          "max_abs_dTg_both_reportable_K": 1.3,
+          "became_unreportable": []
+        }
+      },
+      "per_run": [
+        {
+          "run": "PE_1",
+          "live_Tg_K": 234.2,
+          "Tg_K": 241.9,
+          "dTg_K": 7.7,
+          "live_n_bins": 47,
+          "n_bins": 46,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_2",
+          "live_Tg_K": 239.8,
+          "Tg_K": 241.1,
+          "dTg_K": 1.3,
+          "live_n_bins": 49,
+          "n_bins": 47,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PE_3",
+          "live_Tg_K": 223.5,
+          "Tg_K": 236.2,
+          "dTg_K": 12.7,
+          "live_n_bins": 47,
+          "n_bins": 45,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_1",
+          "live_Tg_K": 259.6,
+          "Tg_K": 269.7,
+          "dTg_K": 10.1,
+          "live_n_bins": 25,
+          "n_bins": 23,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_2",
+          "live_Tg_K": 268.4,
+          "Tg_K": 282.6,
+          "dTg_K": 14.2,
+          "live_n_bins": 24,
+          "n_bins": 22,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEG_3",
+          "live_Tg_K": 243.8,
+          "Tg_K": 238.4,
+          "dTg_K": -5.4,
+          "live_n_bins": 23,
+          "n_bins": 21,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_1",
+          "live_Tg_K": 483.6,
+          "Tg_K": 483.0,
+          "dTg_K": -0.6,
+          "live_n_bins": 42,
+          "n_bins": 40,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_2",
+          "live_Tg_K": 421.0,
+          "Tg_K": 420.5,
+          "dTg_K": -0.5,
+          "live_n_bins": 47,
+          "n_bins": 45,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PLLA_3",
+          "live_Tg_K": 443.2,
+          "Tg_K": 443.2,
+          "dTg_K": 0.0,
+          "live_n_bins": 48,
+          "n_bins": 46,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_1",
+          "live_Tg_K": 421.5,
+          "Tg_K": 425.8,
+          "dTg_K": 4.3,
+          "live_n_bins": 32,
+          "n_bins": 30,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_2",
+          "live_Tg_K": 348.6,
+          "Tg_K": 356.9,
+          "dTg_K": 8.3,
+          "live_n_bins": 32,
+          "n_bins": 30,
+          "live_reportable": false,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "aPS_3",
+          "live_Tg_K": 346.7,
+          "Tg_K": 402.3,
+          "dTg_K": 55.6,
+          "live_n_bins": 33,
+          "n_bins": 31,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_1_rerun",
+          "live_Tg_K": 293.9,
+          "Tg_K": 295.2,
+          "dTg_K": 1.3,
+          "live_n_bins": 41,
+          "n_bins": 39,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_2",
+          "live_Tg_K": 314.3,
+          "Tg_K": 318.0,
+          "dTg_K": 3.7,
+          "live_n_bins": 43,
+          "n_bins": 41,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "sPVC_3",
+          "live_Tg_K": 316.4,
+          "Tg_K": 288.6,
+          "dTg_K": -27.8,
+          "live_n_bins": 43,
+          "n_bins": 41,
+          "live_reportable": true,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_1",
+          "live_Tg_K": 551.9,
+          "Tg_K": 553.8,
+          "dTg_K": 1.9,
+          "live_n_bins": 64,
+          "n_bins": 62,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_2",
+          "live_Tg_K": 572.4,
+          "Tg_K": 574.8,
+          "dTg_K": 2.4,
+          "live_n_bins": 69,
+          "n_bins": 67,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "breakpoint_ambiguity",
+          "fit_method": "bilinear_curvefit",
+          "error": null
+        },
+        {
+          "run": "PEEK_3",
+          "live_Tg_K": 507.6,
+          "Tg_K": 510.5,
+          "dTg_K": 2.9,
+          "live_n_bins": 66,
+          "n_bins": 64,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_1",
+          "live_Tg_K": 481.3,
+          "Tg_K": 481.1,
+          "dTg_K": -0.2,
+          "live_n_bins": 58,
+          "n_bins": 56,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_2",
+          "live_Tg_K": 525.0,
+          "Tg_K": 525.0,
+          "dTg_K": 0.0,
+          "live_n_bins": 54,
+          "n_bins": 52,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "cause": "method_gap",
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        },
+        {
+          "run": "PSU_3",
+          "live_Tg_K": 473.4,
+          "Tg_K": 474.7,
+          "dTg_K": 1.3,
+          "live_n_bins": 53,
+          "n_bins": 51,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "cause": null,
+          "fit_method": "hyperbola_curvefit",
+          "error": null
+        }
+      ],
+      "max_abs_system_effect_both_reportable_K": 12.2,
+      "sensitive_both_reportable": false,
+      "runs_became_unreportable": 2,
+      "max_abs_system_effect_K": 7.6,
+      "sensitive": false,
+      "systems_over_threshold": [],
+      "verdict_changes": 3
+    },
+    "reported_code_vs_current": {
+      "per_system": {
+        "PE": {
+          "n": 3,
+          "mean_dTg_K": 1.3,
+          "max_abs_dTg_K": 3.9
+        },
+        "PEG": {
+          "n": 3,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0
+        },
+        "PLLA": {
+          "n": 3,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0
+        },
+        "aPS": {
+          "n": 1,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0
+        },
+        "sPVC": {
+          "n": 3,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.0
+        },
+        "PEEK": {
+          "n": 2,
+          "mean_dTg_K": 0.0,
+          "max_abs_dTg_K": 0.4
+        },
+        "PSU": {
+          "n": 2,
+          "mean_dTg_K": 3.2,
+          "max_abs_dTg_K": 6.4
+        }
+      },
+      "per_run": [
+        {
+          "run": "PE_1",
+          "live_Tg_K": 234.2,
+          "Tg_K": 234.2,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "PE_2",
+          "live_Tg_K": 239.8,
+          "Tg_K": 243.7,
+          "dTg_K": 3.9,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "bilinear_curvefit"
+        },
+        {
+          "run": "PE_3",
+          "live_Tg_K": 223.5,
+          "Tg_K": 223.5,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "PEG_1",
+          "live_Tg_K": 259.6,
+          "Tg_K": 259.6,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "PEG_2",
+          "live_Tg_K": 268.4,
+          "Tg_K": 268.4,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "PEG_3",
+          "live_Tg_K": 243.8,
+          "Tg_K": 243.8,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "PLLA_1",
+          "live_Tg_K": 483.6,
+          "Tg_K": 483.6,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "PLLA_2",
+          "live_Tg_K": 421.0,
+          "Tg_K": 421.0,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "PLLA_3",
+          "live_Tg_K": 443.2,
+          "Tg_K": 443.2,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "aPS_1",
+          "live_Tg_K": 421.5,
+          "Tg_K": 421.5,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "aPS_2",
+          "live_Tg_K": 348.6,
+          "Tg_K": 348.6,
+          "dTg_K": 0.0,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "fit_method": "bilinear_curvefit"
+        },
+        {
+          "run": "aPS_3",
+          "live_Tg_K": 346.7,
+          "Tg_K": 346.7,
+          "dTg_K": 0.0,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "fit_method": "bilinear_curvefit"
+        },
+        {
+          "run": "sPVC_1_rerun",
+          "live_Tg_K": 293.9,
+          "Tg_K": 293.9,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "sPVC_2",
+          "live_Tg_K": 314.3,
+          "Tg_K": 314.3,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "sPVC_3",
+          "live_Tg_K": 316.4,
+          "Tg_K": 316.4,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "PEEK_1",
+          "live_Tg_K": 551.9,
+          "Tg_K": 552.3,
+          "dTg_K": 0.4,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "bilinear_curvefit"
+        },
+        {
+          "run": "PEEK_2",
+          "live_Tg_K": 572.4,
+          "Tg_K": 572.4,
+          "dTg_K": 0.0,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "fit_method": "bilinear_curvefit"
+        },
+        {
+          "run": "PEEK_3",
+          "live_Tg_K": 507.6,
+          "Tg_K": 507.3,
+          "dTg_K": -0.3,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "bilinear_curvefit"
+        },
+        {
+          "run": "PSU_1",
+          "live_Tg_K": 481.3,
+          "Tg_K": 481.3,
+          "dTg_K": 0.0,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "hyperbola_curvefit"
+        },
+        {
+          "run": "PSU_2",
+          "live_Tg_K": 525.0,
+          "Tg_K": 401.1,
+          "dTg_K": -123.9,
+          "live_reportable": false,
+          "verdict": "TG_REVIEW",
+          "fit_method": "bilinear_curvefit"
+        },
+        {
+          "run": "PSU_3",
+          "live_Tg_K": 473.4,
+          "Tg_K": 479.8,
+          "dTg_K": 6.4,
+          "live_reportable": true,
+          "verdict": "TG_REPORTABLE",
+          "fit_method": "bilinear_curvefit"
+        }
+      ],
+      "max_abs_system_effect_K": 3.2,
+      "sensitive": false,
+      "systems_over_threshold": [],
+      "verdict_changes": 0
+    }
+  },
+  "legs": [
+    {
+      "leg": "TGS_PE_1_L1_r20",
+      "live": 213.4,
+      "bilinear": 218.7,
+      "hyperbola": 213.4,
+      "eqf_0.25": 214.4,
+      "eqf_0.75": 216.7,
+      "trim_top2": 214.2,
+      "trim_bottom2": 223.9,
+      "live_verdict": "TG_REPORTABLE"
+    },
+    {
+      "leg": "TGS_PE_1_L2_r10",
+      "live": 223.1,
+      "bilinear": 234.4,
+      "hyperbola": 223.1,
+      "eqf_0.25": 225.5,
+      "eqf_0.75": 231.9,
+      "trim_top2": 217.0,
+      "trim_bottom2": 237.3,
+      "live_verdict": "TG_REPORTABLE"
+    },
+    {
+      "leg": "TGS_PE_1_L4_dT10",
+      "live": 253.0,
+      "bilinear": 254.8,
+      "hyperbola": 253.0,
+      "eqf_0.25": 252.0,
+      "eqf_0.75": 258.7,
+      "trim_top2": 253.1,
+      "trim_bottom2": 256.9,
+      "live_verdict": "TG_REPORTABLE"
+    },
+    {
+      "leg": "TGS_PE_1_L5_dT40",
+      "live": 208.4,
+      "bilinear": 210.7,
+      "hyperbola": 208.4,
+      "eqf_0.25": 199.2,
+      "eqf_0.75": 207.4,
+      "trim_top2": 205.2,
+      "trim_bottom2": 242.9,
+      "live_verdict": "TG_REPORTABLE"
+    },
+    {
+      "leg": "TGS_PLLA_1_L3_r50",
+      "live": 490.0,
+      "bilinear": 411.5,
+      "hyperbola": 490.0,
+      "eqf_0.25": 514.4,
+      "eqf_0.75": 422.3,
+      "trim_top2": 424.3,
+      "trim_bottom2": 510.9,
+      "live_verdict": "TG_REVIEW"
+    },
+    {
+      "leg": "TGS_PLLA_1_L6_dT40",
+      "live": 382.1,
+      "bilinear": 396.9,
+      "hyperbola": 382.1,
+      "eqf_0.25": 387.2,
+      "eqf_0.75": 406.6,
+      "trim_top2": 390.6,
+      "trim_bottom2": 397.5,
+      "live_verdict": "TG_REPORTABLE"
+    }
+  ],
+  "equilibration_duration_axis": "not controlled: no leg varied the melt-hold or per-step equilibration time"
+}

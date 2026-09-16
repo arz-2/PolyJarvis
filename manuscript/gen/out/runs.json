@@ -1,0 +1,3063 @@
+{
+  "generated_at": "2026-09-16T00:43:38",
+  "references": {
+    "PE": {
+      "tg_K": 195,
+      "density": 0.855,
+      "K_band": [
+        1.5,
+        2.0
+      ]
+    },
+    "PEG": {
+      "tg_K": 206,
+      "density": 1.12,
+      "K_band": [
+        2.0,
+        4.0
+      ]
+    },
+    "PLLA": {
+      "tg_K": 331,
+      "density": 1.248,
+      "K_band": [
+        3.0,
+        4.5
+      ],
+      "K_graded": false
+    },
+    "aPS": {
+      "tg_K": 373,
+      "density": 1.043,
+      "K_band": [
+        3.3,
+        4.0
+      ]
+    },
+    "sPVC": {
+      "tg_K": 371,
+      "tg_K_alt": 354,
+      "density": 1.391,
+      "K_band": [
+        3.5,
+        4.5
+      ]
+    },
+    "PEEK": {
+      "tg_K": 418,
+      "density": 1.263,
+      "K_band": [
+        4.0,
+        5.8
+      ],
+      "K_graded": false
+    },
+    "PSU": {
+      "tg_K": 459,
+      "density": 1.235,
+      "density_alt": 1.24,
+      "K_band": [
+        4.0,
+        5.5
+      ]
+    }
+  },
+  "runs": [
+    {
+      "run": "PE_1",
+      "system": "PE",
+      "replicate": 1,
+      "host": "A800",
+      "protocol": {
+        "ff": "trappe-ua",
+        "dp": 179,
+        "n_chains": 10,
+        "n_atoms": 3600,
+        "dt_fs": 2.0,
+        "cutoff_A": 14.0,
+        "T_equil_K": 550.0,
+        "tg_rate_K_per_ns": 40,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 620.0,
+        "emc_seed": 840238,
+        "velocity_seed": 152739,
+        "ladder_executed_atm": [
+          1.0,
+          1000.0,
+          2500.0,
+          5000.0,
+          10000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          1.0,
+          1000.0,
+          2500.0,
+          5000.0,
+          10000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": [
+          1,
+          1000,
+          2500,
+          5000,
+          10000,
+          15000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": 195,
+          "experimental_density_gcm3": 0.855,
+          "exp_K_min_GPa": 1.5,
+          "exp_K_max_GPa": 2
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "high",
+        "critic_ran": true,
+        "classification_ran": true,
+        "recovery_agent_calls": 1
+      },
+      "tg": {
+        "Tg_K": 234.2,
+        "uncertainty_K": 13.3,
+        "r_squared": 0.9972,
+        "fit_quality": "EXCELLENT",
+        "width_K": 22.8,
+        "method_gap_K": 5.2,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": false,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 0.863705,
+        "rho_melt": 0.718891,
+        "T_melt_K": 549.72,
+        "contraction": null
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 1.8897,
+        "sem_GPa": 0.1198,
+        "B0_prime": 8.3843,
+        "r_squared": 0.99987,
+        "n_points": 6,
+        "production_K_GPa": 1.8897,
+        "production_n_points": 6,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 1.7711,
+        "loo_max_dB0_pct": 13.65,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_NOT_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 31.33,
+        "Rg_cv": 0.2188,
+        "Ree_A": 73.77,
+        "msid_slope": 1.075,
+        "msid_large_s_slope": 1.005,
+        "p2": 0.0213,
+        "rho_cv": 0.1043,
+        "rho_cv_floor": 0.186,
+        "energy_drift_pct": 2.0218,
+        "density_drift_pct": 0.5955,
+        "n_eff_density": 25
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 1,
+        "agent_escalations": 1,
+        "agent_actions": [
+          "stop"
+        ],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {
+          "mechanical": true
+        }
+      },
+      "cost": {
+        "attempts": 10,
+        "gpu_stage_h": 7.1,
+        "all_stage_h": 7.11,
+        "failed_or_superseded_gpu_h": 1.04
+      }
+    },
+    {
+      "run": "PE_2",
+      "system": "PE",
+      "replicate": 2,
+      "host": "A800",
+      "protocol": {
+        "ff": "trappe-ua",
+        "dp": 179,
+        "n_chains": 10,
+        "n_atoms": 3600,
+        "dt_fs": 2.0,
+        "cutoff_A": 14.0,
+        "T_equil_K": 550.0,
+        "tg_rate_K_per_ns": 40,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 620.0,
+        "emc_seed": 783028,
+        "velocity_seed": 904370,
+        "ladder_executed_atm": [
+          1.0,
+          1000.0,
+          2500.0,
+          5000.0,
+          10000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          1.0,
+          1000.0,
+          2500.0,
+          5000.0,
+          10000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": [
+          1,
+          1000,
+          2500,
+          5000,
+          10000,
+          15000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "high",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 239.8,
+        "uncertainty_K": 10.0,
+        "r_squared": 0.9966,
+        "fit_quality": "EXCELLENT",
+        "width_K": null,
+        "method_gap_K": 3.9,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": false,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 0.85918,
+        "rho_melt": 0.716843,
+        "T_melt_K": 549.94,
+        "contraction": null
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 1.83,
+        "sem_GPa": 0.1565,
+        "B0_prime": 8.2691,
+        "r_squared": 0.999763,
+        "n_points": 6,
+        "production_K_GPa": 1.83,
+        "production_n_points": 6,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 1.4682,
+        "loo_max_dB0_pct": 15.19,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_NOT_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 33.104,
+        "Rg_cv": 0.1521,
+        "Ree_A": 70.8,
+        "msid_slope": 1.117,
+        "msid_large_s_slope": 1.011,
+        "p2": 0.0196,
+        "rho_cv": 0.103,
+        "rho_cv_floor": 0.186,
+        "energy_drift_pct": 1.7315,
+        "density_drift_pct": 0.582,
+        "n_eff_density": 19
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "EXTEND",
+          "old": "FAIL",
+          "old_failing": [
+            "energy_component_drift"
+          ],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "EXTEND",
+          "old": "FAIL",
+          "old_failing": [
+            "energy_drift",
+            "n_eff_density"
+          ],
+          "new": "FAIL",
+          "new_failing": [
+            "n_eff_density"
+          ]
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 1,
+        "operator_interventions": 0,
+        "operator_acceptance": {
+          "mechanical": true
+        }
+      },
+      "cost": {
+        "attempts": 13,
+        "gpu_stage_h": 6.32,
+        "all_stage_h": 6.33,
+        "failed_or_superseded_gpu_h": 3.9
+      }
+    },
+    {
+      "run": "PE_3",
+      "system": "PE",
+      "replicate": 3,
+      "host": "A800",
+      "protocol": {
+        "ff": "trappe-ua",
+        "dp": 179,
+        "n_chains": 10,
+        "n_atoms": 3600,
+        "dt_fs": 2.0,
+        "cutoff_A": 14.0,
+        "T_equil_K": 550.0,
+        "tg_rate_K_per_ns": 40,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 620.0,
+        "emc_seed": 962891,
+        "velocity_seed": 137395,
+        "ladder_executed_atm": [
+          1.0,
+          1000.0,
+          2500.0,
+          5000.0,
+          10000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          1.0,
+          1000.0,
+          2500.0,
+          5000.0,
+          10000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": [
+          1,
+          1000,
+          2500,
+          5000,
+          10000,
+          15000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "high",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 223.5,
+        "uncertainty_K": 21.2,
+        "r_squared": 0.9966,
+        "fit_quality": "EXCELLENT",
+        "width_K": 37.4,
+        "method_gap_K": 14.8,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": false,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 0.866135,
+        "rho_melt": 0.718916,
+        "T_melt_K": 550.34,
+        "contraction": null
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 1.9327,
+        "sem_GPa": 0.1366,
+        "B0_prime": 8.2535,
+        "r_squared": 0.99983,
+        "n_points": 6,
+        "production_K_GPa": 1.9327,
+        "production_n_points": 6,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 1.6882,
+        "loo_max_dB0_pct": 11.76,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_NOT_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 35.248,
+        "Rg_cv": 0.2117,
+        "Ree_A": 81.92,
+        "msid_slope": 1.145,
+        "msid_large_s_slope": 1.074,
+        "p2": 0.064,
+        "rho_cv": 0.1059,
+        "rho_cv_floor": 0.186,
+        "energy_drift_pct": 2.4614,
+        "density_drift_pct": 0.4648,
+        "n_eff_density": 15
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "EXTEND",
+          "old": "FAIL",
+          "old_failing": [
+            "energy_drift",
+            "n_eff_density"
+          ],
+          "new": "FAIL",
+          "new_failing": [
+            "n_eff_density"
+          ]
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 2,
+        "operator_interventions": 0,
+        "operator_acceptance": {
+          "mechanical": true
+        }
+      },
+      "cost": {
+        "attempts": 12,
+        "gpu_stage_h": 3.59,
+        "all_stage_h": 3.6,
+        "failed_or_superseded_gpu_h": 1.17
+      }
+    },
+    {
+      "run": "PEG_1",
+      "system": "PEG",
+      "replicate": 1,
+      "host": "A800",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 114,
+        "n_chains": 10,
+        "n_atoms": 8000,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 500.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 625.0,
+        "emc_seed": 148731,
+        "velocity_seed": 135693,
+        "ladder_executed_atm": [
+          -1000.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          3000,
+          7000,
+          15000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "medium",
+        "critic_ran": true,
+        "classification_ran": true,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 259.6,
+        "uncertainty_K": 9.9,
+        "r_squared": 0.999,
+        "fit_quality": "EXCELLENT",
+        "width_K": 24.4,
+        "method_gap_K": 6.2,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": false,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.057893,
+        "rho_melt": 0.939095,
+        "T_melt_K": 499.92,
+        "contraction": null
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 3.2968,
+        "sem_GPa": 0.1205,
+        "B0_prime": 9.4172,
+        "r_squared": 0.999905,
+        "n_points": 5,
+        "production_K_GPa": 3.2968,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 3.2824,
+        "loo_max_dB0_pct": 6.4,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 23.991,
+        "Rg_cv": 0.233,
+        "Ree_A": 63.96,
+        "msid_slope": 0.998,
+        "msid_large_s_slope": 0.71,
+        "p2": 0.0517,
+        "rho_cv": 0.2006,
+        "rho_cv_floor": 0.292,
+        "energy_drift_pct": 0.7495,
+        "density_drift_pct": 0.1252,
+        "n_eff_density": 74
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 13.45,
+        "all_stage_h": 13.49,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "PEG_2",
+      "system": "PEG",
+      "replicate": 2,
+      "host": "A800",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 114,
+        "n_chains": 10,
+        "n_atoms": 8000,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 500.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 625.0,
+        "emc_seed": 798838,
+        "velocity_seed": 316927,
+        "ladder_executed_atm": [
+          -1000.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          3000,
+          7000,
+          15000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "high",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 268.4,
+        "uncertainty_K": 12.1,
+        "r_squared": 0.9991,
+        "fit_quality": "EXCELLENT",
+        "width_K": 58.7,
+        "method_gap_K": 6.8,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": false,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.060015,
+        "rho_melt": 0.937757,
+        "T_melt_K": 500.05,
+        "contraction": null
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 3.5336,
+        "sem_GPa": 0.1132,
+        "B0_prime": 8.9859,
+        "r_squared": 0.999922,
+        "n_points": 5,
+        "production_K_GPa": 3.5336,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 3.632,
+        "loo_max_dB0_pct": 4.51,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 24.079,
+        "Rg_cv": 0.1542,
+        "Ree_A": 57.19,
+        "msid_slope": 1.049,
+        "msid_large_s_slope": 0.789,
+        "p2": 0.0225,
+        "rho_cv": 0.1988,
+        "rho_cv_floor": 0.292,
+        "energy_drift_pct": 1.9748,
+        "density_drift_pct": 0.3364,
+        "n_eff_density": 112
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "EXTEND",
+          "old": "FAIL",
+          "old_failing": [
+            "energy_drift"
+          ],
+          "new": "FAIL",
+          "new_failing": [
+            "energy_drift"
+          ]
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 1,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 12,
+        "gpu_stage_h": 17.41,
+        "all_stage_h": 17.46,
+        "failed_or_superseded_gpu_h": 4.91
+      }
+    },
+    {
+      "run": "PEG_3",
+      "system": "PEG",
+      "replicate": 3,
+      "host": "A800",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 114,
+        "n_chains": 10,
+        "n_atoms": 8000,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 500.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 625.0,
+        "emc_seed": 200187,
+        "velocity_seed": 631302,
+        "ladder_executed_atm": [
+          -1000.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          3000,
+          7000,
+          15000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "high",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 243.8,
+        "uncertainty_K": 9.3,
+        "r_squared": 0.9997,
+        "fit_quality": "EXCELLENT",
+        "width_K": 67.0,
+        "method_gap_K": 9.7,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": false,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.063131,
+        "rho_melt": 0.93751,
+        "T_melt_K": 499.91,
+        "contraction": null
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 3.2957,
+        "sem_GPa": 0.1231,
+        "B0_prime": 9.5759,
+        "r_squared": 0.999902,
+        "n_points": 5,
+        "production_K_GPa": 3.2957,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 3.8203,
+        "loo_max_dB0_pct": 6.77,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 23.493,
+        "Rg_cv": 0.1445,
+        "Ree_A": 61.71,
+        "msid_slope": 1.036,
+        "msid_large_s_slope": 0.755,
+        "p2": 0.0546,
+        "rho_cv": 0.1997,
+        "rho_cv_floor": 0.292,
+        "energy_drift_pct": 0.5885,
+        "density_drift_pct": 0.0447,
+        "n_eff_density": 142
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 12.48,
+        "all_stage_h": 12.53,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "PLLA_1",
+      "system": "PLLA",
+      "replicate": 1,
+      "host": "RTX6000",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 70,
+        "n_chains": 10,
+        "n_atoms": 6320,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 620.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 700.0,
+        "emc_seed": 686928993,
+        "velocity_seed": 561359054,
+        "ladder_executed_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": 331.0,
+          "experimental_density_gcm3": 1.248,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "medium",
+        "critic_ran": true,
+        "classification_ran": true,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 483.6,
+        "uncertainty_K": 21.5,
+        "r_squared": 0.9974,
+        "fit_quality": "EXCELLENT",
+        "width_K": 82.9,
+        "method_gap_K": 0.9,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.234143,
+        "rho_melt": 1.10224,
+        "T_melt_K": 620.2,
+        "contraction": {
+          "expected_contraction": 1.1811,
+          "actual_contraction": 1.1197,
+          "contraction_shortfall": 0.9479,
+          "verdict": "UNDER_ANNEALED_COOLING"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 4.6209,
+        "sem_GPa": 0.1671,
+        "B0_prime": 9.7769,
+        "r_squared": 0.999613,
+        "n_points": 5,
+        "production_K_GPa": 4.6209,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 5.845,
+        "loo_max_dB0_pct": 7.62,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 15.197,
+        "Rg_cv": 0.1802,
+        "Ree_A": 37.22,
+        "msid_slope": 1.04,
+        "msid_large_s_slope": 0.857,
+        "p2": 0.0104,
+        "rho_cv": 0.1761,
+        "rho_cv_floor": 0.237,
+        "energy_drift_pct": 0.0335,
+        "density_drift_pct": 0.3078,
+        "n_eff_density": 96
+      },
+      "gates": {
+        "regrade_file": "benchmarks/stereo_r2/regrade/regrade_20260913.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 1,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 2,
+        "operator_interventions": 1,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 8,
+        "gpu_stage_h": 33.4,
+        "all_stage_h": 33.44,
+        "failed_or_superseded_gpu_h": 5.6
+      }
+    },
+    {
+      "run": "PLLA_2",
+      "system": "PLLA",
+      "replicate": 2,
+      "host": "RTX6000",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 70,
+        "n_chains": 10,
+        "n_atoms": 6320,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 620.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 700.0,
+        "emc_seed": 412260453,
+        "velocity_seed": 328430378,
+        "ladder_executed_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": 331.0,
+          "experimental_density_gcm3": 1.248,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "low",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 421.0,
+        "uncertainty_K": 26.3,
+        "r_squared": 0.9933,
+        "fit_quality": "GOOD",
+        "width_K": 84.2,
+        "method_gap_K": 12.1,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.227022,
+        "rho_melt": 1.101778,
+        "T_melt_K": 620.14,
+        "contraction": {
+          "expected_contraction": 1.1811,
+          "actual_contraction": 1.1137,
+          "contraction_shortfall": 0.9429,
+          "verdict": "UNDER_ANNEALED_COOLING"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 4.7172,
+        "sem_GPa": 0.0589,
+        "B0_prime": 11.4021,
+        "r_squared": 0.999956,
+        "n_points": 5,
+        "production_K_GPa": 4.7172,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 4.5963,
+        "loo_max_dB0_pct": 3.57,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 16.637,
+        "Rg_cv": 0.2177,
+        "Ree_A": 39.3,
+        "msid_slope": 1.111,
+        "msid_large_s_slope": 1.051,
+        "p2": 0.0097,
+        "rho_cv": 0.1857,
+        "rho_cv_floor": 0.237,
+        "energy_drift_pct": 0.0457,
+        "density_drift_pct": 0.3903,
+        "n_eff_density": 58
+      },
+      "gates": {
+        "regrade_file": "benchmarks/stereo_r2/regrade/regrade_20260913.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 26.19,
+        "all_stage_h": 26.23,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "PLLA_3",
+      "system": "PLLA",
+      "replicate": 3,
+      "host": "RTX6000",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 70,
+        "n_chains": 10,
+        "n_atoms": 6320,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 620.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 700.0,
+        "emc_seed": 967838819,
+        "velocity_seed": 25364483,
+        "ladder_executed_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": 331.0,
+          "experimental_density_gcm3": 1.248,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "low",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 443.2,
+        "uncertainty_K": 19.9,
+        "r_squared": 0.9955,
+        "fit_quality": "EXCELLENT",
+        "width_K": 84.5,
+        "method_gap_K": 13.0,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.228874,
+        "rho_melt": 1.103381,
+        "T_melt_K": 619.97,
+        "contraction": {
+          "expected_contraction": 1.1811,
+          "actual_contraction": 1.1137,
+          "contraction_shortfall": 0.9429,
+          "verdict": "UNDER_ANNEALED_COOLING"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 5.0483,
+        "sem_GPa": 0.1715,
+        "B0_prime": 8.5406,
+        "r_squared": 0.999662,
+        "n_points": 5,
+        "production_K_GPa": 5.0483,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 5.1528,
+        "loo_max_dB0_pct": 5.67,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 16.792,
+        "Rg_cv": 0.2562,
+        "Ree_A": 41.75,
+        "msid_slope": 1.117,
+        "msid_large_s_slope": 0.947,
+        "p2": 0.0181,
+        "rho_cv": 0.1797,
+        "rho_cv_floor": 0.237,
+        "energy_drift_pct": 0.0348,
+        "density_drift_pct": 0.116,
+        "n_eff_density": 33
+      },
+      "gates": {
+        "regrade_file": "benchmarks/stereo_r2/regrade/regrade_20260913.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 7,
+        "gpu_stage_h": 26.03,
+        "all_stage_h": 26.07,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "aPS_1_rerun",
+      "system": "aPS",
+      "replicate": 1,
+      "host": "RTX6000",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 49,
+        "n_chains": 10,
+        "n_atoms": 7860,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 550.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 630.0,
+        "emc_seed": 120191275,
+        "velocity_seed": 979826601,
+        "ladder_executed_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "low",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 422.4,
+        "uncertainty_K": 56.2,
+        "r_squared": 0.9938,
+        "fit_quality": "GOOD",
+        "width_K": 128.2,
+        "method_gap_K": 8.0,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 0.985405,
+        "rho_melt": 0.88593,
+        "T_melt_K": 572.9,
+        "contraction": {
+          "expected_contraction": 1.1383,
+          "actual_contraction": 1.1123,
+          "contraction_shortfall": 0.9772,
+          "verdict": "OK"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 2.8795,
+        "sem_GPa": 0.1807,
+        "B0_prime": 7.9041,
+        "r_squared": 0.998845,
+        "n_points": 5,
+        "production_K_GPa": 2.7903,
+        "production_n_points": 4,
+        "excluded_points": [
+          {
+            "pressure_atm": 5000.0,
+            "reasons": [
+              "excluded to reach a converged, volume-monotonic window"
+            ]
+          }
+        ],
+        "fluctuation_K_GPa": 3.0287,
+        "loo_max_dB0_pct": 15.03,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_NOT_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 14.66,
+        "Rg_cv": 0.1243,
+        "Ree_A": 35.74,
+        "msid_slope": 1.296,
+        "msid_large_s_slope": 0.899,
+        "p2": 0.021,
+        "rho_cv": 0.248,
+        "rho_cv_floor": 0.274,
+        "energy_drift_pct": 0.1811,
+        "density_drift_pct": 0.0955,
+        "n_eff_density": 212
+      },
+      "gates": {
+        "regrade_file": null,
+        "melt": {
+          "live": null,
+          "old": null,
+          "old_failing": null,
+          "new": null,
+          "new_failing": null
+        },
+        "cooling": {
+          "live": null,
+          "old": null,
+          "old_failing": null,
+          "new": null,
+          "new_failing": null
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 31.73,
+        "all_stage_h": 31.84,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "aPS_2",
+      "system": "aPS",
+      "replicate": 2,
+      "host": "RTX6000",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 49,
+        "n_chains": 10,
+        "n_atoms": 7860,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 550.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 630.0,
+        "emc_seed": 211721699,
+        "velocity_seed": 422597568,
+        "ladder_executed_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "low",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 348.6,
+        "uncertainty_K": 16.5,
+        "r_squared": 0.9966,
+        "fit_quality": "EXCELLENT",
+        "width_K": null,
+        "method_gap_K": 57.3,
+        "verdict": "TG_REVIEW",
+        "cause": "breakpoint_ambiguity",
+        "reportable": false,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 0.988248,
+        "rho_melt": 0.885554,
+        "T_melt_K": 572.95,
+        "contraction": {
+          "expected_contraction": 1.1383,
+          "actual_contraction": 1.116,
+          "contraction_shortfall": 0.9804,
+          "verdict": "OK"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 2.6694,
+        "sem_GPa": 0.1982,
+        "B0_prime": 9.2226,
+        "r_squared": 0.998436,
+        "n_points": 5,
+        "production_K_GPa": 2.6082,
+        "production_n_points": 4,
+        "excluded_points": [
+          {
+            "pressure_atm": 5000.0,
+            "reasons": [
+              "excluded to reach a converged, volume-monotonic window"
+            ]
+          }
+        ],
+        "fluctuation_K_GPa": 2.4961,
+        "loo_max_dB0_pct": 20.64,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_NOT_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 14.777,
+        "Rg_cv": 0.1355,
+        "Ree_A": 31.43,
+        "msid_slope": 1.337,
+        "msid_large_s_slope": 1.002,
+        "p2": 0.0266,
+        "rho_cv": 0.2385,
+        "rho_cv_floor": 0.274,
+        "energy_drift_pct": 0.0282,
+        "density_drift_pct": 0.0007,
+        "n_eff_density": 54
+      },
+      "gates": {
+        "regrade_file": "benchmarks/stereo_r2/regrade/regrade_20260913.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 1,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 30.8,
+        "all_stage_h": 30.88,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "aPS_3",
+      "system": "aPS",
+      "replicate": 3,
+      "host": "RTX6000",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 49,
+        "n_chains": 10,
+        "n_atoms": 7860,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 550.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 630.0,
+        "emc_seed": 796234216,
+        "velocity_seed": 992835374,
+        "ladder_executed_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "low",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 346.7,
+        "uncertainty_K": 9.4,
+        "r_squared": 0.9949,
+        "fit_quality": "GOOD",
+        "width_K": null,
+        "method_gap_K": 65.1,
+        "verdict": "TG_REVIEW",
+        "cause": "breakpoint_ambiguity",
+        "reportable": false,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 0.989097,
+        "rho_melt": null,
+        "T_melt_K": null,
+        "contraction": {
+          "expected_contraction": 1.1383,
+          "actual_contraction": 1.1165,
+          "contraction_shortfall": 0.9808,
+          "verdict": "OK"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 2.7402,
+        "sem_GPa": 0.0941,
+        "B0_prime": 9.7015,
+        "r_squared": 0.999685,
+        "n_points": 5,
+        "production_K_GPa": 2.7402,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 3.4381,
+        "loo_max_dB0_pct": 9.47,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 14.117,
+        "Rg_cv": 0.1296,
+        "Ree_A": 29.91,
+        "msid_slope": 1.279,
+        "msid_large_s_slope": 0.878,
+        "p2": 0.0461,
+        "rho_cv": 0.2418,
+        "rho_cv_floor": 0.274,
+        "energy_drift_pct": 0.1958,
+        "density_drift_pct": 0.059,
+        "n_eff_density": 239
+      },
+      "gates": {
+        "regrade_file": "benchmarks/stereo_r2/regrade/regrade_20260913.json",
+        "melt": {
+          "live": "EXTEND",
+          "old": "FAIL",
+          "old_failing": [
+            "energy_component_drift"
+          ],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 31.04,
+        "all_stage_h": 31.14,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "sPVC_1_rerun",
+      "system": "sPVC",
+      "replicate": 1,
+      "host": "RTX6000",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 41,
+        "n_chains": 10,
+        "n_atoms": 4940,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 530.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 610.0,
+        "emc_seed": 414243003,
+        "velocity_seed": 405550636,
+        "ladder_executed_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": 371.0,
+          "experimental_density_gcm3": 1.391,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "low",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 293.9,
+        "uncertainty_K": 21.2,
+        "r_squared": 0.9931,
+        "fit_quality": "GOOD",
+        "width_K": 17.5,
+        "method_gap_K": 2.3,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": false,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.345184,
+        "rho_melt": 1.171363,
+        "T_melt_K": 570.86,
+        "contraction": {
+          "expected_contraction": 1.1378,
+          "actual_contraction": 1.1484,
+          "contraction_shortfall": 1.0094,
+          "verdict": "OK"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 2.7501,
+        "sem_GPa": 0.0938,
+        "B0_prime": 10.0135,
+        "r_squared": 0.999686,
+        "n_points": 5,
+        "production_K_GPa": 2.7501,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 3.2603,
+        "loo_max_dB0_pct": 10.56,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_NOT_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 22.47,
+        "Rg_cv": 0.2346,
+        "Ree_A": 58.84,
+        "msid_slope": 1.338,
+        "msid_large_s_slope": 1.096,
+        "p2": 0.0326,
+        "rho_cv": 0.1932,
+        "rho_cv_floor": 0.323,
+        "energy_drift_pct": 2.7714,
+        "density_drift_pct": 0.4382,
+        "n_eff_density": 35
+      },
+      "gates": {
+        "regrade_file": null,
+        "melt": {
+          "live": null,
+          "old": null,
+          "old_failing": null,
+          "new": null,
+          "new_failing": null
+        },
+        "cooling": {
+          "live": null,
+          "old": null,
+          "old_failing": null,
+          "new": null,
+          "new_failing": null
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 17.29,
+        "all_stage_h": 17.32,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "sPVC_2",
+      "system": "sPVC",
+      "replicate": 2,
+      "host": "RTX6000",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 41,
+        "n_chains": 10,
+        "n_atoms": 4940,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 530.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 610.0,
+        "emc_seed": 604339280,
+        "velocity_seed": 438801734,
+        "ladder_executed_atm": [
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": 371.0,
+          "experimental_density_gcm3": 1.391,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "low",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 314.3,
+        "uncertainty_K": 16.8,
+        "r_squared": 0.9937,
+        "fit_quality": "GOOD",
+        "width_K": null,
+        "method_gap_K": 3.5,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.341333,
+        "rho_melt": 1.171309,
+        "T_melt_K": 571.05,
+        "contraction": {
+          "expected_contraction": 1.1378,
+          "actual_contraction": 1.1452,
+          "contraction_shortfall": 1.0065,
+          "verdict": "OK"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 2.6265,
+        "sem_GPa": 0.1982,
+        "B0_prime": 10.2377,
+        "r_squared": 0.998435,
+        "n_points": 5,
+        "production_K_GPa": 3.3633,
+        "production_n_points": 4,
+        "excluded_points": [
+          {
+            "pressure_atm": -1000.0,
+            "reasons": [
+              "|dV/dP| between points 0 and 1 is 3.826, >3x the other intervals' median (1.211) -- possible cavitation/discontinuity in this interval."
+            ]
+          }
+        ],
+        "fluctuation_K_GPa": 3.3639,
+        "loo_max_dB0_pct": 28.06,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 21.074,
+        "Rg_cv": 0.172,
+        "Ree_A": 51.21,
+        "msid_slope": 1.284,
+        "msid_large_s_slope": 1.041,
+        "p2": 0.0243,
+        "rho_cv": 0.1988,
+        "rho_cv_floor": 0.323,
+        "energy_drift_pct": 3.6947,
+        "density_drift_pct": 0.3108,
+        "n_eff_density": 103
+      },
+      "gates": {
+        "regrade_file": "benchmarks/stereo_r2/regrade/regrade_20260913.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "EXTEND",
+          "old": "FAIL",
+          "old_failing": [
+            "energy_sem"
+          ],
+          "new": "FAIL",
+          "new_failing": [
+            "energy_sem"
+          ]
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 16.72,
+        "all_stage_h": 16.75,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "sPVC_3",
+      "system": "sPVC",
+      "replicate": 3,
+      "host": "RTX6000",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 41,
+        "n_chains": 10,
+        "n_atoms": 4940,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 530.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 610.0,
+        "emc_seed": 492680472,
+        "velocity_seed": 585758416,
+        "ladder_executed_atm": [
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_simulated_atm": [
+          -1000.0,
+          0.0,
+          1500.0,
+          3000.0,
+          5000.0
+        ],
+        "ladder_planned_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "refs_in_params": {
+          "experimental_tg_K": 371.0,
+          "experimental_density_gcm3": 1.391,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "low",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 316.4,
+        "uncertainty_K": 41.6,
+        "r_squared": 0.9945,
+        "fit_quality": "GOOD",
+        "width_K": 98.0,
+        "method_gap_K": 3.3,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.347181,
+        "rho_melt": 1.171569,
+        "T_melt_K": 570.82,
+        "contraction": {
+          "expected_contraction": 1.1378,
+          "actual_contraction": 1.1499,
+          "contraction_shortfall": 1.0107,
+          "verdict": "OK"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 2.8879,
+        "sem_GPa": 0.2451,
+        "B0_prime": 9.8065,
+        "r_squared": 0.997964,
+        "n_points": 5,
+        "production_K_GPa": 3.7592,
+        "production_n_points": 4,
+        "excluded_points": [
+          {
+            "pressure_atm": -1000.0,
+            "reasons": [
+              "excluded to reach a converged, volume-monotonic window"
+            ]
+          }
+        ],
+        "fluctuation_K_GPa": 3.2738,
+        "loo_max_dB0_pct": 30.17,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 20.924,
+        "Rg_cv": 0.1997,
+        "Ree_A": 49.68,
+        "msid_slope": 1.326,
+        "msid_large_s_slope": 1.123,
+        "p2": 0.0269,
+        "rho_cv": 0.1882,
+        "rho_cv_floor": 0.323,
+        "energy_drift_pct": 1.7762,
+        "density_drift_pct": 0.1345,
+        "n_eff_density": 184
+      },
+      "gates": {
+        "regrade_file": "benchmarks/stereo_r2/regrade/regrade_20260913.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 16.67,
+        "all_stage_h": 16.7,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "PEEK_1",
+      "system": "PEEK",
+      "replicate": 1,
+      "host": "A800",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 18,
+        "n_chains": 10,
+        "n_atoms": 6140,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 770.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 850.0,
+        "emc_seed": 768489,
+        "velocity_seed": 766602,
+        "ladder_executed_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": null,
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "medium",
+        "critic_ran": true,
+        "classification_ran": true,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 551.9,
+        "uncertainty_K": 9.0,
+        "r_squared": 0.9939,
+        "fit_quality": "GOOD",
+        "width_K": 4.8,
+        "method_gap_K": 0.4,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.205488,
+        "rho_melt": 1.039862,
+        "T_melt_K": 770.1,
+        "contraction": {
+          "expected_contraction": 1.2407,
+          "actual_contraction": 1.1593,
+          "contraction_shortfall": 0.9344,
+          "verdict": "UNDER_ANNEALED_COOLING"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 5.7285,
+        "sem_GPa": 0.2323,
+        "B0_prime": 7.3819,
+        "r_squared": 0.999864,
+        "n_points": 5,
+        "production_K_GPa": 5.7285,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 5.0637,
+        "loo_max_dB0_pct": 9.08,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 25.799,
+        "Rg_cv": 0.223,
+        "Ree_A": 64.59,
+        "msid_slope": 1.271,
+        "msid_large_s_slope": 1.001,
+        "p2": 0.0212,
+        "rho_cv": 0.1561,
+        "rho_cv_floor": 0.225,
+        "energy_drift_pct": 0.1298,
+        "density_drift_pct": 0.0327,
+        "n_eff_density": 166
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 14.6,
+        "all_stage_h": 14.63,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "PEEK_2",
+      "system": "PEEK",
+      "replicate": 2,
+      "host": "A800",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 18,
+        "n_chains": 10,
+        "n_atoms": 6140,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 770.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 850.0,
+        "emc_seed": 791429,
+        "velocity_seed": 898589,
+        "ladder_executed_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": null,
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "high",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 572.4,
+        "uncertainty_K": 19.6,
+        "r_squared": 0.9841,
+        "fit_quality": "GOOD",
+        "width_K": null,
+        "method_gap_K": 69.7,
+        "verdict": "TG_REVIEW",
+        "cause": "breakpoint_ambiguity",
+        "reportable": false,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.201738,
+        "rho_melt": 1.040093,
+        "T_melt_K": 769.57,
+        "contraction": {
+          "expected_contraction": 1.2407,
+          "actual_contraction": 1.1554,
+          "contraction_shortfall": 0.9313,
+          "verdict": "UNDER_ANNEALED_COOLING"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 5.3834,
+        "sem_GPa": 0.0586,
+        "B0_prime": 8.282,
+        "r_squared": 0.999991,
+        "n_points": 5,
+        "production_K_GPa": 5.3834,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 5.519,
+        "loo_max_dB0_pct": 2.08,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 25.363,
+        "Rg_cv": 0.1871,
+        "Ree_A": 67.85,
+        "msid_slope": 1.218,
+        "msid_large_s_slope": 1.017,
+        "p2": 0.0153,
+        "rho_cv": 0.1615,
+        "rho_cv_floor": 0.225,
+        "energy_drift_pct": 0.0316,
+        "density_drift_pct": 0.0269,
+        "n_eff_density": 146
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 1,
+        "operator_interventions": 0,
+        "operator_acceptance": {
+          "thermal": true
+        }
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 16.32,
+        "all_stage_h": 16.34,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "PEEK_3",
+      "system": "PEEK",
+      "replicate": 3,
+      "host": "A800",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 18,
+        "n_chains": 10,
+        "n_atoms": 6140,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 770.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 850.0,
+        "emc_seed": 973247,
+        "velocity_seed": 55037,
+        "ladder_executed_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": null,
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "high",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 507.6,
+        "uncertainty_K": 7.7,
+        "r_squared": 0.9967,
+        "fit_quality": "EXCELLENT",
+        "width_K": 4.8,
+        "method_gap_K": 0.3,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.203755,
+        "rho_melt": 1.040088,
+        "T_melt_K": 770.07,
+        "contraction": {
+          "expected_contraction": 1.2407,
+          "actual_contraction": 1.1574,
+          "contraction_shortfall": 0.9328,
+          "verdict": "UNDER_ANNEALED_COOLING"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 5.4017,
+        "sem_GPa": 0.1183,
+        "B0_prime": 8.0901,
+        "r_squared": 0.999964,
+        "n_points": 5,
+        "production_K_GPa": 5.4017,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 5.6321,
+        "loo_max_dB0_pct": 4.55,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 26.553,
+        "Rg_cv": 0.2351,
+        "Ree_A": 64.38,
+        "msid_slope": 1.292,
+        "msid_large_s_slope": 0.977,
+        "p2": 0.0417,
+        "rho_cv": 0.1642,
+        "rho_cv_floor": 0.225,
+        "energy_drift_pct": 0.0702,
+        "density_drift_pct": 0.2371,
+        "n_eff_density": 135
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 15.95,
+        "all_stage_h": 15.98,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "PSU_1",
+      "system": "PSU",
+      "replicate": 1,
+      "host": "A800",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 12,
+        "n_chains": 10,
+        "n_atoms": 6500,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 700.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 780.0,
+        "emc_seed": 5396,
+        "velocity_seed": 836097,
+        "ladder_executed_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": null,
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": 1.24,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "medium",
+        "critic_ran": true,
+        "classification_ran": true,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 481.3,
+        "uncertainty_K": 14.7,
+        "r_squared": 0.9849,
+        "fit_quality": "GOOD",
+        "width_K": 25.6,
+        "method_gap_K": 5.4,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.184279,
+        "rho_melt": 1.040867,
+        "T_melt_K": 700.22,
+        "contraction": {
+          "expected_contraction": 1.1829,
+          "actual_contraction": 1.1378,
+          "contraction_shortfall": 0.9618,
+          "verdict": "UNDER_ANNEALED_COOLING"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 4.4826,
+        "sem_GPa": 0.1147,
+        "B0_prime": 7.7581,
+        "r_squared": 0.999955,
+        "n_points": 5,
+        "production_K_GPa": 4.4826,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 3.7246,
+        "loo_max_dB0_pct": 2.7,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 22.262,
+        "Rg_cv": 0.2299,
+        "Ree_A": 55.62,
+        "msid_slope": 1.2,
+        "msid_large_s_slope": 0.986,
+        "p2": 0.0095,
+        "rho_cv": 0.1833,
+        "rho_cv_floor": 0.234,
+        "energy_drift_pct": 0.048,
+        "density_drift_pct": 0.3913,
+        "n_eff_density": 57
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 14.23,
+        "all_stage_h": 14.26,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "PSU_2",
+      "system": "PSU",
+      "replicate": 2,
+      "host": "A800",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 12,
+        "n_chains": 10,
+        "n_atoms": 6500,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 700.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 780.0,
+        "emc_seed": 804277,
+        "velocity_seed": 685700,
+        "ladder_executed_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": null,
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "high",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 525.0,
+        "uncertainty_K": 14.2,
+        "r_squared": 0.9851,
+        "fit_quality": "GOOD",
+        "width_K": 0.0,
+        "method_gap_K": 123.9,
+        "verdict": "TG_REVIEW",
+        "cause": "method_gap",
+        "reportable": false,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.187712,
+        "rho_melt": 1.04277,
+        "T_melt_K": 699.73,
+        "contraction": {
+          "expected_contraction": 1.1829,
+          "actual_contraction": 1.139,
+          "contraction_shortfall": 0.9628,
+          "verdict": "UNDER_ANNEALED_COOLING"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 4.0376,
+        "sem_GPa": 0.1208,
+        "B0_prime": 8.8593,
+        "r_squared": 0.999948,
+        "n_points": 5,
+        "production_K_GPa": 4.0376,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 3.7702,
+        "loo_max_dB0_pct": 5.5,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 18.041,
+        "Rg_cv": 0.1844,
+        "Ree_A": 34.87,
+        "msid_slope": 1.071,
+        "msid_large_s_slope": 0.543,
+        "p2": 0.0104,
+        "rho_cv": 0.1821,
+        "rho_cv_floor": 0.234,
+        "energy_drift_pct": 0.1282,
+        "density_drift_pct": 0.0233,
+        "n_eff_density": 50
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 1,
+        "operator_interventions": 0,
+        "operator_acceptance": {
+          "thermal": true
+        }
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 15.6,
+        "all_stage_h": 15.63,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    },
+    {
+      "run": "PSU_3",
+      "system": "PSU",
+      "replicate": 3,
+      "host": "A800",
+      "protocol": {
+        "ff": "pcff",
+        "dp": 12,
+        "n_chains": 10,
+        "n_atoms": 6500,
+        "dt_fs": 1.0,
+        "cutoff_A": 9.5,
+        "T_equil_K": 700.0,
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "annealing_T_high_K": 780.0,
+        "emc_seed": 675306,
+        "velocity_seed": 454398,
+        "ladder_executed_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_simulated_atm": [
+          -200.0,
+          0.0,
+          3000.0,
+          7000.0,
+          15000.0
+        ],
+        "ladder_planned_atm": null,
+        "refs_in_params": {
+          "experimental_tg_K": null,
+          "experimental_density_gcm3": null,
+          "exp_K_min_GPa": null,
+          "exp_K_max_GPa": null
+        }
+      },
+      "planning": {
+        "plan_mode": "reasoned",
+        "confidence": "high",
+        "critic_ran": false,
+        "classification_ran": false,
+        "recovery_agent_calls": 0
+      },
+      "tg": {
+        "Tg_K": 473.4,
+        "uncertainty_K": 10.2,
+        "r_squared": 0.9943,
+        "fit_quality": "GOOD",
+        "width_K": null,
+        "method_gap_K": 6.4,
+        "verdict": "TG_REPORTABLE",
+        "cause": null,
+        "reportable": true,
+        "is_glassy_at_300K": true,
+        "source": "reextract_current_code"
+      },
+      "density": {
+        "rho_300K": 1.184598,
+        "rho_melt": 1.041542,
+        "T_melt_K": 700.09,
+        "contraction": {
+          "expected_contraction": 1.1829,
+          "actual_contraction": 1.1374,
+          "contraction_shortfall": 0.9615,
+          "verdict": "UNDER_ANNEALED_COOLING"
+        }
+      },
+      "K": {
+        "basis": "all_points",
+        "K_GPa": 4.5112,
+        "sem_GPa": 0.0409,
+        "B0_prime": 8.2433,
+        "r_squared": 0.999995,
+        "n_points": 5,
+        "production_K_GPa": 4.5112,
+        "production_n_points": 5,
+        "excluded_points": [],
+        "fluctuation_K_GPa": 4.7082,
+        "loo_max_dB0_pct": 0.82,
+        "gate_verdict": "BM_REPORTABLE",
+        "convergence_verdict": "BM_LADDER_CONVERGED"
+      },
+      "structure_300K": {
+        "Rg_A": 19.471,
+        "Rg_cv": 0.1557,
+        "Ree_A": 43.78,
+        "msid_slope": 1.125,
+        "msid_large_s_slope": 0.834,
+        "p2": 0.0089,
+        "rho_cv": 0.1784,
+        "rho_cv_floor": 0.234,
+        "energy_drift_pct": 0.1684,
+        "density_drift_pct": 0.0076,
+        "n_eff_density": 117
+      },
+      "gates": {
+        "regrade_file": "benchmarks/rev2_replicates/regrade/regrade_20260914.json",
+        "melt": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        },
+        "cooling": {
+          "live": "PASS",
+          "old": "PASS",
+          "old_failing": [],
+          "new": "PASS",
+          "new_failing": []
+        }
+      },
+      "interventions": {
+        "remedies": 0,
+        "agent_escalations": 0,
+        "agent_actions": [],
+        "escalations_archived": 0,
+        "operator_interventions": 0,
+        "operator_acceptance": {}
+      },
+      "cost": {
+        "attempts": 6,
+        "gpu_stage_h": 15.43,
+        "all_stage_h": 15.46,
+        "failed_or_superseded_gpu_h": 0.0
+      }
+    }
+  ],
+  "tg_legs": [
+    {
+      "leg": "TGS_PE_1_L1_r20",
+      "anchor": "PE_1",
+      "axis": "rate",
+      "stage_status": "accepted",
+      "tg_source": "reextract_current_code",
+      "tg_rate_K_per_ns": 20,
+      "tg_t_step_K": 20,
+      "Tg_K": 213.4,
+      "uncertainty_K": 13.2,
+      "r_squared": 0.9977,
+      "fit_quality": "EXCELLENT",
+      "verdict": "TG_REPORTABLE",
+      "cause": null,
+      "method_gap_K": 5.3,
+      "reportable": true
+    },
+    {
+      "leg": "TGS_PE_1_L2_r10",
+      "anchor": "PE_1",
+      "axis": "rate",
+      "stage_status": "accepted",
+      "tg_source": "reextract_current_code",
+      "tg_rate_K_per_ns": 10,
+      "tg_t_step_K": 20,
+      "Tg_K": 223.1,
+      "uncertainty_K": 19.7,
+      "r_squared": 0.9963,
+      "fit_quality": "EXCELLENT",
+      "verdict": "TG_REPORTABLE",
+      "cause": null,
+      "method_gap_K": 11.3,
+      "reportable": true
+    },
+    {
+      "leg": "TGS_PE_1_L4_dT10",
+      "anchor": "PE_1",
+      "axis": "t_grid",
+      "stage_status": "accepted",
+      "tg_source": "reextract_current_code",
+      "tg_rate_K_per_ns": 20,
+      "tg_t_step_K": 10,
+      "Tg_K": 253.0,
+      "uncertainty_K": 10.7,
+      "r_squared": 0.9972,
+      "fit_quality": "EXCELLENT",
+      "verdict": "TG_REPORTABLE",
+      "cause": null,
+      "method_gap_K": 1.8,
+      "reportable": true
+    },
+    {
+      "leg": "TGS_PE_1_L5_dT40",
+      "anchor": "PE_1",
+      "axis": "t_grid",
+      "stage_status": "accepted",
+      "tg_source": "reextract_current_code",
+      "tg_rate_K_per_ns": 20,
+      "tg_t_step_K": 40,
+      "Tg_K": 208.4,
+      "uncertainty_K": 19.1,
+      "r_squared": 0.9975,
+      "fit_quality": "EXCELLENT",
+      "verdict": "TG_REPORTABLE",
+      "cause": null,
+      "method_gap_K": 2.3,
+      "reportable": true
+    },
+    {
+      "leg": "TGS_PLLA_1_L3_r50",
+      "anchor": "PLLA_1",
+      "axis": "rate",
+      "stage_status": "escalation_required",
+      "tg_source": "reextract_current_code",
+      "tg_rate_K_per_ns": 50,
+      "tg_t_step_K": 20,
+      "Tg_K": 490.0,
+      "uncertainty_K": 187.7,
+      "r_squared": 0.9978,
+      "fit_quality": "ACCEPTABLE",
+      "verdict": "TG_REVIEW",
+      "cause": "method_gap",
+      "method_gap_K": 78.5,
+      "reportable": false
+    },
+    {
+      "leg": "TGS_PLLA_1_L6_dT40",
+      "anchor": "PLLA_1",
+      "axis": "t_grid",
+      "stage_status": "accepted",
+      "tg_source": "reextract_current_code",
+      "tg_rate_K_per_ns": 100,
+      "tg_t_step_K": 40,
+      "Tg_K": 382.1,
+      "uncertainty_K": 26.5,
+      "r_squared": 0.9959,
+      "fit_quality": "EXCELLENT",
+      "verdict": "TG_REPORTABLE",
+      "cause": null,
+      "method_gap_K": 14.8,
+      "reportable": true
+    }
+  ],
+  "peg_ff_arms": [
+    {
+      "run": "PEGCMP1",
+      "ff": "compass",
+      "source": "/home/arz2/PolyJarvis/data/PEGCMP1/run_log.md",
+      "exists": true
+    },
+    {
+      "run": "PEGORE1",
+      "ff": "pcff_ore",
+      "source": "/home/arz2/PolyJarvis/data/PEGORE1/run_log.md",
+      "exists": true
+    }
+  ]
+}
