@@ -1,0 +1,204 @@
+{
+  "schema_version": "1.0",
+  "goal": "Predict density for POXI (*CCO*)",
+  "run_name": "PEG2XCMP1",
+  "polymer_class": "POXI",
+  "smiles": "*CCO*",
+  "properties": [
+    "density"
+  ],
+  "confidence": "validated",
+  "plan_mode": "deterministic",
+  "assumptions": [
+    "polymer_rules.json class defaults are a starting hypothesis, not a trust signal -- validity for THIS run rests on plan_mode/confidence above, sourced from this exact canonical SMILES's system_characterization_cache.json entry, not from this class."
+  ],
+  "uncertainties": [
+    {
+      "name": "ff_transferability",
+      "dominant": false,
+      "reduction_probe": "none"
+    }
+  ],
+  "decided_params": {
+    "preferred_ff": "compass",
+    "preferred_builder": "emc",
+    "charge_method": "none",
+    "electrostatics": "pppm",
+    "cutoff_A": 9.5,
+    "dt_fs": 1.0,
+    "dp_typical": 100,
+    "nchain": 20,
+    "density_initial_gcm3": 0.61,
+    "T_equil_K": 500.0,
+    "annealing_T_high_K": 580.0,
+    "P_equil_atm": 1.0,
+    "t_equil_ns": 4.0,
+    "npt_prod_ns": 2.0,
+    "melt_npt_ns": 1.0,
+    "tg_t_high_K": 440,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "tg_steps_per_t": 2000000,
+    "tg_rates_K_per_ns": [
+      25,
+      50,
+      100
+    ],
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "K_strain_max": 0.03,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      3000,
+      7000,
+      15000
+    ],
+    "ct_min_decay_melt": 0.2,
+    "T_workflow_K": 300.0,
+    "dsc_equiv_rate_K_per_ns": 1.6667e-10
+  },
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "RadonPy/GAFF2_mod path replaced by EMC/PCFF (build-tested 2026-05-31: PEO PASS). PCFF Class II outperforms GAFF2 for thermomechanical properties (NkepsuMbitou2025). EMC recommended.",
+          "source_doi": "10.1021/acsapm.0c00524"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Webb2024"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Hayashi2022"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Wu2011"
+        },
+        {
+          "claim": "supporting validation",
+          "citation": "Klajmon2023"
+        }
+      ],
+      "confidence": "class_default",
+      "alternatives": []
+    },
+    {
+      "id": "D-02_charges",
+      "choice": "none",
+      "criteria_evaluated": [
+        "backbone_polarity",
+        "ff_embedded_vs_qm"
+      ],
+      "evidence": [],
+      "confidence": "class_default",
+      "alternatives": []
+    },
+    {
+      "id": "D-03_electrostatics",
+      "choice": "pppm",
+      "criteria_evaluated": [
+        "backbone_heteroatoms",
+        "max_partial_charge"
+      ],
+      "evidence": [
+        {
+          "claim": "see electrostatics_decision_guide",
+          "source": "polymer_rules.json:electrostatics_decision_guide"
+        }
+      ],
+      "confidence": "class_default",
+      "alternatives": []
+    },
+    {
+      "id": "D-04_system_size",
+      "choice": "DP=100, nchain=10",
+      "criteria_evaluated": [
+        "property_target",
+        "finite_size_effects",
+        "gpu_budget"
+      ],
+      "evidence": [],
+      "confidence": "class_default",
+      "alternatives": []
+    }
+  ],
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "critique": {
+    "status": "approved",
+    "rounds": 0,
+    "findings": [
+      "deterministic plan: defaults transcribed verbatim; auto-approved -- this exact canonical SMILES is already protocol_validated"
+    ]
+  },
+  "provenance": {
+    "status": "RECONSTRUCTED",
+    "reconstructed_on": "2026-09-09",
+    "reason": "This run was executed as an ad hoc force-field / system-size comparison arm and no run_plan.json was written at the time. Reviewer comments 2 and 6 require per-run provenance, so the plan is reconstructed from artifacts the run itself produced.",
+    "derived_from_plan": "data/PEGCMP1/raw/run_plan.json",
+    "evidence": {
+      "preferred_ff": "data/PEG2XCMP1/lammps/cell/emc_build.esh: 'field compass'",
+      "nchain": "data/PEG2XCMP1/lammps/cell/emc_build.esh: 'poly alternate 20'",
+      "bm_pressures_atm": "data/PEG2XCMP1/raw/bm_series_manifest.json",
+      "carry_over_licence": "diff of emc_build.esh vs PEGCMP1 differs on exactly ['poly'] - every other build parameter is byte-identical, so the remaining decided_params are the template's verbatim"
+    },
+    "measured_outputs": {
+      "plateau_density_gcm3": 1.1256,
+      "target_temp_K": 300.0,
+      "bm_npt_steps": 500000,
+      "bm_temp_K": 300.0
+    },
+    "not_reconstructed": [
+      "seeds (never recorded for these runs)"
+    ]
+  },
+  "ff_comparison": {
+    "baseline_runs": [
+      "PEG1",
+      "PEG2",
+      "PEG3",
+      "PEG4"
+    ],
+    "baseline_field": "pcff",
+    "field_under_test": "compass",
+    "purpose": "reviewer para 7 alternative-force-field arm. PEG is rubbery at 300 K, so the production cell IS the equilibrium melt and no cooling stage exists \u2014 the cooling-protocol explanation is unavailable by construction. PCFF PEG is -5.43% vs experimental rho(T) and +50% on K.",
+    "protocol_held_fixed": "all decided_params identical to the archived PEG baseline; only preferred_ff differs"
+  }
+}

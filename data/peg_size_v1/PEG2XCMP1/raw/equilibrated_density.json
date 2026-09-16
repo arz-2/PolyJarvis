@@ -1,0 +1,29 @@
+{
+  "status": "success",
+  "plateau_density_mean": 1.1256,
+  "plateau_density_std": 0.003864,
+  "plateau_density_sem": 0.000122,
+  "plateau_n_points": 1001,
+  "plateau_fraction": 1.0,
+  "production_n_points": 1001,
+  "total_n_points": 2001,
+  "eq_fraction_used": 0.5,
+  "naive_mean": 1.1256,
+  "naive_std": 0.003864,
+  "rolling_mean_abs_deriv": 1.812e-05,
+  "tau_eff_frames": 15.93,
+  "tau_eff_fraction": 0.015914,
+  "n_effective_samples": 62,
+  "block_sem_density": 0.00044162,
+  "drift_slope": -1.6257e-06,
+  "drift_pct": 0.1446,
+  "drift_p_value": 0.0001146246042209457,
+  "plateau_equilibrated": true,
+  "target_temp_K": 300.0,
+  "temp_tolerance_K": 50.0,
+  "actual_T_mean": 300.03,
+  "plateau_step_range": [
+    1000000,
+    2000000
+  ]
+}

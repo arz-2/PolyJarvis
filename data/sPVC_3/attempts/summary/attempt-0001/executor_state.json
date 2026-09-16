@@ -1,0 +1,72 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/summary/attempt-0001/raw/byproducts_spec.json",
+      "sha256": "b19a70382a928682ceed94e0dd8b5096c0c955fac9608417cb5f4182fd89a4c4",
+      "size": 638
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/summary/attempt-0001/raw/exp_lookup.json",
+      "sha256": "a156f7b2a14d06f5932ac27766a15c4aea5dcc4fc5b304c3ad93d4f4429be9e1",
+      "size": 2841
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/summary/attempt-0001/raw/run_summary.json",
+      "sha256": "1bad74e18522e765936603f5ab30d1bf6201b8be2172ef24a922340aacfa5019",
+      "size": 2961
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-12T14:07:22.827762+00:00",
+  "input_hash": "899411c88aac80a273225765899faa8521f18de922c19c638be665c9f090864c",
+  "outputs": {
+    "artifacts_missing": [
+      {
+        "file": "bulk_modulus_deform.json",
+        "found_in": null
+      }
+    ],
+    "run_summary_path": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/summary/attempt-0001/raw/run_summary.json",
+    "status": "success",
+    "summary_json": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/summary/attempt-0001/raw/run_summary.json"
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 530.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 530.0,
+    "annealing_T_high_K": 610.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.55,
+    "dp_typical": 41,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 492680472,
+    "experimental_density_gcm3": 1.391,
+    "experimental_tg_K": 371.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "melt_hold_min_steps": 4000000,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 150,
+    "tg_t_step_K": 20,
+    "velocity_seed": 585758416
+  },
+  "stage": "summary",
+  "status": "accepted"
+}

@@ -1,0 +1,271 @@
+{
+  "confidence": "medium",
+  "cost_estimate": {
+    "cell_atoms_estimate": 3000,
+    "confidence": "low",
+    "ff_family": "opls",
+    "note": "Partial/lower-bound total -- see unpriced_stages for what is not included (notably: equil-stage length, and any deform stage beyond a single primary-direction leg).",
+    "stages": {
+      "cool": {
+        "basis": "log-log extrapolated between real measured points [(3220, 55.191), (5040, 36.049), (15040, 15.645)] -- 3000 atoms is outside the measured [3220,15040] range",
+        "confidence": "low",
+        "gpu_hours": 1.8295,
+        "note": "16 cool blocks x 250000 steps (700->300 K at dT=25 K) + npt_final 500000; first blocks only -- adaptive extensions are not priced",
+        "ns_per_day_used": 59.0319,
+        "simulated_ns": 4.5,
+        "steps": 4500000
+      },
+      "murnaghan": {
+        "basis": "log-log extrapolated between real measured points [(3220, 55.191), (5040, 36.049), (15040, 15.645)] -- 3000 atoms is outside the measured [3220,15040] range",
+        "confidence": "low",
+        "gpu_hours": 1.0164,
+        "note": "5 pressure point(s) x 500000 npt_steps each",
+        "ns_per_day_used": 59.0319,
+        "simulated_ns": 2.5,
+        "steps": 2500000
+      },
+      "tg": {
+        "basis": "log-log extrapolated between real measured points [(3220, 55.191), (5040, 36.049), (15040, 15.645)] -- 3000 atoms is outside the measured [3220,15040] range",
+        "confidence": "low",
+        "gpu_hours": 2.5207,
+        "note": "1 rate (100 K/ns) x 31 T-bin(s) x 200000 steps, floor-checked against tg_min_steps_per_T=200000",
+        "ns_per_day_used": 59.0319,
+        "simulated_ns": 6.2,
+        "steps": 6200000
+      }
+    },
+    "total_gpu_hours": 5.3666,
+    "unpriced_stages": [
+      {
+        "reason": "stage-length knobs default to None, deferred to generate_equilibration_workflow's own atom-count-tiered default inside the MCP LAMMPS engine -- not resolvable from decided_params alone; not priced here to avoid guessing",
+        "stage": "equil"
+      }
+    ]
+  },
+  "decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 780.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "opls-library",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 11.0,
+    "density_initial_gcm3": 0.89,
+    "dp_typical": 50,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 909670995,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "opls/2024/opls-aa",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 930760043
+  },
+  "decisions": [
+    {
+      "acknowledgements": {},
+      "alternatives": [],
+      "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PHAL has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
+      "choice": "opls/2024/opls-aa",
+      "confidence": "medium",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "critique": {
+        "findings": [
+          "Critic verdict on D-01_ff is no_evidence with low confidence and no supporting_dois or suggested_override, so opls/2024/opls-aa stays. On-chemistry support already exists in the autofill evidence: Watkins & Jorgensen 2001 fitted the OPLS-AA perfluoroalkane torsions and F LJ terms against PTFE, C4F10 and C5F12. The dedicated PTFE force fields the critic found (Borodin/Smith/Bedrov 2002, DOI 10.1021/jp026158i; AMBER-compatible 2024, DOI 10.1515/chem-2024-0072) cannot be selected: neither is in the preferred_ff enum, and neither has an accessible quantitative comparison. They are noted as unexplored alternatives, not acted on.",
+          "The Viton A caution (10.1016/j.ces.2019.05.007: OPLS-derived fields too soft and under-packed vs PCFF) is on a VDF/HFP copolymer, not all-CF2 PTFE. PCFF has no fluorocarbon parameterization per the class note, so switching to it is not justified. Keep the caution: if K or density comes back low, suspect the force field before the protocol.",
+          "No experimental_* overrides. The SMILES exactly matches PHAL member_smiles.PTFE, and the curated experimental_tg_K.PTFE=160 already resolves (tg success criterion t_range_brackets_exp_tg=160), so re-pinning adds nothing. The class curates no PTFE density or K, so both stay unset rather than guessed. The crystalline ML-FF values (2.136 g/cm3, 137.5 GPa Young's modulus, 10.1021/acs.jpclett.1c01140) are not amorphous targets and are not used. The 100-550 K Tg sweep brackets both candidate Tg values, but grade any Tg result against 160 K with the ambiguity in mind.",
+          "Advisory CHEM_BUILD_RISK (fluoroalkyl failed 25% of 67 EMC trial builds, 1.7x baseline) cannot be acted on through overrides: the force-field probe is a planning-CLI flag, not an allowlisted key. D-01's parameter_coverage evidence already says typing is NOT MEASURED, and polymer_rules warns to check that EMC assigns the CF2 atom types. The build stage is the real test. If it fails on typing, re-plan with --with-ff-probe instead of switching force fields by hand.",
+          "Other resolved params checked and kept: T_equil_K=700 is above PTFE's Tm (~600 K); density_initial_gcm3=0.89 (~0.45x amorphous PTFE) is the class's deliberate low-density start against ordered packing; pppm/11 A cutoff matches the class curation and the chemistry layer's implied electrostatics (pppm)."
+        ],
+        "rounds": 1,
+        "status": "scientific_agent_decision"
+      },
+      "evidence": [
+        {
+          "claim": "polymer_rules.json:classes.PHAL.ff_note: OPLS-AA via EMC: native Watkins & Jorgensen 2001 F LJ parameters (opls_965: sigma=2.95 A, epsilon=0.053 kcal/mol) cover CF2/CF3 backbones; PCFF lacks fluorocarbon parameterization and TraPPE-UA/GAFF2 are not the chemistry-appropriate fit for this backbone. Afzal2021 reports halogen-class R2=0.87, MAE=20.8K for OPLS3e. PVDF's mixed CF2-CH2 dihedrals use general OPLS-AA CT/HC types (Byutner2000 provides a bespoke density-target reference, not the routing justification itself). CAUTION: a same-family fluoropolymer comparison (Viton A, VDF/HFP) reports OPLS-derived fields producing systematically too-soft, under-packed structures relative to PCFF -- qualitative only, worth watching if PHAL modulus/K results come back low. OPLS-AA's own founding paper never tested a fluorine-containing liquid, so today's routing is an extrapolation beyond its stated scope, consistent with (not contradicted by) the Viton A caution.",
+          "criterion": "literature_support",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PHAL.ff_justification_doi",
+          "source_doi": "10.1021/jp004071w"
+        },
+        {
+          "citation": "Hayashi, Y. et al. RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics. npj Comput. Mater. 2022, 8, 222.",
+          "claim": "High-throughput GAFF2 polymer MD; 1 ns NVT anneal 300\u2192700 K; 10 chains ~10,000 atoms; LAMMPS; systematic Tg and density for 1070+ polymers. Primary reference for nchain, dp, and forcefield defaults.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Hayashi2022]",
+          "source_doi": "10.1038/s41524-022-00906-4"
+        },
+        {
+          "citation": "Afzal, M. A. F. et al. High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications. ACS Appl. Polym. Mater. 2021, 3, 2, 620\u2013630.",
+          "claim": "OPLS3e GPU-based Tg for 315 polymers; validates electrostatics impact on polar vs apolar polymers. lj/cut acceptable only when backbone charge < 0.1 e.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Afzal2021]",
+          "source_doi": "10.1021/acsapm.0c00524"
+        },
+        {
+          "citation": "Byutner, O. G.; Smith, G. D. Quantum Chemistry Based Force Field for Simulations of Poly(vinylidene fluoride). Macromolecules 2000, 33, 4264\u20134270.",
+          "claim": "QM-derived all-atom FF for PVDF: oligomer geometries, conformational energies, and PVDF melt density 10\u2013310\u00b0C validated against experiment. Dihedral parameters for CF2\u2013CH2\u2013CF2 backbone. Primary PHAL-class PVDF FF reference; used to validate OPLS-AA path via EMC.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Byutner2000]",
+          "source_doi": "10.1021/ma9918295"
+        },
+        {
+          "citation": "Watkins, E. K.; Jorgensen, W. L. Perfluoroalkanes: Conformational Analysis and Liquid-State Properties from ab Initio and Monte Carlo Calculations. J. Phys. Chem. A 2001, 105, 4118\u20134125.",
+          "claim": "OPLS-AA LJ parameters for perfluoroalkanes: F sigma=2.95 \u00c5, epsilon=0.053 kcal/mol (opls_965). Torsional parameters from LMP2/HF/6-31G* and MC validation on PTFE/C4F10/C5F12. Provides the fluorine LJ patch applied in GAFF2_mod for PHAL class to correct default GAFF2 F parameters.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Watkins2001]",
+          "source_doi": "10.1021/jp004071w"
+        },
+        {
+          "claim": "NOT MEASURED for this SMILES. No EMC trial build was run, so coverage is asserted from polymer_rules.json:classes.PHAL.ff_accuracy_prior='opls/2024/opls-aa' only; whether 'opls/2024/opls-aa' can type THIS repeat unit is unverified until the build stage runs. The moiety screen ran and matched no rule, so no trial build was triggered. That narrows the risk and measures nothing: the rules cover 77% of the measured failures (guides/ff_moiety_rules.json), so this SMILES is UNSCREENED for the rest, not cleared.",
+          "criterion": "parameter_coverage",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PHAL.ff_accuracy_prior"
+        },
+        {
+          "claim": "opls-family cell of 3000 atoms (50007.0 g/mol): estimate_ns_per_day at this run's 3000-atom estimate: 59.03187029455389 ns/day (low confidence). electrostatics=pppm, cutoff_A=11.0.",
+          "criterion": "computational_cost",
+          "origin": "autofill",
+          "resolver": "select_hardware.select_hardware"
+        }
+      ],
+      "id": "D-01_ff",
+      "resolved_by": "polymer_rules.json:classes.PHAL.ff_accuracy_prior"
+    }
+  ],
+  "derived_inputs": {
+    "backbone_types": {
+      "data_file": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/cell.data",
+      "derived_at": "2026-09-14T06:29:42.074277+00:00",
+      "source": "derive_backbone_types (heavy_atom_graph_diameter)",
+      "value": [
+        1,
+        2
+      ]
+    }
+  },
+  "dominant_uncertainty": "PTFE's experimental Tg is ambiguous (curated 160 K from the gamma relaxation vs a ~400 K relaxation), so the Tg grading target may be wrong. EMC OPLS-AA typing of the all-CF2 unit is also untested.",
+  "goal": "density, Tg and bulk modulus for amorphous PTFE (recovery two-arm comparison, AI arm)",
+  "hardware": {
+    "engine": "kokkos",
+    "ff_family": "opls",
+    "gpu_per_run": 1,
+    "mpi_ranks": 1
+  },
+  "overrides": {},
+  "plan_mode": "reasoned",
+  "planned_stages": [
+    {
+      "stage": "build",
+      "success_criteria": {
+        "data_file_written": true
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "equil",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "equil-check",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "cool",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "track": "cooling"
+    },
+    {
+      "stage": "cool-check",
+      "success_criteria": {
+        "cool_verdict": "PASS"
+      },
+      "track": "cooling"
+    },
+    {
+      "stage": "tg",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 160
+      },
+      "track": "thermal"
+    },
+    {
+      "stage": "analyze-tg",
+      "success_criteria": {},
+      "track": "thermal"
+    },
+    {
+      "stage": "murnaghan",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "track": "mechanical"
+    },
+    {
+      "stage": "analyze-bm",
+      "success_criteria": {},
+      "track": "mechanical"
+    },
+    {
+      "stage": "run-summary",
+      "success_criteria": {},
+      "track": "summary"
+    }
+  ],
+  "polymer_class": "PHAL",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "run_name": "PTFE_AI",
+  "schema_version": "2.0",
+  "smiles": "*C(F)(F)C(*)(F)F",
+  "system_size": {
+    "acknowledgements": {
+      "MW_FLOOR_UNKNOWN": {
+        "class": "PHAL",
+        "detail": "no documented entanglement Me for this class in polymer_rules.json:_metadata.global_notes -- bulk_modulus chain-length adequacy is UNASSESSED, not assumed adequate"
+      }
+    },
+    "dp_typical": 50,
+    "nchain": 10,
+    "reasons": [
+      "system size auto-filled {'dp_typical': 50, 'nchain': 10} via solve_system_size()",
+      "rigidity DP recommendation (backbone_rotatable_fraction=1.00, backbone_ring_fraction=0.00, longest_rigid_backbone_run=1 atoms -> flexible; DP_MW=50) does not exceed the existing recommendation 50"
+    ],
+    "resolved_by": "select_system_size.solve_system_size"
+  }
+}

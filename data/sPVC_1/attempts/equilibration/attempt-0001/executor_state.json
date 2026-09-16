@@ -1,0 +1,578 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/raw/d05_block.md",
+      "sha256": "f0007f55c8f7a0d46f517b58f8aff879493fe5ea2d6a3d4455979ec426a839d3",
+      "size": 2045
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/raw/equilibration.json",
+      "sha256": "6b4b5e766b32454a9819968928b4851ad3931670a4302573b3db7db1bee3cbff",
+      "size": 12232
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat.dump.gz",
+      "sha256": "135bae8357b29ca7bb27488939afa72ce3010be274e0b9e098e886c70cbe7228",
+      "size": 71646385
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat.in",
+      "sha256": "bf1b66650fb1932f789b00e6bb19e90c2a2495d53439b1b1f9d60b0e050d0dd9",
+      "size": 4225
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat.log",
+      "sha256": "850c211b4ad2e8ad5f18d7e525f56237c073505978f729525902fb9fdd19b407",
+      "size": 199773
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat_last.dump.gz",
+      "sha256": "cb9b686ea9f8bcca7996d64b9599dbe05a4073822f5eefda57a9bc0d83004706",
+      "size": 163515
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat_out.data",
+      "sha256": "5d7831758cdb20d3e1c9223a8e083385cd346fc7555dc96ebc01ae6640d370e3",
+      "size": 1583291
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat_out.restart",
+      "sha256": "e2fe9f03b5d7064a52c5c3571ce0ec9c10cfc93cb63a1382fda05ba18a83d017",
+      "size": 5177338
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat_run.log",
+      "sha256": "7463f52e174f3ad5c67fb49d29aafbe10ca565e5954664945ab277a95e9e8e1f",
+      "size": 183963
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/log.lammps",
+      "sha256": "f857efb4e3b6f5714d8b3ed33a89f5c815d478dab9348e2b4ee3038545395924",
+      "size": 2502
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/nvt_1.rst",
+      "sha256": "73283ce0d2b2ce977ebcfed9d00588c714a0c74579cc6d887df11b76e07e76ea",
+      "size": 5177434
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/nvt_2.rst",
+      "sha256": "5b731f99f76e39aa78d0c02f572275c35a90462505bd1b88d32445283a935be0",
+      "size": 5177434
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold.dump.gz",
+      "sha256": "ab16beb5e4a9615c4fd40e2055d17199d844e96de51268a7693e884379718873",
+      "size": 71673249
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold.in",
+      "sha256": "5a13708c10ef2fbaa1b5c79d648f23de30a977d69f42e19be9d1b6db31f6434e",
+      "size": 4215
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold.log",
+      "sha256": "6600d08924def83d7b2a7c64ac82b0a319d5eda7184ddc0bea2e7fd22735d362",
+      "size": 199763
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold_last.dump.gz",
+      "sha256": "0c787132da4a93daca5e86bd263d2f471f564e52ba8e8d55812b7e96646d9418",
+      "size": 163842
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold_out.data",
+      "sha256": "19d6971be0571ed457f61ca0e7eeb824dec653829dd6c44f6600d35bfbf8f4d2",
+      "size": 1583484
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold_out.restart",
+      "sha256": "173de179f94e6a78d66678b891bdd4e69dfc9e32523b0fa1793a286c4df3b97b",
+      "size": 5177338
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold_run.log",
+      "sha256": "de6e85783c8ec069662c60c781370f105460088127e80c000f6f382aa80c1208",
+      "size": 183963
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/log.lammps",
+      "sha256": "c5caaed673c4e10d1727bad0b2fcd20e4e570425f165c30ad1e6386331000253",
+      "size": 2502
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/nvt_1.rst",
+      "sha256": "2343a738222e9ee3e5f3817b5a701650c062ade9601cc8fd393c71dd3f3a0685",
+      "size": 5177434
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/nvt_2.rst",
+      "sha256": "c99b393f3de758200959e5005bcc1f3b9e4790a68138f37dc2c4d98fe648cb2f",
+      "size": 5177434
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/minimize/log.lammps",
+      "sha256": "fae178bd4e94f0be21db9f5f892458109a91ec53a01db88ebd521e9888f4ac5e",
+      "size": 1764
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/minimize/minimize.dump.gz",
+      "sha256": "df6eafc1a4eb8812e54c31b15f4a09d3db44dfe44e886b9ccaed9c8b8f2d0c83",
+      "size": 364323
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/minimize/minimize.in",
+      "sha256": "4d4a8641f1314b8c1cd23df7af8e8909ba7ed3d2413bdeac5534b3aca58e9904",
+      "size": 2981
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/minimize/minimize.log",
+      "sha256": "c75b98dd7047b4a0200a95942a9e05978a9f029aebbc574e0dfa88e0fc3a85fc",
+      "size": 23190
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/minimize/minimize_last.dump.gz",
+      "sha256": "676f3059a10752f07685a03a47ec6c49aaf0f3b7a4de80be43fabfb596447da1",
+      "size": 95046
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/minimize/minimize_out.data",
+      "sha256": "ebbb336ae1291aee967113b1aa29233d6373fd42d3f68de61bca876000092284",
+      "size": 1292272
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/minimize/minimize_out.restart",
+      "sha256": "d6810134bc75aa8375130026ac95f15aee7e126720660873298b89126b0508eb",
+      "size": 5177338
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/minimize/minimize_run.log",
+      "sha256": "1a3e146cf8a73103ca91f116a85f35111a6ccaaef64057eaf3f4078081fda68b",
+      "size": 7879
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/compress_1.rst",
+      "sha256": "e406c9aff99fc37bad789d70e0167be74aabdad2e0cf5bafa3a912bd4b57e373",
+      "size": 5177630
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/compress_2.rst",
+      "sha256": "551934f9cc948a4da7af5508c6949795b1f35d2343354f989930f121751c5582",
+      "size": 5177630
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/log.lammps",
+      "sha256": "458daa0c183a8add2797a608f8a1b9908740f60e8e6e342ede7b2d4470cd49c6",
+      "size": 1718
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify.dump.gz",
+      "sha256": "c4769137e14076755b2ddb752f2a5686dc5e5914f6d49b288c99d4cb0a6819cf",
+      "size": 21555399
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify.in",
+      "sha256": "cc17ae52a97f227e4d348346816fc7e86732ce14543ed116abc12e4750a3f9c0",
+      "size": 3298
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify.log",
+      "sha256": "547d7cdb7d2f3e566a7f5cc69b7ad2fa1696623e0f536e60b0d7c3afa4666c50",
+      "size": 118223
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify_last.dump.gz",
+      "sha256": "dd454e6b60d5a44ff444db0e285e127dd11d1fdce3dd10fce019987f8cb5c107",
+      "size": 162784
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify_out.data",
+      "sha256": "43e29f6d3094782bbc06a209dc12a2378168c2481e9c761930af0260c5200771",
+      "size": 1586304
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify_out.restart",
+      "sha256": "f1e6672ccd17c1fd070a14e9f78f0d6b646b4bdcce7d139babed57d714966970",
+      "size": 5177357
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify_run.log",
+      "sha256": "fea8387d3e1aa3222ca942a5a6b852601b5cde1d498a732fe1b3430e0723bd70",
+      "size": 102558
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/log.lammps",
+      "sha256": "89c0c5b9470ffa99bb344120621ba8d9672e8135b47f4c11882809bf0ba8118c",
+      "size": 2781
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_1.rst",
+      "sha256": "82154d1a063fe64680064279a5785e408fff220d8dbc8075478ebe887dd525ce",
+      "size": 5177610
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_2.rst",
+      "sha256": "3d124847d675f3a7475a5983734af040f5278faa3b22312f666d79901fb57eac",
+      "size": 5177610
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold.dump.gz",
+      "sha256": "a50b760dd2045b3a405bc258338f4f94a414e049900498d6ef908d24b9a087bb",
+      "size": 43065565
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold.in",
+      "sha256": "3164f7888d4ec8a7b926bb6d11ad7124b5434a019923fa310e10565de1512f47",
+      "size": 4575
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold.log",
+      "sha256": "d9944f3bba8a4c015146a5ed0e85f13b6899b0d8b7c801e9993608f749032af0",
+      "size": 128456
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold_last.dump.gz",
+      "sha256": "b57d107102890584d7d3b4d524238f8fad9268fd13bbca123ce09d1c087fda04",
+      "size": 163369
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold_out.data",
+      "sha256": "3768302d25d8e28b65386057ffbbf69a09f79b7d3e82e76cfa33d16efca4956c",
+      "size": 1585650
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold_out.restart",
+      "sha256": "56ac095e83ba2770e27eed6f717e0d4cc0fe6389cb1f2fe05364ea687d0fd7c1",
+      "size": 5177338
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold_run.log",
+      "sha256": "38765c26777fa3a7b7e225829cf4033a42c7268906e3b868c609e5ebdc892f58",
+      "size": 112575
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/log.lammps",
+      "sha256": "a43b15cc3a9bc17e5c62b49bb89cbc9622282998ea6713312b374c92ec16a188",
+      "size": 2780
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_1.rst",
+      "sha256": "6cddd4b7a8c50b2fc37a671d7d510b1e68cfbae5db0e80471109f3a44bc42835",
+      "size": 5177610
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_2.rst",
+      "sha256": "e9871fe9f08a32a6bd0765f6a4972399e519d06319349b579412e67137b10e31",
+      "size": 5177610
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate.dump.gz",
+      "sha256": "a76d32203fc435e0d53ade5410d1181da41292aa33655bc4415b76ca456ef837",
+      "size": 14415668
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate.in",
+      "sha256": "4fd6637fa70475c8ab466a42b74a37e83eb7dad994edfcca0c53058b4d713951",
+      "size": 4572
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate.log",
+      "sha256": "10178403313e878fd1f2226c383fbed70992a1d7c1a6fa7c4e65e56b4b0e53f9",
+      "size": 57203
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate_last.dump.gz",
+      "sha256": "15e69cda8b71eb0d1cdd1021ac2066fa9bfe99ae637a8e72aae9430dc2ddca48",
+      "size": 163068
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate_out.data",
+      "sha256": "9ea3c48b297db51800a0f7c5146d23b1102edc5aba277cc21fafe8b9c176d73e",
+      "size": 1585637
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate_out.restart",
+      "sha256": "a01b33b40a8fff4c0e36e841c5aef97c66ac82fd73fc34547106dade926b9b4d",
+      "size": 5177338
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate_run.log",
+      "sha256": "0e8df746fa3519ef485cca8f74f8a86057a1a83c12a845dfe066b51b9eaf7eb0",
+      "size": 41324
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/log.lammps",
+      "sha256": "e153e6f6402fdcf308701a72dc05786612718ace77a135d2e0c578babafa7b64",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_1.rst",
+      "sha256": "7738800b52e504dc4cbace6ef81491aa3cb10fe6469b5d3d105624eb42c40dfe",
+      "size": 5177610
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_2.rst",
+      "sha256": "3e18689660835056cccdc53887efe0bab1a3054d30e9e0f92be0d0dc6a84b31d",
+      "size": 5177610
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.dump.gz",
+      "sha256": "7633fecd1210adc53e3495034fb568ffbf976e54be3e866ea0836408e92333d8",
+      "size": 576013298
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.in",
+      "sha256": "1cdaefd4490d15627a84edcc07554f1f46d3d03d40c38ccce2a443ef09512745",
+      "size": 4552
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+      "sha256": "0a0392d5f0c27e035ee1b803fbdfe1b62cc3f8a0b979e4314ef96e8d29dc3b03",
+      "size": 1449340
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_last.dump.gz",
+      "sha256": "2f76f0bb082d8efa64e7967c6c1cc5b3cd5d2ceafd13c14499b6157e9d8a2da0",
+      "size": 167218
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data",
+      "sha256": "864e08f6aefc592aff3eb30f21873eeed6f64236b6df6ea1541b0ddab6bd1d49",
+      "size": 1584087
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.restart",
+      "sha256": "7de2178a4a418e40481dfd51e00770437a2289cbb10c2deb7b52a8ec8a058741",
+      "size": 5177338
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_run.log",
+      "sha256": "8e02794d2fa443ac84557fb2ae9116c7dbf33a1a218ba552a15fd343099bc018",
+      "size": 1433479
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/log.lammps",
+      "sha256": "223dcb4f24ea6f45a1a8106428ab3baae4a574da3ce555742520afff4dd07a81",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_1.rst",
+      "sha256": "0f60f0c69ca2b8a444e93c931d3b60d2837a8ffbd99f782c16dcb8ebb798a660",
+      "size": 5177610
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_2.rst",
+      "sha256": "a50d274e7a49578bd493038b6667ce4a697bf611ca161b9e6f4b0e900f718383",
+      "size": 5177610
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp.dump.gz",
+      "sha256": "e7afd7d84919beba3773986d993cec3587438a637463886e89fbe778e315c4b5",
+      "size": 71892697
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp.in",
+      "sha256": "af8616af0f7291381fd85fe6ae3f711cd63a3f493d522015fed706f69a4bb29b",
+      "size": 4546
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp.log",
+      "sha256": "ed34e12390784aa791a0b856c8f335555b2cba893edbf79466d3692b87c257f4",
+      "size": 199830
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp_last.dump.gz",
+      "sha256": "da04bc0b19611b4ed50dc5e4fcc2bb8fdd23459dab6df0fbef54f4bd0ee131cd",
+      "size": 165399
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp_out.data",
+      "sha256": "3f9f29abf75f7cd8d94ba9db0470c7b7252469876e6e1f7f3c54ea4a70ef4610",
+      "size": 1583672
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp_out.restart",
+      "sha256": "5312ab53c83ee2bffe8bbbc60fd4f4a96798f37f42e2987291226290fa1eeeb3",
+      "size": 5177338
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp_run.log",
+      "sha256": "dbf3cd042015e2a312f5d6ffe79484519d3b0b1df9a833dd3010aa81ad17e150",
+      "size": 183975
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/log.lammps",
+      "sha256": "3a1f220eba2dedf5803e8f2363a50face7a7cdd4267eaff118e533dd9f5c0a05",
+      "size": 2504
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_1.rst",
+      "sha256": "49bc6754f61b87770e6734e4d43faa4e25869214f037621910a43e7a0edf4fae",
+      "size": 5177434
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_2.rst",
+      "sha256": "388bd984b92cad154783a7367418fde8d7781d4b89c98f5f2cb02d13d7f44d7b",
+      "size": 5177434
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold.dump.gz",
+      "sha256": "7b25a9c78a6455e9c1c786bd753d0ba2c78d3fb9d3c5553efbbe85c08461068b",
+      "size": 719274068
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold.in",
+      "sha256": "ee3cbd17d8faaa0e19ff5c4f215b3fd317b6d2473c7351993ddc0328df369a82",
+      "size": 4236
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold.log",
+      "sha256": "b6f783a9805014232da3c1151a9294483c8ee642793faea8fd8d7a948b1c452a",
+      "size": 1806282
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold_last.dump.gz",
+      "sha256": "80fff9b03e8e714398dc8b4070eb6d437c7c2d6924ca2dc6809b6198ebe78fea",
+      "size": 168133
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold_out.data",
+      "sha256": "d13953d2d4e98c7d7a6cd7a9e4b10cc1b4397dcb4a0925003e4f010424a397f4",
+      "size": 1583946
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold_out.restart",
+      "sha256": "67af5770d5b512e819a1d767f9e9c7e14f44093c1b6384da9fe78ea2ec7ee60b",
+      "size": 5177338
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold_run.log",
+      "sha256": "522a52a4593742eae2df9fbfd93783769216aceeaeb6ac3143825836dfde9f84",
+      "size": 1790463
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/log.lammps",
+      "sha256": "07aa5c6b1a1fbb5f8935ca1e6f4e3f26a63c320eedafa04af6670f3fe12eabcc",
+      "size": 2501
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_1.rst",
+      "sha256": "7f1fb7b69c194302ec819b17bcdf2e5026e127e1be4c64846925c66658b5d29d",
+      "size": 5177434
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_2.rst",
+      "sha256": "85c71619392536c8dd01e741fd924eaadee502d22d6ba03682094e213e16b333",
+      "size": 5177434
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup.dump.gz",
+      "sha256": "948f1f2790e7f05f05eea5a7401cd49b9a40055c8ab0f86d98fd4dcdb316814b",
+      "size": 14483655
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup.in",
+      "sha256": "dcbfe16580c30930d2019d174c7e7dc02038a186c9de1228a3b275924b2b50ca",
+      "size": 4235
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup.log",
+      "sha256": "822d780d4472efb44ac6d381c88370fe7116ede59a0684cb38452ce7ad8e5612",
+      "size": 56935
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup_last.dump.gz",
+      "sha256": "5c59ed13772ca97dc767c081c87cb9f8df9b537a8c4e88e15376e33b8a649d87",
+      "size": 162189
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup_out.data",
+      "sha256": "270e03c8092bf1edb5eff888db9d560f43196cf52d19c11799016fc7777a8e28",
+      "size": 1584992
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup_out.restart",
+      "sha256": "a772896f6e3859205256959c4a70cf6dca6c22c834b9659ec4cea9cd132bf203",
+      "size": 5177338
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup_run.log",
+      "sha256": "bc360dab5085cf1102ae1c6fadd4e9b2b6279fadbf94982f20df0ce542241456",
+      "size": 41116
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-15T04:59:02.810910+00:00",
+  "input_hash": "5ac824f93a862d83bf0b43b77d7cb9632d72dc1dccc701d15febd69a2e89ce86",
+  "outputs": {
+    "T_melt_hold_K": 571.0,
+    "anneal_hold_convergence": null,
+    "backbone_derivation": {
+      "action": "auto-derived [1, 2, 3] from build_data_path bond topology (heavy_atom_graph_diameter) and persisted to decided_params",
+      "outcome": "RESOLVED \u2014 automatic",
+      "trigger": "backbone_types unresolved"
+    },
+    "equil_verdict": "PASS",
+    "equilibration_json_path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/raw/equilibration.json",
+    "extend_history": [],
+    "melt_data_path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data",
+    "melt_density_gcm3": 1.171363,
+    "melt_dump_path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.dump",
+    "melt_log_path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+    "melt_restart_path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.restart",
+    "melt_start_data_path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data",
+    "melt_start_restart_path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.restart",
+    "stage_checkpoints": {
+      "anneal_heat": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat_out.data",
+      "anneal_hold": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold_out.data",
+      "minimize": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/minimize/minimize_out.data",
+      "npt_densify": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify_out.data",
+      "npt_densify_hold": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold_out.data",
+      "npt_ff_activate": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate_out.data",
+      "npt_melt_hold": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data",
+      "npt_melt_ramp": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp_out.data",
+      "nvt_melt_hold": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold_out.data",
+      "nvt_warmup": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup_out.data"
+    },
+    "velocity_seed": 405550636
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 530.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 530.0,
+    "annealing_T_high_K": 610.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.55,
+    "dp_typical": 41,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 414243003,
+    "experimental_density_gcm3": 1.391,
+    "experimental_tg_K": 371.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "melt_hold_min_steps": 4000000,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 150,
+    "tg_t_step_K": 20,
+    "velocity_seed": 405550636
+  },
+  "stage": "equilibration",
+  "status": "accepted"
+}

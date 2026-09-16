@@ -1,0 +1,180 @@
+phase:             full
+npt_prod_log_path: data/PEGCMP1/lammps/equil/npt_production/npt_production.log
+melt_dump_path:    data/PEGCMP1/lammps/equil/npt_production/npt_production.dump
+npt_prod_temp_K:   300.0   # target_temp= for extract_equilibrated_density
+equil_data_path:   data/PEGCMP1/lammps/equil/npt_production/npt_production_out.data
+run_name:          PEGCMP1
+polymer_class:     POXI
+backbone_types:    [1, 2, 5]   # c4 + c4o (backbone C) + o2e (ether O); excludes h1/h1o hydrogens and o2h hydroxyl end-cap
+ct_min_decay_melt: 0.2   # ct_min_decay= ; null ⇒ aromatic main chain, C(t)/C∞ advisory only (do NOT pass ct_min_decay)
+cutoff_A:          9.5   # pass as cutoff_A= — arms the minimum-image check L >= 2*cutoff_A
+is_glassy:         false   # True → require_glassy carve-out: C(t)/Rg/MSD gates are advisory; gate only on density SEM/CV/P2
+regime:            rubbery   # if rubbery: require_rubbery carve-out applies — C(t)/MSD/Rg/τ_relax ADVISORY; verdict gates ONLY on density block-SEM<1% AND Poisson-corrected homogeneity signal CV<=0.11 AND n_eff_density>=20 AND energy drift/SEM AND finite size; do NOT EXTEND/FAIL on reptation metrics alone. If glassy: no carve-out from this line (see is_glassy for require_glassy).
+dp:                100   # DP≥30 required for require_glassy carve-out to apply. NOTE: a class with ct_gate_reliable=false (aromatic main chain) already has ct_min_decay=null above, so its melt-diffusion C(t) gate is suppressed INDEPENDENT of DP — a DP<30 aromatic cell still passes equil on the structural gates (density/SEM/CV/P2/Rg). The DP≥30 clause only bites classes that would otherwise arm ct_min_decay.
+exp_density_range: [1.064, 1.176]
+output_dir:        data/PEGCMP1/raw
+graphs_dir:        data/PEGCMP1/graphs
+tasks:
+  - check_equilibration_comprehensive
+  - extract_equilibrated_density
+
+### D-05 REQUIREMENT (PEEK2 I-04): return result["d05_markdown_path"] (the tool writes
+### the block to data/PEGCMP1/raw/d05_block.md) as d05_markdown_path in your RESULT block.
+### Do NOT paste the block itself — the orchestrator splices it into run_log.md with
+### orchestration/scripts/write_d05.py. It contains the real Rg/MSD/density/C(t)/R_ee
+### values, so no [X ± Y] / [X]% / [PASS / FAIL] placeholder may survive in run_log.md.
+
+### MECHANIZED GATE (Step 3, replaces your own PASS/EXTEND/FAIL judgment — see EQUIL_CHECK guide):
+### after Steps 1-2 write their JSON to output_dir, call the MCP tool
+### mcp__mcp-lammps-engine__enforce_equilibration_gate with:
+###   comprehensive_json = data/PEGCMP1/rawequilibration_comprehensive.json
+###   regime              = rubbery
+###   dp                  = 100
+###   ct_gate_reliable    = true
+###   exp_density_gcm3    = 1.12
+###   tg_K                = 206
+###   t_equil_K           = 300.0
+###   glass_data          = data/PEGCMP1/lammps/equil/npt_production/npt_production_out.data
+###   melt_data           = /home/arz2/PolyJarvis/data/PEGCMP1/lammps/equil/npt_production/npt_production_out.data
+###   out_dir             = data/PEGCMP1/raw
+###   alpha_glass_per_K   = null
+###   alpha_melt_per_K    = null
+### alpha_glass_per_K/alpha_melt_per_K are curated per-class values (polymer_rules.json) or,
+### for off-table/low-medium-confidence classes, planner-sourced from literature_grounding.json's
+### CTE evidence — collected once at plan time, never searched live inside this gate. null means
+### no class- or grounding-specific value exists; the tool falls back to its own generic default
+### (2.5e-4 / 6.0e-4 per K) and the density_value_binding diagnosis is generic-CTE quality.
+### One call — it runs assess_cooling_contraction internally when needed and returns the final
+### verdict directly (no needs_probe round-trip). Use its "verdict" field (PASS | EXTEND |
+### STRUCTURAL_FAIL | FAIL) as equil_verdict directly. Do NOT override it with your own reading
+### of the numbers. (orchestration/enforce_gate.py --live is the same logic as a Bash-callable
+### CLI, kept for retrospective/offline auditing — not used by this live prompt.)
+
+--- Worker Guide (EQUIL_CHECK) ---
+# Equilibration Check Guide
+**Read when:** You are `equilibration-checker` and need to validate the equil chain and extract density.
+**Scope:** Equilibration quality check + density extraction only.
+
+---
+
+## Rules
+
+**`backbone_types`** is **REQUIRED** for `check_equilibration_comprehensive` — do not guess. Derive
+it from the **original pre-simulation `.data` file** (the one EMC/RadonPy wrote, e.g. the D-00
+build result's `data_path` in `run_log.md`) — **never** a `write_data` output like
+`equil_data_path`/`npt_prod_data_path`. `info.atom_type_names` gives each type's FF label
+(e.g. `c`, `c1`, `c_1`, `hc`, `o_1`, `o_2`) and `info.h_type_ids` already excludes hydrogens. Pick
+the heavy types that continue the polymer backbone; if a side-group heavy (e.g. a carbonyl O)
+could be confused with a backbone one, cross-check with `awk '/^Bonds/,/^Angles/' file.data` —
+backbone types appear in chain-continuing bonds. E.g. PEEK = `[1,2,5]` (aromatic C + ether O);
+type names starting with `h` are never backbone.
+
+`ct_min_decay_melt` null ⇒ aromatic main chain: leave C(t) advisory, do NOT pass `ct_min_decay` to
+`check_equilibration_comprehensive`. C(t)/MSD/R_ee are computed on the melt dump regardless, so
+`ct_decay_fraction`/`ct_tau_relax_ps` are always populated — report the actual values even when
+`ct_min_decay_melt` was null (advisory-only, not N/A). For PHYC (PE): include `ct_decayed` +
+`tau_relax_ps` in the RESULT block even on passes.
+
+Density passes within ±5% of experimental; **below −5% is BINDING, not a soft warning.**
+
+**Use `enforce_equilibration_gate`'s `verdict` field directly — do not re-derive PASS/EXTEND/FAIL
+from the raw numbers yourself.** The four possible verdicts:
+- **`PASS`** → `equil_verdict=PASS`.
+- **`EXTEND`** → `equil_verdict=EXTEND`. Only density/energy drift, block-SEM, or `n_eff_density`
+  failed — genuinely not-yet-converged, more NPT at the same T can fix it.
+- **`STRUCTURAL_FAIL`** → `equil_verdict=STRUCTURAL_FAIL`. The cell converged to the *wrong*
+  value, not merely an unconverged one — `EXTEND` cannot fix this. Check the `remedy` field:
+  - `re_melt_slow_recool` (from `UNDER_ANNEALED_COOLING`) — melt was fine, cooling ramp too fast.
+  - `heavy_melt_anneal_probe` (from `MELT_STAGE_DEFICIT`) — melt itself deficient; re-cooling
+    slower will NOT help.
+  - melt-mixing remedy (`density_homogeneity` failing, `homogeneity_verdict=HOMOG_HETEROGENEOUS`) —
+    this is what `phase=melt`'s pre-cool gate exists to catch (see Phase below): extend melt-stage
+    dwell in place, not the cooling ramp, and never re-melt from scratch. Owned by `/recover`'s
+    MELT-MIXING procedure, not this worker.
+  - rebuild remedy (`finite_size_verdict=SIZE_MIN_IMAGE_VIOLATION` or `SIZE_CHAIN_SELF_IMAGE`) — the
+    box is too small for its own contents: below `2·cutoff_A` the pair potential is wrong, and below
+    `2·Rg` every chain overlaps its own periodic images. Raise `nchain` and rebuild; no amount of
+    equilibration fixes a too-small box.
+- **`FAIL`** → `equil_verdict=FAIL`. Box collapse, charge imbalance, dead cell (C(t) exactly 0%),
+  or any binding-gate failure the mechanized script can't classify into the above. (C(t)
+  decaying-but-incomplete is not a FAIL — you should never see it in `failing_binding_gates`.)
+
+## Phase
+
+`phase` from the prompt: `full` (default) is today's gate, after the whole equilibration chain
+completes, with density extraction and the cooling-contraction diagnosis available. `melt`
+(glassy only) runs against `npt_production`/`nvt_production` — the pre-cool checkpoint — *before*
+`npt_cool300`/`npt_prod300` are even submitted. `phase=melt` cannot run `assess_cooling_contraction` (no glass state
+exists yet), so `UNDER_ANNEALED_COOLING`/`MELT_STAGE_DEFICIT` are unreachable verdicts there —
+only the structural/thermo gates that are meaningful on the melt trajectory alone (density/energy
+drift, block-SEM, `n_eff_density`, Rg CV, P2, density-homogeneity signal CV, finite size, C(t)) can
+fire. The prompt's `tasks:` list and MECHANIZED GATE args already reflect which phase you're in —
+follow them, don't infer.
+
+Always pass `cutoff_A` from the prompt to `check_equilibration_comprehensive` — it is required,
+never optional. It arms the minimum-image half of the finite-size gate (`L ≥ 2·cutoff_A`); omitted,
+that half is not evaluated and the verdict rests on the chain-self-imaging criterion (`L ≥ 2·Rg`)
+alone. Report `L_over_2cutoff`, `L_over_2Rg`, and `L_over_Ree` in the RESULT block, and report
+`min_image_evaluated: false` as a defect in your own invocation, not as a property of the cell.
+`L < R_ee` alone is advisory — do not treat it as a failure.
+
+`residual_stress` is reported, never binding. Copy `von_mises_atm`, `z_max`, and `resolved` into the
+RESULT block as-is; do not treat a large `z_max` as a failure or re-derive a verdict from it.
+
+---
+
+## Workflow
+
+### `inspect_data_file` → `backbone_types`
+
+Only if `backbone_types` isn't already given in the prompt — call on the original pre-simulation
+`.data` file per the Rules above.
+
+### `check_equilibration_comprehensive`
+
+```python
+kwargs = dict(
+    log_file=npt_prod_log_path,   # production NPT log → thermo convergence (density/energy drift + block-SEM)
+    dump_file=melt_dump_path,     # MELT nvt_production.dump (both phases) → C(t)/MSD/Rg/R_ee on mobile chains.
+                                  # NOT the production dump: below Tg C(t) never decays (meaningless by construction)
+    data_file=equil_data_path,
+    backbone_types=backbone_types,
+    output_dir=output_dir,
+    graphs_dir=graphs_dir,
+)
+if ct_min_decay_melt is not None:
+    kwargs["ct_min_decay"] = ct_min_decay_melt
+kwargs["cutoff_A"] = cutoff_A              # required — arms the minimum-image check
+check_equilibration_comprehensive(**kwargs)
+```
+
+**Result fields for the RESULT block** (all from this single call):
+- `overall_pass`, `d05_markdown_path`, `density_converged`, `energy_converged`, `ct_decayed`, `warnings`
+- `result["chain"]["ct"]["decay_fraction_at_end"]` → `ct_decay_fraction`
+- `result["chain"]["ct"]["tau_relax_ps"]` → `ct_tau_relax_ps`
+- `result["chain"]["ree"]["mean_R_ee_A"|"std_R_ee_A"|"n_chains"]` → `end_to_end_r_mean_A` / `_std_A` / `_n_chains`
+- `result["spatial"]["finite_size"]` → `L_min_A`, `L_over_2cutoff`, `L_over_2Rg`, `L_over_Ree`, `verdict`
+
+### `extract_equilibrated_density`
+
+```python
+extract_equilibrated_density(
+    log_file=npt_prod_log_path,
+    output_dir=output_dir,
+    graphs_dir=graphs_dir,
+    eq_fraction=0.5,                 # discard first 50% as burn-in
+    target_temp=npt_prod_temp_K,     # filter to production-T rows if log is multi-T
+)
+```
+Primary output: `plateau_density_mean` ± `plateau_density_std`. Verify `plateau_step_range`
+starts after the compression ramp.
+
+### `enforce_equilibration_gate`
+
+Call args are filled in above (search "MECHANIZED GATE"). Call it after the equilibration check
+and density extraction write their JSON.
+
+
+
+---
+**Bash cwd:** never `cd`; use absolute paths. Your `.claude/agent-memory/<worker>/` notes resolve relative to cwd — `cd` strands them outside the repo root.

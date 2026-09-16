@@ -1,0 +1,178 @@
+{
+  "active_finding": {
+    "code": "DENSITY_HETEROGENEITY",
+    "confidence": "high",
+    "details": {
+      "advisory_gates": {
+        "msd_not_trapped": true,
+        "msid_gaussian": false,
+        "residual_stress": true
+      },
+      "applicable_clause": "require_melt",
+      "binding_gates": {
+        "chain_displacement": true,
+        "density_drift": true,
+        "density_homogeneity": false,
+        "density_sem": true,
+        "energy_component_drift": true,
+        "energy_drift": true,
+        "energy_sem": true,
+        "finite_size": true,
+        "n_eff_density": true,
+        "p2": true,
+        "rg": true,
+        "torsion": true
+      },
+      "cooling_extrapolation_reliable": null,
+      "cooling_verdict": null,
+      "density_value_binding": "n/a",
+      "failing_binding_gates": [
+        "density_homogeneity"
+      ],
+      "finite_size": {
+        "L_min_A": 39.01,
+        "L_over_2Rg": 1.096,
+        "L_over_2cutoff": 1.773,
+        "L_over_Ree": 0.88,
+        "available": true,
+        "box_A": [
+          39.01,
+          39.01,
+          39.01
+        ],
+        "cutoff_A": 11.0,
+        "graded_box": "actual_equilibrated",
+        "min_image_evaluated": true,
+        "pass": true,
+        "ree_self_image_flag": true,
+        "self_image_advisory": false,
+        "verdict": "SIZE_PASS"
+      },
+      "finite_size_min_image_unarmed": false,
+      "finite_size_verdict": "SIZE_PASS",
+      "homogeneity_verdict": "HOMOG_HETEROGENEOUS",
+      "regime": "melt",
+      "remedy": "MELT-MIXING \u2014 extend the melt reference block in place (extend_only=True, base_stage_name=<the cool_block_NN tagged as the melt reference>, extend_temp_K=temp, cap 2), then re-run the gate. Never re-melt from scratch and never touch the cooling ramp for a mixing defect.",
+      "remedy_confidence": "high",
+      "residual_stress": {
+        "available": true,
+        "dev_atm": {
+          "Pxx": 13.0,
+          "Pyy": -32.6,
+          "Pzz": 19.6
+        },
+        "max_abs_dev_atm": 32.6,
+        "mean_pressure_atm": -27.5,
+        "resolved": false,
+        "von_mises_atm": 49.2,
+        "z_max": 0.91
+      },
+      "saved_to": "/home/arz2/PolyJarvis_v2/data/PTFE_noAI/attempts/equilibration/attempt-0001/raw/equilibration.json",
+      "unmeasured_binding_gates": [],
+      "verdict": "STRUCTURAL_FAIL"
+    },
+    "remedy_id": null,
+    "severity": "blocking",
+    "stage": "equilibration"
+  },
+  "agent_escalations": [],
+  "created_at": "2026-09-14T01:52:04.165527+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 780.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "opls-library",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 11.0,
+    "density_initial_gcm3": 0.89,
+    "dp_typical": 50,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 909670995,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "opls/2024/opls-aa",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 930760043
+  },
+  "engine_version": "workflow-engine-v3",
+  "input_hash_restamp": [
+    {
+      "at": "2026-09-16T22:01:58.289133+00:00",
+      "reason": "trajectory dumps compressed to .dump.gz (no re-execution, no re-analysis); artifact paths and sha256 changed, so dependency checksums and every dependent stage input hash shifted",
+      "stages": {}
+    }
+  ],
+  "plan_hash": "6b5a03955d454e7a72b1df496d144b322198a9d5f0dec0fb9cd65209b075bab2",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 0
+  },
+  "run_name": "PTFE_noAI",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T01:52:34.864290+00:00",
+          "input_hash": "59a718ec26d7ec109eaa194daca74ea7d840100267291c3874c6d5dce18cc548",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PTFE_noAI/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T01:52:04.166127+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "59a718ec26d7ec109eaa194daca74ea7d840100267291c3874c6d5dce18cc548",
+      "status": "accepted"
+    },
+    "cooling": {
+      "attempts": [],
+      "status": "pending"
+    },
+    "equilibration": {
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T06:33:30.490987+00:00",
+          "input_hash": "de558e9e97e70779bbca1d0b40369bd8ac5a0037add142f206b5f86677336ac2",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PTFE_noAI/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T01:52:34.868656+00:00",
+          "status": "remedy_required"
+        }
+      ],
+      "input_hash": "de558e9e97e70779bbca1d0b40369bd8ac5a0037add142f206b5f86677336ac2",
+      "status": "escalation_required"
+    },
+    "mechanical": {
+      "attempts": [],
+      "status": "pending"
+    },
+    "summary": {
+      "attempts": [],
+      "status": "pending"
+    },
+    "thermal": {
+      "attempts": [],
+      "status": "pending"
+    }
+  },
+  "status": "escalation_required",
+  "updated_at": "2026-09-14T06:33:30.492255+00:00"
+}

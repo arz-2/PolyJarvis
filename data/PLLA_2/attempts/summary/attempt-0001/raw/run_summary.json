@@ -1,0 +1,123 @@
+{
+  "run": {
+    "name": "PLLA_2",
+    "smiles": "*[C@@H](C)C(=O)O*",
+    "polymer_class": "PEST",
+    "ff": "pcff",
+    "charge_method": "bond-increment",
+    "dp": 70,
+    "n_chains": 10,
+    "n_atoms": null,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": "pcff",
+    "D-02_charges": "bond-increment",
+    "D-03_electrostatics": "pppm",
+    "D-04_system_size": "DP=70, 10 chains",
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "GOOD"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 421.0,
+      "grading_basis": "raw_MD",
+      "r_squared": 0.9933,
+      "fit_quality": "GOOD",
+      "primary_fit_invalid": false,
+      "n_replicates": 1,
+      "transition_width_c_K": 84.2,
+      "tg_uncertainty_K": 26.3
+    },
+    "density": {
+      "value_g_cm3": 1.227022,
+      "temperature_K": 300.0
+    },
+    "melt_density": {
+      "value_g_cm3": 1.101778,
+      "temperature_K": 620.14
+    },
+    "bulk_modulus": {
+      "value_GPa": 4.7172,
+      "sem_GPa": 0.0589,
+      "method": "murnaghan",
+      "temperature_K": 300.01
+    }
+  },
+  "byproducts": {
+    "cte_glass": {
+      "value": 0.000186359,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_glassy_per_K",
+      "gate": {
+        "field": "slope_signs_valid",
+        "verdict": true
+      },
+      "blocking": false
+    },
+    "cte_rubber": {
+      "value": 0.000436507,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_rubbery_per_K",
+      "gate": {
+        "field": "slope_ordering_valid",
+        "verdict": true
+      },
+      "blocking": false
+    },
+    "tg_transition_width": {
+      "value": 84.2,
+      "unit": "K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:transition_width_c_K",
+      "gate": {
+        "field": "fit_quality",
+        "verdict": "GOOD"
+      },
+      "blocking": false
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.3903,
+    "caveats": []
+  },
+  "structural_checks": {
+    "rg_cv": 0.2177,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": true,
+    "diffusion_regime": "strongly sub-diffusive (see kinetic_trap_flag for trap verdict)",
+    "msid_slope": 1.111,
+    "msid_large_s_slope": 1.051,
+    "msid_large_s_gaussian_pass": true,
+    "ordered_flag": false,
+    "p2_mean": 0.0097,
+    "heterogeneous_flag": false,
+    "density_cv_mean": 0.1857
+  },
+  "artifacts": {
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "artifacts_missing": [
+    {
+      "file": "bulk_modulus_deform.json",
+      "found_in": null
+    }
+  ],
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "2876fc7",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-09-11T21:04:22.925115+00:00"
+  }
+}

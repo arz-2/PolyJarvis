@@ -1,0 +1,1154 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[pcff] (engine=kokkos)
+INFO: gpu_ids not given — derived "0" from hardware_policy[pcff]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+/home/arz2/PolyJarvis_v2/mcp-servers/.venv/lib/python3.12/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+  warnings.warn(
+2026-09-09 16:38:52,354 [LAMMPS-ENGINE] INFO Loaded 143 runs from /home/arz2/PolyJarvis_v2/data/_engine/run_state.json
+[wait] cooling chain: watching 271e346b
+2026-09-09 18:27:53,511 [LAMMPS-ENGINE] INFO Running comprehensive equilibration check: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/check_equilibration_comprehensive.py --log_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log --dump_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.dump --data_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.data --backbone_types 1 2 3 6 7 --output_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/raw --skip_frames 50 --timestep_fs 1.0 --dump_every 1000 --bond_length_A 1.54 --eq_fraction 0.5 --drift_threshold_pct 1.0 --drift_pvalue 0.01 --block_count 10 --temp_col Temp --density_col Density --energy_col TotEng --atom_style "id resid type charge x y z" --cv_signal_max 0.11 --output_name cooling.json --cutoff_A 9.5 --graphs_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/graphs --struct_dump_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.dump --struct_data_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.data
+2026-09-09 18:27:53,511 [LAMMPS-ENGINE] INFO Running: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/check_equilibration_comprehensive.py --log_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log --dump_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.dump --data_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.data --backbone_types 1 2 3 6 7 --output_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/raw --skip_frames 50 --timestep_fs 1.0 --dump_every 1000 --bond_length_A 1.54 --eq_fraction 0.5 --drift_threshold_pct 1.0 --drift_pvalue 0.01 --block_count 10 --temp_col Temp --density_col Density --energy_col TotEng --atom_style "id resid type charge x y z" --cv_signal_max 0.11 --output_name cooling.json --cutoff_A 9.5 --graphs_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/graphs --struct_dump_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.dump --struct_data_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.data
+2026-09-09 18:30:48,044 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_96111667.json
+2026-09-09 18:30:49,554 [LAMMPS-ENGINE] INFO Running equilibrated density extraction via CLI: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_equilibrated_density.py --log_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log --output_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/raw --eq_fraction 0.5 --target_temp 300.0 --temp_tolerance 50.0 --plateau_shift_sigma 1.0 --density_col Density --temp_col Temp --output_name cooling.json
+2026-09-09 18:30:49,554 [LAMMPS-ENGINE] INFO Running: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_equilibrated_density.py --log_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log --output_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/raw --eq_fraction 0.5 --target_temp 300.0 --temp_tolerance 50.0 --plateau_shift_sigma 1.0 --density_col Density --temp_col Temp --output_name cooling.json
+2026-09-09 18:30:50,771 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_f45dd51c.json
+2026-09-09 18:30:51,533 [LAMMPS-ENGINE] INFO enforce_equilibration_gate: auto-running density_value_binding probe: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/assess_cooling_contraction.py --glass_data /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.data --tg_K 331.0 --t_equil_K 620.0 --final_T_K 300.0 --melt_data /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data --melt_log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.log --glass_log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log
+2026-09-09 18:30:51,534 [LAMMPS-ENGINE] INFO Running: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/assess_cooling_contraction.py --glass_data /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.data --tg_K 331.0 --t_equil_K 620.0 --final_T_K 300.0 --melt_data /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data --melt_log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold.log --glass_log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log
+[wait] tg sweep T=620.0K (ext 0): watching d37cfb3b
+2026-09-09 18:31:17,814 [LAMMPS-ENGINE] INFO [d37cfb3b] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 18:31:17,814 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/d37cfb3b_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_d37cfb3b
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T620_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/d37cfb3b_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"d37cfb3b","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_d37cfb3b.json
+else
+  echo '{"run_id":"d37cfb3b","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_d37cfb3b.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_d37cfb3b
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/d37cfb3b_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/d37cfb3b_run.sh </dev/null & disown; echo $!
+2026-09-09 18:31:47,819 [LAMMPS-ENGINE] INFO [d37cfb3b] nohup PID=unknown
+2026-09-09 18:46:47,873 [LAMMPS-ENGINE] INFO [d37cfb3b] LAMMPS completed successfully
+[wait] tg sweep T=600.0K (ext 0): watching 722bca43
+2026-09-09 18:46:48,305 [LAMMPS-ENGINE] INFO [722bca43] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 18:46:48,305 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/722bca43_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_722bca43
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T600_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/722bca43_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"722bca43","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_722bca43.json
+else
+  echo '{"run_id":"722bca43","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_722bca43.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_722bca43
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/722bca43_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/722bca43_run.sh </dev/null & disown; echo $!
+2026-09-09 18:47:18,335 [LAMMPS-ENGINE] INFO [722bca43] nohup PID=unknown
+2026-09-09 19:02:18,423 [LAMMPS-ENGINE] INFO [722bca43] LAMMPS completed successfully
+[wait] tg sweep T=580.0K (ext 0): watching b120c325
+2026-09-09 19:02:18,818 [LAMMPS-ENGINE] INFO [b120c325] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 19:02:18,818 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/b120c325_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_b120c325
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T580_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/b120c325_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"b120c325","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_b120c325.json
+else
+  echo '{"run_id":"b120c325","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_b120c325.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_b120c325
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/b120c325_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/b120c325_run.sh </dev/null & disown; echo $!
+2026-09-09 19:02:48,848 [LAMMPS-ENGINE] INFO [b120c325] nohup PID=unknown
+2026-09-09 19:17:48,941 [LAMMPS-ENGINE] INFO [b120c325] LAMMPS completed successfully
+[wait] tg sweep T=560.0K (ext 0): watching 7b8729f0
+2026-09-09 19:17:49,367 [LAMMPS-ENGINE] INFO [7b8729f0] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 19:17:49,367 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7b8729f0_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_7b8729f0
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T560_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7b8729f0_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"7b8729f0","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_7b8729f0.json
+else
+  echo '{"run_id":"7b8729f0","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_7b8729f0.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_7b8729f0
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7b8729f0_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7b8729f0_run.sh </dev/null & disown; echo $!
+2026-09-09 19:18:19,398 [LAMMPS-ENGINE] INFO [7b8729f0] nohup PID=unknown
+2026-09-09 19:33:19,480 [LAMMPS-ENGINE] INFO [7b8729f0] LAMMPS completed successfully
+[wait] tg sweep T=540.0K (ext 0): watching f5502c95
+2026-09-09 19:33:19,864 [LAMMPS-ENGINE] INFO [f5502c95] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 19:33:19,864 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/f5502c95_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_f5502c95
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T540_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/f5502c95_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"f5502c95","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_f5502c95.json
+else
+  echo '{"run_id":"f5502c95","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_f5502c95.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_f5502c95
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/f5502c95_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/f5502c95_run.sh </dev/null & disown; echo $!
+2026-09-09 19:33:49,895 [LAMMPS-ENGINE] INFO [f5502c95] nohup PID=unknown
+2026-09-09 19:48:39,956 [LAMMPS-ENGINE] INFO [f5502c95] LAMMPS completed successfully
+[wait] tg sweep T=520.0K (ext 0): watching d12396cd
+2026-09-09 19:48:50,453 [LAMMPS-ENGINE] INFO [d12396cd] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 19:48:50,453 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/d12396cd_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_d12396cd
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T520_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/d12396cd_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"d12396cd","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_d12396cd.json
+else
+  echo '{"run_id":"d12396cd","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_d12396cd.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_d12396cd
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/d12396cd_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/d12396cd_run.sh </dev/null & disown; echo $!
+2026-09-09 19:49:20,484 [LAMMPS-ENGINE] INFO [d12396cd] nohup PID=unknown
+2026-09-09 20:04:10,528 [LAMMPS-ENGINE] INFO [d12396cd] LAMMPS completed successfully
+[wait] tg sweep T=500.0K (ext 0): watching 095f515f
+2026-09-09 20:04:20,985 [LAMMPS-ENGINE] INFO [095f515f] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 20:04:20,985 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/095f515f_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_095f515f
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T500_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/095f515f_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"095f515f","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_095f515f.json
+else
+  echo '{"run_id":"095f515f","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_095f515f.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_095f515f
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/095f515f_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/095f515f_run.sh </dev/null & disown; echo $!
+2026-09-09 20:04:51,015 [LAMMPS-ENGINE] INFO [095f515f] nohup PID=unknown
+2026-09-09 20:19:41,068 [LAMMPS-ENGINE] INFO [095f515f] LAMMPS completed successfully
+[wait] tg sweep T=480.0K (ext 0): watching 0ec70b1c
+2026-09-09 20:19:51,548 [LAMMPS-ENGINE] INFO [0ec70b1c] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 20:19:51,548 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/0ec70b1c_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_0ec70b1c
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T480_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/0ec70b1c_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"0ec70b1c","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_0ec70b1c.json
+else
+  echo '{"run_id":"0ec70b1c","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_0ec70b1c.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_0ec70b1c
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/0ec70b1c_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/0ec70b1c_run.sh </dev/null & disown; echo $!
+2026-09-09 20:20:21,578 [LAMMPS-ENGINE] INFO [0ec70b1c] nohup PID=unknown
+2026-09-09 20:35:11,632 [LAMMPS-ENGINE] INFO [0ec70b1c] LAMMPS completed successfully
+[wait] tg sweep T=460.0K (ext 0): watching 3d2af120
+2026-09-09 20:35:22,052 [LAMMPS-ENGINE] INFO [3d2af120] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 20:35:22,052 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3d2af120_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_3d2af120
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T460_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3d2af120_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"3d2af120","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_3d2af120.json
+else
+  echo '{"run_id":"3d2af120","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_3d2af120.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_3d2af120
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3d2af120_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3d2af120_run.sh </dev/null & disown; echo $!
+2026-09-09 20:35:52,083 [LAMMPS-ENGINE] INFO [3d2af120] nohup PID=unknown
+2026-09-09 20:50:42,151 [LAMMPS-ENGINE] INFO [3d2af120] LAMMPS completed successfully
+[wait] tg sweep T=440.0K (ext 0): watching a09d33ce
+2026-09-09 20:50:52,610 [LAMMPS-ENGINE] INFO [a09d33ce] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 20:50:52,610 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/a09d33ce_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_a09d33ce
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T440_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/a09d33ce_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"a09d33ce","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_a09d33ce.json
+else
+  echo '{"run_id":"a09d33ce","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_a09d33ce.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_a09d33ce
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/a09d33ce_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/a09d33ce_run.sh </dev/null & disown; echo $!
+2026-09-09 20:51:22,640 [LAMMPS-ENGINE] INFO [a09d33ce] nohup PID=unknown
+2026-09-09 21:06:02,699 [LAMMPS-ENGINE] INFO [a09d33ce] LAMMPS completed successfully
+[wait] tg sweep T=420.0K (ext 0): watching 7d9b2bfe
+2026-09-09 21:06:23,146 [LAMMPS-ENGINE] INFO [7d9b2bfe] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 21:06:23,146 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7d9b2bfe_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_7d9b2bfe
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T420_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7d9b2bfe_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"7d9b2bfe","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_7d9b2bfe.json
+else
+  echo '{"run_id":"7d9b2bfe","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_7d9b2bfe.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_7d9b2bfe
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7d9b2bfe_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7d9b2bfe_run.sh </dev/null & disown; echo $!
+2026-09-09 21:06:53,177 [LAMMPS-ENGINE] INFO [7d9b2bfe] nohup PID=unknown
+2026-09-09 21:21:33,229 [LAMMPS-ENGINE] INFO [7d9b2bfe] LAMMPS completed successfully
+[wait] tg sweep T=400.0K (ext 0): watching 7502ca13
+2026-09-09 21:21:53,691 [LAMMPS-ENGINE] INFO [7502ca13] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 21:21:53,691 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7502ca13_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_7502ca13
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T400_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7502ca13_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"7502ca13","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_7502ca13.json
+else
+  echo '{"run_id":"7502ca13","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_7502ca13.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_7502ca13
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7502ca13_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7502ca13_run.sh </dev/null & disown; echo $!
+2026-09-09 21:22:23,722 [LAMMPS-ENGINE] INFO [7502ca13] nohup PID=unknown
+2026-09-09 21:37:03,750 [LAMMPS-ENGINE] INFO [7502ca13] LAMMPS completed successfully
+[wait] tg sweep T=380.0K (ext 0): watching 9b803a6e
+2026-09-09 21:37:24,195 [LAMMPS-ENGINE] INFO [9b803a6e] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 21:37:24,196 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/9b803a6e_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_9b803a6e
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T380_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/9b803a6e_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"9b803a6e","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_9b803a6e.json
+else
+  echo '{"run_id":"9b803a6e","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_9b803a6e.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_9b803a6e
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/9b803a6e_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/9b803a6e_run.sh </dev/null & disown; echo $!
+2026-09-09 21:37:54,226 [LAMMPS-ENGINE] INFO [9b803a6e] nohup PID=unknown
+2026-09-09 21:52:34,285 [LAMMPS-ENGINE] INFO [9b803a6e] LAMMPS completed successfully
+[wait] tg sweep T=360.0K (ext 0): watching e8ed6d33
+2026-09-09 21:52:54,758 [LAMMPS-ENGINE] INFO [e8ed6d33] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 21:52:54,758 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/e8ed6d33_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_e8ed6d33
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T360_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/e8ed6d33_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"e8ed6d33","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_e8ed6d33.json
+else
+  echo '{"run_id":"e8ed6d33","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_e8ed6d33.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_e8ed6d33
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/e8ed6d33_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/e8ed6d33_run.sh </dev/null & disown; echo $!
+2026-09-09 21:53:24,788 [LAMMPS-ENGINE] INFO [e8ed6d33] nohup PID=unknown
+2026-09-09 22:08:04,852 [LAMMPS-ENGINE] INFO [e8ed6d33] LAMMPS completed successfully
+[wait] tg sweep T=340.0K (ext 0): watching a2d6690c
+2026-09-09 22:08:25,340 [LAMMPS-ENGINE] INFO [a2d6690c] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 22:08:25,340 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/a2d6690c_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_a2d6690c
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T340_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/a2d6690c_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"a2d6690c","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_a2d6690c.json
+else
+  echo '{"run_id":"a2d6690c","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_a2d6690c.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_a2d6690c
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/a2d6690c_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/a2d6690c_run.sh </dev/null & disown; echo $!
+2026-09-09 22:08:55,370 [LAMMPS-ENGINE] INFO [a2d6690c] nohup PID=unknown
+2026-09-09 22:23:35,422 [LAMMPS-ENGINE] INFO [a2d6690c] LAMMPS completed successfully
+[wait] tg sweep T=320.0K (ext 0): watching 920debb9
+2026-09-09 22:23:55,909 [LAMMPS-ENGINE] INFO [920debb9] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 22:23:55,909 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/920debb9_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_920debb9
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T320_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/920debb9_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"920debb9","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_920debb9.json
+else
+  echo '{"run_id":"920debb9","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_920debb9.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_920debb9
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/920debb9_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/920debb9_run.sh </dev/null & disown; echo $!
+2026-09-09 22:24:25,940 [LAMMPS-ENGINE] INFO [920debb9] nohup PID=unknown
+2026-09-09 22:38:56,016 [LAMMPS-ENGINE] INFO [920debb9] LAMMPS completed successfully
+[wait] tg sweep T=300.0K (ext 0): watching fc5cc3c6
+2026-09-09 22:38:56,558 [LAMMPS-ENGINE] INFO [fc5cc3c6] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 22:38:56,558 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/fc5cc3c6_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_fc5cc3c6
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T300_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/fc5cc3c6_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"fc5cc3c6","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_fc5cc3c6.json
+else
+  echo '{"run_id":"fc5cc3c6","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_fc5cc3c6.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_fc5cc3c6
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/fc5cc3c6_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/fc5cc3c6_run.sh </dev/null & disown; echo $!
+2026-09-09 22:39:26,589 [LAMMPS-ENGINE] INFO [fc5cc3c6] nohup PID=unknown
+2026-09-09 22:53:56,744 [LAMMPS-ENGINE] INFO [fc5cc3c6] LAMMPS completed successfully
+[wait] tg sweep T=280.0K (ext 0): watching ed8dc34c
+2026-09-09 22:53:57,150 [LAMMPS-ENGINE] INFO [ed8dc34c] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 22:53:57,150 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/ed8dc34c_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_ed8dc34c
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T280_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/ed8dc34c_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"ed8dc34c","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_ed8dc34c.json
+else
+  echo '{"run_id":"ed8dc34c","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_ed8dc34c.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_ed8dc34c
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/ed8dc34c_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/ed8dc34c_run.sh </dev/null & disown; echo $!
+2026-09-09 22:54:27,181 [LAMMPS-ENGINE] INFO [ed8dc34c] nohup PID=unknown
+2026-09-09 23:08:57,360 [LAMMPS-ENGINE] INFO [ed8dc34c] LAMMPS completed successfully
+[wait] tg sweep T=260.0K (ext 0): watching c00393b9
+2026-09-09 23:08:57,758 [LAMMPS-ENGINE] INFO [c00393b9] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 23:08:57,758 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/c00393b9_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_c00393b9
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T260_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/c00393b9_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"c00393b9","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_c00393b9.json
+else
+  echo '{"run_id":"c00393b9","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_c00393b9.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_c00393b9
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/c00393b9_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/c00393b9_run.sh </dev/null & disown; echo $!
+2026-09-09 23:09:27,789 [LAMMPS-ENGINE] INFO [c00393b9] nohup PID=unknown
+2026-09-09 23:23:57,916 [LAMMPS-ENGINE] INFO [c00393b9] LAMMPS completed successfully
+[wait] tg sweep T=240.0K (ext 0): watching 3e45f226
+2026-09-09 23:23:58,405 [LAMMPS-ENGINE] INFO [3e45f226] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 23:23:58,405 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3e45f226_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_3e45f226
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T240_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3e45f226_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"3e45f226","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_3e45f226.json
+else
+  echo '{"run_id":"3e45f226","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_3e45f226.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_3e45f226
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3e45f226_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3e45f226_run.sh </dev/null & disown; echo $!
+2026-09-09 23:24:28,429 [LAMMPS-ENGINE] INFO [3e45f226] nohup PID=unknown
+2026-09-09 23:38:58,553 [LAMMPS-ENGINE] INFO [3e45f226] LAMMPS completed successfully
+[wait] tg sweep T=220.0K (ext 0): watching 3643bed6
+2026-09-09 23:38:58,984 [LAMMPS-ENGINE] INFO [3643bed6] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 23:38:58,984 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3643bed6_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_3643bed6
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T220_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3643bed6_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"3643bed6","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_3643bed6.json
+else
+  echo '{"run_id":"3643bed6","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_3643bed6.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_3643bed6
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3643bed6_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3643bed6_run.sh </dev/null & disown; echo $!
+2026-09-09 23:39:29,014 [LAMMPS-ENGINE] INFO [3643bed6] nohup PID=unknown
+2026-09-09 23:53:59,139 [LAMMPS-ENGINE] INFO [3643bed6] LAMMPS completed successfully
+[wait] tg sweep T=200.0K (ext 0): watching 91ef1af3
+2026-09-09 23:53:59,604 [LAMMPS-ENGINE] INFO [91ef1af3] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-09 23:53:59,604 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/91ef1af3_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_91ef1af3
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T200_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/91ef1af3_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"91ef1af3","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_91ef1af3.json
+else
+  echo '{"run_id":"91ef1af3","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_91ef1af3.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_91ef1af3
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/91ef1af3_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/91ef1af3_run.sh </dev/null & disown; echo $!
+2026-09-09 23:54:29,636 [LAMMPS-ENGINE] INFO [91ef1af3] nohup PID=unknown
+2026-09-10 00:08:49,689 [LAMMPS-ENGINE] INFO [91ef1af3] LAMMPS completed successfully
+[wait] tg sweep T=180.0K (ext 0): watching 0d2f8995
+2026-09-10 00:09:00,248 [LAMMPS-ENGINE] INFO [0d2f8995] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-10 00:09:00,248 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/0d2f8995_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_0d2f8995
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T180_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/0d2f8995_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"0d2f8995","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_0d2f8995.json
+else
+  echo '{"run_id":"0d2f8995","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_0d2f8995.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_0d2f8995
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/0d2f8995_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/0d2f8995_run.sh </dev/null & disown; echo $!
+2026-09-10 00:09:30,279 [LAMMPS-ENGINE] INFO [0d2f8995] nohup PID=unknown
+2026-09-10 00:23:50,330 [LAMMPS-ENGINE] INFO [0d2f8995] LAMMPS completed successfully
+[wait] tg sweep T=160.0K (ext 0): watching 509f0dfb
+2026-09-10 00:24:00,831 [LAMMPS-ENGINE] INFO [509f0dfb] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-10 00:24:00,831 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/509f0dfb_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_509f0dfb
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T160_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/509f0dfb_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"509f0dfb","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_509f0dfb.json
+else
+  echo '{"run_id":"509f0dfb","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_509f0dfb.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_509f0dfb
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/509f0dfb_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/509f0dfb_run.sh </dev/null & disown; echo $!
+2026-09-10 00:24:30,862 [LAMMPS-ENGINE] INFO [509f0dfb] nohup PID=unknown
+2026-09-10 00:38:50,906 [LAMMPS-ENGINE] INFO [509f0dfb] LAMMPS completed successfully
+[wait] tg sweep T=140.0K (ext 0): watching 3bbd25d2
+2026-09-10 00:39:01,404 [LAMMPS-ENGINE] INFO [3bbd25d2] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-10 00:39:01,405 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3bbd25d2_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_3bbd25d2
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T140_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3bbd25d2_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"3bbd25d2","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_3bbd25d2.json
+else
+  echo '{"run_id":"3bbd25d2","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_3bbd25d2.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_3bbd25d2
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3bbd25d2_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/3bbd25d2_run.sh </dev/null & disown; echo $!
+2026-09-10 00:39:31,410 [LAMMPS-ENGINE] INFO [3bbd25d2] nohup PID=unknown
+2026-09-10 00:53:41,456 [LAMMPS-ENGINE] INFO [3bbd25d2] LAMMPS completed successfully
+[wait] tg sweep T=120.0K (ext 0): watching 75c204ff
+2026-09-10 00:54:02,020 [LAMMPS-ENGINE] INFO [75c204ff] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-10 00:54:02,020 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/75c204ff_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_75c204ff
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T120_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/75c204ff_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"75c204ff","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_75c204ff.json
+else
+  echo '{"run_id":"75c204ff","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_75c204ff.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_75c204ff
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/75c204ff_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/75c204ff_run.sh </dev/null & disown; echo $!
+2026-09-10 00:54:32,051 [LAMMPS-ENGINE] INFO [75c204ff] nohup PID=unknown
+2026-09-10 01:08:42,097 [LAMMPS-ENGINE] INFO [75c204ff] LAMMPS completed successfully
+[wait] tg sweep T=100K (ext 0): watching 7f245711
+2026-09-10 01:09:02,658 [LAMMPS-ENGINE] INFO [7f245711] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-10 01:09:02,658 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7f245711_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_7f245711
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=1 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T100_e0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7f245711_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"7f245711","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_7f245711.json
+else
+  echo '{"run_id":"7f245711","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_7f245711.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_7f245711
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7f245711_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/7f245711_run.sh </dev/null & disown; echo $!
+2026-09-10 01:09:32,688 [LAMMPS-ENGINE] INFO [7f245711] nohup PID=unknown
+2026-09-10 01:23:32,836 [LAMMPS-ENGINE] INFO [7f245711] LAMMPS completed successfully
+2026-09-10 01:23:32,952 [LAMMPS-ENGINE] INFO Running thermal extraction via CLI: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_thermal.py --log_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_sweep.log --output_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/raw --equilibration_fraction 0.5 --temp_col Temp --density_col Density --enthalpy_col Enthalpy --graphs_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/graphs --per_t_dump_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/per_t_structs.dump --tg_data_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data --backbone_types 1 2 3 6 7
+2026-09-10 01:23:32,952 [LAMMPS-ENGINE] INFO Running: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_thermal.py --log_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_sweep.log --output_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/raw --equilibration_fraction 0.5 --temp_col Temp --density_col Density --enthalpy_col Enthalpy --graphs_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/graphs --per_t_dump_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/work/tg_sweep_r100/per_t_structs.dump --tg_data_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data --backbone_types 1 2 3 6 7
+2026-09-10 01:23:40,847 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_ea7806fc.json
+2026-09-10 01:23:49,729 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+# PolyJarvis chain 428a93d6 — auto-generated, do not edit (engine=kokkos)
+set -euo pipefail
+
+CHAIN_ID=428a93d6
+LMP=/home/arz2/lammps-install-kokkos/bin/lmp
+OFFLOAD_FLAGS="-k on g 1 -sf kk -pk kokkos"
+MPI=1
+GPU_IDS=1
+N_GPU=1
+
+# Progress log — one JSON object per line
+PROGRESS=/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl
+
+log_done()  { echo "{\"stage\":\"$1\",\"status\":\"done\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_fail()  { echo "{\"stage\":\"$1\",\"status\":\"failed\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_start() { echo "{\"stage\":\"$1\",\"status\":\"running\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+
+# Completion sentinel — written by THIS nohup'd script so it survives an
+# MCP-server restart (the in-process chain monitor is only a fast-path).
+mkdir -p /tmp/polyjarvis/sentinels
+SENTINEL=/tmp/polyjarvis/sentinels/done_428a93d6.json
+PIDFILE=/tmp/polyjarvis/sentinels/pid_428a93d6
+sentinel_ok()   { echo "{\"run_id\":\"428a93d6\",\"status\":\"completed\"}" > "$SENTINEL"; }
+sentinel_fail() { echo "{\"run_id\":\"428a93d6\",\"status\":\"failed\",\"stage\":\"$1\"}" > "$SENTINEL"; }
+
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).
+echo $$ > "$PIDFILE"
+LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"
+
+# --- Stage 1/1: bm_P-1000 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/bm_P-1000
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/bm_P-1000
+log_start bm_P-1000
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/bm_P-1000/bm_P-1000.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/bm_P-1000/bm_P-1000_stdout.log 2>&1 \
+  && log_done bm_P-1000 \
+  || { log_fail bm_P-1000; sentinel_fail bm_P-1000; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"bm_P-1000\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+echo "{\"stage\":\"__chain__\",\"status\":\"completed\",\"n_stages\":1,\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"
+sentinel_ok
+rm -f "$PIDFILE"
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6.sh > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6.log 2>&1 </dev/null & disown; echo $!
+2026-09-10 01:24:19,813 [LAMMPS-ENGINE] INFO [428a93d6] Chain monitor started (polling every 60s)
+[wait] murnaghan pressure=-1000: watching 428a93d6
+2026-09-10 01:25:19,813 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:26:20,066 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:27:20,322 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:28:20,577 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:29:20,853 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:30:21,108 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:31:21,363 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:32:21,626 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:33:21,883 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:34:22,142 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:35:22,396 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:36:22,650 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:37:22,906 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:38:23,163 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:39:23,419 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:40:23,679 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:41:23,949 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:42:24,204 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:43:24,496 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:44:24,748 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:45:25,010 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:46:25,271 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:47:25,538 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:48:25,854 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:49:26,127 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:50:26,401 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:51:26,667 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:52:26,938 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:53:27,210 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:54:27,484 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:55:27,753 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:56:28,050 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:57:28,325 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:58:28,593 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 01:59:28,864 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:00:29,138 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:01:20,457 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+# PolyJarvis chain 62f6cd23 — auto-generated, do not edit (engine=kokkos)
+set -euo pipefail
+
+CHAIN_ID=62f6cd23
+LMP=/home/arz2/lammps-install-kokkos/bin/lmp
+OFFLOAD_FLAGS="-k on g 1 -sf kk -pk kokkos"
+MPI=1
+GPU_IDS=1
+N_GPU=1
+
+# Progress log — one JSON object per line
+PROGRESS=/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl
+
+log_done()  { echo "{\"stage\":\"$1\",\"status\":\"done\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_fail()  { echo "{\"stage\":\"$1\",\"status\":\"failed\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_start() { echo "{\"stage\":\"$1\",\"status\":\"running\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+
+# Completion sentinel — written by THIS nohup'd script so it survives an
+# MCP-server restart (the in-process chain monitor is only a fast-path).
+mkdir -p /tmp/polyjarvis/sentinels
+SENTINEL=/tmp/polyjarvis/sentinels/done_62f6cd23.json
+PIDFILE=/tmp/polyjarvis/sentinels/pid_62f6cd23
+sentinel_ok()   { echo "{\"run_id\":\"62f6cd23\",\"status\":\"completed\"}" > "$SENTINEL"; }
+sentinel_fail() { echo "{\"run_id\":\"62f6cd23\",\"status\":\"failed\",\"stage\":\"$1\"}" > "$SENTINEL"; }
+
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).
+echo $$ > "$PIDFILE"
+LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"
+
+# --- Stage 1/1: bm_P0 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/bm_P0
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/bm_P0
+log_start bm_P0
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/bm_P0/bm_P0.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/bm_P0/bm_P0_stdout.log 2>&1 \
+  && log_done bm_P0 \
+  || { log_fail bm_P0; sentinel_fail bm_P0; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"bm_P0\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+echo "{\"stage\":\"__chain__\",\"status\":\"completed\",\"n_stages\":1,\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"
+sentinel_ok
+rm -f "$PIDFILE"
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23.sh > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23.log 2>&1 </dev/null & disown; echo $!
+2026-09-10 02:01:29,410 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/chain_428a93d6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:01:29,699 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_428a93d6.json
+2026-09-10 02:01:29,699 [LAMMPS-ENGINE] INFO [428a93d6] Chain monitor: completed
+2026-09-10 02:01:29,699 [LAMMPS-ENGINE] INFO [428a93d6] Removed chain_428a93d6_progress.jsonl
+2026-09-10 02:01:29,700 [LAMMPS-ENGINE] INFO [428a93d6] Removed chain_428a93d6.sh
+2026-09-10 02:01:29,700 [LAMMPS-ENGINE] INFO [428a93d6] Removed chain_428a93d6.log
+2026-09-10 02:01:50,538 [LAMMPS-ENGINE] INFO [62f6cd23] Chain monitor started (polling every 60s)
+[wait] murnaghan pressure=0: watching 62f6cd23
+2026-09-10 02:02:50,539 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:03:50,810 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:04:51,105 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:05:51,383 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:06:51,652 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:07:51,914 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:08:52,178 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:09:52,437 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:10:52,731 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:11:52,988 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:12:53,274 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:13:53,546 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:14:53,823 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:15:54,085 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:16:54,358 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:17:54,606 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:18:54,921 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:19:55,218 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:20:55,489 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:21:55,754 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:22:56,079 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:23:56,373 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:24:56,631 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:25:56,897 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:26:57,166 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:27:57,439 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:28:57,706 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:29:57,979 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:30:58,247 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:31:58,550 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:32:58,823 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:33:59,118 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:34:59,389 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:35:59,674 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:36:59,951 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:38:00,248 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:38:21,212 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+# PolyJarvis chain ba2755ea — auto-generated, do not edit (engine=kokkos)
+set -euo pipefail
+
+CHAIN_ID=ba2755ea
+LMP=/home/arz2/lammps-install-kokkos/bin/lmp
+OFFLOAD_FLAGS="-k on g 1 -sf kk -pk kokkos"
+MPI=1
+GPU_IDS=1
+N_GPU=1
+
+# Progress log — one JSON object per line
+PROGRESS=/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl
+
+log_done()  { echo "{\"stage\":\"$1\",\"status\":\"done\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_fail()  { echo "{\"stage\":\"$1\",\"status\":\"failed\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_start() { echo "{\"stage\":\"$1\",\"status\":\"running\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+
+# Completion sentinel — written by THIS nohup'd script so it survives an
+# MCP-server restart (the in-process chain monitor is only a fast-path).
+mkdir -p /tmp/polyjarvis/sentinels
+SENTINEL=/tmp/polyjarvis/sentinels/done_ba2755ea.json
+PIDFILE=/tmp/polyjarvis/sentinels/pid_ba2755ea
+sentinel_ok()   { echo "{\"run_id\":\"ba2755ea\",\"status\":\"completed\"}" > "$SENTINEL"; }
+sentinel_fail() { echo "{\"run_id\":\"ba2755ea\",\"status\":\"failed\",\"stage\":\"$1\"}" > "$SENTINEL"; }
+
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).
+echo $$ > "$PIDFILE"
+LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"
+
+# --- Stage 1/1: bm_P1500 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/bm_P1500
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/bm_P1500
+log_start bm_P1500
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/bm_P1500/bm_P1500.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/bm_P1500/bm_P1500_stdout.log 2>&1 \
+  && log_done bm_P1500 \
+  || { log_fail bm_P1500; sentinel_fail bm_P1500; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"bm_P1500\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+echo "{\"stage\":\"__chain__\",\"status\":\"completed\",\"n_stages\":1,\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"
+sentinel_ok
+rm -f "$PIDFILE"
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea.sh > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea.log 2>&1 </dev/null & disown; echo $!
+2026-09-10 02:38:51,294 [LAMMPS-ENGINE] INFO [ba2755ea] Chain monitor started (polling every 60s)
+[wait] murnaghan pressure=1500: watching ba2755ea
+2026-09-10 02:39:00,520 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/chain_62f6cd23_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:39:00,796 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_62f6cd23.json
+2026-09-10 02:39:00,797 [LAMMPS-ENGINE] INFO [62f6cd23] Chain monitor: completed
+2026-09-10 02:39:00,797 [LAMMPS-ENGINE] INFO [62f6cd23] Removed chain_62f6cd23_progress.jsonl
+2026-09-10 02:39:00,797 [LAMMPS-ENGINE] INFO [62f6cd23] Removed chain_62f6cd23.sh
+2026-09-10 02:39:00,797 [LAMMPS-ENGINE] INFO [62f6cd23] Removed chain_62f6cd23.log
+2026-09-10 02:39:51,294 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:40:51,564 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:41:51,841 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:42:52,117 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:43:52,388 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:44:52,650 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:45:52,900 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:46:53,169 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:47:53,425 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:48:53,704 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:49:53,971 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:50:54,240 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:51:54,512 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:52:54,786 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:53:55,059 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:54:55,324 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:55:55,599 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:56:55,873 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:57:56,149 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:58:56,434 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 02:59:56,745 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:00:57,017 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:01:57,289 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:02:57,569 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:03:57,845 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:04:58,136 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:05:58,405 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:06:58,675 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:07:58,947 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:08:59,201 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:09:59,479 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:10:59,796 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:12:00,056 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:13:00,333 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:14:00,607 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:15:00,878 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:15:51,958 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+# PolyJarvis chain 0fe2e1a2 — auto-generated, do not edit (engine=kokkos)
+set -euo pipefail
+
+CHAIN_ID=0fe2e1a2
+LMP=/home/arz2/lammps-install-kokkos/bin/lmp
+OFFLOAD_FLAGS="-k on g 1 -sf kk -pk kokkos"
+MPI=1
+GPU_IDS=1
+N_GPU=1
+
+# Progress log — one JSON object per line
+PROGRESS=/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl
+
+log_done()  { echo "{\"stage\":\"$1\",\"status\":\"done\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_fail()  { echo "{\"stage\":\"$1\",\"status\":\"failed\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_start() { echo "{\"stage\":\"$1\",\"status\":\"running\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+
+# Completion sentinel — written by THIS nohup'd script so it survives an
+# MCP-server restart (the in-process chain monitor is only a fast-path).
+mkdir -p /tmp/polyjarvis/sentinels
+SENTINEL=/tmp/polyjarvis/sentinels/done_0fe2e1a2.json
+PIDFILE=/tmp/polyjarvis/sentinels/pid_0fe2e1a2
+sentinel_ok()   { echo "{\"run_id\":\"0fe2e1a2\",\"status\":\"completed\"}" > "$SENTINEL"; }
+sentinel_fail() { echo "{\"run_id\":\"0fe2e1a2\",\"status\":\"failed\",\"stage\":\"$1\"}" > "$SENTINEL"; }
+
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).
+echo $$ > "$PIDFILE"
+LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"
+
+# --- Stage 1/1: bm_P3000 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/bm_P3000
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/bm_P3000
+log_start bm_P3000
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/bm_P3000/bm_P3000.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/bm_P3000/bm_P3000_stdout.log 2>&1 \
+  && log_done bm_P3000 \
+  || { log_fail bm_P3000; sentinel_fail bm_P3000; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"bm_P3000\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+echo "{\"stage\":\"__chain__\",\"status\":\"completed\",\"n_stages\":1,\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"
+sentinel_ok
+rm -f "$PIDFILE"
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2.sh > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2.log 2>&1 </dev/null & disown; echo $!
+2026-09-10 03:16:01,149 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/chain_ba2755ea_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:16:01,404 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_ba2755ea.json
+2026-09-10 03:16:01,404 [LAMMPS-ENGINE] INFO [ba2755ea] Chain monitor: completed
+2026-09-10 03:16:01,404 [LAMMPS-ENGINE] INFO [ba2755ea] Removed chain_ba2755ea_progress.jsonl
+2026-09-10 03:16:01,405 [LAMMPS-ENGINE] INFO [ba2755ea] Removed chain_ba2755ea.sh
+2026-09-10 03:16:01,405 [LAMMPS-ENGINE] INFO [ba2755ea] Removed chain_ba2755ea.log
+2026-09-10 03:16:22,036 [LAMMPS-ENGINE] INFO [0fe2e1a2] Chain monitor started (polling every 60s)
+[wait] murnaghan pressure=3000: watching 0fe2e1a2
+2026-09-10 03:17:22,036 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:18:22,309 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:19:22,610 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:20:22,885 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:21:23,181 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:22:23,434 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:23:23,726 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:24:24,020 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:25:24,308 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:26:24,579 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:27:24,853 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:28:25,111 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:29:25,383 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:30:25,650 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:31:25,932 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:32:26,264 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:33:26,530 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:34:26,844 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:35:27,103 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:36:27,378 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:37:27,665 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:38:27,933 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:39:28,200 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:40:28,470 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:41:28,744 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:42:29,005 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:43:29,269 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:44:29,538 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:45:29,798 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:46:30,069 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:47:30,378 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:48:30,642 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:49:30,920 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:50:31,195 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:51:31,469 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:52:31,743 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:53:32,008 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/chain_0fe2e1a2_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:53:32,292 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_0fe2e1a2.json
+2026-09-10 03:53:32,292 [LAMMPS-ENGINE] INFO [0fe2e1a2] Chain monitor: completed
+2026-09-10 03:53:32,292 [LAMMPS-ENGINE] INFO [0fe2e1a2] Removed chain_0fe2e1a2_progress.jsonl
+2026-09-10 03:53:32,293 [LAMMPS-ENGINE] INFO [0fe2e1a2] Removed chain_0fe2e1a2.sh
+2026-09-10 03:53:32,293 [LAMMPS-ENGINE] INFO [0fe2e1a2] Removed chain_0fe2e1a2.log
+2026-09-10 03:53:52,707 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1 && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+# PolyJarvis chain f7adcbc6 — auto-generated, do not edit (engine=kokkos)
+set -euo pipefail
+
+CHAIN_ID=f7adcbc6
+LMP=/home/arz2/lammps-install-kokkos/bin/lmp
+OFFLOAD_FLAGS="-k on g 1 -sf kk -pk kokkos"
+MPI=1
+GPU_IDS=1
+N_GPU=1
+
+# Progress log — one JSON object per line
+PROGRESS=/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl
+
+log_done()  { echo "{\"stage\":\"$1\",\"status\":\"done\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_fail()  { echo "{\"stage\":\"$1\",\"status\":\"failed\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_start() { echo "{\"stage\":\"$1\",\"status\":\"running\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+
+# Completion sentinel — written by THIS nohup'd script so it survives an
+# MCP-server restart (the in-process chain monitor is only a fast-path).
+mkdir -p /tmp/polyjarvis/sentinels
+SENTINEL=/tmp/polyjarvis/sentinels/done_f7adcbc6.json
+PIDFILE=/tmp/polyjarvis/sentinels/pid_f7adcbc6
+sentinel_ok()   { echo "{\"run_id\":\"f7adcbc6\",\"status\":\"completed\"}" > "$SENTINEL"; }
+sentinel_fail() { echo "{\"run_id\":\"f7adcbc6\",\"status\":\"failed\",\"stage\":\"$1\"}" > "$SENTINEL"; }
+
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).
+echo $$ > "$PIDFILE"
+LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"
+
+# --- Stage 1/1: bm_P5000 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000
+log_start bm_P5000
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000_stdout.log 2>&1 \
+  && log_done bm_P5000 \
+  || { log_fail bm_P5000; sentinel_fail bm_P5000; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"bm_P5000\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+echo "{\"stage\":\"__chain__\",\"status\":\"completed\",\"n_stages\":1,\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"
+sentinel_ok
+rm -f "$PIDFILE"
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6.sh > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6.log 2>&1 </dev/null & disown; echo $!
+2026-09-10 03:54:22,788 [LAMMPS-ENGINE] INFO [f7adcbc6] Chain monitor started (polling every 60s)
+[wait] murnaghan pressure=5000: watching f7adcbc6
+2026-09-10 03:55:22,789 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:56:23,083 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:57:23,395 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:58:23,668 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 03:59:23,940 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:00:24,205 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:01:24,458 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:02:24,718 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:03:24,990 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:04:25,262 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:05:25,529 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:06:25,798 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:07:26,072 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:08:26,338 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:09:26,612 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:10:26,884 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:11:27,157 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:12:27,473 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:13:27,765 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:14:28,030 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:15:28,283 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:16:28,534 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:17:28,800 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:18:29,060 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:19:29,321 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:20:29,582 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:21:29,854 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:22:30,119 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:23:30,382 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:24:30,649 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:25:30,936 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:26:31,211 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:27:31,504 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:28:31,776 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:29:32,051 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:30:32,327 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:31:32,595 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:31:52,981 [LAMMPS-ENGINE] INFO Running Murnaghan bulk modulus extraction via CLI: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_bulk_modulus_murnaghan.py --log_files /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/bm_P-1000/bm_P-1000.log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/bm_P0/bm_P0.log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/bm_P1500/bm_P1500.log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/bm_P3000/bm_P3000.log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000.log --pressures_atm -1000 0 1500 3000 5000 --output_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/raw --eq_fraction 0.5 --graphs_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/graphs --npt_prod_log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log
+2026-09-10 04:31:52,982 [LAMMPS-ENGINE] INFO Running: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_bulk_modulus_murnaghan.py --log_files /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_-1000/attempt_1/bm_P-1000/bm_P-1000.log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_0/attempt_1/bm_P0/bm_P0.log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_1500/attempt_1/bm_P1500/bm_P1500.log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_3000/attempt_1/bm_P3000/bm_P3000.log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000.log --pressures_atm -1000 0 1500 3000 5000 --output_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/raw --eq_fraction 0.5 --graphs_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/graphs --npt_prod_log /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/work/npt_final/npt_final.log
+2026-09-10 04:31:54,851 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_f83a37d7.json
+Wrote /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/summary/attempt-0001/raw/exp_lookup.json
+  match=class_representative (medium), polymer='Poly(lactic acid)' (ids=[826])
+  Tg: [326.0, 327.1] K  median=326.6 K  n=2  filter=all_clean
+  density: 1.248 g/cm³  at T=298.15 K  phase=amorphous
+2026-09-10 04:32:30,871 [LAMMPS-ENGINE] INFO Running generate_run_summary via CLI: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/generate_run_summary.py --output_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/summary/attempt-0001/raw --run_name PLLA_1 --smiles '*[C@@H](C)C(=O)O*' --polymer_class PEST --ff 'pcff' --charge_method 'bond-increment' --dp 70 --n_chains 10 --d01 'pcff' --d02 'bond-increment' --d03 'pppm' --d04 'DP=70, 10 chains' --d05 'PASS' --d06 'EXCELLENT' --graphs_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/graphs --n_replicates 1 --tg_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/raw/thermal.json --equilibration_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/raw/cooling.json --melt_equilibration_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/raw/equilibration.json --mechanical_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/raw/mechanical.json --byproducts_spec /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/summary/attempt-0001/raw/byproducts_spec.json
+2026-09-10 04:32:30,871 [LAMMPS-ENGINE] INFO Running: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/generate_run_summary.py --output_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/summary/attempt-0001/raw --run_name PLLA_1 --smiles '*[C@@H](C)C(=O)O*' --polymer_class PEST --ff 'pcff' --charge_method 'bond-increment' --dp 70 --n_chains 10 --d01 'pcff' --d02 'bond-increment' --d03 'pppm' --d04 'DP=70, 10 chains' --d05 'PASS' --d06 'EXCELLENT' --graphs_dir /home/arz2/PolyJarvis_v2/data/PLLA_1/graphs --n_replicates 1 --tg_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/raw/thermal.json --equilibration_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/raw/cooling.json --melt_equilibration_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/raw/equilibration.json --mechanical_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/raw/mechanical.json --byproducts_spec /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/summary/attempt-0001/raw/byproducts_spec.json
+2026-09-10 04:32:31,227 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_eb674b7d.json
+2026-09-10 04:32:32,867 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/chain_f7adcbc6_progress.jsonl 2>/dev/null || echo ''
+2026-09-10 04:32:33,124 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_f7adcbc6.json
+2026-09-10 04:32:33,124 [LAMMPS-ENGINE] INFO [f7adcbc6] Chain monitor: completed
+2026-09-10 04:32:33,125 [LAMMPS-ENGINE] INFO [f7adcbc6] Removed chain_f7adcbc6_progress.jsonl
+2026-09-10 04:32:33,125 [LAMMPS-ENGINE] INFO [f7adcbc6] Removed chain_f7adcbc6.sh
+2026-09-10 04:32:33,125 [LAMMPS-ENGINE] INFO [f7adcbc6] Removed chain_f7adcbc6.log
+{
+  "status": "accepted",
+  "run_name": "PLLA_1",
+  "state_path": "/home/arz2/PolyJarvis_v2/data/PLLA_1/workflow_state.json",
+  "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0002",
+    "cooling": "attempt-0002",
+    "thermal": "attempt-0001",
+    "mechanical": "attempt-0001",
+    "summary": "attempt-0001"
+  }
+}

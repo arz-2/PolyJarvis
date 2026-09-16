@@ -1,0 +1,21 @@
+{
+  "rho_melt": 1.1017780893106894,
+  "rho_glass": 1.2270220948207173,
+  "tg_K": 331.0,
+  "t_equil_K": 620.0,
+  "final_T_K": 300.0,
+  "expected_contraction": 1.1811,
+  "actual_contraction": 1.1137,
+  "contraction_shortfall": 0.9429,
+  "extrapolation_reliable": false,
+  "verdict": "UNDER_ANNEALED_COOLING",
+  "remedy": "The cell gained too little density on cooling relative to its own thermal-expansion prediction (free volume frozen in). REMEDY: re-melt + slow re-cool (reheat >Tg, re-equilibrate, cool at a lower rate / more anneal cycles). Do NOT EXTEND at 300 K \u2014 a glass cannot densify below Tg. CAVEAT: cooling span 320 K is large; the alpha-based expected contraction is unreliable here \u2014 treat this verdict as indicative.",
+  "under_annealed_cooling": true,
+  "density_provenance": {
+    "rho_melt": "plateau_mean(npt_melt_hold.log)",
+    "rho_glass": "plateau_mean(npt_final.log)"
+  },
+  "rho_melt_sd": 0.008685529570374958,
+  "rho_glass_sd": 0.004448649197525302,
+  "markdown": "### Cooling-contraction self-consistency check\n\n- Melt \u03c1(T_equil)=1.1018, glass \u03c1(300K)=1.2270\n- Cooling contraction: actual \u00d71.114 vs expected \u00d71.181 (shortfall 0.943)\n- **Verdict: UNDER_ANNEALED_COOLING** \u2014 The cell gained too little density on cooling relative to its own thermal-expansion prediction (free volume frozen in). REMEDY: re-melt + slow re-cool (reheat >Tg, re-equilibrate, cool at a lower rate / more anneal cycles). Do NOT EXTEND at 300 K \u2014 a glass cannot densify below Tg. CAVEAT: cooling span 320 K is large; the alpha-based expected contraction is unreliable here \u2014 treat this verdict as indicative."
+}

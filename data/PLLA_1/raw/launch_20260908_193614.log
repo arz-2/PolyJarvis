@@ -1,0 +1,21 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[pcff] (engine=kokkos)
+INFO: gpu_ids not given — derived "0" from hardware_policy[pcff]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+/home/arz2/PolyJarvis_v2/mcp-servers/.venv/lib/python3.12/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+  warnings.warn(
+2026-09-08 19:36:15,560 [LAMMPS-ENGINE] INFO Loaded 110 runs from /home/arz2/PolyJarvis_v2/data/_engine/run_state.json
+[wait] equilibration chain: watching 80f3d1ef
+{
+  "status": "failed",
+  "stage": "equilibration",
+  "finding": {
+    "code": "PROCESS_FAILED",
+    "stage": "equilibration",
+    "severity": "blocking",
+    "confidence": "high",
+    "details": {
+      "error": "Equilibration chain did not complete: {'status': 'failed', 'reason': 'PROCESS_DEAD_NO_SENTINEL', 'run_id': '80f3d1ef'}"
+    },
+    "remedy_id": null
+  },
+  "state_path": "/home/arz2/PolyJarvis_v2/data/PLLA_1/workflow_state.json"
+}

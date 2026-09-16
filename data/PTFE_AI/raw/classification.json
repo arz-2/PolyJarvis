@@ -1,0 +1,113 @@
+{
+  "smiles": "*C(F)(F)C(*)(F)F",
+  "class_id": 5,
+  "polyinfo_class": "PHAL",
+  "polymer_class": "PHAL",
+  "class_source": "radonpy_polyinfo",
+  "priority_rank": 18,
+  "flags": {
+    "PURT": false,
+    "PURA": false,
+    "PIMD": false,
+    "PANH": false,
+    "PCBN": false,
+    "PEST": false,
+    "PAMD": false,
+    "PSIL": false,
+    "PPHS": false,
+    "PKTN": false,
+    "PSFO": false,
+    "POXI": false,
+    "PSUL": false,
+    "PIMN": false,
+    "PPNL": false,
+    "PSTR": false,
+    "PACR": false,
+    "PHAL": true,
+    "PDIE": false,
+    "PHYC": false,
+    "PVNL": false
+  },
+  "co_occurring": [],
+  "runner_up": null,
+  "groups": {
+    "PHAL": {
+      "location": "backbone",
+      "source": "polyinfo_flags",
+      "smarts_var": null
+    }
+  },
+  "chemistry": {
+    "screened_on": "2-mer",
+    "functional_groups": [
+      {
+        "id": "fluoroalkyl",
+        "label": "C-F",
+        "polarity": "weakly_polar",
+        "count": 4,
+        "count_2mer": 8,
+        "location": "pendant",
+        "locations": {
+          "backbone": 0,
+          "pendant": 8
+        },
+        "hbond_donors": 0,
+        "hbond_acceptors": 0,
+        "note": "Strong bond dipole but very low polarisability, and the dipoles largely cancel in a symmetric perfluorocarbon. Fluoropolymers are cohesively WEAK, unlike other polar polymers -- do not read C-F count as associating character."
+      }
+    ],
+    "backbone_groups": [],
+    "pendant_groups": [
+      "fluoroalkyl"
+    ],
+    "tm_estimate": {
+      "error": "no Tg to work from: No structural motifs matched."
+    },
+    "tg_estimate": {
+      "error": "No structural motifs matched."
+    },
+    "polarity_class": "weakly_polar",
+    "hydrocarbon_only": false,
+    "apolar_aliphatic": false,
+    "implied_electrostatics": "pppm",
+    "elements": {
+      "C": 2,
+      "F": 4
+    },
+    "n_heavy_atoms": 6,
+    "heteroatom_fraction": 0.667,
+    "aromatic_atom_fraction": 0.0,
+    "descriptor_basis": "2-mer, divided to one repeat unit",
+    "n_aromatic_rings": 0,
+    "hbond_donors": 0,
+    "hbond_acceptors": 0,
+    "rotatable_bonds": 1,
+    "tpsa": 0.0,
+    "mw_repeat_unit": 100.014,
+    "formal_charge": 0
+  },
+  "chemistry_consistency": {
+    "findings": [
+      {
+        "code": "CHEM_BUILD_RISK",
+        "severity": "advisory",
+        "detail": "fluoroalkyl failed 25% of 67 measured EMC trial builds (1.7x the 15% baseline) -- C-F typing gaps outside the OPLS route.. Correlation over one population, not a per-field blocking measurement, so this recommends running the force-field probe rather than pre-judging it.",
+        "groups": [
+          "fluoroalkyl"
+        ],
+        "worst_group": "fluoroalkyl",
+        "recommend": "run make_deterministic_plan run-plan --with-ff-probe",
+        "suggested_override": null
+      }
+    ],
+    "n_warnings": 0,
+    "verdict": "consistent",
+    "polarity_class": "weakly_polar",
+    "backbone_groups": [],
+    "pendant_groups": [
+      "fluoroalkyl"
+    ]
+  },
+  "generated_at": "2026-09-14T01:42:36.413321+00:00",
+  "run_name": "PTFE_AI"
+}

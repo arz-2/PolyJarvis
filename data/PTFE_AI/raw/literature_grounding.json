@@ -1,0 +1,186 @@
+{
+  "critique": {
+    "D-01_ff": {
+      "autofilled_choice": "opls/2024/opls-aa",
+      "verdict": "no_evidence",
+      "confidence": "low",
+      "reason": "No verified peer-reviewed MD study head-to-head benchmarks OPLS-AA against an alternative on amorphous bulk PTFE (all-CF2) with signed density/Tg error. The plan's own same-family caution (Viton A, a VDF/HFP copolymer elastomer, not this homopolymer) reports OPLS-derived fields as too-soft/under-packed vs PCFF, but that is off-chemistry and purely qualitative. Two dedicated non-OPLS PTFE force fields exist in the literature (Borodin/Smith/Bedrov 2002 ab initio FF; a 2024 AMBER-compatible transferable-parameter FF), but neither's full text was accessible to confirm a quantitative comparison against OPLS-AA. A PTFE-specific study reporting OPLS-AA glassy-transition results in good agreement with experiment (Al-Nsour, TechConnect Briefs 2014) was found but has no DOI and cannot be verified, so it backs nothing. Net: the record neither confirms nor contradicts the routed choice.",
+      "supporting_dois": [],
+      "suggested_override": null
+    }
+  },
+  "polymer_class": "PHAL",
+  "polymer_name": "polytetrafluoroethylene (PTFE)",
+  "smiles": "*C(F)(F)C(*)(F)F",
+  "dominant_uncertainty": "No verified peer-reviewed MD study directly benchmarks OPLS-AA vs. alternatives on amorphous bulk homopolymer PTFE; nearest evidence is off-chemistry (VDF/HFP copolymer), unverifiable (no-DOI conference brief), or paywalled (bespoke ab initio / AMBER-compatible PTFE force fields with abstract-only access).",
+  "notes": "The store's own PVDF analog reports an experimental Tg of 237 K, but PVDF and PTFE are chemically distinct homopolymers within PHAL (CF2-CH2 vs. all-CF2 backbone) so that value is not usable as a PTFE Tg target; treat tg_target_K as ungrounded for this SMILES. The PolyDatabase PTFE lead is a crystalline-bundle ML force field study (not this run's amorphous glassy cell), so its density/modulus numbers are not comparable targets either.",
+  "electrostatics": {
+    "confidence": "medium",
+    "recommendation": "pppm",
+    "sources": [
+      {
+        "doi": "10.20964/2018.11.01",
+        "claim": "Section 2.3 (Methods) states explicitly: 'The Lennard-Jones and Coulomb interactions are calculated within the neighbor list with cutoff distance 0.95 nm. The long-range interactions are calculated in k-space as a particle-particle/particle-mesh solver (PPPM).' Timestep 1 fs.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "e9cdd9a63aed"
+      }
+    ]
+  },
+  "forcefield": {
+    "confidence": "low",
+    "recommendation": null,
+    "sources": [
+      {
+        "doi": "10.1016/j.ces.2019.05.007",
+        "claim": "A dedicated force-field-comparison study on Viton A (a VDF/HFP 60/40 wt% fluoroelastomer, 66% fluorine -- chemically closest within the PHAL family to PVDF's CF2-CH2 chemistry) computed thermodynamic, structural, and mechanical properties (density, modulus, Tg-region thermal-volumetric behavior) using several atomistic force fields and compared them against available experimental data. Qualitative results recovered from accessible abstract/summary text: OPLS-derived force fields produce more extended, more mobile chains and a SOFTER material (lower modulus) that under-represents molecular structure/packing; other force fields relying on stronger nonbonded interactions interfere with chain dynamics/mechanics; PCFF is reported as most satisfactorily predicting structural properties and thermal-volumetric (density-related) behavior around Tg, showing relatively successful transferability to long-chain architectures.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "8b917cf11123"
+      },
+      {
+        "doi": "10.1021/jp026158i",
+        "claim": "Borodin, Smith & Bedrov (2002), 'A Quantum Chemistry Based Force Field for Perfluoroalkanes and Poly(tetrafluoroethylene)', J. Phys. Chem. B -- develops a dedicated quantum-chemistry-based force field for perfluoroalkanes and PTFE specifically. DOI resolves to the correct ACS article and title/authors/year confirmed via Semantic Scholar; full text is paywalled so no quantitative density/Tg comparison against OPLS-AA could be verified.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true
+      },
+      {
+        "doi": "10.1515/chem-2024-0072",
+        "claim": "2024 study developing new transferable force-field parameters for PTFE compatible with the AMBER force field, derived from quantum-mechanical reference data, reported (per abstract) to achieve high accuracy in predicting density, vibrational spectra, and specific heat capacity. Abstract does not state a comparison against OPLS-AA or GAFF2; full text was not accessible to verify numeric error figures or amorphous vs. crystalline system.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true
+      }
+    ]
+  },
+  "tg_target_K": {
+    "range": null,
+    "confidence": "low",
+    "sources": []
+  },
+  "md_studies": [
+    {
+      "doi": "10.1016/j.ces.2019.05.007",
+      "url": "https://doi.org/10.1016/j.ces.2019.05.007",
+      "title": "Thermodynamic, structural, and mechanical properties of fluoropolymers from molecular dynamics simulation: Comparison of force fields",
+      "year": 2019,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "OPLS(-derived) vs PCFF (multi-FF comparison)",
+      "force_field_type": "All Atom",
+      "electrostatics": null,
+      "ensemble": null,
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "copolymer",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [],
+      "note": "Same-family fluoropolymer (VDF/HFP elastomer) FF comparison, not PTFE (all-CF2) -- caution-flag only, already accounted for in the plan's own D-01 evidence; qualitative, no numeric errors recoverable from accessible text."
+    },
+    {
+      "doi": "10.20964/2018.11.01",
+      "url": "https://doi.org/10.20964/2018.11.01",
+      "title": "The Predicted Dielectric Constant of an Amorphous PVDF Changing with Temperature by Molecular Dynamics Simulations",
+      "year": 2018,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "CVFF",
+      "force_field_type": "All Atom",
+      "electrostatics": "pppm",
+      "ensemble": null,
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "neat_polymer",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": "20 x 20 CF2-CH2 repeat units, 2440 atoms",
+      "number_of_chains": "20",
+      "reported_properties": [
+        {
+          "property": "glass_transition_temp",
+          "value": 295,
+          "unit": "K"
+        }
+      ],
+      "note": "PVDF (CF2-CH2), not PTFE (all-CF2) -- different homopolymer within PHAL; uses CVFF not OPLS-AA. Its 295 K MD Tg (vs. 237 K experimental DMA Tg the paper itself cites) is not a usable target for this run's PTFE Tg."
+    },
+    {
+      "doi": "10.1021/acs.jpclett.1c01140",
+      "url": "https://doi.org/10.1021/acs.jpclett.1c01140",
+      "title": "First-Principles-Based Machine-Learning Molecular Dynamics for Crystalline Polymers with van der Waals Interactions",
+      "year": 2021,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "polydatabase",
+      "force_field": "Machine-learning force field (Gaussian process regression, kernel-based, trained on first-principles data)",
+      "force_field_type": "All Atom",
+      "electrostatics": null,
+      "ensemble": "NVT (50 ps) for structural optimization, then NPT (100 ps) for cell relaxation; cycle repeated twice (450 ps total) until convergence",
+      "T_K": 300,
+      "P_atm": null,
+      "system_type": "neat_polymer",
+      "material_morphology": "other",
+      "chain_length_or_mw": "C50F102 (50 C per chain)",
+      "number_of_chains": "100",
+      "reported_properties": [
+        {
+          "property": "density",
+          "value": 2.136,
+          "unit": "g/cm3"
+        },
+        {
+          "property": "youngs_modulus",
+          "value": 137.5,
+          "unit": "GPa"
+        }
+      ],
+      "note": "Title confirms this is a CRYSTALLINE PTFE bundle study, not the amorphous bulk melt this run targets (density_initial_gcm3=0.89); density/modulus are crystalline chain-axis values, not comparable to this run's amorphous property targets. Also uses a bespoke ML-FF, not OPLS-AA/PCFF, so does not inform D-01. A second, near-duplicate density value (1.247 g/cm3) in the PolyDatabase extraction looks like an extraction artifact and is not reported here."
+    },
+    {
+      "doi": "10.1021/jp026158i",
+      "url": "https://doi.org/10.1021/jp026158i",
+      "title": "A Quantum Chemistry Based Force Field for Perfluoroalkanes and Poly(tetrafluoroethylene)",
+      "year": 2002,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "websearch",
+      "force_field": "Bespoke ab initio (quantum-chemistry-derived) force field for perfluoroalkanes/PTFE",
+      "force_field_type": "All Atom",
+      "electrostatics": null,
+      "ensemble": null,
+      "T_K": null,
+      "P_atm": null,
+      "system_type": null,
+      "material_morphology": null,
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [],
+      "note": "DOI resolves to the correct ACS article; title/authors (Borodin, Smith, Bedrov)/year confirmed via Semantic Scholar. Full text is paywalled -- no abstract or quantitative density/Tg claim could be verified, so this is recorded only as evidence that a dedicated non-OPLS/non-PCFF PTFE force field exists, an unexplored alternative the plan's alternatives:[] does not enumerate."
+    },
+    {
+      "doi": "10.1515/chem-2024-0072",
+      "url": "https://doi.org/10.1515/chem-2024-0072",
+      "title": "Development of AMBER-compliant transferable force field parameters for polytetrafluoroethylene",
+      "year": 2024,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "websearch",
+      "force_field": "AMBER-compatible (bespoke transferable PTFE parameters)",
+      "force_field_type": "All Atom",
+      "electrostatics": null,
+      "ensemble": null,
+      "T_K": null,
+      "P_atm": null,
+      "system_type": null,
+      "material_morphology": null,
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [],
+      "note": "DOI resolves to the correct De Gruyter article; title/abstract confirmed via Semantic Scholar (abstract: 'high accuracy in predicting density, vibrational spectra, and specific heat capacity' from QM reference data). Abstract does not state a comparison against OPLS-AA/GAFF2, and full text was inaccessible to confirm amorphous vs crystalline system or numeric error -- another unexplored on-chemistry alternative, not a benchmark of the routed choice."
+    }
+  ],
+  "generated_at": "2026-09-14T01:49:30.895358+00:00",
+  "plan_reviewed": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/raw/run_plan.json"
+}

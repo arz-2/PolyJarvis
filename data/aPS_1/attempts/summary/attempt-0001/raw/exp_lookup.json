@@ -1,0 +1,200 @@
+{
+  "match_method": "class_representative",
+  "match_confidence": "medium",
+  "polymer_id": 490,
+  "polymer_name": "Poly(styrene)",
+  "n_polymer_ids": 5,
+  "tg": {
+    "agg_median_K": 373.1,
+    "agg_range_K": [
+      364.1,
+      382.1
+    ],
+    "n_rows": 22,
+    "form_filter": "all_clean",
+    "outliers_clipped": true,
+    "preferred_method": "DSC",
+    "rows": [
+      {
+        "tg_K": 371.15,
+        "form": "isotactic and atactic",
+        "method": "DSC",
+        "notes": "DSC, onset, HR 32deg/min, quenched",
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(styrene)"
+      },
+      {
+        "tg_K": 371.15,
+        "form": "isotactic and atactic",
+        "method": "DSC",
+        "notes": "DTA, DSC, onset, 1deg/min HR, f(HR)",
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(styrene)"
+      },
+      {
+        "tg_K": 371.15,
+        "form": "isotactic and atactic",
+        "method": "DSC",
+        "notes": "DSC, penetration, onset MP, zero HR",
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(styrene)"
+      },
+      {
+        "tg_K": 373.15,
+        "form": "isotactic and atactic",
+        "method": "DSC",
+        "notes": "DSC, Intg, OHR, 10deg/min CR",
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(styrene)"
+      },
+      {
+        "tg_K": 376.15,
+        "form": "isotactic and atactic",
+        "method": "DSC",
+        "notes": "DSC, Mdpt, 1deg/min X HR, TH, f(MW)",
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(styrene)"
+      },
+      {
+        "tg_K": 377.15,
+        "form": "isotactic and atactic",
+        "method": "DSC",
+        "notes": "DSC, onset, 20deg/min HR after similar cool, f(MW)",
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(styrene)"
+      }
+    ]
+  },
+  "density": {
+    "value_gcm3": 1.04,
+    "T_K": 298.15,
+    "phase": "amorphous",
+    "source_key": "PolymerDataHandbook1999",
+    "n_rows": 5,
+    "all_range_gcm3": [
+      1.033,
+      1.11
+    ],
+    "density_equation": {
+      "py_expr": "1.048-1.88*1e-4*t-0.608*1e-6*t**2",
+      "t_min_C": 8.0,
+      "t_max_C": 75.0,
+      "phase": "glass",
+      "source_key": "Mark2007",
+      "evaluated_gcm3": 1.0425
+    }
+  },
+  "density_equations": {
+    "n_rows": 5,
+    "rows": [
+      {
+        "equation": "1.048\u22121.88\u00d710\u207b4t\u22120.608\u00d710\u207b6t\u00b2",
+        "py_expr": "1.048-1.88*1e-4*t-0.608*1e-6*t**2",
+        "t_min_C": 8.0,
+        "t_max_C": 75.0,
+        "phase": "glass",
+        "tg_C": 92.0,
+        "notes": "Table 7.2 ref [20]",
+        "source_key": "Mark2007"
+      },
+      {
+        "equation": "1.052exp(\u22122.86\u00d710\u207b4t)",
+        "py_expr": "1.052*math.exp(-2.86*1e-4*t)",
+        "t_min_C": 30.0,
+        "t_max_C": 79.0,
+        "phase": "glass",
+        "tg_C": 79.0,
+        "notes": "Table 7.2 ref [10]",
+        "source_key": "Mark2007"
+      },
+      {
+        "equation": "1.067\u22125.02\u00d710\u207b4t\u22120.135\u00d710\u207b6t\u00b2",
+        "py_expr": "1.067-5.02*1e-4*t-0.135*1e-6*t**2",
+        "t_min_C": 79.0,
+        "t_max_C": 320.0,
+        "phase": "melt",
+        "tg_C": null,
+        "notes": "Table 7.1 ref [10]",
+        "source_key": "Mark2007"
+      },
+      {
+        "equation": "1.0865\u22126.19\u00d710\u207b4t+0.136\u00d710\u207b6t\u00b2",
+        "py_expr": "1.0865-6.19*1e-4*t+0.136*1e-6*t**2",
+        "t_min_C": 100.0,
+        "t_max_C": 222.0,
+        "phase": "melt",
+        "tg_C": null,
+        "notes": "Table 7.1 ref [23]",
+        "source_key": "Mark2007"
+      },
+      {
+        "equation": "1.077\u22125.49\u00d710\u207b4t+0.124\u00d710\u207b6t\u00b2",
+        "py_expr": "1.077-5.49*1e-4*t+0.124*1e-6*t**2",
+        "t_min_C": 115.0,
+        "t_max_C": 196.0,
+        "phase": "melt",
+        "tg_C": null,
+        "notes": "Table 7.1 ref [20]",
+        "source_key": "Mark2007"
+      }
+    ]
+  },
+  "bulk_modulus": {
+    "agg_median_GPa": 2.816,
+    "agg_range_GPa": [
+      2.632,
+      3.0
+    ],
+    "n_rows": 2,
+    "T_K_ref": 298.15,
+    "value_unit": "GPa",
+    "method_caveat": "rows may mix adiabatic K_S and isothermal K_T (no method column); MD reports K_T \u2014 cross-check row notes and prefer polymer_rules exp_K_GPa when set",
+    "rows": [
+      {
+        "value_GPa": 3.0,
+        "T_K": 298.15,
+        "notes": "Bulkmodulus MPa \u2014 3,000 (5)",
+        "source_key": "PolymerDataHandbook1999",
+        "polymer_name": "Polystyrene"
+      },
+      {
+        "value_GPa": 2.6315789473684204,
+        "T_K": 298.15,
+        "notes": "K_T = 1/\u03ba derived from compressibility. Source line: Compressibility bar1 298KT 2.7\u20134:9105 (2)",
+        "source_key": "PolymerDataHandbook1999",
+        "polymer_name": "Polystyrene"
+      }
+    ]
+  },
+  "thermal_conductivity": {
+    "agg_median_WmK": 0.105,
+    "agg_range_WmK": [
+      0.105,
+      0.13
+    ],
+    "n_rows": 3,
+    "rows": [
+      {
+        "k_WmK": 0.13,
+        "T_K": null,
+        "phase": "amorphous",
+        "notes": "Heatconductivity Js1m1K1 Amorphous 0.13 (5)",
+        "source_key": "PolymerDataHandbook1999"
+      },
+      {
+        "k_WmK": 0.105,
+        "T_K": 273.0,
+        "phase": null,
+        "notes": "Table 10.1 ref [9]",
+        "source_key": "Mark2007"
+      },
+      {
+        "k_WmK": 0.105,
+        "T_K": 273.0,
+        "phase": null,
+        "notes": "Thermalconductivity Wm1K1 T273K 0.105 (1,2,4)",
+        "source_key": "PolymerDataHandbook1999"
+      }
+    ]
+  }
+}

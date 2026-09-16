@@ -1,0 +1,214 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[pcff] (engine=kokkos)
+INFO: gpu_ids not given — derived "0" from hardware_policy[pcff]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+/home/arz2/PolyJarvis_v2/mcp-servers/.venv/lib/python3.12/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+  warnings.warn(
+2026-09-08 17:05:16,440 [LAMMPS-ENGINE] INFO Loaded 108 runs from /home/arz2/PolyJarvis_v2/data/_engine/run_state.json
+2026-09-08 17:05:16,519 [LAMMPS-ENGINE] INFO EMC cell job 4f08c587 submitted — class=PEST dp=70
+2026-09-08 17:07:03,459 [LAMMPS-ENGINE] INFO Job 4f08c587 completed in 106.9s
+2026-09-08 17:07:17,590 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work && cat > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+# PolyJarvis chain 8885dd3b — auto-generated, do not edit (engine=kokkos)
+set -euo pipefail
+
+CHAIN_ID=8885dd3b
+LMP=/home/arz2/lammps-install-kokkos/bin/lmp
+OFFLOAD_FLAGS="-k on g 1 -sf kk -pk kokkos"
+MPI=1
+GPU_IDS=1
+N_GPU=1
+
+# Progress log — one JSON object per line
+PROGRESS=/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl
+
+log_done()  { echo "{\"stage\":\"$1\",\"status\":\"done\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_fail()  { echo "{\"stage\":\"$1\",\"status\":\"failed\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_start() { echo "{\"stage\":\"$1\",\"status\":\"running\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+
+# Completion sentinel — written by THIS nohup'd script so it survives an
+# MCP-server restart (the in-process chain monitor is only a fast-path).
+mkdir -p /tmp/polyjarvis/sentinels
+SENTINEL=/tmp/polyjarvis/sentinels/done_8885dd3b.json
+PIDFILE=/tmp/polyjarvis/sentinels/pid_8885dd3b
+sentinel_ok()   { echo "{\"run_id\":\"8885dd3b\",\"status\":\"completed\"}" > "$SENTINEL"; }
+sentinel_fail() { echo "{\"run_id\":\"8885dd3b\",\"status\":\"failed\",\"stage\":\"$1\"}" > "$SENTINEL"; }
+
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).
+echo $$ > "$PIDFILE"
+LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"
+
+# --- Stage 1/10: minimize ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/minimize
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/minimize
+log_start minimize
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/minimize/minimize.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/minimize/minimize_run.log 2>&1 \
+  && log_done minimize \
+  || { log_fail minimize; sentinel_fail minimize; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"minimize\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Minimization-convergence check (not itself a LAMMPS exit-code failure) ---
+if ! grep -Eq "Stopping criterion.*(tolerance|linesearch alpha is zero)" /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/minimize/minimize_run.log; then
+  log_fail minimize; sentinel_fail minimize_not_converged; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",""\"failed_at\":\"minimize\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1
+fi
+
+# --- Stage 2/10: nvt_warmup ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/nvt_warmup
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/nvt_warmup
+log_start nvt_warmup
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup_run.log 2>&1 \
+  && log_done nvt_warmup \
+  || { log_fail nvt_warmup; sentinel_fail nvt_warmup; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"nvt_warmup\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 3/10: npt_densify ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_densify
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_densify
+log_start npt_densify
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify_run.log 2>&1 \
+  && log_done npt_densify \
+  || { log_fail npt_densify; sentinel_fail npt_densify; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_densify\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 4/10: npt_ff_activate ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_ff_activate
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_ff_activate
+log_start npt_ff_activate
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate_run.log 2>&1 \
+  && log_done npt_ff_activate \
+  || { log_fail npt_ff_activate; sentinel_fail npt_ff_activate; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_ff_activate\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 5/10: npt_densify_hold ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_densify_hold
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_densify_hold
+log_start npt_densify_hold
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold_run.log 2>&1 \
+  && log_done npt_densify_hold \
+  || { log_fail npt_densify_hold; sentinel_fail npt_densify_hold; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_densify_hold\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 6/10: anneal_heat ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/anneal_heat
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/anneal_heat
+log_start anneal_heat
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat_run.log 2>&1 \
+  && log_done anneal_heat \
+  || { log_fail anneal_heat; sentinel_fail anneal_heat; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"anneal_heat\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 7/10: anneal_hold ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/anneal_hold
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/anneal_hold
+log_start anneal_hold
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold_run.log 2>&1 \
+  && log_done anneal_hold \
+  || { log_fail anneal_hold; sentinel_fail anneal_hold; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"anneal_hold\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 8/10: npt_melt_ramp ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp
+log_start npt_melt_ramp
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp_run.log 2>&1 \
+  && log_done npt_melt_ramp \
+  || { log_fail npt_melt_ramp; sentinel_fail npt_melt_ramp; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_melt_ramp\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 9/10: nvt_melt_hold ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold
+log_start nvt_melt_hold
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold_run.log 2>&1 \
+  && log_done nvt_melt_hold \
+  || { log_fail nvt_melt_hold; sentinel_fail nvt_melt_hold; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"nvt_melt_hold\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 10/10: npt_melt_hold ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_melt_hold
+cd /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_melt_hold
+log_start npt_melt_hold
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.in >> /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_run.log 2>&1 \
+  && log_done npt_melt_hold \
+  || { log_fail npt_melt_hold; sentinel_fail npt_melt_hold; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_melt_hold\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+echo "{\"stage\":\"__chain__\",\"status\":\"completed\",\"n_stages\":10,\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"
+sentinel_ok
+rm -f "$PIDFILE"
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b.sh > /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b.log 2>&1 </dev/null & disown; echo $!
+2026-09-08 17:07:47,647 [LAMMPS-ENGINE] INFO [8885dd3b] Chain monitor started (polling every 60s)
+[wait] equilibration chain: watching 8885dd3b
+2026-09-08 17:08:47,648 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:09:47,902 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:10:48,162 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:11:48,440 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:12:48,700 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:13:48,957 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:14:49,215 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:15:49,492 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:16:49,746 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:17:49,999 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:18:50,251 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:19:50,506 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:20:50,758 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:21:51,008 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:22:51,262 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:23:51,511 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:24:51,760 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:25:52,002 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:26:52,258 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:27:52,514 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:28:52,775 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:29:53,032 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:30:53,285 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:31:53,546 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:32:53,803 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:33:54,057 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:34:54,310 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:35:54,559 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:36:54,812 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:37:55,064 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:38:55,337 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:39:55,586 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:40:55,839 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:41:56,093 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:42:56,370 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:43:56,628 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:44:56,908 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:45:57,162 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:46:57,431 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:47:57,687 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:48:57,948 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:49:58,204 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:50:58,459 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:51:58,712 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:52:58,968 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:53:59,227 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:54:59,483 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:55:59,726 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:56:59,983 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:58:00,245 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 17:59:00,510 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:00:00,767 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:01:01,026 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:02:01,280 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:03:01,541 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:04:01,807 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:05:02,059 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:06:02,318 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:07:02,575 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:08:02,834 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:09:03,088 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:10:03,345 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:11:03,602 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:12:03,853 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:13:04,107 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:14:04,376 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:15:04,628 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:16:04,881 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:17:05,131 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:18:05,404 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:19:05,675 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:20:05,924 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:21:06,181 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:22:06,461 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:23:06,719 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:24:06,973 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:25:07,229 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:26:07,488 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''
+2026-09-08 18:27:07,746 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/work/chain_8885dd3b_progress.jsonl 2>/dev/null || echo ''

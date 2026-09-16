@@ -1,0 +1,298 @@
+{
+  "confidence": "low",
+  "cost_estimate": {
+    "cell_atoms_estimate": 7840,
+    "confidence": "high",
+    "ff_family": "pcff",
+    "note": "Partial/lower-bound total -- see unpriced_stages for what is not included (notably: equil-stage length, and any deform stage beyond a single primary-direction leg).",
+    "stages": {
+      "cool": {
+        "basis": "log-log interpolated between real measured points [(3020, 42.269), (5140, 30.63), (15040, 17.384)] -- 7840 atoms is within the measured [3020,15040] range",
+        "confidence": "high",
+        "gpu_hours": 3.1818,
+        "note": "11 cool blocks x 250000 steps (573->300 K at dT=25 K) + npt_final 500000; first blocks only -- adaptive extensions are not priced",
+        "ns_per_day_used": 24.5141,
+        "simulated_ns": 3.25,
+        "steps": 3250000
+      },
+      "deform": {
+        "basis": "log-log interpolated between real measured points [(3020, 42.269), (5140, 30.63), (15040, 17.384)] -- 7840 atoms is within the measured [3020,15040] range",
+        "confidence": "high",
+        "gpu_hours": 0.1958,
+        "note": "single primary-direction leg -- a lower bound, not a full multi-leg total [CONTINGENT: murnaghan's glassy fallback, charged only if BM_INADMISSIBLE routes to it -- included in worst-case, not in the base run]",
+        "ns_per_day_used": 24.5141,
+        "simulated_ns": 0.2,
+        "steps": 200000
+      },
+      "murnaghan": {
+        "basis": "log-log interpolated between real measured points [(3020, 42.269), (5140, 30.63), (15040, 17.384)] -- 7840 atoms is within the measured [3020,15040] range",
+        "confidence": "high",
+        "gpu_hours": 2.4476,
+        "note": "5 pressure point(s) x 500000 npt_steps each",
+        "ns_per_day_used": 24.5141,
+        "simulated_ns": 2.5,
+        "steps": 2500000
+      },
+      "tg": {
+        "basis": "log-log interpolated between real measured points [(3020, 42.269), (5140, 30.63), (15040, 17.384)] -- 7840 atoms is within the measured [3020,15040] range",
+        "confidence": "high",
+        "gpu_hours": 3.9161,
+        "note": "1 rate (100 K/ns) x 20 T-bin(s) x 200000 steps, floor-checked against tg_min_steps_per_T=200000",
+        "ns_per_day_used": 24.5141,
+        "simulated_ns": 4.0,
+        "steps": 4000000
+      }
+    },
+    "total_gpu_hours": 9.7413,
+    "unpriced_stages": [
+      {
+        "reason": "stage-length knobs default to None, deferred to generate_equilibration_workflow's own atom-count-tiered default inside the MCP LAMMPS engine -- not resolvable from decided_params alone; not priced here to avoid guessing",
+        "stage": "equil"
+      }
+    ]
+  },
+  "decided_params": {
+    "K_deform_rate_inv_s": 10000000.0,
+    "K_deform_rate_slow_inv_s": 1000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 573.0,
+    "T_workflow_K": 550.0,
+    "annealing_T_high_K": 630.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.53,
+    "dp_typical": 49,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 796234216,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "melt_hold_min_steps": 6000000,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 200,
+    "tg_t_step_K": 20,
+    "velocity_seed": 992835374
+  },
+  "decisions": [
+    {
+      "acknowledgements": {},
+      "alternatives": [],
+      "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PSTR has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
+      "choice": "pcff",
+      "confidence": "low",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "critique": {
+        "findings": [],
+        "rounds": 1,
+        "status": "scientific_agent_decision"
+      },
+      "evidence": [
+        {
+          "claim": "polymer_rules.json:classes.PSTR.ff_note: PCFF (Class II) via EMC. TraPPE-UA was rejected: its united-atom representation ignores the phenyl ring partial charges and pi-dihedral barriers that govern PS's Tg (~373K), and no TraPPE-UA PS Tg validation exists. PCFF explicitly parameterizes aromatic C-H charges and cross-terms; Soldera2006 (COMPASS/OPLS) confirms MD reaches PS Tg ~449-484K raw, WLF-corrected ~373K -- no direct PCFF PS Tg paper exists, so confidence is medium. DENSITY CAVEAT: PCFF underpredicts PS 300K density by -5.85% to -6.32% across three independent runs; PCFF's founding paper documents the same aromatic-ring deficit for benzene/toluene (-6.3%/-6.5%), which COMPASS reduces to -1.1%/-1.2% for the same compounds -- field_override='compass' is EMC-admissible but not build-tested against PS's SMILES. Do not generalize this aromatic-ring finding to non-aromatic classes.",
+          "criterion": "literature_support",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PSTR.ff_justification_doi",
+          "source_doi": "10.1021/jp980939v"
+        },
+        {
+          "citation": "Srivastava, A. et al. On-the-Fly Machine-Learned Force Fields for High-Fidelity Polymer Glass Transition Simulations. arXiv:2601.17137.",
+          "claim": "Tg values for 12 polymers; PE Tg=281\u00b152 K; PDMS Tg ~228 K. Validation data for PHYC and PSIL classes.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Srivastava2026]"
+        },
+        {
+          "citation": "Tang, Z.; Okazaki, S. All-Atomistic Molecular Dynamics Study of the Glass Transition of Amorphous Polymers. Polymer 2022, 254, 125044.",
+          "claim": "AA-MD glass-transition/dynamics study of polycarbonate (PC) and PMMA via cooling simulations (Tg, radius of gyration, dihedral transitions, end effects, INM). IMPORTANT: PC uses the Kremer et al. force field and PMMA uses OPLS-AA \u2014 NEITHER is PCFF. It validates that AA-MD reproduces PC/PMMA Tg & Rg; it does NOT validate PCFF and does NOT benchmark mass density. Do not cite as a PCFF or density source. The 'PCFF PMMA density within 2%' result is NkepsuMbitou2025 (10.1016/j.commatsci.2025.113861, Fig 4 / \u00a75.1).",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Tang2022]",
+          "source_doi": "10.1016/j.polymer.2022.125044"
+        },
+        {
+          "citation": "Soldera, A.; Metatla, N. Glass Transition of Polymers: Atomistic Simulation versus Experiments. Phys. Rev. E 2006, 74, 061803.",
+          "claim": "COMPASS+AMBER/OPLS MD Tg for PE, PMMA, PMA, PS, PMS; WLF analysis shows linear sim-exp correlation. PS Tg WLF-corrected ~373 K (matches experiment). Closest 'any MD Tg' evidence for PSTR; FF is COMPASS/OPLS, not PCFF.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Soldera2006]",
+          "source_doi": "10.1103/PhysRevE.74.061803"
+        },
+        {
+          "citation": "Nkepsu Mbitou, R. L.; Bedoui, F. A Review on All-Atom Force Fields Capabilities to Predict Polymer Properties: Case of Poly(methyl methacrylate) and Polyisobutylene Polymer Systems. Comput. Mater. Sci. 2025, 253, 113861.",
+          "claim": "Systematic review of Class I (GAFF2, OPLS-AA) and Class II (PCFF, CVFF) all-atom FFs for PMMA (PACR) and PIB/polyisobutylene (PHYC); benchmarks thermomechanical properties against experiment. Class II FFs outperform Class I for thermomechanical predictions; informs PACR and PHYC FF confidence notes.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[NkepsuMbitou2025]",
+          "source_doi": "10.1016/j.commatsci.2025.113861"
+        },
+        {
+          "citation": "Klajmon, M. et al. Glass Transition and Structure of Organic Polymers from All-Atom Molecular Simulations. Ind. Eng. Chem. Res. 2023, 62, 21437\u201321448.",
+          "claim": "All-atom MD benchmark for Tg and density of PLA, PEG, and PVP; quantifies equilibration protocol errors and polydispersity effects. Density identified as the most reliable Tg observable regardless of protocol. Informs PEST (PLA) and POXI (PEG) simulation setup. NOTE: paper covers PLA/PEG/PVP \u2014 not PC/PA/PEEK as previously annotated.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Klajmon2023]",
+          "source_doi": "10.1021/acs.iecr.3c03038"
+        },
+        {
+          "claim": "NOT MEASURED for this SMILES. No EMC trial build was run, so coverage is asserted from polymer_rules.json:classes.PSTR.ff_accuracy_prior='pcff' only; whether 'pcff' can type THIS repeat unit is unverified until the build stage runs. The moiety screen ran and matched no rule, so no trial build was triggered. That narrows the risk and measures nothing: the rules cover 77% of the measured failures (guides/ff_moiety_rules.json), so this SMILES is UNSCREENED for the rest, not cleared.",
+          "criterion": "parameter_coverage",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PSTR.ff_accuracy_prior"
+        },
+        {
+          "claim": "pcff-family cell of 7840 atoms (51034.5 g/mol): estimate_ns_per_day at this run's 7840-atom estimate: 24.51408561487439 ns/day (high confidence). electrostatics=pppm, cutoff_A=9.5.",
+          "criterion": "computational_cost",
+          "origin": "autofill",
+          "resolver": "select_hardware.select_hardware"
+        }
+      ],
+      "id": "D-01_ff",
+      "resolved_by": "polymer_rules.json:classes.PSTR.ff_accuracy_prior"
+    }
+  ],
+  "derived_inputs": {
+    "backbone_types": {
+      "data_file": "/home/arz2/PolyJarvis_v2/data/aPS_3/attempts/build/attempt-0001/work/cell/cell.data",
+      "derived_at": "2026-09-12T22:26:14.460123+00:00",
+      "source": "derive_backbone_types (heavy_atom_graph_diameter)",
+      "value": [
+        1,
+        2,
+        3
+      ]
+    }
+  },
+  "dominant_uncertainty": "scientific_review_pending",
+  "goal": "density, Tg and bulk modulus for polystyrene (atactic), stereo_r2",
+  "hardware": {
+    "engine": "kokkos",
+    "ff_family": "pcff",
+    "gpu_per_run": 1,
+    "mpi_ranks": 1
+  },
+  "overrides": {
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "emc_seed": 796234216,
+    "velocity_seed": 992835374
+  },
+  "plan_mode": "reasoned",
+  "planned_stages": [
+    {
+      "stage": "build",
+      "success_criteria": {
+        "data_file_written": true
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "equil",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "equil-check",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "cool",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "track": "cooling"
+    },
+    {
+      "stage": "cool-check",
+      "success_criteria": {
+        "cool_verdict": "PASS"
+      },
+      "track": "cooling"
+    },
+    {
+      "stage": "tg",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 373
+      },
+      "track": "thermal"
+    },
+    {
+      "stage": "analyze-tg",
+      "success_criteria": {},
+      "track": "thermal"
+    },
+    {
+      "fallback": "deform",
+      "stage": "murnaghan",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "track": "mechanical"
+    },
+    {
+      "stage": "analyze-bm",
+      "success_criteria": {},
+      "track": "mechanical"
+    },
+    {
+      "stage": "run-summary",
+      "success_criteria": {},
+      "track": "summary"
+    }
+  ],
+  "polymer_class": "PSTR",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "run_name": "aPS_3",
+  "schema_version": "2.0",
+  "smiles": "*CC(*)c1ccccc1",
+  "system_size": {
+    "acknowledgements": {
+      "entanglement_dp_advisory": {
+        "detail": "entanglement MW Me=16600 g/mol for member 'PS' (Mark 2007 Ch.25) / repeat-unit MW 104.2 g/mol -> DP@Me=159 -- reported for context only, not an acceptance criterion for bulk_modulus: entanglement Me governs shear/viscoelastic properties (plateau modulus, reptation), not the isothermal bulk modulus, which is an EOS/local-packing quantity. Establish chain-length convergence of density/K instead (a small DP sweep confirming both plateau) rather than requiring DP>=DP@Me.",
+        "dp_at_me": 159
+      },
+      "nchain_below_production_minimum": {
+        "current_nchain": 10,
+        "detail": "nchain=10 is below the advisory PCFF production minimum 20. Its source (\"Bejagam 2020\") has no copy in this repo and no verified DOI, so the claim is unchecked; nchain>=10 (Wang 2021, verified) IS met, and Hayashi 2022 (RadonPy) ran nchain=10 across 1,077 polymers. Raising nchain to 20 at a fixed system-mass floor would halve per-chain MW (worse chain-length bias); raising it at fixed DP doubles cost for no criterion this module can state. Reported, not applied -- the L>=2*Rg finite-size gate (a separate, already-mechanized check) is the binding constraint on nchain; supply a nchain is now a pure function of the system-mass floor."
+      }
+    },
+    "dp_typical": 49,
+    "nchain": 10,
+    "reasons": [
+      "system size auto-filled {'dp_typical': 49, 'nchain': 10} via solve_system_size()",
+      "rigidity DP recommendation (backbone_rotatable_fraction=1.00, backbone_ring_fraction=0.00, longest_rigid_backbone_run=1 atoms -> flexible; DP_MW=49) does not exceed the existing recommendation 49"
+    ],
+    "resolved_by": "select_system_size.solve_system_size"
+  }
+}

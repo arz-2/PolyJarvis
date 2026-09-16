@@ -1,0 +1,291 @@
+$ perl /home/arz2/emc/scripts/emc_setup.pl -field=pcff -seed=414243003 -temperature=300.0 -replace emc_build.esh
+# exit 0
+EMC Setup v4.1.5 (March 30, 2024), (c) 2004-2024 Pieter J. in 't Veld
+
+Info: reading script from "./emc_build.esh"
+Info: phase1 = {poly}
+Info: project = emc_build
+Info: direction = x
+Info: shape = 1
+Info: force field type = "cff"
+Info: force field name = "pcff/pcff"
+Info: force field location = "~emc/field"
+Info: build for LAMMPS script in "../build"
+Info: creating LAMMPS run script "emc_build.in"
+Info: adding pressure sampling
+Info: creating EMC build script "build.emc"
+
+$ /home/arz2/emc/bin/emc_linux_x86_64 build.emc
+# exit 0
+(* EMC: Enhanced Monte Carlo simulations *)
+
+version 9.4.4, build Jul 21 2026 07:58:38, date Mon Sep 14 16:32:35 2026
+
+valid until Jun 30, 2027
+
+Info: script v1.0 started at Mon Sep 14 16:32:35 2026
+Info: variables = {seed -> 414243003, ntotal -> 3000, fshape -> 1, output ->
+        "emc_build", field -> "pcff/pcff", location1 ->
+        "/home/arz2/emc/field/", nav -> 0.6022141179, temperature -> 300, 
+        radius -> 5, nrelax -> 100, weight_nonbond -> 0.0001, weight_bond ->
+        0.0001, weight_focus -> 1, cutoff -> 9.5, charge_cutoff -> 9.5, kappa
+        -> 4, density1 -> 0.55, lprevious -> 0, lphase -> 0, f_poly -> 10, 
+        chem_repeat -> "*C[C@H](Cl)C[C@@H](Cl)*", chem_cap -> "*[H]"}
+Info: output = 
+      {detail -> 3, wide -> false, expand -> false, math -> true, reduced ->
+        false, info -> true, strict -> true, warning -> true, message -> true,
+        debug -> false, exit -> true, ignore -> false}
+Info: field = {id -> pcff, mode -> cff, style -> none, name ->
+        {"/home/arz2/emc/field/pcff/pcff.frc", 
+          "/home/arz2/emc/field/pcff/pcff_templates.dat"}, compress -> false, 
+        error -> true, debug -> false, check -> {atomistic -> true, charge ->
+          true}}
+Info: importing '/home/arz2/emc/field/pcff/pcff.frc'
+Warning: duplicate field.bond entry 40 [c:c] omitted.
+Warning: duplicate field.bond entry 51 [c:h] omitted.
+Warning: duplicate field.bond entry 62 [c:o_2] omitted.
+Warning: duplicate field.bond entry 176 [c=:c=1] omitted.
+Warning: duplicate field.bond entry 328 [c_1:o_1] omitted.
+Warning: duplicate field.bond entry 364 [cp:cp] omitted.
+Warning: duplicate field.bond entry 365 [cp:cp] omitted.
+Warning: duplicate field.bond entry 367 [cp:h] omitted.
+Warning: duplicate field.bond entry 689 [o:p] omitted.
+Info: groups = {ngroups -> 2, group -> {
+          {id -> repeat, chemistry -> "*C[C@H](Cl)C[C@@H](Cl)*", depth -> 8, 
+            charges -> field, charge -> 0, terminator -> false, nconnects ->
+            4, connects -> {
+              {source -> $end1, destination -> {index -> cap, site -> $end1}}, 
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end2}}, 
+              {source -> $end2, destination -> {index -> cap, site -> $end1}}, 
+              {source -> $end2, destination -> {index -> repeat, site ->
+                  $end1}}}}, 
+          {id -> cap, chemistry -> "*[H]", depth -> 8, charges -> field, 
+            charge -> 0, terminator -> false, nconnects -> 2, connects -> {
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end1}}, 
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end2}}}}}, ndeletes -> 0, npolymers -> 0}
+Info: field = {mode -> apply, style -> none, error -> true, debug -> false, 
+        check -> {atomistic -> true, charge -> true}}
+Info: applying '/home/arz2/emc/field/pcff/pcff.frc'
+Info: variables = {lg_repeat -> 12, lg_cap -> 1, norm_poly -> 100, l_poly ->
+        494, mg_repeat -> 100.97612, mg_cap -> 1.00797, m_poly -> 4142.03686, 
+        n_poly -> 10, ntotal -> 0, mtotal -> 0}
+Info: simulation = {units -> {permittivity -> 1, seed -> seed}, types -> {
+          coulomb -> {pair -> {active -> true, cutoff -> charge_cutoff}}}}
+Info: clusters = {progress -> none, nbodys -> 0, nclusters -> 0, ngrafts -> 0,
+        npolymers -> 1, 
+        polymer -> 
+        {id -> poly, system -> main, type -> alternate, niterations -> 1000, n
+          -> 10, groups -> {repeat, cap}, weights -> {1, 1}, nrepeat -> {41, 
+            0}}}
+      delta = {systems -> 1, bodies -> 0, clusters -> 10, sites -> 4940}
+Info: field = {mode -> apply, style -> none, error -> true, debug -> false, 
+        check -> {atomistic -> true, charge -> true}}
+Info: applying '/home/arz2/emc/field/pcff/pcff.frc'
+Info: types = {cff -> {pair -> {active -> true, mode -> repulsive}}}
+Info: variables = {nphase1 -> 4940, mphase1 -> 51269.5116, vphase1 ->
+        154790.947351, lbox -> 53.6926928981, lphase1 -> 53.6926928981, lxx ->
+        53.6926928981, lyy -> 53.6926928981, lzz -> 53.6926928981, lzy -> 0, 
+        lzx -> 0, lyx -> 0, lphase -> 53.6926928981, ntotal -> 4940, mtotal ->
+        51269.5116, vtotal -> 154790.947351}
+Info: build = {
+        system -> {id -> main, temperature -> 300, density -> 0.55, split ->
+          false, flag -> {charge -> true, map -> true, pbc -> true, geometry
+            -> true}, periodic -> {x -> true, y -> true, z -> true}, geometry
+          -> {xx -> 53.6926928981, yy -> 53.6926928981, zz -> 53.6926928981, 
+            zy -> 0, zx -> 0, yx -> 0}, deform -> {xx -> 1, yy -> 1, zz -> 1, 
+            zy -> 0, zx -> 0, yx -> 0}}, 
+        select -> {progress -> list, frequency -> 1, message -> nkt, center ->
+          false, origin -> {x -> 0, y -> 0, z -> 0}, order -> random, check ->
+          true, nclusters -> 1, cluster -> poly, 
+          relax -> {ncycles -> 100, radius -> 5}, name -> "error", type ->
+          xyz, compress -> false, 
+          grow -> {check -> all, method -> energetic, cutoff -> 0, focus ->
+            all, 
+            weight -> {nonbonded -> 0.0001, bonded -> 0.0001, focus -> 1}, 
+            theta -> 0, dphi -> 1, nbonded -> 20, ntrials -> 20, niterations
+            -> 1000}}}
+Info: building 4940 sites.
+
+   progress/%      E[0]/nkT
+---------------------------
+            0             0
+            1      1.387524
+            2      1.894711
+            3      2.328215
+            4      2.558754
+            5      2.560498
+            6      2.652319
+            7      2.775061
+            8      2.787867
+            9      2.889662
+           10      2.932839
+           11      3.053865
+           12      3.172267
+           13      3.282715
+           14      3.233393
+           15      3.221962
+           16      3.203685
+           17      3.239365
+           18        3.1986
+           19       3.21218
+           20      3.241558
+           21      3.225557
+           22      3.280507
+           23      3.279343
+           24      3.276289
+           25      3.292616
+           26      3.321463
+           27      3.318415
+           28      3.344388
+           29      3.408574
+           30      3.658823
+           31      3.789797
+           32      3.766807
+           33      3.736819
+           34      3.782716
+           35      3.739474
+           36      3.756452
+           37      3.755688
+           38        3.7688
+           39      3.780875
+           40      3.784639
+           41      4.039941
+           42      4.218567
+           43      4.146754
+           44      4.052441
+           45      4.096084
+           46      4.028422
+           47      4.106598
+           48      4.044802
+           49      4.043671
+           50      4.030744
+           51      4.025394
+           52      4.003579
+           53      4.057166
+           54      4.064844
+           55      4.179804
+           56      4.201103
+           57      4.151952
+           58      4.257271
+           59      4.224755
+           60      4.244242
+           61      4.340879
+           62        4.2729
+           63      4.304008
+           64      4.287975
+           65       4.24307
+           66      4.228303
+           67      4.209558
+           68      4.215729
+           69      4.192255
+           70      4.181522
+           71      4.175343
+           72      4.189243
+           73      4.248076
+           74      4.166304
+           75      4.224704
+           76      4.183864
+           77      4.183121
+           78      4.146948
+           79       4.14864
+           80      4.145067
+           81      4.162155
+           82      4.179174
+           83      4.181699
+           84      4.170853
+           85      4.193447
+           86      4.187494
+           87      4.192995
+           88      4.194762
+           89      4.221482
+           90      4.295083
+           91      4.292524
+           92      4.323138
+           93      4.327965
+           94      4.335564
+           95      4.323944
+           96      4.355146
+           97      4.353562
+           98      4.348636
+           99         4.368
+          100       4.41443
+---------------------------
+      average      3.760622
+
+      niterations = 2480, <niterations> = 0.502024
+Info: force = {style -> none, message -> nkt}
+
+(* Energy *)
+
+                         E[0]/nkT 
+---------------------------------
+cff.angle_angle_tor    -0.1867771 
+cff.angle_angle        0.02142248 
+cff.angle_torsion      0.02743974 
+cff.angle                 1.79871 
+cff.bond_angle        -0.03241198 
+cff.bond_bond_13                0 
+cff.bond_bond         0.000289007 
+cff.bond                0.6851534 
+cff.end_bond_torsio  0.0007284459 
+cff.improper                    0 
+cff.middle_bond_tor   -0.01755738 
+cff.pair                 2.117434 
+cff.torsion                     0 
+---------------------------------
+total                     4.41443 
+
+Info: force = {style -> init, message -> nkt}
+
+(* Energy *)
+
+                         E[0]/nkT 
+---------------------------------
+cff.angle_angle_tor    -0.1867771 
+cff.angle_angle        0.02142248 
+cff.angle_torsion      0.02743974 
+cff.angle                 1.79871 
+cff.bond_angle        -0.03241198 
+cff.bond_bond_13                0 
+cff.bond_bond         0.000289007 
+cff.bond                0.6851534 
+cff.end_bond_torsio  0.0007284459 
+cff.improper                    0 
+cff.middle_bond_tor   -0.01755738 
+cff.pair                 2.117434 
+cff.torsion                     0 
+---------------------------------
+total                     4.41443 
+
+Info: variables = {nl_poly -> 10}
+Info: put = {name -> "emc_build", compress -> true, detail -> 3}
+Info: pdb = {name -> "emc_build", compress -> true, extend -> false, mode ->
+        put, system -> main, length -> auto, forcefield -> cff, atomistic ->
+        full, depth -> auto, charges -> false, detect -> false, atom -> index,
+        residue -> index, segment -> index, rank -> false, hexadecimal ->
+        false, cut -> false, pbc -> true, map -> false, unwrap -> clusters, 
+        rigid -> true, fixed -> true, licorice -> false, vdw -> false, 
+        connectivity -> false, crystal -> false, element -> auto, parameters
+        -> false, flag -> {charge -> true, map -> true, pbc -> true, geometry
+          -> true}}
+Info: lammps = {name -> "emc_build", compress -> false, system -> main, mode
+        -> put, length -> auto, units -> none, forcefield -> cff, shake ->
+        auto, atomistic -> none, detect -> true, cutoff -> false, charges ->
+        true, ewald -> true, ellipsoid -> false, sphere -> false, bonds ->
+        false, types -> false, data -> true, parameters -> true, cross ->
+        false, variables -> true, coefficients -> true, comment -> true, map
+        -> true, unwrap -> true, flag -> {charge -> true, map -> true, pbc ->
+          true, geometry -> true}}
+Info: tsc: bonded = {28.29, 9.518, 4.757, 12.2, 0.3076, 0.2213} s
+Info: tsc: simulation = 79.42 s, threads = 46.11 s
+Info: tsc: thread = 44.41 s
+Info: script v1.0 finished at Mon Sep 14 16:33:55 2026
+
+Info: Thank you for using EMC v9.4.4
+Info: In any publication of scientific results based in part or
+Info: completely on the use of EMC, please include this reference:
+Info: P.J. in 't Veld and G.C. Rutledge, Macromolecules 2003, 36, 7358
+

@@ -1,0 +1,284 @@
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/cut/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+dielectric 1.000000
+bond_style harmonic
+angle_style harmonic
+dihedral_style multi/harmonic
+improper_style none
+special_bonds lj/coul 0 0 0.5
+pair_modify mix geometric tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+# KOKKOS: package loaded via -pk kokkos on the command line
+
+read_data /home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/cell.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (45.361593 45.361593 45.361593)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  3020 atoms
+  scanning bonds ...
+  4 = max bonds/atom
+  scanning angles ...
+  12 = max angles/atom
+  scanning dihedrals ...
+  24 = max dihedrals/atom
+  orthogonal box = (0 0 0) to (45.361593 45.361593 45.361593)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  3010 bonds
+  reading angles ...
+  6000 angles
+  reading dihedrals ...
+  8910 dihedrals
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0.5     
+  special bond factors coul:  0        0        0.5     
+     4 = max # of 1-2 neighbors
+     6 = max # of 1-3 neighbors
+    12 = max # of 1-4 neighbors
+    16 = max # of special neighbors
+  special bonds CPU = 0.003 seconds
+  read_data CPU = 0.068 seconds
+include /home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.params
+# LAMMPS parameters created by EMC v9.4.4, build Jul 21 2026 07:58:38
+
+# Variables
+
+variable	seed		index	909670995
+variable	ntotal		index	3020
+variable	fshape		index	1
+variable	output		index	emc_build
+variable	field		index	opls/2024/opls-aa
+variable	location1	index	/home/arz2/emc/field/
+variable	nav		index	0.6022141179
+variable	temperature	index	300
+variable	radius		index	5
+variable	nrelax		index	100
+variable	weight_nonbond	index	0.0001
+variable	weight_bond	index	0.0001
+variable	weight_focus	index	1
+variable	cutoff		index	9.5
+variable	charge_cutoff	index	9.5
+variable	kappa		index	4
+variable	density1	index	0.89
+variable	lprevious	index	0
+variable	lphase		index	45.3615929848
+variable	f_poly		index	10
+variable	chem_repeat	index	*C(F)(F)C(*)(F)F
+variable	chem_cap	index	*[H]
+variable	lg_repeat	index	6
+variable	lg_cap		index	1
+variable	norm_poly	index	100
+variable	l_poly		index	302
+variable	mg_repeat	index	88.003
+variable	mg_cap		index	1.0079
+variable	m_poly		index	4402.1658
+variable	n_poly		index	10
+variable	mtotal		index	50027.158
+variable	nphase1		index	3020
+variable	mphase1		index	50027.158
+variable	vphase1		index	93339.3758414
+variable	lbox		index	45.3615929848
+variable	lphase1		index	45.3615929848
+variable	lxx		index	45.3615929848
+variable	lyy		index	45.3615929848
+variable	lzz		index	45.3615929848
+variable	lzy		index	0
+variable	lzx		index	0
+variable	lyx		index	0
+variable	vtotal		index	93339.3758414
+variable	nl_poly		index	10
+
+# Types
+
+variable	type_c4		index	1
+variable	type_f1		index	2
+variable	type_h1		index	3
+
+variable	type_bond_c4_c4	index	1
+variable	type_bond_c4_f1	index	2
+variable	type_bond_c4_h1	index	3
+
+variable	type_angle_c4_c4_c4 index	1
+variable	type_angle_c4_c4_f1 index	2
+variable	type_angle_c4_c4_h1 index	3
+variable	type_angle_f1_c4_f1 index	4
+variable	type_angle_f1_c4_h1 index	5
+
+# Clusters
+
+variable	n0_poly		index	1
+variable	n1_poly		index	10
+variable	nl_poly		index	10
+
+# Flags
+
+variable	flag_charged	index	1
+
+# Masses
+
+mass		1    12.01100  # c4
+mass		2    18.99800  # f1
+mass		3     1.00790  # h1
+
+# Potentials
+
+pair_modify	mix geometric tail yes
+special_bonds	lj/coul 0 0 0.5
+
+# Pair Coeffs
+
+pair_coeff	1 1    0.06600    3.50000  # c4,c4
+pair_coeff	2 2    0.06100    2.94000  # f1,f1
+pair_coeff	3 3    0.03000    2.50000  # h1,h1
+
+# Bond Coeffs
+
+bond_coeff	1  268.00000    1.52900  # c4,c4
+bond_coeff	2  367.00000    1.36000  # c4,f1
+bond_coeff	3  340.00000    1.09000  # c4,h1
+
+# Angle Coeffs
+
+angle_coeff	1   58.35000  112.70000  # c4,c4,c4
+angle_coeff	2   50.00000  109.50000  # c4,c4,f1
+angle_coeff	3   37.50000  110.70000  # c4,c4,h1
+angle_coeff	4   77.00000  109.10000  # f1,c4,f1
+angle_coeff	5   40.00000  107.00000  # f1,c4,h1
+
+# Dihedral Coeffs
+
+dihedral_coeff	1    0.70000    0.35000    0.05000    0.40000    0.00000  # c4,c4,c4,c4
+dihedral_coeff	2   -0.05000   -0.45000    0.40000    0.80000    0.00000  # c4,c4,c4,f1
+dihedral_coeff	3    0.15000   -0.45000    0.00000    0.60000    0.00000  # c4,c4,c4,h1
+dihedral_coeff	4   -1.12500   -1.62500    0.00000    0.50000    0.00000  # f1,c4,c4,f1
+dihedral_coeff	5    0.20000   -0.60000    0.00000    0.80000    0.00000  # f1,c4,c4,h1
+
+
+# --- Thermo Output ---
+thermo_style custom step time temp press etotal pe ebond eangle edihed eimp evdwl ecoul elong vol lx ly lz density
+thermo_modify flush yes
+thermo 500
+
+# --- Trajectory ---
+dump dump_min all custom 1000 minimize.dump id type mol x y z ix iy iz
+
+# --- Minimization ---
+min_style cg
+minimize 1e-06 1e-06 50000 100000
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.32720492
+  grid = 45 45 45
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00028988744
+  estimated relative force accuracy = 8.7298742e-07
+  using double precision cuFFT
+  3d grid and FFT values/proc = 140608 91125
+Generated 3 of 3 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 4000, page size: 100000
+  master list distance cutoff = 11.5
+  ghost atom cutoff = 11.5
+  binsize = 11.5, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/cut/coul/long/kk, perpetual
+      attributes: full, newton off, kokkos_device
+      pair build: full/bin/kk/device
+      stencil: full/bin/3d
+      bin: kk/device
+WARNING: Fix MINIMIZE/kk not compatible with sending data in Kokkos communication (src/KOKKOS/comm_kokkos.cpp:767)
+WARNING: Fix with atom-based arrays not compatible with sending data in Kokkos communication, switching to classic exchange/border communication (src/KOKKOS/comm_kokkos.cpp:780)
+WARNING: Fix MINIMIZE/kk not compatible with Kokkos sorting on device (src/KOKKOS/atom_kokkos.cpp:212)
+WARNING: Fix with atom-based arrays not compatible with Kokkos sorting on device, switching to classic host sorting (src/KOKKOS/atom_kokkos.cpp:218)
+Per MPI rank memory allocation (min/avg/max) = 33.19 | 33.19 | 33.19 Mbytes
+   Step          Time           Temp          Press          TotEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         Volume           Lx             Ly             Lz          Density    
+         0   0              0              6349.3605      3757.1188      3757.1188      1205.4245      2357.4523     -3441.8524      0              1966.7286      15977.133     -14307.767      93339.376      45.361593      45.361593      45.361593      0.88999998   
+       500   500            0             -352.3853      -1082.2939     -1082.2939      259.85299      564.42847     -3904.1039      0              538.65059      15762.123     -14303.245      93339.376      45.361593      45.361593      45.361593      0.88999998   
+      1000   1000           0             -276.98221     -1190.3716     -1190.3716      253.65543      557.90903     -3925.9768      0              478.51808      15773.534     -14328.011      93339.376      45.361593      45.361593      45.361593      0.88999998   
+      1500   1500           0             -279.45545     -1234.2186     -1234.2186      252.24435      554.23615     -3940.3336      0              461.54555      15772.73      -14334.641      93339.376      45.361593      45.361593      45.361593      0.88999998   
+      2000   2000           0             -286.00506     -1249.3661     -1249.3661      252.69639      557.61321     -3944.0555      0              444.53326      15782.126     -14342.279      93339.376      45.361593      45.361593      45.361593      0.88999998   
+      2500   2500           0             -279.71813     -1265.1949     -1265.1949      251.68804      561.70876     -3944.0193      0              427.747        15785.494     -14347.813      93339.376      45.361593      45.361593      45.361593      0.88999998   
+      3000   3000           0             -213.80009     -1277.4192     -1277.4192      248.65369      554.71897     -3941.4793      0              425.20183      15787.97      -14352.485      93339.376      45.361593      45.361593      45.361593      0.88999998   
+      3246   3246           0             -219.98861     -1279.9931     -1279.9931      248.87813      556.47727     -3942.227       0              421.55834      15788.676     -14353.356      93339.376      45.361593      45.361593      45.361593      0.88999998   
+Loop time of 12.3403 on 1 procs for 3246 steps with 3020 atoms
+
+100.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      3757.11875172732   -1279.9925434857  -1279.99310446713
+  Force two-norm initial, final = 1850.0374 2.568615
+  Force max component initial, final = 110.30663 0.38429423
+  Final line search alpha, max atom move = 0.035385671 0.013598509
+  Iterations, force evaluations = 3246 6490
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 2.8784     | 2.8784     | 2.8784     |   0.0 | 23.33
+Bond    | 0.82523    | 0.82523    | 0.82523    |   0.0 |  6.69
+Kspace  | 7.3794     | 7.3794     | 7.3794     |   0.0 | 59.80
+Neigh   | 0.3881     | 0.3881     | 0.3881     |   0.0 |  3.14
+Comm    | 0.06502    | 0.06502    | 0.06502    |   0.0 |  0.53
+Output  | 0.011192   | 0.011192   | 0.011192   |   0.0 |  0.09
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.793      |            |       |  6.43
+
+Nlocal:           3020 ave        3020 max        3020 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           7086 ave        7086 max        7086 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:       762012 ave      762012 max      762012 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 762012
+Ave neighs/atom = 252.32185
+Ave special neighs/atom = 11.86755
+Neighbor list builds = 59
+Dangerous builds = 0
+
+undump dump_min
+reset_timestep 0
+
+# --- Write Output ---
+write_dump all custom minimize_last.dump id type mol x y z xu yu zu vx vy vz modify sort id
+write_data /home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/equilibration/attempt-0001/work/minimize/minimize_out.data
+System init for write_data ...
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.32720492
+  grid = 45 45 45
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00028988744
+  estimated relative force accuracy = 8.7298742e-07
+  using double precision cuFFT
+  3d grid and FFT values/proc = 140608 91125
+Generated 3 of 3 mixed pair_coeff terms from geometric mixing rule
+write_restart /home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/equilibration/attempt-0001/work/minimize/minimize_out.restart
+System init for write_restart ...
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.32720492
+  grid = 45 45 45
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00028988744
+  estimated relative force accuracy = 8.7298742e-07
+  using double precision cuFFT
+  3d grid and FFT values/proc = 140608 91125
+Generated 3 of 3 mixed pair_coeff terms from geometric mixing rule
+
+print "STAGE COMPLETE: minimization"
+STAGE COMPLETE: minimization
+quit

@@ -1,0 +1,134 @@
+{
+  "run": {
+    "name": "PTFE_AI",
+    "smiles": "*C(F)(F)C(*)(F)F",
+    "polymer_class": "PHAL",
+    "ff": "opls/2024/opls-aa",
+    "charge_method": "opls-library",
+    "dp": 50,
+    "n_chains": 10,
+    "n_atoms": null,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": "opls/2024/opls-aa",
+    "D-02_charges": "opls-library",
+    "D-03_electrostatics": "pppm",
+    "D-04_system_size": "DP=50, 10 chains",
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "GOOD"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": null,
+      "grading_basis": "raw_MD",
+      "r_squared": 0.9889,
+      "fit_quality": "GOOD",
+      "primary_fit_invalid": false,
+      "n_replicates": 1,
+      "transition_width_c_K": 248.2,
+      "tg_uncertainty_K": 66.8,
+      "gate_verdict": "TG_REVIEW",
+      "withheld": {
+        "value_K": 525.0,
+        "gate_verdict": "TG_REVIEW"
+      }
+    },
+    "density": {
+      "value_g_cm3": 1.930482,
+      "temperature_K": 299.98
+    },
+    "melt_density": {
+      "value_g_cm3": 1.449958,
+      "temperature_K": 700.02
+    },
+    "bulk_modulus": {
+      "value_GPa": 2.0664,
+      "sem_GPa": 0.0475,
+      "method": "murnaghan",
+      "temperature_K": 299.96,
+      "gate_verdict": "BM_REPORTABLE",
+      "withheld": null
+    }
+  },
+  "byproducts": {
+    "cte_glass": {
+      "value": 7.9123e-05,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_glassy_per_K",
+      "gate": {
+        "field": "slope_signs_valid",
+        "verdict": true
+      },
+      "blocking": false
+    },
+    "cte_rubber": {
+      "value": 0.001483864,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_rubbery_per_K",
+      "gate": {
+        "field": "slope_ordering_valid",
+        "verdict": true
+      },
+      "blocking": false
+    },
+    "tg_transition_width": {
+      "value": 248.2,
+      "unit": "K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:transition_width_c_K",
+      "gate": {
+        "field": "fit_quality",
+        "verdict": "GOOD"
+      },
+      "blocking": false
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.1923,
+    "caveats": [
+      "kinetic_trap_flag=True (strongly sub-diffusive (see kinetic_trap_flag for trap verdict)) in a rubbery/melt run -- chains have not displaced their own size (MSD_max < Rg^2). density/Tg/bulk_modulus were measured on a structure whose chain-scale conformation may not represent true equilibrium.",
+      "C(t) only 0% decayed by end of trajectory (tau_relax=4.62e+09 ps vs trajectory=451 ps) -- whole-chain conformational relaxation is far from complete.",
+      "GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED: large-s MSID slope=1.253 (s=18-51), expected 1.0 +/-20% for melt-screened (ideal-chain) statistics -- long-wavelength chain shape has not relaxed to equilibrium. Local packing/short-range structure can still be sound; whole-chain conformation may not represent true equilibrium."
+    ]
+  },
+  "structural_checks": {
+    "rg_cv": 0.1882,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": true,
+    "diffusion_regime": "strongly sub-diffusive (see kinetic_trap_flag for trap verdict)",
+    "msid_slope": 1.499,
+    "msid_large_s_slope": 1.253,
+    "msid_large_s_gaussian_pass": false,
+    "ordered_flag": false,
+    "p2_mean": 0.0251,
+    "heterogeneous_flag": false,
+    "density_cv_mean": 0.1581
+  },
+  "artifacts": {
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "artifacts_missing": [
+    {
+      "file": "bulk_modulus_deform.json",
+      "found_in": null
+    }
+  ],
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "7ca21b8",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-09-15T02:57:44.792656+00:00"
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/build.emc",
+      "sha256": "d9b62cda7870e8e124e252eab98477e224e64138492a69abe10b226094be175e",
+      "size": 4414
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/cell.data",
+      "sha256": "724aa5d463dc37bfe5f69509e39bd8e07da51bce382bcd409c35ab07eac91d61",
+      "size": 3670149
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.emc.gz",
+      "sha256": "836dd1c014b84be192e3ffc9cf8db9ec9c47b96b16244a3eb4772a20ef8f89c9",
+      "size": 323804
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.esh",
+      "sha256": "2484cab8d65b679cc92450424c967ee513a842817e7c66d3903383b4a80a77d1",
+      "size": 332
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.in",
+      "sha256": "ed6b2247313c9ca331be6bae55a0dc116ce528c1b7eb23fae9c5263e4d2627a7",
+      "size": 2932
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.log",
+      "sha256": "a52f9087c44a1f7247497325e1b12c9c6741827bba0860c249bc1ef557b7104b",
+      "size": 11998
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.params",
+      "sha256": "d4f224be3cdc7830dd379e7841b8ea92dbe6aa9c80ad2ca621adf7746dad6395",
+      "size": 22431
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.pdb.gz",
+      "sha256": "ae886ae218b0a2021af309b227189faf815a61146b6bf0d70c4bc62a084c06a0",
+      "size": 137065
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.psf.gz",
+      "sha256": "86d022240f2ec1becc189dbb1b4110d89b48397af199c47ba197085e65c60f1e",
+      "size": 230930
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.vmd",
+      "sha256": "9005ccba9824bef5a9fa31ad0b85fb49c7f4a7f1190003211fdc4e31126826d6",
+      "size": 1270
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_metadata.json",
+      "sha256": "d8007208398ed35e28b13dbf3ce77e260392041e7150992a23e2bc6d2f7871c6",
+      "size": 140
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-10T22:02:03.832677+00:00",
+  "input_hash": "f8c7d188c445b5d8247df56992a53528bc5b205a254c980064764db6de5e63fa",
+  "outputs": {
+    "data_path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/cell.data",
+    "emc_inputs": {
+      "build.emc": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/build.emc",
+      "emc_build.esh": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.esh",
+      "emc_build.in": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.in",
+      "emc_build.log": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.log",
+      "emc_metadata.json": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_metadata.json"
+    },
+    "emc_params_path": "/home/arz2/PolyJarvis_v2/data/aPS_2/attempts/build/attempt-0001/work/cell/emc_build.params",
+    "emc_seed": 211721699,
+    "ff_provenance": {
+      "available": true,
+      "counts": {
+        "AUTO_FALLBACK": 4,
+        "ZERO_SUBSTITUTED": 10
+      },
+      "field": "pcff",
+      "field_file": "/home/arz2//emc/field/pcff/pcff.frc",
+      "local_patch_increments": [],
+      "rows_checked": 65,
+      "unchecked_cross_terms": {
+        "AngleAngle": 14,
+        "AngleAngleTorsion": 24,
+        "AngleTorsion": 24,
+        "BondAngle": 15,
+        "BondBond": 15,
+        "BondBond13": 24,
+        "EndBondTorsion": 24,
+        "MiddleBondTorsion": 24
+      },
+      "zero_substituted": []
+    },
+    "lammps_flags": {
+      "use_opls": false,
+      "use_pcff": true
+    },
+    "n_atoms": 7860
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 10000000.0,
+    "K_deform_rate_slow_inv_s": 1000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 573.0,
+    "T_workflow_K": 550.0,
+    "annealing_T_high_K": 630.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.53,
+    "dp_typical": 49,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 211721699,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "melt_hold_min_steps": 6000000,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 200,
+    "tg_t_step_K": 20,
+    "velocity_seed": 422597568
+  },
+  "stage": "build",
+  "status": "accepted"
+}

@@ -1,0 +1,202 @@
+{
+  "agent_escalations": [],
+  "created_at": "2026-09-14T20:32:23.936271+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 530.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 530.0,
+    "annealing_T_high_K": 610.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.55,
+    "dp_typical": 41,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 414243003,
+    "experimental_density_gcm3": 1.391,
+    "experimental_tg_K": 371.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "melt_hold_min_steps": 4000000,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 150,
+    "tg_t_step_K": 20,
+    "velocity_seed": 405550636
+  },
+  "engine_version": "workflow-engine-v3",
+  "input_hash_restamp": [
+    {
+      "at": "2026-09-15T16:01:21.024625+00:00",
+      "reason": "trajectory dumps of accepted attempts compressed to .dump.gz (no re-execution, no re-analysis); artifact paths and sha256 changed, so dependency checksums and every dependent stage input hash shifted",
+      "stages": {
+        "cooling": {
+          "after": "db1e376e0612dfe0aa979e201afb65c608acdffe7574b7a612e10dcd0f7069e9",
+          "before": "4991751fb5b0fd3a6c24192603b8604d8180e231797cd570f0d0c740aceb89be"
+        },
+        "mechanical": {
+          "after": "d53e8f5ce1e85ad449acdc8a6e904b9c2c69549f141ff1981be73935ebd579bd",
+          "before": "227fce7325c6f02e289a487b16e8d9c0e3a07db21befa28382c3c81b0c029784"
+        },
+        "summary": {
+          "after": "1dbf7db5bcfe5d61798b7360c03c035e7fb3e15c1c591a232504cb5781293b6c",
+          "before": "844deda6982d0e0afc840d1c88954e5bad22c296b73cb5fe75ae34daebdc3ee5"
+        },
+        "thermal": {
+          "after": "cef51da43930f57feedf0ef3e18b201cdc218942e85378bb3235f560b57bdcf9",
+          "before": "58165ef0950ed86483ececfa59e7b3d8af0888a3cdb19d4fb4b276e326312ec6"
+        }
+      }
+    },
+    {
+      "at": "2026-09-16T22:04:30.148436+00:00",
+      "reason": "run workspace renamed sPVC_1_rerun -> sPVC_1 (text references in plan, state, decks, scripts and logs rewritten) (no re-execution, no re-analysis); artifact paths and sha256 changed, so dependency checksums and every dependent stage input hash shifted",
+      "stages": {
+        "cooling": {
+          "after": "273aa947f29b6dbe7f3a460cdc51a5b89ebd793e496c131f2d667cca5851f462",
+          "before": "db1e376e0612dfe0aa979e201afb65c608acdffe7574b7a612e10dcd0f7069e9"
+        },
+        "equilibration": {
+          "after": "cf301b3d0f4e79e979718a8fbea397f4a507136b5a183742328bb5196927312e",
+          "before": "5ac824f93a862d83bf0b43b77d7cb9632d72dc1dccc701d15febd69a2e89ce86"
+        },
+        "mechanical": {
+          "after": "293e10d2d9fc85b44eb464603f5240d6b382880f8609c91c9c7ae9f97292e1e5",
+          "before": "d53e8f5ce1e85ad449acdc8a6e904b9c2c69549f141ff1981be73935ebd579bd"
+        },
+        "summary": {
+          "after": "72daee03ffd10adcb1efc34d5b9822cd94e7d45d6d411091e5b404fa648433bf",
+          "before": "1dbf7db5bcfe5d61798b7360c03c035e7fb3e15c1c591a232504cb5781293b6c"
+        },
+        "thermal": {
+          "after": "c4f2930f1a3290cf9fa3a856dbbe99bb09d427ad695d6a855fd62c029a93d599",
+          "before": "cef51da43930f57feedf0ef3e18b201cdc218942e85378bb3235f560b57bdcf9"
+        }
+      }
+    }
+  ],
+  "plan_hash": "d7a95e61f38ef942df459bfcffd19bb5df47bb3944c0d0119021e6ec787c6932",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 12
+  },
+  "replicate_protocol_lock": {
+    "agent_escalation": "disabled by launching without --recovery-agent-command",
+    "auto_remedies": "disabled by pre-seeding remedy_counters.total = 12",
+    "donor_plan": "data/sPVC_2/raw/run_plan.json with sPVC_1's emc_seed/velocity_seed; derived_inputs removed",
+    "gates": "POLYJARVIS_GATES_ADVISORY=1 -- verdicts recorded, never enforced, never adapted",
+    "locked_at": "2026-09-14",
+    "melt_fold": "melt_hold_min_steps=4000000 as in sPVC_2/sPVC_3",
+    "why": "rerun of sPVC_1 under the locked replicate protocol (continuous melt hold); original sPVC_1 left untouched"
+  },
+  "run_name": "sPVC_1",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T20:34:06.025899+00:00",
+          "input_hash": "c8dc8878a774bb1564b39faf684f4682138bd320d5e9a71807856cabf713397d",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T20:32:35.679875+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "c8dc8878a774bb1564b39faf684f4682138bd320d5e9a71807856cabf713397d",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T07:36:49.889702+00:00",
+          "input_hash": "273aa947f29b6dbe7f3a460cdc51a5b89ebd793e496c131f2d667cca5851f462",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T04:59:11.922457+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "273aa947f29b6dbe7f3a460cdc51a5b89ebd793e496c131f2d667cca5851f462",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T04:59:02.810910+00:00",
+          "input_hash": "cf301b3d0f4e79e979718a8fbea397f4a507136b5a183742328bb5196927312e",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T20:34:06.033973+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "cf301b3d0f4e79e979718a8fbea397f4a507136b5a183742328bb5196927312e",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T13:51:45.882689+00:00",
+          "input_hash": "293e10d2d9fc85b44eb464603f5240d6b382880f8609c91c9c7ae9f97292e1e5",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T11:39:02.178342+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "293e10d2d9fc85b44eb464603f5240d6b382880f8609c91c9c7ae9f97292e1e5",
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T13:52:17.113414+00:00",
+          "input_hash": "72daee03ffd10adcb1efc34d5b9822cd94e7d45d6d411091e5b404fa648433bf",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T13:52:00.452065+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "72daee03ffd10adcb1efc34d5b9822cd94e7d45d6d411091e5b404fa648433bf",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T11:38:59.037151+00:00",
+          "input_hash": "c4f2930f1a3290cf9fa3a856dbbe99bb09d427ad695d6a855fd62c029a93d599",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_1/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T07:36:58.953962+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "c4f2930f1a3290cf9fa3a856dbbe99bb09d427ad695d6a855fd62c029a93d599",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-15T13:52:17.116824+00:00"
+}

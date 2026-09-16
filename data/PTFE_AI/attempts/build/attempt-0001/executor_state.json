@@ -1,0 +1,125 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/build.emc",
+      "sha256": "561adb51577b19822b1393a57e8e3efa1903a1878947e9f3a0140b5553a3c9d4",
+      "size": 4430
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/cell.data",
+      "sha256": "49b0eba52c5bf8e03596f77fd6d21d262c3082c3a33675563cecc771db136fe7",
+      "size": 1256759
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.emc.gz",
+      "sha256": "813aeb5b554cad1ced98c11e8c29c8e366fc313aa9cfd6285c72e70e38ea2cd6",
+      "size": 125217
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.esh",
+      "sha256": "de289b3c9604c837bd4239440dde414f5df3f8afc12aaf24d2d04c080e410f7d",
+      "size": 347
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.in",
+      "sha256": "0e8997578ed8febac94b63d7d74bf606f78065d9e60dc67bda5aa885f808f942",
+      "size": 2931
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.log",
+      "sha256": "0ef84dc432b280dd5d4700aab74a60aeeb85d207da3602eba3b2227c975caa92",
+      "size": 11073
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.params",
+      "sha256": "d4db1e6b4cc7e532d0d27029cd6f00be4b05f06b8e3af5c72acd07108ec35125",
+      "size": 3140
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.pdb.gz",
+      "sha256": "e224054d253ee7c1e8a0024e52b85c97f7808150becc3c7a3317a1bafe2f1186",
+      "size": 47636
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.psf.gz",
+      "sha256": "edc0af40fade5aba67f613597a2476fe8144b1bef8296a59d999db1e935a48ce",
+      "size": 69587
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.vmd",
+      "sha256": "e1fcc846bbb334a5b49b56afe58c15cc8d39e06815481d2aeab1ba95ece823c1",
+      "size": 1256
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_metadata.json",
+      "sha256": "eb041b3ac3bf5d4a209f8f0aa4ad1832260f89365d9b4455fe8fb0e31270cef9",
+      "size": 155
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-14T01:52:38.778355+00:00",
+  "input_hash": "59a718ec26d7ec109eaa194daca74ea7d840100267291c3874c6d5dce18cc548",
+  "outputs": {
+    "data_path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/cell.data",
+    "emc_inputs": {
+      "build.emc": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/build.emc",
+      "emc_build.esh": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.esh",
+      "emc_build.in": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.in",
+      "emc_build.log": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.log",
+      "emc_metadata.json": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_metadata.json"
+    },
+    "emc_params_path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/work/cell/emc_build.params",
+    "emc_seed": 909670995,
+    "ff_provenance": {
+      "available": true,
+      "counts": {},
+      "field": "opls/2024/opls-aa",
+      "field_file": "/home/arz2//emc/field/opls/2024/opls-aa.prm",
+      "local_patch_increments": [],
+      "rows_checked": 16,
+      "unchecked_cross_terms": {},
+      "zero_substituted": []
+    },
+    "lammps_flags": {
+      "use_opls": true,
+      "use_pcff": false
+    },
+    "n_atoms": 3020
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 780.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "opls-library",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 11.0,
+    "density_initial_gcm3": 0.89,
+    "dp_typical": 50,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 909670995,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "opls/2024/opls-aa",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 930760043
+  },
+  "stage": "build",
+  "status": "accepted"
+}

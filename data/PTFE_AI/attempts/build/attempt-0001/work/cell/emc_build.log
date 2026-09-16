@@ -1,0 +1,268 @@
+$ perl /home/arz2/emc/scripts/emc_setup.pl -field=opls/2024/opls-aa -seed=909670995 -temperature=300.0 -replace emc_build.esh
+# exit 0
+EMC Setup v4.1.5 (March 30, 2024), (c) 2004-2024 Pieter J. in 't Veld
+
+Info: reading script from "./emc_build.esh"
+Info: phase1 = {poly}
+Info: project = emc_build
+Info: direction = x
+Info: shape = 1
+Info: force field type = "opls"
+Info: force field name = "opls/2024/opls-aa"
+Info: force field location = "~emc/field"
+Info: build for LAMMPS script in "../build"
+Info: creating LAMMPS run script "emc_build.in"
+Info: adding pressure sampling
+Info: creating EMC build script "build.emc"
+
+$ /home/arz2/emc/bin/emc_linux_x86_64 build.emc
+# exit 0
+(* EMC: Enhanced Monte Carlo simulations *)
+
+version 9.4.4, build Jul 21 2026 07:58:38, date Sun Sep 13 21:52:08 2026
+
+valid until Jun 30, 2027
+
+Info: script v1.0 started at Sun Sep 13 21:52:08 2026
+Info: variables = {seed -> 909670995, ntotal -> 3000, fshape -> 1, output ->
+        "emc_build", field -> "opls/2024/opls-aa", location1 ->
+        "/home/arz2/emc/field/", nav -> 0.6022141179, temperature -> 300, 
+        radius -> 5, nrelax -> 100, weight_nonbond -> 0.0001, weight_bond ->
+        0.0001, weight_focus -> 1, cutoff -> 9.5, charge_cutoff -> 9.5, kappa
+        -> 4, density1 -> 0.89, lprevious -> 0, lphase -> 0, f_poly -> 10, 
+        chem_repeat -> "*C(F)(F)C(*)(F)F", chem_cap -> "*[H]"}
+Info: output = 
+      {detail -> 3, wide -> false, expand -> false, math -> true, reduced ->
+        false, info -> true, strict -> true, warning -> true, message -> true,
+        debug -> false, exit -> true, ignore -> false}
+Info: field = {id -> opls/2024/opls-aa, mode -> opls, style -> none, name ->
+        {"/home/arz2/emc/field/opls/2024/opls-aa.prm", 
+          "/home/arz2/emc/field/opls/2024/opls-aa.top"}, compress -> false, 
+        error -> true, debug -> false, check -> {atomistic -> true, charge ->
+          true}}
+Info: importing '/home/arz2/emc/field/opls/2024/opls-aa.prm'
+Info: groups = {ngroups -> 2, group -> {
+          {id -> repeat, chemistry -> "*C(F)(F)C(*)(F)F", depth -> 8, charges
+            -> field, charge -> 0, terminator -> false, nconnects -> 4, 
+            connects -> {
+              {source -> $end1, destination -> {index -> cap, site -> $end1}}, 
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end2}}, 
+              {source -> $end2, destination -> {index -> cap, site -> $end1}}, 
+              {source -> $end2, destination -> {index -> repeat, site ->
+                  $end1}}}}, 
+          {id -> cap, chemistry -> "*[H]", depth -> 8, charges -> field, 
+            charge -> 0, terminator -> false, nconnects -> 2, connects -> {
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end1}}, 
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end2}}}}}, ndeletes -> 0, npolymers -> 0}
+Info: field = {mode -> apply, style -> none, error -> true, debug -> false, 
+        check -> {atomistic -> true, charge -> true}}
+Info: applying '/home/arz2/emc/field/opls/2024/opls-aa.prm'
+Info: variables = {lg_repeat -> 6, lg_cap -> 1, norm_poly -> 100, l_poly ->
+        302, mg_repeat -> 88.003, mg_cap -> 1.0079, m_poly -> 4402.1658, 
+        n_poly -> 10, ntotal -> 0, mtotal -> 0}
+Info: simulation = {units -> {permittivity -> 1, seed -> seed}, types -> {
+          coulomb -> {pair -> {active -> true, cutoff -> charge_cutoff}}}}
+Info: clusters = {progress -> none, nbodys -> 0, nclusters -> 0, ngrafts -> 0,
+        npolymers -> 1, 
+        polymer -> 
+        {id -> poly, system -> main, type -> alternate, niterations -> 1000, n
+          -> 10, groups -> {repeat, cap}, weights -> {1, 1}, nrepeat -> {50, 
+            0}}}
+      delta = {systems -> 1, bodies -> 0, clusters -> 10, sites -> 3020}
+Info: field = {mode -> apply, style -> none, error -> true, debug -> false, 
+        check -> {atomistic -> true, charge -> true}}
+Info: applying '/home/arz2/emc/field/opls/2024/opls-aa.prm'
+Info: types = {opls -> {pair -> {active -> true, mode -> repulsive}}}
+Info: variables = {nphase1 -> 3020, mphase1 -> 50027.158, vphase1 ->
+        93339.3758414, lbox -> 45.3615929848, lphase1 -> 45.3615929848, lxx ->
+        45.3615929848, lyy -> 45.3615929848, lzz -> 45.3615929848, lzy -> 0, 
+        lzx -> 0, lyx -> 0, lphase -> 45.3615929848, ntotal -> 3020, mtotal ->
+        50027.158, vtotal -> 93339.3758414}
+Info: build = {
+        system -> {id -> main, temperature -> 300, density -> 0.89, split ->
+          false, flag -> {charge -> true, map -> true, pbc -> true, geometry
+            -> true}, periodic -> {x -> true, y -> true, z -> true}, geometry
+          -> {xx -> 45.3615929848, yy -> 45.3615929848, zz -> 45.3615929848, 
+            zy -> 0, zx -> 0, yx -> 0}, deform -> {xx -> 1, yy -> 1, zz -> 1, 
+            zy -> 0, zx -> 0, yx -> 0}}, 
+        select -> {progress -> list, frequency -> 1, message -> nkt, center ->
+          false, origin -> {x -> 0, y -> 0, z -> 0}, order -> random, check ->
+          true, nclusters -> 1, cluster -> poly, 
+          relax -> {ncycles -> 100, radius -> 5}, name -> "error", type ->
+          xyz, compress -> false, 
+          grow -> {check -> all, method -> energetic, cutoff -> 0, focus ->
+            all, 
+            weight -> {nonbonded -> 0.0001, bonded -> 0.0001, focus -> 1}, 
+            theta -> 0, dphi -> 1, nbonded -> 20, ntrials -> 20, niterations
+            -> 1000}}}
+Info: building 3020 sites.
+
+   progress/%      E[0]/nkT
+---------------------------
+            0             0
+            1     0.4557987
+            2      1.073706
+            3     0.8595785
+            4     0.6485113
+            5     0.6137391
+            6     0.6931944
+            7     0.8734828
+            8     0.9603541
+            9     0.9238182
+           10       1.12704
+           11      1.054556
+           12      1.117988
+           13      1.160307
+           14      1.233155
+           15      1.146908
+           16      1.292816
+           17       1.19795
+           18      1.270997
+           19      1.230782
+           20      1.270555
+           21      1.273282
+           22      1.275136
+           23      1.316572
+           24      1.397153
+           25      1.415512
+           26      1.464772
+           27      1.448081
+           28      1.436749
+           29      1.424308
+           30      1.508915
+           31      1.526635
+           32      1.558786
+           33      1.596436
+           34      1.565942
+           35      1.588658
+           36      1.556883
+           37      1.599827
+           38      1.596982
+           39       1.56261
+           40      1.566823
+           41      1.575185
+           42      1.531178
+           43      1.551375
+           44      1.544219
+           45      1.573907
+           46       1.54859
+           47        1.5748
+           48      1.571905
+           49      1.578196
+           50      1.576325
+           51      1.619546
+           52       1.62303
+           53      1.611497
+           54      1.634888
+           55      1.627807
+           56      1.642458
+           57      1.662879
+           58      1.670431
+           59      1.672816
+           60      1.710362
+           61      1.716449
+           62      1.735177
+           63      1.741164
+           64      1.871038
+           65      1.981913
+           66      1.961681
+           67      2.087578
+           68      2.098978
+           69      2.087149
+           70      2.081991
+           71      2.082085
+           72      2.111424
+           73      2.091413
+           74      2.093777
+           75      2.085918
+           76      2.063275
+           77      2.099913
+           78      2.069866
+           79      2.061934
+           80      2.069298
+           81      2.067071
+           82      2.051459
+           83      2.033507
+           84      2.046856
+           85      2.040707
+           86      2.056911
+           87      2.060407
+           88      2.053898
+           89      2.052807
+           90      2.082467
+           91      2.091767
+           92      2.082843
+           93      2.091955
+           94      2.111594
+           95      2.162433
+           96      2.183304
+           97      2.174921
+           98      2.166684
+           99      2.176532
+          100      2.199783
+---------------------------
+      average      1.625412
+
+      niterations = 3020, <niterations> = 1
+Info: force = {style -> none, message -> nkt}
+
+(* Energy *)
+
+                         E[0]/nkT 
+---------------------------------
+opls.angle               1.309398 
+opls.bond               0.6695282 
+opls.improper                   0 
+opls.pair                1.152649 
+opls.pair14             0.9799128 
+opls.torsion            -1.911706 
+---------------------------------
+total                    2.199783 
+
+Info: force = {style -> init, message -> nkt}
+
+(* Energy *)
+
+                         E[0]/nkT 
+---------------------------------
+opls.angle               1.309398 
+opls.bond               0.6695282 
+opls.improper                   0 
+opls.pair                1.152649 
+opls.pair14             0.9799128 
+opls.torsion            -1.911706 
+---------------------------------
+total                    2.199783 
+
+Info: variables = {nl_poly -> 10}
+Info: put = {name -> "emc_build", compress -> true, detail -> 3}
+Info: pdb = {name -> "emc_build", compress -> true, extend -> false, mode ->
+        put, system -> main, length -> auto, forcefield -> opls, atomistic ->
+        full, depth -> auto, charges -> false, detect -> false, atom -> index,
+        residue -> index, segment -> index, rank -> false, hexadecimal ->
+        false, cut -> false, pbc -> true, map -> false, unwrap -> clusters, 
+        rigid -> true, fixed -> true, licorice -> false, vdw -> false, 
+        connectivity -> false, crystal -> false, element -> auto, parameters
+        -> false, flag -> {charge -> true, map -> true, pbc -> true, geometry
+          -> true}}
+Info: lammps = {name -> "emc_build", compress -> false, system -> main, mode
+        -> put, length -> auto, units -> none, forcefield -> opls, shake ->
+        auto, atomistic -> none, detect -> true, cutoff -> false, charges ->
+        true, ewald -> true, ellipsoid -> false, sphere -> false, bonds ->
+        false, types -> false, data -> true, parameters -> true, cross ->
+        false, variables -> true, coefficients -> true, comment -> true, map
+        -> true, unwrap -> true, flag -> {charge -> true, map -> true, pbc ->
+          true, geometry -> true}}
+Info: tsc: bonded = {11.42, 4.008, 2.495, 4.241, 0.04909, 0} s
+Info: tsc: simulation = 28.49 s, threads = 14.53 s
+Info: tsc: thread = 13.21 s
+Info: script v1.0 finished at Sun Sep 13 21:52:36 2026
+
+Info: Thank you for using EMC v9.4.4
+Info: In any publication of scientific results based in part or
+Info: completely on the use of EMC, please include this reference:
+Info: P.J. in 't Veld and G.C. Rutledge, Macromolecules 2003, 36, 7358
+
