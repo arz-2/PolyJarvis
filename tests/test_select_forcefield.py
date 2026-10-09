@@ -20,7 +20,7 @@ import forcefield as sf  # noqa: E402
 from forcefield import LINEAGE  # noqa: E402
 from validate_run_plan import _forcefield_findings  # noqa: E402
 
-EMC = Path.home() / "emc"
+EMC = Path(sf.EMC_ROOT)  # the tree the code under test reads, not a guess at it
 needs_emc = pytest.mark.skipif(not EMC.exists(), reason="no installed EMC field tree")
 
 

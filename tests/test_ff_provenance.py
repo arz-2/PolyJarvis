@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 from forcefield import (  # noqa: E402
+    EMC_ROOT,
     FrcField,
     PrmField,
     _match,
@@ -26,7 +27,7 @@ from forcefield import (  # noqa: E402
 )
 
 ARCHIVE = REPO_ROOT / "manuscript" / "data"
-EMC = Path.home() / "emc"
+EMC = Path(EMC_ROOT)  # the tree the code under test reads, not a guess at it
 
 
 def _cells():

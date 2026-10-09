@@ -77,6 +77,15 @@ _CLEAN = "*CC(*)c1ccccc1"            # polystyrene: matches no rule
 _BLOCKED = "*C(C*)c1c(cccc1)C(=O)NC"  # PI94, a real measured carbonyl_adjacent_N failure
 
 
+@pytest.fixture
+def lammps_integrates_every_field(monkeypatch):
+    """The probe loop asks the LAMMPS binary for its styles before it calls check_typing;
+    with no binary that list is empty and nothing is probed. Stub both so these tests
+    exercise the resolver's decision, not the host's LAMMPS build."""
+    monkeypatch.setattr(sf, "installed_styles", lambda *a, **k: {"stub"})
+    monkeypatch.setattr(sf, "check_integration", lambda *a, **k: {"integrates": True})
+
+
 def test_no_blocker_keeps_the_prior_and_runs_no_probe(monkeypatch):
     monkeypatch.setattr(sf, "check_typing",
                         lambda *a, **k: pytest.fail("probed a SMILES with no blocker"))
@@ -87,7 +96,7 @@ def test_no_blocker_keeps_the_prior_and_runs_no_probe(monkeypatch):
     assert out["blockers"] == []
 
 
-def test_a_blocker_that_still_types_keeps_the_prior(monkeypatch):
+def test_a_blocker_that_still_types_keeps_the_prior(monkeypatch, lammps_integrates_every_field):
     """3% of carbonyl_adjacent_N matches build anyway. The probe is what catches them, so a
     false positive costs one trial build and not a demotion off a DOI-backed field."""
     monkeypatch.setattr(sf, "check_typing", lambda *a, **k: {"types_smiles": True})
@@ -246,7 +255,7 @@ def test_match_moieties_refuses_both_or_neither_input():
 
 # ─── the refusal has to survive every layer that rebuilds the row ─────────────────────
 
-def test_the_refusal_survives_materialize_plan(monkeypatch):
+def test_the_refusal_survives_materialize_plan(monkeypatch, lammps_integrates_every_field):
     """materialize_plan re-derives plan["decisions"] from build_decisions, which transcribes
     class fields only. Without carrying D-01's measured choice AND admissible set through,
     a SMILES that types under no field silently gets the class prior back and dies in EMC --
@@ -270,7 +279,8 @@ def test_the_refusal_survives_materialize_plan(monkeypatch):
     assert plan["decided_params"]["preferred_ff"] == "pcff"
 
 
-def test_a_plan_that_types_nowhere_is_refused_by_the_validator(monkeypatch):
+def test_a_plan_that_types_nowhere_is_refused_by_the_validator(monkeypatch,
+                                                              lammps_integrates_every_field):
     import validate_run_plan as vrp
     monkeypatch.setattr(sf, "check_typing", lambda *a, **k: {"types_smiles": False})
     plan = mdp.make_plan("t", "PSTR", _BLOCKED, {"density"}, with_ff_probe=True)
