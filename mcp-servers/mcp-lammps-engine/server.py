@@ -4560,11 +4560,13 @@ def generate_run_summary(
 # ─── Entry point ──────────────────────────────────────────────────────────────
 def _recover_interrupted_chains():
     """
-    On server startup, find any chains that were running/pending when the
-    server last died and re-launch their threads, skipping stages whose
-    output data file already exists locally.
+    On server startup, settle any legacy in-process chains ("lammps_chain")
+    that were running/pending when the server last died: complete them if
+    every stage's output data file exists locally, otherwise fail them with a
+    resubmit message. Current chains ("lammps_nohup_chain") run detached and
+    outlive the server, so they are not touched here.
     """
-    recovered = 0
+    settled = 0
     for run in run_manager.all():
         if run["run_type"] != "lammps_chain":
             continue
@@ -4574,8 +4576,6 @@ def _recover_interrupted_chains():
         chain_id = run["run_id"]
         meta     = run["meta"]
         stages   = meta.get("stages", [])
-        mpi      = meta.get("mpi", 2)
-        gpu_ids  = meta.get("gpu_ids", "0")
 
         if not stages:
             run_manager.fail(chain_id, "Cannot recover: full stage list not persisted (pre-fix chain)")
@@ -4595,19 +4595,17 @@ def _recover_interrupted_chains():
         if not remaining:
             run_manager.complete(chain_id, {"recovered": True, "note": "All stages already complete on disk"})
             logger.info(f"[{chain_id}] Recovery: all stages already done")
+            settled += 1
             continue
 
-        logger.info(f"[{chain_id}] Recovering: {len(remaining)} stages remaining")
-        thread = threading.Thread(
-            target=_lammps_chain_background,
-            args=(chain_id, remaining, mpi, gpu_ids),
-            daemon=True,
-        )
-        thread.start()
-        recovered += 1
+        run_manager.fail(chain_id, f"Cannot recover: {len(remaining)} stage(s) unfinished and "
+                                   "in-process chains are no longer supported; resubmit with "
+                                   "run_lammps_chain")
+        logger.warning(f"[{chain_id}] Legacy chain marked failed: {len(remaining)} stages unfinished")
+        settled += 1
 
-    if recovered:
-        logger.info(f"Startup recovery: re-launched {recovered} interrupted chain(s)")
+    if settled:
+        logger.info(f"Startup recovery: settled {settled} legacy interrupted chain(s)")
 
 
 if __name__ == "__main__":
