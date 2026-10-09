@@ -1,6 +1,8 @@
 # ── Claude Code (machine-specific, use .mcp.json.example as template) ─────────
 .mcp.json
 .claude/settings.local.json
+# per-agent working notes written during interactive sessions; local to each checkout
+.claude/agent-memory/
 # understand-anything knowledge graph — machine-local, rebuildable via /understand
 .understand-anything/
 
@@ -30,6 +32,8 @@ data/*
 # the sqlite payload is curated from copyrighted sources (Polymer Handbook, MatWeb) and stays
 # local; the schema + query/ingest code is tracked so a clone can rebuild it
 db/experimental_db.sqlite
+# pre-rename copy of experimental_db.sqlite; same copyrighted payload
+db/polymer_db.sqlite
 # PolyDatabase (polydatabase.com) MD-simulation-literature index, rebuilt locally from the
 # public CC-BY Zenodo dataset via db/ingest_scripts/import_polydatabase.py — gitignored for
 # size/rebuildability, not copyright; schema + ingest/query code is tracked
@@ -80,6 +84,8 @@ hardware/CALIB_*/*
 # produces are not -- one PEG1 RadonPy run alone leaves 24 GB (14 files over GitHub's
 # 100 MB hard limit) of dumps, ESP grids, pickles and per-thermo plots.
 benchmarks/*/data/
+# unfinished autonomy suite; local only until it has a manifest
+benchmarks/autonomy/
 
 # Launcher PID files written by background campaign runs
 *.pid
