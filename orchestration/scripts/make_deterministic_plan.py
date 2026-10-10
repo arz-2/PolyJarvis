@@ -30,7 +30,6 @@ from types import SimpleNamespace
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -41,11 +40,8 @@ import track_registry  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from stage_params import (_exp_tg_point, _regime_exp_tg,  # reuse the proven resolvers,
                           workflow_reference_temperature)  # don't duplicate them
-from select_system_size import derive_cell  # per-SMILES cell derivation; the class dp_typical/nchain keys were removed 2026-09-02
-from select_system_size import _is_ua  # noqa: E402  -- one UA-field definition, shared with D-04
-from select_system_size import solve_system_size, SYSTEM_MW_FLOOR_DOI  # noqa: E402  -- D-04, the same call materialize_plan makes
+from select_system_size import solve_system_size  # noqa: E402  -- D-04, the same call materialize_plan makes
 from select_hardware import select_hardware       # noqa: E402  -- D-08, live host + derived cell size
-from hardware_runtime import gpu_status, host_matches  # noqa: E402  -- D-08 concurrent_load / host_match
 from rules_common import primary_source, source_evidence  # noqa: E402  -- citations[] id -> real DOI
 import forcefield  # noqa: E402  -- D-01's moiety screen + EMC trial probe
 
@@ -529,7 +525,6 @@ def make_plan_from_cache(run_name: str, polymer_class: str, smiles: str, canonic
     recalibrated host must pick up the current policy rather than the original cell's.
     """
     rules = load_rules()
-    cls = get_class_entry(rules, polymer_class)
     protocol = cache_entry["protocol"]
     decided_params = dict(protocol["decided_params"])  # literal replay, no recomputation
     if not decided_params.get("preferred_ff"):

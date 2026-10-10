@@ -129,7 +129,7 @@ def _write_run_fixture(tmp_path, run_name, smiles):
 
 
 def test_ingest_from_completed_run_writes_the_store(tmp_path):
-    run_dir = _write_run_fixture(tmp_path, "PE1", PMMA_SMILES)
+    _write_run_fixture(tmp_path, "PE1", PMMA_SMILES)
     cache_path = tmp_path / "system_characterization_cache.json"
     cache_path.write_text(json.dumps({PMMA_SMILES: VALIDATED_ENTRY}))
     ff_store = tmp_path / "protocol_evidence_ff.json"

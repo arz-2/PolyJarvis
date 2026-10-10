@@ -17,9 +17,9 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import rules_common
 from make_deterministic_plan import (  # noqa: E402
-    _try_cache, make_plan_from_cache, make_plan,
+    _try_cache, make_plan,
 )
-from rules_common import load_rules, get_class_entry  # noqa: E402
+from rules_common import load_rules  # noqa: E402
 
 SMILES = "*CC*"
 CLASS = "PHYC"

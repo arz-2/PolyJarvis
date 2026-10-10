@@ -15,7 +15,6 @@ important assertion in this file silently skip.
 Structural assertions below it need no RadonPy and run in the default suite.
 """
 import json
-import subprocess
 import sys
 from pathlib import Path
 

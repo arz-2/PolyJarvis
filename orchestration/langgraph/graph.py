@@ -22,7 +22,7 @@ import functools
 import json
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 from langgraph.graph import END, START, StateGraph
 

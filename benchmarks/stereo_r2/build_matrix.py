@@ -153,7 +153,7 @@ def build_system(name: str, spec: dict, master: int, dry_run: bool) -> dict:
     records = []
     for replicate in REPLICATES:
         staged = PLANS / "_seeded" / f"{name}_{replicate}.json"
-        plan = seeded_copy(canonical, name, replicate, master, staged)
+        seeded_copy(canonical, name, replicate, master, staged)
         out_path = materialize(name, replicate, spec, staged)
         final = json.loads(out_path.read_text())
         records.append({

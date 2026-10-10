@@ -11,7 +11,6 @@ dependency, always runnable) rather than importing server.py, since this checkou
 generated bash script contains the exact same pattern, skipped if `mcp` is unavailable.
 """
 import subprocess
-import sys
 
 import pytest
 

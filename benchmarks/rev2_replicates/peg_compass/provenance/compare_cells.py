@@ -3,7 +3,6 @@
 Usage: python3 compare_cells.py 1 [2 3]
 """
 import collections
-import glob
 import json
 import re
 import sys

@@ -10,7 +10,6 @@ The duplication was not the main problem. The class carries the force-field PRIO
 run integrates with the field D-01 actually resolved for THIS SMILES -- so when the probe
 cascades to another field, the class's dt stops describing what runs.
 """
-import json
 import sys
 from pathlib import Path
 

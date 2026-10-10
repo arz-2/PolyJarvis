@@ -747,7 +747,7 @@ class ScriptGenerator:
 
         box_min = min(info.get("box_x", 0), info.get("box_y", 0), info.get("box_z", 0))
         if box_min <= 0:
-            errors.append(f"Box dimension <= 0 — file may be truncated")
+            errors.append("Box dimension <= 0 — file may be truncated")
         elif box_min < 2 * lj_cutoff:
             errors.append(
                 f"Minimum box side {box_min:.1f} Å < 2×cutoff ({2*lj_cutoff:.1f} Å). "

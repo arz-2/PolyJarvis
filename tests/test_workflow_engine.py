@@ -902,7 +902,6 @@ def test_a_plan_write_outside_decided_params_invalidates_nothing(tmp_path):
     elsewhere must therefore update plan_hash and invalidate NOTHING. If that ever stops holding,
     the gate's backbone_types write-back silently starts replaying ten stages again.
     """
-    import workflow_engine
     fake = FakeExecutor({})
     doc = plan()
     engine = WorkflowEngine(tmp_path, doc, fake)
@@ -924,7 +923,6 @@ def test_the_same_write_inside_decided_params_does_invalidate(tmp_path):
     """The other half: a genuine parameter change must still invalidate. This is why the fix
     moves the DERIVED value out rather than exempting the key -- a caller-SUPPLIED
     backbone_types changes which atoms the assessment treats as backbone, and must re-gate."""
-    import workflow_engine
     fake = FakeExecutor({})
     doc = plan()
     engine = WorkflowEngine(tmp_path, doc, fake)
@@ -1017,7 +1015,6 @@ def test_a_plan_change_does_not_discard_remedy_applied_parameters(tmp_path):
     decided_params. The continuation parameter vanished, so the 'continuation' ran as a fresh
     ten-stage chain -- with recovery_log.jsonl still showing the remedy as applied.
     """
-    import workflow_engine
     fake = FakeExecutor({})
     doc = plan()
     engine = WorkflowEngine(tmp_path, doc, fake)
@@ -1037,7 +1034,6 @@ def test_a_plan_change_does_not_discard_remedy_applied_parameters(tmp_path):
 def test_the_plan_still_wins_for_keys_it_defines(tmp_path):
     """Preservation must not let a stale remedy value shadow the plan -- only keys the plan does
     not define survive."""
-    import workflow_engine
     fake = FakeExecutor({})
     doc = plan()
     engine = WorkflowEngine(tmp_path, doc, fake)
@@ -1062,7 +1058,6 @@ def test_a_remedy_parameter_does_not_invalidate_its_own_stage_forever(tmp_path):
     "changed", and invalidated an equilibration that had been ACCEPTED for four hours --
     re-submitting a 2 ns melt continuation for a stage that was already done.
     """
-    import workflow_engine
     fake = FakeExecutor({})
     doc = plan()
     engine = WorkflowEngine(tmp_path, doc, fake)
@@ -1085,7 +1080,6 @@ def test_a_remedy_parameter_does_not_invalidate_its_own_stage_forever(tmp_path):
 def test_a_real_plan_edit_still_invalidates_after_a_remedy_ran(tmp_path):
     """The narrowing must not blind the diff: a genuine decided_params change still invalidates,
     even while a remedy key is being preserved alongside it."""
-    import workflow_engine
     fake = FakeExecutor({})
     doc = plan()
     engine = WorkflowEngine(tmp_path, doc, fake)

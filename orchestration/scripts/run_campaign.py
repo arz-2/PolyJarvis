@@ -1861,7 +1861,6 @@ def do_thermal(args, cls: dict, lammps, melt_density_gcm3=None) -> dict:
 def _submit_deform(args, cls: dict, lammps, mode: str) -> dict:
     args.deform_rate_mode = mode
     p = resolve_stage_params("deform", args, cls)
-    rate_key = "K_deform_rate_inv_s" if mode == "primary" else "K_deform_rate_slow_inv_s"
     rate_val = p["K_deform_rate_inv_s"] if mode == "primary" else p["K_deform_rate_slow_inv_s"]
     if mode == "slow" and (rate_val in (None, "null")):
         return None  # class has no slow rate defined — no-op, matches deform-worker's guard

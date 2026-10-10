@@ -594,7 +594,7 @@ def plot_tg_fit(temps, densities, cf_result, Tg_K, r2, fit_quality, graphs_dir):
         # The transition is smeared over roughly +/- c; show it, because a width comparable to
         # the fitted Tg is the real caveat on that number.
         ax.axvspan(Tg_K - float(c), Tg_K + float(c), color='gray', alpha=0.10, zorder=0,
-                   label=f'transition width +/- c')
+                   label='transition width +/- c')
     ax.set_xlabel('Temperature (K)')
     ax.set_ylabel('Density (g/cm³)')
     _title = f'Tg fit — R² = {r2:.4f} ({fit_quality})'
@@ -825,7 +825,7 @@ def main():
     else:
         df_bins_plateau = pd.DataFrame(
             columns=["temperature", "mean_density", "std_density", "n_points"])
-        df_bins_plateau_all = df_bins_plateau
+        df_bins_plateau_all = df_bins_plateau  # noqa: F841 -- mirrors the plateau branch; unread
         n_plateaus_skipped = 0
 
     # Choose the better dataset for fitting

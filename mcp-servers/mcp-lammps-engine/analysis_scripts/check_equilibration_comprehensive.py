@@ -46,7 +46,6 @@ Usage:
 import argparse
 import json
 import math
-import re
 import sys
 import warnings
 from datetime import datetime
@@ -713,8 +712,6 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     voxel_maps = []        # (n_frames, grid_n**3) voxel mass, for the time-averaged verdict
     torsion_per_frame = []  # list of 1-D arrays (backbone dihedral angles, all chains flattened)
     msid_accum = None      # shape (n_backbone_per_chain - 1,)
-    msid_n = None
-    msid_count = 0
 
     try:
         masses_all = u.atoms.masses.copy()
@@ -780,7 +777,8 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
 
             # End-to-end vector (from sorted backbone termini)
             if d["has_bb"]:
-                bb_pos_now = ch.positions[
+                # superseded by bb_pos_sorted below; kept because this indexing can raise
+                bb_pos_now = ch.positions[  # noqa: F841
                     np.searchsorted(ch.atoms.indices, d["bb_ix"])
                     if hasattr(ch, "atoms") else np.arange(len(d["bb_ix"]))
                 ]
@@ -1001,10 +999,11 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         voxel_maps, cv_arr, masses_all, n_atoms, grid_n, method=homog_method,
         cv_signal_max=cv_signal_max, persist_max=homog_persist_max,
         min_frames=homog_min_frames, melt_cv_floor=homog_melt_cv_floor)
-    cv_mean = dh_result["cv_mean"]
-    cv_signal = dh_result["cv_signal"]
-    verdict = dh_result["verdict"]
-    heterogeneous_flag = dh_result["heterogeneous_flag"]
+    # unused here, but each lookup asserts the key is present (KeyError otherwise)
+    cv_mean = dh_result["cv_mean"]  # noqa: F841
+    cv_signal = dh_result["cv_signal"]  # noqa: F841
+    verdict = dh_result["verdict"]  # noqa: F841
+    heterogeneous_flag = dh_result["heterogeneous_flag"]  # noqa: F841
 
     # Chain displacement in the system's OWN units -- the per-system melt-equilibration
     # criterion (Auhl/Kremer): a melt is equilibrated when chain centres of mass have
@@ -1044,7 +1043,7 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
                        skip_frames, n_eff_min=20, finite_size=None):
     verdict = "PASS" if overall_pass else "FAIL"
     lines = [
-        f"## D-05 CONVERGENCE DETAIL",
+        "## D-05 CONVERGENCE DETAIL",
         f"`check_equilibration_comprehensive` · T={thermo['meta'].get('T_mean', '?')} K · "
         f"{n_frames} frames analysed (skip={skip_frames}) · {timestamp}",
         "",

@@ -23,8 +23,7 @@ from rules_common import load_rules, get_class_entry  # noqa: E402
 import run_campaign as rdr  # noqa: E402
 from run_campaign import (  # noqa: E402
     _base_args, wait_for_analysis, do_equil_and_check, do_summary, do_build, COMPRESSION_RATIO,
-    _run_tg_sweep_adaptive, _bm_point_adaptive_extend, do_cool_and_check, _submit_cool_chain,
-    _anneal_hold_adaptive_extend, _record_anneal_hold_convergence, _submit_equil_chain,
+    _run_tg_sweep_adaptive, _bm_point_adaptive_extend, _anneal_hold_adaptive_extend, _record_anneal_hold_convergence, _submit_equil_chain,
 )
 
 RULES = json.loads((REPO_ROOT / "guides" / "polymer_rules.json").read_text())
@@ -2911,8 +2910,5 @@ def test_every_prior_attempts_walk_skips_superseded_attempts():
     at = 0
     for _ in range(walks):
         at = src.index(loop, at) + len(loop)
-        nxt = src.index("\n", src.index("\n", at) + 1)
-        window = src[at:src.index("\n", src.index('if prior.get("superseded"):', at)) + 1] \
-            if 'if prior.get("superseded"):' in src[at:at + 600] else ""
         assert 'if prior.get("superseded"):' in src[at:at + 600], \
             "a prior_attempts walk does not skip superseded attempts"

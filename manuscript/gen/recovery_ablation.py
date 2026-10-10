@@ -81,7 +81,8 @@ def _run_checker(a: Path, w: Path, out: Path) -> None:
 def _summarize(run: str, out: Path) -> dict:
     res = load(out / "equilibration.json")
     dh = res["spatial"]["density_homogeneity"]
-    failing = [k for k, v in (res.get("gate", {}).get("binding_gates") or {}).items() if v is False]
+    # computed but not in the returned summary; kept pending a decision on whether it belongs
+    failing = [k for k, v in (res.get("gate", {}).get("binding_gates") or {}).items() if v is False]  # noqa: F841
     return {"run": run, "method": dh.get("decided_by"), "persistent_cv": (dh.get("split_half") or {}).get("persistent_cv"),
             "limit": dh.get("signal_max"), "frames": (dh.get("split_half") or {}).get("frames"),
             "homogeneity_pass": dh.get("pass"), "overall_pass": res.get("overall_pass"),

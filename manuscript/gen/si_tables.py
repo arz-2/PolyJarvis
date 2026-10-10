@@ -26,7 +26,6 @@ def f(x, nd=1):
 
 
 def longtable(caption, label, cols, header, rows):
-    ncol = len(header)
     h = " & ".join(rf"\textbf{{{c}}}" for c in header) + r" \\"
     return "\n".join([
         r"\scriptsize",

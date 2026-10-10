@@ -160,7 +160,7 @@ def main() -> int:
     print(f"\nagent_only faults (exercise the 2-call cap): "
           f"{[f.id for f in CATALOG if live.get(f.code, {}).get('remedy_id') == 'agent_only']}")
     print(f"implemented: {[f.id for f in CATALOG if f.implemented] or 'none yet'}")
-    print(f"\nNOT ported from round 1:")
+    print("\nNOT ported from round 1:")
     for name, why in NOT_PORTED.items():
         print(f"  {name}\n      {why}")
     print(f"\nvalidation: {'FAIL -- ' + '; '.join(failures) if failures else 'PASS'}")

@@ -176,7 +176,7 @@ def main() -> int:
         print(json.dumps(payload, indent=2))
         return 0
     print(f"cell: {data}")
-    print(f"control: clean cell produces no error\n")
+    print("control: clean cell produces no error\n")
     print(f"{len(verified['injectors'])}/{len(verified['injectors'])} injectors fire their "
           f"target code; {args.trials} trials/arm, fault recurs {args.failures}x "
           f"(every automatic cap is <= 2)\n")

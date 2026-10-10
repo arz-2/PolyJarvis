@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import shlex
 import subprocess
@@ -22,7 +21,7 @@ import track_registry  # noqa: E402
 
 from rules_common import get_class_entry, load_rules  # noqa: E402
 from make_deterministic_plan import (_assert_tg_rate_feasible,  # noqa: E402
-                                     build_decisions, build_planned_stages, make_plan,
+                                     build_planned_stages, make_plan,
                                      ordered_plan, resolve_d01, KNOWN_DECISIONS,
                                      _derived_from_field, _field_of, _ff_prior_uncertainty)
 from select_system_size import solve_system_size  # noqa: E402
@@ -661,7 +660,7 @@ class DeterministicScriptChain:
         self.validator = SCRIPT_DIR / "validate_run_plan.py"
 
     def execute(self, plan_path: Path, dry_run: bool = False, attempt: int = 0) -> WorkflowOutcome:
-        plan = json.loads(plan_path.read_text())
+        json.loads(plan_path.read_text())  # unreadable JSON fails here, before the validator runs
         steps = []
         validation = subprocess.run(
             [self.python, str(self.validator), "--run_plan", str(plan_path)],

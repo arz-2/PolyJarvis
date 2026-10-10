@@ -25,8 +25,7 @@ sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
 import rules_common  # noqa: E402
 import select_system_size as sss  # noqa: E402
-from select_system_size import (select_system_size, solve_system_size, _fox_flory_floor,
-                                _property_floors, MIN_NCHAIN)  # noqa: E402
+from select_system_size import (select_system_size, solve_system_size, _property_floors, MIN_NCHAIN)  # noqa: E402
 from validate_run_plan import (_system_size_findings,
                                _system_size_over_provisioned_findings)  # noqa: E402
 

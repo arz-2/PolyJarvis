@@ -82,7 +82,6 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
 
 from analysis_utils import parse_lammps_log
 

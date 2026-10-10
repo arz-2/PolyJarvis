@@ -35,7 +35,6 @@ import math
 import os
 import sqlite3
 import statistics
-import sys
 import re
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "experimental_db.sqlite")

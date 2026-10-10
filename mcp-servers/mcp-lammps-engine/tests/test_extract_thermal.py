@@ -67,7 +67,6 @@ def _synthetic_hyperbola_rho_vs_T(Tg=300.0, c=25.0,
 
 def test_hyperbola_indep_reduces_to_asymptotic_slopes():
     """Far from Tg the model is linear with slopes m_bar -/+ delta."""
-    T = np.array([0.0, 1.0])
     # delta>0: high-T slope = m_bar+delta, far below Tg slope = m_bar-delta
     far_low = hyperbola_indep(np.array([-1e6, -1e6 + 1.0]), 0.0, 1.0, 0.5, 0.0, 1.0)
     far_high = hyperbola_indep(np.array([1e6, 1e6 + 1.0]), 0.0, 1.0, 0.5, 0.0, 1.0)
@@ -172,7 +171,7 @@ def test_an_unresolved_width_does_not_change_the_estimator(tmp_path):
 
     With c -> 0 the hyperbola IS the bilinear, so the swap changed parameterisation, not model.
     """
-    import re, inspect, extract_thermal
+    import inspect, extract_thermal
     src = inspect.getsource(extract_thermal.main) if hasattr(extract_thermal, "main") else \
         (tmp_path.parent, open(extract_thermal.__file__).read())[1]
     assert "_ESTIMATOR_PRESERVING" in src
@@ -188,7 +187,7 @@ def test_an_unresolved_width_does_not_change_the_estimator(tmp_path):
 def test_the_swap_still_fires_on_a_real_physics_violation():
     """Narrowing the swap must not disable it: inverted slopes still hand over to the
     alternative fit, because there the other model is genuinely the better answer."""
-    import inspect, extract_thermal
+    import extract_thermal
     src = open(extract_thermal.__file__).read()
     assert "_swap_worthy = [v for v in primary_violations" in src
     assert "if _swap_worthy and alt_result is not None" in src

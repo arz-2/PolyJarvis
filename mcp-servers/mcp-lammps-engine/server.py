@@ -407,7 +407,7 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
         f"N_GPU={n_gpu}",
         "",
         "# Progress log — one JSON object per line",
-        f"PROGRESS=$( dirname $0 )/chain_progress.jsonl",
+        "PROGRESS=$( dirname $0 )/chain_progress.jsonl",
         "",
         "log_done()  { echo \"{\\\"stage\\\":\\\"$1\\\",\\\"status\\\":\\\"done\\\",\\\"ts\\\":\\\"$(date -Iseconds)\\\"}\""
             " >> \"$PROGRESS\"; }",
@@ -1106,7 +1106,6 @@ def run_lammps_chain(
         # FIX: collapse mkdir + write + chmod + launch into ONE heredoc SSH command
         # to avoid 4 sequential conda-activate round trips (~5-15s each) that
         # cause the MCP tool response to timeout before returning.
-        escaped_body = script_body.replace("'", "'\"'\"'")
         one_shot = (
             f"mkdir -p {chain_dir} && "
             f"cat > {chain_script} << 'POLYJARVIS_EOF'\n{script_body}\nPOLYJARVIS_EOF\n"
@@ -1859,7 +1858,9 @@ def generate_equilibration_workflow(
 
         n_atoms = n_atoms or info.get("n_atoms", 0)
 
-        # Select step counts based on system size
+        # Select step counts based on system size. Only steps_comp and steps_heat are read
+        # below; steps_min/npt/nvt are unused (those stages take their counts elsewhere) and
+        # are kept pending review rather than removed.
         if n_atoms < 5000:
             steps_min   = 50000
             steps_comp  = 300000
@@ -1873,11 +1874,11 @@ def generate_equilibration_workflow(
             steps_npt   = 2000000
             steps_nvt   = 2000000
         else:
-            steps_min   = 50000
+            steps_min   = 50000    # noqa: F841 -- unused, see above
             steps_comp  = 1000000
             steps_heat  = 2000000
-            steps_npt   = 3000000
-            steps_nvt   = 3000000
+            steps_npt   = 3000000  # noqa: F841 -- unused, see above
+            steps_nvt   = 3000000  # noqa: F841 -- unused, see above
 
         ff_base = _ff_base_for(use_pcff, use_trappe, use_opls, params_file, engine)
         # TraPPE-UA's united-atom sites permit 2 fs; the early ramps still pin 0.5 fs inline.

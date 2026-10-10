@@ -677,7 +677,7 @@ def main():
         B0_GPa, r2 = fit_linear_fallback(volumes_sorted, pressures_sorted)
         B0_prime = None
         V0_A3 = None
-        B0_sem_GPa = None
+        B0_sem_GPa = None  # noqa: F841 -- no SEM for the linear fallback; never reported
         method = "linear_fallback"
 
     # -------------------------------------------------------------------

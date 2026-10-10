@@ -150,12 +150,12 @@ def main() -> int:
             flag = "" if r["campaign"] else "  (non-campaign)"
             print(f"{e['run']:10s} {e['stage'] or '?':14s} {e['code'] or '?':26s} "
                   f"{e['remedy_id'] or '?':20s} {e['outcome']}{flag}")
-    print(f"\nCOMPLETION RATE (campaign runs, reviewer's definition):")
+    print("\nCOMPLETION RATE (campaign runs, reviewer's definition):")
     print(f"  recovered {summary['recovered']} / {summary['scored']} scored"
           + (f" = {summary['completion_rate']:.0%}" if summary["completion_rate"] is not None else "")
           + f"   ({summary['pending_excluded']} still in flight, excluded)")
     print(f"  by remedy: {summary['by_remedy']}")
-    print(f"\nAUTONOMY COST")
+    print("\nAUTONOMY COST")
     print(f"  agent escalations: {summary['escalations_total']} "
           f"({summary['escalations_retired_by_operator']} retired by an operator -- the live "
           f"counter alone under-reports)")

@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from config import DATA_ROOT, REPO_ROOT
+from config import DATA_ROOT
 from polyjarvis_runner import run_dir_for, campaign_status
 from metrics.schema import ArmMetrics
 from metrics.accuracy import extract_polyjarvis_accuracy, extract_radonpy_accuracy

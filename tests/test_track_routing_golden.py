@@ -16,7 +16,6 @@ import json
 import sys
 from itertools import combinations
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 

@@ -31,7 +31,6 @@ import argparse
 import json
 import sqlite3
 import sys
-from copy import deepcopy
 from pathlib import Path
 
 REPO_ROOT   = Path(__file__).resolve().parent.parent.parent
@@ -115,7 +114,7 @@ def _already_in_db(conn: sqlite3.Connection, table: str, polymer_id: int,
 def _insert_density(conn: sqlite3.Connection, db_id: int, source_id: int,
                     density: float, polymer_id: str, dry_run: bool) -> None:
     if _already_in_db(conn, "density_measurements", db_id, source_id):
-        print(f"  skip density (already in DB)")
+        print("  skip density (already in DB)")
         return
     note = f"amorphous RT from MatWeb ({CLASS_POLYMER.get(CANONICAL_DB_IDS.get(polymer_id, 0), polymer_id)})"
     if dry_run:
@@ -168,7 +167,7 @@ def _patch_rules(rules: dict, rec: dict, poly_class: str,
         val = rec["density_gcm3"]
         entry["experimental_density_gcm3"] = {
             pid: val,
-            "note": f"amorphous RT (MatWeb)",
+            "note": "amorphous RT (MatWeb)",
             "source": source_id_key,
         }
         changes.append(f"experimental_density_gcm3 = {val} g/cm³")
@@ -291,7 +290,7 @@ def run(refs_path: Path, dry_run: bool) -> None:
         conn.close()
         # Write updated polymer_rules.json
         RULES_PATH.write_text(json.dumps(rules, indent=2, ensure_ascii=False))
-        print(f"\nCommitted DB changes.")
+        print("\nCommitted DB changes.")
         print(f"Updated {RULES_PATH}")
     else:
         conn.close()

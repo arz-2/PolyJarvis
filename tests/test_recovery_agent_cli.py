@@ -240,7 +240,7 @@ def _capture_argv(monkeypatch, stdout):
         seen["cmd"], seen["kwargs"] = cmd, kwargs
         return _Completed(stdout)
 
-    monkeypatch.setattr(rac.subprocess, "run", fake_run)
+    monkeypatch.setattr(rac.headless_claude.subprocess, "run", fake_run)  # where the call is made
     rac._run_headless_claude_once("p", {"type": "object"}, 600)
     return seen
 

@@ -619,7 +619,6 @@ def solve_system_size(polymer_class: str, smiles: str, properties=None,
                       f"{SYSTEM_MW_FLOOR_GMOL:,.0f} g/mol system-mass floor; no property-specific "
                       "chain-length floor applies to the requested properties")
 
-    ff = (field or cls.get("ff_accuracy_prior") or "").lower()
     recommended_nchain = None
     # The PCFF-minimum advisory is emitted once, by select_system_size() above, and arrives
     # here in `uncertainties` -- PCFF_NCHAIN_PRODUCTION_MINIMUM is advisory (see its docstring)

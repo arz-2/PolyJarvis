@@ -6,7 +6,6 @@ thin wrappers around ``ScriptGenerator.parse_data_file`` /
 validator is the pre-submission gate that refuses a malformed cell, so its
 checks are exercised here directly against a minimal in-memory data file.
 """
-import pytest
 
 from script_generator import ScriptGenerator
 
