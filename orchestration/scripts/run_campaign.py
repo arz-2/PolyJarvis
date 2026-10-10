@@ -43,7 +43,8 @@ from scientific_control import validate_overrides  # noqa: E402
 
 LAMMPS_ENGINE_DIR = REPO_ROOT / "mcp-servers" / "mcp-lammps-engine"
 EMC_SERVER_DIR = REPO_ROOT / "mcp-servers" / "mcp-emc-server"
-VENV_PY = REPO_ROOT / "mcp-servers" / ".venv" / "bin" / "python"
+VENV_PY = Path(os.environ.get("POLYJARVIS_PYTHON")
+               or REPO_ROOT / "mcp-servers" / ".venv" / "bin" / "python")
 MCP_JSON = REPO_ROOT / ".mcp.json"
 
 POLL_SECONDS = 30

@@ -36,7 +36,12 @@ import guards  # noqa: E402
 import schemas  # noqa: E402
 from state import UNREVIEWED, VALID_CONFIDENCE  # noqa: E402
 
-VENV_PY = REPO_ROOT / "mcp-servers" / ".venv" / "bin" / "python"
+# The interpreter every child script runs under: $POLYJARVIS_PYTHON, else the repo venv, else
+# this one (a checkout with no mcp-servers/.venv, e.g. a reviewer's dry-run).
+VENV_PY = Path(os.environ.get("POLYJARVIS_PYTHON")
+               or REPO_ROOT / "mcp-servers" / ".venv" / "bin" / "python")
+if not VENV_PY.is_file():
+    VENV_PY = Path(sys.executable)
 CRITIC_MD = REPO_ROOT / ".claude" / "agents" / "literature-grounding-worker.md"
 SKILL_MD = REPO_ROOT / ".claude" / "skills" / "novel-run-plan" / "SKILL.md"
 

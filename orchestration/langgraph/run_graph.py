@@ -35,7 +35,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent.parent
-VENV_PY = REPO_ROOT / "mcp-servers" / ".venv" / "bin" / "python"
+VENV_PY = Path(os.environ.get("POLYJARVIS_PYTHON")
+               or REPO_ROOT / "mcp-servers" / ".venv" / "bin" / "python")
 sys.path.insert(0, str(HERE))
 
 
