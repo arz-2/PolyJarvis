@@ -112,6 +112,7 @@ def inspect_run(run_name: str, repo_root: Path = REPO_ROOT) -> dict:
 
 
 def interface_contract() -> dict:
+    """The actions an agent may take through this API and the rules it runs under."""
     return {"available_actions": AVAILABLE_ACTIONS, "rules": RULES}
 
 

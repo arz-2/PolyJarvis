@@ -129,4 +129,5 @@ def check_d01_admissible(plan: dict[str, Any]) -> dict[str, Any]:
 
 
 def read_plan(plan_path: str | Path) -> dict[str, Any]:
+    """Load a run_plan.json."""
     return json.loads(Path(plan_path).read_text())

@@ -615,6 +615,14 @@ def _system_size_over_provisioned_findings(plan: dict) -> list:
 
 
 def validate_plan(plan: dict, policy: dict) -> list:
+    """Every check a run_plan.json must pass before execution, as a flat list of findings.
+
+    Each finding has a `check` name and a `severity`: "structural" findings block execution
+    (DeterministicScriptChain refuses the plan), "advisory" ones are recorded and passed on.
+    Covers policy criteria and evidence, stage schema, hardware, force-field admissibility,
+    system size (re-solved live, not trusted from the plan), finite-size limits, and
+    parameters that are unimplemented or overridden.
+    """
     findings = []
     findings += _criteria_and_evidence_findings(plan, policy)
     findings += _stage_schema_findings(plan, policy)

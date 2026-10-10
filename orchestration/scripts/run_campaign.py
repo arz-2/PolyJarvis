@@ -387,6 +387,13 @@ def _ff_provenance(cell_dir: Path, field: str, params_path) -> dict:
 
 
 def do_build(args, cls: dict, emc, lammps) -> dict:
+    """Build the amorphous cell with EMC into this attempt's directory and vet it before MD.
+
+    Checks, in order: force-field provenance (halt FF_PROVENANCE_ZERO_SUBSTITUTED if EMC
+    zero-filled any parameter), the finite-size forecast (raised as its own finding so the
+    counted finite_size_rebuild remedy can act), and pre-simulation validation (halt
+    BUILD_CELL_INVALID). Returns the build outputs with n_atoms, or halted=True and a reason.
+    """
     preferred_builder = cls.get("preferred_builder", "emc")
     if preferred_builder != "emc":
         raise SystemExit(
@@ -1033,6 +1040,13 @@ def _resolve_backbone_types(args, cls: dict, lammps, build_data_path: str, p: di
 
 
 def do_equil_and_check(args, cls: dict, lammps) -> dict:
+    """Run the equilibration chain to the gated melt hold and enforce the equilibration gate.
+
+    An EXTEND verdict extends the hold deterministically, at most EXTEND_MAX_ATTEMPTS times
+    (then halt EXTEND_EXHAUSTED). Any other failing verdict halts with that verdict as the
+    reason and never changes the protocol implicitly; that decision belongs to the
+    recovery boundary.
+    """
     # Captured before args.data_path gets reassigned to the equilibration chain's own output
     # below — the original pre-simulation .data file is the only one whose Masses section still
     # has the "# <name>" comments inspect_data_file's atom_type_names parsing needs; a write_data
@@ -2183,6 +2197,13 @@ def _record_anneal_hold_convergence(output_dir: str, gate_result: dict) -> None:
 
 
 def do_mechanical(args, cls: dict, lammps, is_glassy: bool, npt_prod_data_path: str) -> dict:
+    """Bulk modulus from a Murnaghan pressure ladder on the assessment cell.
+
+    The ladder comes from select_pressure_ladder (class configuration, informed by the
+    fluctuation estimate of K when available). A fit that fails its gate is reported, not
+    raised: accepted=False with the gate verdict as the reason. Only a failed analysis
+    aborts (SystemExit from wait_for_analysis).
+    """
     args.is_glassy = "true" if is_glassy else "false"
     gpu_per_run = cls.get("gpu_per_run") or 1
     p = resolve_stage_params("murnaghan", args, cls)
@@ -2488,6 +2509,9 @@ def do_cohesive(args, cls: dict, emc, lammps) -> dict:
 def do_summary(args, cls: dict, lammps, is_glassy: bool, thermal_result, equil_verdict: str,
                raw_dir: Path, equil_result: dict = None, mechanical_result: dict = None,
                cool_result: dict = None) -> dict:
+    """Write run_summary.json: every requested property graded against its experimental
+    band, with the decision labels and paths to each stage's evidence. Also records an
+    exp_lookup.json for human review, which is never applied automatically."""
     exp_lookup_path = raw_dir / "exp_lookup.json"
     properties = (set(track_registry.DEFAULT_PROPERTIES) if args.properties in (None, "all")
                   else {x.strip().lower() for x in args.properties.split(",") if x.strip()})

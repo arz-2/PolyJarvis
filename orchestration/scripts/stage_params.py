@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 RULES_PATH = REPO_ROOT / 'guides' / 'polymer_rules.json'
 
 def load_plan(plan_path: str) -> dict:
+    """Load a run_plan.json."""
     with open(plan_path) as f:
         return json.load(f)
 

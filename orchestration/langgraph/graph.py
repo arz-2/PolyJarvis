@@ -99,6 +99,9 @@ def _stop_or(next_node: str) -> Callable[[dict], str]:
 
 
 def build_graph():
+    """Compile the campaign DAG: resolve, classify, plan, critique, adjudicate, materialize,
+    then execute. A cost guard runs after planning and again before execution, on every
+    path into execute (resume and cache hit included). No edge leads back."""
     g = StateGraph(RunState)
 
     for name, fn in (

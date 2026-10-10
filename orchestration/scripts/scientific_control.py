@@ -255,14 +255,20 @@ class WorkflowOutcome:
 
 
 class PlanningAgent(Protocol):
+    """Chooses the scientific plan. Returns a decision only; it never writes files."""
+
     def decide(self, intent: ScientificIntent, context: dict[str, Any]) -> PlanDecision: ...
 
 
 class RecoveryAgent(Protocol):
+    """Diagnoses one structured issue. Called only when a deterministic stage reports one."""
+
     def diagnose(self, intent: ScientificIntent, plan: dict, issue: WorkflowIssue) -> RecoveryDecision: ...
 
 
 class Workflow(Protocol):
+    """Validates and executes a materialized plan, reporting success or one structured issue."""
+
     def execute(self, plan_path: Path, dry_run: bool = False, attempt: int = 0) -> WorkflowOutcome: ...
 
 
@@ -285,6 +291,11 @@ class JsonSubprocessAgent:
         self.timeout_s = timeout_s
 
     def invoke(self, payload: dict) -> dict:
+        """Send `payload` as JSON on stdin; return the one JSON object printed on stdout.
+
+        Raises RuntimeError on timeout, non-zero exit, or output that is not a JSON object,
+        so callers can tell a failed call (no decision) from a decision to stop.
+        """
         try:
             completed = subprocess.run(
                 self.command,
@@ -318,6 +329,7 @@ class SubprocessPlanningAgent:
         self.backend = backend
 
     def decide(self, intent: ScientificIntent, context: dict[str, Any]) -> PlanDecision:
+        """Ask the external agent for a plan decision against the stated output contract."""
         result = self.backend.invoke({
             "task": "plan_polymer_simulation",
             "intent": intent.to_dict(),
@@ -347,6 +359,7 @@ class SubprocessRecoveryAgent:
         self.backend = backend
 
     def diagnose(self, intent: ScientificIntent, plan: dict, issue: WorkflowIssue) -> RecoveryDecision:
+        """Ask the external agent for one recovery action, restricted to the valid menu."""
         issue_payload = issue.to_dict()
         # WorkflowEngine states its own per-failure menu (accept_with_caveat, wait_and_retry,
         # end_run ...) in engine_context; the outer control-plane loop sends none and keeps
@@ -378,6 +391,7 @@ class FilePlanningAgent:
         self.base_plan = None
 
     def decide(self, intent: ScientificIntent, context: dict[str, Any]) -> PlanDecision:
+        """Return the decision captured in `self.path`; the context is ignored."""
         value = json.loads(self.path.read_text())
         if "decided_params" in value:
             # Keep the file itself: its D-01 row carries the critic's evidence and the probe's
@@ -388,6 +402,8 @@ class FilePlanningAgent:
 
 
 def planning_context(intent: ScientificIntent) -> dict[str, Any]:
+    """What the planning agent is shown: class summaries, the decision policy's criteria,
+    and this SMILES's characterization-cache entry if one exists. Read-only."""
     rules = load_rules()
     classes = rules.get("classes", {})
     summaries = {}
@@ -660,6 +676,9 @@ class DeterministicScriptChain:
         self.validator = SCRIPT_DIR / "validate_run_plan.py"
 
     def execute(self, plan_path: Path, dry_run: bool = False, attempt: int = 0) -> WorkflowOutcome:
+        """Run validate_run_plan.py; on any structural finding return PLAN_VALIDATION_FAILED
+        without executing. Otherwise hand the plan to run_campaign_workflow (with
+        dry_run=True, stage parameters are resolved but nothing is submitted)."""
         json.loads(plan_path.read_text())  # unreadable JSON fails here, before the validator runs
         steps = []
         validation = subprocess.run(
@@ -702,6 +721,8 @@ class DeterministicScriptChain:
 
 
 class ScientificControlPlane:
+    """Plan once, execute deterministically, consult the recovery agent only on an issue."""
+
     def __init__(
         self,
         planning_agent: PlanningAgent,
@@ -715,6 +736,15 @@ class ScientificControlPlane:
         self.repo_root = repo_root
 
     def run(self, intent: ScientificIntent, dry_run: bool = False) -> dict:
+        """Run one campaign end to end and return its terminal result.
+
+        The planning agent is called once; a decision that fails validation gets one retry
+        with the error as feedback, then PLAN_AGENT_CONTRACT_ERROR. The materialized plan is
+        written to data/<run>/raw/run_plan.json and executed by `self.workflow`. On an issue
+        the recovery agent may amend the plan at most MAX_RECOVERY_ATTEMPTS times (the
+        workflow engine keeps its own, separate per-run budget); `stop`, a missing agent, or
+        an exhausted budget returns status "unresolved" or "needs_recovery_agent".
+        """
         events = []
         context = planning_context(intent)
         for planning_attempt in range(2):

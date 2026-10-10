@@ -212,6 +212,7 @@ def _canonical_hash(value: Any) -> str:
 
 
 def file_sha256(path: Path) -> str:
+    """Hex SHA-256 of a file, read in 1 MiB chunks."""
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -220,6 +221,7 @@ def file_sha256(path: Path) -> str:
 
 
 def atomic_write_json(path: Path, value: Mapping[str, Any]) -> None:
+    """Write JSON via a temp file and rename, so readers never see a partial file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True, default=str) + "\n")
@@ -310,6 +312,8 @@ class StageResult:
 
 
 class StageExecutor(Protocol):
+    """Runs one stage and reports a StageResult; the engine owns retries and state."""
+
     def execute(self, stage: str, context: Mapping[str, Any]) -> StageResult | Mapping[str, Any]: ...
 
 
@@ -674,12 +678,14 @@ class RemedyRegistry:
                 self._by_code[code] = remedy
 
     def route(self, finding: Finding) -> Remedy:
+        """The remedy registered for this finding's code, else the agent-only fallback."""
         remedy = self._by_code.get(finding.code)
         if remedy is None:
             return next(item for item in self.remedies if item.agent_only)
         return remedy
 
     def assert_complete(self, active_codes: set[str] | frozenset[str]) -> None:
+        """Raise if any blocking verdict code has no registered remedy route."""
         missing = set(active_codes) - set(self._by_code)
         if missing:
             raise AssertionError(f"blocking verdicts lack remedy routes: {sorted(missing)}")
@@ -1085,6 +1091,8 @@ class WorkflowEngine:
         })
 
     def invalidate_from(self, stage: str, reason: str) -> None:
+        """Mark `stage` and every enabled stage downstream of it stale (if accepted) or
+        pending, recording `reason`. A running stage keeps its status."""
         enabled = self.enabled_stages()
         descendants = {stage}
         changed = True
@@ -1107,6 +1115,9 @@ class WorkflowEngine:
         self._save()
 
     def reconcile_inputs(self) -> None:
+        """On resume, re-verify each accepted stage in order: its output manifest must still
+        match on disk and its input hash must be unchanged. The first mismatch invalidates
+        that stage and everything after it."""
         for stage in self.enabled_stages():
             record = self.state["stages"].setdefault(stage, {"status": "pending", "attempts": []})
             if record.get("status") != "accepted":
@@ -1639,6 +1650,14 @@ class WorkflowEngine:
         return _finish("resume", action=action, modifications=modifications), None
 
     def run(self) -> dict[str, Any]:
+        """Execute stages in dependency order until all are accepted or one cannot proceed.
+
+        A blocking finding first goes to its code-owned remedy (bounded by
+        MAX_AUTOMATIC_REMEDIES); if none applies it is escalated to the recovery agent
+        (bounded by MAX_AGENT_DECISIONS and MAX_AGENT_DECISIONS_PER_STAGE). Returns
+        {"status": "accepted", ...} or the terminal status with the stage and finding,
+        plus `terminated_by` when a budget closed the run. Safe to call again to resume.
+        """
         # A resumed run is a new decision; the previous close no longer describes it.
         if self.state.pop("terminated_by", None) is not None:
             self._save()
@@ -1695,6 +1714,7 @@ class WorkflowEngine:
 
 
 def inspect_workflow(run_dir: Path) -> dict[str, Any]:
+    """Read-only view of data/<run>/workflow_state.json, or status "not_found"."""
     path = Path(run_dir) / "workflow_state.json"
     if not path.exists():
         return {"status": "not_found", "state_path": str(path)}
