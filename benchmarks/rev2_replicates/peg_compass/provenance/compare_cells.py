@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO = Path("/home/alexzhao/PolyJarvis")
+REPO = Path(__file__).resolve().parents[4]
 
 
 def accepted_build_dir(run: str) -> Path:

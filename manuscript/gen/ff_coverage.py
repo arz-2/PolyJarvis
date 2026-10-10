@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import collections
 import json
+import os
 import re
 import subprocess
 import sys
@@ -33,7 +34,7 @@ SYSTEMS = [  # (system, run whose plan gives the SMILES, class prior)
     ("aPS", "aPS_2", "pcff"), ("sPVC", "sPVC_2", "pcff"), ("PEEK", "PEEK_1", "pcff"),
     ("PSU", "PSU_1", "pcff"), ("PTFE", "PTFE_AI", "opls/2024/opls-aa"),
 ]
-PCFF_FRC = Path("/home/arz2/emc/field/pcff/pcff.frc")
+PCFF_FRC = Path(os.environ.get("EMC_ROOT", Path.home() / "emc")) / "field" / "pcff" / "pcff.frc"
 CROSS_SECTIONS = ("bond-bond", "bond-angle", "angle-angle", "torsion_3 ", "bond-torsion", "angle-torsion",
                   "torsion-torsion")
 

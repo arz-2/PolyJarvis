@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO = Path("/home/alexzhao/PolyJarvis")
+REPO = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO / "orchestration" / "scripts"))
 import workflow_engine as we  # noqa: E402
 
