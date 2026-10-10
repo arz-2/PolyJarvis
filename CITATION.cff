@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use PolyJarvis, please cite the paper below."
+title: "PolyJarvis"
+type: software
+license: MIT
+repository-code: "https://github.com/arz-2/PolyJarvis"
+authors:
+  - family-names: Zhao
+    given-names: Alexander
+  - family-names: Chandrasekhar
+    given-names: Achuth
+  - family-names: Barati Farimani
+    given-names: Amir
+preferred-citation:
+  type: article
+  title: "PolyJarvis: An LLM-Orchestrated Agent for Automated All-Atom Molecular Dynamics of Amorphous Homopolymers"
+  authors:
+    - family-names: Zhao
+      given-names: Alexander
+    - family-names: Chandrasekhar
+      given-names: Achuth
+    - family-names: Barati Farimani
+      given-names: Amir
+  year: 2026
+  identifiers:
+    - type: other
+      value: "arXiv:2604.02537"
+  url: "https://arxiv.org/abs/2604.02537"
