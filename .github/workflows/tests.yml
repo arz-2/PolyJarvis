@@ -5,28 +5,37 @@ on:
     branches: ["**"]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  lint:
+    name: ruff (correctness rules)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - run: uv sync --locked
+      - run: uv run --locked ruff check .
+
   unit:
     name: pure-logic unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.11"
-
-      - name: Install test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-test.txt
+      - run: uv sync --locked
 
       - name: Run tests
-        # pytest.ini already skips @requires_binaries tests by default.
-        # POLYJARVIS_MOL_PYTHON points mol_python.run_in_mol_env() at this same venv's
-        # interpreter (rdkit is in requirements-test.txt) instead of the conda-activate
-        # fallback, which needs a local conda install this runner doesn't have.
+        # pytest.ini already skips @requires_binaries tests by default; no LAMMPS, EMC,
+        # RadonPy or GPU on this runner. POLYJARVIS_MOL_PYTHON points
+        # mol_python.run_in_mol_env() at this venv's interpreter (RDKit is a locked
+        # dependency) instead of the conda-activate fallback.
         env:
-          POLYJARVIS_MOL_PYTHON: python
-        run: pytest -v
+          POLYJARVIS_MOL_PYTHON: ${{ github.workspace }}/.venv/bin/python
+        run: uv run --locked pytest -v
