@@ -5,17 +5,11 @@
 
 PolyJarvis runs all-atom molecular dynamics of amorphous polymers end to end: from a
 repeat-unit SMILES to an EMC-built amorphous cell, LAMMPS equilibration on a GPU
-workstation, and properties (density, glass transition temperature, bulk modulus) graded
-against experimental reference bands. Control is split deliberately. Code owns every
+workstation, and properties (density, glass transition temperature, bulk modulus). Control is split deliberately. Code owns every
 simulation file, parameter, job, validation gate, retry budget and provenance record; a
 language model makes a small number of typed, bounded decisions (a force-field critique, a
 plan adjudication, and diagnosis of failures that no code-owned remedy covers), and the
 whole pipeline also runs with no model at all.
-
-In the paper's v3 evaluation (seven amorphous homopolymers, three replicates each), 13 of
-19 graded comparisons against experiment met their acceptance criteria. The misses
-concentrate in the PCFF systems: aPS and PEG come out under-dense, and the Tg of PLLA and
-PEEK is overestimated.
 
 ## How it works
 
@@ -107,7 +101,7 @@ before anything runs:
 {"event": "done", "status": "cost_exceeded", "exit_code": 5, ...}
 ```
 
-Both runs write their plan to `data/<run-name>/raw/run_plan.json` (ignored by git). A
+Both runs write their plan to `data/<run-name>/raw/run_plan.json`. A
 SMILES not in `guides/system_characterization_cache.json` must first be classified, which
 needs RadonPy, so this demo uses a cached polymer.
 
